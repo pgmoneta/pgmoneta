@@ -103,7 +103,8 @@ Please, consult our [Code of Conduct](./CODE_OF_CONDUCT.md) policies for interac
 community.
 
 Consider giving the project a [star](https://github.com/pgmoneta/pgmoneta/stargazers) on
-[GitHub](https://github.com/pgmoneta/pgmoneta/) if you find it useful.
+[GitHub](https://github.com/pgmoneta/pgmoneta/) if you find it useful. And, feel free to follow
+the project on [Twitter](https://twitter.com/pgmoneta/) as well.
 
 ## License
 
