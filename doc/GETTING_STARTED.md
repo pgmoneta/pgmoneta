@@ -8,7 +8,7 @@ pgmoneta 0.1.0
   High-performance connection pool for PostgreSQL
 
 Usage:
-  pgmoneta [ -c CONFIG_FILE ] [ -a HBA_FILE ] [ -d ]
+  pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -d ]
 
 Options:
   -c, --config CONFIG_FILE           Set the path to the pgmoneta.conf file
