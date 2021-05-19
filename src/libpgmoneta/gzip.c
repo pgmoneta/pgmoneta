@@ -85,6 +85,12 @@ pgmoneta_gzip_data(char* directory)
          
          status = system(cmd);
 
+         if (status != 0)
+         {
+            pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
+            break;
+         }
+
          free(cmd);
       }
    }
@@ -127,6 +133,12 @@ pgmoneta_gzip_wal(char* directory)
          cmd = pgmoneta_append(cmd, entry->d_name);
          
          status = system(cmd);
+
+         if (status != 0)
+         {
+            pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
+            break;
+         }
 
          free(cmd);
       }

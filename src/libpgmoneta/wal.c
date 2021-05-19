@@ -113,6 +113,11 @@ pgmoneta_wal(int srv, char** argv)
 
    status = system(cmd);
 
+   if (status != 0)
+   {
+      pgmoneta_log_error("WAL: Could not start receiver for %s", config->servers[srv].name);
+   }
+
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 

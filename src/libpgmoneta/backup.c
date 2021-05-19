@@ -119,20 +119,27 @@ pgmoneta_backup(int server, char** argv)
    
    status = system(cmd);
    
-   if (config->compression_type == COMPRESSION_GZIP)
+   if (status != 0)
    {
-      pgmoneta_gzip_data(d);
+      pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
    }
+   else
+   {
+      if (config->compression_type == COMPRESSION_GZIP)
+      {
+         pgmoneta_gzip_data(d);
+      }
 
-   total_seconds = (int)difftime(time(NULL), start_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+      total_seconds = (int)difftime(time(NULL), start_time);
+      hours = total_seconds / 3600;
+      minutes = (total_seconds % 3600) / 60;
+      seconds = total_seconds % 60;
 
-   memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+      memset(&elapsed[0], 0, sizeof(elapsed));
+      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+      pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+   }
 
    pgmoneta_stop_logging();
 
