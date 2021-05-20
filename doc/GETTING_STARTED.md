@@ -5,7 +5,7 @@ using `pgmoneta -?`. You should see
 
 ```
 pgmoneta 0.1.0
-  High-performance connection pool for PostgreSQL
+  Backup / restore solution for PostgreSQL
 
 Usage:
   pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -d ]
