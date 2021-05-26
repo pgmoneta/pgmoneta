@@ -37,15 +37,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#define BUFFER_LENGTH 8192
+
+static int gz_compress(char* from, int level, char* to);
+static int gz_decompress(char* from, char* to);
+
 void
 pgmoneta_gzip_data(char* directory)
 {
-   char* cmd = NULL;
-   int status;
+   char* from = NULL;
+   char* to = NULL;
    DIR *dir;
    struct dirent *entry;
    struct configuration* config;
@@ -74,24 +80,29 @@ pgmoneta_gzip_data(char* directory)
       }
       else
       {
-         cmd = NULL;
+         from = NULL;
 
-         cmd = pgmoneta_append(cmd, "gzip -");
-         cmd = pgmoneta_append_int(cmd, config->compression_level);
-         cmd = pgmoneta_append(cmd, " ");
-         cmd = pgmoneta_append(cmd, directory);
-         cmd = pgmoneta_append(cmd, "/");
-         cmd = pgmoneta_append(cmd, entry->d_name);
+         from = pgmoneta_append(from, directory);
+         from = pgmoneta_append(from, "/");
+         from = pgmoneta_append(from, entry->d_name);
+
+         to = NULL;
+
+         to = pgmoneta_append(to, directory);
+         to = pgmoneta_append(to, "/");
+         to = pgmoneta_append(to, entry->d_name);
+         to = pgmoneta_append(to, ".gz");
          
-         status = system(cmd);
-
-         if (status != 0)
+         if (gz_compress(from, config->compression_level, to))
          {
             pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
             break;
          }
 
-         free(cmd);
+         pgmoneta_delete_file(from);
+
+         free(from);
+         free(to);
       }
    }
 
@@ -101,8 +112,8 @@ pgmoneta_gzip_data(char* directory)
 void
 pgmoneta_gzip_wal(char* directory)
 {
-   char* cmd = NULL;
-   int status;
+   char* from = NULL;
+   char* to = NULL;
    DIR *dir;
    struct dirent *entry;
    struct configuration* config;
@@ -123,26 +134,167 @@ pgmoneta_gzip_wal(char* directory)
             continue;
          }
 
-         cmd = NULL;
+         from = NULL;
 
-         cmd = pgmoneta_append(cmd, "gzip -");
-         cmd = pgmoneta_append_int(cmd, config->compression_level);
-         cmd = pgmoneta_append(cmd, " ");
-         cmd = pgmoneta_append(cmd, directory);
-         cmd = pgmoneta_append(cmd, "/");
-         cmd = pgmoneta_append(cmd, entry->d_name);
-         
-         status = system(cmd);
+         from = pgmoneta_append(from, directory);
+         from = pgmoneta_append(from, "/");
+         from = pgmoneta_append(from, entry->d_name);
 
-         if (status != 0)
+         to = NULL;
+
+         to = pgmoneta_append(to, directory);
+         to = pgmoneta_append(to, "/");
+         to = pgmoneta_append(to, entry->d_name);
+         to = pgmoneta_append(to, ".gz");
+
+         if (gz_compress(from, config->compression_level, to))
          {
             pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
             break;
          }
 
-         free(cmd);
+         pgmoneta_delete_file(from);
+
+         free(from);
+         free(to);
       }
    }
 
    closedir(dir);
+}
+
+static int
+gz_compress(char* from, int level, char* to)
+{
+   char buf[BUFFER_LENGTH];
+   FILE* in = NULL;
+   char mode[4];
+   gzFile out = NULL;
+   size_t length;
+
+   in = fopen(from, "rb");
+   if (in == NULL)
+   {
+      goto error;
+   }
+
+   memset(&mode[0], 0, sizeof(mode));
+   mode[0] = 'w';
+   mode[1] = 'b';
+   mode[2] = '0' + level;
+
+   out = gzopen(to, mode);
+   if (out == NULL)
+   {
+      goto error;
+   }
+
+   do
+   {
+      length = fread(buf, 1, sizeof(buf), in);
+
+      if (ferror(in))
+      {
+         goto error;
+      }
+
+      if (length > 0)
+      {
+         if (gzwrite(out, buf, (unsigned)length) != length)
+         {
+            goto error;
+         }
+      }
+   }
+   while (length > 0);
+
+   fclose(in);
+
+   if (gzclose(out) != Z_OK)
+   {
+      out = NULL;
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   if (in != NULL)
+   {
+      fclose(in);
+   }
+
+   if (out != NULL)
+   {
+      gzclose(out);
+   }
+
+   return 1;
+}
+
+static int
+gz_decompress(char* from, char* to)
+{
+   char buf[BUFFER_LENGTH];
+   FILE* out = NULL;
+   char mode[3];
+   gzFile in = NULL;
+   size_t length;
+
+   memset(&mode[0], 0, sizeof(mode));
+   mode[0] = 'r';
+   mode[1] = 'b';
+
+   in = gzopen(from, mode);
+   if (in == NULL)
+   {
+      goto error;
+   }
+
+   out = fopen(to, "wb");
+   if (in == NULL)
+   {
+      goto error;
+   }
+
+   do
+   {
+      length = (int)gzread(in, buf, (unsigned)BUFFER_LENGTH);
+
+      if (length > 0)
+      {
+         if (fwrite(buf, 1, length, out) != length)
+         {
+            goto error;
+         }
+      }
+   }
+   while (length > 0);
+
+   if (gzclose(in) != Z_OK)
+   {
+      in = NULL;
+      goto error;
+   }
+
+   fclose(out);
+
+   pgmoneta_delete_file(from);
+
+   return 0;
+
+error:
+
+   if (in != NULL)
+   {
+      gzclose(in);
+   }
+
+   if (out != NULL)
+   {
+      fclose(out);
+   }
+
+   return 1;
 }
