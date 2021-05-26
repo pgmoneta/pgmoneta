@@ -40,16 +40,9 @@
 void
 pgmoneta_retention(char** argv)
 {
-   char* b;
    char* d;
-   char* f;
-   char* w;
    int number_of_directories;
    char** dirs;
-   int number_of_files;
-   char** files;
-   int number_of_wals;
-   char** wals;
    time_t t;
    char check_date[128];
    struct tm* time_info;
@@ -86,108 +79,14 @@ pgmoneta_retention(char** argv)
       {
          if (strcmp(dirs[0], &check_date[0]) < 0)
          {
-            w = NULL;
-            f = NULL;
-
-            w = pgmoneta_append(w, config->base_dir);
-            w = pgmoneta_append(w, "/");
-            w = pgmoneta_append(w, config->servers[i].name);
-            w = pgmoneta_append(w, "/backup/");
-            w = pgmoneta_append(w, dirs[0]);
-            w = pgmoneta_append(w, "/data/pg_wal/");
-
-            f = pgmoneta_append(f, config->base_dir);
-            f = pgmoneta_append(f, "/");
-            f = pgmoneta_append(f, config->servers[i].name);
-            f = pgmoneta_append(f, "/wal/");
-
-            number_of_wals = 0;
-            wals = NULL;
-
-            number_of_files = 0;
-            files = NULL;
-
-            pgmoneta_get_files(w, &number_of_wals, &wals);
-            pgmoneta_get_files(f, &number_of_files, &files);
-
-            for (int j = 0; j < number_of_files; j++)
-            {
-               if (strcmp(files[j], wals[0]) < 0)
-               {
-                  b = NULL;
-
-                  b = pgmoneta_append(b, config->base_dir);
-                  b = pgmoneta_append(b, "/");
-                  b = pgmoneta_append(b, config->servers[i].name);
-                  b = pgmoneta_append(b, "/wal/");
-                  b = pgmoneta_append(b, files[j]);
-
-                  pgmoneta_delete_file(b);
-
-                  free(b);
-               }
-            }
-
             pgmoneta_delete(i, dirs[0]);
+            pgmoneta_delete_wal(i);
             pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, dirs[0]);
-
-            for (int i = 0; i < number_of_wals; i++)
-            {
-               free(wals[i]);
-            }
-            free(wals);
-
-            for (int i = 0; i < number_of_files; i++)
-            {
-               free(files[i]);
-            }
-            free(files);
-
-            free(w);
-            free(f);
          }
       }
       else if (number_of_directories == 0)
       {
-         f = NULL;
-
-         f = pgmoneta_append(f, config->base_dir);
-         f = pgmoneta_append(f, "/");
-         f = pgmoneta_append(f, config->servers[i].name);
-         f = pgmoneta_append(f, "/wal/");
-
-         number_of_files = 0;
-         files = NULL;
-
-         pgmoneta_get_files(f, &number_of_files, &files);
-
-         for (int j = 0; j < number_of_files; j++)
-         {
-            if (pgmoneta_ends_with(files[j], ".partial"))
-            {
-               continue;
-            }
-
-            b = NULL;
-
-            b = pgmoneta_append(b, config->base_dir);
-            b = pgmoneta_append(b, "/");
-            b = pgmoneta_append(b, config->servers[i].name);
-            b = pgmoneta_append(b, "/wal/");
-            b = pgmoneta_append(b, files[j]);
-
-            pgmoneta_delete_file(b);
-
-            free(b);
-         }
-
-         for (int i = 0; i < number_of_files; i++)
-         {
-            free(files[i]);
-         }
-         free(files);
-
-         free(f);
+         pgmoneta_delete_wal(i);
       }
 
       for (int i = 0; i < number_of_directories; i++)

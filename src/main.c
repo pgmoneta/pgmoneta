@@ -799,6 +799,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
             memcpy(backup_id, payload_s2, strlen(payload_s2));
 
             result = pgmoneta_delete(srv, backup_id);
+            pgmoneta_delete_wal(srv);
             pgmoneta_management_write_delete(client_fd, srv, result);
 
             free(backup_id);

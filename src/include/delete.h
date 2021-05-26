@@ -38,11 +38,19 @@ extern "C" {
 /**
  * Delete a backup from a server
  * @param srv The server index
- * @param argv The argv
+ * @param backup_id The backup_id
  * @return 0 upon success, otherwise 1
  */
 int
 pgmoneta_delete(int srv, char* backup_id);
+
+/**
+ * Delete WAL from a server
+ * @param srv The server index
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_wal(int srv);
 
 #ifdef __cplusplus
 }
