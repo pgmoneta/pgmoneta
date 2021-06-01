@@ -73,6 +73,14 @@ make
 sudo make install
 ```
 
+Note, that `pgmoneta` requires [PostgreSQL](https://www.postgresql.org) 10 or later to run as the command line tools
+are required. These can be installed from the [PostgreSQL YUM](https://yum.postgresql.org/) repository, or from the
+official distribution repository, if supported, like
+
+```sh
+dnf install -y postgresql
+```
+
 See [RPM](./doc/RPM.md) for how to build a RPM of `pgmoneta`.
 
 ### Debug build
