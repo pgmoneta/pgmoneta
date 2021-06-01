@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <ev.h>
 #include <execinfo.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -997,6 +998,127 @@ int
 pgmoneta_delete_file(char *file)
 {
    return unlink(file);
+}
+
+int
+pgmoneta_copy_directory(char* from, char* to)
+{
+   DIR* d = opendir(from);
+   char* from_buffer;
+   char* to_buffer;
+   size_t from_length;
+   size_t to_length;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   pgmoneta_mkdir(to);
+
+   if (d)
+   {
+      while ((entry = readdir(d)))
+      {
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         from_length = strlen(from) + strlen(entry->d_name) + 2;
+         from_buffer = malloc(from_length);
+
+         to_length = strlen(to) + strlen(entry->d_name) + 2;
+         to_buffer = malloc(to_length);
+
+         snprintf(from_buffer, from_length, "%s/%s", from, entry->d_name);
+         snprintf(to_buffer, to_length, "%s/%s", to, entry->d_name);
+
+         if (!stat(from_buffer, &statbuf))
+         {
+            if (S_ISDIR(statbuf.st_mode))
+            {
+               pgmoneta_copy_directory(from_buffer, to_buffer);
+            }
+            else
+            {
+               pgmoneta_copy_file(from_buffer, to_buffer);
+            }
+         }
+
+         free(from_buffer);
+         free(to_buffer);
+      }
+      closedir(d);
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_copy_file(char* from, char* to)
+{
+   int fd_from = -1;
+   int fd_to = -1;
+   char buffer[8192];
+   ssize_t nread = -1;
+   int saved_errno = -1;
+
+   fd_from = open(from, O_RDONLY);
+   if (fd_from < 0)
+   {
+      goto error;
+   }
+
+   /* TODO: Permissions */
+   fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, 0664);
+   if (fd_to < 0)
+   {
+      goto error;
+   }
+
+   while ((nread = read(fd_from, buffer, sizeof(buffer))) > 0)
+   {
+      char *out = &buffer[0];
+      ssize_t nwritten;
+
+      do
+      {
+         nwritten = write(fd_to, out, nread);
+
+         if (nwritten >= 0)
+         {
+            nread -= nwritten;
+            out += nwritten;
+         }
+         else if (errno != EINTR)
+         {
+            goto error;
+         }
+      }
+      while (nread > 0);
+   }
+
+   if (nread == 0)
+   {
+      if (close(fd_to) < 0)
+      {
+         fd_to = -1;
+         goto error;
+      }
+      close(fd_from);
+   }
+
+   return 0;
+
+error:
+   saved_errno = errno;
+
+   close(fd_from);
+   if (fd_to >= 0)
+   {
+      close(fd_to);
+   }
+
+   errno = saved_errno;
+   return 1;
 }
 
 unsigned long

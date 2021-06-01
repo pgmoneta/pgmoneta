@@ -7,6 +7,7 @@
 ## Features
 
 * Full backup
+* Restore
 * Prometheus support
 * Remote management
 * Transport Layer Security (TLS) v1.2+ support

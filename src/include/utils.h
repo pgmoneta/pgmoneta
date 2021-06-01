@@ -285,6 +285,24 @@ int
 pgmoneta_delete_file(char* file);
 
 /**
+ * Copy a directory
+ * @param from The from directory
+ * @param to The to directory
+ * @return The result
+ */
+int
+pgmoneta_copy_directory(char* from, char* to);
+
+/**
+ * Copy a file
+ * @param from The from file
+ * @param to The to file
+ * @return The result
+ */
+int
+pgmoneta_copy_file(char* from, char* to);
+
+/**
  * Get the free space for a path
  * @param path The path
  * @return The result

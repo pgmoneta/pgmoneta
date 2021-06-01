@@ -163,6 +163,70 @@ pgmoneta_gzip_wal(char* directory)
    closedir(dir);
 }
 
+void
+pgmoneta_gunzip_data(char* directory)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* name = NULL;
+   DIR *dir;
+   struct dirent *entry;
+
+   if (!(dir = opendir(directory)))
+   {
+      return;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[1024];
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         {
+            continue;
+         }
+
+         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+
+         pgmoneta_gunzip_data(path);
+      }
+      else
+      {
+         from = NULL;
+
+         from = pgmoneta_append(from, directory);
+         from = pgmoneta_append(from, "/");
+         from = pgmoneta_append(from, entry->d_name);
+
+         name = malloc(strlen(entry->d_name) - 2);
+         memset(name, 0, strlen(entry->d_name) - 2);
+         memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
+
+         to = NULL;
+
+         to = pgmoneta_append(to, directory);
+         to = pgmoneta_append(to, "/");
+         to = pgmoneta_append(to, name);
+
+         if (gz_decompress(from, to))
+         {
+            pgmoneta_log_error("Gzip: Could not decompress %s/%s", directory, entry->d_name);
+            break;
+         }
+
+         pgmoneta_delete_file(from);
+
+         free(name);
+         free(from);
+         free(to);
+      }
+   }
+
+   closedir(dir);
+}
+
 static int
 gz_compress(char* from, int level, char* to)
 {

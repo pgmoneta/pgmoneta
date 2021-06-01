@@ -95,6 +95,7 @@ pgmoneta_remote_management(int client_fd, char* address)
             break;
          case MANAGEMENT_BACKUP:
          case MANAGEMENT_LIST_BACKUP:
+         case MANAGEMENT_RESTORE:
          case MANAGEMENT_DELETE:
          case MANAGEMENT_STATUS:
          case MANAGEMENT_ISALIVE:

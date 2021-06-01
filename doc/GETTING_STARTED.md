@@ -114,6 +114,7 @@ Options:
 Commands:
   backup                   Backup a server
   list-backup              List the backups for a server
+  restore                  Restore a backup from a server
   delete                   Delete a backup from a server
   is-alive                 Is pgmoneta alive
   stop                     Stop pgmoneta
@@ -127,6 +128,12 @@ This tool can be used on the machine running `pgmoneta` to do a backup like
 
 ```
 pgmoneta-cli -c pgmoneta.conf backup primary
+```
+
+A restore would be
+
+```
+pgmoneta-cli -c pgmoneta.conf restore primary <timestamp> /path/to/restore
 ```
 
 To stop pgmoneta you would use

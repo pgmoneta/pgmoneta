@@ -42,13 +42,14 @@ extern "C" {
 
 #define MANAGEMENT_BACKUP      0
 #define MANAGEMENT_LIST_BACKUP 1
-#define MANAGEMENT_DELETE      2
-#define MANAGEMENT_STOP        3
-#define MANAGEMENT_STATUS      4
-#define MANAGEMENT_DETAILS     5
-#define MANAGEMENT_ISALIVE     6
-#define MANAGEMENT_RESET       7
-#define MANAGEMENT_RELOAD      8
+#define MANAGEMENT_RESTORE     2
+#define MANAGEMENT_DELETE      3
+#define MANAGEMENT_STOP        4
+#define MANAGEMENT_STATUS      5
+#define MANAGEMENT_DETAILS     6
+#define MANAGEMENT_ISALIVE     7
+#define MANAGEMENT_RESET       8
+#define MANAGEMENT_RELOAD      9
 
 /**
  * Read the management header
@@ -67,10 +68,11 @@ pgmoneta_management_read_header(int socket, signed char* id, int* ns);
  * @param ns The number of parameters
  * @param payload_s1 The resulting string payload
  * @param payload_s2 The resulting string payload
+ * @param payload_s3 The resulting string payload
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_payload(int socket, signed char id, int ns, char** payload_s1, char** payload_s2);
+pgmoneta_management_read_payload(int socket, signed char id, int ns, char** payload_s1, char** payload_s2, char** payload_s3);
 
 /**
  * Management operation: Backup a server
@@ -110,6 +112,18 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server);
  */
 int
 pgmoneta_management_write_list_backup(int socket, int server);
+
+/**
+ * Management operation: Restore a server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup_id The backup identifier
+ * @param directory The directory
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
 
 /**
  * Management operation: Delete a backup for a server

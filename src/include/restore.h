@@ -26,39 +26,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_GZIP_H
-#define PGMONETA_GZIP_H
+#ifndef PGMONETA_RESTORE_H
+#define PGMONETA_RESTORE_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <ev.h>
 #include <stdlib.h>
 
 /**
- * GZip a data directory
- * @param directory The directory
+ * Create a restore
+ * @param server The server
+ * @param backup_id The backup identifier
+ * @param directory The target directory
+ * @param argv The argv
  */
 void
-pgmoneta_gzip_data(char* directory);
-
-/**
- * GZip a WAL directory
- * @param directory The directory
- */
-void
-pgmoneta_gzip_wal(char* directory);
-
-/**
- * GUNZip a directory
- * @param directory The directory
- */
-void
-pgmoneta_gunzip_data(char* directory);
+pgmoneta_restore(int server, char* backup_id, char* directory, char** argv);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
