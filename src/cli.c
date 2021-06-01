@@ -59,6 +59,14 @@
 #define ACTION_ISALIVE      8
 #define ACTION_RESET        9
 #define ACTION_RELOAD      10
+#define ACTION_HELP        99
+
+static int find_action(int argc, char** argv, int* place);
+
+static void help_backup(void);
+static void help_list_backup(void);
+static void help_restore(void);
+static void help_delete(void);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server);
@@ -136,6 +144,7 @@ main(int argc, char **argv)
    int c;
    int option_index = 0;
    size_t size;
+   int position;
    int32_t action = ACTION_UNKNOWN;
    char un[MAX_USERNAME_LENGTH];
    struct configuration* config = NULL;
@@ -282,55 +291,85 @@ main(int argc, char **argv)
 
    if (argc > 0)
    {
-      if (!strcmp("backup", argv[argc - 2]))
+      action = find_action(argc, argv, &position);
+
+      if (action == ACTION_BACKUP)
       {
-         action = ACTION_BACKUP;
-         server = argv[argc - 1];
+         if (argc == position + 2)
+         {
+            server = argv[argc - 1];
+         }
+         else
+         {
+            help_backup();
+            action = ACTION_HELP;
+         }
       }
-      else if (!strcmp("list-backup", argv[argc - 2]))
+      else if (action == ACTION_LIST_BACKUP)
       {
-         action = ACTION_LIST_BACKUP;
-         server = argv[argc - 1];
+         if (argc == position + 2)
+         {
+            server = argv[argc - 1];
+         }
+         else
+         {
+            help_list_backup();
+            action = ACTION_HELP;
+         }
       }
-      else if (!strcmp("restore", argv[argc - 4]))
+      else if (action == ACTION_RESTORE)
       {
-         action = ACTION_RESTORE;
-         server = argv[argc - 3];
-         id = argv[argc - 2];
-         dir = argv[argc - 1];
+         if (argc == position + 4)
+         {
+            server = argv[argc - 3];
+            id = argv[argc - 2];
+            dir = argv[argc - 1];
+         }
+         else
+         {
+            help_restore();
+            action = ACTION_HELP;
+         }
       }
-      else if (!strcmp("delete", argv[argc - 3]))
+      else if (action == ACTION_DELETE)
       {
-         action = ACTION_DELETE;
-         server = argv[argc - 2];
-         id = argv[argc - 1];
+         if (argc == position + 3)
+         {
+            server = argv[argc - 2];
+            id = argv[argc - 1];
+         }
+         else
+         {
+            help_delete();
+            action = ACTION_HELP;
+         }
       }
-      else if (!strcmp("stop", argv[argc - 1]))
+      else if (action == ACTION_STOP)
       {
-         action = ACTION_STOP;
+         /* Ok */
       }
-      else if (!strcmp("status", argv[argc - 1]))
+      else if (action == ACTION_STATUS)
       {
-         action = ACTION_STATUS;
+         /* Ok */
       }
-      else if (!strcmp("details", argv[argc - 1]))
+      else if (action == ACTION_DETAILS)
       {
-         action = ACTION_DETAILS;
+         /* Ok */
       }
-      else if (!strcmp("is-alive", argv[argc - 1]))
+      else if (action == ACTION_ISALIVE)
       {
-         action = ACTION_ISALIVE;
+         /* Ok */
       }
-      else if (!strcmp("reset", argv[argc - 1]))
+      else if (action == ACTION_RESET)
       {
-         action = ACTION_RESET;
+         /* Ok */
       }
-      else if (!strcmp("reload", argv[argc - 1]))
+      else if (action == ACTION_RELOAD)
       {
          /* Local connection only */
-         if (configuration_path != NULL)
+         if (configuration_path == NULL)
          {
-            action = ACTION_RELOAD;
+            action = ACTION_UNKNOWN;
          }
       }
 
@@ -474,7 +513,11 @@ done:
    
    if (configuration_path != NULL)
    {
-      if (action != ACTION_UNKNOWN && exit_code != 0)
+      if (action == ACTION_HELP)
+      {
+         /* Ok */
+      }
+      else if (action != ACTION_UNKNOWN && exit_code != 0)
       {
          printf("No connection to pgmoneta on %s\n", config->unix_socket_dir);
       }
@@ -501,6 +544,96 @@ done:
    }
 
    return exit_code;
+}
+
+static int
+find_action(int argc, char** argv, int* place)
+{
+   *place = -1;
+
+   for (int i = 1; i < argc; i++)
+   {
+      if (!strcmp("backup", argv[i]))
+      {
+         *place = i;
+         return ACTION_BACKUP;
+      }
+      else if (!strcmp("list-backup", argv[i]))
+      {
+         *place = i;
+         return ACTION_LIST_BACKUP;
+      }
+      else if (!strcmp("restore", argv[i]))
+      {
+         *place = i;
+         return ACTION_RESTORE;
+      }
+      else if (!strcmp("delete", argv[i]))
+      {
+         *place = i;
+         return ACTION_DELETE;
+      }
+      else if (!strcmp("stop", argv[i]))
+      {
+         *place = i;
+         return ACTION_STOP;
+      }
+      else if (!strcmp("status", argv[i]))
+      {
+         *place = i;
+         return ACTION_STATUS;
+      }
+      else if (!strcmp("details", argv[i]))
+      {
+         *place = i;
+         return ACTION_DETAILS;
+      }
+      else if (!strcmp("is-alive", argv[i]))
+      {
+         *place = i;
+         return ACTION_ISALIVE;
+      }
+      else if (!strcmp("reset", argv[i]))
+      {
+         *place = i;
+         return ACTION_RESET;
+      }
+      else if (!strcmp("reload", argv[i]))
+      {
+         *place = i;
+         return ACTION_RELOAD;
+      }
+   }
+
+   return ACTION_UNKNOWN;
+}
+
+static void
+help_backup(void)
+{
+   printf("Backup a server\n");
+   printf("  pgmoneta-cli backup <server>\n");
+}
+
+static void
+help_list_backup(void)
+{
+   printf("List backups for a server\n");
+   printf("  pgmoneta-cli list-backup <server>\n");
+}
+
+static void
+help_restore(void)
+{
+   printf("Restore a backup for a server\n");
+   printf("  pgmoneta-cli restore <server> <timestamp> <directory>\n");
+}
+
+static void
+help_delete(void)
+{
+   printf("Delete a backup for a server\n");
+   printf("  pgmoneta-cli delete <server> <timestamp>\n");
 }
 
 static int
