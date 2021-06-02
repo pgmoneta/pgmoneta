@@ -65,7 +65,6 @@ pgmoneta_management_read_header(int socket, signed char* id, int* ns)
 
    if (read_complete(NULL, socket, &header[0], sizeof(header)))
    {
-      pgmoneta_log_warn("pgmoneta_management_read_header: %d %s", socket, strerror(errno));
       errno = 0;
       goto error;
    }

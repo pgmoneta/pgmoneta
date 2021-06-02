@@ -704,7 +704,10 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
    }
 
    /* Process internal management request -- f.ex. returning a file descriptor to the pool */
-   pgmoneta_management_read_header(client_fd, &id, &ns);
+   if (pgmoneta_management_read_header(client_fd, &id, &ns))
+   {
+      goto disconnect;
+   }
    pgmoneta_management_read_payload(client_fd, id, ns, &payload_s1, &payload_s2, &payload_s3);
 
    switch (id)
@@ -891,6 +894,8 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          pgmoneta_log_debug("pgmoneta: Unknown management id: %d", id);
          break;
    }
+
+disconnect:
 
    pgmoneta_disconnect(client_fd);
 }
