@@ -245,6 +245,12 @@ pgmoneta_write_int32(void* data, int32_t i)
    *((char*)(data)) = *ptr;
 }
 
+char*
+pgmoneta_read_string(void* data)
+{
+   return (char*)data;
+}
+
 void
 pgmoneta_write_string(void* data, char* s)
 {

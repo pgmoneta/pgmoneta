@@ -40,6 +40,18 @@ extern "C" {
 #include <openssl/ssl.h>
 
 /**
+ * Authenticate a user
+ * @param server The server
+ * @param database The database
+ * @param username The username
+ * @param password The password
+ * @param fd The resulting socket
+ * @return AUTH_SUCCESS, AUTH_BAD_PASSWORD or AUTH_ERROR
+ */
+int
+pgmoneta_server_authenticate(int server, char* database, char* username, char* password, int* fd);
+
+/**
  * Authenticate a remote management user
  * @param client_fd The descriptor
  * @param address The client address

@@ -61,6 +61,12 @@ pgmoneta_backup(int server, char** argv)
 
    pgmoneta_set_proc_title(1, argv, "backup", config->servers[server].name);
 
+   if (!config->servers[server].valid)
+   {
+      pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
+      goto done;
+   }
+
    start_time = time(NULL);
 
    usr = -1;
@@ -140,6 +146,8 @@ pgmoneta_backup(int server, char** argv)
 
       pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
    }
+
+done:
 
    pgmoneta_stop_logging();
 

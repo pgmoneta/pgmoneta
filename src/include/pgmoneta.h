@@ -104,6 +104,7 @@ struct server
    char username[MAX_USERNAME_LENGTH]; /**< The user name */
    char backup_slot[MISC_LENGTH];      /**< The backup slot name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
+   bool valid;                         /**< Is the server valid */
 } __attribute__ ((aligned (64)));
 
 /** @struct

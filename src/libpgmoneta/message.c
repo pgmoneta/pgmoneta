@@ -124,6 +124,23 @@ pgmoneta_free_copy_message(struct message* msg)
    }
 }
 
+void
+pgmoneta_log_message(struct message* msg)
+{
+   if (msg == NULL)
+   {
+      pgmoneta_log_info("Message is NULL");
+   }
+   else if (msg->data == NULL)
+   {
+      pgmoneta_log_info("Message DATA is NULL");
+   }
+   else
+   {
+      pgmoneta_log_mem(msg->data, msg->length);
+   }
+}
+
 int
 pgmoneta_write_empty(SSL* ssl, int socket)
 {
@@ -192,6 +209,30 @@ pgmoneta_write_tls(SSL* ssl, int socket)
 }
 
 int
+pgmoneta_write_terminate(SSL* ssl, int socket)
+{
+   char terminate[5];
+   struct message msg;
+
+   memset(&msg, 0, sizeof(struct message));
+   memset(&terminate, 0, sizeof(terminate));
+
+   pgmoneta_write_byte(&terminate, 'X');
+   pgmoneta_write_int32(&(terminate[1]), 4);
+
+   msg.kind = 'X';
+   msg.length = 5;
+   msg.data = &terminate;
+
+   if (ssl == NULL)
+   {
+      return write_message(socket, &msg);
+   }
+
+   return ssl_write_message(ssl, &msg);
+}
+
+int
 pgmoneta_write_connection_refused(SSL* ssl, int socket)
 {
    int size = 46;
@@ -243,6 +284,56 @@ pgmoneta_write_connection_refused_old(SSL* ssl, int socket)
    }
 
    return ssl_write_message(ssl, &msg);
+}
+
+int
+pgmoneta_create_auth_password_response(char* password, struct message** msg)
+{
+   struct message* m = NULL;
+   size_t size;
+
+   size = 6 + strlen(password);
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'p';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'p');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   pgmoneta_write_string(m->data + 5, password);
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_create_auth_md5_response(char* md5, struct message** msg)
+{
+   struct message* m = NULL;
+   size_t size;
+
+   size = 1 + 4 + strlen(md5) + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'p';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'p');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   pgmoneta_write_string(m->data + 5, md5);
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
 }
 
 int

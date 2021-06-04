@@ -67,7 +67,20 @@
 #define NUMBER_OF_SECURITY_MESSAGES   5
 #define SECURITY_BUFFER_SIZE        512
 
+static signed char has_security;
+static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
+static char security_messages[NUMBER_OF_SECURITY_MESSAGES][SECURITY_BUFFER_SIZE];
+
+static int get_auth_type(struct message* msg, int* auth_type);
+static int get_salt(void* data, char** salt);
+static int generate_md5(char* str, int length, char** md5);
+
 static int client_scram256(SSL* c_ssl, int client_fd, char* username, char* password, int slot);
+
+static int server_trust(void);
+static int server_password(char* username, char* password, int server_fd);
+static int server_md5(char* username, char* password, int server_fd);
+static int server_scram256(char* username, char* password, int server_fd);
 
 static char* get_admin_password(char* username);
 
@@ -642,6 +655,142 @@ error:
 }
 
 static int
+get_auth_type(struct message* msg, int* auth_type)
+{
+   int32_t length;
+   int32_t type = -1;
+   int offset;
+
+   if (msg->kind != 'R')
+   {
+      return 1;
+   }
+
+   length = pgmoneta_read_int32(msg->data + 1);
+   type = pgmoneta_read_int32(msg->data + 5);
+   offset = 9;
+
+   if (type == 0 && msg->length > 8)
+   {
+      if ('E' == pgmoneta_read_byte(msg->data + 9))
+      {
+         *auth_type = -1;
+         return 0;
+      }
+   }
+
+   switch (type)
+   {
+      case 0:
+         pgmoneta_log_trace("Backend: R - Success");
+         break;
+      case 2:
+         pgmoneta_log_trace("Backend: R - KerberosV5");
+         break;
+      case 3:
+         pgmoneta_log_trace("Backend: R - CleartextPassword");
+         break;
+      case 5:
+         pgmoneta_log_trace("Backend: R - MD5Password");
+         pgmoneta_log_trace("             Salt %02hhx%02hhx%02hhx%02hhx",
+                 (signed char)(pgmoneta_read_byte(msg->data + 9) & 0xFF),
+                 (signed char)(pgmoneta_read_byte(msg->data + 10) & 0xFF),
+                 (signed char)(pgmoneta_read_byte(msg->data + 11) & 0xFF),
+                 (signed char)(pgmoneta_read_byte(msg->data + 12) & 0xFF));
+         break;
+      case 6:
+         pgmoneta_log_trace("Backend: R - SCMCredential");
+         break;
+      case 7:
+         pgmoneta_log_trace("Backend: R - GSS");
+         break;
+      case 8:
+         pgmoneta_log_trace("Backend: R - GSSContinue");
+         break;
+      case 9:
+         pgmoneta_log_trace("Backend: R - SSPI");
+         break;
+      case 10:
+         pgmoneta_log_trace("Backend: R - SASL");
+         while (offset < length - 8)
+         {
+            char* mechanism = pgmoneta_read_string(msg->data + offset);
+            pgmoneta_log_trace("             %s", mechanism);
+            offset += strlen(mechanism) + 1;
+         }
+         break;
+      case 11:
+         pgmoneta_log_trace("Backend: R - SASLContinue");
+         break;
+      case 12:
+         pgmoneta_log_trace("Backend: R - SASLFinal");
+         offset += length - 8;
+
+         if (offset < msg->length)
+         {
+            signed char peek = pgmoneta_read_byte(msg->data + offset);
+            switch (peek)
+            {
+               case 'R':
+                  type = pgmoneta_read_int32(msg->data + offset + 5);
+                  break;
+               default:
+                  break;
+            }
+         }
+
+         break;
+      default:
+         break;
+   }
+
+   *auth_type = type;
+
+   return 0;
+}
+
+static int
+get_salt(void* data, char** salt)
+{
+   char* result;
+
+   result = malloc(4);
+   memset(result, 0, 4);
+
+   memcpy(result, data + 9, 4);
+
+   *salt = result;
+
+   return 0;
+}
+
+static int
+generate_md5(char* str, int length, char** md5)
+{
+   int n;
+   MD5_CTX c;
+   unsigned char digest[16];
+   char *out;
+
+   out = malloc(33);
+
+   memset(out, 0, 33);
+
+   MD5_Init(&c);
+   MD5_Update(&c, str, length);
+   MD5_Final(digest, &c);
+
+   for (n = 0; n < 16; ++n)
+   {
+      snprintf(&(out[n * 2]), 32, "%02x", (unsigned int)digest[n]);
+   }
+
+   *md5 = out;
+
+   return 0;
+}
+
+static int
 client_scram256(SSL* c_ssl, int client_fd, char* username, char* password, int slot)
 {
    int status;
@@ -855,6 +1004,566 @@ error:
    free(base64_server_signature_calc);
 
    pgmoneta_free_copy_message(sasl_continue);
+   pgmoneta_free_copy_message(sasl_final);
+
+   return AUTH_ERROR;
+}
+
+int
+pgmoneta_server_authenticate(int server, char* database, char* username, char* password, int* fd)
+{
+   int server_fd;
+   int auth_type;
+   int ret;
+   int status;
+   struct message* startup_msg = NULL;
+   struct message* msg = NULL;
+   struct configuration* config;
+
+   *fd = -1;
+
+   auth_type = SECURITY_INVALID;
+   server_fd = -1;
+   config = (struct configuration*)shmem;
+
+   for (int i = 0; i < NUMBER_OF_SECURITY_MESSAGES; i++)
+   {
+      memset(&security_messages[i], 0, SECURITY_BUFFER_SIZE);
+   }
+
+   ret = pgmoneta_connect(config->servers[server].host, config->servers[server].port, &server_fd);
+   if (ret != 0)
+   {
+      goto error;
+   }
+
+   ret = pgmoneta_create_startup_message(username, database, &startup_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   ret = pgmoneta_write_message(NULL, server_fd, startup_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   ret = pgmoneta_read_block_message(NULL, server_fd, &msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   get_auth_type(msg, &auth_type);
+
+   if (auth_type == -1)
+   {
+      goto error;
+   }
+   else if (auth_type != SECURITY_TRUST && auth_type != SECURITY_PASSWORD && auth_type != SECURITY_MD5 && auth_type != SECURITY_SCRAM256)
+   {
+      goto error;
+   }
+
+   security_lengths[0] = msg->length;
+   memcpy(&security_messages[0], msg->data, msg->length);
+
+   if (auth_type == SECURITY_TRUST)
+   {
+      status = server_trust();
+   }
+   else if (auth_type == SECURITY_PASSWORD)
+   {
+      status = server_password(username, password, server_fd);
+   }
+   else if (auth_type == SECURITY_MD5)
+   {
+      status = server_md5(username, password, server_fd);
+   }
+   else if (auth_type == SECURITY_SCRAM256)
+   {
+      status = server_scram256(username, password, server_fd);
+   }
+
+   if (status == AUTH_BAD_PASSWORD)
+   {
+      goto bad_password;
+   }
+   else if (status == AUTH_ERROR)
+   {
+      goto error;
+   }
+
+   *fd = server_fd;
+
+   pgmoneta_free_copy_message(startup_msg);
+   pgmoneta_free_message(msg);
+
+   return AUTH_SUCCESS;
+
+bad_password:
+
+   pgmoneta_free_copy_message(startup_msg);
+   pgmoneta_free_message(msg);
+
+   if (server_fd != -1)
+   {
+      pgmoneta_disconnect(server_fd);
+   }
+
+   return AUTH_BAD_PASSWORD;
+
+error:
+
+   pgmoneta_free_copy_message(startup_msg);
+   pgmoneta_free_message(msg);
+
+   if (server_fd != -1)
+   {
+      pgmoneta_disconnect(server_fd);
+   }
+
+   return AUTH_ERROR;
+}
+
+static int
+server_trust(void)
+{
+   pgmoneta_log_trace("server_trust");
+
+   has_security = SECURITY_TRUST;
+
+   return AUTH_SUCCESS;
+}
+
+static int
+server_password(char* username, char* password, int server_fd)
+{
+   int status = MESSAGE_STATUS_ERROR;
+   int auth_index = 1;
+   int auth_response = -1;
+   struct message* auth_msg = NULL;
+   struct message* password_msg = NULL;
+
+   pgmoneta_log_trace("server_password");
+
+   status = pgmoneta_create_auth_password_response(password, &password_msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_write_message(NULL, server_fd, password_msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   security_lengths[auth_index] = password_msg->length;
+   memcpy(&security_messages[auth_index], password_msg->data, password_msg->length);
+   auth_index++;
+
+   status = pgmoneta_read_block_message(NULL, server_fd, &auth_msg);
+   if (auth_msg->length > SECURITY_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
+      goto error;
+   }
+
+   get_auth_type(auth_msg, &auth_response);
+   pgmoneta_log_trace("authenticate: auth response %d", auth_response);
+
+   if (auth_response == 0)
+   {
+      if (auth_msg->length > SECURITY_BUFFER_SIZE)
+      {
+         pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
+         goto error;
+      }
+
+      security_lengths[auth_index] = auth_msg->length;
+      memcpy(&security_messages[auth_index], auth_msg->data, auth_msg->length);
+
+      has_security = SECURITY_PASSWORD;
+   }
+   else
+   {
+      goto bad_password;
+   }
+
+   pgmoneta_free_copy_message(password_msg);
+   pgmoneta_free_message(auth_msg);
+
+   return AUTH_SUCCESS;
+
+bad_password:
+
+   pgmoneta_log_warn("Wrong password for user: %s", username);
+
+   pgmoneta_free_copy_message(password_msg);
+   pgmoneta_free_message(auth_msg);
+
+   return AUTH_BAD_PASSWORD;
+
+error:
+
+   pgmoneta_free_copy_message(password_msg);
+   pgmoneta_free_message(auth_msg);
+
+   return AUTH_ERROR;
+}
+
+static int
+server_md5(char* username, char* password, int server_fd)
+{
+   int status = MESSAGE_STATUS_ERROR;
+   int auth_index = 1;
+   int auth_response = -1;
+   size_t size;
+   char* pwdusr = NULL;
+   char* shadow = NULL;
+   char* md5_req = NULL;
+   char* md5 = NULL;
+   char md5str[36];
+   char* salt = NULL;
+   struct message* auth_msg = NULL;
+   struct message* md5_msg = NULL;
+
+   pgmoneta_log_trace("server_md5");
+
+   if (get_salt(security_messages[0], &salt))
+   {
+      goto error;
+   }
+
+   size = strlen(username) + strlen(password) + 1;
+   pwdusr = malloc(size);
+   memset(pwdusr, 0, size);
+
+   snprintf(pwdusr, size, "%s%s", password, username);
+
+   if (generate_md5(pwdusr, strlen(pwdusr), &shadow))
+   {
+      goto error;
+   }
+
+   md5_req = malloc(36);
+   memset(md5_req, 0, 36);
+   memcpy(md5_req, shadow, 32);
+   memcpy(md5_req + 32, salt, 4);
+
+   if (generate_md5(md5_req, 36, &md5))
+   {
+      goto error;
+   }
+
+   memset(&md5str, 0, sizeof(md5str));
+   snprintf(&md5str[0], 36, "md5%s", md5);
+
+   status = pgmoneta_create_auth_md5_response(md5str, &md5_msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_write_message(NULL, server_fd, md5_msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   security_lengths[auth_index] = md5_msg->length;
+   memcpy(&security_messages[auth_index], md5_msg->data, md5_msg->length);
+   auth_index++;
+
+   status = pgmoneta_read_block_message(NULL, server_fd, &auth_msg);
+   if (auth_msg->length > SECURITY_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
+      goto error;
+   }
+
+   get_auth_type(auth_msg, &auth_response);
+   pgmoneta_log_trace("authenticate: auth response %d", auth_response);
+
+   if (auth_response == 0)
+   {
+      if (auth_msg->length > SECURITY_BUFFER_SIZE)
+      {
+         pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
+         goto error;
+      }
+
+      security_lengths[auth_index] = auth_msg->length;
+      memcpy(&security_messages[auth_index], auth_msg->data, auth_msg->length);
+
+      has_security = SECURITY_MD5;
+   }
+   else
+   {
+      goto bad_password;
+   }
+
+   free(pwdusr);
+   free(shadow);
+   free(md5_req);
+   free(md5);
+   free(salt);
+
+   pgmoneta_free_copy_message(md5_msg);
+   pgmoneta_free_message(auth_msg);
+
+   return AUTH_SUCCESS;
+
+bad_password:
+
+   pgmoneta_log_warn("Wrong password for user: %s", username);
+
+   free(pwdusr);
+   free(shadow);
+   free(md5_req);
+   free(md5);
+   free(salt);
+
+   pgmoneta_free_copy_message(md5_msg);
+   pgmoneta_free_message(auth_msg);
+
+   return AUTH_BAD_PASSWORD;
+
+error:
+
+   free(pwdusr);
+   free(shadow);
+   free(md5_req);
+   free(md5);
+   free(salt);
+
+   pgmoneta_free_copy_message(md5_msg);
+   pgmoneta_free_message(auth_msg);
+
+   return AUTH_ERROR;
+}
+
+static int
+server_scram256(char* username, char* password, int server_fd)
+{
+   int status = MESSAGE_STATUS_ERROR;
+   int auth_index = 1;
+   char* salt = NULL;
+   int salt_length = 0;
+   char* password_prep = NULL;
+   char* client_nounce = NULL;
+   char* combined_nounce = NULL;
+   char* base64_salt = NULL;
+   char* iteration_string = NULL;
+   char* err = NULL;
+   int iteration;
+   char* client_first_message_bare = NULL;
+   char* server_first_message = NULL;
+   char wo_proof[58];
+   unsigned char* proof = NULL;
+   int proof_length;
+   char* proof_base = NULL;
+   char* base64_server_signature = NULL;
+   char* server_signature_received = NULL;
+   int server_signature_received_length;
+   unsigned char* server_signature_calc = NULL;
+   int server_signature_calc_length;
+   struct message* sasl_response = NULL;
+   struct message* sasl_continue = NULL;
+   struct message* sasl_continue_response = NULL;
+   struct message* sasl_final = NULL;
+   struct message* msg = NULL;
+
+   pgmoneta_log_trace("server_scram256");
+
+   status = sasl_prep(password, &password_prep);
+   if (status)
+   {
+      goto error;
+   }
+
+   generate_nounce(&client_nounce);
+
+   status = pgmoneta_create_auth_scram256_response(client_nounce, &sasl_response);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   security_lengths[auth_index] = sasl_response->length;
+   memcpy(&security_messages[auth_index], sasl_response->data, sasl_response->length);
+   auth_index++;
+
+   status = pgmoneta_write_message(NULL, server_fd, sasl_response);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_read_block_message(NULL, server_fd, &msg);
+   if (msg->length > SECURITY_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Security message too large: %ld", msg->length);
+      goto error;
+   }
+
+   sasl_continue = pgmoneta_copy_message(msg);
+
+   security_lengths[auth_index] = sasl_continue->length;
+   memcpy(&security_messages[auth_index], sasl_continue->data, sasl_continue->length);
+   auth_index++;
+
+   get_scram_attribute('r', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &combined_nounce);
+   get_scram_attribute('s', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &base64_salt);
+   get_scram_attribute('i', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &iteration_string);
+   get_scram_attribute('e', (char*)(sasl_continue->data + 9), sasl_continue->length - 9, &err);
+
+   if (err != NULL)
+   {
+      pgmoneta_log_error("SCRAM-SHA-256: %s", err);
+      goto error;
+   }
+
+   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), &salt, &salt_length);
+
+   iteration = atoi(iteration_string);
+
+   memset(&wo_proof[0], 0, sizeof(wo_proof));
+   snprintf(&wo_proof[0], sizeof(wo_proof), "c=biws,r=%s", combined_nounce);
+
+   /* n=,r=... */
+   client_first_message_bare = security_messages[1] + 26;
+
+   /* r=...,s=...,i=4096 */
+   server_first_message = security_messages[2] + 9;
+
+   if (client_proof(password_prep, salt, salt_length, iteration,
+                    client_first_message_bare, security_lengths[1] - 26,
+                    server_first_message, security_lengths[2] - 9,
+                    &wo_proof[0], strlen(wo_proof),
+                    &proof, &proof_length))
+   {
+      goto error;
+   }
+
+   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base);
+
+   status = pgmoneta_create_auth_scram256_continue_response(&wo_proof[0], (char*)proof_base, &sasl_continue_response);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   security_lengths[auth_index] = sasl_continue_response->length;
+   memcpy(&security_messages[auth_index], sasl_continue_response->data, sasl_continue_response->length);
+   auth_index++;
+
+   status = pgmoneta_write_message(NULL, server_fd, sasl_continue_response);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_read_block_message(NULL, server_fd, &msg);
+   if (msg->length > SECURITY_BUFFER_SIZE)
+   {
+      pgmoneta_log_error("Security message too large: %ld", msg->length);
+      goto error;
+   }
+
+   security_lengths[auth_index] = msg->length;
+   memcpy(&security_messages[auth_index], msg->data, msg->length);
+   auth_index++;
+
+   if (pgmoneta_extract_message('R', msg, &sasl_final))
+   {
+      goto error;
+   }
+
+   /* Get 'v' attribute */
+   base64_server_signature = sasl_final->data + 11;
+   pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11,
+                          &server_signature_received, &server_signature_received_length);
+
+   if (server_signature(password_prep, salt, salt_length, iteration,
+                        NULL, 0,
+                        client_first_message_bare, security_lengths[1] - 26,
+                        server_first_message, security_lengths[2] - 9,
+                        &wo_proof[0], strlen(wo_proof),
+                        &server_signature_calc, &server_signature_calc_length))
+   {
+      goto error;
+   }
+
+   if (server_signature_calc_length != server_signature_received_length ||
+       memcmp(server_signature_received, server_signature_calc, server_signature_calc_length) != 0)
+   {
+      goto bad_password;
+   }
+
+   has_security = SECURITY_SCRAM256;
+
+   free(salt);
+   free(err);
+   free(password_prep);
+   free(client_nounce);
+   free(combined_nounce);
+   free(base64_salt);
+   free(iteration_string);
+   free(proof);
+   free(proof_base);
+   free(server_signature_received);
+   free(server_signature_calc);
+
+   pgmoneta_free_copy_message(sasl_response);
+   pgmoneta_free_copy_message(sasl_continue);
+   pgmoneta_free_copy_message(sasl_continue_response);
+   pgmoneta_free_copy_message(sasl_final);
+
+   return AUTH_SUCCESS;
+
+bad_password:
+
+   pgmoneta_log_warn("Wrong password for user: %s", username);
+
+   free(salt);
+   free(err);
+   free(password_prep);
+   free(client_nounce);
+   free(combined_nounce);
+   free(base64_salt);
+   free(iteration_string);
+   free(proof);
+   free(proof_base);
+   free(server_signature_received);
+   free(server_signature_calc);
+
+   pgmoneta_free_copy_message(sasl_response);
+   pgmoneta_free_copy_message(sasl_continue);
+   pgmoneta_free_copy_message(sasl_continue_response);
+   pgmoneta_free_copy_message(sasl_final);
+
+   return AUTH_BAD_PASSWORD;
+
+error:
+
+   free(salt);
+   free(err);
+   free(password_prep);
+   free(client_nounce);
+   free(combined_nounce);
+   free(base64_salt);
+   free(iteration_string);
+   free(proof);
+   free(proof_base);
+   free(server_signature_received);
+   free(server_signature_calc);
+
+   pgmoneta_free_copy_message(sasl_response);
+   pgmoneta_free_copy_message(sasl_continue);
+   pgmoneta_free_copy_message(sasl_continue_response);
    pgmoneta_free_copy_message(sasl_final);
 
    return AUTH_ERROR;

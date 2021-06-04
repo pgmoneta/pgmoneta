@@ -29,14 +29,10 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
-#include <management.h>
-#include <memory.h>
 #include <message.h>
 #include <network.h>
-#include <prometheus.h>
 #include <security.h>
 #include <server.h>
-#include <wal.h>
 #include <utils.h>
 
 /* system */
@@ -45,23 +41,19 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <openssl/ssl.h>
+
+static int get_wal_level(int socket, bool* replica);
 
 void
-pgmoneta_wal(int srv, char** argv)
+pgmoneta_server_wal_level(int srv)
 {
    int usr;
-   char* d = NULL;
-   char* cmd = NULL;
-   int status;
+   int auth;
+   int socket;
+   bool replica;
    struct configuration* config;
 
-   pgmoneta_start_logging();
-   pgmoneta_memory_init();
-
    config = (struct configuration*)shmem;
-
-   pgmoneta_set_proc_title(1, argv, "wal", config->servers[srv].name);
 
    usr = -1;
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -72,68 +64,97 @@ pgmoneta_wal(int srv, char** argv)
       }  
    }
 
-   pgmoneta_server_wal_level(srv);
-
-   d = pgmoneta_append(d, config->base_dir);
-   d = pgmoneta_append(d, "/");
-   d = pgmoneta_append(d, config->servers[srv].name);
-   d = pgmoneta_append(d, "/wal");
-
-   pgmoneta_mkdir(d);
-
-   if (config->servers[srv].valid)
+   if (usr == -1)
    {
-      cmd = pgmoneta_append(cmd, "PGPASSWORD=\"");
-      cmd = pgmoneta_append(cmd, config->users[usr].password);
-      cmd = pgmoneta_append(cmd, "\" ");
+      goto error;
+   }
 
-      cmd = pgmoneta_append(cmd, config->pgsql_dir);
-      cmd = pgmoneta_append(cmd, "/pg_receivewal ");
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, &socket);
 
-      cmd = pgmoneta_append(cmd, "-h ");
-      cmd = pgmoneta_append(cmd, config->servers[srv].host);
-      cmd = pgmoneta_append(cmd, " ");
+   if (auth != AUTH_SUCCESS)
+   {
+      goto error;
+   }
 
-      cmd = pgmoneta_append(cmd, "-p ");
-      cmd = pgmoneta_append_int(cmd, config->servers[srv].port);
-      cmd = pgmoneta_append(cmd, " ");
-
-      cmd = pgmoneta_append(cmd, "-U ");
-      cmd = pgmoneta_append(cmd, config->servers[srv].username);
-      cmd = pgmoneta_append(cmd, " ");
-
-      if (strlen(config->servers[srv].wal_slot) > 0)
-      {
-         cmd = pgmoneta_append(cmd, "-S ");
-         cmd = pgmoneta_append(cmd, config->servers[srv].wal_slot);
-         cmd = pgmoneta_append(cmd, " ");
-      }
-
-      cmd = pgmoneta_append(cmd, "--no-password ");
-
-      cmd = pgmoneta_append(cmd, "-D ");
-      cmd = pgmoneta_append(cmd, d);
-   
-      pgmoneta_log_info("WAL: %s", config->servers[srv].name);
-
-      status = system(cmd);
-
-      if (status != 0)
-      {
-         config->servers[srv].valid = false;
-         pgmoneta_log_error("WAL: Could not start receiver for %s", config->servers[srv].name);
-      }
+   if (get_wal_level(socket, &replica))
+   {
+      config->servers[srv].valid = false;
    }
    else
    {
-      pgmoneta_log_error("WAL: Server %s is not in a valid configuration", config->servers[srv].name);
+      config->servers[srv].valid = replica;
    }
 
-   pgmoneta_memory_destroy();
-   pgmoneta_stop_logging();
+   pgmoneta_write_terminate(NULL, socket);
 
-   free(d);
-   free(cmd);
+   pgmoneta_disconnect(socket);
 
-   exit(0);
+error:
+
+   pgmoneta_disconnect(socket);
+}
+
+static int
+get_wal_level(int socket, bool* replica)
+{
+   int status;
+   size_t size = 21;
+   char wal_level[size];
+   int vlength;
+   char* value = NULL;
+   struct message qmsg;
+   struct message* tmsg = NULL;
+   struct message* dmsg = NULL;
+
+   *replica = false;
+
+   memset(&qmsg, 0, sizeof(struct message));
+   memset(&wal_level, 0, size);
+
+   pgmoneta_write_byte(&wal_level, 'Q');
+   pgmoneta_write_int32(&(wal_level[1]), size - 1);
+   pgmoneta_write_string(&(wal_level[5]), "SHOW wal_level;");
+
+   qmsg.kind = 'Q';
+   qmsg.length = size;
+   qmsg.data = &wal_level;
+
+   status = pgmoneta_write_message(NULL, socket, &qmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_read_block_message(NULL, socket, &tmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   pgmoneta_extract_message('D', tmsg, &dmsg);
+
+   vlength = pgmoneta_read_int32(dmsg->data + 7);
+   value = (char*)malloc(vlength + 1);
+   memset(value, 0, vlength + 1);
+   memcpy(value, dmsg->data + 11, vlength);
+   
+   if (!strcmp("replica", value) || !strcmp("logical", value))
+   {
+      *replica = true;
+   }
+
+   pgmoneta_free_message(dmsg);
+   pgmoneta_free_message(tmsg);
+   free(value);
+
+   return 0;
+
+error:
+   pgmoneta_log_trace("get_wal_level: socket %d status %d", socket, status);
+
+   pgmoneta_free_message(dmsg);
+   pgmoneta_free_message(tmsg);
+   free(value);
+
+   return 1;
 }

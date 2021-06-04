@@ -109,6 +109,13 @@ void
 pgmoneta_free_copy_message(struct message* msg);
 
 /**
+ * Log a message
+ * @param msg The message
+ */
+void
+pgmoneta_log_message(struct message* msg);
+
+/**
  * Write a notice message
  * @param ssl The SSL struct
  * @param socket The socket descriptor
@@ -116,6 +123,15 @@ pgmoneta_free_copy_message(struct message* msg);
  */
 int
 pgmoneta_write_notice(SSL* ssl, int socket);
+
+/**
+ * Write a terminate message
+ * @param ssl The SSL struct
+ * @param socket The socket descriptor
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_write_terminate(SSL* ssl, int socket);
 
 /**
  * Write an empty message
@@ -152,6 +168,24 @@ pgmoneta_write_connection_refused_old(SSL* ssl, int socket);
  */
 int
 pgmoneta_write_tls(SSL* ssl, int socket);
+
+/**
+ * Create an auth password response message
+ * @param password The password
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_auth_password_response(char* password, struct message** msg);
+
+/**
+ * Create an auth MD5 response message
+ * @param md5 The md5
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_auth_md5_response(char* md5, struct message** msg);
 
 /**
  * Write an auth SCRAM-SHA-256 message

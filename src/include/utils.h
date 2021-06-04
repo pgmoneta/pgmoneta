@@ -109,6 +109,14 @@ void
 pgmoneta_write_int32(void* data, int32_t i);
 
 /**
+ * Read a string
+ * @param data Pointer to the data
+ * @return The string
+ */
+char*
+pgmoneta_read_string(void* data);
+
+/**
  * Write a string
  * @param data Pointer to the data
  * @param s The string

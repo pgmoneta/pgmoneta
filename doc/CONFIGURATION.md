@@ -58,6 +58,10 @@ See a [sample](./etc/pgmoneta/pgmoneta.conf) configuration for running `pgmoneta
 | backup_slot | | String | No | The replication slot for the backup |
 | wal_slot | | String | No | The replication slot for WAL |
 
+The `user` specified must have the `REPLICATION` option in order to stream the Write-Ahead Log (WAL), and must
+have access to the `postgres` database in order to get the necessary configuration parameters.
+
+Note, that PostgreSQL 10+ is required, as well as having `wal_level` at `replica` or `logical` level.
 
 # pgmoneta_users configuration
 

@@ -187,6 +187,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      if (max > MISC_LENGTH - 1)
                         max = MISC_LENGTH - 1;
                      memcpy(&srv.host, value, max);
+                     srv.valid = false;
                   }
                   else
                   {
