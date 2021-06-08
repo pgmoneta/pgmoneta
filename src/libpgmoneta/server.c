@@ -143,7 +143,7 @@ get_wal_level(int socket, bool* replica)
       *replica = true;
    }
 
-   pgmoneta_free_message(dmsg);
+   pgmoneta_free_copy_message(dmsg);
    pgmoneta_free_message(tmsg);
    free(value);
 
@@ -152,7 +152,7 @@ get_wal_level(int socket, bool* replica)
 error:
    pgmoneta_log_trace("get_wal_level: socket %d status %d", socket, status);
 
-   pgmoneta_free_message(dmsg);
+   pgmoneta_free_copy_message(dmsg);
    pgmoneta_free_message(tmsg);
    free(value);
 
