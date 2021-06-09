@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <info.h>
 #include <logging.h>
 #include <network.h>
 #include <management.h>
@@ -276,34 +277,39 @@ error:
 int
 pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
 {
-   char buf[4];
+   char buf4[4];
+   char buf8[8];
    char name[MISC_LENGTH];
    int srv;
    int number_of_directories;
    int length;
+   unsigned long backup_size;
+   unsigned long restore_size;
+   char* bck = NULL;
+   char* res = NULL;
 
-   memset(&buf, 0, sizeof(buf));
+   memset(&buf4, 0, sizeof(buf4));
 
-   if (read_complete(ssl, socket, &buf[0], sizeof(buf)))
+   if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
    {
       pgmoneta_log_warn("pgmoneta_management_read_list_backup: read: %d %s", socket, strerror(errno));
       errno = 0;
       goto error;
    }
 
-   srv = pgmoneta_read_int32(&buf);
+   srv = pgmoneta_read_int32(&buf4);
    printf("Server           : %s\n", (srv == -1 ? "Unknown" : server));
 
    if (srv != -1)
    {
-      if (read_complete(ssl, socket, &buf[0], sizeof(buf)))
+      if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
       {
          pgmoneta_log_warn("pgmoneta_management_read_list_backup: read: %d %s", socket, strerror(errno));
          errno = 0;
          goto error;
       }
 
-      number_of_directories = pgmoneta_read_int32(&buf);
+      number_of_directories = pgmoneta_read_int32(&buf4);
       printf("Number of backups: %d\n", number_of_directories);
 
       if (number_of_directories > 0)
@@ -311,14 +317,14 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
          printf("Backup           :\n");
          for (int i = 0; i < number_of_directories; i++)
          {
-            if (read_complete(ssl, socket, &buf[0], sizeof(buf)))
+            if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
             {
                pgmoneta_log_warn("pgmoneta_management_read_list_backup: read: %d %s", socket, strerror(errno));
                errno = 0;
                goto error;
             }
 
-            length = pgmoneta_read_int32(&buf);
+            length = pgmoneta_read_int32(&buf4);
 
             memset(&name[0], 0, sizeof(name));
             
@@ -329,7 +335,32 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
                goto error;
             }
 
-            printf("                   %s\n", &name[0]);
+            memset(&buf8, 0, sizeof(buf8));
+            if (read_complete(ssl, socket, &buf8[0], sizeof(buf8)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_read_list_backup: read: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
+
+            backup_size = pgmoneta_read_int64(&buf8);
+            bck = pgmoneta_bytes_to_string(backup_size);
+
+            memset(&buf8, 0, sizeof(buf8));
+            if (read_complete(ssl, socket, &buf8[0], sizeof(buf8)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_read_list_backup: read: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
+
+            restore_size = pgmoneta_read_int64(&buf8);
+            res = pgmoneta_bytes_to_string(restore_size);
+
+            printf("                   %s (Backup: %s Restore: %s)\n", &name[0], bck, res);
+
+            free(bck);
+            free(res);
          }
       }
    }
@@ -344,17 +375,18 @@ error:
 int
 pgmoneta_management_write_list_backup(int socket, int server)
 {
-   char buf[4];
+   char buf4[4];
+   char buf8[8];
    char* d = NULL;
-   int number_of_directories;
-   DIR *dir = NULL;
-   char** array = NULL;
+   int number_of_backups;
+   struct backup** backups = NULL;
+   int nob;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_write_int32(&buf, server);
-   if (write_complete(NULL, socket, &buf, sizeof(buf)))
+   pgmoneta_write_int32(&buf4, server);
+   if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
    {
       pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
       errno = 0;
@@ -369,10 +401,10 @@ pgmoneta_management_write_list_backup(int socket, int server)
       d = pgmoneta_append(d, config->servers[server].name);
       d = pgmoneta_append(d, "/backup/");
 
-      if (pgmoneta_get_directories(d, &number_of_directories, &array))
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
-         pgmoneta_write_int32(&buf, 0);
-         if (write_complete(NULL, socket, &buf, sizeof(buf)))
+         pgmoneta_write_int32(&buf4, 0);
+         if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
          {
             pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
             errno = 0;
@@ -380,37 +412,65 @@ pgmoneta_management_write_list_backup(int socket, int server)
          goto error;
       }
 
-      pgmoneta_write_int32(&buf, number_of_directories);
-      if (write_complete(NULL, socket, &buf, sizeof(buf)))
+      nob = 0;
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (backups[i] != NULL && backups[i]->valid)
+         {
+            nob++;
+         }
+      }
+
+      pgmoneta_write_int32(&buf4, nob);
+      if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
       {
          pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
          errno = 0;
          goto error;
       }
 
-      for (int i = 0; i < number_of_directories; i++)
+      for (int i = 0; i < number_of_backups; i++)
       {
-         pgmoneta_write_int32(&buf, strlen(array[i]));
-         if (write_complete(NULL, socket, &buf, sizeof(buf)))
+         if (backups[i] != NULL && backups[i]->valid)
          {
-            pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
-            errno = 0;
-            goto error;
-         }
+            pgmoneta_write_int32(&buf4, strlen(backups[i]->label));
+            if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
 
-         if (write_complete(NULL, socket, array[i], strlen(array[i])))
-         {
-            pgmoneta_log_warn("pgmoneta_management_list_backup: write: %d %s", socket, strerror(errno));
-            errno = 0;
-            goto error;
+            if (write_complete(NULL, socket, backups[i]->label, strlen(backups[i]->label)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_list_backup: write: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
+
+            pgmoneta_write_int64(&buf8, backups[i]->backup_size);
+            if (write_complete(NULL, socket, &buf8, sizeof(buf8)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
+
+            pgmoneta_write_int64(&buf8, backups[i]->restore_size);
+            if (write_complete(NULL, socket, &buf8, sizeof(buf8)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
          }
       }
 
-      for (int i = 0; i < number_of_directories; i++)
+      for (int i = 0; i < number_of_backups; i++)
       {
-         free(array[i]);
+         free(backups[i]);
       }
-      free(array);
+      free(backups);
    }
 
    free(d);
@@ -418,11 +478,6 @@ pgmoneta_management_write_list_backup(int socket, int server)
    return 0;
 
 error:
-
-   if (dir != NULL)
-   {
-      closedir(dir);
-   }
 
    free(d);
 

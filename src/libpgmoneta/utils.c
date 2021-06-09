@@ -225,6 +225,30 @@ pgmoneta_read_int32(void* data)
    return res;
 }
 
+int64_t
+pgmoneta_read_int64(void* data)
+{
+   int64_t i0 = *((unsigned char*)data);
+   int64_t i1 = *((unsigned char*)data + 1);
+   int64_t i2 = *((unsigned char*)data + 2);
+   int64_t i3 = *((unsigned char*)data + 3);
+   int64_t i4 = *((unsigned char*)data + 4);
+   int64_t i5 = *((unsigned char*)data + 5);
+   int64_t i6 = *((unsigned char*)data + 6);
+   int64_t i7 = *((unsigned char*)data + 7);
+
+   i0 = i0 << 56;
+   i1 = i1 << 48;
+   i2 = i2 << 40;
+   i3 = i3 << 32;
+   i4 = i4 << 24;
+   i5 = i5 << 16;
+   i6 = i6 <<  8;
+   i7 = i7;
+
+   return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
+}
+
 void
 pgmoneta_write_byte(void* data, signed char b)
 {
@@ -236,6 +260,28 @@ pgmoneta_write_int32(void* data, int32_t i)
 {
    char *ptr = (char*)&i;
 
+   *((char*)(data + 3)) = *ptr;
+   ptr++;
+   *((char*)(data + 2)) = *ptr;
+   ptr++;
+   *((char*)(data + 1)) = *ptr;
+   ptr++;
+   *((char*)(data)) = *ptr;
+}
+
+void
+pgmoneta_write_int64(void* data, int64_t i)
+{
+   char *ptr = (char*)&i;
+
+   *((char*)(data + 7)) = *ptr;
+   ptr++;
+   *((char*)(data + 6)) = *ptr;
+   ptr++;
+   *((char*)(data + 5)) = *ptr;
+   ptr++;
+   *((char*)(data + 4)) = *ptr;
+   ptr++;
    *((char*)(data + 3)) = *ptr;
    ptr++;
    *((char*)(data + 2)) = *ptr;
@@ -719,6 +765,21 @@ pgmoneta_append_ulong(char* orig, unsigned long l)
    return orig;
 }
 
+char*
+pgmoneta_append_bool(char* orig, bool b)
+{
+   if (b)
+   {
+      orig = pgmoneta_append(orig, "1");
+   }
+   else
+   {
+      orig = pgmoneta_append(orig, "0");
+   }
+
+   return orig;
+}
+
 unsigned long
 pgmoneta_directory_size(char* directory)
 {
@@ -1168,6 +1229,39 @@ void
 pgmoneta_sort(size_t size, char** array)
 {
    qsort(array, size, sizeof(const char*), string_compare);
+}
+
+char*
+pgmoneta_bytes_to_string(uint64_t bytes)
+{
+   char* sizes[] = {"EB", "PB", "TB", "GB", "MB", "KB", "B"};
+   uint64_t exbibytes = 1024ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL;
+   uint64_t multiplier = exbibytes;
+   char* result;
+
+   result = (char*)malloc(sizeof(char) * 20);
+
+   for (int i = 0; i < sizeof(sizes)/sizeof(*(sizes)); i++, multiplier /= 1024)
+   {
+      if (bytes < multiplier)
+      {
+         continue;
+      }
+
+      if (bytes % multiplier == 0)
+      {
+         sprintf(result, "%" PRIu64 " %s", bytes / multiplier, sizes[i]);
+      }
+      else
+      {
+         sprintf(result, "%.1f %s", (float)bytes / multiplier, sizes[i]);
+      }
+
+      return result;
+   }
+
+   strcpy(result, "0");
+   return result;
 }
 
 static int

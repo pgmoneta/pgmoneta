@@ -93,6 +93,14 @@ int32_t
 pgmoneta_read_int32(void* data);
 
 /**
+ * Read an int64
+ * @param data Pointer to the data
+ * @return The int64
+ */
+int64_t
+pgmoneta_read_int64(void* data);
+
+/**
  * Write a byte
  * @param data Pointer to the data
  * @param b The byte
@@ -107,6 +115,14 @@ pgmoneta_write_byte(void* data, signed char b);
  */
 void
 pgmoneta_write_int32(void* data, int32_t i);
+
+/**
+ * Write an int64
+ * @param data Pointer to the data
+ * @param i The int64
+ */
+void
+pgmoneta_write_int64(void* data, int64_t i);
 
 /**
  * Read a string
@@ -249,6 +265,15 @@ char*
 pgmoneta_append_ulong(char* orig, unsigned long l);
 
 /**
+ * Append a bool
+ * @param orig The original string
+ * @param b The bool
+ * @return The resulting string
+ */
+char*
+pgmoneta_append_bool(char* orig, bool b);
+
+/**
  * Calculate the directory size
  * @param directory The directory
  * @return The size in bytes
@@ -343,6 +368,14 @@ pgmoneta_ends_with(char* str, char* suffix);
  */
 void
 pgmoneta_sort(size_t size, char** array);
+
+/**
+ * Bytes to string
+ * @param bytes The number of bytes
+ * @return The result
+ */
+char*
+pgmoneta_bytes_to_string(uint64_t bytes);
 
 #ifdef DEBUG
 

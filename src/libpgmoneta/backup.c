@@ -30,10 +30,12 @@
 #include <pgmoneta.h>
 #include <backup.h>
 #include <gzip.h>
+#include <info.h>
 #include <logging.h>
 #include <utils.h>
 
 /* system */
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -50,9 +52,11 @@ pgmoneta_backup(int server, char** argv)
    int hours;
    int minutes;
    int seconds;
+   char* root = NULL;
    char* d = NULL;
    char* cmd = NULL;
    int status;
+   unsigned long size;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -68,6 +72,7 @@ pgmoneta_backup(int server, char** argv)
    }
 
    start_time = time(NULL);
+   total_seconds = 0;
 
    usr = -1;
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -82,6 +87,15 @@ pgmoneta_backup(int server, char** argv)
    time(&current_time);
    time_info = localtime(&current_time);
    strftime(&date[0], sizeof(date), "%Y%m%d%H%M%S", time_info);
+
+   root = pgmoneta_append(root, config->base_dir);
+   root = pgmoneta_append(root, "/");
+   root = pgmoneta_append(root, config->servers[server].name);
+   root = pgmoneta_append(root, "/backup/");
+   root = pgmoneta_append(root, date);
+   root = pgmoneta_append(root, "/");
+
+   pgmoneta_mkdir(root);
 
    d = pgmoneta_append(d, config->base_dir);
    d = pgmoneta_append(d, "/");
@@ -116,6 +130,10 @@ pgmoneta_backup(int server, char** argv)
       cmd = pgmoneta_append(cmd, " ");
    }
 
+   cmd = pgmoneta_append(cmd, "-l ");
+   cmd = pgmoneta_append(cmd, date);
+   cmd = pgmoneta_append(cmd, " ");
+
    cmd = pgmoneta_append(cmd, "-X stream ");
    cmd = pgmoneta_append(cmd, "--no-password ");
    cmd = pgmoneta_append(cmd, "-c fast ");
@@ -125,6 +143,8 @@ pgmoneta_backup(int server, char** argv)
    
    status = system(cmd);
    
+   size = pgmoneta_directory_size(d);
+
    if (status != 0)
    {
       pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
@@ -147,10 +167,13 @@ pgmoneta_backup(int server, char** argv)
       pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
    }
 
+   pgmoneta_create_info(root, status, &date[0], size, total_seconds);
+
 done:
 
    pgmoneta_stop_logging();
 
+   free(root);
    free(d);
    free(cmd);
 
