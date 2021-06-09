@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <delete.h>
+#include <info.h>
 #include <logging.h>
 #include <utils.h>
 
@@ -40,9 +41,9 @@ pgmoneta_delete(int srv, char* backup_id)
 {
    char* id = NULL;
    char* d = NULL;
-   int number_of_directories = 0;
-   char** array = NULL;
-   DIR *dir = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   DIR* dir;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -55,15 +56,24 @@ pgmoneta_delete(int srv, char* backup_id)
       d = pgmoneta_append(d, config->servers[srv].name);
       d = pgmoneta_append(d, "/backup/");
 
-      if (pgmoneta_get_directories(d, &number_of_directories, &array))
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
          goto error;
       }
 
-      if (number_of_directories > 0)
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
       {
-         id = array[0];
+         if (backups[i] != NULL && backups[i]->valid)
+         {
+            id = backups[i]->label;
+         }
       }
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
 
       free(d);
       d = NULL;
@@ -76,15 +86,24 @@ pgmoneta_delete(int srv, char* backup_id)
       d = pgmoneta_append(d, config->servers[srv].name);
       d = pgmoneta_append(d, "/backup/");
 
-      if (pgmoneta_get_directories(d, &number_of_directories, &array))
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
          goto error;
       }
 
-      if (number_of_directories > 0)
+      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
       {
-         id = array[number_of_directories - 1];
+         if (backups[i] != NULL && backups[i]->valid)
+         {
+            id = backups[i]->label;
+         }
       }
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
 
       free(d);
       d = NULL;
@@ -116,12 +135,6 @@ pgmoneta_delete(int srv, char* backup_id)
 
    pgmoneta_log_info("Delete: %s/%s", config->servers[srv].name, id);
 
-   for (int i = 0; i < number_of_directories; i++)
-   {
-      free(array[i]);
-   }
-   free(array);
-
    free(d);
 
    return 0;
@@ -133,12 +146,6 @@ error:
       closedir(dir);
    }
    
-   for (int i = 0; i < number_of_directories; i++)
-   {
-      free(array[i]);
-   }
-   free(array);
-
    free(d);
 
    return 1;

@@ -626,14 +626,14 @@ static void
 help_restore(void)
 {
    printf("Restore a backup for a server\n");
-   printf("  pgmoneta-cli restore <server> <timestamp> <directory>\n");
+   printf("  pgmoneta-cli restore <server> [<timestamp>|oldest|newest] <directory>\n");
 }
 
 static void
 help_delete(void)
 {
    printf("Delete a backup for a server\n");
-   printf("  pgmoneta-cli delete <server> <timestamp>\n");
+   printf("  pgmoneta-cli delete <server> [<timestamp>|oldest|newest]\n");
 }
 
 static int

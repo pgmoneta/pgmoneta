@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <gzip.h>
+#include <info.h>
 #include <logging.h>
 #include <restore.h>
 #include <utils.h>
@@ -46,8 +47,12 @@ pgmoneta_restore(int server, char* backup_id, char* directory, char** argv)
    int hours;
    int minutes;
    int seconds;
+   int number_of_backups;
+   struct backup** backups;
+   char* d = NULL;
    char* from = NULL;
    char* to = NULL;
+   char* id = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -58,22 +63,69 @@ pgmoneta_restore(int server, char* backup_id, char* directory, char** argv)
 
    start_time = time(NULL);
 
+   if (!strcmp(backup_id, "oldest"))
+   {
+      d = NULL;
+      d = pgmoneta_append(d, config->base_dir);
+      d = pgmoneta_append(d, "/");
+      d = pgmoneta_append(d, config->servers[server].name);
+      d = pgmoneta_append(d, "/backup/");
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto done;
+      }
+
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
+      {
+         if (backups[i] != NULL && backups[i]->valid)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
+   {
+      d = NULL;
+      d = pgmoneta_append(d, config->base_dir);
+      d = pgmoneta_append(d, "/");
+      d = pgmoneta_append(d, config->servers[server].name);
+      d = pgmoneta_append(d, "/backup/");
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto done;
+      }
+
+      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
+      {
+         if (backups[i] != NULL && backups[i]->valid)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else
+   {
+      id = backup_id;
+   }
+
    from = pgmoneta_append(from, config->base_dir);
    from = pgmoneta_append(from, "/");
    from = pgmoneta_append(from, config->servers[server].name);
    from = pgmoneta_append(from, "/backup/");
-   from = pgmoneta_append(from, backup_id);
+   from = pgmoneta_append(from, id);
    from = pgmoneta_append(from, "/data");
 
    to = pgmoneta_append(to, directory);
    to = pgmoneta_append(to, "/");
-   to = pgmoneta_append(to, backup_id);
+   to = pgmoneta_append(to, id);
 
    pgmoneta_delete_directory(to);
 
    if (pgmoneta_copy_directory(from, to))
    {
-      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, backup_id);
+      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, id);
    }
    else
    {
@@ -90,13 +142,22 @@ pgmoneta_restore(int server, char* backup_id, char* directory, char** argv)
       memset(&elapsed[0], 0, sizeof(elapsed));
       sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, backup_id, &elapsed[0]);
+      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
 
+done:
+   
    pgmoneta_stop_logging();
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
 
    free(from);
    free(to);
+   free(d);
 
    free(backup_id);
    free(directory);
