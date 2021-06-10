@@ -69,12 +69,6 @@ pgmoneta_delete(int srv, char* backup_id)
          }
       }
 
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         free(backups[i]);
-      }
-      free(backups);
-
       free(d);
       d = NULL;
    }
@@ -98,12 +92,6 @@ pgmoneta_delete(int srv, char* backup_id)
             id = backups[i]->label;
          }
       }
-
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         free(backups[i]);
-      }
-      free(backups);
 
       free(d);
       d = NULL;
@@ -135,6 +123,12 @@ pgmoneta_delete(int srv, char* backup_id)
 
    pgmoneta_log_info("Delete: %s/%s", config->servers[srv].name, id);
 
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
    free(d);
 
    return 0;
@@ -146,6 +140,12 @@ error:
       closedir(dir);
    }
    
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
    free(d);
 
    return 1;
