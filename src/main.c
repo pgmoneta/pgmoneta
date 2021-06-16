@@ -43,6 +43,7 @@
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
+#include <zstandard.h>
 
 /* system */
 #include <errno.h>
@@ -1081,7 +1082,7 @@ wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      /* pgmoneta_gzip_wal() is always in a fork() */
+      /* Compression is always in a fork() */
       if (!fork())
       {
          char* d = NULL;
@@ -1096,6 +1097,10 @@ wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents)
          if (config->compression_type == COMPRESSION_GZIP)
          {
             pgmoneta_gzip_wal(d);
+         }
+         else if (config->compression_type == COMPRESSION_ZSTD)
+         {
+            pgmoneta_zstandardc_wal(d);
          }
 
          free(d);

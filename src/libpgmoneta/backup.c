@@ -33,6 +33,7 @@
 #include <info.h>
 #include <logging.h>
 #include <utils.h>
+#include <zstandard.h>
 
 /* system */
 #include <stdio.h>
@@ -154,6 +155,10 @@ pgmoneta_backup(int server, char** argv)
       if (config->compression_type == COMPRESSION_GZIP)
       {
          pgmoneta_gzip_data(d);
+      }
+      else if (config->compression_type == COMPRESSION_ZSTD)
+      {
+         pgmoneta_zstandardc_data(d);
       }
 
       total_seconds = (int)difftime(time(NULL), start_time);

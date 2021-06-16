@@ -33,7 +33,7 @@ metrics = 5001
 
 base_dir = /home/pgmoneta
 
-compression = gzip
+compression = zstd
 
 retention = 7
 
@@ -52,7 +52,7 @@ user = repl
 
 In our main section called `[pgmoneta]` we setup `pgmoneta` to listen on all
 network addresses. We will enable Prometheus metrics on port 5001 and have the backups
-live in the `/home/pgmoneta` directory. All backups are being compressed with gzip and kept
+live in the `/home/pgmoneta` directory. All backups are being compressed with zstd and kept
 for 7 days. Logging will be performed at `info` level and
 put in a file called `/tmp/pgmoneta.log`. Last we specify the
 location of the `unix_socket_dir` used for management operations and the path for the

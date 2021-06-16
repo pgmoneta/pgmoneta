@@ -74,8 +74,8 @@ pgmoneta_init_configuration(void* shm)
 
    config = (struct configuration*)shm;
 
-   config->compression_type = COMPRESSION_GZIP;
-   config->compression_level = 9;
+   config->compression_type = COMPRESSION_ZSTD;
+   config->compression_level = 3;
 
    config->retention = 7;
 
@@ -655,15 +655,6 @@ pgmoneta_validate_configuration(void* shm)
    {
       pgmoneta_log_fatal("pgmoneta: No PostgreSQL directory defined");
       return 1;
-   }
-
-   if (config->compression_level < 1)
-   {
-      config->compression_level = 1;
-   }
-   else if (config->compression_level > 9)
-   {
-      config->compression_level = 9;
    }
 
    if (config->retention < 0)
@@ -1284,7 +1275,10 @@ as_compression(char* str)
    if (!strcasecmp(str, "gzip"))
       return COMPRESSION_GZIP;
 
-   return COMPRESSION_GZIP;
+   if (!strcasecmp(str, "zstd"))
+      return COMPRESSION_ZSTD;
+
+   return COMPRESSION_ZSTD;
 }
 
 static int

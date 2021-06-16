@@ -40,10 +40,10 @@ management
   The remote management port. Default is 0 (disabled)
 
 compression
-  The compression type (none, gzip). Default is gzip
+  The compression type (none, gzip, zstd). Default is zstd
 
 compression_level
-  The compression level (1..9). Default is 9
+  The compression level. Default is 3
 
 log_type
   The logging type (console, file, syslog). Default is console

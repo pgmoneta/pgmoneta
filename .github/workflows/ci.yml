@@ -25,6 +25,8 @@ jobs:
       run: sudo apt install -y libsystemd-dev
     - name: Install rst2man
       run: sudo apt install -y python-docutils
+    - name: Install zstd
+      run: sudo apt install -y libzstd libzstd-dev
     - name: Update alternatives
       run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60
     - name: mkdir

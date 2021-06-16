@@ -62,6 +62,13 @@ else ()
   message(FATAL_ERROR "zlib needed")
 endif()
 
+find_package(Zstd)
+if (ZSTD_FOUND)
+  message(STATUS "zstd found")
+else ()
+  message(FATAL_ERROR "zstd needed")
+endif()
+
 find_package(Libev 4.11)
 if (LIBEV_FOUND)
   message(STATUS "libev found")

@@ -28,8 +28,8 @@ See a [sample](./etc/pgmoneta/pgmoneta.conf) configuration for running `pgmoneta
 | pgsql_dir | | String | Yes | The directory for the PostgreSQL binaries |
 | metrics | 0 | Int | No | The metrics port (disable = 0) |
 | management | 0 | Int | No | The remote management port (disable = 0) |
-| compression | gzip | String | No | The compression type (none, gzip) |
-| compression_level | 9 | int | No | The compression level (1..9) |
+| compression | zstd | String | No | The compression type (none, gzip, zstd) |
+| compression_level | 3 | int | No | The compression level |
 | retention | 7 | Int | No | The retention time in days |
 | log_type | console | String | No | The logging type (console, file, syslog) |
 | log_level | info | String | No | The logging level (fatal, error, warn, info, debug1, ..., debug5) |

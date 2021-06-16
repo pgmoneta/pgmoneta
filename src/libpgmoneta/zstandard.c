@@ -28,27 +28,25 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <gzip.h>
 #include <logging.h>
 #include <utils.h>
+#include <zstandard.h>
 
 /* system */
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>
+#include <zstd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BUFFER_LENGTH 8192
-
-static int gz_compress(char* from, int level, char* to);
-static int gz_decompress(char* from, char* to);
+static int zstd_compress(char* from, int level, char* to);
+static int zstd_decompress(char* from, char* to);
 
 void
-pgmoneta_gzip_data(char* directory)
+pgmoneta_zstandardc_data(char* directory)
 {
    char* from = NULL;
    char* to = NULL;
@@ -69,9 +67,9 @@ pgmoneta_gzip_data(char* directory)
    {
       level = 1;
    }
-   else if (level > 9)
+   else if (level > 19)
    {
-      level = 9;
+      level = 19;
    }
 
    while ((entry = readdir(dir)) != NULL)
@@ -87,7 +85,7 @@ pgmoneta_gzip_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_gzip_data(path);
+         pgmoneta_zstandardc_data(path);
       }
       else
       {
@@ -102,11 +100,11 @@ pgmoneta_gzip_data(char* directory)
          to = pgmoneta_append(to, directory);
          to = pgmoneta_append(to, "/");
          to = pgmoneta_append(to, entry->d_name);
-         to = pgmoneta_append(to, ".gz");
+         to = pgmoneta_append(to, ".zstd");
          
-         if (gz_compress(from, level, to))
+         if (zstd_compress(from, level, to))
          {
-            pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
+            pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, entry->d_name);
             break;
          }
 
@@ -121,7 +119,7 @@ pgmoneta_gzip_data(char* directory)
 }
 
 void
-pgmoneta_gzip_wal(char* directory)
+pgmoneta_zstandardc_wal(char* directory)
 {
    char* from = NULL;
    char* to = NULL;
@@ -142,16 +140,16 @@ pgmoneta_gzip_wal(char* directory)
    {
       level = 1;
    }
-   else if (level > 9)
+   else if (level > 19)
    {
-      level = 9;
+      level = 19;
    }
 
    while ((entry = readdir(dir)) != NULL)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, ".gz") || pgmoneta_ends_with(entry->d_name, ".partial"))
+         if (pgmoneta_ends_with(entry->d_name, ".zstd") || pgmoneta_ends_with(entry->d_name, ".partial"))
          {
             continue;
          }
@@ -167,11 +165,11 @@ pgmoneta_gzip_wal(char* directory)
          to = pgmoneta_append(to, directory);
          to = pgmoneta_append(to, "/");
          to = pgmoneta_append(to, entry->d_name);
-         to = pgmoneta_append(to, ".gz");
+         to = pgmoneta_append(to, ".zstd");
 
-         if (gz_compress(from, level, to))
+         if (zstd_compress(from, level, to))
          {
-            pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
+            pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, entry->d_name);
             break;
          }
 
@@ -186,7 +184,7 @@ pgmoneta_gzip_wal(char* directory)
 }
 
 void
-pgmoneta_gunzip_data(char* directory)
+pgmoneta_zstandardd_data(char* directory)
 {
    char* from = NULL;
    char* to = NULL;
@@ -212,7 +210,7 @@ pgmoneta_gunzip_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_gunzip_data(path);
+         pgmoneta_zstandardd_data(path);
       }
       else
       {
@@ -222,9 +220,9 @@ pgmoneta_gunzip_data(char* directory)
          from = pgmoneta_append(from, "/");
          from = pgmoneta_append(from, entry->d_name);
 
-         name = malloc(strlen(entry->d_name) - 2);
-         memset(name, 0, strlen(entry->d_name) - 2);
-         memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
+         name = malloc(strlen(entry->d_name) - 4);
+         memset(name, 0, strlen(entry->d_name) - 4);
+         memcpy(name, entry->d_name, strlen(entry->d_name) - 5);
 
          to = NULL;
 
@@ -232,9 +230,9 @@ pgmoneta_gunzip_data(char* directory)
          to = pgmoneta_append(to, "/");
          to = pgmoneta_append(to, name);
 
-         if (gz_decompress(from, to))
+         if (zstd_decompress(from, to))
          {
-            pgmoneta_log_error("Gzip: Could not decompress %s/%s", directory, entry->d_name);
+            pgmoneta_log_error("ZSTD: Could not decompress %s/%s", directory, entry->d_name);
             break;
          }
 
@@ -250,137 +248,158 @@ pgmoneta_gunzip_data(char* directory)
 }
 
 static int
-gz_compress(char* from, int level, char* to)
+zstd_compress(char* from, int level, char* to)
 {
-   char buf[BUFFER_LENGTH];
-   FILE* in = NULL;
-   char mode[4];
-   gzFile out = NULL;
-   size_t length;
+   FILE* fin = NULL;
+   FILE* fout = NULL;
+   size_t buffInSize = -1;
+   void* buffIn = NULL;
+   size_t buffOutSize = -1;
+   void* buffOut = NULL;
+   ZSTD_CCtx* cctx = NULL;
 
-   in = fopen(from, "rb");
-   if (in == NULL)
+   fin  = fopen(from, "rb");
+   fout = fopen(to, "wb");
+   buffInSize = ZSTD_CStreamInSize();
+   buffIn  = malloc(buffInSize);
+   buffOutSize = ZSTD_CStreamOutSize();
+   buffOut = malloc(buffOutSize);
+
+   cctx = ZSTD_createCCtx();
+   if (cctx == NULL)
    {
       goto error;
    }
 
-   memset(&mode[0], 0, sizeof(mode));
-   mode[0] = 'w';
-   mode[1] = 'b';
-   mode[2] = '0' + level;
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, 4);
 
-   out = gzopen(to, mode);
-   if (out == NULL)
+   size_t toRead = buffInSize;
+   for (;;)
    {
-      goto error;
-   }
-
-   do
-   {
-      length = fread(buf, 1, sizeof(buf), in);
-
-      if (ferror(in))
+      size_t read = fread(buffIn, sizeof(char), toRead, fin);
+      int lastChunk = (read < toRead);
+      ZSTD_EndDirective mode = lastChunk ? ZSTD_e_end : ZSTD_e_continue;
+      ZSTD_inBuffer input = {buffIn, read, 0};
+      int finished;
+      do
       {
-         goto error;
+         ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
+         size_t remaining = ZSTD_compressStream2(cctx, &output , &input, mode);
+         fwrite(buffOut, sizeof(char), output.pos, fout);
+         finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
       }
+      while (!finished);
 
-      if (length > 0)
+      if (lastChunk)
       {
-         if (gzwrite(out, buf, (unsigned)length) != length)
-         {
-            goto error;
-         }
+         break;
       }
    }
-   while (length > 0);
 
-   fclose(in);
-
-   if (gzclose(out) != Z_OK)
-   {
-      out = NULL;
-      goto error;
-   }
+   ZSTD_freeCCtx(cctx);
+   fclose(fout);
+   fclose(fin);
+   free(buffIn);
+   free(buffOut);
 
    return 0;
 
 error:
 
-   if (in != NULL)
+   if (cctx != NULL)
    {
-      fclose(in);
+      ZSTD_freeCCtx(cctx);
    }
 
-   if (out != NULL)
+   if (fout != NULL)
    {
-      gzclose(out);
+      fclose(fout);
    }
+
+   if (fin != NULL)
+   {
+      fclose(fin);
+   }
+
+   free(buffIn);
+   free(buffOut);
 
    return 1;
 }
 
 static int
-gz_decompress(char* from, char* to)
+zstd_decompress(char* from, char* to)
 {
-   char buf[BUFFER_LENGTH];
-   FILE* out = NULL;
-   char mode[3];
-   gzFile in = NULL;
-   size_t length;
+   FILE* fin = NULL;
+   size_t buffInSize = -1;
+   void* buffIn = NULL;
+   FILE* fout = NULL;
+   size_t buffOutSize = -1;
+   void* buffOut = NULL;
+   ZSTD_DCtx* dctx = NULL;
 
-   memset(&mode[0], 0, sizeof(mode));
-   mode[0] = 'r';
-   mode[1] = 'b';
+   fin = fopen(from, "rb");
+   buffInSize = ZSTD_DStreamInSize();
+   buffIn  = malloc(buffInSize);
+   fout = fopen(to, "wb");;
+   buffOutSize = ZSTD_DStreamOutSize();
+   buffOut = malloc(buffOutSize);
 
-   in = gzopen(from, mode);
-   if (in == NULL)
+   dctx = ZSTD_createDCtx();
+   if (dctx == NULL)
    {
       goto error;
    }
 
-   out = fopen(to, "wb");
-   if (in == NULL)
+   size_t toRead = buffInSize;
+   size_t read;
+   size_t lastRet = 0;
+   while ((read = fread(buffIn, sizeof(char), toRead, fin)))
    {
-      goto error;
-   }
-
-   do
-   {
-      length = (int)gzread(in, buf, (unsigned)BUFFER_LENGTH);
-
-      if (length > 0)
+      ZSTD_inBuffer input = {buffIn, read, 0};
+      while (input.pos < input.size)
       {
-         if (fwrite(buf, 1, length, out) != length)
-         {
-            goto error;
-         }
+         ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
+         size_t ret = ZSTD_decompressStream(dctx, &output , &input);
+         fwrite(buffOut, sizeof(char), output.pos, fout);
+         lastRet = ret;
       }
    }
-   while (length > 0);
 
-   if (gzclose(in) != Z_OK)
+   if (lastRet != 0)
    {
-      in = NULL;
       goto error;
    }
 
-   fclose(out);
-
-   pgmoneta_delete_file(from);
+   ZSTD_freeDCtx(dctx);
+   fclose(fin);
+   fclose(fout);
+   free(buffIn);
+   free(buffOut);
 
    return 0;
 
 error:
 
-   if (in != NULL)
+   if (dctx != NULL)
    {
-      gzclose(in);
+      ZSTD_freeDCtx(dctx);
    }
 
-   if (out != NULL)
+   if (fout != NULL)
    {
-      fclose(out);
+      fclose(fout);
    }
+
+   if (fin != NULL)
+   {
+      fclose(fin);
+   }
+
+   free(buffIn);
+   free(buffOut);
 
    return 1;
 }
