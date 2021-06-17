@@ -806,15 +806,6 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
    memset(&buf4, 0, sizeof(buf4));
    memset(&buf8, 0, sizeof(buf8));
 
-   if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
-   {
-      pgmoneta_log_warn("pgmoneta_management_read_status: read: %d %s", socket, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-
-   retention = pgmoneta_read_int32(&buf4);
-
    if (read_complete(ssl, socket, &buf8[0], sizeof(buf8)))
    {
       pgmoneta_log_warn("pgmoneta_management_read_status: read: %d %s", socket, strerror(errno));
@@ -863,6 +854,15 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
 
    for (int i = 0; i < servers; i++)
    {
+      if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
+      {
+         pgmoneta_log_warn("pgmoneta_management_read_status: read: %d %s", socket, strerror(errno));
+         errno = 0;
+         goto error;
+      }
+
+      retention = pgmoneta_read_int32(&buf4);
+
       if (read_complete(ssl, socket, &buf8[0], sizeof(buf8)))
       {
          pgmoneta_log_warn("pgmoneta_management_read_status: read: %d %s", socket, strerror(errno));
@@ -921,6 +921,7 @@ pgmoneta_management_write_status(int socket)
    char buf4[4];
    char buf8[8];
    char* d = NULL;
+   int retention;
    unsigned long used_size;
    unsigned long free_size;
    unsigned long total_size;
@@ -930,14 +931,6 @@ pgmoneta_management_write_status(int socket)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
-
-   pgmoneta_write_int32(&buf4, config->retention);
-   if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
-   {
-      pgmoneta_log_warn("pgmoneta_management_write_status: write: %d %s", socket, strerror(errno));
-      errno = 0;
-      goto error;
-   }
 
    d = NULL;
    d = pgmoneta_append(d, config->base_dir);
@@ -985,6 +978,20 @@ pgmoneta_management_write_status(int socket)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
+      retention = config->servers[i].retention;
+      if (retention <= 0)
+      {
+         retention = config->retention;
+      }
+
+      pgmoneta_write_int32(&buf4, retention);
+      if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
+      {
+         pgmoneta_log_warn("pgmoneta_management_write_status: write: %d %s", socket, strerror(errno));
+         errno = 0;
+         goto error;
+      }
+
       d = NULL;
       d = pgmoneta_append(d, config->base_dir);
       d = pgmoneta_append(d, "/");

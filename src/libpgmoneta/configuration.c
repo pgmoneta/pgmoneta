@@ -587,6 +587,13 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         unknown = true;
                      }
                   }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_int(value, &srv.retention))
+                     {
+                        unknown = true;
+                     }
+                  }
                   else
                   {
                      unknown = true;

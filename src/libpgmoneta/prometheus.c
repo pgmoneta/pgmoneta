@@ -250,6 +250,9 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention</h2>\n");
    data = pgmoneta_append(data, "  The retention of pgmoneta in days\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_retention_server</h2>\n");
+   data = pgmoneta_append(data, "  The retention a server in days\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_used_space</h2>\n");
    data = pgmoneta_append(data, "  The disk space used for pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
@@ -504,6 +507,7 @@ general_information(int client_fd)
 {
    char* d;
    unsigned long size;
+   int retention;
    char* data = NULL;
    struct configuration* config;
 
@@ -520,6 +524,28 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "pgmoneta_retention ");
    data = pgmoneta_append_int(data, config->retention);
    data = pgmoneta_append(data, "\n\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_retention_server The retention of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_server gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_retention_server{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      retention = config->servers[i].retention;
+      if (retention <= 0)
+      {
+         retention = config->retention;
+      }
+
+      data = pgmoneta_append_int(data, retention);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
 
    d = NULL;
 
@@ -565,7 +591,7 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n\n");
 
    free(d);
-   
+
    if (data != NULL)
    {
       send_chunk(client_fd, data);

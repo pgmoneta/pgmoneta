@@ -54,15 +54,23 @@ pgmoneta_retention(char** argv)
 
    pgmoneta_set_proc_title(1, argv, "retention", NULL);
 
-   t = time(NULL);
-
-   memset(&check_date[0], 0, sizeof(check_date));
-   t = t - (config->retention * 24 * 60 * 60);
-   time_info = localtime(&t);
-   strftime(&check_date[0], sizeof(check_date), "%Y%m%d%H%M%S", time_info);
-
    for (int i = 0; i < config->number_of_servers; i++)
    {
+      int retention;
+
+      t = time(NULL);
+
+      retention = config->servers[i].retention;
+      if (retention <= 0)
+      {
+         retention = config->retention;
+      }
+
+      memset(&check_date[0], 0, sizeof(check_date));
+      t = t - (retention * 24 * 60 * 60);
+      time_info = localtime(&t);
+      strftime(&check_date[0], sizeof(check_date), "%Y%m%d%H%M%S", time_info);
+
       d = NULL;
 
       d = pgmoneta_append(d, config->base_dir);

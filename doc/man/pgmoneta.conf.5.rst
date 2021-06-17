@@ -104,6 +104,15 @@ port
 user
   The user name for the replication role. Mandatory
 
+backup_slot
+  The backup slot
+
+wal_slot
+  The WAL slot
+
+retention
+  The retention for the server
+
 REPORTING BUGS
 ==============
 

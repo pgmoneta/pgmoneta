@@ -57,6 +57,7 @@ See a [sample](./etc/pgmoneta/pgmoneta.conf) configuration for running `pgmoneta
 | user | | String | Yes | The replication user name |
 | backup_slot | | String | No | The replication slot for the backup |
 | wal_slot | | String | No | The replication slot for WAL |
+| retention | | Int | No | The retention for the server |
 
 The `user` specified must have the `REPLICATION` option in order to stream the Write-Ahead Log (WAL), and must
 have access to the `postgres` database in order to get the necessary configuration parameters.
