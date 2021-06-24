@@ -37,6 +37,7 @@
 #include <zstandard.h>
 
 /* system */
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -44,6 +45,7 @@
 void
 pgmoneta_backup(int server, char** argv)
 {
+   bool active;
    int usr;
    char date[128];
    char elapsed[128];
@@ -77,6 +79,13 @@ pgmoneta_backup(int server, char** argv)
    if (!config->servers[server].valid)
    {
       pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
+      goto done;
+   }
+
+   active = false;
+
+   if (!atomic_compare_exchange_strong(&config->servers[server].backup, &active, true))
+   {
       goto done;
    }
 
@@ -263,6 +272,8 @@ pgmoneta_backup(int server, char** argv)
       size = pgmoneta_directory_size(d);
       pgmoneta_add_backup_info(root, size);
    }
+
+   atomic_store(&config->servers[server].backup, false);
 
 done:
 

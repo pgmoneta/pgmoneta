@@ -106,6 +106,8 @@ struct server
    char backup_slot[MISC_LENGTH];      /**< The backup slot name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
    int retention;                      /**< The retention for the server */
+   atomic_bool backup;                 /**< Is there an active backup */
+   atomic_bool delete;                 /**< Is there an active delete */
    bool valid;                         /**< Is the server valid */
 } __attribute__ ((aligned (64)));
 

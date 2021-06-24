@@ -35,6 +35,7 @@
 #include <utils.h>
 
 /* system */
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -88,9 +89,12 @@ pgmoneta_retention(char** argv)
       {
          if (strcmp(backups[0]->label, &check_date[0]) < 0)
          {
-            pgmoneta_delete(i, backups[0]->label);
-            pgmoneta_delete_wal(i);
-            pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[0]->label);
+            if (!atomic_load(&config->servers[i].delete))
+            {
+               pgmoneta_delete(i, backups[0]->label);
+               pgmoneta_delete_wal(i);
+               pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[0]->label);
+            }
          }
       }
       else if (number_of_backups == 0)

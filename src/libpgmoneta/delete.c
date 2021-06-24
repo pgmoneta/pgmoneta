@@ -35,11 +35,13 @@
 #include <utils.h>
 
 /* system */
+#include <stdatomic.h>
 #include <stdlib.h>
 
 int
 pgmoneta_delete(int srv, char* backup_id)
 {
+   bool active;
    int backup_index = -1;
    int prev_index = -1;
    int next_index = -1;
@@ -52,6 +54,13 @@ pgmoneta_delete(int srv, char* backup_id)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   active = false;
+
+   if (!atomic_compare_exchange_strong(&config->servers[srv].delete, &active, true))
+   {
+      goto error;
+   }
 
    d = NULL;
    d = pgmoneta_append(d, config->base_dir);
@@ -240,6 +249,8 @@ pgmoneta_delete(int srv, char* backup_id)
 
    free(d);
 
+   atomic_store(&config->servers[srv].delete, false);
+
    return 0;
 
 error:
@@ -251,6 +262,8 @@ error:
    free(backups);
 
    free(d);
+
+   atomic_store(&config->servers[srv].delete, false);
 
    return 1;
 }

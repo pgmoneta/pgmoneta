@@ -151,6 +151,11 @@ pgmoneta_read_configuration(void* shm, char* filename)
 
                   memset(&srv, 0, sizeof(struct server));
                   memcpy(&srv.name, &section, strlen(section));
+
+                  atomic_init(&srv.backup, false);
+                  atomic_init(&srv.delete, false);
+                  srv.valid = false;
+
                   idx_server++;
                }
             }
@@ -188,7 +193,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      if (max > MISC_LENGTH - 1)
                         max = MISC_LENGTH - 1;
                      memcpy(&srv.host, value, max);
-                     srv.valid = false;
                   }
                   else
                   {
@@ -1394,6 +1398,8 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    dst->retention = src->retention;
+   /* dst->backup = src->backup; */
+   /* dst->delete = src->delete; */
    /* dst->valid = src->valid; */
 }
 
