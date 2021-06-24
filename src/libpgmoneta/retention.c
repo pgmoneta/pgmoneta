@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <delete.h>
+#include <info.h>
 #include <logging.h>
 #include <retention.h>
 #include <utils.h>
@@ -41,8 +42,8 @@ void
 pgmoneta_retention(char** argv)
 {
    char* d;
-   int number_of_directories;
-   char** dirs;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
    time_t t;
    char check_date[128];
    struct tm* time_info;
@@ -71,6 +72,9 @@ pgmoneta_retention(char** argv)
       time_info = localtime(&t);
       strftime(&check_date[0], sizeof(check_date), "%Y%m%d%H%M%S", time_info);
 
+      number_of_backups = 0;
+      backups = NULL;
+
       d = NULL;
 
       d = pgmoneta_append(d, config->base_dir);
@@ -78,30 +82,27 @@ pgmoneta_retention(char** argv)
       d = pgmoneta_append(d, config->servers[i].name);
       d = pgmoneta_append(d, "/backup/");
 
-      number_of_directories = 0;
-      dirs = NULL;
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-      pgmoneta_get_directories(d, &number_of_directories, &dirs);
-
-      if (number_of_directories > 0)
+      if (number_of_backups > 0)
       {
-         if (strcmp(dirs[0], &check_date[0]) < 0)
+         if (strcmp(backups[0]->label, &check_date[0]) < 0)
          {
-            pgmoneta_delete(i, dirs[0]);
+            pgmoneta_delete(i, backups[0]->label);
             pgmoneta_delete_wal(i);
-            pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, dirs[0]);
+            pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[0]->label);
          }
       }
-      else if (number_of_directories == 0)
+      else if (number_of_backups == 0)
       {
          pgmoneta_delete_wal(i);
       }
 
-      for (int i = 0; i < number_of_directories; i++)
+      for (int i = 0; i < number_of_backups; i++)
       {
-         free(dirs[i]);
+         free(backups[i]);
       }
-      free(dirs);
+      free(backups);
 
       free(d);
    }

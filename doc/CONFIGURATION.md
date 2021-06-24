@@ -31,6 +31,7 @@ See a [sample](./etc/pgmoneta/pgmoneta.conf) configuration for running `pgmoneta
 | compression | zstd | String | No | The compression type (none, gzip, zstd) |
 | compression_level | 3 | int | No | The compression level |
 | retention | 7 | Int | No | The retention time in days |
+| link | `on` | Bool | No | Use links to limit backup size |
 | log_type | console | String | No | The logging type (console, file, syslog) |
 | log_level | info | String | No | The logging level (fatal, error, warn, info, debug1, ..., debug5) |
 | log_path | pgmoneta.log | String | No | The log file location |

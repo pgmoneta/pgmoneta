@@ -799,6 +799,7 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
    unsigned long server_size;
    char* size_string;
    int retention;
+   int link;
    int servers;
    int number_of_directories;
    int length;
@@ -841,6 +842,16 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
    size_string = pgmoneta_bytes_to_string(total_size);
    printf("Total space      : %s\n", size_string);
    free(size_string);
+
+   if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_read_status: read: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   link = pgmoneta_read_int32(&buf4);
+   printf("Link             : %s\n", link == 1 ? "Yes" : "No");
 
    if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
    {
@@ -962,6 +973,14 @@ pgmoneta_management_write_status(int socket)
 
    pgmoneta_write_int64(&buf8, total_size);
    if (write_complete(NULL, socket, &buf8, sizeof(buf8)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_write_status: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   pgmoneta_write_int32(&buf4, config->link ? 1 : 0);
+   if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
    {
       pgmoneta_log_warn("pgmoneta_management_write_status: write: %d %s", socket, strerror(errno));
       errno = 0;

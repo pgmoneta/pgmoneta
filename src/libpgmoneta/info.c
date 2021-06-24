@@ -41,7 +41,6 @@ void
 pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time)
 {
    char buffer[128];
-   unsigned long disk;
    char* s = NULL;
    FILE* sfile = NULL;
 
@@ -50,7 +49,7 @@ pgmoneta_create_info(char* directory, int status, char* label, unsigned long siz
 
    sfile = fopen(s, "w");
 
-   if (status == 0)
+   if (status == 1)
    {
       fputs("STATUS=1\n", sfile);
 
@@ -58,17 +57,12 @@ pgmoneta_create_info(char* directory, int status, char* label, unsigned long siz
       snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
       fputs(&buffer[0], sfile);
 
-      disk = pgmoneta_directory_size(directory);
       memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "BACKUP=%lu\n", disk);
+      snprintf(&buffer[0], sizeof(buffer), "ELAPSED=%d\n", elapsed_time);
       fputs(&buffer[0], sfile);
 
       memset(&buffer[0], 0, sizeof(buffer));
       snprintf(&buffer[0], sizeof(buffer), "RESTORE=%lu\n", size);
-      fputs(&buffer[0], sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "ELAPSED=%d\n", elapsed_time);
       fputs(&buffer[0], sfile);
    }
    else
@@ -86,6 +80,95 @@ pgmoneta_create_info(char* directory, int status, char* label, unsigned long siz
    }
 
    free(s);
+}
+
+void
+pgmoneta_add_backup_info(char* directory, unsigned long size)
+{
+   char buffer[128];
+   char* s = NULL;
+   FILE* sfile = NULL;
+
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, "/backup.info");
+
+   sfile = fopen(s, "a");
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "BACKUP=%lu\n", size);
+   fputs(&buffer[0], sfile);
+
+   if (sfile != NULL)
+   {
+      fclose(sfile);
+   }
+
+   free(s);
+}
+
+void
+pgmoneta_update_backup_info(char* directory, unsigned long size)
+{
+   char buffer[128];
+   char line[128];
+   char* s = NULL;
+   FILE* sfile = NULL;
+   char* d = NULL;
+   FILE* dfile = NULL;
+
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, "/backup.info");
+
+   d = pgmoneta_append(d, directory);
+   d = pgmoneta_append(d, "/backup.info.tmp");
+
+   sfile = fopen(s, "r");
+   dfile = fopen(d, "w");
+
+   while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
+   {
+      char key[MISC_LENGTH];
+      char value[MISC_LENGTH];
+      char* ptr = NULL;
+
+      memset(&key[0], 0, sizeof(key));
+      memset(&value[0], 0, sizeof(value));
+
+      memset(&line[0], 0, sizeof(line));
+      memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
+
+      ptr = strtok(&buffer[0], "=");
+      memcpy(&key[0], ptr, strlen(ptr));
+
+      ptr = strtok(NULL, "=");
+      memcpy(&value[0], ptr, strlen(ptr) - 1);
+
+      if (!strcmp("BACKUP", &key[0]))
+      {
+         memset(&line[0], 0, sizeof(line));
+         snprintf(&line[0], sizeof(line), "BACKUP=%lu\n", size);
+         fputs(&line[0], dfile);
+      }
+      else
+      {
+         fputs(&line[0], dfile);
+      }
+   }
+
+   if (sfile != NULL)
+   {
+      fclose(sfile);
+   }
+
+   if (dfile != NULL)
+   {
+      fclose(dfile);
+   }
+
+   pgmoneta_move_file(d, s);
+
+   free(s);
+   free(d);
 }
 
 int

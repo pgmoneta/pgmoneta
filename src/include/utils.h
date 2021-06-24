@@ -336,6 +336,65 @@ int
 pgmoneta_copy_file(char* from, char* to);
 
 /**
+ * Move a file
+ * @param from The from file
+ * @param to The to file
+ * @return The result
+ */
+int
+pgmoneta_move_file(char* from, char* to);
+
+/**
+ * File exists
+ * @param f The file
+ * @return The result
+ */
+bool
+pgmoneta_exists_file(char* f);
+
+/**
+ * Check for file
+ * @param file The file
+ * @return The result
+ */
+bool
+pgmoneta_is_file(char* file);
+
+/**
+ * Compare files
+ * @param f1 The first file path
+ * @param f2 The second file path
+ * @return The result
+ */
+bool
+pgmoneta_compare_files(char* f1, char* f2);
+
+/**
+ * Symlink files
+ * @param from The from file
+ * @param to The to file
+ * @return The result
+ */
+int
+pgmoneta_symlink_file(char* from, char* to);
+
+/**
+ * Check for symlink
+ * @param file The file
+ * @return The result
+ */
+bool
+pgmoneta_is_symlink(char* file);
+
+/**
+ * Get symlink
+ * @param symlink The symlink
+ * @return The result
+ */
+char*
+pgmoneta_get_symlink(char* symlink);
+
+/**
  * Get the free space for a path
  * @param path The path
  * @return The result

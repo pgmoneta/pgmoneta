@@ -833,6 +833,22 @@ pgmoneta_directory_size(char* directory)
 
          free(p);
       }
+      else if (entry->d_type == DT_LNK)
+      {
+         p = NULL;
+
+         p = pgmoneta_append(p, directory);
+         p = pgmoneta_append(p, "/");
+         p = pgmoneta_append(p, entry->d_name);
+
+         memset(&st, 0, sizeof(struct stat));
+
+         stat(p, &st);
+
+         total_size += st.st_blksize;
+
+         free(p);
+      }
    }
 
    closedir(dir);
@@ -1064,7 +1080,18 @@ error:
 int
 pgmoneta_delete_file(char *file)
 {
-   return unlink(file);
+   int ret;
+
+   ret = unlink(file);
+
+   if (ret != 0)
+   {
+      pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", file, strerror(errno));
+      errno = 0;
+      ret = 1;
+   }
+
+   return ret;
 }
 
 int
@@ -1186,6 +1213,193 @@ error:
 
    errno = saved_errno;
    return 1;
+}
+
+int
+pgmoneta_move_file(char* from, char* to)
+{
+   int ret;
+
+   ret = rename(from, to);
+   if (ret != 0)
+   {
+      pgmoneta_log_warn("pgmoneta_move_file: %s -> %s (%s)", from, to, strerror(errno));
+      errno = 0;
+      ret = 1;
+   }
+
+   return ret;
+}
+
+bool
+pgmoneta_exists_file(char* f)
+{
+   if (access(f, F_OK) == 0)
+   {
+      return true;
+   }
+
+   return false;
+}
+
+bool
+pgmoneta_is_file(char* file)
+{
+   struct stat statbuf;
+
+   memset(&statbuf, 0, sizeof(struct stat));
+
+   if (!lstat(file, &statbuf))
+   {
+      if (S_ISREG(statbuf.st_mode))
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
+bool
+pgmoneta_compare_files(char* f1, char* f2)
+{
+   FILE* fp1 = NULL;
+   FILE* fp2 = NULL;
+   struct stat statbuf1 = {0};
+   struct stat statbuf2 = {0};
+   size_t fs1;
+   size_t fs2;
+   char buf1[8192];
+   char buf2[8192];
+   size_t cs;
+   size_t bs;
+
+   fp1 = fopen(f1,  "r");
+
+   if (fp1 == NULL)
+   {
+      goto error;
+   }
+
+   fp2 = fopen(f2,  "r");
+
+   if (fp2 == NULL)
+   {
+      goto error;
+   }
+
+   memset(&statbuf1, 0, sizeof(struct stat));
+   memset(&statbuf2, 0, sizeof(struct stat));
+
+   if (stat(f1, &statbuf1) != 0)
+   {
+      errno = 0;
+      goto error;
+   }
+
+   if (stat(f2, &statbuf2) != 0)
+   {
+      errno = 0;
+      goto error;
+   }
+
+   if (statbuf1.st_size != statbuf2.st_size)
+   {
+      goto error;
+   }
+
+   cs = sizeof(char);
+   bs = sizeof(buf1);
+
+   while (!feof(fp1))
+   {
+      fs1 = fread(&buf1[0], cs, bs, fp1);
+      fs2 = fread(&buf2[0], cs, bs, fp2);
+
+      if (fs1 != fs2)
+      {
+         goto error;
+      }
+
+      if (memcmp(&buf1[0], &buf2[0], fs1) != 0)
+      {
+         goto error;
+      }
+   }
+
+   fclose(fp1);
+   fclose(fp2);
+
+   return true;
+
+error:
+
+   if (fp1 != NULL)
+   {
+      fclose(fp1);
+   }
+
+   if (fp2 != NULL)
+   {
+      fclose(fp2);
+   }
+
+   return false;
+}
+
+int
+pgmoneta_symlink_file(char* from, char* to)
+{
+   int ret;
+
+   ret = symlink(to, from);
+
+   if (ret != 0)
+   {
+      pgmoneta_log_warn("pgmoneta_symlink_file: %s -> %s (%s)", from, to, strerror(errno));
+      errno = 0;
+      ret = 1;
+   }
+
+   return ret;
+}
+
+bool
+pgmoneta_is_symlink(char* file)
+{
+   struct stat statbuf;
+
+   memset(&statbuf, 0, sizeof(struct stat));
+
+   if (!lstat(file, &statbuf))
+   {
+      if (S_ISLNK(statbuf.st_mode))
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
+char*
+pgmoneta_get_symlink(char* symlink)
+{
+   ssize_t size;
+   char link[1024];
+   size_t alloc;
+   char* result = NULL;
+
+   memset(&link[0], 0, sizeof(link));
+   size = readlink(symlink, &link[0], sizeof(link));
+   link[size + 1] = '\0';
+
+   alloc = strlen(&link[0]) + 1;
+   result = malloc(alloc);
+   memset(result, 0, alloc);
+   memcpy(result, &link[0], strlen(&link[0]));
+
+   return result;
 }
 
 unsigned long

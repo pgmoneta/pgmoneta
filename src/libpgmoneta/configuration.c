@@ -78,6 +78,7 @@ pgmoneta_init_configuration(void* shm)
    config->compression_level = 3;
 
    config->retention = 7;
+   config->link = true;
 
    config->tls = false;
 
@@ -590,6 +591,20 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   else if (strlen(section) > 0)
                   {
                      if (as_int(value, &srv.retention))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "link"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_bool(value, &config->link))
                      {
                         unknown = true;
                      }
@@ -1307,6 +1322,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->compression_level = reload->compression_level;
 
    config->retention = reload->retention;
+   config->link = reload->link;
 
    /* log_type */
    restart_int("log_type", config->log_type, reload->log_type);
@@ -1377,6 +1393,8 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
    memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
+   dst->retention = src->retention;
+   /* dst->valid = src->valid; */
 }
 
 static void

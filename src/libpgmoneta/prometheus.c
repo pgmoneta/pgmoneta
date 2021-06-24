@@ -234,24 +234,22 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_state</h2>\n");
    data = pgmoneta_append(data, "  The state of pgmoneta\n");
-   data = pgmoneta_append(data, "  <table border=\"1\">\n");
-   data = pgmoneta_append(data, "    <tbody>\n");
-   data = pgmoneta_append(data, "      <tr>\n");
-   data = pgmoneta_append(data, "        <td>value</td>\n");
-   data = pgmoneta_append(data, "        <td>State\n");
-   data = pgmoneta_append(data, "          <ol>\n");
-   data = pgmoneta_append(data, "            <li>Running</li>\n");
-   data = pgmoneta_append(data, "          </ol>\n");
-   data = pgmoneta_append(data, "        </td>\n");
-   data = pgmoneta_append(data, "      </tr>\n");
-   data = pgmoneta_append(data, "    </tbody>\n");
-   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <ul>\n");
+   data = pgmoneta_append(data, "    <li>1 = Running</li>\n");
+   data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention</h2>\n");
    data = pgmoneta_append(data, "  The retention of pgmoneta in days\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention_server</h2>\n");
    data = pgmoneta_append(data, "  The retention a server in days\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_link</h2>\n");
+   data = pgmoneta_append(data, "  Use links to limit backup size\n");
+   data = pgmoneta_append(data, "  <ul>\n");
+   data = pgmoneta_append(data, "    <li>1 = Yes</li>\n");
+   data = pgmoneta_append(data, "    <li>0 = No</li>\n");
+   data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_used_space</h2>\n");
    data = pgmoneta_append(data, "  The disk space used for pgmoneta\n");
@@ -546,6 +544,12 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_link Use links to limit backup size\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_link gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_link ");
+   data = pgmoneta_append_bool(data, config->link);
+   data = pgmoneta_append(data, "\n\n");
 
    d = NULL;
 

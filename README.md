@@ -8,6 +8,7 @@
 
 * Full backup
 * Restore
+* Symlink support
 * Prometheus support
 * Remote management
 * Transport Layer Security (TLS) v1.2+ support
@@ -49,7 +50,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [libev](http://software.schmorp.de/pkg/libev.html)
 * [OpenSSL](http://www.openssl.org/)
 * [zlib](https://zlib.net)
-* [zstd](https://www.zstd.net)
+* [zstd](http://www.zstd.net)
 * [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
 * [rst2man](https://docutils.sourceforge.io/)
 

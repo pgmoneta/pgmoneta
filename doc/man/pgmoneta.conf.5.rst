@@ -45,6 +45,12 @@ compression
 compression_level
   The compression level. Default is 3
 
+retention
+  The retention for pgmoneta. Default is 7
+
+link
+  Use links to limit backup size. Default is true
+
 log_type
   The logging type (console, file, syslog). Default is console
 

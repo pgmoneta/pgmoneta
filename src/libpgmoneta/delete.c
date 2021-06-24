@@ -30,98 +30,207 @@
 #include <pgmoneta.h>
 #include <delete.h>
 #include <info.h>
+#include <link.h>
 #include <logging.h>
 #include <utils.h>
 
 /* system */
-#include <dirent.h>
+#include <stdlib.h>
 
 int
 pgmoneta_delete(int srv, char* backup_id)
 {
-   char* id = NULL;
+   int backup_index = -1;
+   int prev_index = -1;
+   int next_index = -1;
    char* d = NULL;
+   char* from = NULL;
+   char* to = NULL;
+   unsigned long size;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   DIR* dir;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
+   d = NULL;
+   d = pgmoneta_append(d, config->base_dir);
+   d = pgmoneta_append(d, "/");
+   d = pgmoneta_append(d, config->servers[srv].name);
+   d = pgmoneta_append(d, "/backup/");
+
+   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   {
+      goto error;
+   }
+
+   free(d);
+   d = NULL;
+
    if (!strcmp(backup_id, "oldest"))
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[srv].name);
-      d = pgmoneta_append(d, "/backup/");
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
       {
-         goto error;
-      }
-
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (backups[i] != NULL && backups[i]->valid)
+         if (backups[i] != NULL)
          {
-            id = backups[i]->label;
+            backup_index = i;
          }
       }
-
-      free(d);
-      d = NULL;
    }
    else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[srv].name);
-      d = pgmoneta_append(d, "/backup/");
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      for (int i = number_of_backups - 1; backup_index == -1 && i >= 0; i--)
       {
-         goto error;
-      }
-
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (backups[i] != NULL && backups[i]->valid)
+         if (backups[i] != NULL)
          {
-            id = backups[i]->label;
+            backup_index = i;
          }
       }
-
-      free(d);
-      d = NULL;
    }
    else
    {
-      id = backup_id;
+      for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
+      {
+         if (backups[i] != NULL && !strcmp(backups[i]->label, backup_id))
+         {
+            backup_index = i;
+         }
+      }
    }
 
-   if (id == NULL)
+   if (backup_index == -1)
    {
       goto error;
+   }
+
+   /* Find previous valid backup */
+   for (int i = backup_index - 1; prev_index == -1 && i >= 0; i--)
+   {
+      if (backups[i] != NULL && backups[i]->valid)
+      {
+         prev_index = i;
+      }
+   }
+
+   /* Find next valid backup */
+   for (int i = backup_index + 1; next_index == -1 && i < number_of_backups; i++)
+   {
+      if (backups[i] != NULL && backups[i]->valid)
+      {
+         next_index = i;
+      }
    }
 
    d = pgmoneta_append(d, config->base_dir);
    d = pgmoneta_append(d, "/");
    d = pgmoneta_append(d, config->servers[srv].name);
    d = pgmoneta_append(d, "/backup/");
-   d = pgmoneta_append(d, id);
+   d = pgmoneta_append(d, backups[backup_index]->label);
 
-   if (!(dir = opendir(d)))
+   if (backups[backup_index]->valid)
    {
-      goto error;
+      if (prev_index != -1 && next_index != -1)
+      {
+         /* In-between valid backup */
+         from = NULL;
+         to = NULL;
+
+         from = pgmoneta_append(from, config->base_dir);
+         from = pgmoneta_append(from, "/");
+         from = pgmoneta_append(from, config->servers[srv].name);
+         from = pgmoneta_append(from, "/backup/");
+         from = pgmoneta_append(from, backups[backup_index]->label);
+         from = pgmoneta_append(from, "/data/");
+
+         to = pgmoneta_append(to, config->base_dir);
+         to = pgmoneta_append(to, "/");
+         to = pgmoneta_append(to, config->servers[srv].name);
+         to = pgmoneta_append(to, "/backup/");
+         to = pgmoneta_append(to, backups[next_index]->label);
+         to = pgmoneta_append(to, "/data/");
+
+         pgmoneta_relink(from, to);
+
+         /* Delete from */
+         pgmoneta_delete_directory(d);
+         free(d);
+         d = NULL;
+
+         /* Recalculate to */
+         d = pgmoneta_append(d, config->base_dir);
+         d = pgmoneta_append(d, "/");
+         d = pgmoneta_append(d, config->servers[srv].name);
+         d = pgmoneta_append(d, "/backup/");
+         d = pgmoneta_append(d, backups[next_index]->label);
+
+         size = pgmoneta_directory_size(d);
+         pgmoneta_update_backup_info(d, size);
+
+         free(from);
+         free(to);
+         from = NULL;
+         to = NULL;
+      }
+      else if (prev_index != -1)
+      {
+         /* Latest valid backup */
+         pgmoneta_delete_directory(d);
+      }
+      else if (next_index != -1)
+      {
+         /* Oldest valid backup */
+         from = NULL;
+         to = NULL;
+
+         from = pgmoneta_append(from, config->base_dir);
+         from = pgmoneta_append(from, "/");
+         from = pgmoneta_append(from, config->servers[srv].name);
+         from = pgmoneta_append(from, "/backup/");
+         from = pgmoneta_append(from, backups[backup_index]->label);
+         from = pgmoneta_append(from, "/data/");
+
+         to = pgmoneta_append(to, config->base_dir);
+         to = pgmoneta_append(to, "/");
+         to = pgmoneta_append(to, config->servers[srv].name);
+         to = pgmoneta_append(to, "/backup/");
+         to = pgmoneta_append(to, backups[next_index]->label);
+         to = pgmoneta_append(to, "/data/");
+
+         pgmoneta_relink(from, to);
+
+         /* Delete from */
+         pgmoneta_delete_directory(d);
+         free(d);
+         d = NULL;
+
+         /* Recalculate to */
+         d = pgmoneta_append(d, config->base_dir);
+         d = pgmoneta_append(d, "/");
+         d = pgmoneta_append(d, config->servers[srv].name);
+         d = pgmoneta_append(d, "/backup/");
+         d = pgmoneta_append(d, backups[next_index]->label);
+
+         size = pgmoneta_directory_size(d);
+         pgmoneta_update_backup_info(d, size);
+
+         free(from);
+         free(to);
+         from = NULL;
+         to = NULL;
+      }
+      else
+      {
+         /* Only valid backup */
+         pgmoneta_delete_directory(d);
+      }
+   }
+   else
+   {
+      /* Just delete */
+      pgmoneta_delete_directory(d);
    }
 
-   closedir(dir);
-
-   pgmoneta_delete_directory(d);
-
-   pgmoneta_log_info("Delete: %s/%s", config->servers[srv].name, id);
+   pgmoneta_log_info("Delete: %s/%s", config->servers[srv].name, backups[backup_index]->label);
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -135,11 +244,6 @@ pgmoneta_delete(int srv, char* backup_id)
 
 error:
 
-   if (dir != NULL)
-   {
-      closedir(dir);
-   }
-   
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
@@ -154,10 +258,10 @@ error:
 int
 pgmoneta_delete_wal(int srv)
 {
-   char* id = NULL;
+   int backup_index = -1;
    char* d = NULL;
-   int number_of_directories = 0;
-   char** dirs = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
    char* srv_wal = NULL;
    int number_of_srv_wal_files = 0;
    char** srv_wal_files = NULL;
@@ -175,27 +279,30 @@ pgmoneta_delete_wal(int srv)
    d = pgmoneta_append(d, config->servers[srv].name);
    d = pgmoneta_append(d, "/backup/");
 
-   if (pgmoneta_get_directories(d, &number_of_directories, &dirs))
+   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
    {
       goto error;
    }
 
-   if (number_of_directories > 0)
+   for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
    {
-      id = dirs[0];
+      if (backups[i] != NULL && backups[i]->valid)
+      {
+         backup_index = i;
+      }
    }
 
    free(d);
 
    /* Find the oldest WAL file */
-   if (id != NULL)
+   if (backup_index != -1)
    {
       d = NULL;
       d = pgmoneta_append(d, config->base_dir);
       d = pgmoneta_append(d, "/");
       d = pgmoneta_append(d, config->servers[srv].name);
       d = pgmoneta_append(d, "/backup/");
-      d = pgmoneta_append(d, id);
+      d = pgmoneta_append(d, backups[backup_index]->label);
       d = pgmoneta_append(d, "/data/pg_wal/");
 
       number_of_srv_wal_files = 0;
@@ -235,7 +342,7 @@ pgmoneta_delete_wal(int srv)
 
       delete = false;
 
-      if (id == NULL)
+      if (backup_index == -1)
       {
          delete = true;
       }
@@ -274,11 +381,11 @@ pgmoneta_delete_wal(int srv)
    }
    free(wal_files);
 
-   for (int i = 0; i < number_of_directories; i++)
+   for (int i = 0; i < number_of_backups; i++)
    {
-      free(dirs[i]);
+      free(backups[i]);
    }
-   free(dirs);
+   free(backups);
 
    return 0;
 
@@ -298,11 +405,11 @@ error:
    }
    free(wal_files);
 
-   for (int i = 0; i < number_of_directories; i++)
+   for (int i = 0; i < number_of_backups; i++)
    {
-      free(dirs[i]);
+      free(backups[i]);
    }
-   free(dirs);
+   free(backups);
 
    return 1;
 }

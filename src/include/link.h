@@ -26,8 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_INFO_H
-#define PGMONETA_INFO_H
+#ifndef PGMONETA_LINK_H
+#define PGMONETA_LINK_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,66 +35,25 @@ extern "C" {
 
 #include <stdlib.h>
 
-/** @struct
- * Defines a backup
- */
-struct backup
-{
-   char label[MISC_LENGTH];    /**< The label of the backup */
-   unsigned long backup_size;  /**< The backup size */
-   unsigned long restore_size; /**< The restore size */
-   int elapsed_time;           /**< The elapsed time in seconds */
-   bool valid;                 /**< Is the backup valid */
-} __attribute__ ((aligned (64)));
-
 /**
- * Create a backup information file
- * @param directory The backup directory
- * @param status The status
- * @param label The label
- * @param size The backup size
- * @param elapsed_time The elapsed time in seconds
+ * Create link two directories
+ * @param from The from directory
+ * @param to The to directory
  */
 void
-pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time);
+pgmoneta_link(char* from, char* to);
 
 /**
- * Add backup information
- * @param directory The backup directory
- * @param size The backup size
+ * Relink link two directories
+ * @param from The from directory
+ * @param to The to directory
  */
 void
-pgmoneta_add_backup_info(char* directory, unsigned long size);
-
-/**
- * Update backup information
- * @param directory The backup directory
- * @param size The backup size
- */
-void
-pgmoneta_update_backup_info(char* directory, unsigned long size);
-
-/**
- * Get the backups
- * @param directory The directory
- * @param number_of_backups The number of backups
- * @param backups The backups
- * @return The result
- */
-int
-pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** backups);
-
-/**
- * Get a backup
- * @param directory The directory
- * @param backup The backup
- * @return The result
- */
-int
-pgmoneta_get_backup(char* directory, struct backup** backup);
+pgmoneta_relink(char* from, char* to);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
+

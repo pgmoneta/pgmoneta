@@ -89,6 +89,11 @@ pgmoneta_server_wal_level(int srv)
 
    pgmoneta_disconnect(socket);
 
+   if (!config->servers[srv].valid)
+   {
+      pgmoneta_log_error("Server %s need wal_level at replica or logical", config->servers[srv].name);
+   }
+
 error:
 
    pgmoneta_disconnect(socket);

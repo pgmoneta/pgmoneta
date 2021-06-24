@@ -145,6 +145,7 @@ struct configuration
    int compression_level; /**< The compression level */
 
    int retention; /**< The retention */
+   bool link;     /**< Use link */
 
    int log_type;               /**< The logging type */
    int log_level;              /**< The logging level */
