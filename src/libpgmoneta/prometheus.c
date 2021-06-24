@@ -244,6 +244,14 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention_server</h2>\n");
    data = pgmoneta_append(data, "  The retention a server in days\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_compression</h2>\n");
+   data = pgmoneta_append(data, "  The compression used\n");
+   data = pgmoneta_append(data, "  <ul>\n");
+   data = pgmoneta_append(data, "    <li>0 = None</li>\n");
+   data = pgmoneta_append(data, "    <li>1 = GZip</li>\n");
+   data = pgmoneta_append(data, "    <li>2 = ZSTD</li>\n");
+   data = pgmoneta_append(data, "  </ul>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_link</h2>\n");
    data = pgmoneta_append(data, "  Use links to limit backup size\n");
    data = pgmoneta_append(data, "  <ul>\n");
@@ -544,6 +552,12 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_compression The compression used\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_compression gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_compression ");
+   data = pgmoneta_append_int(data, config->compression_type);
+   data = pgmoneta_append(data, "\n\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_link Use links to limit backup size\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_link gauge\n");
