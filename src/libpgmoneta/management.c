@@ -283,6 +283,7 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
    int srv;
    int number_of_directories;
    int length;
+   int valid;
    unsigned long backup_size;
    unsigned long restore_size;
    char* bck = NULL;
@@ -335,6 +336,15 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
                goto error;
             }
 
+            if (read_complete(ssl, socket, &buf4[0], sizeof(buf4)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_read_list_backup: read: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
+
+            valid = pgmoneta_read_int32(&buf4);
+
             memset(&buf8, 0, sizeof(buf8));
             if (read_complete(ssl, socket, &buf8[0], sizeof(buf8)))
             {
@@ -357,7 +367,7 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
             restore_size = pgmoneta_read_int64(&buf8);
             res = pgmoneta_bytes_to_string(restore_size);
 
-            printf("                   %s (Backup: %s Restore: %s)\n", &name[0], bck, res);
+            printf("                   %s (Backup: %s Restore: %s Valid: %s)\n", &name[0], bck, res, valid ? "Yes" : "No");
 
             free(bck);
             free(res);
@@ -415,7 +425,7 @@ pgmoneta_management_write_list_backup(int socket, int server)
       nob = 0;
       for (int i = 0; i < number_of_backups; i++)
       {
-         if (backups[i] != NULL && backups[i]->valid)
+         if (backups[i] != NULL)
          {
             nob++;
          }
@@ -431,7 +441,7 @@ pgmoneta_management_write_list_backup(int socket, int server)
 
       for (int i = 0; i < number_of_backups; i++)
       {
-         if (backups[i] != NULL && backups[i]->valid)
+         if (backups[i] != NULL)
          {
             pgmoneta_write_int32(&buf4, strlen(backups[i]->label));
             if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
@@ -444,6 +454,14 @@ pgmoneta_management_write_list_backup(int socket, int server)
             if (write_complete(NULL, socket, backups[i]->label, strlen(backups[i]->label)))
             {
                pgmoneta_log_warn("pgmoneta_management_list_backup: write: %d %s", socket, strerror(errno));
+               errno = 0;
+               goto error;
+            }
+
+            pgmoneta_write_int32(&buf4, backups[i]->valid ? 1 : 0);
+            if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
+            {
+               pgmoneta_log_warn("pgmoneta_management_write_list_backup: write: %d %s", socket, strerror(errno));
                errno = 0;
                goto error;
             }
