@@ -1015,7 +1015,7 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    int server_fd;
    int auth_type;
    int ret;
-   int status;
+   int status = AUTH_ERROR;
    struct message* startup_msg = NULL;
    struct message* msg = NULL;
    struct configuration* config;
