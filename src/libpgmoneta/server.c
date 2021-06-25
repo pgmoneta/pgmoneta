@@ -73,11 +73,13 @@ pgmoneta_server_wal_level(int srv)
 
    if (auth != AUTH_SUCCESS)
    {
+      pgmoneta_log_trace("Invalid credentials for %s", config->users[usr].username);
       goto error;
    }
 
    if (get_wal_level(socket, &replica))
    {
+      pgmoneta_log_trace("Unable to get wal_level for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
    }
    else
