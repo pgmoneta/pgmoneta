@@ -75,7 +75,10 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_server_wal_level(srv);
 
    d = pgmoneta_append(d, config->base_dir);
-   d = pgmoneta_append(d, "/");
+   if (!pgmoneta_ends_with(config->base_dir, "/"))
+   {
+      d = pgmoneta_append(d, "/");
+   }
    d = pgmoneta_append(d, config->servers[srv].name);
    d = pgmoneta_append(d, "/wal");
 
