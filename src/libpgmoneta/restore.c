@@ -120,6 +120,8 @@ pgmoneta_restore(int server, char* backup_id, char* directory, char** argv)
 
    to = pgmoneta_append(to, directory);
    to = pgmoneta_append(to, "/");
+   to = pgmoneta_append(to, config->servers[server].name);
+   to = pgmoneta_append(to, "-");
    to = pgmoneta_append(to, id);
 
    pgmoneta_delete_directory(to);
