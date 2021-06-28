@@ -249,6 +249,40 @@ pgmoneta_gunzip_data(char* directory)
    closedir(dir);
 }
 
+int
+pgmoneta_gzip_file(char* from, char* to)
+{
+   int level;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   level = config->compression_level;
+   if (level < 1)
+   {
+      level = 1;
+   }
+   else if (level > 9)
+   {
+      level = 9;
+   }
+
+   if (gz_compress(from, level, to))
+   {
+      goto error;
+   }
+   else
+   {
+      pgmoneta_delete_file(from);
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
 static int
 gz_compress(char* from, int level, char* to)
 {

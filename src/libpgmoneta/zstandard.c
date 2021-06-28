@@ -247,6 +247,40 @@ pgmoneta_zstandardd_data(char* directory)
    closedir(dir);
 }
 
+int
+pgmoneta_zstandardc_file(char* from, char* to)
+{
+   int level;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   level = config->compression_level;
+   if (level < 1)
+   {
+      level = 1;
+   }
+   else if (level > 19)
+   {
+      level = 19;
+   }
+
+   if (zstd_compress(from, level, to))
+   {
+      goto error;
+   }
+   else
+   {
+      pgmoneta_delete_file(from);
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
 static int
 zstd_compress(char* from, int level, char* to)
 {

@@ -115,6 +115,7 @@ pgmoneta_management_read_payload(int socket, signed char id, int ns, char** payl
          *payload_s1 = s1;
          break;
       case MANAGEMENT_RESTORE:
+      case MANAGEMENT_ARCHIVE:
          if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
          {
             goto error;
@@ -555,6 +556,70 @@ pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id,
    if (write_complete(ssl, socket, directory, strlen(directory)))
    {
       pgmoneta_log_warn("pgmoneta_management_restore: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
+{
+   char buf[4];
+
+   if (write_header(ssl, socket, MANAGEMENT_ARCHIVE, 3))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d", socket);
+      errno = 0;
+      goto error;
+   }
+
+   pgmoneta_write_int32(&buf, strlen(server));
+   if (write_complete(ssl, socket, &buf, sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   if (write_complete(ssl, socket, server, strlen(server)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   pgmoneta_write_int32(&buf, strlen(backup_id));
+   if (write_complete(ssl, socket, &buf, sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   if (write_complete(ssl, socket, backup_id, strlen(backup_id)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   pgmoneta_write_int32(&buf, strlen(directory));
+   if (write_complete(ssl, socket, &buf, sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   if (write_complete(ssl, socket, directory, strlen(directory)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
       errno = 0;
       goto error;
    }

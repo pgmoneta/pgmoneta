@@ -55,6 +55,13 @@ if(NOT COMPILER_SUPPORTS_C17)
   message(FATAL_ERROR "The compiler ${CMAKE_C_COMPILER} has no C17 support. Please use a different C compiler.")
 endif()
 
+find_package(Libtar)
+if (LIBTAR_FOUND)
+  message(STATUS "libtar found")
+else ()
+  message(FATAL_ERROR "libtar needed")
+endif()
+
 find_package(ZLIB)
 if (ZLIB_FOUND)
   message(STATUS "zlib found")

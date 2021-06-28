@@ -51,6 +51,24 @@ OPTIONS
 COMMANDS
 ========
 
+backup
+  Backup a server
+
+list-backup
+  List the backups for a server
+
+restore
+  Restore a backup from a server
+
+archive
+  Archive a backup from a server
+
+delete
+  Delete a backup from a server
+
+is-alive
+  Is pgmoneta alive
+
 stop
   Stop pgmoneta
 
@@ -59,6 +77,9 @@ status
 
 details
   Detailed status of pgmoneta
+
+reload
+  Reload the configuration
 
 reset
   Reset the Prometheus statistics

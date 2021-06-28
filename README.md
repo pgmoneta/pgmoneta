@@ -49,13 +49,14 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [make](https://www.gnu.org/software/make/)
 * [libev](http://software.schmorp.de/pkg/libev.html)
 * [OpenSSL](http://www.openssl.org/)
+* [libtar](https://repo.or.cz/libtar.git)
 * [zlib](https://zlib.net)
 * [zstd](http://www.zstd.net)
 * [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
 * [rst2man](https://docutils.sourceforge.io/)
 
 ```sh
-dnf install gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel python3-docutils
+dnf install gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel libtar libtar-devel zlib zlib-devel libzstd libzstd-devel python3-docutils
 ```
 
 Alternative [clang 8+](https://clang.llvm.org/) can be used.

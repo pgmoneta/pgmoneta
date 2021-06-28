@@ -56,6 +56,14 @@ pgmoneta_gzip_wal(char* directory);
 void
 pgmoneta_gunzip_data(char* directory);
 
+/**
+ * GZip a file
+ * @param from The from name
+ * @param to The to name
+ */
+int
+pgmoneta_gzip_file(char* from, char* to);
+
 #ifdef __cplusplus
 }
 #endif

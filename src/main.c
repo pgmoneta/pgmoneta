@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <archive.h>
 #include <backup.h>
 #include <configuration.h>
 #include <delete.h>
@@ -860,6 +861,52 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          else
          {
             pgmoneta_log_error("Restore: Unknown server %s", payload_s1);
+         }
+
+         free(payload_s1);
+         free(payload_s2);
+         free(payload_s3);
+         break;
+      case MANAGEMENT_ARCHIVE:
+         pgmoneta_log_debug("pgmoneta: Management archive: %s/%s -> %s", payload_s1, payload_s2, payload_s3);
+
+         srv = -1;
+         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         {
+            if (!strcmp(config->servers[i].name, payload_s1))
+            {
+               srv = i;
+            }
+         }
+
+         /* TODO: Redo with success/failure */
+         if (srv != -1)
+         {
+            pid = fork();
+            if (pid == -1)
+            {
+               /* No process */
+               pgmoneta_log_error("Cannot create process");
+            }
+            else if (pid == 0)
+            {
+               char* backup_id = NULL;
+               char* directory = NULL;
+
+               backup_id = malloc(strlen(payload_s2) + 1);
+               memset(backup_id, 0, strlen(payload_s2) + 1);
+               memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+               directory = malloc(strlen(payload_s3) + 1);
+               memset(directory, 0, strlen(payload_s3) + 1);
+               memcpy(directory, payload_s3, strlen(payload_s3));
+
+               pgmoneta_archive(srv, backup_id, directory, ai->argv);
+            }
+         }
+         else
+         {
+            pgmoneta_log_error("Archive: Unknown server %s", payload_s1);
          }
 
          free(payload_s1);

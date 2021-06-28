@@ -115,6 +115,7 @@ Commands:
   backup                   Backup a server
   list-backup              List the backups for a server
   restore                  Restore a backup from a server
+  archive                  Archive a backup from a server
   delete                   Delete a backup from a server
   is-alive                 Is pgmoneta alive
   stop                     Stop pgmoneta

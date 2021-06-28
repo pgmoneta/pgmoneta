@@ -43,13 +43,14 @@ extern "C" {
 #define MANAGEMENT_BACKUP      0
 #define MANAGEMENT_LIST_BACKUP 1
 #define MANAGEMENT_RESTORE     2
-#define MANAGEMENT_DELETE      3
-#define MANAGEMENT_STOP        4
-#define MANAGEMENT_STATUS      5
-#define MANAGEMENT_DETAILS     6
-#define MANAGEMENT_ISALIVE     7
-#define MANAGEMENT_RESET       8
-#define MANAGEMENT_RELOAD      9
+#define MANAGEMENT_ARCHIVE     3
+#define MANAGEMENT_DELETE      4
+#define MANAGEMENT_STOP        5
+#define MANAGEMENT_STATUS      6
+#define MANAGEMENT_DETAILS     7
+#define MANAGEMENT_ISALIVE     8
+#define MANAGEMENT_RESET       9
+#define MANAGEMENT_RELOAD     10
 
 /**
  * Read the management header
@@ -124,6 +125,18 @@ pgmoneta_management_write_list_backup(int socket, int server);
  */
 int
 pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
+
+/**
+ * Management operation: Archive a server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup_id The backup identifier
+ * @param directory The directory
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
 
 /**
  * Management operation: Delete a backup for a server

@@ -26,48 +26,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_ZSTANDARD_H
-#define PGMONETA_ZSTANDARD_H
+#ifndef PGMONETA_ARCHIVE_H
+#define PGMONETA_ARCHIVE_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <ev.h>
 #include <stdlib.h>
 
 /**
- * Compress a data directory with Zstandard
- * @param directory The directory
+ * Create an archive
+ * @param server The server
+ * @param backup_id The backup identifier
+ * @param directory The target directory
+ * @param argv The argv
  */
 void
-pgmoneta_zstandardc_data(char* directory);
-
-/**
- * Compress a WAL directory with Zstandard
- * @param directory The directory
- */
-void
-pgmoneta_zstandardc_wal(char* directory);
-
-/**
- * Decompress a Zstandard directory
- * @param directory The directory
- */
-void
-pgmoneta_zstandardd_data(char* directory);
-
-/**
- * Compress a file
- * @param from The from name
- * @param to The to name
- * @return The result
- */
-int
-pgmoneta_zstandardc_file(char* from, char* to);
+pgmoneta_archive(int server, char* backup_id, char* directory, char** argv);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

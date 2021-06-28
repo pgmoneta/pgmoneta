@@ -52,13 +52,14 @@
 #define ACTION_BACKUP       1
 #define ACTION_LIST_BACKUP  2
 #define ACTION_RESTORE      3
-#define ACTION_DELETE       4
-#define ACTION_STOP         5
-#define ACTION_STATUS       6
-#define ACTION_DETAILS      7
-#define ACTION_ISALIVE      8
-#define ACTION_RESET        9
-#define ACTION_RELOAD      10
+#define ACTION_ARCHIVE      4
+#define ACTION_DELETE       5
+#define ACTION_STOP         6
+#define ACTION_STATUS       7
+#define ACTION_DETAILS      8
+#define ACTION_ISALIVE      9
+#define ACTION_RESET       10
+#define ACTION_RELOAD      11
 #define ACTION_HELP        99
 
 static int find_action(int argc, char** argv, int* place);
@@ -66,11 +67,13 @@ static int find_action(int argc, char** argv, int* place);
 static void help_backup(void);
 static void help_list_backup(void);
 static void help_restore(void);
+static void help_archive(void);
 static void help_delete(void);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
+static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
 static int delete(SSL* ssl, int socket, char* server, char* backup_id);
 static int stop(SSL* ssl, int socket);
 static int status(SSL* ssl, int socket);
@@ -111,6 +114,7 @@ usage(void)
    printf("  backup                   Backup a server\n");
    printf("  list-backup              List the backups for a server\n");
    printf("  restore                  Restore a backup from a server\n");
+   printf("  archive                  Archive a backup from a server\n");
    printf("  delete                   Delete a backup from a server\n");
    printf("  is-alive                 Is pgmoneta alive\n");
    printf("  stop                     Stop pgmoneta\n");
@@ -331,6 +335,20 @@ main(int argc, char **argv)
             action = ACTION_HELP;
          }
       }
+      else if (action == ACTION_ARCHIVE)
+      {
+         if (argc == position + 4)
+         {
+            server = argv[argc - 3];
+            id = argv[argc - 2];
+            dir = argv[argc - 1];
+         }
+         else
+         {
+            help_archive();
+            action = ACTION_HELP;
+         }
+      }
       else if (action == ACTION_DELETE)
       {
          if (argc == position + 3)
@@ -458,6 +476,10 @@ password:
       {
          exit_code = restore(s_ssl, socket, server, id, dir);
       }
+      else if (action == ACTION_ARCHIVE)
+      {
+         exit_code = archive(s_ssl, socket, server, id, dir);
+      }
       else if (action == ACTION_DELETE)
       {
          exit_code = delete(s_ssl, socket, server, id);
@@ -568,6 +590,11 @@ find_action(int argc, char** argv, int* place)
          *place = i;
          return ACTION_RESTORE;
       }
+      else if (!strcmp("archive", argv[i]))
+      {
+         *place = i;
+         return ACTION_ARCHIVE;
+      }
       else if (!strcmp("delete", argv[i]))
       {
          *place = i;
@@ -630,6 +657,13 @@ help_restore(void)
 }
 
 static void
+help_archive(void)
+{
+   printf("Archive a backup for a server\n");
+   printf("  pgmoneta-cli archive <server> [<timestamp>|oldest|newest] <directory>\n");
+}
+
+static void
 help_delete(void)
 {
    printf("Delete a backup for a server\n");
@@ -666,6 +700,17 @@ static int
 restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
 {
    if (pgmoneta_management_restore(ssl, socket, server, backup_id, directory))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
+{
+   if (pgmoneta_management_archive(ssl, socket, server, backup_id, directory))
    {
       return 1;
    }
