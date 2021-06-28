@@ -56,6 +56,8 @@
 #define EVBACKEND_IOURING  0x00000080U
 #endif
 
+extern char** environ;
+static bool env_changed = false;
 static int max_process_title_size = -1;
 
 static int string_compare(const void* a, const void* b);
@@ -632,8 +634,39 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char *s2)
 {
 #ifdef HAVE_LINUX
    char title[256];
+   size_t size;
+   char** env = environ;
+   int es = 0;
 
-   memset(&title, 0, sizeof(title));
+   if (!env_changed)
+   {
+      for (int i = 0; env[i] != NULL; i++)
+      {
+         es++;
+      }
+
+      environ = (char**)malloc(sizeof(char*) * (es + 1));
+      if (environ == NULL)
+      {
+         return;
+      }
+
+      for (int i = 0; env[i] != NULL; i++)
+      {
+         size = strlen(env[i]);
+         environ[i] = (char*)malloc(size + 1);
+
+         if (environ[i] == NULL)
+         {
+            return;
+         }
+
+         memset(environ[i], 0, size + 1);
+         memcpy(environ[i], env[i], size);
+      }
+      environ[es] = NULL;
+      env_changed = true;
+   }
 
    if (max_process_title_size == -1)
    {
@@ -646,7 +679,10 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char *s2)
       }
 
       max_process_title_size = m;
+      memset(*argv, 0, max_process_title_size);
    }
+
+   memset(&title, 0, sizeof(title));
 
    if (s1 != NULL && s2 != NULL)
    {
@@ -657,7 +693,11 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char *s2)
       snprintf(title, sizeof(title) - 1, "pgmoneta: %s", s1);
    }
 
-   memcpy(*argv, title, MIN(max_process_title_size, 256));
+   size = MIN(max_process_title_size, sizeof(title));
+   size = MIN(size, strlen(title) + 1);
+
+   memcpy(*argv, title, size);
+   memset(*argv + size, 0, 1);
 
 #else
    if (s1 != NULL && s2 != NULL)
