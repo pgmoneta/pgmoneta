@@ -399,7 +399,7 @@ main(int argc, char **argv)
    else
    {
       admins_path = "/etc/pgmoneta/pgmoneta_admins.conf";
-      ret = pgmoneta_read_users_configuration(shmem, admins_path);
+      ret = pgmoneta_read_admins_configuration(shmem, admins_path);
       if (ret == 0)
       {
          memcpy(&config->admins_path[0], admins_path, MIN(strlen(admins_path), MAX_PATH - 1));
