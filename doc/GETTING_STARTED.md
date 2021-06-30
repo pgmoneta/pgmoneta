@@ -11,12 +11,12 @@ Usage:
   pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -d ]
 
 Options:
-  -c, --config CONFIG_FILE           Set the path to the pgmoneta.conf file
-  -u, --users USERS_FILE             Set the path to the pgmoneta_users.conf file
-  -A, --admins ADMINS_FILE           Set the path to the pgmoneta_admins.conf file
-  -d, --daemon                       Run as a daemon
-  -V, --version                      Display version information
-  -?, --help                         Display help
+  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
+  -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file
+  -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file
+  -d, --daemon             Run as a daemon
+  -V, --version            Display version information
+  -?, --help               Display help
 ```
 
 If you don't have `pgmoneta` in your path see [README](../README.md) on how to
