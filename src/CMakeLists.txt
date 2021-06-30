@@ -19,7 +19,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   #
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${LIBTAR_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${ZSTD_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
@@ -31,7 +30,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   # Library directories
   #
   link_libraries(
-    ${LIBTAR_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${ZSTD_LIBRARIES}
     ${LIBEV_LIBRARIES}
@@ -51,7 +49,6 @@ else()
   #
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${LIBTAR_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${ZSTD_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
@@ -62,7 +59,6 @@ else()
   # Library directories
   #
   link_libraries(
-    ${LIBTAR_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${ZSTD_LIBRARIES}
     ${LIBEV_LIBRARIES}
