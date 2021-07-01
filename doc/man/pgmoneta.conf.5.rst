@@ -119,6 +119,9 @@ wal_slot
 retention
   The retention for the server
 
+synchronous
+  Use synchronous receive. Default is off
+
 REPORTING BUGS
 ==============
 

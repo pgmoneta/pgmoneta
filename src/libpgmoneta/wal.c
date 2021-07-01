@@ -112,6 +112,11 @@ pgmoneta_wal(int srv, char** argv)
          cmd = pgmoneta_append(cmd, " ");
       }
 
+      if (config->servers[srv].synchronous)
+      {
+         cmd = pgmoneta_append(cmd, "--synchronous ");
+      }
+
       cmd = pgmoneta_append(cmd, "--no-password ");
 
       cmd = pgmoneta_append(cmd, "-D ");
