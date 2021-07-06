@@ -89,29 +89,32 @@ pgmoneta_zstandardc_data(char* directory)
       }
       else
       {
-         from = NULL;
-
-         from = pgmoneta_append(from, directory);
-         from = pgmoneta_append(from, "/");
-         from = pgmoneta_append(from, entry->d_name);
-
-         to = NULL;
-
-         to = pgmoneta_append(to, directory);
-         to = pgmoneta_append(to, "/");
-         to = pgmoneta_append(to, entry->d_name);
-         to = pgmoneta_append(to, ".zstd");
-         
-         if (zstd_compress(from, level, to))
+         if (!pgmoneta_ends_with(entry->d_name, ".zstd"))
          {
-            pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, entry->d_name);
-            break;
+            from = NULL;
+
+            from = pgmoneta_append(from, directory);
+            from = pgmoneta_append(from, "/");
+            from = pgmoneta_append(from, entry->d_name);
+
+            to = NULL;
+
+            to = pgmoneta_append(to, directory);
+            to = pgmoneta_append(to, "/");
+            to = pgmoneta_append(to, entry->d_name);
+            to = pgmoneta_append(to, ".zstd");
+
+            if (zstd_compress(from, level, to))
+            {
+               pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, entry->d_name);
+               break;
+            }
+
+            pgmoneta_delete_file(from);
+
+            free(from);
+            free(to);
          }
-
-         pgmoneta_delete_file(from);
-
-         free(from);
-         free(to);
       }
    }
 
