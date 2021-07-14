@@ -62,6 +62,36 @@ Next we create a section called `[primary]` which has the information about our
 [PostgreSQL](https://www.postgresql.org) instance. In this case it is running
 on `localhost` on port `5432` and we will use the `repl` user account to connect.
 
+The `repl` user must have the `REPLICATION` role and have access to the `postgres` database,
+so for example
+
+```
+CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';
+```
+
+and in `pg_hba.conf`
+
+```
+local   postgres        repl                                   scram-sha-256
+host    postgres        repl           127.0.0.1/32            scram-sha-256
+host    postgres        repl           ::1/128                 scram-sha-256
+host    replication     repl           127.0.0.1/32            scram-sha-256
+host    replication     repl           ::1/128                 scram-sha-256
+```
+
+Optionally, create a physical replication slot that can be used for Write-Ahead Log streaming,
+like
+
+```
+SELECT pg_create_physical_replication_slot('repl');
+```
+
+and add that to the `pgmoneta.conf` configuration under `[primary]`, as
+
+```
+wal_slot = repl
+```
+
 We will need a user vault for the `repl` account, so the following commands will add
 a master key, and the `repl` password
 
