@@ -345,12 +345,12 @@ int
 pgmoneta_move_file(char* from, char* to);
 
 /**
- * File exists
- * @param f The file
+ * File/directory exists
+ * @param f The file/directory
  * @return The result
  */
 bool
-pgmoneta_exists_file(char* f);
+pgmoneta_exists(char* f);
 
 /**
  * Check for file

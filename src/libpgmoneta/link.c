@@ -90,7 +90,7 @@ pgmoneta_link(char* from, char* to)
          }
          else
          {
-            if (pgmoneta_exists_file(to))
+            if (pgmoneta_exists(to))
             {
                bool equal = pgmoneta_compare_files(from_entry, to_entry);
 

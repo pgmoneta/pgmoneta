@@ -373,7 +373,7 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
    from = pgmoneta_append(from, id);
    from = pgmoneta_append(from, "/data");
 
-   if (!pgmoneta_exists_file(from))
+   if (!pgmoneta_exists(from))
    {
       pgmoneta_log_error("Archive: Unknown identifier for %s/%s", config->servers[server].name, id);
       goto done;
@@ -430,7 +430,7 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
          to = pgmoneta_append(to, id);
          to = pgmoneta_append(to, ".tar.gz");
 
-         if (pgmoneta_exists_file(to))
+         if (pgmoneta_exists(to))
          {
             pgmoneta_delete_file(to);
          }
@@ -446,7 +446,7 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
          to = pgmoneta_append(to, id);
          to = pgmoneta_append(to, ".tar.zstd");
 
-         if (pgmoneta_exists_file(to))
+         if (pgmoneta_exists(to))
          {
             pgmoneta_delete_file(to);
          }

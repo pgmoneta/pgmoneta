@@ -1272,7 +1272,7 @@ pgmoneta_move_file(char* from, char* to)
 }
 
 bool
-pgmoneta_exists_file(char* f)
+pgmoneta_exists(char* f)
 {
    if (access(f, F_OK) == 0)
    {
