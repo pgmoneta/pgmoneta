@@ -288,8 +288,8 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
    int hours;
    int minutes;
    int seconds;
-   int number_of_backups;
-   struct backup** backups;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
    TAR* tar = NULL;
    char* d = NULL;
    char* tarfile = NULL;
@@ -353,6 +353,12 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
       id = backup_id;
    }
 
+   if (id == NULL)
+   {
+      pgmoneta_log_error("Archive: No identifier for %s", config->servers[server].name);
+      goto done;
+   }
+
    tarfile = pgmoneta_append(tarfile, directory);
    tarfile = pgmoneta_append(tarfile, "/");
    tarfile = pgmoneta_append(tarfile, config->servers[server].name);
@@ -366,6 +372,12 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
    from = pgmoneta_append(from, "/backup/");
    from = pgmoneta_append(from, id);
    from = pgmoneta_append(from, "/data");
+
+   if (!pgmoneta_exists_file(from))
+   {
+      pgmoneta_log_error("Archive: Unknown identifier for %s/%s", config->servers[server].name, id);
+      goto done;
+   }
 
    to = pgmoneta_append(to, directory);
    to = pgmoneta_append(to, "/");
