@@ -79,12 +79,10 @@ static void reload_cb(struct ev_loop *loop, ev_signal *w, int revents);
 static void coredump_cb(struct ev_loop *loop, ev_signal *w, int revents);
 static void wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents);
 static void retention_cb(struct ev_loop *loop, ev_periodic *w, int revents);
+static void wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents);
 static bool accept_fatal(int error);
 static void reload_configuration(void);
-static void add_receivewal(pid_t pid);
-static void remove_receivewal(pid_t pid);
-static void start_receivewals(void);
-static void stop_receivewals(void);
+static void init_receivewals(void);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
 
@@ -93,12 +91,6 @@ struct accept_io
    struct ev_io io;
    int socket;
    char** argv;
-};
-
-struct receivewal
-{
-   pid_t pid;
-   struct receivewal* next;
 };
 
 static volatile int keep_running = 1;
@@ -112,7 +104,6 @@ static int metrics_fds_length = -1;
 static struct accept_io io_management[MAX_FDS];
 static int* management_fds = NULL;
 static int management_fds_length = -1;
-static struct receivewal* receivewals = NULL;
 
 static void
 start_mgt(void)
@@ -230,6 +221,7 @@ main(int argc, char **argv)
    struct signal_info signal_watcher[5];
    struct ev_periodic wal_compress;
    struct ev_periodic retention;
+   struct ev_periodic wal_streaming;
    size_t shmem_size;
    struct configuration* config = NULL;
    int ret;
@@ -577,7 +569,7 @@ main(int argc, char **argv)
    }
 
    /* Start all pg_receivewal processes */
-   start_receivewals();
+   init_receivewals();
 
    /* Start WAL compression */
    if (config->compression_type != COMPRESSION_NONE)
@@ -588,6 +580,9 @@ main(int argc, char **argv)
 
    ev_periodic_init (&retention, retention_cb, 0., 60, 0);
    ev_periodic_start (main_loop, &retention);
+
+   ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
+   ev_periodic_start (main_loop, &wal_streaming);
 
    pgmoneta_log_info("pgmoneta: started on %s", config->host);
    pgmoneta_log_debug("Management: %d", unix_management_socket);
@@ -627,9 +622,6 @@ main(int argc, char **argv)
    sd_notify(0, "STOPPING=1");
 #endif
 
-   /* Stop all pg_receivewal processes */
-   stop_receivewals();
-
    shutdown_management();
    shutdown_metrics();
    shutdown_mgt();
@@ -648,6 +640,11 @@ main(int argc, char **argv)
 
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
+
+   if (daemon)
+   {
+      kill(0, SIGTERM);
+   }
 
    return 0;
 }
@@ -1190,6 +1187,39 @@ retention_cb(struct ev_loop *loop, ev_periodic *w, int revents)
    }
 }
 
+static void
+wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (EV_ERROR & revents)
+   {
+      pgmoneta_log_trace("wal_streaming_cb: got invalid event: %s", strerror(errno));
+      return;
+   }
+
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      if (keep_running && !config->servers[i].wal_streaming)
+      {
+         pid_t pid;
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("WAL: Cannot create process");
+         }
+         else if (pid == 0)
+         {
+            pgmoneta_wal(i, argv_ptr);
+         }
+      }
+   }
+}
+
 static bool
 accept_fatal(int error)
 {
@@ -1280,70 +1310,7 @@ reload_configuration(void)
 }
 
 static void
-add_receivewal(pid_t pid)
-{
-   struct receivewal* r = NULL;
-
-   r = (struct receivewal*)malloc(sizeof(struct receivewal));
-   r->pid = pid;
-   r->next = NULL;
-
-   if (receivewals == NULL)
-   {
-      receivewals = r;
-   }
-   else
-   {
-      struct receivewal* last = NULL;
-
-      last = receivewals;
-
-      while (last->next != NULL)
-      {
-         last = last->next;
-      }
-
-      last->next = r;
-   }
-}
-
-static void
-remove_receivewal(pid_t pid)
-{
-   struct receivewal* r = NULL;
-   struct receivewal* p = NULL;
-
-   r = receivewals;
-   p = NULL;
-
-   if (r != NULL)
-   {
-      while (r->pid != pid)
-      {
-         p = r;
-         r = r->next;
-
-         if (r == NULL)
-         {
-            return;
-         }
-      }
-
-      if (r == receivewals)
-      {
-         receivewals = r->next;
-      }
-      else
-      {
-         p->next = r->next;
-      }
-
-      free(r);
-   }
-}
-
-static void
-start_receivewals(void)
+init_receivewals(void)
 {
    struct configuration* config;
 
@@ -1363,27 +1330,6 @@ start_receivewals(void)
       {
          pgmoneta_wal(i, argv_ptr);
       }
-      else
-      {
-         add_receivewal(pid);
-      }
-   }
-}
-
-static void
-stop_receivewals(void)
-{
-   struct receivewal* h = NULL;
-   struct receivewal* r = NULL;
-
-   h = receivewals;
-
-   while (h != NULL)
-   {
-      r = h;
-      h = h->next;
-
-      remove_receivewal(r->pid);
    }
 }
 

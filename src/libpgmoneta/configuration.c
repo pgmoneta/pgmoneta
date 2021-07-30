@@ -156,6 +156,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   srv.synchronous = false;
                   atomic_init(&srv.backup, false);
                   atomic_init(&srv.delete, false);
+                  srv.wal_streaming = false;
                   srv.valid = false;
 
                   idx_server++;
@@ -1417,6 +1418,7 @@ copy_server(struct server* dst, struct server* src)
    restart_bool("synchronous", dst->synchronous, src->synchronous);
    /* dst->backup = src->backup; */
    /* dst->delete = src->delete; */
+   dst->wal_streaming = src->wal_streaming;
    /* dst->valid = src->valid; */
 }
 

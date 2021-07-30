@@ -117,6 +117,7 @@ pgmoneta_wal(int srv, char** argv)
          cmd = pgmoneta_append(cmd, "--synchronous ");
       }
 
+      cmd = pgmoneta_append(cmd, "--no-loop ");
       cmd = pgmoneta_append(cmd, "--no-password ");
 
       cmd = pgmoneta_append(cmd, "-D ");
@@ -124,7 +125,9 @@ pgmoneta_wal(int srv, char** argv)
    
       pgmoneta_log_info("WAL: %s", config->servers[srv].name);
 
+      config->servers[srv].wal_streaming = true;
       status = system(cmd);
+      config->servers[srv].wal_streaming = false;
 
       if (status != 0)
       {

@@ -268,6 +268,9 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_total_space</h2>\n");
    data = pgmoneta_append(data, "  The total disk space for pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_wal_streaming</h2>\n");
+   data = pgmoneta_append(data, "  The WAL streaming status of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_backup_oldest</h2>\n");
    data = pgmoneta_append(data, "  The oldest backup for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -609,6 +612,22 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n\n");
 
    free(d);
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_wal_streaming The WAL streaming status of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_streaming gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_wal_streaming{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
 
    if (data != NULL)
    {
