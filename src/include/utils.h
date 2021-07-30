@@ -345,6 +345,15 @@ int
 pgmoneta_move_file(char* from, char* to);
 
 /**
+ * Get basename of a file
+ * @param s The string
+ * @param basename The basename of the file
+ * @return The result
+ */
+int
+pgmoneta_basename_file(char* s, char** basename);
+
+/**
  * File/directory exists
  * @param f The file/directory
  * @return The result
@@ -395,6 +404,16 @@ char*
 pgmoneta_get_symlink(char* symlink);
 
 /**
+ * Copy WAL files
+ * @param from The from directory
+ * @param to The to directory
+ * @param start The start file
+ * @return The result
+ */
+int
+pgmoneta_copy_wal_files(char* from, char* to, char* start);
+
+/**
  * Get the free space for a path
  * @param path The path
  * @return The result
@@ -435,6 +454,15 @@ pgmoneta_sort(size_t size, char** array);
  */
 char*
 pgmoneta_bytes_to_string(uint64_t bytes);
+
+/**
+ * Read version number
+ * @param directory The base directory
+ * @param version The version
+ * @return The result
+ */
+int
+pgmoneta_read_version(char* directory, char** version);
 
 #ifdef DEBUG
 

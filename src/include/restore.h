@@ -40,11 +40,26 @@ extern "C" {
  * Create a restore
  * @param server The server
  * @param backup_id The backup identifier
- * @param directory The target directory
+ * @param position The position
+ * @param directory The base directory
  * @param argv The argv
  */
 void
-pgmoneta_restore(int server, char* backup_id, char* directory, char** argv);
+pgmoneta_restore(int server, char* backup_id, char* position, char* directory, char** argv);
+
+/**
+ * Restore to a directory
+ * @param prefix The log prefix
+ * @param server The server
+ * @param backup_id The backup identifier
+ * @param position The position
+ * @param directory The base directory
+ * @param output The output directory
+ * @param identifier The identifier
+ * @return The result
+ */
+int
+pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* position, char* directory, char** output, char** identifier);
 
 #ifdef __cplusplus
 }

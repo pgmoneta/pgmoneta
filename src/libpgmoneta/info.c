@@ -38,7 +38,7 @@
 #include <unistd.h>
 
 void
-pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time)
+pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time, char* version)
 {
    char buffer[128];
    char* s = NULL;
@@ -59,6 +59,10 @@ pgmoneta_create_info(char* directory, int status, char* label, unsigned long siz
 
       memset(&buffer[0], 0, sizeof(buffer));
       snprintf(&buffer[0], sizeof(buffer), "ELAPSED=%d\n", elapsed_time);
+      fputs(&buffer[0], sfile);
+
+      memset(&buffer[0], 0, sizeof(buffer));
+      snprintf(&buffer[0], sizeof(buffer), "VERSION=%s\n", version);
       fputs(&buffer[0], sfile);
 
       memset(&buffer[0], 0, sizeof(buffer));
@@ -279,6 +283,10 @@ pgmoneta_get_backup(char* directory, struct backup** backup)
       else if (!strcmp("ELAPSED", &key[0]))
       {
          bck->elapsed_time = atoi(&value[0]);
+      }
+      else if (!strcmp("VERSION", &key[0]))
+      {
+         bck->version = atoi(&value[0]);
       }
    }
 

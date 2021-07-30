@@ -50,17 +50,18 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#define MANAGEMENT_HEADER_SIZE 5
+#define MANAGEMENT_HEADER_SIZE 1
 
 
+static int read_string(SSL* ssl, int socket, char** str);
 static int read_complete(SSL* ssl, int socket, void* buf, size_t size);
 static int write_complete(SSL* ssl, int socket, void* buf, size_t size);
 static int write_socket(int socket, void* buf, size_t size);
 static int write_ssl(SSL* ssl, void* buf, size_t size);
-static int write_header(SSL* ssl, int fd, signed char type, int ns);
+static int write_header(SSL* ssl, int fd, signed char type);
 
 int
-pgmoneta_management_read_header(int socket, signed char* id, int* ns)
+pgmoneta_management_read_header(int socket, signed char* id)
 {
    char header[MANAGEMENT_HEADER_SIZE];
 
@@ -71,123 +72,40 @@ pgmoneta_management_read_header(int socket, signed char* id, int* ns)
    }
 
    *id = pgmoneta_read_byte(&(header));
-   *ns = pgmoneta_read_int32(&(header[1]));
    
    return 0;
 
 error:
 
    *id = -1;
-   *ns = 0;
 
    return 1;
 }
 
 int
-pgmoneta_management_read_payload(int socket, signed char id, int ns, char** payload_s1, char** payload_s2, char** payload_s3)
+pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4)
 {
-   char* s1 = NULL;
-   char* s2 = NULL;
-   char* s3 = NULL;
-   char buf4[4];
-   int size;
-
    *payload_s1 = NULL;
    *payload_s2 = NULL;
    *payload_s3 = NULL;
+   *payload_s4 = NULL;
 
    switch (id)
    {
       case MANAGEMENT_BACKUP:
       case MANAGEMENT_LIST_BACKUP:
-         if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
-         {
-            goto error;
-         }
-         size = pgmoneta_read_int32(&buf4);
-
-         s1 = malloc(size + 1);
-         memset(s1, 0, size + 1);
-         if (read_complete(NULL, socket, s1, size))
-         {
-            goto error;
-         }
-         *payload_s1 = s1;
+         read_string(NULL, socket, payload_s1);
          break;
       case MANAGEMENT_RESTORE:
       case MANAGEMENT_ARCHIVE:
-         if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
-         {
-            goto error;
-         }
-
-         size = pgmoneta_read_int32(&buf4);
-         s1 = malloc(size + 1);
-         memset(s1, 0, size + 1);
-         if (read_complete(NULL, socket, s1, size))
-         {
-            goto error;
-         }
-         *payload_s1 = s1;
-
-         if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
-         {
-            goto error;
-         }
-
-         size = pgmoneta_read_int32(&buf4);
-         s2 = malloc(size + 1);
-         memset(s2, 0, size + 1);
-         if (read_complete(NULL, socket, s2, size))
-         {
-            goto error;
-         }
-         *payload_s2 = s2;
-
-         if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
-         {
-            goto error;
-         }
-
-         size = pgmoneta_read_int32(&buf4);
-         s3 = malloc(size + 1);
-         memset(s3, 0, size + 1);
-         if (read_complete(NULL, socket, s3, size))
-         {
-            goto error;
-         }
-         *payload_s3 = s3;
-
+         read_string(NULL, socket, payload_s1);
+         read_string(NULL, socket, payload_s2);
+         read_string(NULL, socket, payload_s3);
+         read_string(NULL, socket, payload_s4);
          break;
       case MANAGEMENT_DELETE:
-         if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
-         {
-            goto error;
-         }
-
-         size = pgmoneta_read_int32(&buf4);
-         s1 = malloc(size + 1);
-         memset(s1, 0, size + 1);
-         if (read_complete(NULL, socket, s1, size))
-         {
-            goto error;
-         }
-         *payload_s1 = s1;
-
-         if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
-         {
-            goto error;
-         }
-
-         size = pgmoneta_read_int32(&buf4);
-         s2 = malloc(size + 1);
-         memset(s2, 0, size + 1);
-         if (read_complete(NULL, socket, s2, size))
-         {
-            goto error;
-         }
-         *payload_s2 = s2;
-
+         read_string(NULL, socket, payload_s1);
+         read_string(NULL, socket, payload_s2);
          break;
       case MANAGEMENT_STOP:
       case MANAGEMENT_STATUS:
@@ -212,7 +130,7 @@ pgmoneta_management_backup(SSL* ssl, int socket, char* server)
 {
    char buf[4];
 
-   if (write_header(ssl, socket, MANAGEMENT_BACKUP, 1))
+   if (write_header(ssl, socket, MANAGEMENT_BACKUP))
    {
       pgmoneta_log_warn("pgmoneta_management_backup: write: %d", socket);
       errno = 0;
@@ -246,7 +164,7 @@ pgmoneta_management_list_backup(SSL* ssl, int socket, char* server)
 {
    char buf[4];
 
-   if (write_header(ssl, socket, MANAGEMENT_LIST_BACKUP, 1))
+   if (write_header(ssl, socket, MANAGEMENT_LIST_BACKUP))
    {
       pgmoneta_log_warn("pgmoneta_management_list_backup: write: %d", socket);
       errno = 0;
@@ -504,11 +422,11 @@ error:
 }
 
 int
-pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
+pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
 {
    char buf[4];
 
-   if (write_header(ssl, socket, MANAGEMENT_RESTORE, 3))
+   if (write_header(ssl, socket, MANAGEMENT_RESTORE))
    {
       pgmoneta_log_warn("pgmoneta_management_restore: write: %d", socket);
       errno = 0;
@@ -545,6 +463,24 @@ pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id,
       goto error;
    }
 
+   pgmoneta_write_int32(&buf, position != NULL ? strlen(position) : 0);
+   if (write_complete(ssl, socket, &buf, sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_restore: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   if (position != NULL)
+   {
+      if (write_complete(ssl, socket, position, strlen(position)))
+      {
+         pgmoneta_log_warn("pgmoneta_management_restore: write: %d %s", socket, strerror(errno));
+         errno = 0;
+         goto error;
+      }
+   }
+
    pgmoneta_write_int32(&buf, strlen(directory));
    if (write_complete(ssl, socket, &buf, sizeof(buf)))
    {
@@ -568,11 +504,11 @@ error:
 }
 
 int
-pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
+pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
 {
    char buf[4];
 
-   if (write_header(ssl, socket, MANAGEMENT_ARCHIVE, 3))
+   if (write_header(ssl, socket, MANAGEMENT_ARCHIVE))
    {
       pgmoneta_log_warn("pgmoneta_management_archive: write: %d", socket);
       errno = 0;
@@ -609,6 +545,24 @@ pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id,
       goto error;
    }
 
+   pgmoneta_write_int32(&buf, position != NULL ? strlen(position) : 0);
+   if (write_complete(ssl, socket, &buf, sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   if (position != NULL)
+   {
+      if (write_complete(ssl, socket, position, strlen(position)))
+      {
+         pgmoneta_log_warn("pgmoneta_management_archive: write: %d %s", socket, strerror(errno));
+         errno = 0;
+         goto error;
+      }
+   }
+
    pgmoneta_write_int32(&buf, strlen(directory));
    if (write_complete(ssl, socket, &buf, sizeof(buf)))
    {
@@ -636,7 +590,7 @@ pgmoneta_management_delete(SSL* ssl, int socket, char* server, char* backup_id)
 {
    char buf[4];
 
-   if (write_header(ssl, socket, MANAGEMENT_DELETE, 2))
+   if (write_header(ssl, socket, MANAGEMENT_DELETE))
    {
       pgmoneta_log_warn("pgmoneta_management_delete: write: %d", socket);
       errno = 0;
@@ -839,7 +793,7 @@ error:
 int
 pgmoneta_management_stop(SSL* ssl, int socket)
 {
-   if (write_header(ssl, socket, MANAGEMENT_STOP, 0))
+   if (write_header(ssl, socket, MANAGEMENT_STOP))
    {
       pgmoneta_log_warn("pgmoneta_management_stop: write: %d", socket);
       errno = 0;
@@ -856,7 +810,7 @@ error:
 int
 pgmoneta_management_status(SSL* ssl, int socket)
 {
-   if (write_header(ssl, socket, MANAGEMENT_STATUS, 0))
+   if (write_header(ssl, socket, MANAGEMENT_STATUS))
    {
       pgmoneta_log_warn("pgmoneta_management_status: write: %d", socket);
       errno = 0;
@@ -1173,7 +1127,7 @@ error:
 int
 pgmoneta_management_details(SSL* ssl, int socket)
 {
-   if (write_header(ssl, socket, MANAGEMENT_DETAILS, 0))
+   if (write_header(ssl, socket, MANAGEMENT_DETAILS))
    {
       pgmoneta_log_warn("pgmoneta_management_details: write: %d", socket);
       errno = 0;
@@ -1202,7 +1156,7 @@ pgmoneta_management_write_details(int socket)
 int
 pgmoneta_management_isalive(SSL* ssl, int socket)
 {
-   if (write_header(ssl, socket, MANAGEMENT_ISALIVE, 0))
+   if (write_header(ssl, socket, MANAGEMENT_ISALIVE))
    {
       pgmoneta_log_warn("pgmoneta_management_isalive: write: %d", socket);
       errno = 0;
@@ -1265,7 +1219,7 @@ error:
 int
 pgmoneta_management_reset(SSL* ssl, int socket)
 {
-   if (write_header(ssl, socket, MANAGEMENT_RESET, 0))
+   if (write_header(ssl, socket, MANAGEMENT_RESET))
    {
       pgmoneta_log_warn("pgmoneta_management_reset: write: %d", socket);
       errno = 0;
@@ -1282,11 +1236,44 @@ error:
 int
 pgmoneta_management_reload(SSL* ssl, int socket)
 {
-   if (write_header(ssl, socket, MANAGEMENT_RELOAD, 0))
+   if (write_header(ssl, socket, MANAGEMENT_RELOAD))
    {
       pgmoneta_log_warn("pgmoneta_management_reload: write: %d", socket);
       errno = 0;
       goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+read_string(SSL* ssl, int socket, char** str)
+{
+   char* s = NULL;
+   char buf4[4];
+   int size;
+
+   if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
+   {
+      goto error;
+   }
+
+   size = pgmoneta_read_int32(&buf4);
+   if (size > 0)
+   {
+      s = malloc(size + 1);
+      memset(s, 0, size + 1);
+
+      if (read_complete(NULL, socket, s, size))
+      {
+         goto error;
+      }
+
+      *str = s;
    }
 
    return 0;
@@ -1508,12 +1495,11 @@ write_ssl(SSL* ssl, void* buf, size_t size)
 }
 
 static int
-write_header(SSL* ssl, int socket, signed char type, int ns)
+write_header(SSL* ssl, int socket, signed char type)
 {
    char header[MANAGEMENT_HEADER_SIZE];
 
    pgmoneta_write_byte(&(header), type);
-   pgmoneta_write_int32(&(header[1]), ns);
 
    return write_complete(ssl, socket, &(header), MANAGEMENT_HEADER_SIZE);
 }

@@ -44,6 +44,7 @@ struct backup
    unsigned long backup_size;  /**< The backup size */
    unsigned long restore_size; /**< The restore size */
    int elapsed_time;           /**< The elapsed time in seconds */
+   int version;                /**< The version */
    bool valid;                 /**< Is the backup valid */
 } __attribute__ ((aligned (64)));
 
@@ -54,9 +55,10 @@ struct backup
  * @param label The label
  * @param size The backup size
  * @param elapsed_time The elapsed time in seconds
+ * @param version The version
  */
 void
-pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time);
+pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time, char* version);
 
 /**
  * Add backup information

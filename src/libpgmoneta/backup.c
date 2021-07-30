@@ -66,6 +66,7 @@ pgmoneta_backup(int server, char** argv)
    struct backup** backups = NULL;
    char* from = NULL;
    char* to = NULL;
+   char* version = NULL;
    int newest;
    int next_newest;
    struct configuration* config;
@@ -164,10 +165,11 @@ pgmoneta_backup(int server, char** argv)
    if (status != 0)
    {
       pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
-      pgmoneta_create_info(root, 0, &date[0], 0, 0);
+      pgmoneta_create_info(root, 0, &date[0], 0, 0, NULL);
    }
    else
    {
+      pgmoneta_read_version(d, &version);
       size = pgmoneta_directory_size(d);
 
       if (config->compression_type == COMPRESSION_GZIP)
@@ -189,7 +191,7 @@ pgmoneta_backup(int server, char** argv)
 
       pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
 
-      pgmoneta_create_info(root, 1, &date[0], size, total_seconds);
+      pgmoneta_create_info(root, 1, &date[0], size, total_seconds, version);
 
       if (config->link)
       {
@@ -291,6 +293,7 @@ done:
    free(server_path);
    free(from);
    free(to);
+   free(version);
 
    exit(0);
 }

@@ -40,11 +40,12 @@ extern "C" {
  * Create an archive
  * @param server The server
  * @param backup_id The backup identifier
+ * @param position The position
  * @param directory The target directory
  * @param argv The argv
  */
 void
-pgmoneta_archive(int server, char* backup_id, char* directory, char** argv);
+pgmoneta_archive(int server, char* backup_id, char* position, char* directory, char** argv);
 
 #ifdef __cplusplus
 }

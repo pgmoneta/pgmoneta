@@ -32,6 +32,7 @@
 #include <gzip.h>
 #include <info.h>
 #include <logging.h>
+#include <restore.h>
 #include <utils.h>
 #include <zstandard.h>
 
@@ -280,7 +281,7 @@ static int ino_hash(ino_t* inode);
    int_to_oct_nonull((fmtime), (t)->th_buf.mtime, 12)
 
 void
-pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
+pgmoneta_archive(int server, char* backup_id, char* position, char* directory, char** argv)
 {
    char elapsed[128];
    time_t start_time;
@@ -288,14 +289,11 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
    int hours;
    int minutes;
    int seconds;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
    TAR* tar = NULL;
-   char* d = NULL;
    char* tarfile = NULL;
-   char* from = NULL;
    char* to = NULL;
    char* id = NULL;
+   char* output = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -306,120 +304,20 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
 
    start_time = time(NULL);
 
-   if (!strcmp(backup_id, "oldest"))
+   if (!pgmoneta_restore_backup("Archive", server, backup_id, position, directory, &output, &id))
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[server].name);
-      d = pgmoneta_append(d, "/backup/");
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto done;
-      }
-
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (backups[i] != NULL && backups[i]->valid)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
-   {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[server].name);
-      d = pgmoneta_append(d, "/backup/");
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto done;
-      }
-
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (backups[i] != NULL && backups[i]->valid)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else
-   {
-      id = backup_id;
-   }
-
-   if (id == NULL)
-   {
-      pgmoneta_log_error("Archive: No identifier for %s", config->servers[server].name);
-      goto done;
-   }
-
-   tarfile = pgmoneta_append(tarfile, directory);
-   tarfile = pgmoneta_append(tarfile, "/");
-   tarfile = pgmoneta_append(tarfile, config->servers[server].name);
-   tarfile = pgmoneta_append(tarfile, "-");
-   tarfile = pgmoneta_append(tarfile, id);
-   tarfile = pgmoneta_append(tarfile, ".tar");
-
-   from = pgmoneta_append(from, config->base_dir);
-   from = pgmoneta_append(from, "/");
-   from = pgmoneta_append(from, config->servers[server].name);
-   from = pgmoneta_append(from, "/backup/");
-   from = pgmoneta_append(from, id);
-   from = pgmoneta_append(from, "/data");
-
-   if (!pgmoneta_exists(from))
-   {
-      pgmoneta_log_error("Archive: Unknown identifier for %s/%s", config->servers[server].name, id);
-      goto done;
-   }
-
-   to = pgmoneta_append(to, directory);
-   to = pgmoneta_append(to, "/");
-   to = pgmoneta_append(to, config->servers[server].name);
-   to = pgmoneta_append(to, "-");
-   to = pgmoneta_append(to, id);
-   to = pgmoneta_append(to, "/");
-
-   pgmoneta_delete_directory(to);
-
-   if (pgmoneta_copy_directory(from, to))
-   {
-      pgmoneta_log_error("Archive: Could not restore %s/%s", config->servers[server].name, id);
-   }
-   else
-   {
-      if (config->compression_type == COMPRESSION_GZIP)
-      {
-         pgmoneta_gunzip_data(to);
-      }
-      else if (config->compression_type == COMPRESSION_ZSTD)
-      {
-         pgmoneta_zstandardd_data(to);
-      }
+      tarfile = pgmoneta_append(tarfile, directory);
+      tarfile = pgmoneta_append(tarfile, "/");
+      tarfile = pgmoneta_append(tarfile, config->servers[server].name);
+      tarfile = pgmoneta_append(tarfile, "-");
+      tarfile = pgmoneta_append(tarfile, id);
+      tarfile = pgmoneta_append(tarfile, ".tar");
 
       tar_open(&tar, tarfile, NULL, O_WRONLY | O_CREAT, 0644);
-      tar_append_tree(tar, to, ".");
+      tar_append_tree(tar, output, ".");
       tar_close(tar);
 
-      pgmoneta_delete_directory(to);
-
-      free(from);
-      free(to);
-      from = NULL;
-      to = NULL;
-
-      from = pgmoneta_append(from, directory);
-      from = pgmoneta_append(from, "/");
-      from = pgmoneta_append(from, config->servers[server].name);
-      from = pgmoneta_append(from, "-");
-      from = pgmoneta_append(from, id);
-      from = pgmoneta_append(from, ".tar");
+      pgmoneta_delete_directory(output);
 
       if (config->compression_type == COMPRESSION_GZIP)
       {
@@ -435,7 +333,7 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
             pgmoneta_delete_file(to);
          }
 
-         pgmoneta_gzip_file(from, to);
+         pgmoneta_gzip_file(tarfile, to);
       }
       else if (config->compression_type == COMPRESSION_ZSTD)
       {
@@ -451,7 +349,7 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
             pgmoneta_delete_file(to);
          }
 
-         pgmoneta_zstandardc_file(from, to);
+         pgmoneta_zstandardc_file(tarfile, to);
       }
 
       total_seconds = (int)difftime(time(NULL), start_time);
@@ -464,23 +362,16 @@ pgmoneta_archive(int server, char* backup_id, char* directory, char** argv)
 
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
-
-done:
    
    pgmoneta_stop_logging();
 
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(from);
+   free(id);
+   free(output);
    free(to);
    free(tarfile);
-   free(d);
 
    free(backup_id);
+   free(position);
    free(directory);
 
    exit(0);

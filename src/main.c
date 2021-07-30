@@ -659,10 +659,10 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
    socklen_t client_addr_length;
    int client_fd;
    signed char id;
-   int ns;
    char* payload_s1 = NULL; 
    char* payload_s2 = NULL;
    char* payload_s3 = NULL;
+   char* payload_s4 = NULL;
    int srv;
    pid_t pid;
    struct accept_io* ai;
@@ -706,11 +706,11 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
    }
 
    /* Process internal management request -- f.ex. returning a file descriptor to the pool */
-   if (pgmoneta_management_read_header(client_fd, &id, &ns))
+   if (pgmoneta_management_read_header(client_fd, &id))
    {
       goto disconnect;
    }
-   pgmoneta_management_read_payload(client_fd, id, ns, &payload_s1, &payload_s2, &payload_s3);
+   pgmoneta_management_read_payload(client_fd, id, &payload_s1, &payload_s2, &payload_s3, &payload_s4);
 
    switch (id)
    {
@@ -822,7 +822,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          free(payload_s2);
          break;
       case MANAGEMENT_RESTORE:
-         pgmoneta_log_debug("pgmoneta: Management restore: %s/%s -> %s", payload_s1, payload_s2, payload_s3);
+         pgmoneta_log_debug("pgmoneta: Management restore: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -845,17 +845,25 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
             else if (pid == 0)
             {
                char* backup_id = NULL;
+               char* position = NULL;
                char* directory = NULL;
 
                backup_id = malloc(strlen(payload_s2) + 1);
                memset(backup_id, 0, strlen(payload_s2) + 1);
                memcpy(backup_id, payload_s2, strlen(payload_s2));
 
-               directory = malloc(strlen(payload_s3) + 1);
-               memset(directory, 0, strlen(payload_s3) + 1);
-               memcpy(directory, payload_s3, strlen(payload_s3));
+               if (payload_s3 != NULL)
+               {
+                  position = malloc(strlen(payload_s3) + 1);
+                  memset(position, 0, strlen(payload_s3) + 1);
+                  memcpy(position, payload_s3, strlen(payload_s3));
+               }
 
-               pgmoneta_restore(srv, backup_id, directory, ai->argv);
+               directory = malloc(strlen(payload_s4) + 1);
+               memset(directory, 0, strlen(payload_s4) + 1);
+               memcpy(directory, payload_s4, strlen(payload_s4));
+
+               pgmoneta_restore(srv, backup_id, position, directory, ai->argv);
             }
          }
          else
@@ -866,9 +874,10 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          free(payload_s1);
          free(payload_s2);
          free(payload_s3);
+         free(payload_s4);
          break;
       case MANAGEMENT_ARCHIVE:
-         pgmoneta_log_debug("pgmoneta: Management archive: %s/%s -> %s", payload_s1, payload_s2, payload_s3);
+         pgmoneta_log_debug("pgmoneta: Management archive: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -891,17 +900,25 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
             else if (pid == 0)
             {
                char* backup_id = NULL;
+               char* position = NULL;
                char* directory = NULL;
 
                backup_id = malloc(strlen(payload_s2) + 1);
                memset(backup_id, 0, strlen(payload_s2) + 1);
                memcpy(backup_id, payload_s2, strlen(payload_s2));
 
-               directory = malloc(strlen(payload_s3) + 1);
-               memset(directory, 0, strlen(payload_s3) + 1);
-               memcpy(directory, payload_s3, strlen(payload_s3));
+               if (payload_s3 != NULL)
+               {
+                  position = malloc(strlen(payload_s3) + 1);
+                  memset(position, 0, strlen(payload_s3) + 1);
+                  memcpy(position, payload_s3, strlen(payload_s3));
+               }
 
-               pgmoneta_archive(srv, backup_id, directory, ai->argv);
+               directory = malloc(strlen(payload_s4) + 1);
+               memset(directory, 0, strlen(payload_s4) + 1);
+               memcpy(directory, payload_s4, strlen(payload_s4));
+
+               pgmoneta_archive(srv, backup_id, position, directory, ai->argv);
             }
          }
          else
@@ -912,6 +929,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          free(payload_s1);
          free(payload_s2);
          free(payload_s3);
+         free(payload_s4);
          break;
       case MANAGEMENT_STOP:
          pgmoneta_log_debug("pgmoneta: Management stop");

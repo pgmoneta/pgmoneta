@@ -56,24 +56,23 @@ extern "C" {
  * Read the management header
  * @param socket The socket descriptor
  * @param id The resulting management identifier
- * @param ns The number of parameters
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_header(int socket, signed char* id, int* ns);
+pgmoneta_management_read_header(int socket, signed char* id);
 
 /**
  * Read the management payload
  * @param socket The socket descriptor
  * @param id The management identifier
- * @param ns The number of parameters
  * @param payload_s1 The resulting string payload
  * @param payload_s2 The resulting string payload
  * @param payload_s3 The resulting string payload
+ * @param payload_s4 The resulting string payload
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_payload(int socket, signed char id, int ns, char** payload_s1, char** payload_s2, char** payload_s3);
+pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4);
 
 /**
  * Management operation: Backup a server
@@ -120,11 +119,12 @@ pgmoneta_management_write_list_backup(int socket, int server);
  * @param socket The socket descriptor
  * @param server The server name
  * @param backup_id The backup identifier
+ * @param position The position
  * @param directory The directory
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
+pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
 
 /**
  * Management operation: Archive a server
@@ -132,11 +132,12 @@ pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id,
  * @param socket The socket descriptor
  * @param server The server name
  * @param backup_id The backup identifier
+ * @param position The position
  * @param directory The directory
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
+pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
 
 /**
  * Management operation: Delete a backup for a server

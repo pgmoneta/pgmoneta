@@ -72,8 +72,8 @@ static void help_delete(void);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server);
-static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
-static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory);
+static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
+static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
 static int delete(SSL* ssl, int socket, char* server, char* backup_id);
 static int stop(SSL* ssl, int socket);
 static int status(SSL* ssl, int socket);
@@ -143,6 +143,7 @@ main(int argc, char **argv)
    char* logfile = NULL;
    char* server = NULL;
    char* id = NULL;
+   char* pos = NULL;
    char* dir = NULL;
    bool do_free = true;
    int c;
@@ -323,7 +324,14 @@ main(int argc, char **argv)
       }
       else if (action == ACTION_RESTORE)
       {
-         if (argc == position + 4)
+         if (argc == position + 5)
+         {
+            server = argv[argc - 4];
+            id = argv[argc - 3];
+            pos = argv[argc - 2];
+            dir = argv[argc - 1];
+         }
+         else if (argc == position + 4)
          {
             server = argv[argc - 3];
             id = argv[argc - 2];
@@ -337,7 +345,14 @@ main(int argc, char **argv)
       }
       else if (action == ACTION_ARCHIVE)
       {
-         if (argc == position + 4)
+         if (argc == position + 5)
+         {
+            server = argv[argc - 4];
+            id = argv[argc - 3];
+            pos = argv[argc - 2];
+            dir = argv[argc - 1];
+         }
+         else if (argc == position + 4)
          {
             server = argv[argc - 3];
             id = argv[argc - 2];
@@ -474,11 +489,11 @@ password:
       }
       else if (action == ACTION_RESTORE)
       {
-         exit_code = restore(s_ssl, socket, server, id, dir);
+         exit_code = restore(s_ssl, socket, server, id, pos, dir);
       }
       else if (action == ACTION_ARCHIVE)
       {
-         exit_code = archive(s_ssl, socket, server, id, dir);
+         exit_code = archive(s_ssl, socket, server, id, pos, dir);
       }
       else if (action == ACTION_DELETE)
       {
@@ -653,14 +668,14 @@ static void
 help_restore(void)
 {
    printf("Restore a backup for a server\n");
-   printf("  pgmoneta-cli restore <server> [<timestamp>|oldest|newest] <directory>\n");
+   printf("  pgmoneta-cli restore <server> [<timestamp>|oldest|newest] [current] <directory>\n");
 }
 
 static void
 help_archive(void)
 {
    printf("Archive a backup for a server\n");
-   printf("  pgmoneta-cli archive <server> [<timestamp>|oldest|newest] <directory>\n");
+   printf("  pgmoneta-cli archive <server> [<timestamp>|oldest|newest] [current] <directory>\n");
 }
 
 static void
@@ -697,9 +712,9 @@ list_backup(SSL* ssl, int socket, char* server)
 }
 
 static int
-restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
+restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
 {
-   if (pgmoneta_management_restore(ssl, socket, server, backup_id, directory))
+   if (pgmoneta_management_restore(ssl, socket, server, backup_id, position, directory))
    {
       return 1;
    }
@@ -708,9 +723,9 @@ restore(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
 }
 
 static int
-archive(SSL* ssl, int socket, char* server, char* backup_id, char* directory)
+archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
 {
-   if (pgmoneta_management_archive(ssl, socket, server, backup_id, directory))
+   if (pgmoneta_management_archive(ssl, socket, server, backup_id, position, directory))
    {
       return 1;
    }

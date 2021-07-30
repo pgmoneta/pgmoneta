@@ -217,33 +217,36 @@ pgmoneta_zstandardd_data(char* directory)
       }
       else
       {
-         from = NULL;
-
-         from = pgmoneta_append(from, directory);
-         from = pgmoneta_append(from, "/");
-         from = pgmoneta_append(from, entry->d_name);
-
-         name = malloc(strlen(entry->d_name) - 4);
-         memset(name, 0, strlen(entry->d_name) - 4);
-         memcpy(name, entry->d_name, strlen(entry->d_name) - 5);
-
-         to = NULL;
-
-         to = pgmoneta_append(to, directory);
-         to = pgmoneta_append(to, "/");
-         to = pgmoneta_append(to, name);
-
-         if (zstd_decompress(from, to))
+         if (pgmoneta_ends_with(entry->d_name, ".zstd"))
          {
-            pgmoneta_log_error("ZSTD: Could not decompress %s/%s", directory, entry->d_name);
-            break;
+            from = NULL;
+
+            from = pgmoneta_append(from, directory);
+            from = pgmoneta_append(from, "/");
+            from = pgmoneta_append(from, entry->d_name);
+
+            name = malloc(strlen(entry->d_name) - 4);
+            memset(name, 0, strlen(entry->d_name) - 4);
+            memcpy(name, entry->d_name, strlen(entry->d_name) - 5);
+
+            to = NULL;
+
+            to = pgmoneta_append(to, directory);
+            to = pgmoneta_append(to, "/");
+            to = pgmoneta_append(to, name);
+
+            if (zstd_decompress(from, to))
+            {
+               pgmoneta_log_error("ZSTD: Could not decompress %s/%s", directory, entry->d_name);
+               break;
+            }
+
+            pgmoneta_delete_file(from);
+
+            free(name);
+            free(from);
+            free(to);
          }
-
-         pgmoneta_delete_file(from);
-
-         free(name);
-         free(from);
-         free(to);
       }
    }
 

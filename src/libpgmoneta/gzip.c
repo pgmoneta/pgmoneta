@@ -219,33 +219,36 @@ pgmoneta_gunzip_data(char* directory)
       }
       else
       {
-         from = NULL;
-
-         from = pgmoneta_append(from, directory);
-         from = pgmoneta_append(from, "/");
-         from = pgmoneta_append(from, entry->d_name);
-
-         name = malloc(strlen(entry->d_name) - 2);
-         memset(name, 0, strlen(entry->d_name) - 2);
-         memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
-
-         to = NULL;
-
-         to = pgmoneta_append(to, directory);
-         to = pgmoneta_append(to, "/");
-         to = pgmoneta_append(to, name);
-
-         if (gz_decompress(from, to))
+         if (pgmoneta_ends_with(entry->d_name, ".gz"))
          {
-            pgmoneta_log_error("Gzip: Could not decompress %s/%s", directory, entry->d_name);
-            break;
+            from = NULL;
+
+            from = pgmoneta_append(from, directory);
+            from = pgmoneta_append(from, "/");
+            from = pgmoneta_append(from, entry->d_name);
+
+            name = malloc(strlen(entry->d_name) - 2);
+            memset(name, 0, strlen(entry->d_name) - 2);
+            memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
+
+            to = NULL;
+
+            to = pgmoneta_append(to, directory);
+            to = pgmoneta_append(to, "/");
+            to = pgmoneta_append(to, name);
+
+            if (gz_decompress(from, to))
+            {
+               pgmoneta_log_error("Gzip: Could not decompress %s/%s", directory, entry->d_name);
+               break;
+            }
+
+            pgmoneta_delete_file(from);
+
+            free(name);
+            free(from);
+            free(to);
          }
-
-         pgmoneta_delete_file(from);
-
-         free(name);
-         free(from);
-         free(to);
       }
    }
 

@@ -1271,6 +1271,52 @@ pgmoneta_move_file(char* from, char* to)
    return ret;
 }
 
+int
+pgmoneta_basename_file(char* s, char** basename)
+{
+   size_t size;
+   char* ext = NULL;
+   char* r = NULL;
+
+   *basename = NULL;
+
+   ext = strrchr(s, '.');
+   if (ext != NULL)
+   {
+      size = ext - s + 1;
+
+      r = (char*)malloc(size);
+      if (r == NULL)
+      {
+         goto error;
+      }
+
+      memset(r, 0, size);
+      memcpy(r, s, size - 1);
+   }
+   else
+   {
+      size = strlen(s) + 1;
+
+      r = (char*)malloc(size);
+      if (r == NULL)
+      {
+         goto error;
+      }
+
+      memset(r, 0, size);
+      memcpy(r, s, strlen(s));
+   }
+
+   *basename = r;
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
 bool
 pgmoneta_exists(char* f)
 {
@@ -1442,6 +1488,77 @@ pgmoneta_get_symlink(char* symlink)
    return result;
 }
 
+int
+pgmoneta_copy_wal_files(char* from, char* to, char* start)
+{
+   int number_of_wal_files = 0;
+   char** wal_files = NULL;
+   char* basename = NULL;
+   char* ff = NULL;
+   char* tf = NULL;
+
+   pgmoneta_get_files(from, &number_of_wal_files, &wal_files);
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      pgmoneta_basename_file(wal_files[i], &basename);
+
+      if (strcmp(wal_files[i], start) >= 0)
+      {
+         if (pgmoneta_ends_with(wal_files[i], ".partial"))
+         {
+            ff = pgmoneta_append(ff, from);
+            if (!pgmoneta_ends_with(ff, "/"))
+            {
+               ff = pgmoneta_append(ff, "/");
+            }
+            ff = pgmoneta_append(ff, wal_files[i]);
+
+            tf = pgmoneta_append(tf, to);
+            if (!pgmoneta_ends_with(tf, "/"))
+            {
+               tf = pgmoneta_append(tf, "/");
+            }
+            tf = pgmoneta_append(tf, basename);
+         }
+         else
+         {
+            ff = pgmoneta_append(ff, from);
+            if (!pgmoneta_ends_with(ff, "/"))
+            {
+               ff = pgmoneta_append(ff, "/");
+            }
+            ff = pgmoneta_append(ff, wal_files[i]);
+
+            tf = pgmoneta_append(tf, to);
+            if (!pgmoneta_ends_with(tf, "/"))
+            {
+               tf = pgmoneta_append(tf, "/");
+            }
+            tf = pgmoneta_append(tf, wal_files[i]);
+         }
+
+         pgmoneta_copy_file(ff, tf);
+      }
+
+      free(basename);
+      free(ff);
+      free(tf);
+
+      basename = NULL;
+      ff = NULL;
+      tf = NULL;
+   }
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return 0;
+}
+
 unsigned long
 pgmoneta_free_space(char* path)
 {
@@ -1516,6 +1633,52 @@ pgmoneta_bytes_to_string(uint64_t bytes)
 
    strcpy(result, "0");
    return result;
+}
+
+int
+pgmoneta_read_version(char* directory, char** version)
+{
+   char* result = NULL;
+   char* filename = NULL;
+   FILE* file = NULL;
+   char buf[3];
+
+   *version = NULL;
+
+   filename = pgmoneta_append(filename, directory);
+   filename = pgmoneta_append(filename, "/PG_VERSION");
+
+   file = fopen(filename, "r");
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   memset(&buf[0], 0, sizeof(buf));
+   fgets(&buf[0], sizeof(buf), file);
+
+   result = malloc(strlen(&buf[0]) + 1);
+   memset(result, 0, strlen(&buf[0]) + 1);
+   memcpy(result, &buf[0], strlen(&buf[0]));
+
+   *version = result;
+
+   fclose(file);
+
+   free(filename);
+
+   return 0;
+
+error:
+
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+
+   free(filename);
+
+   return 1;
 }
 
 static int
