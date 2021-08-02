@@ -2,28 +2,41 @@
 
 ## Overview
 
-`pgmoneta` use a process model (`fork()`), where each process handles one connection to [PostgreSQL](https://www.postgresql.org).
-This was done such a potential crash on one connection won't take the entire pool down.
+`pgmoneta` use a process model (`fork()`), where each process handles one Write-Ahead Log (WAL) receiver to
+[PostgreSQL](https://www.postgresql.org).
 
-The main process is defined in [main.c](../src/main.c). When a client connects it is processed in its own process, which
-is handle in [worker.h](../src/include/worker.h) ([worker.c](../src/libpgmoneta/worker.c)).
+The main process is defined in [main.c](../src/main.c).
 
-Once the client disconnects the connection is put back in the pool, and the child process is terminated.
+Backup is handled in [backup.h](../src/include/backup.h) ([backup.c](../src/libpgmoneta/backup.c)).
+
+Restore is handled in [restore.h](../src/include/restore.h) ([restore.c](../src/libpgmoneta/restore.c)) with linking
+handled in [link.h](../src/include/link.h) ([link.c](../src/libpgmoneta/link.c)).
+
+Archive is handled in [archive.h](../src/include/archive.h) ([archive.c](../src/libpgmoneta/archive.c)) backed by
+restore.
+
+Write-Ahead Log is handled in [wal.h](../src/include/wal.h) ([wal.c](../src/libpgmoneta/wal.c)).
+
+Backup information is handled in [info.h](../src/include/info.h) ([info.c](../src/libpgmoneta/info.c)).
+
+Retention is handled in [retention.h](../src/include/retention.h) ([retention.c](../src/libpgmoneta/retention.c)).
+
+Compression is handled in [gzip.h](../src/include/gzip.h) ([gzip.c](../src/libpgmoneta/gzip.c)) and
+[zstandard.h](../src/include/zstandard.h) ([zstandard.c](../src/libpgmoneta/zstandard.c)).
 
 ## Shared memory
 
 A memory segment ([shmem.h](../src/include/shmem.h)) is shared among all processes which contains the `pgmoneta`
-state containing the configuration of the pool, the list of servers and the state of each connection.
+state containing the configuration and the list of servers.
 
-The configuration of `pgmoneta` (`struct configuration`), the configuration of the servers (`struct server`) and
-the state of each connection (`struct connection`) is initialized in this shared memory segment.
-These structs are all defined in [pgmoneta.h](../src/include/pgmoneta.h).
+The configuration of `pgmoneta` (`struct configuration`) and the configuration of the servers (`struct server`)
+is initialized in this shared memory segment. These structs are all defined in [pgmoneta.h](../src/include/pgmoneta.h).
 
 The shared memory segment is created using the `mmap()` call.
 
 ## Network and messages
 
-All communication is abstracted using the `struct message` data type defined in [pgmoneta.h](../src/include/pgmoneta.h).
+All communication is abstracted using the `struct message` data type defined in [messge.h](../src/include/message.h).
 
 Reading and writing messages are handled in the [message.h](../src/include/message.h) ([message.c](../src/libpgmoneta/message.c))
 files.
@@ -32,7 +45,7 @@ Network operations are defined in [network.h](../src/include/network.h) ([networ
 
 ## Memory
 
-Each process uses a fixed memory block for its network communication, which is allocated upon startup of the worker.
+Each process uses a fixed memory block for its network communication, which is allocated upon startup of the process.
 
 That way we don't have to allocate memory for each network message, and more importantly free it after end of use.
 
@@ -40,14 +53,8 @@ The memory interface is defined in [memory.h](../src/include/memory.h) ([memory.
 
 ## Management
 
-`pgmoneta` has a management interface which serves two purposes.
-
-First, it defines the administrator abilities that can be performed on the pool when it is running. This include
-for example flushing the pool. The `pgmoneta-cli` program is used for these operations ([cli.c](../src/cli.c)).
-
-Second, the interface is used internally to transfer the connection (socket descriptor) from the child process
-to the main `pgmoneta` process after a new connection has been created. This is necessary since the socket descriptor
-needs to be available to subsequent client and hence processes.
+`pgmoneta` has a management interface which defines the administrator abilities that can be performed when it is running.
+This include for example taking a backup. The `pgmoneta-cli` program is used for these operations ([cli.c](../src/cli.c)).
 
 The management interface use Unix Domain Socket for communication.
 
@@ -57,7 +64,6 @@ uses its own protocol which always consist of a header
 | Field      | Type | Description |
 |------------|------|-------------|
 | `id` | Byte | The identifier of the message type |
-| `slot` | Int | The slot that the message is for |
 
 The rest of the message is depending on the message type.
 
