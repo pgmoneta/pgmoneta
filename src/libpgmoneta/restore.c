@@ -157,7 +157,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
 
    if (id == NULL)
    {
-      pgmoneta_log_error("%s: No identifier for %s", prefix, config->servers[server].name);
+      pgmoneta_log_error("%s: No identifier for %s/%s", prefix, config->servers[server].name, backup_id);
       goto error;
    }
 
