@@ -109,6 +109,7 @@ pgmoneta_delete(int srv, char* backup_id)
 
    if (backup_index == -1)
    {
+      pgmoneta_log_error("Delete: No identifier for %s/%s", config->servers[srv].name, backup_id);
       goto error;
    }
 
