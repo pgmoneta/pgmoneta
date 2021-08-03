@@ -36,9 +36,6 @@ extern "C" {
 #include <ev.h>
 #include <stdlib.h>
 
-extern volatile int running;
-extern volatile int exit_code;
-
 /**
  * Create a backup
  * @param server The server
