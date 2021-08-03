@@ -92,16 +92,15 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    char* ident = NULL;
    int number_of_backups = 0;
    struct backup** backups = NULL;
+   struct backup* backup = NULL;
    char* d = NULL;
+   char* base = NULL;
    char* from = NULL;
    char* to = NULL;
    char* id = NULL;
    char* origwal = NULL;
    char* waldir = NULL;
    char* waltarget = NULL;
-   int number_of_wal_files = 0;
-   char** wal_files = NULL;
-   char* start = NULL;
    struct configuration* config;
 
    *output = NULL;
@@ -162,18 +161,21 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
       goto error;
    }
 
-   from = pgmoneta_append(from, config->base_dir);
-   from = pgmoneta_append(from, "/");
-   from = pgmoneta_append(from, config->servers[server].name);
-   from = pgmoneta_append(from, "/backup/");
-   from = pgmoneta_append(from, id);
-   from = pgmoneta_append(from, "/data");
+   base = pgmoneta_append(base, config->base_dir);
+   base = pgmoneta_append(base, "/");
+   base = pgmoneta_append(base, config->servers[server].name);
+   base = pgmoneta_append(base, "/backup/");
+   base = pgmoneta_append(base, id);
+   base = pgmoneta_append(base, "/");
 
-   if (!pgmoneta_exists(from))
+   if (!pgmoneta_exists(base))
    {
       pgmoneta_log_error("%s: Unknown identifier for %s/%s", prefix, config->servers[server].name, id);
       goto error;
    }
+
+   from = pgmoneta_append(from, base);
+   from = pgmoneta_append(from, "data");
 
    to = pgmoneta_append(to, directory);
    to = pgmoneta_append(to, "/");
@@ -193,14 +195,12 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    {
       if (position != NULL)
       {
+         pgmoneta_get_backup(base, &backup);
+
          if (!strcmp(position, "current") || !strcmp(position, "immediate"))
          {
-            origwal = pgmoneta_append(origwal, config->base_dir);
-            origwal = pgmoneta_append(origwal, "/");
-            origwal = pgmoneta_append(origwal, config->servers[server].name);
-            origwal = pgmoneta_append(origwal, "/backup/");
-            origwal = pgmoneta_append(origwal, id);
-            origwal = pgmoneta_append(origwal, "/data/pg_wal/");
+            origwal = pgmoneta_append(origwal, base);
+            origwal = pgmoneta_append(origwal, "data/pg_wal/");
 
             waldir = pgmoneta_append(waldir, config->base_dir);
             waldir = pgmoneta_append(waldir, "/");
@@ -214,14 +214,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
             waltarget = pgmoneta_append(waltarget, id);
             waltarget = pgmoneta_append(waltarget, "/pg_wal/");
 
-            number_of_wal_files = 0;
-            wal_files = NULL;
-
-            pgmoneta_get_files(origwal, &number_of_wal_files, &wal_files);
-
-            pgmoneta_basename_file(wal_files[0], &start);
-
-            pgmoneta_copy_wal_files(waldir, waltarget, start);
+            pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0]);
          }
          else
          {
@@ -257,19 +250,14 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    }
    free(backups);
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
-
+   free(backup);
+   free(base);
    free(from);
    free(to);
    free(d);
    free(origwal);
    free(waldir);
    free(waltarget);
-   free(start);
 
    return 0;
 
@@ -281,19 +269,14 @@ error:
    }
    free(backups);
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
-
+   free(backup);
+   free(base);
    free(from);
    free(to);
    free(d);
    free(origwal);
    free(waldir);
    free(waltarget);
-   free(start);
 
    return 1;
 }

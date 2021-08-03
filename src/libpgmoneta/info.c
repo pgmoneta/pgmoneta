@@ -38,7 +38,7 @@
 #include <unistd.h>
 
 void
-pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time, char* version)
+pgmoneta_create_info(char* directory, int status, char* label, char* wal, unsigned long size, int elapsed_time, char* version)
 {
    char buffer[128];
    char* s = NULL;
@@ -55,6 +55,10 @@ pgmoneta_create_info(char* directory, int status, char* label, unsigned long siz
 
       memset(&buffer[0], 0, sizeof(buffer));
       snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
+      fputs(&buffer[0], sfile);
+
+      memset(&buffer[0], 0, sizeof(buffer));
+      snprintf(&buffer[0], sizeof(buffer), "WAL=%s\n", wal);
       fputs(&buffer[0], sfile);
 
       memset(&buffer[0], 0, sizeof(buffer));
@@ -271,6 +275,10 @@ pgmoneta_get_backup(char* directory, struct backup** backup)
       else if (!strcmp("LABEL", &key[0]))
       {
          memcpy(&bck->label[0], &value[0], strlen(&value[0]));
+      }
+      else if (!strcmp("WAL", &key[0]))
+      {
+         memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
       }
       else if (!strcmp("BACKUP", &key[0]))
       {

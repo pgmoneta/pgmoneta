@@ -41,6 +41,7 @@ extern "C" {
 struct backup
 {
    char label[MISC_LENGTH];    /**< The label of the backup */
+   char wal[MISC_LENGTH];      /**< The name of the WAL file */
    unsigned long backup_size;  /**< The backup size */
    unsigned long restore_size; /**< The restore size */
    int elapsed_time;           /**< The elapsed time in seconds */
@@ -53,12 +54,13 @@ struct backup
  * @param directory The backup directory
  * @param status The status
  * @param label The label
+ * @param wal The WAL
  * @param size The backup size
  * @param elapsed_time The elapsed time in seconds
  * @param version The version
  */
 void
-pgmoneta_create_info(char* directory, int status, char* label, unsigned long size, int elapsed_time, char* version);
+pgmoneta_create_info(char* directory, int status, char* label, char* wal, unsigned long size, int elapsed_time, char* version);
 
 /**
  * Add backup information

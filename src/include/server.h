@@ -36,11 +36,11 @@ extern "C" {
 #include <stdlib.h>
 
 /**
- * Register the WAL level for a server
+ * Get the information for a server
  * @param srv The server index
  */
 void
-pgmoneta_server_wal_level(int srv);
+pgmoneta_server_info(int srv);
 
 #ifdef __cplusplus
 }

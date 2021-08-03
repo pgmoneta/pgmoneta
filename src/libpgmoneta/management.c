@@ -183,8 +183,10 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
    int valid;
    unsigned long backup_size;
    unsigned long restore_size;
+   unsigned long wal_size;
    char* bck = NULL;
    char* res = NULL;
+   char* ws = NULL;
 
    if (read_int32("pgmoneta_management_read_list_backup", socket, &srv))
    {
@@ -231,13 +233,23 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
 
             res = pgmoneta_bytes_to_string(restore_size);
 
-            printf("                   %s (Backup: %s Restore: %s Valid: %s)\n", &name[0], bck, res, valid ? "Yes" : "No");
+            if (read_int64("pgmoneta_management_read_list_backup", socket, &wal_size))
+            {
+               goto error;
+            }
+
+            ws = pgmoneta_bytes_to_string(wal_size);
+
+            printf("                   %s (Backup: %s Restore: %s WAL: %s Valid: %s)\n", &name[0], bck, res, ws, valid ? "Yes" : "No");
 
             free(bck);
             bck = NULL;
 
             free(res);
             res = NULL;
+
+            free(ws);
+            ws = NULL;
 
             free(name);
             name = NULL;
@@ -256,9 +268,11 @@ int
 pgmoneta_management_write_list_backup(int socket, int server)
 {
    char* d = NULL;
+   char* wal_dir = NULL;
    int number_of_backups;
    struct backup** backups = NULL;
    int nob;
+   unsigned long wal;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -275,6 +289,12 @@ pgmoneta_management_write_list_backup(int socket, int server)
       d = pgmoneta_append(d, "/");
       d = pgmoneta_append(d, config->servers[server].name);
       d = pgmoneta_append(d, "/backup/");
+
+      wal_dir = NULL;
+      wal_dir = pgmoneta_append(wal_dir, config->base_dir);
+      wal_dir = pgmoneta_append(wal_dir, "/");
+      wal_dir = pgmoneta_append(wal_dir, config->servers[server].name);
+      wal_dir = pgmoneta_append(wal_dir, "/wal/");
 
       if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
@@ -319,6 +339,14 @@ pgmoneta_management_write_list_backup(int socket, int server)
             {
                goto error;
             }
+
+            wal = pgmoneta_number_of_wal_files(wal_dir, &backups[i]->wal[0], NULL);
+            wal *= config->servers[server].wal_size;
+
+            if (write_int64("pgmoneta_management_write_list_backup", socket, wal))
+            {
+               goto error;
+            }
          }
       }
 
@@ -330,12 +358,14 @@ pgmoneta_management_write_list_backup(int socket, int server)
    }
 
    free(d);
+   free(wal_dir);
 
    return 0;
 
 error:
 
    free(d);
+   free(wal_dir);
 
    return 1;
 }
@@ -842,9 +872,11 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
    int number_of_backups;
    unsigned long backup_size;
    unsigned long restore_size;
+   unsigned long wal_size;
    int valid;
    char* bck = NULL;
    char* res = NULL;
+   char* ws = NULL;
 
    if (read_int64("pgmoneta_management_read_details", socket, &used_size))
    {
@@ -941,13 +973,23 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
 
          res = pgmoneta_bytes_to_string(restore_size);
 
-         printf("                   %s (Backup: %s Restore: %s Valid: %s)\n", name, bck, res, valid ? "Yes" : "No");
+         if (read_int64("pgmoneta_management_read_details", socket, &wal_size))
+         {
+            goto error;
+         }
+
+         ws = pgmoneta_bytes_to_string(wal_size);
+
+         printf("                   %s (Backup: %s Restore: %s WAL: %s Valid: %s)\n", name, bck, res, ws, valid ? "Yes" : "No");
 
          free(bck);
          bck = NULL;
 
          free(res);
          res = NULL;
+
+         free(ws);
+         ws = NULL;
 
          free(name);
          name = NULL;
@@ -973,6 +1015,7 @@ int
 pgmoneta_management_write_details(int socket)
 {
    char* d = NULL;
+   char* wal_dir = NULL;
    int retention;
    unsigned long used_size;
    unsigned long free_size;
@@ -980,6 +1023,7 @@ pgmoneta_management_write_details(int socket)
    int number_of_backups;
    struct backup** backups = NULL;
    unsigned long server_size;
+   unsigned long wal;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -1023,6 +1067,12 @@ pgmoneta_management_write_details(int socket)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
+      wal_dir = NULL;
+      wal_dir = pgmoneta_append(wal_dir, config->base_dir);
+      wal_dir = pgmoneta_append(wal_dir, "/");
+      wal_dir = pgmoneta_append(wal_dir, config->servers[i].name);
+      wal_dir = pgmoneta_append(wal_dir, "/wal/");
+
       if (write_string("pgmoneta_management_write_details", socket, config->servers[i].name))
       {
          goto error;
@@ -1089,6 +1139,14 @@ pgmoneta_management_write_details(int socket)
             {
                goto error;
             }
+
+            wal = pgmoneta_number_of_wal_files(wal_dir, &backups[i]->wal[0], NULL);
+            wal *= config->servers[i].wal_size;
+
+            if (write_int64("pgmoneta_management_write_details", socket, wal))
+            {
+               goto error;
+            }
          }
       }
 
@@ -1101,6 +1159,9 @@ pgmoneta_management_write_details(int socket)
 
       free(d);
       d = NULL;
+
+      free(wal_dir);
+      wal_dir = NULL;
    }
 
    return 0;

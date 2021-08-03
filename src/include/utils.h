@@ -414,6 +414,16 @@ int
 pgmoneta_copy_wal_files(char* from, char* to, char* start);
 
 /**
+ * Get the number of WAL files
+ * @param directory The directory
+ * @param from The from WAL file
+ * @param to The to WAL file; can be NULL
+ * @return The result
+ */
+int
+pgmoneta_number_of_wal_files(char* directory, char* from, char* to);
+
+/**
  * Get the free space for a path
  * @param path The path
  * @return The result
@@ -463,6 +473,15 @@ pgmoneta_bytes_to_string(uint64_t bytes);
  */
 int
 pgmoneta_read_version(char* directory, char** version);
+
+/**
+ * Read the first WAL file name
+ * @param directory The base directory
+ * @param wal The WAL
+ * @return The result
+ */
+int
+pgmoneta_read_wal(char* directory, char** wal);
 
 #ifdef DEBUG
 

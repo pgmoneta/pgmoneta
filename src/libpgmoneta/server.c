@@ -43,17 +43,21 @@
 #include <sys/types.h>
 
 static int get_wal_level(int socket, bool* replica);
+static int get_wal_size(int socket, int* ws);
 
 void
-pgmoneta_server_wal_level(int srv)
+pgmoneta_server_info(int srv)
 {
    int usr;
    int auth;
    int socket;
    bool replica;
+   int ws;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   config->servers[srv].valid = false;
 
    usr = -1;
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -66,7 +70,7 @@ pgmoneta_server_wal_level(int srv)
 
    if (usr == -1)
    {
-      goto error;
+      goto done;
    }
 
    auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, &socket);
@@ -74,20 +78,34 @@ pgmoneta_server_wal_level(int srv)
    if (auth != AUTH_SUCCESS)
    {
       pgmoneta_log_trace("Invalid credentials for %s", config->users[usr].username);
-      goto error;
+      goto done;
    }
 
    if (get_wal_level(socket, &replica))
    {
       pgmoneta_log_trace("Unable to get wal_level for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
+      goto done;
    }
    else
    {
       config->servers[srv].valid = replica;
    }
 
+   if (get_wal_size(socket, &ws))
+   {
+      pgmoneta_log_trace("Unable to get wal_segment_size for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
+      goto done;
+   }
+   else
+   {
+      config->servers[srv].wal_size = ws;
+   }
+
    pgmoneta_write_terminate(NULL, socket);
+
+done:
 
    pgmoneta_disconnect(socket);
 
@@ -95,10 +113,6 @@ pgmoneta_server_wal_level(int srv)
    {
       pgmoneta_log_error("Server %s need wal_level at replica or logical", config->servers[srv].name);
    }
-
-error:
-
-   pgmoneta_disconnect(socket);
 }
 
 static int
@@ -162,6 +176,82 @@ error:
    pgmoneta_free_copy_message(dmsg);
    pgmoneta_free_message(tmsg);
    free(value);
+
+   return 1;
+}
+
+static int
+get_wal_size(int socket, int* ws)
+{
+   int status;
+   size_t size = 28;
+   char wal_segment_size[size];
+   int vlength;
+   char* value = NULL;
+   char* number = NULL;
+   struct message qmsg;
+   struct message* tmsg = NULL;
+   struct message* dmsg = NULL;
+
+   *ws = 0;
+
+   memset(&qmsg, 0, sizeof(struct message));
+   memset(&wal_segment_size, 0, size);
+
+   pgmoneta_write_byte(&wal_segment_size, 'Q');
+   pgmoneta_write_int32(&(wal_segment_size[1]), size - 1);
+   pgmoneta_write_string(&(wal_segment_size[5]), "SHOW wal_segment_size;");
+
+   qmsg.kind = 'Q';
+   qmsg.length = size;
+   qmsg.data = &wal_segment_size;
+
+   status = pgmoneta_write_message(NULL, socket, &qmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_read_block_message(NULL, socket, &tmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   pgmoneta_extract_message('D', tmsg, &dmsg);
+
+   vlength = pgmoneta_read_int32(dmsg->data + 7);
+   value = (char*)malloc(vlength + 1);
+   memset(value, 0, vlength + 1);
+   memcpy(value, dmsg->data + 11, vlength);
+
+   number = (char*)malloc(strlen(value) - 2 + 1);
+   memset(number, 0, strlen(value) - 2 + 1);
+   memcpy(number, value, strlen(value) - 2);
+
+   if (pgmoneta_ends_with(value, "MB"))
+   {
+      *ws = atoi(number) * 1024 * 1024;
+   }
+   else
+   {
+      *ws = atoi(number) * 1024 * 1024 * 1024;
+   }
+
+   pgmoneta_free_copy_message(dmsg);
+   pgmoneta_free_message(tmsg);
+   free(value);
+   free(number);
+
+   return 0;
+
+error:
+   pgmoneta_log_trace("get_wal_segment_size: socket %d status %d", socket, status);
+
+   pgmoneta_free_copy_message(dmsg);
+   pgmoneta_free_message(tmsg);
+   free(value);
+   free(number);
 
    return 1;
 }

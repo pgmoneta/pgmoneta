@@ -1559,6 +1559,43 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start)
    return 0;
 }
 
+int
+pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
+{
+   int result;
+   int number_of_wal_files = 0;
+   char** wal_files = NULL;
+   char* basename = NULL;
+
+   result = 0;
+
+   pgmoneta_get_files(directory, &number_of_wal_files, &wal_files);
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      pgmoneta_basename_file(wal_files[i], &basename);
+
+      if (strcmp(basename, from) >= 0)
+      {
+         if (to == NULL || strcmp(basename, to) < 0)
+         {
+            result++;
+         }
+      }
+
+      free(basename);
+      basename = NULL;
+   }
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return result;
+}
+
 unsigned long
 pgmoneta_free_space(char* path)
 {
@@ -1677,6 +1714,54 @@ error:
    }
 
    free(filename);
+
+   return 1;
+}
+
+int
+pgmoneta_read_wal(char* directory, char** wal)
+{
+   char* result = NULL;
+   char* pgwal = NULL;
+   int number_of_wal_files = 0;
+   char** wal_files = NULL;
+
+   *wal = NULL;
+
+   pgwal = pgmoneta_append(pgwal, directory);
+   pgwal = pgmoneta_append(pgwal, "/pg_wal/");
+
+   number_of_wal_files = 0;
+   wal_files = NULL;
+
+   pgmoneta_get_files(pgwal, &number_of_wal_files, &wal_files);
+
+   if (number_of_wal_files == 0)
+   {
+      goto error;
+   }
+
+   result = malloc(strlen(wal_files[0]) + 1);
+   memset(result, 0, strlen(wal_files[0]) + 1);
+   memcpy(result, wal_files[0], strlen(wal_files[0]));
+
+   *wal = result;
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return 0;
+
+error:
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
 
    return 1;
 }

@@ -72,7 +72,7 @@ pgmoneta_wal(int srv, char** argv)
       }  
    }
 
-   pgmoneta_server_wal_level(srv);
+   pgmoneta_server_info(srv);
 
    d = pgmoneta_append(d, config->base_dir);
    if (!pgmoneta_ends_with(config->base_dir, "/"))
