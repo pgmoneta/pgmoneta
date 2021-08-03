@@ -823,22 +823,35 @@ backup_information(int client_fd)
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-      for (int j = 0; j < number_of_backups; j++)
+      if (number_of_backups > 0)
       {
-         if (backups[j] != NULL)
+         for (int j = 0; j < number_of_backups; j++)
          {
-            data = pgmoneta_append(data, "pgmoneta_backup{");
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup{");
 
-            data = pgmoneta_append(data, "name=\"");
-            data = pgmoneta_append(data, config->servers[i].name);
-            data = pgmoneta_append(data, "\",label=\"");
-            data = pgmoneta_append(data, backups[j]->label);
-            data = pgmoneta_append(data, "\"} ");
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
 
-            data = pgmoneta_append_bool(data, backups[j]->valid);
+               data = pgmoneta_append_bool(data, backups[j]->valid);
 
-            data = pgmoneta_append(data, "\n");
+               data = pgmoneta_append(data, "\n");
+            }
          }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
       }
 
       for (int i = 0; i < number_of_backups; i++)
@@ -874,22 +887,35 @@ backup_information(int client_fd)
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-      for (int j = 0; j < number_of_backups; j++)
+      if (number_of_backups > 0)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         for (int j = 0; j < number_of_backups; j++)
          {
-            data = pgmoneta_append(data, "pgmoneta_backup_elapsed_time{");
+            if (backups[j] != NULL && backups[j]->valid)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_elapsed_time{");
 
-            data = pgmoneta_append(data, "name=\"");
-            data = pgmoneta_append(data, config->servers[i].name);
-            data = pgmoneta_append(data, "\",label=\"");
-            data = pgmoneta_append(data, backups[j]->label);
-            data = pgmoneta_append(data, "\"} ");
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
 
-            data = pgmoneta_append_int(data, backups[j]->elapsed_time);
+               data = pgmoneta_append_int(data, backups[j]->elapsed_time);
 
-            data = pgmoneta_append(data, "\n");
+               data = pgmoneta_append(data, "\n");
+            }
          }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
       }
 
       for (int i = 0; i < number_of_backups; i++)
@@ -1051,22 +1077,35 @@ size_information(int client_fd)
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-      for (int j = 0; j < number_of_backups; j++)
+      if (number_of_backups > 0)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         for (int j = 0; j < number_of_backups; j++)
          {
-            data = pgmoneta_append(data, "pgmoneta_restore_size{");
+            if (backups[j] != NULL && backups[j]->valid)
+            {
+               data = pgmoneta_append(data, "pgmoneta_restore_size{");
 
-            data = pgmoneta_append(data, "name=\"");
-            data = pgmoneta_append(data, config->servers[i].name);
-            data = pgmoneta_append(data, "\",label=\"");
-            data = pgmoneta_append(data, backups[j]->label);
-            data = pgmoneta_append(data, "\"} ");
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
 
-            data = pgmoneta_append_ulong(data, backups[j]->restore_size);
+               data = pgmoneta_append_ulong(data, backups[j]->restore_size);
 
-            data = pgmoneta_append(data, "\n");
+               data = pgmoneta_append(data, "\n");
+            }
          }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_restore_size{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
       }
 
       for (int i = 0; i < number_of_backups; i++)
@@ -1102,22 +1141,35 @@ size_information(int client_fd)
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-      for (int j = 0; j < number_of_backups; j++)
+      if (number_of_backups > 0)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         for (int j = 0; j < number_of_backups; j++)
          {
-            data = pgmoneta_append(data, "pgmoneta_backup_size{");
+            if (backups[j] != NULL && backups[j]->valid)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_size{");
 
-            data = pgmoneta_append(data, "name=\"");
-            data = pgmoneta_append(data, config->servers[i].name);
-            data = pgmoneta_append(data, "\",label=\"");
-            data = pgmoneta_append(data, backups[j]->label);
-            data = pgmoneta_append(data, "\"} ");
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
 
-            data = pgmoneta_append_ulong(data, backups[j]->backup_size);
+               data = pgmoneta_append_ulong(data, backups[j]->backup_size);
 
-            data = pgmoneta_append(data, "\n");
+               data = pgmoneta_append(data, "\n");
+            }
          }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_size{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
       }
 
       for (int i = 0; i < number_of_backups; i++)
