@@ -94,6 +94,7 @@ struct accept_io
 };
 
 static volatile int keep_running = 1;
+static volatile int stop = 0;
 static char** argv_ptr;
 static struct ev_loop* main_loop = NULL;
 static struct accept_io io_mgt;
@@ -641,7 +642,7 @@ main(int argc, char **argv)
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
 
-   if (daemon)
+   if (daemon || stop)
    {
       kill(0, SIGTERM);
    }
@@ -932,6 +933,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          pgmoneta_log_debug("pgmoneta: Management stop");
          ev_break(loop, EVBREAK_ALL);
          keep_running = 0;
+         stop = 1;
          break;
       case MANAGEMENT_STATUS:
          pgmoneta_log_debug("pgmoneta: Management status");
