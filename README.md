@@ -59,8 +59,7 @@ Alternative [clang 8+](https://clang.llvm.org/) can be used.
 
 ### Release build
 
-The following commands will install `pgmoneta` in the `/usr/local` hierarchy
-and run the default configuration.
+The following commands will install `pgmoneta` in the `/usr/local` hierarchy.
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
