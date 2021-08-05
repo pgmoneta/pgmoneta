@@ -5,7 +5,7 @@ The configuration is loaded from either the path specified by the `-c` flag or `
 The configuration of `pgmoneta` is split into sections using the `[` and `]` characters.
 
 The main section, called `[pgmoneta]`, is where you configure the overall properties
-of the connection pool.
+of `pgmoneta`.
 
 Other sections doesn't have any requirements to their naming so you can give them
 meaningful names like `[primary]` for the primary [PostgreSQL](https://www.postgresql.org)
@@ -16,7 +16,7 @@ All properties are in the format `key = value`.
 The characters `#` and `;` can be used for comments; must be the first character on the line.
 The `Bool` data type supports the following values: `on`, `1`, `true`, `off`, `0` and `false`.
 
-See a [sample](./etc/pgmoneta/pgmoneta.conf) configuration for running `pgmoneta` on `localhost`.
+See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `localhost`.
 
 ## [pgmoneta]
 
