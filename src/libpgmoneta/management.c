@@ -947,7 +947,7 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
       printf("  Retention      : %d days\n", retention);
       printf("  Backups        : %d\n", number_of_backups);
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
          if (read_string("pgmoneta_management_read_details", socket, &name))
          {
@@ -1116,31 +1116,31 @@ pgmoneta_management_write_details(int socket)
          goto error;
       }
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         if (backups[i] != NULL)
+         if (backups[j] != NULL)
          {
-            if (write_string("pgmoneta_management_write_details", socket, backups[i]->label))
+            if (write_string("pgmoneta_management_write_details", socket, backups[j]->label))
             {
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_details", socket, backups[i]->valid ? 1 : 0))
+            if (write_int32("pgmoneta_management_write_details", socket, backups[j]->valid ? 1 : 0))
             {
                goto error;
             }
 
-            if (write_int64("pgmoneta_management_write_details", socket, backups[i]->backup_size))
+            if (write_int64("pgmoneta_management_write_details", socket, backups[j]->backup_size))
             {
                goto error;
             }
 
-            if (write_int64("pgmoneta_management_write_details", socket, backups[i]->restore_size))
+            if (write_int64("pgmoneta_management_write_details", socket, backups[j]->restore_size))
             {
                goto error;
             }
 
-            wal = pgmoneta_number_of_wal_files(wal_dir, &backups[i]->wal[0], NULL);
+            wal = pgmoneta_number_of_wal_files(wal_dir, &backups[j]->wal[0], NULL);
             wal *= config->servers[i].wal_size;
 
             if (write_int64("pgmoneta_management_write_details", socket, wal))
@@ -1150,9 +1150,9 @@ pgmoneta_management_write_details(int socket)
          }
       }
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
       backups = NULL;
