@@ -689,9 +689,9 @@ backup_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -745,9 +745,9 @@ backup_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -790,9 +790,9 @@ backup_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -854,9 +854,9 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "\n");
       }
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -918,9 +918,9 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "\n");
       }
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -988,9 +988,9 @@ size_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -1044,9 +1044,9 @@ size_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -1108,9 +1108,9 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "\n");
       }
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
@@ -1172,9 +1172,9 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "\n");
       }
 
-      for (int i = 0; i < number_of_backups; i++)
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 

@@ -814,9 +814,9 @@ pgmoneta_management_write_status(int socket)
          goto error;
       }
 
-      for (int i = 0; i < number_of_directories; i++)
+      for (int j = 0; j < number_of_directories; j++)
       {
-         free(array[i]);
+         free(array[j]);
       }
       free(array);
       array = NULL;
