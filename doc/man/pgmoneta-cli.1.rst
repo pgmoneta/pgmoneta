@@ -66,6 +66,12 @@ archive
 delete
   Delete a backup from a server
 
+retain
+  Retain a backup from a server - exclude deletion by retention policy
+
+expunge
+  Expunge a backup from a server - include in deletion by retention policy
+
 is-alive
   Is pgmoneta alive
 

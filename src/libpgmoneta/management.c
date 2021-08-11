@@ -109,6 +109,8 @@ pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, 
          read_string("pgmoneta_management_read_payload", socket, payload_s4);
          break;
       case MANAGEMENT_DELETE:
+      case MANAGEMENT_RETAIN:
+      case MANAGEMENT_EXPUNGE:
          read_string("pgmoneta_management_read_payload", socket, payload_s1);
          read_string("pgmoneta_management_read_payload", socket, payload_s2);
          break;
@@ -180,6 +182,7 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
    char* name = NULL;
    int srv;
    int number_of_backups;
+   int keep;
    int valid;
    unsigned long backup_size;
    unsigned long restore_size;
@@ -212,6 +215,11 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
          for (int i = 0; i < number_of_backups; i++)
          {
             if (read_string("pgmoneta_management_read_list_backup", socket, &name))
+            {
+               goto error;
+            }
+
+            if (read_int32("pgmoneta_management_read_list_backup", socket, &keep))
             {
                goto error;
             }
@@ -249,7 +257,8 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
 
             ds = pgmoneta_bytes_to_string(delta_size);
 
-            printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Valid: %s)\n", &name[0], bck, res, ws, ds, valid ? "Yes" : "No");
+            printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
+                   &name[0], bck, res, ws, ds, keep ? "Yes" : "No", valid ? "Yes" : "No");
 
             free(bck);
             bck = NULL;
@@ -340,6 +349,11 @@ pgmoneta_management_write_list_backup(int socket, int server)
          if (backups[i] != NULL)
          {
             if (write_string("pgmoneta_management_write_list_backup", socket, backups[i]->label))
+            {
+               goto error;
+            }
+
+            if (write_int32("pgmoneta_management_write_list_backup", socket, backups[i]->keep ? 1 : 0))
             {
                goto error;
             }
@@ -905,6 +919,7 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
    unsigned long restore_size;
    unsigned long wal_size;
    unsigned long delta_size;
+   int keep;
    int valid;
    char* bck = NULL;
    char* res = NULL;
@@ -987,6 +1002,11 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
             goto error;
          }
 
+         if (read_int32("pgmoneta_management_read_details", socket, &keep))
+         {
+            goto error;
+         }
+
          if (read_int32("pgmoneta_management_read_details", socket, &valid))
          {
             goto error;
@@ -1020,7 +1040,8 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
 
          ds = pgmoneta_bytes_to_string(delta_size);
 
-         printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Valid: %s)\n", name, bck, res, ws, ds, valid ? "Yes" : "No");
+         printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
+                name, bck, res, ws, ds, keep ? "Yes" : "No", valid ? "Yes" : "No");
 
          free(bck);
          bck = NULL;
@@ -1171,6 +1192,11 @@ pgmoneta_management_write_details(int socket)
          if (backups[j] != NULL)
          {
             if (write_string("pgmoneta_management_write_details", socket, backups[j]->label))
+            {
+               goto error;
+            }
+
+            if (write_int32("pgmoneta_management_write_details", socket, backups[j]->keep ? 1 : 0))
             {
                goto error;
             }
@@ -1328,6 +1354,60 @@ pgmoneta_management_reload(SSL* ssl, int socket)
    {
       pgmoneta_log_warn("pgmoneta_management_reload: write: %d", socket);
       errno = 0;
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_retain(SSL* ssl, int socket, char* server, char* backup_id)
+{
+   if (write_header(ssl, socket, MANAGEMENT_RETAIN))
+   {
+      pgmoneta_log_warn("pgmoneta_management_retain: write: %d", socket);
+      errno = 0;
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_retain", socket, server))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_retain", socket, backup_id))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_expunge(SSL* ssl, int socket, char* server, char* backup_id)
+{
+   if (write_header(ssl, socket, MANAGEMENT_EXPUNGE))
+   {
+      pgmoneta_log_warn("pgmoneta_management_expunge: write: %d", socket);
+      errno = 0;
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_expunge", socket, server))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_expunge", socket, backup_id))
+   {
       goto error;
    }
 

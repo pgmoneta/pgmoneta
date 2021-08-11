@@ -60,6 +60,8 @@
 #define ACTION_ISALIVE      9
 #define ACTION_RESET       10
 #define ACTION_RELOAD      11
+#define ACTION_RETAIN      12
+#define ACTION_EXPUNGE     13
 #define ACTION_HELP        99
 
 static int find_action(int argc, char** argv, int* place);
@@ -69,6 +71,8 @@ static void help_list_backup(void);
 static void help_restore(void);
 static void help_archive(void);
 static void help_delete(void);
+static void help_retain(void);
+static void help_expunge(void);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server);
@@ -81,6 +85,8 @@ static int details(SSL* ssl, int socket);
 static int isalive(SSL* ssl, int socket);
 static int reset(SSL* ssl, int socket);
 static int reload(SSL* ssl, int socket);
+static int retain(SSL* ssl, int socket, char* server, char* backup_id);
+static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
 
 static void
 version(void)
@@ -116,6 +122,8 @@ usage(void)
    printf("  restore                  Restore a backup from a server\n");
    printf("  archive                  Archive a backup from a server\n");
    printf("  delete                   Delete a backup from a server\n");
+   printf("  retain                   Retain a backup from a server\n");
+   printf("  expunge                  Expunge a backup from a server\n");
    printf("  is-alive                 Is pgmoneta alive\n");
    printf("  stop                     Stop pgmoneta\n");
    printf("  status                   Status of pgmoneta\n");
@@ -405,6 +413,32 @@ main(int argc, char **argv)
             action = ACTION_UNKNOWN;
          }
       }
+      else if (action == ACTION_RETAIN)
+      {
+         if (argc == position + 3)
+         {
+            server = argv[argc - 2];
+            id = argv[argc - 1];
+         }
+         else
+         {
+            help_retain();
+            action = ACTION_HELP;
+         }
+      }
+      else if (action == ACTION_EXPUNGE)
+      {
+         if (argc == position + 3)
+         {
+            server = argv[argc - 2];
+            id = argv[argc - 1];
+         }
+         else
+         {
+            help_expunge();
+            action = ACTION_HELP;
+         }
+      }
 
       if (action != ACTION_UNKNOWN)
       {
@@ -522,6 +556,14 @@ password:
       else if (action == ACTION_RELOAD)
       {
          exit_code = reload(s_ssl, socket);
+      }
+      else if (action == ACTION_RETAIN)
+      {
+         exit_code = retain(s_ssl, socket, server, id);
+      }
+      else if (action == ACTION_EXPUNGE)
+      {
+         exit_code = expunge(s_ssl, socket, server, id);
       }
    }
 
@@ -645,6 +687,16 @@ find_action(int argc, char** argv, int* place)
          *place = i;
          return ACTION_RELOAD;
       }
+      else if (!strcmp("retain", argv[i]))
+      {
+         *place = i;
+         return ACTION_RETAIN;
+      }
+      else if (!strcmp("expunge", argv[i]))
+      {
+         *place = i;
+         return ACTION_EXPUNGE;
+      }
    }
 
    return ACTION_UNKNOWN;
@@ -683,6 +735,20 @@ help_delete(void)
 {
    printf("Delete a backup for a server\n");
    printf("  pgmoneta-cli delete <server> [<timestamp>|oldest|newest]\n");
+}
+
+static void
+help_retain(void)
+{
+   printf("Retain a backup for a server\n");
+   printf("  pgmoneta-cli retain <server> [<timestamp>|oldest|newest]\n");
+}
+
+static void
+help_expunge(void)
+{
+   printf("Expunge a backup for a server\n");
+   printf("  pgmoneta-cli expunge <server> [<timestamp>|oldest|newest]\n");
 }
 
 static int
@@ -829,6 +895,28 @@ static int
 reload(SSL* ssl, int socket)
 {
    if (pgmoneta_management_reload(ssl, socket))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+retain(SSL* ssl, int socket, char* server, char* backup_id)
+{
+   if (pgmoneta_management_retain(ssl, socket, server, backup_id))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+expunge(SSL* ssl, int socket, char* server, char* backup_id)
+{
+   if (pgmoneta_management_expunge(ssl, socket, server, backup_id))
    {
       return 1;
    }

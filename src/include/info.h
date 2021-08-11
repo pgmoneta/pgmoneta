@@ -46,6 +46,7 @@ struct backup
    unsigned long restore_size; /**< The restore size */
    int elapsed_time;           /**< The elapsed time in seconds */
    int version;                /**< The version */
+   bool keep;                  /**< Keep the backup */
    bool valid;                 /**< Is the backup valid */
 } __attribute__ ((aligned (64)));
 
@@ -77,6 +78,14 @@ pgmoneta_add_backup_info(char* directory, unsigned long size);
  */
 void
 pgmoneta_update_backup_info(char* directory, unsigned long size);
+
+/**
+ * Update keep information
+ * @param directory The backup directory
+ * @param k The keep status
+ */
+void
+pgmoneta_update_keep_info(char* directory, bool k);
 
 /**
  * Get the backups

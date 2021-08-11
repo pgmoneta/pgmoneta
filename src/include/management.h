@@ -51,6 +51,8 @@ extern "C" {
 #define MANAGEMENT_ISALIVE     8
 #define MANAGEMENT_RESET       9
 #define MANAGEMENT_RELOAD     10
+#define MANAGEMENT_RETAIN     11
+#define MANAGEMENT_EXPUNGE    12
 
 /**
  * Read the management header
@@ -272,6 +274,28 @@ pgmoneta_management_reset(SSL* ssl, int socket);
  */
 int
 pgmoneta_management_reload(SSL* ssl, int socket);
+
+/**
+ * Management operation: Retain a backup for a server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup_id The backup id
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_retain(SSL* ssl, int socket, char* server, char* backup_id);
+
+/**
+ * Management operation: Expunge a backup for a server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup_id The backup id
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_expunge(SSL* ssl, int socket, char* server, char* backup_id);
 
 #ifdef __cplusplus
 }

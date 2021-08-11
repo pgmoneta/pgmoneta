@@ -147,6 +147,8 @@ Commands:
   restore                  Restore a backup from a server
   archive                  Archive a backup from a server
   delete                   Delete a backup from a server
+  retain                   Retain a backup from a server
+  expunge                  Expunge a backup from a server
   is-alive                 Is pgmoneta alive
   stop                     Stop pgmoneta
   status                   Status of pgmoneta

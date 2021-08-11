@@ -70,6 +70,10 @@ pgmoneta_create_info(char* directory, int status, char* label, char* wal, unsign
       fputs(&buffer[0], sfile);
 
       memset(&buffer[0], 0, sizeof(buffer));
+      snprintf(&buffer[0], sizeof(buffer), "KEEP=0\n");
+      fputs(&buffer[0], sfile);
+
+      memset(&buffer[0], 0, sizeof(buffer));
       snprintf(&buffer[0], sizeof(buffer), "RESTORE=%lu\n", size);
       fputs(&buffer[0], sfile);
    }
@@ -155,6 +159,71 @@ pgmoneta_update_backup_info(char* directory, unsigned long size)
       {
          memset(&line[0], 0, sizeof(line));
          snprintf(&line[0], sizeof(line), "BACKUP=%lu\n", size);
+         fputs(&line[0], dfile);
+      }
+      else
+      {
+         fputs(&line[0], dfile);
+      }
+   }
+
+   if (sfile != NULL)
+   {
+      fclose(sfile);
+   }
+
+   if (dfile != NULL)
+   {
+      fclose(dfile);
+   }
+
+   pgmoneta_move_file(d, s);
+
+   free(s);
+   free(d);
+}
+
+void
+pgmoneta_update_keep_info(char* directory, bool k)
+{
+   char buffer[128];
+   char line[128];
+   char* s = NULL;
+   FILE* sfile = NULL;
+   char* d = NULL;
+   FILE* dfile = NULL;
+
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, "/backup.info");
+
+   d = pgmoneta_append(d, directory);
+   d = pgmoneta_append(d, "/backup.info.tmp");
+
+   sfile = fopen(s, "r");
+   dfile = fopen(d, "w");
+
+   while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
+   {
+      char key[MISC_LENGTH];
+      char value[MISC_LENGTH];
+      char* ptr = NULL;
+
+      memset(&key[0], 0, sizeof(key));
+      memset(&value[0], 0, sizeof(value));
+
+      memset(&line[0], 0, sizeof(line));
+      memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
+
+      ptr = strtok(&buffer[0], "=");
+      memcpy(&key[0], ptr, strlen(ptr));
+
+      ptr = strtok(NULL, "=");
+      memcpy(&value[0], ptr, strlen(ptr) - 1);
+
+      if (!strcmp("KEEP", &key[0]))
+      {
+         memset(&line[0], 0, sizeof(line));
+         snprintf(&line[0], sizeof(line), "KEEP=%d\n", k ? 1 : 0);
          fputs(&line[0], dfile);
       }
       else
@@ -295,6 +364,10 @@ pgmoneta_get_backup(char* directory, struct backup** backup)
       else if (!strcmp("VERSION", &key[0]))
       {
          bck->version = atoi(&value[0]);
+      }
+      else if (!strcmp("KEEP", &key[0]))
+      {
+         bck->keep = atoi(&value[0]) == 1 ? true : false;
       }
    }
 

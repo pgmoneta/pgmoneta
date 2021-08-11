@@ -300,18 +300,18 @@ pgmoneta_delete_wal(int srv)
 
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
    {
-      if (backups[i] != NULL && backups[i]->valid)
+      if (backups[i] != NULL && !backups[i]->keep && backups[i]->valid)
       {
          backup_index = i;
       }
    }
 
    free(d);
+   d = NULL;
 
    /* Find the oldest WAL file */
-   if (backup_index != -1)
+   if (backup_index == 0)
    {
-      d = NULL;
       d = pgmoneta_append(d, config->base_dir);
       d = pgmoneta_append(d, "/");
       d = pgmoneta_append(d, config->servers[srv].name);
@@ -330,56 +330,65 @@ pgmoneta_delete_wal(int srv)
       }
 
       free(d);
+      d = NULL;
    }
 
-   /* Find WAL files */
-   d = NULL;
-   d = pgmoneta_append(d, config->base_dir);
-   d = pgmoneta_append(d, "/");
-   d = pgmoneta_append(d, config->servers[srv].name);
-   d = pgmoneta_append(d, "/wal/");
-
-   number_of_wal_files = 0;
-   wal_files = NULL;
-
-   pgmoneta_get_files(d, &number_of_wal_files, &wal_files);
-
-   free(d);
-
-   /* Delete outdated WAL files */
-   for (int i = 0; i < number_of_wal_files; i++)
+   /* Delete WAL if there are no backups, or the oldest one is valid */
+   if (number_of_backups == 0 || backup_index == 0)
    {
-      if (pgmoneta_ends_with(wal_files[i], ".partial"))
-      {
-         continue;
-      }
+      /* Find WAL files */
+      d = pgmoneta_append(d, config->base_dir);
+      d = pgmoneta_append(d, "/");
+      d = pgmoneta_append(d, config->servers[srv].name);
+      d = pgmoneta_append(d, "/wal/");
 
-      delete = false;
+      number_of_wal_files = 0;
+      wal_files = NULL;
 
-      if (backup_index == -1)
+      pgmoneta_get_files(d, &number_of_wal_files, &wal_files);
+
+      free(d);
+      d = NULL;
+
+      /* Delete outdated WAL files */
+      for (int i = 0; i < number_of_wal_files; i++)
       {
-         delete = true;
-      }
-      else if (srv_wal != NULL)
-      {
-         if (strcmp(wal_files[i], srv_wal) < 0)
+         if (pgmoneta_ends_with(wal_files[i], ".partial"))
+         {
+            break;
+         }
+
+         delete = false;
+
+         if (backup_index == -1)
          {
             delete = true;
          }
-      }
+         else if (srv_wal != NULL)
+         {
+            if (strcmp(wal_files[i], srv_wal) < 0)
+            {
+               delete = true;
+            }
+         }
 
-      if (delete)
-      {
-         d = NULL;
-         d = pgmoneta_append(d, config->base_dir);
-         d = pgmoneta_append(d, "/");
-         d = pgmoneta_append(d, config->servers[srv].name);
-         d = pgmoneta_append(d, "/wal/");
-         d = pgmoneta_append(d, wal_files[i]);
+         if (delete)
+         {
+            d = pgmoneta_append(d, config->base_dir);
+            d = pgmoneta_append(d, "/");
+            d = pgmoneta_append(d, config->servers[srv].name);
+            d = pgmoneta_append(d, "/wal/");
+            d = pgmoneta_append(d, wal_files[i]);
 
-         pgmoneta_delete_file(d);
+            pgmoneta_delete_file(d);
 
-         free(d);
+            free(d);
+            d = NULL;
+         }
+         else
+         {
+            break;
+         }
       }
    }
 

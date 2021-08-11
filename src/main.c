@@ -33,6 +33,7 @@
 #include <configuration.h>
 #include <delete.h>
 #include <gzip.h>
+#include <keep.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
@@ -579,7 +580,7 @@ main(int argc, char **argv)
       ev_periodic_start (main_loop, &wal_compress);
    }
 
-   ev_periodic_init (&retention, retention_cb, 0., 60, 0);
+   ev_periodic_init (&retention, retention_cb, 0., 300, 0);
    ev_periodic_start (main_loop, &retention);
 
    ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
@@ -954,6 +955,86 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
       case MANAGEMENT_RELOAD:
          pgmoneta_log_debug("pgmoneta: Management reload");
          reload_configuration();
+         break;
+      case MANAGEMENT_RETAIN:
+         pgmoneta_log_debug("pgmoneta: Management retain: %s/%s", payload_s1, payload_s2);
+
+         srv = -1;
+         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         {
+            if (!strcmp(config->servers[i].name, payload_s1))
+            {
+               srv = i;
+            }
+         }
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("Cannot create process");
+         }
+         else if (pid == 0)
+         {
+            char* backup_id = NULL;
+
+            backup_id = malloc(strlen(payload_s2) + 1);
+            memset(backup_id, 0, strlen(payload_s2) + 1);
+            memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+            pgmoneta_retain_backup(srv, backup_id);
+
+            free(backup_id);
+            exit(0);
+         }
+
+         if (srv == -1)
+         {
+            pgmoneta_log_error("Retain: Unknown server %s", payload_s1);
+         }
+
+         free(payload_s1);
+         free(payload_s2);
+         break;
+      case MANAGEMENT_EXPUNGE:
+         pgmoneta_log_debug("pgmoneta: Management expunge: %s/%s", payload_s1, payload_s2);
+
+         srv = -1;
+         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         {
+            if (!strcmp(config->servers[i].name, payload_s1))
+            {
+               srv = i;
+            }
+         }
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("Cannot create process");
+         }
+         else if (pid == 0)
+         {
+            char* backup_id = NULL;
+
+            backup_id = malloc(strlen(payload_s2) + 1);
+            memset(backup_id, 0, strlen(payload_s2) + 1);
+            memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+            pgmoneta_expunge_backup(srv, backup_id);
+
+            free(backup_id);
+            exit(0);
+         }
+
+         if (srv == -1)
+         {
+            pgmoneta_log_error("Expunge: Unknown server %s", payload_s1);
+         }
+
+         free(payload_s1);
+         free(payload_s2);
          break;
       default:
          pgmoneta_log_debug("pgmoneta: Unknown management id: %d", id);

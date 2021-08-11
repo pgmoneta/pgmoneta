@@ -87,24 +87,31 @@ pgmoneta_retention(char** argv)
 
       if (number_of_backups > 0)
       {
-         if (strcmp(backups[0]->label, &check_date[0]) < 0)
+         for (int j = 0; j < number_of_backups; j++)
          {
-            if (!atomic_load(&config->servers[i].delete))
+            if (strcmp(backups[j]->label, &check_date[0]) < 0)
             {
-               pgmoneta_delete(i, backups[0]->label);
-               pgmoneta_delete_wal(i);
-               pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[0]->label);
+               if (!backups[j]->keep)
+               {
+                  if (!atomic_load(&config->servers[i].delete))
+                  {
+                     pgmoneta_delete(i, backups[j]->label);
+                     pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[j]->label);
+                  }
+               }
+            }
+            else
+            {
+               break;
             }
          }
       }
-      else if (number_of_backups == 0)
-      {
-         pgmoneta_delete_wal(i);
-      }
 
-      for (int i = 0; i < number_of_backups; i++)
+      pgmoneta_delete_wal(i);
+
+      for (int j = 0; j < number_of_backups; j++)
       {
-         free(backups[i]);
+         free(backups[j]);
       }
       free(backups);
 
