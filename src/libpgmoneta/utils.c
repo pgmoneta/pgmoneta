@@ -1625,6 +1625,12 @@ pgmoneta_total_space(char* path)
 }
 
 bool
+pgmoneta_starts_with(char* str, char* prefix)
+{
+   return strncmp(prefix, str, strlen(prefix)) == 0;
+}
+
+bool
 pgmoneta_ends_with(char* str, char* suffix)
 {
    int str_len = strlen(str);

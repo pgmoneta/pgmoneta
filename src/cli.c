@@ -720,14 +720,14 @@ static void
 help_restore(void)
 {
    printf("Restore a backup for a server\n");
-   printf("  pgmoneta-cli restore <server> [<timestamp>|oldest|newest] [current] <directory>\n");
+   printf("  pgmoneta-cli restore <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
 }
 
 static void
 help_archive(void)
 {
    printf("Archive a backup for a server\n");
-   printf("  pgmoneta-cli archive <server> [<timestamp>|oldest|newest] [current] <directory>\n");
+   printf("  pgmoneta-cli archive <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
 }
 
 static void

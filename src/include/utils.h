@@ -440,6 +440,15 @@ unsigned long
 pgmoneta_total_space(char* path);
 
 /**
+ * Does a string start with another string
+ * @param str The string
+ * @param prefix The prefix
+ * @return The result
+ */
+bool
+pgmoneta_starts_with(char* str, char* prefix);
+
+/**
  * Does a string end with another string
  * @param str The string
  * @param suffix The suffix
