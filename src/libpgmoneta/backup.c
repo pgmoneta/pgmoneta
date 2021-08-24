@@ -52,6 +52,8 @@ pgmoneta_backup(int server, char** argv)
    time_t current_time;
    struct tm* time_info;
    time_t start_time;
+   time_t compression_time;
+   time_t link_time;
    int total_seconds;
    int hours;
    int minutes;
@@ -170,19 +172,6 @@ pgmoneta_backup(int server, char** argv)
    }
    else
    {
-      pgmoneta_read_version(d, &version);
-      size = pgmoneta_directory_size(d);
-      pgmoneta_read_wal(d, &wal);
-
-      if (config->compression_type == COMPRESSION_GZIP)
-      {
-         pgmoneta_gzip_data(d);
-      }
-      else if (config->compression_type == COMPRESSION_ZSTD)
-      {
-         pgmoneta_zstandardc_data(d);
-      }
-
       total_seconds = (int)difftime(time(NULL), start_time);
       hours = total_seconds / 3600;
       minutes = (total_seconds % 3600) / 60;
@@ -191,13 +180,39 @@ pgmoneta_backup(int server, char** argv)
       memset(&elapsed[0], 0, sizeof(elapsed));
       sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-      pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+      pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
 
-      pgmoneta_create_info(root, 1, &date[0], wal, size, total_seconds, version);
+      pgmoneta_read_version(d, &version);
+      size = pgmoneta_directory_size(d);
+      pgmoneta_read_wal(d, &wal);
+
+      if (config->compression_type != COMPRESSION_NONE)
+      {
+         compression_time = time(NULL);
+
+         if (config->compression_type == COMPRESSION_GZIP)
+         {
+            pgmoneta_gzip_data(d);
+         }
+         else if (config->compression_type == COMPRESSION_ZSTD)
+         {
+            pgmoneta_zstandardc_data(d);
+         }
+
+         total_seconds = (int)difftime(time(NULL), compression_time);
+         hours = total_seconds / 3600;
+         minutes = (total_seconds % 3600) / 60;
+         seconds = total_seconds % 60;
+
+         memset(&elapsed[0], 0, sizeof(elapsed));
+         sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+
+         pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+      }
 
       if (config->link)
       {
-         start_time = time(NULL);
+         link_time = time(NULL);
          total_seconds = 0;
 
          server_path = NULL;
@@ -260,7 +275,7 @@ pgmoneta_backup(int server, char** argv)
 
                pgmoneta_link(from, to);
 
-               total_seconds = (int)difftime(time(NULL), start_time);
+               total_seconds = (int)difftime(time(NULL), link_time);
                hours = total_seconds / 3600;
                minutes = (total_seconds % 3600) / 60;
                seconds = total_seconds % 60;
@@ -272,6 +287,18 @@ pgmoneta_backup(int server, char** argv)
             }
          }
       }
+
+      total_seconds = (int)difftime(time(NULL), start_time);
+      hours = total_seconds / 3600;
+      minutes = (total_seconds % 3600) / 60;
+      seconds = total_seconds % 60;
+
+      memset(&elapsed[0], 0, sizeof(elapsed));
+      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+
+      pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+
+      pgmoneta_create_info(root, 1, &date[0], wal, size, total_seconds, version);
 
       size = pgmoneta_directory_size(d);
       pgmoneta_add_backup_info(root, size);
