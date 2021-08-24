@@ -105,6 +105,7 @@ struct server
    char username[MAX_USERNAME_LENGTH]; /**< The user name */
    char backup_slot[MISC_LENGTH];      /**< The backup slot name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
+   char follow[MISC_LENGTH];           /**< Follow a server */
    int retention;                      /**< The retention for the server */
    bool synchronous;                   /**< Run in synchronous mode */
    atomic_bool backup;                 /**< Is there an active backup */

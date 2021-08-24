@@ -58,6 +58,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | user | | String | Yes | The replication user name |
 | backup_slot | | String | No | The replication slot for the backup |
 | wal_slot | | String | No | The replication slot for WAL |
+| follow | | String | No | Failover to this server if follow server fails |
 | retention | | Int | No | The retention for the server |
 | synchronous | `off` | Bool | No | Use synchronous receive |
 

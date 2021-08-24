@@ -270,6 +270,24 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "follow"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                        max = MISC_LENGTH - 1;
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                        max = MISC_LENGTH - 1;
+                     memcpy(&srv.follow, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "synchronous"))
                {
                   if (strlen(section) > 0)
@@ -672,6 +690,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
 int
 pgmoneta_validate_configuration(void* shm)
 {
+   bool found = false;
    struct configuration* config;
 
    config = (struct configuration*)shm;
@@ -744,6 +763,24 @@ pgmoneta_validate_configuration(void* shm)
       if (strlen(config->servers[i].wal_slot) == 0)
       {
          pgmoneta_log_debug("pgmoneta: No WAL slot defined for %s", config->servers[i].name);
+      }
+
+      if (strlen(config->servers[i].follow) > 0)
+      {
+         found = false;
+         for (int j = 0; !found && j < config->number_of_servers; j++)
+         {
+            if (!strcmp(config->servers[i].follow, config->servers[j].name))
+            {
+               found = true;
+            }
+         }
+
+         if (!found)
+         {
+            pgmoneta_log_fatal("pgmoneta: Invalid follow value for %s", config->servers[i].name);
+            return 1;
+         }
       }
    }
 

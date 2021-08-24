@@ -716,34 +716,56 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
       case MANAGEMENT_BACKUP:
          pgmoneta_log_debug("pgmoneta: Management backup: %s", payload_s1);
 
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         if (!strcmp("all", payload_s1))
          {
-            if (!strcmp(config->servers[i].name, payload_s1))
+            for (int i = 0; i < config->number_of_servers; i++)
             {
-               srv = i;
-            }  
-         }
-
-         /* TODO: Redo with success/failure */
-         if (srv != -1)
-         {
-            pid = fork();
-            if (pid == -1)
-            {
-               /* No process */
-               pgmoneta_log_error("Cannot create process");
-            }
-            else if (pid == 0)
-            {
-               pgmoneta_backup(srv, ai->argv);
+               if (config->servers[i].wal_streaming)
+               {
+                  pid = fork();
+                  if (pid == -1)
+                  {
+                     /* No process */
+                     pgmoneta_log_error("Cannot create process");
+                  }
+                  else if (pid == 0)
+                  {
+                     pgmoneta_backup(i, ai->argv);
+                  }
+               }
             }
          }
          else
          {
-            pgmoneta_log_error("Backup: Unknown server %s", payload_s1);
+            srv = -1;
+            for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+            {
+               if (!strcmp(config->servers[i].name, payload_s1))
+               {
+                  srv = i;
+               }
+            }
+
+            /* TODO: Redo with success/failure */
+            if (srv != -1)
+            {
+               pid = fork();
+               if (pid == -1)
+               {
+                  /* No process */
+                  pgmoneta_log_error("Cannot create process");
+               }
+               else if (pid == 0)
+               {
+                  pgmoneta_backup(srv, ai->argv);
+               }
+            }
+            else
+            {
+               pgmoneta_log_error("Backup: Unknown server %s", payload_s1);
+            }
          }
-         
+
          free(payload_s1);
          break;
       case MANAGEMENT_LIST_BACKUP:
@@ -1273,6 +1295,7 @@ retention_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 static void
 wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 {
+   bool start = false;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -1287,17 +1310,43 @@ wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents)
    {
       if (keep_running && !config->servers[i].wal_streaming)
       {
-         pid_t pid;
+         start = false;
 
-         pid = fork();
-         if (pid == -1)
+         if (strlen(config->servers[i].follow) == 0)
          {
-            /* No process */
-            pgmoneta_log_error("WAL: Cannot create process");
+            for (int j = 0; !start && j < config->number_of_servers; j++)
+            {
+               if (!strcmp(config->servers[j].follow, config->servers[i].name) && !config->servers[j].wal_streaming)
+               {
+                  start = true;
+               }
+            }
          }
-         else if (pid == 0)
+         else
          {
-            pgmoneta_wal(i, argv_ptr);
+            for (int j = 0; !start && j < config->number_of_servers; j++)
+            {
+               if (!strcmp(config->servers[i].follow, config->servers[j].name) && !config->servers[j].wal_streaming)
+               {
+                  start = true;
+               }
+            }
+         }
+
+         if (start)
+         {
+            pid_t pid;
+
+            pid = fork();
+            if (pid == -1)
+            {
+               /* No process */
+               pgmoneta_log_error("WAL: Cannot create process");
+            }
+            else if (pid == 0)
+            {
+               pgmoneta_wal(i, argv_ptr);
+            }
          }
       }
    }
@@ -1395,24 +1444,37 @@ reload_configuration(void)
 static void
 init_receivewals(void)
 {
+   int active = 0;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      pid_t pid;
+      if (strlen(config->servers[i].follow) == 0)
+      {
+         pid_t pid;
 
-      pid = fork();
-      if (pid == -1)
-      {
-         /* No process */
-         pgmoneta_log_error("WAL: Cannot create process");
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("WAL: Cannot create process");
+         }
+         else if (pid == 0)
+         {
+            pgmoneta_wal(i, argv_ptr);
+         }
+         else
+         {
+            active++;
+         }
       }
-      else if (pid == 0)
-      {
-         pgmoneta_wal(i, argv_ptr);
-      }
+   }
+
+   if (active == 0)
+   {
+      pgmoneta_log_error("No active WAL streaming");
    }
 }
 

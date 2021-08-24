@@ -706,7 +706,7 @@ static void
 help_backup(void)
 {
    printf("Backup a server\n");
-   printf("  pgmoneta-cli backup <server>\n");
+   printf("  pgmoneta-cli backup [<server>|all]\n");
 }
 
 static void
