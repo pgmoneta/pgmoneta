@@ -85,6 +85,8 @@ static void reload_configuration(void);
 static void init_receivewals(void);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
+static int  create_lockfile(void);
+static void remove_lockfile(void);
 
 struct accept_io
 {
@@ -474,6 +476,11 @@ main(int argc, char **argv)
       exit(1);
    }
 
+   if (create_lockfile())
+   {
+      exit(1);
+   }
+
    pgmoneta_set_proc_title(argc, argv, "main", NULL);
 
    /* Bind Unix Domain Socket */
@@ -638,6 +645,7 @@ main(int argc, char **argv)
    free(management_fds);
 
    remove_pidfile();
+   remove_lockfile();
 
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
@@ -1387,4 +1395,44 @@ remove_pidfile(void)
    {
       unlink(config->pidfile);
    }
+}
+
+static int
+create_lockfile(void)
+{
+   char* f = NULL;
+   int fd;
+
+   f = pgmoneta_append(f, "/tmp/pgmoneta.lock");
+
+   fd = open(f, O_WRONLY | O_CREAT | O_EXCL, 0644);
+   if (fd < 0)
+   {
+      printf("Could not create lock file '%s' due to %s\n", f, strerror(errno));
+      goto error;
+   }
+
+   close(fd);
+
+   free(f);
+
+   return 0;
+
+error:
+
+   free(f);
+
+   return 1;
+}
+
+static void
+remove_lockfile(void)
+{
+   char* f = NULL;
+
+   f = pgmoneta_append(f, "/tmp/pgmoneta.lock");
+
+   unlink(f);
+
+   free(f);
 }
