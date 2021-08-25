@@ -62,6 +62,8 @@ static int max_process_title_size = -1;
 
 static int string_compare(const void* a, const void* b);
 
+static bool is_wal_file(char* file);
+
 int32_t
 pgmoneta_get_request(struct message* msg)
 {
@@ -1727,6 +1729,7 @@ error:
 int
 pgmoneta_read_wal(char* directory, char** wal)
 {
+   bool found = false;
    char* result = NULL;
    char* pgwal = NULL;
    int number_of_wal_files = 0;
@@ -1747,11 +1750,19 @@ pgmoneta_read_wal(char* directory, char** wal)
       goto error;
    }
 
-   result = malloc(strlen(wal_files[0]) + 1);
-   memset(result, 0, strlen(wal_files[0]) + 1);
-   memcpy(result, wal_files[0], strlen(wal_files[0]));
+   for (int i = 0; !found && i < number_of_wal_files; i++)
+   {
+      if (is_wal_file(wal_files[i]))
+      {
+         result = malloc(strlen(wal_files[i]) + 1);
+         memset(result, 0, strlen(wal_files[i]) + 1);
+         memcpy(result, wal_files[i], strlen(wal_files[i]));
 
-   *wal = result;
+         *wal = result;
+
+         found = true;
+      }
+   }
 
    for (int i = 0; i < number_of_wal_files; i++)
    {
@@ -1776,6 +1787,22 @@ static int
 string_compare(const void* a, const void* b)
 {
    return strcmp(*(const char**)a, *(const char**)b);
+}
+
+static bool
+is_wal_file(char* file)
+{
+   if (pgmoneta_ends_with(file, ".history"))
+   {
+      return false;
+   }
+
+   if (strlen(file) != 24)
+   {
+      return false;
+   }
+
+   return true;
 }
 
 #ifdef DEBUG
