@@ -116,7 +116,7 @@ pgmoneta_delete(int srv, char* backup_id)
    /* Find previous valid backup */
    for (int i = backup_index - 1; prev_index == -1 && i >= 0; i--)
    {
-      if (backups[i] != NULL && backups[i]->valid)
+      if (backups[i]->valid == VALID_TRUE)
       {
          prev_index = i;
       }
@@ -125,7 +125,7 @@ pgmoneta_delete(int srv, char* backup_id)
    /* Find next valid backup */
    for (int i = backup_index + 1; next_index == -1 && i < number_of_backups; i++)
    {
-      if (backups[i] != NULL && backups[i]->valid)
+      if (backups[i]->valid == VALID_TRUE)
       {
          next_index = i;
       }
@@ -137,7 +137,7 @@ pgmoneta_delete(int srv, char* backup_id)
    d = pgmoneta_append(d, "/backup/");
    d = pgmoneta_append(d, backups[backup_index]->label);
 
-   if (backups[backup_index]->valid)
+   if (backups[backup_index]->valid == VALID_TRUE)
    {
       if (prev_index != -1 && next_index != -1)
       {
@@ -300,7 +300,7 @@ pgmoneta_delete_wal(int srv)
 
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
    {
-      if (backups[i] != NULL && !backups[i]->keep && backups[i]->valid)
+      if (!backups[i]->keep && backups[i]->valid == VALID_TRUE)
       {
          backup_index = i;
       }

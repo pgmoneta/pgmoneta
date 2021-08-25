@@ -257,8 +257,15 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
 
             ds = pgmoneta_bytes_to_string(delta_size);
 
-            printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                   &name[0], bck, res, ws, ds, keep ? "Yes" : "No", valid ? "Yes" : "No");
+            if (valid == VALID_UNKNOWN)
+            {
+               printf("                   %s (Unknown)\n", &name[0]);
+            }
+            else
+            {
+               printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
+                      &name[0], bck, res, ws, ds, keep ? "Yes" : "No", valid == VALID_TRUE ? "Yes" : "No");
+            }
 
             free(bck);
             bck = NULL;
@@ -358,7 +365,7 @@ pgmoneta_management_write_list_backup(int socket, int server)
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_list_backup", socket, backups[i]->valid ? 1 : 0))
+            if (write_int32("pgmoneta_management_write_list_backup", socket, backups[i]->valid))
             {
                goto error;
             }
@@ -1040,8 +1047,15 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
 
          ds = pgmoneta_bytes_to_string(delta_size);
 
-         printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                name, bck, res, ws, ds, keep ? "Yes" : "No", valid ? "Yes" : "No");
+         if (valid == VALID_UNKNOWN)
+         {
+            printf("                   %s (Unknown)\n", name);
+         }
+         else
+         {
+            printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
+                   name, bck, res, ws, ds, keep ? "Yes" : "No", valid  == VALID_TRUE ? "Yes" : "No");
+         }
 
          free(bck);
          bck = NULL;
@@ -1201,7 +1215,7 @@ pgmoneta_management_write_details(int socket)
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_details", socket, backups[j]->valid ? 1 : 0))
+            if (write_int32("pgmoneta_management_write_details", socket, backups[j]->valid))
             {
                goto error;
             }

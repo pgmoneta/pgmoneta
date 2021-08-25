@@ -35,6 +35,10 @@ extern "C" {
 
 #include <stdlib.h>
 
+#define VALID_UNKNOWN -1
+#define VALID_FALSE    0
+#define VALID_TRUE     1
+
 /** @struct
  * Defines a backup
  */
@@ -47,7 +51,7 @@ struct backup
    int elapsed_time;           /**< The elapsed time in seconds */
    int version;                /**< The version */
    bool keep;                  /**< Keep the backup */
-   bool valid;                 /**< Is the backup valid */
+   char valid;                 /**< Is the backup valid */
 } __attribute__ ((aligned (64)));
 
 /**
@@ -100,11 +104,12 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
 /**
  * Get a backup
  * @param directory The directory
+ * @param label The label
  * @param backup The backup
  * @return The result
  */
 int
-pgmoneta_get_backup(char* directory, struct backup** backup);
+pgmoneta_get_backup(char* directory, char* label, struct backup** backup);
 
 #ifdef __cplusplus
 }

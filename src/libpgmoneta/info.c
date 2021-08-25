@@ -271,10 +271,8 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
       d = NULL;
 
       d = pgmoneta_append(d, directory);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, dirs[i]);
 
-      pgmoneta_get_backup(d, &bcks[i]);
+      pgmoneta_get_backup(d, dirs[i], &bcks[i]);
 
       free(d);
    }
@@ -292,7 +290,7 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
 }
 
 int
-pgmoneta_get_backup(char* directory, struct backup** backup)
+pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
 {
    char buffer[MISC_LENGTH];
    char* fn;
@@ -303,71 +301,74 @@ pgmoneta_get_backup(char* directory, struct backup** backup)
 
    fn = NULL;
    fn = pgmoneta_append(fn, directory);
+   fn = pgmoneta_append(fn, "/");
+   fn = pgmoneta_append(fn, label);
    fn = pgmoneta_append(fn, "/backup.info");
 
    file = fopen(fn, "r");
 
-   if (file == NULL)
-   {
-      goto error;
-   }
-
    bck = (struct backup*)malloc(sizeof(struct backup));
    memset(bck, 0, sizeof(struct backup));
 
-   while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
+   memcpy(&bck->label[0], label, strlen(label));
+   bck->valid = VALID_UNKNOWN;
+
+   if (file != NULL)
    {
-      char key[MISC_LENGTH];
-      char value[MISC_LENGTH];
-      char* ptr = NULL;
-
-      memset(&key[0], 0, sizeof(key));
-      memset(&value[0], 0, sizeof(value));
-
-      ptr = strtok(&buffer[0], "=");
-      memcpy(&key[0], ptr, strlen(ptr));
-
-      ptr = strtok(NULL, "=");
-      memcpy(&value[0], ptr, strlen(ptr) - 1);
-
-      if (!strcmp("STATUS", &key[0]))
+      while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
       {
-         if (!strcmp("1", &value[0]))
+         char key[MISC_LENGTH];
+         char value[MISC_LENGTH];
+         char* ptr = NULL;
+
+         memset(&key[0], 0, sizeof(key));
+         memset(&value[0], 0, sizeof(value));
+
+         ptr = strtok(&buffer[0], "=");
+         memcpy(&key[0], ptr, strlen(ptr));
+
+         ptr = strtok(NULL, "=");
+         memcpy(&value[0], ptr, strlen(ptr) - 1);
+
+         if (!strcmp("STATUS", &key[0]))
          {
-            bck->valid = true;
+            if (!strcmp("1", &value[0]))
+            {
+               bck->valid = VALID_TRUE;
+            }
+            else
+            {
+               bck->valid = VALID_FALSE;
+            }
          }
-         else
+         else if (!strcmp("LABEL", &key[0]))
          {
-            bck->valid = false;
+            memcpy(&bck->label[0], &value[0], strlen(&value[0]));
          }
-      }
-      else if (!strcmp("LABEL", &key[0]))
-      {
-         memcpy(&bck->label[0], &value[0], strlen(&value[0]));
-      }
-      else if (!strcmp("WAL", &key[0]))
-      {
-         memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
-      }
-      else if (!strcmp("BACKUP", &key[0]))
-      {
-         bck->backup_size = strtoul(&value[0], &ptr, 10);
-      }
-      else if (!strcmp("RESTORE", &key[0]))
-      {
-         bck->restore_size = strtoul(&value[0], &ptr, 10);
-      }
-      else if (!strcmp("ELAPSED", &key[0]))
-      {
+         else if (!strcmp("WAL", &key[0]))
+         {
+            memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
+         }
+         else if (!strcmp("BACKUP", &key[0]))
+         {
+            bck->backup_size = strtoul(&value[0], &ptr, 10);
+         }
+         else if (!strcmp("RESTORE", &key[0]))
+         {
+            bck->restore_size = strtoul(&value[0], &ptr, 10);
+         }
+         else if (!strcmp("ELAPSED", &key[0]))
+         {
          bck->elapsed_time = atoi(&value[0]);
-      }
-      else if (!strcmp("VERSION", &key[0]))
-      {
-         bck->version = atoi(&value[0]);
-      }
-      else if (!strcmp("KEEP", &key[0]))
-      {
-         bck->keep = atoi(&value[0]) == 1 ? true : false;
+         }
+         else if (!strcmp("VERSION", &key[0]))
+         {
+            bck->version = atoi(&value[0]);
+         }
+         else if (!strcmp("KEEP", &key[0]))
+         {
+            bck->keep = atoi(&value[0]) == 1 ? true : false;
+         }
       }
    }
 
@@ -381,15 +382,4 @@ pgmoneta_get_backup(char* directory, struct backup** backup)
    free(fn);
 
    return 0;
-
-error:
-
-   if (file != NULL)
-   {
-      fclose(file);
-   }
-
-   free(fn);
-
-   return 1;
 }

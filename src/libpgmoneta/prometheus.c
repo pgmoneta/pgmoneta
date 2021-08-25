@@ -690,7 +690,7 @@ backup_information(int client_fd)
       valid = false;
       for (int j = 0; !valid && j < number_of_backups; j++)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         if (backups[j]->valid == VALID_TRUE)
          {
             data = pgmoneta_append(data, backups[j]->label);
             valid = true;
@@ -746,7 +746,7 @@ backup_information(int client_fd)
       valid = false;
       for (int j = number_of_backups - 1; !valid && j >= 0; j--)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         if (backups[j]->valid == VALID_TRUE)
          {
             data = pgmoneta_append(data, backups[j]->label);
             valid = true;
@@ -795,7 +795,7 @@ backup_information(int client_fd)
       valid_count = 0;
       for (int j = 0; j < number_of_backups; j++)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         if (backups[j]->valid == VALID_TRUE)
          {
             valid_count++;
          }
@@ -852,7 +852,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_bool(data, backups[j]->valid);
+               data = pgmoneta_append_int(data, backups[j]->valid);
 
                data = pgmoneta_append(data, "\n");
             }
@@ -906,7 +906,7 @@ backup_information(int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j] != NULL && backups[j]->valid)
+            if (backups[j]->valid == VALID_TRUE)
             {
                data = pgmoneta_append(data, "pgmoneta_backup_elapsed_time{");
 
@@ -989,7 +989,7 @@ size_information(int client_fd)
       valid = false;
       for (int j = number_of_backups - 1; !valid && j >= 0; j--)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         if (backups[j]->valid == VALID_TRUE)
          {
             data = pgmoneta_append_ulong(data, backups[j]->restore_size);
             valid = true;
@@ -1045,7 +1045,7 @@ size_information(int client_fd)
       valid = false;
       for (int j = number_of_backups - 1; !valid && j >= 0; j--)
       {
-         if (backups[j] != NULL && backups[j]->valid)
+         if (backups[j]->valid == VALID_TRUE)
          {
             data = pgmoneta_append_ulong(data, backups[j]->backup_size);
             valid = true;
@@ -1096,7 +1096,7 @@ size_information(int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j] != NULL && backups[j]->valid)
+            if (backups[j]->valid == VALID_TRUE)
             {
                data = pgmoneta_append(data, "pgmoneta_restore_size{");
 
@@ -1160,7 +1160,7 @@ size_information(int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j] != NULL && backups[j]->valid)
+            if (backups[j]->valid == VALID_TRUE)
             {
                data = pgmoneta_append(data, "pgmoneta_backup_size{");
 

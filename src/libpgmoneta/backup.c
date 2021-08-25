@@ -234,7 +234,7 @@ pgmoneta_backup(int server, char** argv)
 
             for (int j = number_of_backups - 1; j >= 0; j--)
             {
-               if (backups[j] != NULL && backups[j]->valid)
+               if (backups[j]->valid == VALID_TRUE)
                {
                   if (newest == -1)
                   {

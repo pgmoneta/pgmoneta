@@ -97,6 +97,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    struct backup** backups = NULL;
    struct backup* backup = NULL;
    char* d = NULL;
+   char* root = NULL;
    char* base = NULL;
    char* from = NULL;
    char* to = NULL;
@@ -126,7 +127,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
 
       for (int i = 0; id == NULL && i < number_of_backups; i++)
       {
-         if (backups[i] != NULL && backups[i]->valid)
+         if (backups[i]->valid == VALID_TRUE)
          {
             id = backups[i]->label;
          }
@@ -147,7 +148,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
 
       for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
       {
-         if (backups[i] != NULL && backups[i]->valid)
+         if (backups[i]->valid == VALID_TRUE)
          {
             id = backups[i]->label;
          }
@@ -164,10 +165,12 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
       goto error;
    }
 
-   base = pgmoneta_append(base, config->base_dir);
-   base = pgmoneta_append(base, "/");
-   base = pgmoneta_append(base, config->servers[server].name);
-   base = pgmoneta_append(base, "/backup/");
+   root = pgmoneta_append(root, config->base_dir);
+   root = pgmoneta_append(root, "/");
+   root = pgmoneta_append(root, config->servers[server].name);
+   root = pgmoneta_append(root, "/backup/");
+
+   base = pgmoneta_append(base, root);
    base = pgmoneta_append(base, id);
    base = pgmoneta_append(base, "/");
 
@@ -254,7 +257,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
             ptr = strtok(NULL, ",");
          }
 
-         pgmoneta_get_backup(base, &backup);
+         pgmoneta_get_backup(root, id, &backup);
          create_recovery_info(server, to, primary, position, backup->version);
 
          if (copy_wal)
@@ -307,6 +310,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    free(backups);
 
    free(backup);
+   free(root);
    free(base);
    free(from);
    free(to);
@@ -326,6 +330,7 @@ error:
    free(backups);
 
    free(backup);
+   free(root);
    free(base);
    free(from);
    free(to);

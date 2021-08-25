@@ -113,7 +113,7 @@ keep(char* prefix, int srv, char* backup_id, bool k)
       goto error;
    }
 
-   if (backups[backup_index]->valid)
+   if (backups[backup_index]->valid == VALID_TRUE)
    {
       d = pgmoneta_append(d, config->base_dir);
       d = pgmoneta_append(d, "/");
