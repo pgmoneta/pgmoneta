@@ -1463,6 +1463,7 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
    memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
+   memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
    dst->retention = src->retention;
    restart_bool("synchronous", dst->synchronous, src->synchronous);
    /* dst->backup = src->backup; */
