@@ -737,6 +737,18 @@ pgmoneta_validate_configuration(void* shm)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
+      if (!strcmp(config->servers[i].name, "pgmoneta"))
+      {
+         pgmoneta_log_fatal("pgmoneta: pgmoneta is a reserved word for a host");
+         return 1;
+      }
+
+      if (!strcmp(config->servers[i].name, "all"))
+      {
+         pgmoneta_log_fatal("pgmoneta: all is a reserved word for a host");
+         return 1;
+      }
+
       if (strlen(config->servers[i].host) == 0)
       {
          pgmoneta_log_fatal("pgmoneta: No host defined for %s", config->servers[i].name);
