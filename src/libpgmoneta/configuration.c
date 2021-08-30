@@ -90,7 +90,7 @@ pgmoneta_init_configuration(void* shm)
    config->keep_alive = true;
    config->nodelay = true;
    config->non_blocking = true;
-   config->backlog = -1;
+   config->backlog = 16;
    config->hugepage = HUGEPAGE_TRY;
 
    config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
@@ -724,7 +724,7 @@ pgmoneta_validate_configuration(void* shm)
       config->retention = 0;
    }
 
-   if (config->backlog <= 0)
+   if (config->backlog < 16)
    {
       config->backlog = 16;
    }

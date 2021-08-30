@@ -91,7 +91,7 @@ non_blocking
   Have O_NONBLOCK on sockets. Default is on
 
 backlog
-  The backlog for listen(). Minimum 16. Default is max_connections / 4
+  The backlog for listen(). Minimum 16. Default is 16
 
 hugepage
   Huge page support. Default is try

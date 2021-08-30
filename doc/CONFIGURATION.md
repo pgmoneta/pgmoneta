@@ -45,7 +45,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
 | nodelay | on | Bool | No | Have `TCP_NODELAY` on sockets |
 | non_blocking | on | Bool | No | Have `O_NONBLOCK` on sockets |
-| backlog | `max_connections` / 4 | Int | No | The backlog for `listen()`. Minimum `16` |
+| backlog | 16 | Int | No | The backlog for `listen()`. Minimum `16` |
 | hugepage | `try` | String | No | Huge page support (`off`, `try`, `on`) |
 | pidfile | | String | No | Path to the PID file |
 
