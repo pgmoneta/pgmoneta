@@ -65,6 +65,8 @@ static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
 static int restart_bool(char* name, bool e, bool n);
 
+static bool is_empty_string(char* s);
+
 /**
  *
  */
@@ -127,7 +129,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      if (strcmp(line, ""))
+      if (!is_empty_string(line))
       {
          if (line[0] == '[')
          {
@@ -833,7 +835,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      if (strcmp(line, ""))
+      if (!is_empty_string(line))
       {
          if (line[0] == '#' || line[0] == ';')
          {
@@ -1005,7 +1007,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      if (strcmp(line, ""))
+      if (!is_empty_string(line))
       {
          if (line[0] == '#' || line[0] == ';')
          {
@@ -1513,4 +1515,32 @@ restart_bool(char* name, bool e, bool n)
    }
 
    return 0;
+}
+
+static bool
+is_empty_string(char* s)
+{
+   if (s == NULL)
+   {
+      return true;
+   }
+
+   if (!strcmp(s, ""))
+   {
+      return true;
+   }
+
+   for (int i = 0; i < strlen(s); i++)
+   {
+      if (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n')
+      {
+         /* Ok */
+      }
+      else
+      {
+         return false;
+      }
+   }
+
+   return true;
 }
