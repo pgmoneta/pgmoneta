@@ -80,12 +80,6 @@ pgmoneta_backup(int server, char** argv)
 
    pgmoneta_set_proc_title(1, argv, "backup", config->servers[server].name);
 
-   if (!config->servers[server].valid)
-   {
-      pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
-      goto done;
-   }
-
    active = false;
 
    if (!atomic_compare_exchange_strong(&config->servers[server].backup, &active, true))
@@ -118,6 +112,12 @@ pgmoneta_backup(int server, char** argv)
    root = pgmoneta_append(root, "/");
 
    pgmoneta_mkdir(root);
+
+   if (!config->servers[server].valid)
+   {
+      pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
+      goto error;
+   }
 
    d = pgmoneta_append(d, config->base_dir);
    d = pgmoneta_append(d, "/");
@@ -168,7 +168,7 @@ pgmoneta_backup(int server, char** argv)
    if (status != 0)
    {
       pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
-      pgmoneta_create_info(root, 0, &date[0], NULL, 0, 0, NULL);
+      goto error;
    }
    else
    {
@@ -326,4 +326,26 @@ done:
    free(wal);
 
    exit(0);
+
+error:
+
+   pgmoneta_create_info(root, 0, &date[0], NULL, 0, 0, NULL);
+   pgmoneta_stop_logging();
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(root);
+   free(d);
+   free(cmd);
+   free(server_path);
+   free(from);
+   free(to);
+   free(version);
+   free(wal);
+
+   exit(1);
 }

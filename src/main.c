@@ -42,6 +42,7 @@
 #include <restore.h>
 #include <retention.h>
 #include <security.h>
+#include <server.h>
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
@@ -80,6 +81,7 @@ static void reload_cb(struct ev_loop *loop, ev_signal *w, int revents);
 static void coredump_cb(struct ev_loop *loop, ev_signal *w, int revents);
 static void wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents);
 static void retention_cb(struct ev_loop *loop, ev_periodic *w, int revents);
+static void valid_cb(struct ev_loop *loop, ev_periodic *w, int revents);
 static void wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents);
 static bool accept_fatal(int error);
 static void reload_configuration(void);
@@ -225,6 +227,7 @@ main(int argc, char **argv)
    struct signal_info signal_watcher[5];
    struct ev_periodic wal_compress;
    struct ev_periodic retention;
+   struct ev_periodic valid;
    struct ev_periodic wal_streaming;
    size_t shmem_size;
    struct configuration* config = NULL;
@@ -589,6 +592,9 @@ main(int argc, char **argv)
 
    ev_periodic_init (&retention, retention_cb, 0., 300, 0);
    ev_periodic_start (main_loop, &retention);
+
+   ev_periodic_init (&valid, valid_cb, 0., 600, 0);
+   ev_periodic_start (main_loop, &valid);
 
    ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
    ev_periodic_start (main_loop, &wal_streaming);
@@ -1297,6 +1303,28 @@ retention_cb(struct ev_loop *loop, ev_periodic *w, int revents)
    if (!fork())
    {
       pgmoneta_retention(argv_ptr);
+   }
+}
+
+static void
+valid_cb(struct ev_loop *loop, ev_periodic *w, int revents)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (EV_ERROR & revents)
+   {
+      pgmoneta_log_trace("valid_cb: got invalid event: %s", strerror(errno));
+      return;
+   }
+
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      if (keep_running && !config->servers[i].valid)
+      {
+         pgmoneta_server_info(i);
+      }
    }
 }
 
