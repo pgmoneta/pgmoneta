@@ -33,6 +33,7 @@
 #include <configuration.h>
 #include <delete.h>
 #include <gzip.h>
+#include <info.h>
 #include <keep.h>
 #include <logging.h>
 #include <management.h>
@@ -914,57 +915,105 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
       case MANAGEMENT_ARCHIVE:
          pgmoneta_log_debug("pgmoneta: Management archive: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
 
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         if (!strcmp("all", payload_s1))
          {
-            if (!strcmp(config->servers[i].name, payload_s1))
+            for (int i = 0; i < config->number_of_servers; i++)
             {
-               srv = i;
-            }
-         }
-
-         /* TODO: Redo with success/failure */
-         if (srv != -1)
-         {
-            pid = fork();
-            if (pid == -1)
-            {
-               /* No process */
-               pgmoneta_log_error("Cannot create process");
-            }
-            else if (pid == 0)
-            {
-               char* backup_id = NULL;
-               char* position = NULL;
-               char* directory = NULL;
-
-               backup_id = malloc(strlen(payload_s2) + 1);
-               memset(backup_id, 0, strlen(payload_s2) + 1);
-               memcpy(backup_id, payload_s2, strlen(payload_s2));
-
-               if (payload_s3 != NULL)
+               pid = fork();
+               if (pid == -1)
                {
-                  position = malloc(strlen(payload_s3) + 1);
-                  memset(position, 0, strlen(payload_s3) + 1);
-                  memcpy(position, payload_s3, strlen(payload_s3));
+                  /* No process */
+                  pgmoneta_log_error("Cannot create process");
                }
+               else if (pid == 0)
+               {
+                  int number_of_backups = pgmoneta_get_number_of_valid_backups(i);
 
-               directory = malloc(strlen(payload_s4) + 1);
-               memset(directory, 0, strlen(payload_s4) + 1);
-               memcpy(directory, payload_s4, strlen(payload_s4));
+                  if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2)))
+                  {
+                     char* backup_id = NULL;
+                     char* position = NULL;
+                     char* directory = NULL;
 
-               pgmoneta_archive(srv, backup_id, position, directory, ai->argv);
+                     backup_id = malloc(strlen(payload_s2) + 1);
+                     memset(backup_id, 0, strlen(payload_s2) + 1);
+                     memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+                     if (payload_s3 != NULL)
+                     {
+                        position = malloc(strlen(payload_s3) + 1);
+                        memset(position, 0, strlen(payload_s3) + 1);
+                        memcpy(position, payload_s3, strlen(payload_s3));
+                     }
+
+                     directory = malloc(strlen(payload_s4) + 1);
+                     memset(directory, 0, strlen(payload_s4) + 1);
+                     memcpy(directory, payload_s4, strlen(payload_s4));
+
+                     pgmoneta_archive(i, backup_id, position, directory, ai->argv);
+                  }
+               }
             }
+
+            free(payload_s1);
+            free(payload_s2);
+            free(payload_s3);
+            free(payload_s4);
          }
          else
          {
-            pgmoneta_log_error("Archive: Unknown server %s", payload_s1);
-         }
+            srv = -1;
+            for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+            {
+               if (!strcmp(config->servers[i].name, payload_s1))
+               {
+                  srv = i;
+               }
+            }
 
-         free(payload_s1);
-         free(payload_s2);
-         free(payload_s3);
-         free(payload_s4);
+            /* TODO: Redo with success/failure */
+            if (srv != -1)
+            {
+               pid = fork();
+               if (pid == -1)
+               {
+                  /* No process */
+                  pgmoneta_log_error("Cannot create process");
+               }
+               else if (pid == 0)
+               {
+                  char* backup_id = NULL;
+                  char* position = NULL;
+                  char* directory = NULL;
+
+                  backup_id = malloc(strlen(payload_s2) + 1);
+                  memset(backup_id, 0, strlen(payload_s2) + 1);
+                  memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+                  if (payload_s3 != NULL)
+                  {
+                     position = malloc(strlen(payload_s3) + 1);
+                     memset(position, 0, strlen(payload_s3) + 1);
+                     memcpy(position, payload_s3, strlen(payload_s3));
+                  }
+
+                  directory = malloc(strlen(payload_s4) + 1);
+                  memset(directory, 0, strlen(payload_s4) + 1);
+                  memcpy(directory, payload_s4, strlen(payload_s4));
+
+                  pgmoneta_archive(srv, backup_id, position, directory, ai->argv);
+               }
+            }
+            else
+            {
+               pgmoneta_log_error("Archive: Unknown server %s", payload_s1);
+            }
+
+            free(payload_s1);
+            free(payload_s2);
+            free(payload_s3);
+            free(payload_s4);
+         }
          break;
       case MANAGEMENT_STOP:
          pgmoneta_log_debug("pgmoneta: Management stop");

@@ -111,6 +111,14 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
 int
 pgmoneta_get_backup(char* directory, char* label, struct backup** backup);
 
+/**
+ * Get the number of valid backups
+ * @param i The server
+ * @return The result
+ */
+int
+pgmoneta_get_number_of_valid_backups(int server);
+
 #ifdef __cplusplus
 }
 #endif

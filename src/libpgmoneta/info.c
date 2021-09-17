@@ -383,3 +383,42 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
 
    return 0;
 }
+
+int
+pgmoneta_get_number_of_valid_backups(int server)
+{
+   char* server_path = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct configuration* config = NULL;
+   int result = 0;
+
+   config = (struct configuration*)shmem;
+
+   server_path = pgmoneta_append(server_path, config->base_dir);
+   if (!pgmoneta_ends_with(config->base_dir, "/"))
+   {
+      server_path = pgmoneta_append(server_path, "/");
+   }
+   server_path = pgmoneta_append(server_path, config->servers[server].name);
+   server_path = pgmoneta_append(server_path, "/backup/");
+
+   pgmoneta_get_backups(server_path, &number_of_backups, &backups);
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      if (backups[i]->valid)
+      {
+         result++;
+      }
+   }
+
+   free(server_path);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   return result;
+}

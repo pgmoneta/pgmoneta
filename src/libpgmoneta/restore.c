@@ -96,6 +96,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct backup* backup = NULL;
+   struct backup* verify = NULL;
    char* d = NULL;
    char* root = NULL;
    char* base = NULL;
@@ -177,6 +178,18 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    if (!pgmoneta_exists(base))
    {
       pgmoneta_log_error("%s: Unknown identifier for %s/%s", prefix, config->servers[server].name, id);
+      goto error;
+   }
+
+   if (pgmoneta_get_backup(root, id, &verify))
+   {
+      pgmoneta_log_error("%s: Unable to get backup for %s/%s", prefix, config->servers[server].name, id);
+      goto error;
+   }
+
+   if (!verify->valid)
+   {
+      pgmoneta_log_error("%s: Invalid backup for %s/%s", prefix, config->servers[server].name, id);
       goto error;
    }
 
@@ -310,6 +323,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    free(backups);
 
    free(backup);
+   free(verify);
    free(root);
    free(base);
    free(from);
@@ -330,6 +344,7 @@ error:
    free(backups);
 
    free(backup);
+   free(verify);
    free(root);
    free(base);
    free(from);

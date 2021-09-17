@@ -727,7 +727,7 @@ static void
 help_archive(void)
 {
    printf("Archive a backup for a server\n");
-   printf("  pgmoneta-cli archive <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+   printf("  pgmoneta-cli archive [<server>|all] [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
 }
 
 static void
