@@ -1023,11 +1023,35 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          break;
       case MANAGEMENT_STATUS:
          pgmoneta_log_debug("pgmoneta: Management status");
-         pgmoneta_management_write_status(client_fd);
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("Cannot create process");
+         }
+         else if (pid == 0)
+         {
+            pgmoneta_management_write_status(client_fd);
+            exit(0);
+         }
+
          break;
       case MANAGEMENT_DETAILS:
          pgmoneta_log_debug("pgmoneta: Management details");
-         pgmoneta_management_write_details(client_fd);
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("Cannot create process");
+         }
+         else if (pid == 0)
+         {
+            pgmoneta_management_write_details(client_fd);
+            exit(0);
+         }
+
          break;
       case MANAGEMENT_ISALIVE:
          pgmoneta_log_debug("pgmoneta: Management isalive");
