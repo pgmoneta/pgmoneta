@@ -52,7 +52,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [rst2man](https://docutils.sourceforge.io/)
 
 ```sh
-dnf install gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel python3-docutils
+dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel python3-docutils
 ```
 
 Alternative [clang 8+](https://clang.llvm.org/) can be used.
