@@ -70,7 +70,6 @@ pgmoneta_backup(int server, char** argv)
    char* to = NULL;
    char* version = NULL;
    char* wal = NULL;
-   int newest;
    int next_newest;
    struct configuration* config;
 
@@ -227,39 +226,26 @@ pgmoneta_backup(int server, char** argv)
 
          pgmoneta_get_backups(server_path, &number_of_backups, &backups);
 
-         if (number_of_backups > 1)
+         if (number_of_backups > 0)
          {
-            newest = -1;
             next_newest = -1;
 
             for (int j = number_of_backups - 1; j >= 0; j--)
             {
                if (backups[j]->valid == VALID_TRUE)
                {
-                  if (newest == -1)
-                  {
-                     newest = j;
-                  }
-                  else if (next_newest == -1)
+                  if (next_newest == -1)
                   {
                      next_newest = j;
                   }
                }
             }
 
-            if (newest != -1 && next_newest != -1)
+            if (next_newest != -1)
             {
                from = NULL;
 
-               from = pgmoneta_append(from, config->base_dir);
-               if (!pgmoneta_ends_with(config->base_dir, "/"))
-               {
-                  from = pgmoneta_append(from, "/");
-               }
-               from = pgmoneta_append(from, config->servers[server].name);
-               from = pgmoneta_append(from, "/backup/");
-               from = pgmoneta_append(from, backups[newest]->label);
-               from = pgmoneta_append(from, "/data");
+               from = pgmoneta_append(from, d);
 
                to = NULL;
 
