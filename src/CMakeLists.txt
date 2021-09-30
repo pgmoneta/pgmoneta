@@ -163,17 +163,6 @@ if (CMAKE_BUILD_TYPE MATCHES Release OR CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
   endif()
 endif (CMAKE_BUILD_TYPE MATCHES Release OR CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
 
-if (CMAKE_BUILD_TYPE MATCHES Performance)
-  add_compile_options(-O2)
-  add_compile_options(-DNDEBUG)
-
-  if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-march=native)
-    add_compile_options(-mtune=native)
-    add_compile_options(-flto)
-  endif()
-endif (CMAKE_BUILD_TYPE MATCHES Performance)
-
 #
 # Build libpgmoneta
 #
