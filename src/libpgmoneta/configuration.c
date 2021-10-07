@@ -43,6 +43,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #ifdef HAVE_LINUX
 #include <systemd/sd-daemon.h>
@@ -693,6 +694,7 @@ int
 pgmoneta_validate_configuration(void* shm)
 {
    bool found = false;
+   struct stat st;
    struct configuration* config;
 
    config = (struct configuration*)shm;
@@ -709,15 +711,45 @@ pgmoneta_validate_configuration(void* shm)
       return 1;
    }
 
+   if (stat(config->unix_socket_dir, &st) == 0 && S_ISDIR(st.st_mode))
+   {
+      /* Ok */
+   }
+   else
+   {
+      pgmoneta_log_fatal("pgmoneta: unix_socket_dir is not a directory (%s)", config->unix_socket_dir);
+      return 1;
+   }
+
    if (strlen(config->base_dir) == 0)
    {
       pgmoneta_log_fatal("pgmoneta: No base directory defined");
       return 1;
    }
 
+   if (stat(config->base_dir, &st) == 0 && S_ISDIR(st.st_mode))
+   {
+      /* Ok */
+   }
+   else
+   {
+      pgmoneta_log_fatal("pgmoneta: base_dir is not a directory (%s)", config->base_dir);
+      return 1;
+   }
+
    if (strlen(config->pgsql_dir) == 0)
    {
       pgmoneta_log_fatal("pgmoneta: No PostgreSQL directory defined");
+      return 1;
+   }
+
+   if (stat(config->pgsql_dir, &st) == 0 && S_ISDIR(st.st_mode))
+   {
+      /* Ok */
+   }
+   else
+   {
+      pgmoneta_log_fatal("pgmoneta: pgsql_dir is not a directory (%s)", config->pgsql_dir);
       return 1;
    }
 
