@@ -575,7 +575,7 @@ int
 pgmoneta_management_write_delete(int socket, int server, int result)
 {
    char* d = NULL;
-   int number_of_backups;
+   int number_of_backups = 0;
    char** array = NULL;
    struct configuration* config;
 
@@ -1002,6 +1002,9 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
       printf("  Retention      : %d days\n", retention);
       printf("  Backups        : %d\n", number_of_backups);
 
+      free(name);
+      name = NULL;
+
       for (int j = 0; j < number_of_backups; j++)
       {
          if (read_string("pgmoneta_management_read_details", socket, &name))
@@ -1104,7 +1107,7 @@ pgmoneta_management_write_details(int socket)
    unsigned long used_size;
    unsigned long free_size;
    unsigned long total_size;
-   int number_of_backups;
+   int number_of_backups = 0;
    struct backup** backups = NULL;
    unsigned long server_size;
    unsigned long wal;
