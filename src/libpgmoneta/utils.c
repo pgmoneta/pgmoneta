@@ -248,7 +248,7 @@ pgmoneta_read_int64(void* data)
    i4 = i4 << 24;
    i5 = i5 << 16;
    i6 = i6 <<  8;
-   i7 = i7;
+   /* i7 = i7; */
 
    return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
 }
@@ -1764,6 +1764,7 @@ pgmoneta_read_wal(char* directory, char** wal)
       }
    }
 
+   free(pgwal);
    for (int i = 0; i < number_of_wal_files; i++)
    {
       free(wal_files[i]);
@@ -1774,6 +1775,7 @@ pgmoneta_read_wal(char* directory, char** wal)
 
 error:
 
+   free(pgwal);
    for (int i = 0; i < number_of_wal_files; i++)
    {
       free(wal_files[i]);

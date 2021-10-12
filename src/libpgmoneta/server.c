@@ -50,7 +50,7 @@ pgmoneta_server_info(int srv)
 {
    int usr;
    int auth;
-   int socket;
+   int socket = -1;
    bool replica;
    int ws;
    struct configuration* config;
@@ -107,7 +107,10 @@ pgmoneta_server_info(int srv)
 
 done:
 
-   pgmoneta_disconnect(socket);
+   if (socket != -1)
+   {
+      pgmoneta_disconnect(socket);
+   }
 
    if (!config->servers[srv].valid)
    {
