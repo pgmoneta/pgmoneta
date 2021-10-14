@@ -91,6 +91,7 @@ static int  create_pidfile(void);
 static void remove_pidfile(void);
 static int  create_lockfile(void);
 static void remove_lockfile(void);
+static void shutdown_ports(void);
 
 struct accept_io
 {
@@ -745,6 +746,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                   }
                   else if (pid == 0)
                   {
+                     shutdown_ports();
                      pgmoneta_backup(i, ai->argv);
                   }
                }
@@ -772,6 +774,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                }
                else if (pid == 0)
                {
+                  shutdown_ports();
                   pgmoneta_backup(srv, ai->argv);
                }
             }
@@ -803,6 +806,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          }
          else if (pid == 0)
          {
+            shutdown_ports();
             pgmoneta_management_write_list_backup(client_fd, srv);
             exit(0);
          }
@@ -837,6 +841,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
             int result;
             char* backup_id = NULL;
 
+            shutdown_ports();
             backup_id = malloc(strlen(payload_s2) + 1);
             memset(backup_id, 0, strlen(payload_s2) + 1);
             memcpy(backup_id, payload_s2, strlen(payload_s2));
@@ -884,6 +889,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                char* position = NULL;
                char* directory = NULL;
 
+               shutdown_ports();
                backup_id = malloc(strlen(payload_s2) + 1);
                memset(backup_id, 0, strlen(payload_s2) + 1);
                memcpy(backup_id, payload_s2, strlen(payload_s2));
@@ -935,6 +941,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                      char* position = NULL;
                      char* directory = NULL;
 
+                     shutdown_ports();
                      backup_id = malloc(strlen(payload_s2) + 1);
                      memset(backup_id, 0, strlen(payload_s2) + 1);
                      memcpy(backup_id, payload_s2, strlen(payload_s2));
@@ -986,6 +993,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                   char* position = NULL;
                   char* directory = NULL;
 
+                  shutdown_ports();
                   backup_id = malloc(strlen(payload_s2) + 1);
                   memset(backup_id, 0, strlen(payload_s2) + 1);
                   memcpy(backup_id, payload_s2, strlen(payload_s2));
@@ -1032,6 +1040,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          }
          else if (pid == 0)
          {
+            shutdown_ports();
             pgmoneta_management_write_status(client_fd);
             exit(0);
          }
@@ -1048,6 +1057,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          }
          else if (pid == 0)
          {
+            shutdown_ports();
             pgmoneta_management_write_details(client_fd);
             exit(0);
          }
@@ -1087,6 +1097,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          {
             char* backup_id = NULL;
 
+            shutdown_ports();
             backup_id = malloc(strlen(payload_s2) + 1);
             memset(backup_id, 0, strlen(payload_s2) + 1);
             memcpy(backup_id, payload_s2, strlen(payload_s2));
@@ -1127,6 +1138,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          {
             char* backup_id = NULL;
 
+            shutdown_ports();
             backup_id = malloc(strlen(payload_s2) + 1);
             memset(backup_id, 0, strlen(payload_s2) + 1);
             memcpy(backup_id, payload_s2, strlen(payload_s2));
@@ -1216,6 +1228,7 @@ accept_metrics_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
    if (!fork())
    {
       ev_loop_fork(loop);
+      shutdown_ports();
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
       pgmoneta_prometheus(client_fd);
    }
@@ -1292,6 +1305,7 @@ accept_management_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
       memcpy(addr, address, sizeof(address));
 
       ev_loop_fork(loop);
+      shutdown_ports();
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
       pgmoneta_remote_management(client_fd, addr);
    }
@@ -1343,6 +1357,8 @@ wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 
          pgmoneta_set_proc_title(1, argv_ptr, "wal compress", config->servers[i].name);
 
+         shutdown_ports();
+
          d = pgmoneta_append(d, config->base_dir);
          d = pgmoneta_append(d, "/");
          d = pgmoneta_append(d, config->servers[i].name);
@@ -1375,6 +1391,7 @@ retention_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 
    if (!fork())
    {
+      shutdown_ports();
       pgmoneta_retention(argv_ptr);
    }
 }
@@ -1454,6 +1471,7 @@ wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents)
             }
             else if (pid == 0)
             {
+               shutdown_ports();
                pgmoneta_wal(i, argv_ptr);
             }
          }
@@ -1487,66 +1505,79 @@ accept_fatal(int error)
 static void
 reload_configuration(void)
 {
+   int old_metrics;
+   int old_management;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   shutdown_metrics();
-   shutdown_management();
+   old_metrics = config->metrics;
+   old_management = config->management;
 
    pgmoneta_reload_configuration();
 
-   if (config->metrics > 0)
+   if (old_metrics != config->metrics)
    {
+      shutdown_metrics();
+
       free(metrics_fds);
       metrics_fds = NULL;
       metrics_fds_length = 0;
 
-      /* Bind metrics socket */
-      if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
+      if (config->metrics > 0)
       {
-         pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->metrics);
-         exit(1);
-      }
+         /* Bind metrics socket */
+         if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
+         {
+            pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->metrics);
+            exit(1);
+         }
 
-      if (metrics_fds_length > MAX_FDS)
-      {
-         pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", metrics_fds_length);
-         exit(1);
-      }
+         if (metrics_fds_length > MAX_FDS)
+         {
+            pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", metrics_fds_length);
+            exit(1);
+         }
 
-      start_metrics();
+         start_metrics();
+
+         for (int i = 0; i < metrics_fds_length; i++)
+         {
+            pgmoneta_log_debug("Metrics: %d", *(metrics_fds + i));
+         }
+      }
    }
 
-   if (config->management > 0)
+   if (old_management != config->management)
    {
+      shutdown_management();
+
       free(management_fds);
       management_fds = NULL;
       management_fds_length = 0;
 
-      /* Bind management socket */
-      if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
+      if (config->management > 0)
       {
-         pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->management);
-         exit(1);
+         /* Bind management socket */
+         if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
+         {
+            pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->management);
+            exit(1);
+         }
+
+         if (management_fds_length > MAX_FDS)
+         {
+            pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", management_fds_length);
+            exit(1);
+         }
+
+         start_management();
+
+         for (int i = 0; i < management_fds_length; i++)
+         {
+            pgmoneta_log_debug("Remote management: %d", *(management_fds + i));
+         }
       }
-
-      if (management_fds_length > MAX_FDS)
-      {
-         pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", management_fds_length);
-         exit(1);
-      }
-
-      start_management();
-   }
-
-   for (int i = 0; i < metrics_fds_length; i++)
-   {
-      pgmoneta_log_debug("Metrics: %d", *(metrics_fds + i));
-   }
-   for (int i = 0; i < management_fds_length; i++)
-   {
-      pgmoneta_log_debug("Remote management: %d", *(management_fds + i));
    }
 }
 
@@ -1572,6 +1603,7 @@ init_receivewals(void)
          }
          else if (pid == 0)
          {
+            shutdown_ports();
             pgmoneta_wal(i, argv_ptr);
          }
          else
@@ -1679,4 +1711,22 @@ remove_lockfile(void)
    unlink(f);
 
    free(f);
+}
+
+static void
+shutdown_ports(void)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (config->metrics > 0)
+   {
+      shutdown_metrics();
+   }
+
+   if (config->management > 0)
+   {
+      shutdown_management();
+   }
 }
