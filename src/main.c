@@ -670,7 +670,7 @@ main(int argc, char **argv)
 static void
 accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 {
-   struct sockaddr_in client_addr;
+   struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
    signed char id;
@@ -725,7 +725,10 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
    {
       goto disconnect;
    }
-   pgmoneta_management_read_payload(client_fd, id, &payload_s1, &payload_s2, &payload_s3, &payload_s4);
+   if (pgmoneta_management_read_payload(client_fd, id, &payload_s1, &payload_s2, &payload_s3, &payload_s4))
+   {
+      goto disconnect;
+   }
 
    switch (id)
    {
@@ -1170,7 +1173,7 @@ disconnect:
 static void
 accept_metrics_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 {
-   struct sockaddr_in client_addr;
+   struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
    struct configuration* config;
@@ -1239,7 +1242,7 @@ accept_metrics_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 static void
 accept_management_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 {
-   struct sockaddr_in client_addr;
+   struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
    char address[INET6_ADDRSTRLEN];
@@ -1301,8 +1304,9 @@ accept_management_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 
    if (!fork())
    {
-      char* addr = malloc(sizeof(address));
-      memcpy(addr, address, sizeof(address));
+      char* addr = malloc(strlen(address) + 1);
+      memset(addr, 0, strlen(address) + 1);
+      memcpy(addr, address, strlen(address));
 
       ev_loop_fork(loop);
       shutdown_ports();
