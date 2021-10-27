@@ -67,6 +67,8 @@ have access to the `postgres` database in order to get the necessary configurati
 
 Note, that PostgreSQL 10+ is required, as well as having `wal_level` at `replica` or `logical` level.
 
+Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will connect using a Unix Domain Socket.
+
 # pgmoneta_users configuration
 
 The `pgmoneta_users` configuration defines the users known to the system. This file is created and managed through
