@@ -1031,7 +1031,19 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
       memset(&security_messages[i], 0, SECURITY_BUFFER_SIZE);
    }
 
-   ret = pgmoneta_connect(config->servers[server].host, config->servers[server].port, &server_fd);
+   if (config->servers[server].host[0] == '/')
+   {
+      char pgsql[MISC_LENGTH];
+
+      memset(&pgsql, 0, sizeof(pgsql));
+      snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->servers[server].port);
+      ret = pgmoneta_connect_unix_socket(config->servers[server].host, &pgsql[0], &server_fd);
+   }
+   else
+   {
+      ret = pgmoneta_connect(config->servers[server].host, config->servers[server].port, &server_fd);
+   }
+
    if (ret != 0)
    {
       goto error;
