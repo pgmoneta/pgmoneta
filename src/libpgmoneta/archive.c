@@ -32,6 +32,8 @@
 #include <gzip.h>
 #include <info.h>
 #include <logging.h>
+#include <management.h>
+#include <network.h>
 #include <restore.h>
 #include <utils.h>
 #include <zstandard.h>
@@ -281,7 +283,7 @@ static int ino_hash(ino_t* inode);
    int_to_oct_nonull((fmtime), (t)->th_buf.mtime, 12)
 
 void
-pgmoneta_archive(int server, char* backup_id, char* position, char* directory, char** argv)
+pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
 {
    char elapsed[128];
    time_t start_time;
@@ -294,6 +296,7 @@ pgmoneta_archive(int server, char* backup_id, char* position, char* directory, c
    char* to = NULL;
    char* id = NULL;
    char* output = NULL;
+   int result = 1;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -306,6 +309,8 @@ pgmoneta_archive(int server, char* backup_id, char* position, char* directory, c
 
    if (!pgmoneta_restore_backup("Archive", server, backup_id, position, directory, &output, &id))
    {
+      result = 0;
+
       tarfile = pgmoneta_append(tarfile, directory);
       tarfile = pgmoneta_append(tarfile, "/");
       tarfile = pgmoneta_append(tarfile, config->servers[server].name);
@@ -363,6 +368,9 @@ pgmoneta_archive(int server, char* backup_id, char* position, char* directory, c
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
    
+   pgmoneta_management_write_int32(client_fd, result);
+   pgmoneta_disconnect(client_fd);
+
    pgmoneta_stop_logging();
 
    free(id);

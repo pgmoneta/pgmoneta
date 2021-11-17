@@ -754,12 +754,19 @@ help_expunge(void)
 static int
 backup(SSL* ssl, int socket, char* server)
 {
-   if (pgmoneta_management_backup(ssl, socket, server))
+   int ret;
+   int number_of_returns = 0;
+   int code = 0;
+
+   ret = pgmoneta_management_backup(ssl, socket, server);
+   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
+
+   for (int i = 0; i < number_of_returns; i++)
    {
-      return 1;
+      pgmoneta_management_read_int32(ssl, socket, &code);
    }
 
-   return 0;
+   return ret;
 }
 
 static int
@@ -780,23 +787,37 @@ list_backup(SSL* ssl, int socket, char* server)
 static int
 restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
 {
-   if (pgmoneta_management_restore(ssl, socket, server, backup_id, position, directory))
+   int ret;
+   int number_of_returns = 0;
+   int code = 0;
+
+   ret = pgmoneta_management_restore(ssl, socket, server, backup_id, position, directory);
+   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
+
+   for (int i = 0; i < number_of_returns; i++)
    {
-      return 1;
+      pgmoneta_management_read_int32(ssl, socket, &code);
    }
 
-   return 0;
+   return ret;
 }
 
 static int
 archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
 {
-   if (pgmoneta_management_archive(ssl, socket, server, backup_id, position, directory))
+   int ret;
+   int number_of_returns = 0;
+   int code = 0;
+
+   ret = pgmoneta_management_archive(ssl, socket, server, backup_id, position, directory);
+   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
+
+   for (int i = 0; i < number_of_returns; i++)
    {
-      return 1;
+      pgmoneta_management_read_int32(ssl, socket, &code);
    }
 
-   return 0;
+   return ret;
 }
 
 static int

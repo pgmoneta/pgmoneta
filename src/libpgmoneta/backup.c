@@ -33,6 +33,8 @@
 #include <info.h>
 #include <link.h>
 #include <logging.h>
+#include <management.h>
+#include <network.h>
 #include <utils.h>
 #include <zstandard.h>
 
@@ -43,7 +45,7 @@
 #include <unistd.h>
 
 void
-pgmoneta_backup(int server, char** argv)
+pgmoneta_backup(int client_fd, int server, char** argv)
 {
    bool active;
    int usr;
@@ -294,6 +296,9 @@ pgmoneta_backup(int server, char** argv)
 
 done:
 
+   pgmoneta_management_write_int32(client_fd, 0);
+   pgmoneta_disconnect(client_fd);
+
    pgmoneta_stop_logging();
 
    for (int i = 0; i < number_of_backups; i++)
@@ -316,6 +321,10 @@ done:
 error:
 
    pgmoneta_create_info(root, 0, &date[0], NULL, 0, 0, NULL);
+
+   pgmoneta_management_write_int32(client_fd, 1);
+   pgmoneta_disconnect(client_fd);
+
    pgmoneta_stop_logging();
 
    for (int i = 0; i < number_of_backups; i++)

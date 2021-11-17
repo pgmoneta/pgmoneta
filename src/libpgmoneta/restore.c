@@ -31,6 +31,8 @@
 #include <gzip.h>
 #include <info.h>
 #include <logging.h>
+#include <management.h>
+#include <network.h>
 #include <restore.h>
 #include <utils.h>
 #include <zstandard.h>
@@ -43,7 +45,7 @@ static int   create_recovery_info(int server, char* base, bool primary, char* po
 static char* get_user_password(char* username);
 
 void
-pgmoneta_restore(int server, char* backup_id, char* position, char* directory, char** argv)
+pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
 {
    char elapsed[128];
    time_t start_time;
@@ -53,6 +55,7 @@ pgmoneta_restore(int server, char* backup_id, char* position, char* directory, c
    int seconds;
    char* output = NULL;
    char* id = NULL;
+   int result = 1;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -65,6 +68,8 @@ pgmoneta_restore(int server, char* backup_id, char* position, char* directory, c
 
    if (!pgmoneta_restore_backup("Restore", server, backup_id, position, directory, &output, &id))
    {
+      result = 0;
+
       total_seconds = (int)difftime(time(NULL), start_time);
       hours = total_seconds / 3600;
       minutes = (total_seconds % 3600) / 60;
@@ -75,6 +80,9 @@ pgmoneta_restore(int server, char* backup_id, char* position, char* directory, c
 
       pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
+
+   pgmoneta_management_write_int32(client_fd, result);
+   pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
 

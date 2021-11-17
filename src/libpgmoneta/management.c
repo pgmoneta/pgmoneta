@@ -1435,6 +1435,52 @@ error:
    return 1;
 }
 
+int
+pgmoneta_management_read_int32(SSL* ssl, int socket, int* status)
+{
+   char buf[4];
+
+   memset(&buf, 0, sizeof(buf));
+
+   if (read_complete(ssl, socket, &buf[0], sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_read_int32: read: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   *status = pgmoneta_read_int32(&buf);
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_write_int32(int socket, int code)
+{
+   char buf[4];
+
+   memset(&buf, 0, sizeof(buf));
+
+   pgmoneta_write_int32(buf, code);
+
+   if (write_complete(NULL, socket, &buf, sizeof(buf)))
+   {
+      pgmoneta_log_warn("pgmoneta_management_write_int32: write: %d %s", socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
 static int
 read_int32(char* prefix, int socket, int* i)
 {
