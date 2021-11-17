@@ -680,6 +680,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
    char* payload_s4 = NULL;
    int srv;
    pid_t pid;
+   int number_of_results = 0;
    struct accept_io* ai;
    struct configuration* config;
 
@@ -741,16 +742,28 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
             {
                if (config->servers[i].wal_streaming)
                {
+                  number_of_results++;
+               }
+            }
+
+            pgmoneta_management_write_int32(client_fd, number_of_results);
+
+            for (int i = 0; i < config->number_of_servers; i++)
+            {
+               if (config->servers[i].wal_streaming)
+               {
                   pid = fork();
                   if (pid == -1)
                   {
+                     pgmoneta_management_write_int32(client_fd, 1);
+
                      /* No process */
                      pgmoneta_log_error("Cannot create process");
                   }
                   else if (pid == 0)
                   {
                      shutdown_ports();
-                     pgmoneta_backup(i, ai->argv);
+                     pgmoneta_backup(client_fd, i, ai->argv);
                   }
                }
             }
@@ -766,23 +779,28 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                }
             }
 
-            /* TODO: Redo with success/failure */
+            pgmoneta_management_write_int32(client_fd, 1);
+
             if (srv != -1)
             {
                pid = fork();
                if (pid == -1)
                {
+                  pgmoneta_management_write_int32(client_fd, 1);
+
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
                }
                else if (pid == 0)
                {
                   shutdown_ports();
-                  pgmoneta_backup(srv, ai->argv);
+                  pgmoneta_backup(client_fd, srv, ai->argv);
                }
             }
             else
             {
+               pgmoneta_management_write_int32(client_fd, 1);
+
                pgmoneta_log_error("Backup: Unknown server %s", payload_s1);
             }
          }
@@ -877,12 +895,15 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
             }
          }
 
-         /* TODO: Redo with success/failure */
+         pgmoneta_management_write_int32(client_fd, 1);
+
          if (srv != -1)
          {
             pid = fork();
             if (pid == -1)
             {
+               pgmoneta_management_write_int32(client_fd, 1);
+
                /* No process */
                pgmoneta_log_error("Cannot create process");
             }
@@ -908,11 +929,13 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                memset(directory, 0, strlen(payload_s4) + 1);
                memcpy(directory, payload_s4, strlen(payload_s4));
 
-               pgmoneta_restore(srv, backup_id, position, directory, ai->argv);
+               pgmoneta_restore(client_fd, srv, backup_id, position, directory, ai->argv);
             }
          }
          else
          {
+            pgmoneta_management_write_int32(client_fd, 1);
+
             pgmoneta_log_error("Restore: Unknown server %s", payload_s1);
          }
 
@@ -928,9 +951,23 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
          {
             for (int i = 0; i < config->number_of_servers; i++)
             {
+               int number_of_backups = pgmoneta_get_number_of_valid_backups(i);
+
+               if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2)))
+               {
+                  number_of_results++;
+               }
+            }
+
+            pgmoneta_management_write_int32(client_fd, number_of_results);
+
+            for (int i = 0; i < config->number_of_servers; i++)
+            {
                pid = fork();
                if (pid == -1)
                {
+                  pgmoneta_management_write_int32(client_fd, 1);
+
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
                }
@@ -960,7 +997,7 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                      memset(directory, 0, strlen(payload_s4) + 1);
                      memcpy(directory, payload_s4, strlen(payload_s4));
 
-                     pgmoneta_archive(i, backup_id, position, directory, ai->argv);
+                     pgmoneta_archive(client_fd, i, backup_id, position, directory, ai->argv);
                   }
                }
             }
@@ -981,12 +1018,15 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                }
             }
 
-            /* TODO: Redo with success/failure */
+            pgmoneta_management_write_int32(client_fd, 1);
+
             if (srv != -1)
             {
                pid = fork();
                if (pid == -1)
                {
+                  pgmoneta_management_write_int32(client_fd, 1);
+
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
                }
@@ -1012,11 +1052,13 @@ accept_mgt_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
                   memset(directory, 0, strlen(payload_s4) + 1);
                   memcpy(directory, payload_s4, strlen(payload_s4));
 
-                  pgmoneta_archive(srv, backup_id, position, directory, ai->argv);
+                  pgmoneta_archive(client_fd, srv, backup_id, position, directory, ai->argv);
                }
             }
             else
             {
+               pgmoneta_management_write_int32(client_fd, 1);
+
                pgmoneta_log_error("Archive: Unknown server %s", payload_s1);
             }
 

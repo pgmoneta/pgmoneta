@@ -297,6 +297,24 @@ pgmoneta_management_retain(SSL* ssl, int socket, char* server, char* backup_id);
 int
 pgmoneta_management_expunge(SSL* ssl, int socket, char* server, char* backup_id);
 
+/**
+ * Management: Read int32
+ * @param socket The socket
+ * @param status The resulting status
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_read_int32(SSL* ssl, int socket, int* status);
+
+/**
+ * Management: Write int32
+ * @param socket The socket
+ * @param code The code
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_write_int32(int socket, int code);
+
 #ifdef __cplusplus
 }
 #endif

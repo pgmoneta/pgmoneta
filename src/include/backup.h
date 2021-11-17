@@ -38,11 +38,12 @@ extern "C" {
 
 /**
  * Create a backup
+ * @param client_fd The client
  * @param server The server
  * @param argv The argv
  */
 void
-pgmoneta_backup(int server, char** argv);
+pgmoneta_backup(int client_fd, int server, char** argv);
 
 #ifdef __cplusplus
 }
