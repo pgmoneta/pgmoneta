@@ -310,6 +310,16 @@ int
 pgmoneta_get_files(char* base, int* number_of_files, char*** files);
 
 /**
+ * Get WAL files
+ * @param base The base directory
+ * @param number_of_files The number of files
+ * @param files The files
+ * @return The result
+ */
+int
+pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files);
+
+/**
  * Remove a file
  * @param file The file
  * @return The result

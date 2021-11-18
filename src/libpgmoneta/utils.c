@@ -1120,6 +1120,107 @@ error:
 }
 
 int
+pgmoneta_get_wal_files(char *base, int* number_of_files, char*** files)
+{
+   char* d = NULL;
+   char** array = NULL;
+   int nof = 0;
+   int n;
+   DIR *dir;
+   struct dirent *entry;
+
+   *number_of_files = 0;
+   *files = NULL;
+
+   nof = 0;
+
+   if (!(dir = opendir(base)))
+   {
+      goto error;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (pgmoneta_ends_with(entry->d_name, ".partial"))
+      {
+         continue;
+      }
+
+      if (strstr(entry->d_name, ".history") != NULL)
+      {
+         continue;
+      }
+
+      if (entry->d_type == DT_REG)
+      {
+         nof++;
+      }
+   }
+
+   closedir(dir);
+   dir = NULL;
+
+   dir = opendir(base);
+
+   array = (char**)malloc(sizeof(char*) * nof);
+   n = 0;
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (pgmoneta_ends_with(entry->d_name, ".partial"))
+      {
+         continue;
+      }
+
+      if (strstr(entry->d_name, ".history") != NULL)
+      {
+         continue;
+      }
+
+      if (entry->d_type == DT_REG)
+      {
+         array[n] = (char*)malloc(strlen(entry->d_name) + 1);
+         memset(array[n], 0, strlen(entry->d_name) + 1);
+         memcpy(array[n], entry->d_name, strlen(entry->d_name));
+         n++;
+      }
+   }
+
+   closedir(dir);
+   dir = NULL;
+
+   pgmoneta_sort(nof, array);
+
+   free(d);
+   d = NULL;
+
+   *number_of_files = nof;
+   *files = array;
+
+   return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   for (int i = 0; i < nof; i++)
+   {
+      free(array[i]);
+   }
+   free(array);
+
+   free(d);
+
+   *number_of_files = 0;
+   *files = NULL;
+
+   return 1;
+}
+
+int
 pgmoneta_delete_file(char *file)
 {
    int ret;

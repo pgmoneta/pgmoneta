@@ -322,7 +322,7 @@ pgmoneta_delete_wal(int srv)
       number_of_srv_wal_files = 0;
       srv_wal_files = NULL;
 
-      pgmoneta_get_files(d, &number_of_srv_wal_files, &srv_wal_files);
+      pgmoneta_get_wal_files(d, &number_of_srv_wal_files, &srv_wal_files);
 
       if (number_of_srv_wal_files > 0)
       {
@@ -345,7 +345,7 @@ pgmoneta_delete_wal(int srv)
       number_of_wal_files = 0;
       wal_files = NULL;
 
-      pgmoneta_get_files(d, &number_of_wal_files, &wal_files);
+      pgmoneta_get_wal_files(d, &number_of_wal_files, &wal_files);
 
       free(d);
       d = NULL;
@@ -353,11 +353,6 @@ pgmoneta_delete_wal(int srv)
       /* Delete outdated WAL files */
       for (int i = 0; i < number_of_wal_files; i++)
       {
-         if (pgmoneta_ends_with(wal_files[i], ".partial"))
-         {
-            break;
-         }
-
          delete = false;
 
          if (backup_index == -1)
