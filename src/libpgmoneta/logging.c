@@ -61,11 +61,8 @@ static const char* colors[] =
   "\x1b[35m"
 };
 
-/**
- *
- */
 int
-pgmoneta_start_logging(void)
+pgmoneta_init_logging(void)
 {
    struct configuration* config;
 
@@ -94,6 +91,38 @@ pgmoneta_start_logging(void)
          {
             log_file = fopen("pgmoneta.log", "w");
          }
+      }
+
+      if (!log_file)
+      {
+         printf("Failed to open log file %s due to %s\n", strlen(config->log_path) > 0 ? config->log_path : "pgmoneta.log", strerror(errno));
+         errno = 0;
+         return 1;
+      }
+   }
+
+   return 0;
+}
+
+/**
+ *
+ */
+int
+pgmoneta_start_logging(void)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
+   {
+      if (strlen(config->log_path) > 0)
+      {
+         log_file = fopen(config->log_path, "a");
+      }
+      else
+      {
+         log_file = fopen("pgmoneta.log", "a");
       }
 
       if (!log_file)

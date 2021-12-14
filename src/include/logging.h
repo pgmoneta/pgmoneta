@@ -60,6 +60,13 @@ extern "C" {
 #define pgmoneta_log_fatal(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_FATAL, __FILE__, __LINE__, __VA_ARGS__)
 
 /**
+ * Initalize the logging system
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_init_logging(void);
+
+/**
  * Start the logging system
  * @return 0 upon success, otherwise 1
  */
