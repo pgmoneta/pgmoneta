@@ -49,6 +49,9 @@ extern "C" {
 #define PGMONETA_LOGGING_LEVEL_ERROR   5
 #define PGMONETA_LOGGING_LEVEL_FATAL   6
 
+#define PGMONETA_LOGGING_MODE_CREATE 0
+#define PGMONETA_LOGGING_MODE_APPEND 1
+
 #define pgmoneta_log_trace(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_DEBUG5, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_debug(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_DEBUG1, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_info(...)  pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_INFO,  __FILE__, __LINE__,  __VA_ARGS__)

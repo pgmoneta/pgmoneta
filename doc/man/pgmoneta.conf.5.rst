@@ -60,6 +60,9 @@ log_level
 log_path
   The log file location. Default is pgmoneta.log
 
+log_mode
+  Append to or create the log file (append, create). Default is append
+
 blocking_timeout
   The number of seconds the process will be blocking for a connection (disable = 0). Default is 30
 

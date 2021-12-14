@@ -56,6 +56,7 @@ static int as_int(char* str, int* i);
 static int as_bool(char* str, bool* b);
 static int as_logging_type(char* str);
 static int as_logging_level(char* str);
+static int as_logging_mode(char* str);
 static int as_hugepage(char* str);
 static int as_compression(char* str);
 
@@ -98,6 +99,7 @@ pgmoneta_init_configuration(void* shm)
 
    config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
    config->log_level = PGMONETA_LOGGING_LEVEL_INFO;
+   config->log_mode = PGMONETA_LOGGING_MODE_APPEND;
    atomic_init(&config->log_lock, STATE_FREE);
 
    return 0;
@@ -475,6 +477,17 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      if (max > MISC_LENGTH - 1)
                         max = MISC_LENGTH - 1;
                      memcpy(config->log_path, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_mode"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     config->log_mode = as_logging_mode(value);
                   }
                   else
                   {
@@ -1378,6 +1391,18 @@ as_logging_level(char* str)
 }
 
 static int
+as_logging_mode(char* str)
+{
+   if (!strcasecmp(str, "a") || !strcasecmp(str, "append"))
+      return PGMONETA_LOGGING_MODE_APPEND;
+
+   if (!strcasecmp(str, "c") || !strcasecmp(str, "create"))
+      return PGMONETA_LOGGING_MODE_CREATE;
+
+   return PGMONETA_LOGGING_MODE_APPEND;
+}
+
+static int
 as_hugepage(char* str)
 {
    if (!strcasecmp(str, "off"))
@@ -1433,6 +1458,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->log_level = reload->log_level;
    /* log_path */
    restart_string("log_path", config->log_path, reload->log_path);
+   restart_int("log_mode", config->log_mode, reload->log_mode);
    /* log_lock */
 
    config->tls = reload->tls;

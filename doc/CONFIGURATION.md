@@ -35,6 +35,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | log_type | console | String | No | The logging type (console, file, syslog) |
 | log_level | info | String | No | The logging level (fatal, error, warn, info, debug1, ..., debug5) |
 | log_path | pgmoneta.log | String | No | The log file location |
+| log_mode | append | String | No | Append to or create the log file (append, create) |
 | blocking_timeout | 30 | Int | No | The number of seconds the process will be blocking for a connection (disable = 0) |
 | tls | `off` | Bool | No | Enable Transport Layer Security (TLS) |
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. |

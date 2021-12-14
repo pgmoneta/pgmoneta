@@ -156,6 +156,7 @@ struct configuration
    int log_type;               /**< The logging type */
    int log_level;              /**< The logging level */
    char log_path[MISC_LENGTH]; /**< The logging path */
+   int log_mode;               /**< The logging mode */
    atomic_schar log_lock;      /**< The logging lock */
 
    bool tls;                        /**< Is TLS enabled */
