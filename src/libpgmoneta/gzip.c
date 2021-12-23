@@ -106,13 +106,16 @@ pgmoneta_gzip_data(char* directory)
             to = pgmoneta_append(to, entry->d_name);
             to = pgmoneta_append(to, ".gz");
 
-            if (gz_compress(from, level, to))
+            if (pgmoneta_exists(from))
             {
-               pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
-               break;
-            }
+               if (gz_compress(from, level, to))
+               {
+                  pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
+                  break;
+               }
 
-            pgmoneta_delete_file(from);
+               pgmoneta_delete_file(from);
+            }
 
             free(from);
             free(to);
@@ -172,13 +175,16 @@ pgmoneta_gzip_wal(char* directory)
          to = pgmoneta_append(to, entry->d_name);
          to = pgmoneta_append(to, ".gz");
 
-         if (gz_compress(from, level, to))
+         if (pgmoneta_exists(from))
          {
-            pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
-            break;
-         }
+            if (gz_compress(from, level, to))
+            {
+               pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
+               break;
+            }
 
-         pgmoneta_delete_file(from);
+            pgmoneta_delete_file(from);
+         }
 
          free(from);
          free(to);
