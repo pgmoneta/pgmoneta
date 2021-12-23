@@ -37,6 +37,7 @@
 #include <keep.h>
 #include <logging.h>
 #include <management.h>
+#include <memory.h>
 #include <network.h>
 #include <prometheus.h>
 #include <remote.h>
@@ -1463,12 +1464,25 @@ valid_cb(struct ev_loop *loop, ev_periodic *w, int revents)
       return;
    }
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   if (!fork())
    {
-      if (keep_running && !config->servers[i].valid)
+      pgmoneta_start_logging();
+      pgmoneta_memory_init();
+
+      for (int i = 0; i < config->number_of_servers; i++)
       {
-         pgmoneta_server_info(i);
+         pgmoneta_log_trace("Valid - Server %d Valid %d WAL %d", i, config->servers[i].valid, config->servers[i].wal_streaming);
+
+         if (keep_running && !config->servers[i].valid)
+         {
+            pgmoneta_server_info(i);
+         }
       }
+
+      pgmoneta_memory_destroy();
+      pgmoneta_stop_logging();
+
+      exit(0);
    }
 }
 
@@ -1476,6 +1490,7 @@ static void
 wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 {
    bool start = false;
+   int follow;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -1488,18 +1503,31 @@ wal_streaming_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
+      pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d", i, config->servers[i].valid, config->servers[i].wal_streaming);
+
       if (keep_running && !config->servers[i].wal_streaming)
       {
          start = false;
 
          if (strlen(config->servers[i].follow) == 0)
          {
-            for (int j = 0; !start && j < config->number_of_servers; j++)
+            follow = -1;
+
+            for (int j = 0; j == -1 && j < config->number_of_servers; j++)
             {
-               if (!strcmp(config->servers[j].follow, config->servers[i].name) && !config->servers[j].wal_streaming)
+               if (!strcmp(config->servers[j].follow, config->servers[i].name))
                {
-                  start = true;
+                  follow = j;
                }
+            }
+
+            if (follow == -1)
+            {
+               start = true;
+            }
+            else if (!config->servers[follow].wal_streaming)
+            {
+               start = true;
             }
          }
          else
