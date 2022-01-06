@@ -1,5 +1,5 @@
 Name:          pgmoneta
-Version:       0.5.5
+Version:       0.5.6
 Release:       1%{dist}
 Summary:       Backup / restore for PostgreSQL
 License:       BSD
