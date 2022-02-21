@@ -90,8 +90,6 @@ static void reload_configuration(void);
 static void init_receivewals(void);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
-static int  create_lockfile(void);
-static void remove_lockfile(void);
 static void shutdown_ports(void);
 
 struct accept_io
@@ -483,11 +481,6 @@ main(int argc, char **argv)
       exit(1);
    }
 
-   if (create_lockfile())
-   {
-      exit(1);
-   }
-
    pgmoneta_set_proc_title(argc, argv, "main", NULL);
 
    /* Bind Unix Domain Socket */
@@ -655,7 +648,6 @@ main(int argc, char **argv)
    free(management_fds);
 
    remove_pidfile();
-   remove_lockfile();
 
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
@@ -1704,8 +1696,28 @@ create_pidfile(void)
 
    config = (struct configuration*)shmem;
 
+   if (strlen(config->pidfile) == 0)
+   {
+      // no pidfile set, use a default one
+      snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
+               config->unix_socket_dir,
+               !strncmp(config->host,"*", sizeof(config->host)) ? "all" : config->host );
+      pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);
+   }
+   
    if (strlen(config->pidfile) > 0)
    {
+
+       if (strlen(config->pidfile) > 0)
+       {
+          // check pidfile is not there
+          if (access(config->pidfile, F_OK) == 0)
+          {
+             pgmoneta_log_fatal("PID file [%s] exists, is there another instance running ?", config->pidfile);
+             goto error;
+          }
+       }
+       
       pid = getpid();
 
       fd = open(config->pidfile, O_WRONLY | O_CREAT | O_EXCL, 0644);
@@ -1741,50 +1753,10 @@ remove_pidfile(void)
 
    config = (struct configuration*)shmem;
 
-   if (strlen(config->pidfile) > 0)
+   if (strlen(config->pidfile) > 0 && access(config->pidfile, F_OK) == 0)
    {
       unlink(config->pidfile);
    }
-}
-
-static int
-create_lockfile(void)
-{
-   char* f = NULL;
-   int fd;
-
-   f = pgmoneta_append(f, "/tmp/pgmoneta.lock");
-
-   fd = open(f, O_WRONLY | O_CREAT | O_EXCL, 0644);
-   if (fd < 0)
-   {
-      printf("Could not create lock file '%s' due to %s\n", f, strerror(errno));
-      goto error;
-   }
-
-   close(fd);
-
-   free(f);
-
-   return 0;
-
-error:
-
-   free(f);
-
-   return 1;
-}
-
-static void
-remove_lockfile(void)
-{
-   char* f = NULL;
-
-   f = pgmoneta_append(f, "/tmp/pgmoneta.lock");
-
-   unlink(f);
-
-   free(f);
 }
 
 static void
