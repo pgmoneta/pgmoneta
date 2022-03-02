@@ -1406,10 +1406,7 @@ wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents)
 
          shutdown_ports();
 
-         d = pgmoneta_append(d, config->base_dir);
-         d = pgmoneta_append(d, "/");
-         d = pgmoneta_append(d, config->servers[i].name);
-         d = pgmoneta_append(d, "/wal/");
+         d = pgmoneta_get_server_wal(i);
 
          if (config->compression_type == COMPRESSION_GZIP)
          {

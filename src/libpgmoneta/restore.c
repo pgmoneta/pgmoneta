@@ -123,11 +123,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
 
    if (!strcmp(backup_id, "oldest"))
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[server].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(server);
 
       if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
@@ -144,11 +140,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    }
    else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[server].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(server);
 
       if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
@@ -174,14 +166,9 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
       goto error;
    }
 
-   root = pgmoneta_append(root, config->base_dir);
-   root = pgmoneta_append(root, "/");
-   root = pgmoneta_append(root, config->servers[server].name);
-   root = pgmoneta_append(root, "/backup/");
+   root = pgmoneta_get_server_backup(server);
 
-   base = pgmoneta_append(base, root);
-   base = pgmoneta_append(base, id);
-   base = pgmoneta_append(base, "/");
+   base = pgmoneta_get_server_backup_identifier(server, id);
 
    if (!pgmoneta_exists(base))
    {
@@ -201,8 +188,7 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
       goto error;
    }
 
-   from = pgmoneta_append(from, base);
-   from = pgmoneta_append(from, "data");
+   from = pgmoneta_get_server_backup_identifier_data(server, id);
 
    to = pgmoneta_append(to, directory);
    to = pgmoneta_append(to, "/");
@@ -283,13 +269,8 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
 
          if (copy_wal)
          {
-            origwal = pgmoneta_append(origwal, base);
-            origwal = pgmoneta_append(origwal, "data/pg_wal/");
-
-            waldir = pgmoneta_append(waldir, config->base_dir);
-            waldir = pgmoneta_append(waldir, "/");
-            waldir = pgmoneta_append(waldir, config->servers[server].name);
-            waldir = pgmoneta_append(waldir, "/wal/");
+            origwal = pgmoneta_get_server_backup_identifier_data_wal(server, id);
+            waldir = pgmoneta_get_server_wal(server);
 
             waltarget = pgmoneta_append(waltarget, directory);
             waltarget = pgmoneta_append(waltarget, "/");

@@ -319,17 +319,8 @@ pgmoneta_management_write_list_backup(int socket, int server)
 
    if (server != -1)
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[server].name);
-      d = pgmoneta_append(d, "/backup/");
-
-      wal_dir = NULL;
-      wal_dir = pgmoneta_append(wal_dir, config->base_dir);
-      wal_dir = pgmoneta_append(wal_dir, "/");
-      wal_dir = pgmoneta_append(wal_dir, config->servers[server].name);
-      wal_dir = pgmoneta_append(wal_dir, "/wal/");
+      d = pgmoneta_get_server_backup(server);
+      wal_dir = pgmoneta_get_server_wal(server);
 
       if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
@@ -577,9 +568,6 @@ pgmoneta_management_write_delete(int socket, int server, int result)
    char* d = NULL;
    int number_of_backups = 0;
    char** array = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
 
    if (write_int32("pgmoneta_management_write_delete", socket, server))
    {
@@ -588,11 +576,7 @@ pgmoneta_management_write_delete(int socket, int server, int result)
 
    if (server != -1)
    {
-      d = NULL;
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[server].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(server);
 
       if (pgmoneta_get_directories(d, &number_of_backups, &array))
       {
@@ -834,10 +818,7 @@ pgmoneta_management_write_status(int socket)
          goto error;
       }
 
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/");
+      d = pgmoneta_get_server(i);
 
       server_size = pgmoneta_directory_size(d);
 
@@ -849,10 +830,7 @@ pgmoneta_management_write_status(int socket)
       free(d);
       d = NULL;
 
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       pgmoneta_get_directories(d, &number_of_directories, &array);
 
@@ -1155,11 +1133,7 @@ pgmoneta_management_write_details(int socket)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      wal_dir = NULL;
-      wal_dir = pgmoneta_append(wal_dir, config->base_dir);
-      wal_dir = pgmoneta_append(wal_dir, "/");
-      wal_dir = pgmoneta_append(wal_dir, config->servers[i].name);
-      wal_dir = pgmoneta_append(wal_dir, "/wal/");
+      wal_dir = pgmoneta_get_server_wal(i);
 
       if (write_string("pgmoneta_management_write_details", socket, config->servers[i].name))
       {
@@ -1177,10 +1151,7 @@ pgmoneta_management_write_details(int socket)
          goto error;
       }
 
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/");
+      d = pgmoneta_get_server(i);
 
       server_size = pgmoneta_directory_size(d);
 
@@ -1192,10 +1163,7 @@ pgmoneta_management_write_details(int socket)
       free(d);
       d = NULL;
 
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 

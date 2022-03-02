@@ -84,13 +84,7 @@ link_execute(int server, char* identifier)
 
    link_time = time(NULL);
 
-   server_path = pgmoneta_append(server_path, config->base_dir);
-   if (!pgmoneta_ends_with(config->base_dir, "/"))
-   {
-      server_path = pgmoneta_append(server_path, "/");
-   }
-   server_path = pgmoneta_append(server_path, config->servers[server].name);
-   server_path = pgmoneta_append(server_path, "/backup/");
+   server_path = pgmoneta_get_server_backup(server);
 
    pgmoneta_get_backups(server_path, &number_of_backups, &backups);
 
@@ -109,25 +103,8 @@ link_execute(int server, char* identifier)
 
       if (next_newest != -1)
       {
-         from = pgmoneta_append(from, config->base_dir);
-         if (!pgmoneta_ends_with(config->base_dir, "/"))
-         {
-            from = pgmoneta_append(from, "/");
-         }
-         from = pgmoneta_append(from, config->servers[server].name);
-         from = pgmoneta_append(from, "/backup/");
-         from = pgmoneta_append(from, identifier);
-         from = pgmoneta_append(from, "/data/");
-
-         to = pgmoneta_append(to, config->base_dir);
-         if (!pgmoneta_ends_with(config->base_dir, "/"))
-         {
-            to = pgmoneta_append(to, "/");
-         }
-         to = pgmoneta_append(to, config->servers[server].name);
-         to = pgmoneta_append(to, "/backup/");
-         to = pgmoneta_append(to, backups[next_newest]->label);
-         to = pgmoneta_append(to, "/data");
+         from = pgmoneta_get_server_backup_identifier_data(server, identifier);
+         to = pgmoneta_get_server_backup_identifier_data(server, backups[next_newest]->label);
 
          pgmoneta_link(from, to);
 

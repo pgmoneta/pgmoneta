@@ -361,18 +361,9 @@ pgmoneta_get_number_of_valid_backups(int server)
    char* server_path = NULL;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   struct configuration* config = NULL;
    int result = 0;
 
-   config = (struct configuration*)shmem;
-
-   server_path = pgmoneta_append(server_path, config->base_dir);
-   if (!pgmoneta_ends_with(config->base_dir, "/"))
-   {
-      server_path = pgmoneta_append(server_path, "/");
-   }
-   server_path = pgmoneta_append(server_path, config->servers[server].name);
-   server_path = pgmoneta_append(server_path, "/backup/");
+   server_path = pgmoneta_get_server_backup(server);
 
    pgmoneta_get_backups(server_path, &number_of_backups, &backups);
 

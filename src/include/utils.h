@@ -502,6 +502,58 @@ pgmoneta_read_version(char* directory, char** version);
 int
 pgmoneta_read_wal(char* directory, char** wal);
 
+/**
+ * Get the directory for a server
+ * @param server The server
+ * @return The directory
+ */
+char*
+pgmoneta_get_server(int server);
+
+/**
+ * Get the backup directory for a server
+ * @param server The server
+ * @return The backup directory
+ */
+char*
+pgmoneta_get_server_backup(int server);
+
+/**
+ * Get the wal directory for a server
+ * @param server The server
+ * @return The wal directory
+ */
+char*
+pgmoneta_get_server_wal(int server);
+
+/**
+ * Get the backup directory for a server with an identifier
+ * @param server The server
+ * @param identifier The identifier
+ * @return The backup directory
+ */
+char*
+pgmoneta_get_server_backup_identifier(int server, char* identifier);
+
+/**
+ * Get the data directory for a server with an identifier
+ * @param server The server
+ * @param identifier The identifier
+ * @return The backup directory
+ */
+char*
+pgmoneta_get_server_backup_identifier_data(int server, char* identifier);
+
+/**
+ * Get the pg_wal directory for a server with an identifier
+ * @param server The server
+ * @param identifier The identifier
+ * @return The backup directory
+ */
+char*
+pgmoneta_get_server_backup_identifier_data_wal(int server, char* identifier);
+
+
 #ifdef DEBUG
 
 /**

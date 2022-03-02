@@ -64,6 +64,8 @@ static int string_compare(const void* a, const void* b);
 
 static bool is_wal_file(char* file);
 
+static char* get_server_basepath(int server);
+
 int32_t
 pgmoneta_get_request(struct message* msg)
 {
@@ -1906,6 +1908,87 @@ is_wal_file(char* file)
    }
 
    return true;
+}
+
+char*
+pgmoneta_get_server(int server)
+{
+   return get_server_basepath(server);
+}
+
+char*
+pgmoneta_get_server_backup(int server)
+{
+   char* d = NULL;
+
+   d = get_server_basepath(server);
+   d = pgmoneta_append(d, "backup/");
+
+   return d;
+}
+
+char*
+pgmoneta_get_server_wal(int server)
+{
+   char* d = NULL;
+
+   d = get_server_basepath(server);
+   d = pgmoneta_append(d, "wal/");
+
+   return d;
+}
+
+char*
+pgmoneta_get_server_backup_identifier(int server, char* identifier)
+{
+   char* d = NULL;
+
+   d = pgmoneta_get_server_backup(server);
+   d = pgmoneta_append(d, identifier);
+   d = pgmoneta_append(d, "/");
+
+   return d;
+}
+
+char*
+pgmoneta_get_server_backup_identifier_data(int server, char* identifier)
+{
+   char* d = NULL;
+
+   d = pgmoneta_get_server_backup_identifier(server, identifier);
+   d = pgmoneta_append(d, "data/");
+
+   return d;
+}
+
+char*
+pgmoneta_get_server_backup_identifier_data_wal(int server, char* identifier)
+{
+   char* d = NULL;
+
+   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   d = pgmoneta_append(d, "pg_wal/");
+
+   return d;
+}
+
+static char*
+get_server_basepath(int server)
+{
+   char* d = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   d = pgmoneta_append(d, config->base_dir);
+   if (!pgmoneta_ends_with(config->base_dir, "/"))
+   {
+      d = pgmoneta_append(d, "/");
+   }
+   d = pgmoneta_append(d, config->servers[server].name);
+   d = pgmoneta_append(d, "/");
+
+   return d;
 }
 
 #ifdef DEBUG

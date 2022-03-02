@@ -85,21 +85,11 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    time_info = localtime(&current_time);
    strftime(&date[0], sizeof(date), "%Y%m%d%H%M%S", time_info);
 
-   root = pgmoneta_append(root, config->base_dir);
-   root = pgmoneta_append(root, "/");
-   root = pgmoneta_append(root, config->servers[server].name);
-   root = pgmoneta_append(root, "/backup/");
-   root = pgmoneta_append(root, date);
-   root = pgmoneta_append(root, "/");
+   root = pgmoneta_get_server_backup_identifier(server, &date[0]);
 
    pgmoneta_mkdir(root);
 
-   d = pgmoneta_append(d, config->base_dir);
-   d = pgmoneta_append(d, "/");
-   d = pgmoneta_append(d, config->servers[server].name);
-   d = pgmoneta_append(d, "/backup/");
-   d = pgmoneta_append(d, date);
-   d = pgmoneta_append(d, "/data/");
+   d = pgmoneta_get_server_backup_identifier_data(server, &date[0]);
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_BACKUP);
 

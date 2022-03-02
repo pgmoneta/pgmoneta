@@ -75,15 +75,7 @@ zstd_execute(int server, char* identifier)
 
    config = (struct configuration*)shmem;
    
-   d = pgmoneta_append(d, config->base_dir);
-   if (!pgmoneta_ends_with(config->base_dir, "/"))
-   {
-      d = pgmoneta_append(d, "/");
-   }
-   d = pgmoneta_append(d, config->servers[server].name);
-   d = pgmoneta_append(d, "/backup/");
-   d = pgmoneta_append(d, identifier);
-   d = pgmoneta_append(d, "/data/");
+   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
 
    compression_time = time(NULL);
 

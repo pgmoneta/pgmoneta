@@ -62,11 +62,7 @@ keep(char* prefix, int srv, char* backup_id, bool k)
 
    config = (struct configuration*)shmem;
 
-   d = NULL;
-   d = pgmoneta_append(d, config->base_dir);
-   d = pgmoneta_append(d, "/");
-   d = pgmoneta_append(d, config->servers[srv].name);
-   d = pgmoneta_append(d, "/backup/");
+   d = pgmoneta_get_server_backup(srv);
 
    if (pgmoneta_get_backups(d, &number_of_backups, &backups))
    {
@@ -115,11 +111,7 @@ keep(char* prefix, int srv, char* backup_id, bool k)
 
    if (backups[backup_index]->valid == VALID_TRUE)
    {
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[srv].name);
-      d = pgmoneta_append(d, "/backup/");
-      d = pgmoneta_append(d, backups[backup_index]->label);
+      d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
 
       pgmoneta_update_info_bool(d, INFO_KEEP, k);
 

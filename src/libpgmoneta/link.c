@@ -79,8 +79,23 @@ pgmoneta_link(char* from, char* to)
       memset(from_entry, 0, from_length);
       memset(to_entry, 0, to_length);
 
-      snprintf(from_entry, from_length, "%s/%s", from, entry->d_name);
-      snprintf(to_entry, to_length, "%s/%s", to, entry->d_name);
+      if (pgmoneta_ends_with(from, "/"))
+      {
+         snprintf(from_entry, from_length, "%s%s", from, entry->d_name);
+      }
+      else
+      {
+         snprintf(from_entry, from_length, "%s/%s", from, entry->d_name);
+      }
+
+      if (pgmoneta_ends_with(to, "/"))
+      {
+         snprintf(to_entry, to_length, "%s%s", to, entry->d_name);
+      }
+      else
+      {
+         snprintf(to_entry, to_length, "%s/%s", to, entry->d_name);
+      }
 
       if (!stat(from_entry, &statbuf))
       {
@@ -162,8 +177,23 @@ pgmoneta_relink(char* from, char* to)
       memset(from_entry, 0, from_length);
       memset(to_entry, 0, to_length);
 
-      snprintf(from_entry, from_length, "%s/%s", from, entry->d_name);
-      snprintf(to_entry, to_length, "%s/%s", to, entry->d_name);
+      if (pgmoneta_ends_with(from, "/"))
+      {
+         snprintf(from_entry, from_length, "%s%s", from, entry->d_name);
+      }
+      else
+      {
+         snprintf(from_entry, from_length, "%s/%s", from, entry->d_name);
+      }
+
+      if (pgmoneta_ends_with(to, "/"))
+      {
+         snprintf(to_entry, to_length, "%s%s", to, entry->d_name);
+      }
+      else
+      {
+         snprintf(to_entry, to_length, "%s/%s", to, entry->d_name);
+      }
 
       if (!lstat(from_entry, &statbuf))
       {

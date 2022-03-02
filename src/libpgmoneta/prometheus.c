@@ -688,12 +688,7 @@ backup_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_oldest gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -744,12 +739,7 @@ backup_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -793,12 +783,7 @@ backup_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_count gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -845,12 +830,7 @@ backup_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -909,12 +889,7 @@ backup_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_elapsed_time gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -987,12 +962,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_restore_newest_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -1043,12 +1013,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -1099,12 +1064,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_restore_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -1163,12 +1123,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -1227,12 +1182,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_retain gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       number_of_backups = 0;
       backups = NULL;
@@ -1291,12 +1241,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_total_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       size = pgmoneta_directory_size(d);
 
@@ -1325,12 +1270,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_total_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/wal/");
+      d = pgmoneta_get_server_wal(i);
 
       size = pgmoneta_directory_size(d);
 
@@ -1359,12 +1299,7 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_total_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/");
+      d = pgmoneta_get_server(i);
 
       size = pgmoneta_directory_size(d);
 

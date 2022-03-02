@@ -93,27 +93,11 @@ basebackup_execute(int server, char* identifier)
       }
    }
 
-   root = pgmoneta_append(root, config->base_dir);
-   if (!pgmoneta_ends_with(config->base_dir, "/"))
-   {
-      root = pgmoneta_append(root, "/");
-   }
-   root = pgmoneta_append(root, config->servers[server].name);
-   root = pgmoneta_append(root, "/backup/");
-   root = pgmoneta_append(root, identifier);
-   root = pgmoneta_append(root, "/");
+   root = pgmoneta_get_server_backup_identifier(server, identifier);
 
    pgmoneta_mkdir(root);
 
-   d = pgmoneta_append(d, config->base_dir);
-   if (!pgmoneta_ends_with(config->base_dir, "/"))
-   {
-      d = pgmoneta_append(d, "/");
-   }
-   d = pgmoneta_append(d, config->servers[server].name);
-   d = pgmoneta_append(d, "/backup/");
-   d = pgmoneta_append(d, identifier);
-   d = pgmoneta_append(d, "/data/");
+   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
 
    pgmoneta_mkdir(d);
 

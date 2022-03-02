@@ -76,12 +76,7 @@ pgmoneta_retention(char** argv)
       number_of_backups = 0;
       backups = NULL;
 
-      d = NULL;
-
-      d = pgmoneta_append(d, config->base_dir);
-      d = pgmoneta_append(d, "/");
-      d = pgmoneta_append(d, config->servers[i].name);
-      d = pgmoneta_append(d, "/backup/");
+      d = pgmoneta_get_server_backup(i);
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 
