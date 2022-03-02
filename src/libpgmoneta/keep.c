@@ -121,7 +121,7 @@ keep(char* prefix, int srv, char* backup_id, bool k)
       d = pgmoneta_append(d, "/backup/");
       d = pgmoneta_append(d, backups[backup_index]->label);
 
-      pgmoneta_update_keep_info(d, k);
+      pgmoneta_update_info_bool(d, INFO_KEEP, k);
 
       free(d);
       d = NULL;

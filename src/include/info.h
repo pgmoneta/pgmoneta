@@ -35,6 +35,15 @@ extern "C" {
 
 #include <stdlib.h>
 
+#define INFO_STATUS  "STATUS"
+#define INFO_LABEL   "LABEL"
+#define INFO_WAL     "WAL"
+#define INFO_ELAPSED "ELAPSED"
+#define INFO_VERSION "VERSION"
+#define INFO_KEEP    "KEEP"
+#define INFO_BACKUP  "BACKUP"
+#define INFO_RESTORE "RESTORE"
+
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
 #define VALID_TRUE     1
@@ -57,39 +66,38 @@ struct backup
 /**
  * Create a backup information file
  * @param directory The backup directory
- * @param status The status
  * @param label The label
- * @param wal The WAL
- * @param size The backup size
- * @param elapsed_time The elapsed time in seconds
- * @param version The version
+ * @param status The status
  */
 void
-pgmoneta_create_info(char* directory, int status, char* label, char* wal, unsigned long size, int elapsed_time, char* version);
+pgmoneta_create_info(char* directory, char* label, int status);
 
 /**
- * Add backup information
+ * Update backup information: unsigned long
  * @param directory The backup directory
- * @param size The backup size
+ * @param key The key
+ * @param value The value
  */
 void
-pgmoneta_add_backup_info(char* directory, unsigned long size);
+pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long value);
 
 /**
- * Update backup information
+ * Update backup information: string
  * @param directory The backup directory
- * @param size The backup size
+ * @param key The key
+ * @param value The value
  */
 void
-pgmoneta_update_backup_info(char* directory, unsigned long size);
+pgmoneta_update_info_string(char* directory, char* key, char* value);
 
 /**
- * Update keep information
+ * Update backup information: bool
  * @param directory The backup directory
- * @param k The keep status
+ * @param key The key
+ * @param value The value
  */
 void
-pgmoneta_update_keep_info(char* directory, bool k);
+pgmoneta_update_info_bool(char* directory, char* key, bool value);
 
 /**
  * Get the backups

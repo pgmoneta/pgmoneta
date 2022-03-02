@@ -29,50 +29,36 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <backup.h>
-#include <gzip.h>
 #include <info.h>
-#include <link.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
 #include <utils.h>
-#include <zstandard.h>
+#include <workflow.h>
 
 /* system */
 #include <stdatomic.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <time.h>
 
 void
 pgmoneta_backup(int client_fd, int server, char** argv)
 {
-   bool active;
-   int usr;
+   bool active = false;
    char date[128];
    char elapsed[128];
    time_t current_time;
    struct tm* time_info;
    time_t start_time;
-   time_t compression_time;
-   time_t link_time;
    int total_seconds;
    int hours;
    int minutes;
    int seconds;
    char* root = NULL;
    char* d = NULL;
-   char* cmd = NULL;
-   int status;
-   char* server_path = NULL;
    unsigned long size;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
-   char* from = NULL;
-   char* to = NULL;
-   char* version = NULL;
-   char* wal = NULL;
-   int next_newest;
+   struct workflow* workflow = NULL;
+   struct workflow* current = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -81,7 +67,11 @@ pgmoneta_backup(int client_fd, int server, char** argv)
 
    pgmoneta_set_proc_title(1, argv, "backup", config->servers[server].name);
 
-   active = false;
+   if (!config->servers[server].valid)
+   {
+      pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
+      goto error;
+   }
 
    if (!atomic_compare_exchange_strong(&config->servers[server].backup, &active, true))
    {
@@ -89,16 +79,6 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    }
 
    start_time = time(NULL);
-   total_seconds = 0;
-
-   usr = -1;
-   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
-   {
-      if (!strcmp(config->servers[server].username, config->users[i].username))
-      {
-         usr = i;
-      }  
-   }
 
    memset(&date[0], 0, sizeof(date));
    time(&current_time);
@@ -114,12 +94,6 @@ pgmoneta_backup(int client_fd, int server, char** argv)
 
    pgmoneta_mkdir(root);
 
-   if (!config->servers[server].valid)
-   {
-      pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
-      goto error;
-   }
-
    d = pgmoneta_append(d, config->base_dir);
    d = pgmoneta_append(d, "/");
    d = pgmoneta_append(d, config->servers[server].name);
@@ -127,220 +101,80 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    d = pgmoneta_append(d, date);
    d = pgmoneta_append(d, "/data/");
 
-   cmd = pgmoneta_append(cmd, "PGPASSWORD=\"");
-   cmd = pgmoneta_append(cmd, config->users[usr].password);
-   cmd = pgmoneta_append(cmd, "\" ");
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_BACKUP);
 
-   cmd = pgmoneta_append(cmd, config->pgsql_dir);
-   cmd = pgmoneta_append(cmd, "/pg_basebackup ");
-
-   cmd = pgmoneta_append(cmd, "-h ");
-   cmd = pgmoneta_append(cmd, config->servers[server].host);
-   cmd = pgmoneta_append(cmd, " ");
-
-   cmd = pgmoneta_append(cmd, "-p ");
-   cmd = pgmoneta_append_int(cmd, config->servers[server].port);
-   cmd = pgmoneta_append(cmd, " ");
-
-   cmd = pgmoneta_append(cmd, "-U ");
-   cmd = pgmoneta_append(cmd, config->servers[server].username);
-   cmd = pgmoneta_append(cmd, " ");
-
-   if (strlen(config->servers[server].backup_slot) > 0)
+   current = workflow;
+   while (current != NULL)
    {
-      cmd = pgmoneta_append(cmd, "-S ");
-      cmd = pgmoneta_append(cmd, config->servers[server].backup_slot);
-      cmd = pgmoneta_append(cmd, " ");
-   }
-
-   cmd = pgmoneta_append(cmd, "-l ");
-   cmd = pgmoneta_append(cmd, date);
-   cmd = pgmoneta_append(cmd, " ");
-
-   cmd = pgmoneta_append(cmd, "-X stream ");
-   cmd = pgmoneta_append(cmd, "--no-password ");
-   cmd = pgmoneta_append(cmd, "-c fast ");
-
-   cmd = pgmoneta_append(cmd, "-D ");
-   cmd = pgmoneta_append(cmd, d);
-   
-   status = system(cmd);
-   
-   if (status != 0)
-   {
-      pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
-      goto error;
-   }
-   else
-   {
-      total_seconds = (int)difftime(time(NULL), start_time);
-      hours = total_seconds / 3600;
-      minutes = (total_seconds % 3600) / 60;
-      seconds = total_seconds % 60;
-
-      memset(&elapsed[0], 0, sizeof(elapsed));
-      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
-
-      pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
-
-      pgmoneta_read_version(d, &version);
-      size = pgmoneta_directory_size(d);
-      pgmoneta_read_wal(d, &wal);
-
-      if (config->compression_type != COMPRESSION_NONE)
+      if (current->setup(server, &date[0]))
       {
-         compression_time = time(NULL);
-
-         if (config->compression_type == COMPRESSION_GZIP)
-         {
-            pgmoneta_gzip_data(d);
-         }
-         else if (config->compression_type == COMPRESSION_ZSTD)
-         {
-            pgmoneta_zstandardc_data(d);
-         }
-
-         total_seconds = (int)difftime(time(NULL), compression_time);
-         hours = total_seconds / 3600;
-         minutes = (total_seconds % 3600) / 60;
-         seconds = total_seconds % 60;
-
-         memset(&elapsed[0], 0, sizeof(elapsed));
-         sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
-
-         pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+         goto error;
       }
-
-      if (config->link)
-      {
-         link_time = time(NULL);
-         total_seconds = 0;
-
-         server_path = NULL;
-
-         server_path = pgmoneta_append(server_path, config->base_dir);
-         if (!pgmoneta_ends_with(config->base_dir, "/"))
-         {
-            server_path = pgmoneta_append(server_path, "/");
-         }
-         server_path = pgmoneta_append(server_path, config->servers[server].name);
-         server_path = pgmoneta_append(server_path, "/backup/");
-
-         pgmoneta_get_backups(server_path, &number_of_backups, &backups);
-
-         if (number_of_backups > 0)
-         {
-            next_newest = -1;
-
-            for (int j = number_of_backups - 1; j >= 0; j--)
-            {
-               if (backups[j]->valid == VALID_TRUE)
-               {
-                  if (next_newest == -1)
-                  {
-                     next_newest = j;
-                  }
-               }
-            }
-
-            if (next_newest != -1)
-            {
-               from = NULL;
-
-               from = pgmoneta_append(from, d);
-
-               to = NULL;
-
-               to = pgmoneta_append(to, config->base_dir);
-               if (!pgmoneta_ends_with(config->base_dir, "/"))
-               {
-                  to = pgmoneta_append(to, "/");
-               }
-               to = pgmoneta_append(to, config->servers[server].name);
-               to = pgmoneta_append(to, "/backup/");
-               to = pgmoneta_append(to, backups[next_newest]->label);
-               to = pgmoneta_append(to, "/data");
-
-               pgmoneta_link(from, to);
-
-               total_seconds = (int)difftime(time(NULL), link_time);
-               hours = total_seconds / 3600;
-               minutes = (total_seconds % 3600) / 60;
-               seconds = total_seconds % 60;
-
-               memset(&elapsed[0], 0, sizeof(elapsed));
-               sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
-
-               pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
-            }
-         }
-      }
-
-      total_seconds = (int)difftime(time(NULL), start_time);
-      hours = total_seconds / 3600;
-      minutes = (total_seconds % 3600) / 60;
-      seconds = total_seconds % 60;
-
-      memset(&elapsed[0], 0, sizeof(elapsed));
-      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
-
-      pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
-
-      pgmoneta_create_info(root, 1, &date[0], wal, size, total_seconds, version);
-
-      size = pgmoneta_directory_size(d);
-      pgmoneta_add_backup_info(root, size);
+      current = current->next;
    }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->execute(server, &date[0]))
+      {
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->teardown(server, &date[0]))
+      {
+         goto error;
+      }
+      current = current->next;
+   }
+
+   size = pgmoneta_directory_size(d);
+   pgmoneta_update_info_unsigned_long(root, INFO_BACKUP, size);
+
+   total_seconds = (int)difftime(time(NULL), start_time);
+   hours = total_seconds / 3600;
+   minutes = (total_seconds % 3600) / 60;
+   seconds = total_seconds % 60;
+
+   memset(&elapsed[0], 0, sizeof(elapsed));
+   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+
+   pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], &elapsed[0]);
+
+   pgmoneta_update_info_unsigned_long(root, INFO_ELAPSED, total_seconds);
 
    atomic_store(&config->servers[server].backup, false);
 
 done:
+
+   pgmoneta_workflow_delete(workflow);
+
+   free(root);
+   free(d);
 
    pgmoneta_management_write_int32(client_fd, 0);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
 
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(root);
-   free(d);
-   free(cmd);
-   free(server_path);
-   free(from);
-   free(to);
-   free(version);
-   free(wal);
-
    exit(0);
 
 error:
 
-   pgmoneta_create_info(root, 0, &date[0], NULL, 0, 0, NULL);
+   pgmoneta_workflow_delete(workflow);
+
+   free(root);
+   free(d);
 
    pgmoneta_management_write_int32(client_fd, 1);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(root);
-   free(d);
-   free(cmd);
-   free(server_path);
-   free(from);
-   free(to);
-   free(version);
-   free(wal);
 
    exit(1);
 }

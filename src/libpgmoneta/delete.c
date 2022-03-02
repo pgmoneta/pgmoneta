@@ -174,7 +174,7 @@ pgmoneta_delete(int srv, char* backup_id)
          d = pgmoneta_append(d, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_backup_info(d, size);
+         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
 
          free(from);
          free(to);
@@ -221,7 +221,7 @@ pgmoneta_delete(int srv, char* backup_id)
          d = pgmoneta_append(d, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_backup_info(d, size);
+         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
 
          free(from);
          free(to);

@@ -38,7 +38,7 @@
 #include <unistd.h>
 
 void
-pgmoneta_create_info(char* directory, int status, char* label, char* wal, unsigned long size, int elapsed_time, char* version)
+pgmoneta_create_info(char* directory, char* label, int status)
 {
    char buffer[128];
    char* s = NULL;
@@ -49,65 +49,12 @@ pgmoneta_create_info(char* directory, int status, char* label, char* wal, unsign
 
    sfile = fopen(s, "w");
 
-   if (status == 1)
-   {
-      fputs("STATUS=1\n", sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
-      fputs(&buffer[0], sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "WAL=%s\n", wal);
-      fputs(&buffer[0], sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "ELAPSED=%d\n", elapsed_time);
-      fputs(&buffer[0], sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "VERSION=%s\n", version);
-      fputs(&buffer[0], sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "KEEP=0\n");
-      fputs(&buffer[0], sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "RESTORE=%lu\n", size);
-      fputs(&buffer[0], sfile);
-   }
-   else
-   {
-      fputs("STATUS=0\n", sfile);
-
-      memset(&buffer[0], 0, sizeof(buffer));
-      snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
-      fputs(&buffer[0], sfile);
-   }
-
-   if (sfile != NULL)
-   {
-      fclose(sfile);
-   }
-
-   free(s);
-}
-
-void
-pgmoneta_add_backup_info(char* directory, unsigned long size)
-{
-   char buffer[128];
-   char* s = NULL;
-   FILE* sfile = NULL;
-
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, "/backup.info");
-
-   sfile = fopen(s, "a");
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "STATUS=%d\n", status);
+   fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "BACKUP=%lu\n", size);
+   snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
    fputs(&buffer[0], sfile);
 
    if (sfile != NULL)
@@ -119,10 +66,11 @@ pgmoneta_add_backup_info(char* directory, unsigned long size)
 }
 
 void
-pgmoneta_update_backup_info(char* directory, unsigned long size)
+pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long value)
 {
    char buffer[128];
    char line[128];
+   bool found = false;
    char* s = NULL;
    FILE* sfile = NULL;
    char* d = NULL;
@@ -139,32 +87,40 @@ pgmoneta_update_backup_info(char* directory, unsigned long size)
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
-      char key[MISC_LENGTH];
-      char value[MISC_LENGTH];
+      char k[MISC_LENGTH];
+      char v[MISC_LENGTH];
       char* ptr = NULL;
 
-      memset(&key[0], 0, sizeof(key));
-      memset(&value[0], 0, sizeof(value));
+      memset(&k[0], 0, sizeof(k));
+      memset(&v[0], 0, sizeof(v));
 
       memset(&line[0], 0, sizeof(line));
       memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
 
       ptr = strtok(&buffer[0], "=");
-      memcpy(&key[0], ptr, strlen(ptr));
+      memcpy(&k[0], ptr, strlen(ptr));
 
       ptr = strtok(NULL, "=");
-      memcpy(&value[0], ptr, strlen(ptr) - 1);
+      memcpy(&v[0], ptr, strlen(ptr) - 1);
 
-      if (!strcmp("BACKUP", &key[0]))
+      if (!strcmp(key, &k[0]))
       {
          memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "BACKUP=%lu\n", size);
+         snprintf(&line[0], sizeof(line), "%s=%lu\n", key, value);
          fputs(&line[0], dfile);
+         found = true;
       }
       else
       {
          fputs(&line[0], dfile);
       }
+   }
+
+   if (!found)
+   {
+      memset(&line[0], 0, sizeof(line));
+      snprintf(&line[0], sizeof(line), "%s=%lu\n", key, value);
+      fputs(&line[0], dfile);
    }
 
    if (sfile != NULL)
@@ -184,10 +140,11 @@ pgmoneta_update_backup_info(char* directory, unsigned long size)
 }
 
 void
-pgmoneta_update_keep_info(char* directory, bool k)
+pgmoneta_update_info_string(char* directory, char* key, char* value)
 {
    char buffer[128];
    char line[128];
+   bool found = false;
    char* s = NULL;
    FILE* sfile = NULL;
    char* d = NULL;
@@ -204,32 +161,40 @@ pgmoneta_update_keep_info(char* directory, bool k)
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
-      char key[MISC_LENGTH];
-      char value[MISC_LENGTH];
+      char k[MISC_LENGTH];
+      char v[MISC_LENGTH];
       char* ptr = NULL;
 
-      memset(&key[0], 0, sizeof(key));
-      memset(&value[0], 0, sizeof(value));
+      memset(&k[0], 0, sizeof(k));
+      memset(&v[0], 0, sizeof(v));
 
       memset(&line[0], 0, sizeof(line));
       memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
 
       ptr = strtok(&buffer[0], "=");
-      memcpy(&key[0], ptr, strlen(ptr));
+      memcpy(&k[0], ptr, strlen(ptr));
 
       ptr = strtok(NULL, "=");
-      memcpy(&value[0], ptr, strlen(ptr) - 1);
+      memcpy(&v[0], ptr, strlen(ptr) - 1);
 
-      if (!strcmp("KEEP", &key[0]))
+      if (!strcmp(key, &k[0]))
       {
          memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "KEEP=%d\n", k ? 1 : 0);
+         snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
          fputs(&line[0], dfile);
+         found = true;
       }
       else
       {
          fputs(&line[0], dfile);
       }
+   }
+
+   if (!found)
+   {
+      memset(&line[0], 0, sizeof(line));
+      snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
+      fputs(&line[0], dfile);
    }
 
    if (sfile != NULL)
@@ -246,6 +211,12 @@ pgmoneta_update_keep_info(char* directory, bool k)
 
    free(s);
    free(d);
+}
+
+void
+pgmoneta_update_info_bool(char* directory, char* key, bool value)
+{
+   pgmoneta_update_info_unsigned_long(directory, key, value ? 1 : 0);
 }
 
 int
@@ -330,7 +301,7 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          ptr = strtok(NULL, "=");
          memcpy(&value[0], ptr, strlen(ptr) - 1);
 
-         if (!strcmp("STATUS", &key[0]))
+         if (!strcmp(INFO_STATUS, &key[0]))
          {
             if (!strcmp("1", &value[0]))
             {
@@ -341,31 +312,31 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
                bck->valid = VALID_FALSE;
             }
          }
-         else if (!strcmp("LABEL", &key[0]))
+         else if (!strcmp(INFO_LABEL, &key[0]))
          {
             memcpy(&bck->label[0], &value[0], strlen(&value[0]));
          }
-         else if (!strcmp("WAL", &key[0]))
+         else if (!strcmp(INFO_WAL, &key[0]))
          {
             memcpy(&bck->wal[0], &value[0], strlen(&value[0]));
          }
-         else if (!strcmp("BACKUP", &key[0]))
+         else if (!strcmp(INFO_BACKUP, &key[0]))
          {
             bck->backup_size = strtoul(&value[0], &ptr, 10);
          }
-         else if (!strcmp("RESTORE", &key[0]))
+         else if (!strcmp(INFO_RESTORE, &key[0]))
          {
             bck->restore_size = strtoul(&value[0], &ptr, 10);
          }
-         else if (!strcmp("ELAPSED", &key[0]))
+         else if (!strcmp(INFO_ELAPSED, &key[0]))
          {
-         bck->elapsed_time = atoi(&value[0]);
+            bck->elapsed_time = atoi(&value[0]);
          }
-         else if (!strcmp("VERSION", &key[0]))
+         else if (!strcmp(INFO_VERSION, &key[0]))
          {
             bck->version = atoi(&value[0]);
          }
-         else if (!strcmp("KEEP", &key[0]))
+         else if (!strcmp(INFO_KEEP, &key[0]))
          {
             bck->keep = atoi(&value[0]) == 1 ? true : false;
          }
