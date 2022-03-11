@@ -32,6 +32,7 @@
 #include <gzip_compression.h>
 #include <info.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <network.h>
 #include <restore.h>
@@ -356,6 +357,23 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
 
          pgmoneta_zstandardc_file(tarfile, to);
       }
+      else if (config->compression_type == COMPRESSION_LZ4)
+      {
+         to = pgmoneta_append(to, directory);
+         to = pgmoneta_append(to, "/");
+         to = pgmoneta_append(to, config->servers[server].name);
+         to = pgmoneta_append(to, "-");
+         to = pgmoneta_append(to, id);
+         to = pgmoneta_append(to, ".tar.lz4");
+
+         if (pgmoneta_exists(to))
+         {
+            pgmoneta_delete_file(to);
+         }
+
+         pgmoneta_lz4c_file(tarfile, to);
+      }
+      
 
       total_seconds = (int)difftime(time(NULL), start_time);
       hours = total_seconds / 3600;

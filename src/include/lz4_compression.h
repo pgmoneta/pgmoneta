@@ -26,8 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_WORKFLOW_H
-#define PGMONETA_WORKFLOW_H
+#ifndef PGMONETA_LZ4_H
+#define PGMONETA_LZ4_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,71 +35,37 @@ extern "C" {
 
 #include <stdlib.h>
 
-#define WORKFLOW_TYPE_BACKUP 0
-
-typedef int (*setup)(int, char*);
-typedef int (*execute)(int, char*);
-typedef int (*teardown)(int, char*);
-
-struct workflow
-{
-   setup setup;
-   execute execute;
-   teardown teardown;
-
-   struct workflow* next;
-};
+#define BLOCK_BYTES 1024 * 4
 
 /**
- * Create a workflow
- * @param workflow_type The workflow type
- * @return The workflow
+ * Compress a data directory with Lz4
+ * @param directory The directory
  */
-struct workflow*
-pgmoneta_workflow_create(int workflow_type);
+void
+pgmoneta_lz4c_data(char* directory);
 
 /**
- * Delete the workflow
- * @param workflow The workflow
- * @return 0 upon success, otherwise 1
+ * Compress a WAL directory with Lz4
+ * @param directory The directory
+ */
+void
+pgmoneta_lz4c_wal(char* directory);
+
+/**
+ * Decompress a Lz4 directory
+ * @param directory The directory
+ */
+void
+pgmoneta_lz4d_data(char* directory);
+
+/**
+ * Compress a file
+ * @param from The from name
+ * @param to The to name
+ * @return The result
  */
 int
-pgmoneta_workflow_delete(struct workflow* workflow);
-
-/**
- * Create a workflow for the base backup
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_basebackup(void);
-
-/**
- * Create a workflow for GZIP
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_gzip(void);
-
-/**
- * Create a workflow for Zstandard
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_zstd(void);
-
-/**
- * Create a workflow for Lz4
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_lz4(void);
-
-/**
- * Create a workflow for symlinking
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_link(void);
+pgmoneta_lz4c_file(char* from, char* to);
 
 #ifdef __cplusplus
 }

@@ -28,7 +28,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | pgsql_dir | | String | Yes | The directory for the PostgreSQL binaries |
 | metrics | 0 | Int | No | The metrics port (disable = 0) |
 | management | 0 | Int | No | The remote management port (disable = 0) |
-| compression | zstd | String | No | The compression type (none, gzip, zstd) |
+| compression | zstd | String | No | The compression type (none, gzip, zstd, lz4) |
 | compression_level | 3 | int | No | The compression level |
 | retention | 7 | Int | No | The retention time in days |
 | link | `on` | Bool | No | Use links to limit backup size |

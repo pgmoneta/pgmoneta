@@ -31,6 +31,7 @@
 #include <gzip_compression.h>
 #include <info.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <network.h>
 #include <restore.h>
@@ -290,6 +291,10 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
       else if (config->compression_type == COMPRESSION_ZSTD)
       {
          pgmoneta_zstandardd_data(to);
+      }
+      else if (config->compression_type == COMPRESSION_LZ4)
+      {
+         pgmoneta_lz4d_data(to);
       }
    }
 

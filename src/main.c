@@ -36,6 +36,7 @@
 #include <info.h>
 #include <keep.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <memory.h>
 #include <network.h>
@@ -1415,6 +1416,10 @@ wal_compress_cb(struct ev_loop *loop, ev_periodic *w, int revents)
          else if (config->compression_type == COMPRESSION_ZSTD)
          {
             pgmoneta_zstandardc_wal(d);
+         }
+         else if(config->compression_type == COMPRESSION_LZ4)
+         {
+            pgmoneta_lz4c_wal(d);
          }
 
          free(d);

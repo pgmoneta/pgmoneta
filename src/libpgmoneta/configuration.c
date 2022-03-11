@@ -1428,6 +1428,9 @@ as_compression(char* str)
 
    if (!strcasecmp(str, "zstd"))
       return COMPRESSION_ZSTD;
+   
+   if (!strcasecmp(str, "lz4"))
+      return COMPRESSION_LZ4;
 
    return COMPRESSION_ZSTD;
 }

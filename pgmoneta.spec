@@ -6,9 +6,9 @@ License:       BSD
 URL:           https://github.com/pgmoneta/pgmoneta
 Source0:       https://github.com/pgmoneta/pgmoneta/archive/%{version}.tar.gz
 
-BuildRequires: gcc cmake make python3-docutils zlib zlib-devel libzstd libzstd-devel
+BuildRequires: gcc cmake make python3-docutils zlib zlib-devel libzstd libzstd-devel liblz4 liblz4-dev
 BuildRequires: libev libev-devel openssl openssl-devel systemd systemd-devel
-Requires:      libev openssl systemd postgresql zlib libzstd
+Requires:      libev openssl systemd postgresql zlib libzstd liblz4
 
 %description
 pgmoneta is a backup / restore solution for PostgreSQL.

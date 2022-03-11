@@ -26,83 +26,78 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_WORKFLOW_H
-#define PGMONETA_WORKFLOW_H
+/* pgmoneta */
+#include <pgmoneta.h>
+#include <logging.h>
+#include <utils.h>
+#include <lz4_compression.h>
+#include <workflow.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+/* system */
 #include <stdlib.h>
 
-#define WORKFLOW_TYPE_BACKUP 0
+static int lz4_setup(int, char*);
+static int lz4_execute(int, char*);
+static int lz4_teardown(int, char*);
 
-typedef int (*setup)(int, char*);
-typedef int (*execute)(int, char*);
-typedef int (*teardown)(int, char*);
-
-struct workflow
+struct workflow*
+pgmoneta_workflow_create_lz4(void)
 {
-   setup setup;
-   execute execute;
-   teardown teardown;
+   struct workflow* wf = NULL;
 
-   struct workflow* next;
-};
+   wf = (struct workflow*)malloc(sizeof(struct workflow));
 
-/**
- * Create a workflow
- * @param workflow_type The workflow type
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create(int workflow_type);
+   wf->setup = &lz4_setup;
+   wf->execute = &lz4_execute;
+   wf->teardown = &lz4_teardown;
+   wf->next = NULL;
 
-/**
- * Delete the workflow
- * @param workflow The workflow
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_workflow_delete(struct workflow* workflow);
-
-/**
- * Create a workflow for the base backup
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_basebackup(void);
-
-/**
- * Create a workflow for GZIP
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_gzip(void);
-
-/**
- * Create a workflow for Zstandard
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_zstd(void);
-
-/**
- * Create a workflow for Lz4
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_lz4(void);
-
-/**
- * Create a workflow for symlinking
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_link(void);
-
-#ifdef __cplusplus
+   return wf;
 }
-#endif
 
-#endif
+static int
+lz4_setup(int server, char* identifier)
+{
+   return 0;
+}
+
+static int
+lz4_execute(int server, char* identifier)
+{
+   char* d = NULL;
+   time_t compression_time;
+   int total_seconds;
+   int hours;
+   int minutes;
+   int seconds;
+   char elapsed[128];
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+   
+   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+
+   compression_time = time(NULL);
+
+   pgmoneta_lz4c_data(d);
+
+   total_seconds = (int)difftime(time(NULL), compression_time);
+   hours = total_seconds / 3600;
+   minutes = (total_seconds % 3600) / 60;
+   seconds = total_seconds % 60;
+
+   memset(&elapsed[0], 0, sizeof(elapsed));
+   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+
+   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+
+   free(d);
+
+   return 0;
+}
+
+static int
+lz4_teardown(int server, char* identifier)
+{
+   return 0;
+}

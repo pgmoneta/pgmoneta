@@ -27,6 +27,8 @@ jobs:
       run: sudo apt install -y python-docutils
     - name: Install zstd
       run: sudo apt install -y libzstd-dev
+    - name: Install lz4
+      run: sudo apt install -y liblz4-dev
     - name: Update alternatives
       run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60
     - name: mkdir

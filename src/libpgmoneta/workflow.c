@@ -96,6 +96,11 @@ wf_backup(void)
       current->next = pgmoneta_workflow_create_zstd();
       current = current->next;
    }
+   else if (config->compression_type == COMPRESSION_LZ4)
+   {
+      current->next = pgmoneta_workflow_create_lz4();
+      current = current->next;
+   }
 
    if (config->link)
    {

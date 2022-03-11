@@ -75,6 +75,7 @@ extern "C" {
 #define COMPRESSION_NONE 0
 #define COMPRESSION_GZIP 1
 #define COMPRESSION_ZSTD 2
+#define COMPRESSION_LZ4  3
 
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
