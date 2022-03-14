@@ -28,14 +28,14 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <gzip.h>
+#include <gzip_compression.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
 #include <restore.h>
 #include <utils.h>
-#include <zstandard.h>
+#include <zstandard_compression.h>
 
 /* system */
 #include <stdlib.h>

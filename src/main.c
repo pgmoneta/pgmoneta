@@ -32,7 +32,7 @@
 #include <backup.h>
 #include <configuration.h>
 #include <delete.h>
-#include <gzip.h>
+#include <gzip_compression.h>
 #include <info.h>
 #include <keep.h>
 #include <logging.h>
@@ -48,7 +48,7 @@
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
-#include <zstandard.h>
+#include <zstandard_compression.h>
 
 /* system */
 #include <errno.h>

@@ -30,7 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
-#include <zstandard.h>
+#include <zstandard_compression.h>
 
 /* system */
 #include <dirent.h>

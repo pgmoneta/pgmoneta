@@ -28,7 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <gzip.h>
+#include <gzip_compression.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
