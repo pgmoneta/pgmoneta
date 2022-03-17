@@ -44,28 +44,29 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static int lz4_compress(char *from, char *to);
-static int lz4_decompress(char *from, char *to);
+static int lz4_compress(char* from, char* to);
+static int lz4_decompress(char* from, char* to);
 
-void pgmoneta_lz4c_data(char *directory) 
+void
+pgmoneta_lz4c_data(char* directory)
 {
-   char *from = NULL;
-   char *to = NULL;
-   DIR *dir;
-   struct dirent *entry;
+   char* from = NULL;
+   char* to = NULL;
+   DIR* dir;
+   struct dirent* entry;
 
-   if (!(dir = opendir(directory))) 
+   if (!(dir = opendir(directory)))
    {
       return;
    }
 
-   while ((entry = readdir(dir)) != NULL) 
+   while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR) 
+      if (entry->d_type == DT_DIR)
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) 
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
          {
             continue;
          }
@@ -73,8 +74,8 @@ void pgmoneta_lz4c_data(char *directory)
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
          pgmoneta_lz4c_data(path);
-      } 
-      else 
+      }
+      else
       {
          from = NULL;
 
@@ -101,23 +102,24 @@ void pgmoneta_lz4c_data(char *directory)
    closedir(dir);
 }
 
-void pgmoneta_lz4c_wal(char *directory) 
+void
+pgmoneta_lz4c_wal(char* directory)
 {
-   char *from = NULL;
-   char *to = NULL;
-   DIR *dir;
-   struct dirent *entry;
+   char* from = NULL;
+   char* to = NULL;
+   DIR* dir;
+   struct dirent* entry;
 
-   if (!(dir = opendir(directory))) 
+   if (!(dir = opendir(directory)))
    {
       return;
    }
 
-   while ((entry = readdir(dir)) != NULL) 
+   while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_REG) 
+      if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, ".lz4") || pgmoneta_ends_with(entry->d_name, ".partial")) 
+         if (pgmoneta_ends_with(entry->d_name, ".lz4") || pgmoneta_ends_with(entry->d_name, ".partial"))
          {
             continue;
          }
@@ -143,30 +145,31 @@ void pgmoneta_lz4c_wal(char *directory)
          free(to);
       }
    }
-   
+
    closedir(dir);
 }
 
-void pgmoneta_lz4d_data(char *directory) 
+void
+pgmoneta_lz4d_data(char* directory)
 {
-   char *from = NULL;
-   char *to = NULL;
-   char *name = NULL;
-   DIR *dir;
-   struct dirent *entry;
+   char* from = NULL;
+   char* to = NULL;
+   char* name = NULL;
+   DIR* dir;
+   struct dirent* entry;
 
-   if (!(dir = opendir(directory))) 
+   if (!(dir = opendir(directory)))
    {
       return;
    }
 
-   while ((entry = readdir(dir)) != NULL) 
+   while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR) 
+      if (entry->d_type == DT_DIR)
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) 
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
          {
             continue;
          }
@@ -174,8 +177,8 @@ void pgmoneta_lz4d_data(char *directory)
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
          pgmoneta_lz4d_data(path);
-      } 
-      else 
+      }
+      else
       {
          from = NULL;
 
@@ -212,15 +215,16 @@ pgmoneta_lz4c_file(char* from, char* to)
    lz4_compress(from, to);
 
    pgmoneta_delete_file(from);
-  
+
    return 0;
 }
 
-static int lz4_compress(char *from, char *to) 
+static int
+lz4_compress(char* from, char* to)
 {
-   LZ4_stream_t *lz4Stream = NULL;
-   FILE *fin = NULL;
-   FILE *fout = NULL;
+   LZ4_stream_t* lz4Stream = NULL;
+   FILE* fin = NULL;
+   FILE* fout = NULL;
    char buffIn[2][BLOCK_BYTES];
    int buffInIndex = 0;
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
@@ -229,16 +233,16 @@ static int lz4_compress(char *from, char *to)
    fin = fopen(from, "rb");
    fout = fopen(to, "wb");
 
-   for (;;) 
+   for (;;)
    {
       size_t read = fread(buffIn[buffInIndex], sizeof(char), BLOCK_BYTES, fin);
-      if (read == 0) 
+      if (read == 0)
       {
          break;
       }
 
       int compression = LZ4_compress_fast_continue(lz4Stream, buffIn[buffInIndex], buffOut, read, sizeof(buffOut), 1);
-      if (compression <= 0) 
+      if (compression <= 0)
       {
          break;
       }
@@ -256,12 +260,13 @@ static int lz4_compress(char *from, char *to)
    return 0;
 }
 
-static int lz4_decompress(char *from, char *to) 
+static int
+lz4_decompress(char* from, char* to)
 {
    LZ4_streamDecode_t lz4StreamDecodeBody;
-   LZ4_streamDecode_t *lz4StreamDecode = NULL;
-   FILE *fin = NULL;
-   FILE *fout = NULL;
+   LZ4_streamDecode_t* lz4StreamDecode = NULL;
+   FILE* fin = NULL;
+   FILE* fout = NULL;
    char buffIn[2][BLOCK_BYTES];
    int buffInIndex = 0;
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
@@ -272,7 +277,7 @@ static int lz4_decompress(char *from, char *to)
 
    LZ4_setStreamDecode(lz4StreamDecode, NULL, 0);
 
-   for (;;) 
+   for (;;)
    {
       int compression = 0;
       fread(&compression, sizeof(compression), 1, fin);
@@ -280,7 +285,7 @@ static int lz4_decompress(char *from, char *to)
       fread(buffOut, sizeof(char), compression, fin);
 
       int decompression = LZ4_decompress_safe_continue(lz4StreamDecode, buffOut, buffIn[buffInIndex],compression, BLOCK_BYTES);
-      if (decompression <= 0) 
+      if (decompression <= 0)
       {
          break;
       }
@@ -293,5 +298,5 @@ static int lz4_decompress(char *from, char *to)
    fclose(fout);
    fclose(fin);
 
-  return 0;
+   return 0;
 }

@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2022 Red Hat
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this list
  * of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice, this
  * list of conditions and the following disclaimer in the documentation and/or other
  * materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its contributors may
  * be used to endorse or promote products derived from this software without specific
  * prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -116,12 +116,12 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
          array[counter] = (char*)malloc(end - start);
          memset(array[counter], 0, end - start);
          memcpy(array[counter], msg->data + start, end - start);
-               
+
          start = end;
          counter++;
       }
    }
-         
+
    for (int i = 0; i < counter; i++)
    {
       if (!strcmp(array[i], "user"))
@@ -224,9 +224,9 @@ pgmoneta_read_int32(void* data)
                             *((unsigned char*)(data + 3))};
 
    int32_t res = (int32_t)((bytes[0] << 24)) |
-                          ((bytes[1] << 16)) |
-                          ((bytes[2] <<  8)) |
-                          ((bytes[3]      ));
+                 ((bytes[1] << 16)) |
+                 ((bytes[2] <<  8)) |
+                 ((bytes[3]      ));
 
    return res;
 }
@@ -264,7 +264,7 @@ pgmoneta_write_byte(void* data, signed char b)
 void
 pgmoneta_write_int32(void* data, int32_t i)
 {
-   char *ptr = (char*)&i;
+   char* ptr = (char*)&i;
 
    *((char*)(data + 3)) = *ptr;
    ptr++;
@@ -278,7 +278,7 @@ pgmoneta_write_int32(void* data, int32_t i)
 void
 pgmoneta_write_int64(void* data, int64_t i)
 {
-   char *ptr = (char*)&i;
+   char* ptr = (char*)&i;
 
    *((char*)(data + 7)) = *ptr;
    ptr++;
@@ -313,7 +313,7 @@ bool
 pgmoneta_bigendian(void)
 {
    short int word = 0x0001;
-   char *b = (char *)&word;
+   char* b = (char*)&word;
    return (b[0] ? false : true);
 }
 
@@ -484,7 +484,7 @@ pgmoneta_libev_engine(unsigned int val)
 char*
 pgmoneta_get_home_directory(void)
 {
-   struct passwd *pw = getpwuid(getuid());
+   struct passwd* pw = getpwuid(getuid());
 
    if (pw == NULL)
    {
@@ -497,7 +497,7 @@ pgmoneta_get_home_directory(void)
 char*
 pgmoneta_get_user_name(void)
 {
-   struct passwd *pw = getpwuid(getuid());
+   struct passwd* pw = getpwuid(getuid());
 
    if (pw == NULL)
    {
@@ -634,7 +634,7 @@ error:
 }
 
 void
-pgmoneta_set_proc_title(int argc, char** argv, char* s1, char *s2)
+pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 {
 #ifdef HAVE_LINUX
    char title[256];
@@ -778,7 +778,7 @@ pgmoneta_append(char* orig, char* s)
 
    n = (char*)realloc(orig, orig_length + s_length + 1);
 
-   memcpy(n + orig_length, s, s_length); 
+   memcpy(n + orig_length, s, s_length);
 
    n[orig_length + s_length] = '\0';
 
@@ -828,8 +828,8 @@ unsigned long
 pgmoneta_directory_size(char* directory)
 {
    unsigned long total_size = 0;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
    char* p;
    struct stat st;
    unsigned long l;
@@ -901,14 +901,14 @@ pgmoneta_directory_size(char* directory)
 }
 
 int
-pgmoneta_get_directories(char *base, int* number_of_directories, char*** dirs)
+pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
 {
    char* d = NULL;
    char** array = NULL;
    int nod = 0;
    int n;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
 
    *number_of_directories = 0;
    *dirs = NULL;
@@ -992,9 +992,9 @@ error:
 }
 
 int
-pgmoneta_delete_directory(char *path)
+pgmoneta_delete_directory(char* path)
 {
-   DIR *d = opendir(path);
+   DIR* d = opendir(path);
    size_t path_len = strlen(path);
    int r = -1;
    int r2 = -1;
@@ -1012,7 +1012,7 @@ pgmoneta_delete_directory(char *path)
             continue;
          }
 
-         len = path_len + strlen(entry->d_name) + 2; 
+         len = path_len + strlen(entry->d_name) + 2;
          buf = malloc(len);
 
          if (buf)
@@ -1041,14 +1041,14 @@ pgmoneta_delete_directory(char *path)
 }
 
 int
-pgmoneta_get_files(char *base, int* number_of_files, char*** files)
+pgmoneta_get_files(char* base, int* number_of_files, char*** files)
 {
    char* d = NULL;
    char** array = NULL;
    int nof = 0;
    int n;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
 
    *number_of_files = 0;
    *files = NULL;
@@ -1122,14 +1122,14 @@ error:
 }
 
 int
-pgmoneta_get_wal_files(char *base, int* number_of_files, char*** files)
+pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
 {
    char* d = NULL;
    char** array = NULL;
    int nof = 0;
    int n;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
 
    *number_of_files = 0;
    *files = NULL;
@@ -1223,7 +1223,7 @@ error:
 }
 
 int
-pgmoneta_delete_file(char *file)
+pgmoneta_delete_file(char* file)
 {
    int ret;
 
@@ -1315,7 +1315,7 @@ pgmoneta_copy_file(char* from, char* to)
 
    while ((nread = read(fd_from, buffer, sizeof(buffer))) > 0)
    {
-      char *out = &buffer[0];
+      char* out = &buffer[0];
       ssize_t nwritten;
 
       do
@@ -1705,7 +1705,7 @@ unsigned long
 pgmoneta_free_space(char* path)
 {
    struct statvfs buf;
-   
+
    if (statvfs(path, &buf))
    {
       errno = 0;
@@ -1719,7 +1719,7 @@ unsigned long
 pgmoneta_total_space(char* path)
 {
    struct statvfs buf;
-   
+
    if (statvfs(path, &buf))
    {
       errno = 0;
@@ -1741,7 +1741,7 @@ pgmoneta_ends_with(char* str, char* suffix)
    int str_len = strlen(str);
    int suffix_len = strlen(suffix);
 
-  return (str_len >= suffix_len) && (strcmp(str + (str_len - suffix_len), suffix) == 0);
+   return (str_len >= suffix_len) && (strcmp(str + (str_len - suffix_len), suffix) == 0);
 }
 
 void
