@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2022 Red Hat
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this list
  * of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice, this
  * list of conditions and the following disclaimer in the documentation and/or other
  * materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its contributors may
  * be used to endorse or promote products derived from this software without specific
  * prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -50,8 +50,8 @@ pgmoneta_zstandardc_data(char* directory)
 {
    char* from = NULL;
    char* to = NULL;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
    int level;
    struct configuration* config;
 
@@ -129,8 +129,8 @@ pgmoneta_zstandardc_wal(char* directory)
 {
    char* from = NULL;
    char* to = NULL;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
    int level;
    struct configuration* config;
 
@@ -198,8 +198,8 @@ pgmoneta_zstandardd_data(char* directory)
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
-   DIR *dir;
-   struct dirent *entry;
+   DIR* dir;
+   struct dirent* entry;
 
    if (!(dir = opendir(directory)))
    {
@@ -332,7 +332,7 @@ zstd_compress(char* from, int level, char* to)
       do
       {
          ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
-         size_t remaining = ZSTD_compressStream2(cctx, &output , &input, mode);
+         size_t remaining = ZSTD_compressStream2(cctx, &output, &input, mode);
          fwrite(buffOut, sizeof(char), output.pos, fout);
          finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
       }
@@ -408,7 +408,7 @@ zstd_decompress(char* from, char* to)
       while (input.pos < input.size)
       {
          ZSTD_outBuffer output = {buffOut, buffOutSize, 0};
-         size_t ret = ZSTD_decompressStream(dctx, &output , &input);
+         size_t ret = ZSTD_decompressStream(dctx, &output, &input);
          fwrite(buffOut, sizeof(char), output.pos, fout);
          lastRet = ret;
       }

@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2022 Red Hat
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this list
  * of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice, this
  * list of conditions and the following disclaimer in the documentation and/or other
  * materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its contributors may
  * be used to endorse or promote products derived from this software without specific
  * prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -100,16 +100,16 @@
 #define FIFOTYPE '6'
 #define CONTTYPE '7'
 
-typedef int (*openfunc_t)(const char *, int, ...);
-typedef int (*closefunc_t)(int);
-typedef ssize_t (*readfunc_t)(int, void *, size_t);
-typedef ssize_t (*writefunc_t)(int, const void *, size_t);
+typedef int (* openfunc_t)(const char*, int, ...);
+typedef int (* closefunc_t)(int);
+typedef ssize_t (* readfunc_t)(int, void*, size_t);
+typedef ssize_t (* writefunc_t)(int, const void*, size_t);
 
 #define TH_ISREG(t) ((t)->th_buf.typeflag == REGTYPE \
                      || (t)->th_buf.typeflag == AREGTYPE     \
                      || (t)->th_buf.typeflag == CONTTYPE                \
                      || (S_ISREG((mode_t)oct_to_int((t)->th_buf.mode))  \
-			     && (t)->th_buf.typeflag != LNKTYPE))
+                         && (t)->th_buf.typeflag != LNKTYPE))
 #define TH_ISSYM(t) ((t)->th_buf.typeflag == SYMTYPE \
                      || S_ISLNK((mode_t)oct_to_int((t)->th_buf.mode)))
 #define TH_ISDIR(t) ((t)->th_buf.typeflag == DIRTYPE                     \
@@ -118,25 +118,25 @@ typedef ssize_t (*writefunc_t)(int, const void *, size_t);
                          && strlen((t)->th_buf.name)                    \
                          && ((t)->th_buf.name[strlen((t)->th_buf.name) - 1] == '/')))
 
-static int oct_to_int(char *oct);
-static size_t oct_to_size(char *oct);
-static void int_to_oct_nonull(int num, char *oct, size_t octlen);
-static void int_to_oct(int num, char *oct, size_t octlen);
+static int oct_to_int(char* oct);
+static size_t oct_to_size(char* oct);
+static void int_to_oct_nonull(int num, char* oct, size_t octlen);
+static void int_to_oct(int num, char* oct, size_t octlen);
 
 #define th_get_size(t) oct_to_size((t)->th_buf.size)
 #define th_set_size(t, fsize) \
-	int_to_oct_nonull((fsize), (t)->th_buf.size, 12)
+   int_to_oct_nonull((fsize), (t)->th_buf.size, 12)
 
-typedef unsigned int (*libtar_hashfunc_t)(void *, unsigned int);
-typedef void (*libtar_freefunc_t)(void *);
-typedef int (*libtar_cmpfunc_t)(void *, void *);
-typedef int (*libtar_matchfunc_t)(void *, void *);
+typedef unsigned int (* libtar_hashfunc_t)(void*, unsigned int);
+typedef void (* libtar_freefunc_t)(void*);
+typedef int (* libtar_cmpfunc_t)(void*, void*);
+typedef int (* libtar_matchfunc_t)(void*, void*);
 
 struct libtar_node
 {
-   void *data;
-   struct libtar_node *next;
-   struct libtar_node *prev;
+   void* data;
+   struct libtar_node* next;
+   struct libtar_node* prev;
 };
 typedef struct libtar_node* libtar_listptr_t;
 
@@ -169,7 +169,7 @@ static libtar_hash_t* libtar_hash_new(int, libtar_hashfunc_t);
 static void libtar_hash_free(libtar_hash_t*, libtar_freefunc_t);
 static int libtar_hash_getkey(libtar_hash_t*, libtar_hashptr_t*, void*, libtar_matchfunc_t);
 static void libtar_hashptr_reset(libtar_hashptr_t*);
-static void *libtar_hashptr_data(libtar_hashptr_t*);
+static void*libtar_hashptr_data(libtar_hashptr_t*);
 static int libtar_hash_add(libtar_hash_t*, void*);
 static unsigned int libtar_str_hashfunc(char*, unsigned int);
 static int libtar_str_match(char*, char*);
@@ -177,15 +177,15 @@ static int libtar_str_match(char*, char*);
 static void libtar_list_free(libtar_list_t*, libtar_freefunc_t);
 static int libtar_list_search(libtar_list_t*, libtar_listptr_t*, void*, libtar_matchfunc_t);
 static void libtar_listptr_reset(libtar_listptr_t*);
-static void *libtar_listptr_data(libtar_listptr_t*);
-static libtar_list_t *libtar_list_new(libtar_cmpfunc_t);
+static void*libtar_listptr_data(libtar_listptr_t*);
+static libtar_list_t*libtar_list_new(libtar_cmpfunc_t);
 static int libtar_list_add(libtar_list_t*, void*);
 static void libtar_list_empty(libtar_list_t*, libtar_freefunc_t);
 
-#define T_BLOCKSIZE	512
-#define T_NAMELEN	100
-#define T_PREFIXLEN	155
-#define T_MAXPATHLEN	(T_NAMELEN + T_PREFIXLEN)
+#define T_BLOCKSIZE  512
+#define T_NAMELEN 100
+#define T_PREFIXLEN  155
+#define T_MAXPATHLEN (T_NAMELEN + T_PREFIXLEN)
 
 #define GNU_LONGNAME_TYPE 'L'
 #define GNU_LONGLINK_TYPE 'K'
@@ -209,8 +209,8 @@ struct tar_header
    char devminor[8];
    char prefix[155];
    char padding[12];
-   char *gnu_longname;
-   char *gnu_longlink;
+   char* gnu_longname;
+   char* gnu_longlink;
 };
 
 typedef struct
@@ -223,7 +223,7 @@ typedef struct
 tartype_t;
 
 #define tar_block_write(t, buf) \
-   (*((t)->type->writefunc))((t)->fd, (char *)(buf), T_BLOCKSIZE)
+   (*((t)->type->writefunc))((t)->fd, (char*)(buf), T_BLOCKSIZE)
 
 static tartype_t default_type = {open, close, read, write};
 
@@ -367,7 +367,7 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
 
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
-   
+
    pgmoneta_management_write_int32(client_fd, result);
    pgmoneta_disconnect(client_fd);
 
@@ -394,7 +394,7 @@ tar_init(TAR** t, const char* pathname, tartype_t* type, int oflags, int mode)
       return -1;
    }
 
-   *t = (TAR *)calloc(1, sizeof(TAR));
+   *t = (TAR*)calloc(1, sizeof(TAR));
    if (*t == NULL)
    {
       return -1;
@@ -635,7 +635,7 @@ tar_append_file(TAR* t, const char* realname, const char* savename)
 }
 
 static int
-tar_append_regfile(TAR *t, const char *realname)
+tar_append_regfile(TAR* t, const char* realname)
 {
    char block[T_BLOCKSIZE];
    int filefd;
@@ -727,7 +727,7 @@ strlcpy(char* dst, const char* src, size_t siz)
 }
 
 static void
-th_set_path(TAR *t, const char *pathname)
+th_set_path(TAR* t, const char* pathname)
 {
    char suffix[2] = "";
    char* tmp;
@@ -768,7 +768,7 @@ th_set_path(TAR *t, const char *pathname)
 }
 
 static int
-th_write(TAR *t)
+th_write(TAR* t)
 {
    int i, j;
    char type2;
@@ -954,7 +954,7 @@ th_crc_calc(TAR* t)
 
    for (i = 0; i < T_BLOCKSIZE; i++)
    {
-      sum += ((unsigned char *)(&(t->th_buf)))[i];
+      sum += ((unsigned char*)(&(t->th_buf)))[i];
    }
 
    for (i = 0; i < 8; i++)
@@ -1034,7 +1034,7 @@ th_set_device(TAR* t, dev_t device)
 static void
 th_set_user(TAR* t, uid_t uid)
 {
-   struct passwd *pw;
+   struct passwd* pw;
 
    pw = getpwuid(uid);
 
@@ -1135,7 +1135,7 @@ libtar_hash_new(int num, libtar_hashfunc_t hashfunc)
 {
    libtar_hash_t* hash;
 
-   hash = (libtar_hash_t *)calloc(1, sizeof(libtar_hash_t));
+   hash = (libtar_hash_t*)calloc(1, sizeof(libtar_hash_t));
 
    if (hash == NULL)
    {
@@ -1153,7 +1153,7 @@ libtar_hash_new(int num, libtar_hashfunc_t hashfunc)
       hash->hashfunc = (libtar_hashfunc_t)libtar_str_hashfunc;
    }
 
-   hash->table = (libtar_list_t **)calloc(num, sizeof(libtar_list_t *));
+   hash->table = (libtar_list_t**)calloc(num, sizeof(libtar_list_t*));
 
    if (hash->table == NULL)
    {
@@ -1302,7 +1302,7 @@ libtar_list_new(libtar_cmpfunc_t cmpfunc)
 {
    libtar_list_t* newlist;
 
-   newlist = (libtar_list_t *)calloc(1, sizeof(libtar_list_t));
+   newlist = (libtar_list_t*)calloc(1, sizeof(libtar_list_t));
 
    if (cmpfunc != NULL)
    {

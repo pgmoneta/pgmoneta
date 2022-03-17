@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2022 Red Hat
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this list
  * of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice, this
  * list of conditions and the following disclaimer in the documentation and/or other
  * materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its contributors may
  * be used to endorse or promote products derived from this software without specific
  * prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -167,7 +167,7 @@ unknown_page(int client_fd)
    memset(&time_buf, 0, sizeof(time_buf));
    ctime_r(&now, &time_buf[0]);
    time_buf[strlen(time_buf) - 1] = 0;
-   
+
    data = pgmoneta_append(data, "HTTP/1.1 403 Forbidden\r\n");
    data = pgmoneta_append(data, "Date: ");
    data = pgmoneta_append(data, &time_buf[0]);
@@ -201,7 +201,7 @@ home_page(int client_fd)
    memset(&time_buf, 0, sizeof(time_buf));
    ctime_r(&now, &time_buf[0]);
    time_buf[strlen(time_buf) - 1] = 0;
-   
+
    data = pgmoneta_append(data, "HTTP/1.1 200 OK\r\n");
    data = pgmoneta_append(data, "Content-Type: text/html; charset=utf-8\r\n");
    data = pgmoneta_append(data, "Date: ");
@@ -479,7 +479,7 @@ metrics_page(int client_fd)
    memset(&time_buf, 0, sizeof(time_buf));
    ctime_r(&now, &time_buf[0]);
    time_buf[strlen(time_buf) - 1] = 0;
-   
+
    data = pgmoneta_append(data, "HTTP/1.1 200 OK\r\n");
    data = pgmoneta_append(data, "Content-Type: text/plain; version=0.0.1; charset=utf-8\r\n");
    data = pgmoneta_append(data, "Date: ");
@@ -615,7 +615,7 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n\n");
 
    free(d);
-   
+
    d = NULL;
 
    d = pgmoneta_append(d, config->base_dir);
@@ -1406,7 +1406,7 @@ send_chunk(int client_fd, char* data)
 
    m = pgmoneta_append(m, data);
    m = pgmoneta_append(m, "\r\n");
-   
+
    msg.kind = 0;
    msg.length = strlen(m);
    msg.data = m;
