@@ -720,10 +720,11 @@ strlcpy(char* dst, const char* src, size_t siz)
       {
          *d = '\0';
       }
-      while (*s++);
+      while (*s++)
+         ;
    }
 
-   return(s - src - 1);
+   return (s - src - 1);
 }
 
 static void
@@ -744,7 +745,7 @@ th_set_path(TAR* t, const char* pathname)
       strcpy(suffix, "/");
    }
 
-   if (strlen(pathname) > T_NAMELEN-1)
+   if (strlen(pathname) > T_NAMELEN - 1)
    {
       t->th_buf.gnu_longname = strdup(pathname);
       strncpy(t->th_buf.name, t->th_buf.gnu_longname, T_NAMELEN);

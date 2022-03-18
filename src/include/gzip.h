@@ -69,4 +69,3 @@ pgmoneta_gzip_file(char* from, char* to);
 #endif
 
 #endif
-

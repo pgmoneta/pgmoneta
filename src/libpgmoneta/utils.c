@@ -223,8 +223,8 @@ pgmoneta_read_int32(void* data)
 
    int32_t res = (int32_t)((bytes[0] << 24)) |
                  ((bytes[1] << 16)) |
-                 ((bytes[2] <<  8)) |
-                 ((bytes[3]      ));
+                 ((bytes[2] << 8)) |
+                 ((bytes[3]));
 
    return res;
 }
@@ -247,7 +247,7 @@ pgmoneta_read_int64(void* data)
    i3 = i3 << 32;
    i4 = i4 << 24;
    i5 = i5 << 16;
-   i6 = i6 <<  8;
+   i6 = i6 << 8;
    /* i7 = i7; */
 
    return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
@@ -319,8 +319,8 @@ unsigned int
 pgmoneta_swap(unsigned int i)
 {
    return ((i << 24) & 0xff000000) |
-          ((i << 8)  & 0x00ff0000) |
-          ((i >> 8)  & 0x0000ff00) |
+          ((i << 8) & 0x00ff0000) |
+          ((i >> 8) & 0x0000ff00) |
           ((i >> 24) & 0x000000ff);
 }
 
@@ -611,7 +611,7 @@ pgmoneta_base64_decode(char* encoded, size_t encoded_length, char** raw, int* ra
    BIO_set_flags(b64_bio, BIO_FLAGS_BASE64_NO_NL);
 
    index = 0;
-   while (0 < BIO_read(b64_bio, decoded + index, 1) )
+   while (0 < BIO_read(b64_bio, decoded + index, 1))
    {
       index++;
    }
@@ -1463,14 +1463,14 @@ pgmoneta_compare_files(char* f1, char* f2)
    size_t cs;
    size_t bs;
 
-   fp1 = fopen(f1,  "r");
+   fp1 = fopen(f1, "r");
 
    if (fp1 == NULL)
    {
       goto error;
    }
 
-   fp2 = fopen(f2,  "r");
+   fp2 = fopen(f2, "r");
 
    if (fp2 == NULL)
    {
@@ -1758,7 +1758,7 @@ pgmoneta_bytes_to_string(uint64_t bytes)
 
    result = (char*)malloc(sizeof(char) * 20);
 
-   for (int i = 0; i < sizeof(sizes)/sizeof(*(sizes)); i++, multiplier /= 1024)
+   for (int i = 0; i < sizeof(sizes) / sizeof(*(sizes)); i++, multiplier /= 1024)
    {
       if (bytes < multiplier)
       {

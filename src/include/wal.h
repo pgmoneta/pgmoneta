@@ -49,4 +49,3 @@ pgmoneta_wal(int srv, char** argv);
 #endif
 
 #endif
-

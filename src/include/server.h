@@ -47,4 +47,3 @@ pgmoneta_server_info(int srv);
 #endif
 
 #endif
-

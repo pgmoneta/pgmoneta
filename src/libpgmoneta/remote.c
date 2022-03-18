@@ -109,7 +109,8 @@ pgmoneta_remote_management(int client_fd, char* address)
                }
 
                status = pgmoneta_write_message(client_ssl, client_fd, msg);
-            } while (status == MESSAGE_STATUS_OK);
+            }
+            while (status == MESSAGE_STATUS_OK);
             break;
          default:
             pgmoneta_log_warn("Unknown management operation: %d", type);

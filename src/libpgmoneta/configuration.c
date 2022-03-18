@@ -1161,7 +1161,6 @@ pgmoneta_validate_admins_configuration(void* shm)
    return 0;
 }
 
-
 int
 pgmoneta_reload_configuration(void)
 {

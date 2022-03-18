@@ -51,8 +51,8 @@ extern "C" {
 
 #define pgmoneta_log_trace(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_DEBUG5, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_debug(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_DEBUG1, __FILE__, __LINE__, __VA_ARGS__)
-#define pgmoneta_log_info(...)  pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_INFO,  __FILE__, __LINE__,  __VA_ARGS__)
-#define pgmoneta_log_warn(...)  pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_WARN,  __FILE__, __LINE__, __VA_ARGS__)
+#define pgmoneta_log_info(...)  pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_INFO, __FILE__, __LINE__, __VA_ARGS__)
+#define pgmoneta_log_warn(...)  pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_WARN, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_error(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_fatal(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_FATAL, __FILE__, __LINE__, __VA_ARGS__)
 
@@ -81,4 +81,3 @@ pgmoneta_log_mem(void* data, size_t size);
 #endif
 
 #endif
-
