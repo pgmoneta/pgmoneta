@@ -374,7 +374,6 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
          pgmoneta_lz4c_file(tarfile, to);
       }
 
-
       total_seconds = (int)difftime(time(NULL), start_time);
       hours = total_seconds / 3600;
       minutes = (total_seconds % 3600) / 60;
@@ -738,10 +737,11 @@ strlcpy(char* dst, const char* src, size_t siz)
       {
          *d = '\0';
       }
-      while (*s++);
+      while (*s++)
+         ;
    }
 
-   return(s - src - 1);
+   return (s - src - 1);
 }
 
 static void
@@ -762,7 +762,7 @@ th_set_path(TAR* t, const char* pathname)
       strcpy(suffix, "/");
    }
 
-   if (strlen(pathname) > T_NAMELEN-1)
+   if (strlen(pathname) > T_NAMELEN - 1)
    {
       t->th_buf.gnu_longname = strdup(pathname);
       strncpy(t->th_buf.name, t->th_buf.gnu_longname, T_NAMELEN);

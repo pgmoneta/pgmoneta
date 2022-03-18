@@ -54,4 +54,3 @@ pgmoneta_prometheus_reset(void);
 #endif
 
 #endif
-

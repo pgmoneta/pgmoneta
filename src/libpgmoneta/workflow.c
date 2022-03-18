@@ -110,4 +110,3 @@ wf_backup(void)
 
    return head;
 }
-

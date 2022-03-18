@@ -52,7 +52,6 @@
 
 #define MANAGEMENT_HEADER_SIZE 1
 
-
 static int read_int32(char* prefix, int socket, int* i);
 static int read_int64(char* prefix, int socket, unsigned long* l);
 static int read_string(char* prefix, int socket, char** str);
@@ -1035,7 +1034,7 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
          else
          {
             printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                   name, bck, res, ws, ds, keep ? "Yes" : "No", valid  == VALID_TRUE ? "Yes" : "No");
+                   name, bck, res, ws, ds, keep ? "Yes" : "No", valid == VALID_TRUE ? "Yes" : "No");
          }
 
          free(bck);
@@ -1726,7 +1725,8 @@ write_socket(int socket, void* buf, size_t size)
                break;
          }
       }
-   } while (keep_write);
+   }
+   while (keep_write);
 
    return 1;
 }
@@ -1808,7 +1808,8 @@ write_ssl(SSL* ssl, void* buf, size_t size)
             return 1;
          }
       }
-   } while (keep_write);
+   }
+   while (keep_write);
 
    return 1;
 }

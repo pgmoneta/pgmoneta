@@ -242,7 +242,7 @@ main(int argc, char** argv)
    {
       static struct option long_options[] =
       {
-         {"config",  required_argument, 0, 'c'},
+         {"config", required_argument, 0, 'c'},
          {"users", required_argument, 0, 'u'},
          {"admins", required_argument, 0, 'A'},
          {"daemon", no_argument, 0, 'd'},
@@ -1417,7 +1417,7 @@ wal_compress_cb(struct ev_loop* loop, ev_periodic* w, int revents)
          {
             pgmoneta_zstandardc_wal(d);
          }
-         else if(config->compression_type == COMPRESSION_LZ4)
+         else if (config->compression_type == COMPRESSION_LZ4)
          {
             pgmoneta_lz4c_wal(d);
          }
@@ -1711,7 +1711,7 @@ create_pidfile(void)
       // no pidfile set, use a default one
       snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
                config->unix_socket_dir,
-               !strncmp(config->host,"*", sizeof(config->host)) ? "all" : config->host );
+               !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host );
       pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);
    }
 

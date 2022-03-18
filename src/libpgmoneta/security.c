@@ -433,7 +433,8 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
                         }
                         ERR_clear_error();
                      }
-                  } while (status != 1);
+                  }
+                  while (status != 1);
                }
             }
          }
@@ -2785,7 +2786,7 @@ static int
 create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
 {
    SSL* s = NULL;
-   STACK_OF(X509_NAME) *root_cert_list = NULL;
+   STACK_OF(X509_NAME) * root_cert_list = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;

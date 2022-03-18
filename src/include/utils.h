@@ -553,7 +553,6 @@ pgmoneta_get_server_backup_identifier_data(int server, char* identifier);
 char*
 pgmoneta_get_server_backup_identifier_data_wal(int server, char* identifier);
 
-
 #ifdef DEBUG
 
 /**

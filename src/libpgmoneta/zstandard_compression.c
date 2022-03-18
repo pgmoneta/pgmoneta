@@ -304,10 +304,10 @@ zstd_compress(char* from, int level, char* to)
    void* buffOut = NULL;
    ZSTD_CCtx* cctx = NULL;
 
-   fin  = fopen(from, "rb");
+   fin = fopen(from, "rb");
    fout = fopen(to, "wb");
    buffInSize = ZSTD_CStreamInSize();
-   buffIn  = malloc(buffInSize);
+   buffIn = malloc(buffInSize);
    buffOutSize = ZSTD_CStreamOutSize();
    buffOut = malloc(buffOutSize);
 
@@ -388,7 +388,7 @@ zstd_decompress(char* from, char* to)
 
    fin = fopen(from, "rb");
    buffInSize = ZSTD_DStreamInSize();
-   buffIn  = malloc(buffInSize);
+   buffIn = malloc(buffInSize);
    fout = fopen(to, "wb");;
    buffOutSize = ZSTD_DStreamOutSize();
    buffOut = malloc(buffOutSize);
