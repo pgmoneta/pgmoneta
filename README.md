@@ -8,7 +8,7 @@
 
 * Full backup
 * Restore
-* Compression (gzip, zstd)
+* Compression (gzip, zstd, lz4)
 * Symlink support
 * Prometheus support
 * Remote management
@@ -49,7 +49,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [OpenSSL](http://www.openssl.org/)
 * [zlib](https://zlib.net)
 * [zstd](http://www.zstd.net)
-* [lz4](www.lz4.org)
+* [lz4](https://lz4.github.io/lz4/)
 * [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
 * [rst2man](https://docutils.sourceforge.io/)
 
