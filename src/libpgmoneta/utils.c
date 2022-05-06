@@ -96,7 +96,9 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
    {
       c = pgmoneta_read_byte(msg->data + i);
       if (c == 0)
+      {
          counter++;
+      }
    }
 
    array = (char**)malloc(sizeof(char*) * counter);
@@ -152,13 +154,17 @@ pgmoneta_extract_username_database(struct message* msg, char** username, char** 
    }
 
    if (*database == NULL)
+   {
       *database = *username;
+   }
 
    pgmoneta_log_trace("Username: %s", *username);
    pgmoneta_log_trace("Database: %s", *database);
 
    for (int i = 0; i < counter; i++)
+   {
       free(array[i]);
+   }
    free(array);
 
    return 0;
@@ -1021,9 +1027,13 @@ pgmoneta_delete_directory(char* path)
             if (!stat(buf, &statbuf))
             {
                if (S_ISDIR(statbuf.st_mode))
+               {
                   r2 = pgmoneta_delete_directory(buf);
+               }
                else
+               {
                   r2 = unlink(buf);
+               }
             }
             free(buf);
          }
@@ -1033,7 +1043,9 @@ pgmoneta_delete_directory(char* path)
    }
 
    if (!r)
+   {
       r = rmdir(path);
+   }
 
    return r;
 }

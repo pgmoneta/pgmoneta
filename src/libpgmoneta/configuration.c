@@ -123,7 +123,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
    file = fopen(filename, "r");
 
    if (!file)
+   {
       return 1;
+   }
 
    memset(&section, 0, LINE_LENGTH);
    config = (struct configuration*)shm;
@@ -140,7 +142,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                memset(&section, 0, LINE_LENGTH);
                max = ptr - line - 1;
                if (max > MISC_LENGTH - 1)
+               {
                   max = MISC_LENGTH - 1;
+               }
                memcpy(&section, line + 1, max);
                if (strcmp(section, "pgmoneta"))
                {
@@ -186,18 +190,24 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->host, value, max);
                   }
                   else if (strlen(section) > 0)
                   {
                      max = strlen(section);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.host, value, max);
                   }
                   else
@@ -225,11 +235,15 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(section);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
                      if (max > MAX_USERNAME_LENGTH - 1)
+                     {
                         max = MAX_USERNAME_LENGTH - 1;
+                     }
                      memcpy(&srv.username, value, max);
                   }
                   else
@@ -243,11 +257,15 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(section);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.backup_slot, value, max);
                   }
                   else
@@ -261,11 +279,15 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(section);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.wal_slot, value, max);
                   }
                   else
@@ -279,11 +301,15 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(section);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(&srv.follow, value, max);
                   }
                   else
@@ -311,7 +337,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
+                     {
                         max = MAX_PATH - 1;
+                     }
                      memcpy(&config->base_dir[0], value, max);
                   }
                   else
@@ -325,7 +353,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MAX_PATH - 1)
+                     {
                         max = MAX_PATH - 1;
+                     }
                      memcpy(&config->pgsql_dir[0], value, max);
                   }
                   else
@@ -381,7 +411,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->tls_ca_file, value, max);
                   }
                   else
@@ -395,7 +427,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->tls_cert_file, value, max);
                   }
                   else
@@ -409,7 +443,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->tls_key_file, value, max);
                   }
                   else
@@ -437,7 +473,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->pidfile, value, max);
                   }
                   else
@@ -473,7 +511,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->log_path, value, max);
                   }
                   else
@@ -487,7 +527,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->unix_socket_dir, value, max);
                   }
                   else
@@ -501,7 +543,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   {
                      max = strlen(value);
                      if (max > MISC_LENGTH - 1)
+                     {
                         max = MISC_LENGTH - 1;
+                     }
                      memcpy(config->libev, value, max);
                   }
                   else
@@ -1332,13 +1376,19 @@ static int
 as_logging_type(char* str)
 {
    if (!strcasecmp(str, "console"))
+   {
       return PGMONETA_LOGGING_TYPE_CONSOLE;
+   }
 
    if (!strcasecmp(str, "file"))
+   {
       return PGMONETA_LOGGING_TYPE_FILE;
+   }
 
    if (!strcasecmp(str, "syslog"))
+   {
       return PGMONETA_LOGGING_TYPE_SYSLOG;
+   }
 
    return 0;
 }
@@ -1347,31 +1397,49 @@ static int
 as_logging_level(char* str)
 {
    if (!strcasecmp(str, "debug5"))
+   {
       return PGMONETA_LOGGING_LEVEL_DEBUG5;
+   }
 
    if (!strcasecmp(str, "debug4"))
+   {
       return PGMONETA_LOGGING_LEVEL_DEBUG4;
+   }
 
    if (!strcasecmp(str, "debug3"))
+   {
       return PGMONETA_LOGGING_LEVEL_DEBUG3;
+   }
 
    if (!strcasecmp(str, "debug2"))
+   {
       return PGMONETA_LOGGING_LEVEL_DEBUG2;
+   }
 
    if (!strcasecmp(str, "debug1"))
+   {
       return PGMONETA_LOGGING_LEVEL_DEBUG1;
+   }
 
    if (!strcasecmp(str, "info"))
+   {
       return PGMONETA_LOGGING_LEVEL_INFO;
+   }
 
    if (!strcasecmp(str, "warn"))
+   {
       return PGMONETA_LOGGING_LEVEL_WARN;
+   }
 
    if (!strcasecmp(str, "error"))
+   {
       return PGMONETA_LOGGING_LEVEL_ERROR;
+   }
 
    if (!strcasecmp(str, "fatal"))
+   {
       return PGMONETA_LOGGING_LEVEL_FATAL;
+   }
 
    return PGMONETA_LOGGING_LEVEL_INFO;
 }
@@ -1380,13 +1448,19 @@ static int
 as_hugepage(char* str)
 {
    if (!strcasecmp(str, "off"))
+   {
       return HUGEPAGE_OFF;
+   }
 
    if (!strcasecmp(str, "try"))
+   {
       return HUGEPAGE_TRY;
+   }
 
    if (!strcasecmp(str, "on"))
+   {
       return HUGEPAGE_ON;
+   }
 
    return HUGEPAGE_OFF;
 }
@@ -1395,13 +1469,19 @@ static int
 as_compression(char* str)
 {
    if (!strcasecmp(str, "none"))
+   {
       return COMPRESSION_NONE;
+   }
 
    if (!strcasecmp(str, "gzip"))
+   {
       return COMPRESSION_GZIP;
+   }
 
    if (!strcasecmp(str, "zstd"))
+   {
       return COMPRESSION_ZSTD;
+   }
 
    return COMPRESSION_ZSTD;
 }
