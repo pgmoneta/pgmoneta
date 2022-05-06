@@ -1378,7 +1378,9 @@ libtar_list_empty(libtar_list_t* l, libtar_freefunc_t freefunc)
    {
       l->first = n->next;
       if (freefunc != NULL)
+      {
          (*freefunc)(n->data);
+      }
       free(n);
    }
 

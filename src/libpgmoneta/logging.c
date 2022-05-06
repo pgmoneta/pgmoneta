@@ -178,7 +178,9 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
    config = (struct configuration*)shmem;
 
    if (config == NULL)
+   {
       return;
+   }
 
    if (level >= config->log_level)
    {
@@ -281,7 +283,9 @@ pgmoneta_log_mem(void* data, size_t size)
    config = (struct configuration*)shmem;
 
    if (config == NULL)
+   {
       return;
+   }
 
    if (config->log_level == PGMONETA_LOGGING_LEVEL_DEBUG5 &&
        size > 0 &&
