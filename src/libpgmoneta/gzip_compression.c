@@ -341,6 +341,7 @@ gz_compress(char* from, int level, char* to)
    while (length > 0);
 
    fclose(in);
+   in = NULL;
 
    if (gzclose(out) != Z_OK)
    {
