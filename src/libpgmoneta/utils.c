@@ -1813,7 +1813,10 @@ pgmoneta_read_version(char* directory, char** version)
    }
 
    memset(&buf[0], 0, sizeof(buf));
-   fgets(&buf[0], sizeof(buf), file);
+   if (fgets(&buf[0], sizeof(buf), file) == NULL)
+   {
+      goto error;
+   }
 
    result = malloc(strlen(&buf[0]) + 1);
    memset(result, 0, strlen(&buf[0]) + 1);
