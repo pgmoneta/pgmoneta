@@ -1713,7 +1713,7 @@ create_pidfile(void)
       // no pidfile set, use a default one
       snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
                config->unix_socket_dir,
-               !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host );
+               !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);
    }
 
