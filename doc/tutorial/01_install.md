@@ -56,6 +56,18 @@ to `/tmp/pgsql/pg_hba.conf`
 
 (`postgres` user)
 
+## Make sure that replication level is set
+
+Check that
+
+```
+wal_level = replica
+```
+
+is set in `/tmp/pgsql/postgresql.conf` - or `logical`
+
+(`postgres` user)
+
 ## Start PostgreSQL
 
 ```
