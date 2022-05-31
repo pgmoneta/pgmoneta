@@ -19,6 +19,7 @@ dnf install -y postgresql10 postgresql10-server pgmoneta
 ## Initialize cluster
 
 ```
+export PATH=/usr/pgsql-10/bin:$PATH
 initdb /tmp/pgsql
 ```
 
