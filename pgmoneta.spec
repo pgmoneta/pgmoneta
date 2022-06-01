@@ -49,6 +49,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/01_install.md %{buildroot}%{_docdir}/%{name}/tutorial/01_install.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/02_replication_slot.md %{buildroot}%{_docdir}/%{name}/tutorial/02_replication_slot.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/03_remote_management.md %{buildroot}%{_docdir}/%{name}/tutorial/03_remote_management.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/04_prometheus.md %{buildroot}%{_docdir}/%{name}/tutorial/04_prometheus.md
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
@@ -82,6 +83,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/tutorial/01_install.md
 %{_docdir}/%{name}/tutorial/02_replication_slot.md
 %{_docdir}/%{name}/tutorial/03_remote_management.md
+%{_docdir}/%{name}/tutorial/04_prometheus.md
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
