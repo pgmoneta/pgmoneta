@@ -55,6 +55,9 @@ host    replication      repl            ::1/128                 md5
 
 to `/tmp/pgsql/pg_hba.conf`
 
+Remember to check the value of `password_encryption` in `/tmp/pgsql/postgresql.conf`
+to setup the correct authentication type.
+
 (`postgres` user)
 
 ## Make sure that replication level is set
