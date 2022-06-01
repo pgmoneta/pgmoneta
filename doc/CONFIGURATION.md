@@ -48,7 +48,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | non_blocking | on | Bool | No | Have `O_NONBLOCK` on sockets |
 | backlog | 16 | Int | No | The backlog for `listen()`. Minimum `16` |
 | hugepage | `try` | String | No | Huge page support (`off`, `try`, `on`) |
-| pidfile | | String | No | Path to the PID file. If not specified, it will be automatically set to `unix_socket_dir`/pgmoneta.<host>.pid` where `<host>` is the value of the `host` parameter or `all` if `host = *`.|
+| pidfile | | String | No | Path to the PID file. If not specified, it will be automatically set to `unix_socket_dir/pgmoneta.<host>.pid` where `<host>` is the value of the `host` parameter or `all` if `host = *`.|
 
 ## Server section
 
