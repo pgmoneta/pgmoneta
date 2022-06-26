@@ -77,6 +77,8 @@ extern "C" {
 #define COMPRESSION_ZSTD 2
 #define COMPRESSION_LZ4  3
 
+#define STORAGE_ENGINE_LOCAL 0
+
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 
@@ -150,6 +152,8 @@ struct configuration
 
    int compression_type;  /**< The compression type */
    int compression_level; /**< The compression level */
+
+   int storage_engine;  /**< The storage engine */
 
    int retention; /**< The retention */
    bool link;     /**< Use link */

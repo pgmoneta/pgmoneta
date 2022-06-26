@@ -26,90 +26,69 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_WORKFLOW_H
-#define PGMONETA_WORKFLOW_H
+/* pgmoneta */
+#include <pgmoneta.h>
+#include <stdio.h>
+#include <workflow.h>
+#include <info.h>
+#include <logging.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+/* system */
 #include <stdlib.h>
 
-#define WORKFLOW_TYPE_BACKUP 0
+static int local_storage_setup(int, char*);
+static int local_storage_execute(int, char*);
+static int local_storage_teardown(int, char*);
 
-typedef int (* setup)(int, char*);
-typedef int (* execute)(int, char*);
-typedef int (* teardown)(int, char*);
-
-struct workflow
+struct workflow*
+pgmoneta_workflow_create_local_storage(void)
 {
-   setup setup;
-   execute execute;
-   teardown teardown;
+   struct workflow* wf = NULL;
 
-   struct workflow* next;
-};
+   wf = (struct workflow*)malloc(sizeof(struct workflow));
 
-/**
- * Create a workflow
- * @param workflow_type The workflow type
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create(int workflow_type);
+   wf->setup = &local_storage_setup;
+   wf->execute = &local_storage_execute;
+   wf->teardown = &local_storage_teardown;
+   wf->next = NULL;
 
-/**
- * Delete the workflow
- * @param workflow The workflow
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_workflow_delete(struct workflow* workflow);
-
-/**
- * Create a workflow for the local storage engine
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_local_storage(void);
-
-/**
- * Create a workflow for the base backup
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_basebackup(void);
-
-/**
- * Create a workflow for GZIP
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_gzip(void);
-
-/**
- * Create a workflow for Zstandard
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_zstd(void);
-
-/**
- * Create a workflow for Lz4
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_lz4(void);
-
-/**
- * Create a workflow for symlinking
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_link(void);
-
-#ifdef __cplusplus
+   return wf;
 }
-#endif
 
-#endif
+static int
+local_storage_setup(int server, char* identifier)
+{
+   return 0;
+}
+
+static int
+local_storage_execute(int server, char* identifier)
+{
+   time_t start_time;
+   int total_seconds;
+   int hours;
+   int minutes;
+   int seconds;
+   char elapsed[128];
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   start_time = time(NULL);
+   total_seconds = (int)difftime(time(NULL), start_time);
+   hours = total_seconds / 3600;
+   minutes = (total_seconds % 3600) / 60;
+   seconds = total_seconds % 60;
+
+   memset(&elapsed[0], 0, sizeof(elapsed));
+   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+
+   pgmoneta_log_info("Local storage engine: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   return 0;
+}
+
+static int
+local_storage_teardown(int server, char* identifier)
+{
+   return 0;
+}

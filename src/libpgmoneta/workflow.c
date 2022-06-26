@@ -86,6 +86,12 @@ wf_backup(void)
    head = pgmoneta_workflow_create_basebackup();
    current = head;
 
+   if (config->storage_engine == STORAGE_ENGINE_LOCAL)
+   {
+      current->next = pgmoneta_workflow_create_local_storage();
+      current = current->next;
+   }
+
    if (config->compression_type == COMPRESSION_GZIP)
    {
       current->next = pgmoneta_workflow_create_gzip();
