@@ -36,9 +36,9 @@
 /* system */
 #include <stdlib.h>
 
-static int local_storage_setup(int, char*);
-static int local_storage_execute(int, char*);
-static int local_storage_teardown(int, char*);
+static int local_storage_setup(int, char*, struct node*, struct node**);
+static int local_storage_execute(int, char*, struct node*, struct node**);
+static int local_storage_teardown(int, char*, struct node*, struct node**);
 
 struct workflow*
 pgmoneta_workflow_create_local_storage(void)
@@ -56,13 +56,13 @@ pgmoneta_workflow_create_local_storage(void)
 }
 
 static int
-local_storage_setup(int server, char* identifier)
+local_storage_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }
 
 static int
-local_storage_execute(int server, char* identifier)
+local_storage_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    time_t start_time;
    int total_seconds;
@@ -88,7 +88,7 @@ local_storage_execute(int server, char* identifier)
 }
 
 static int
-local_storage_teardown(int server, char* identifier)
+local_storage_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }

@@ -36,9 +36,9 @@
 /* system */
 #include <stdlib.h>
 
-static int basebackup_setup(int, char*);
-static int basebackup_execute(int, char*);
-static int basebackup_teardown(int, char*);
+static int basebackup_setup(int, char*, struct node*, struct node**);
+static int basebackup_execute(int, char*, struct node*, struct node**);
+static int basebackup_teardown(int, char*, struct node*, struct node**);
 
 struct workflow*
 pgmoneta_workflow_create_basebackup(void)
@@ -56,13 +56,13 @@ pgmoneta_workflow_create_basebackup(void)
 }
 
 static int
-basebackup_setup(int server, char* identifier)
+basebackup_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }
 
 static int
-basebackup_execute(int server, char* identifier)
+basebackup_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    time_t start_time;
    char* root = NULL;
@@ -195,7 +195,7 @@ error:
 }
 
 static int
-basebackup_teardown(int server, char* identifier)
+basebackup_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }

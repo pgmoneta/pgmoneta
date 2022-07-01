@@ -33,13 +33,17 @@
 extern "C" {
 #endif
 
+#include <node.h>
+
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define WORKFLOW_TYPE_BACKUP 0
+#define WORKFLOW_TYPE_RESTORE 1
 
-typedef int (* setup)(int, char*);
-typedef int (* execute)(int, char*);
-typedef int (* teardown)(int, char*);
+typedef int (* setup)(int, char*, struct node*, struct node**);
+typedef int (* execute)(int, char*, struct node*, struct node**);
+typedef int (* teardown)(int, char*, struct node*, struct node**);
 
 struct workflow
 {
@@ -81,25 +85,35 @@ struct workflow*
 pgmoneta_workflow_create_basebackup(void);
 
 /**
- * Create a workflow for GZIP
+ * Create a workflow for the restore
  * @return The workflow
  */
 struct workflow*
-pgmoneta_workflow_create_gzip(void);
+pgmoneta_workflow_create_restore(void);
+
+/**
+ * Create a workflow for GZIP
+ * @param compress The compress
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_gzip(bool compress);
 
 /**
  * Create a workflow for Zstandard
+ * @param compress The compress
  * @return The workflow
  */
 struct workflow*
-pgmoneta_workflow_create_zstd(void);
+pgmoneta_workflow_create_zstd(bool compress);
 
 /**
  * Create a workflow for Lz4
+ * @param compress The compress
  * @return The workflow
  */
 struct workflow*
-pgmoneta_workflow_create_lz4(void);
+pgmoneta_workflow_create_lz4(bool compress);
 
 /**
  * Create a workflow for symlinking
@@ -107,6 +121,13 @@ pgmoneta_workflow_create_lz4(void);
  */
 struct workflow*
 pgmoneta_workflow_create_link(void);
+
+/**
+ * Create a workflow for recovery info
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_recovery_info(void);
 
 #ifdef __cplusplus
 }

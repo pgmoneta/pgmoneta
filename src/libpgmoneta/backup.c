@@ -59,6 +59,8 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    unsigned long size;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
+   struct node* i_nodes = NULL;
+   struct node* o_nodes = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -96,7 +98,7 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, &date[0]))
+      if (current->setup(server, &date[0], i_nodes, &o_nodes))
       {
          goto error;
       }
@@ -106,7 +108,7 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, &date[0]))
+      if (current->execute(server, &date[0], i_nodes, &o_nodes))
       {
          goto error;
       }
@@ -116,7 +118,7 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, &date[0]))
+      if (current->teardown(server, &date[0], i_nodes, &o_nodes))
       {
          goto error;
       }

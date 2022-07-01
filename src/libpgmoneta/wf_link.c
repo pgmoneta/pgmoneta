@@ -38,9 +38,9 @@
 /* system */
 #include <stdlib.h>
 
-static int link_setup(int, char*);
-static int link_execute(int, char*);
-static int link_teardown(int, char*);
+static int link_setup(int, char*, struct node*, struct node**);
+static int link_execute(int, char*, struct node*, struct node**);
+static int link_teardown(int, char*, struct node*, struct node**);
 
 struct workflow*
 pgmoneta_workflow_create_link(void)
@@ -58,13 +58,13 @@ pgmoneta_workflow_create_link(void)
 }
 
 static int
-link_setup(int server, char* identifier)
+link_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }
 
 static int
-link_execute(int server, char* identifier)
+link_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* server_path = NULL;
    char* from = NULL;
@@ -134,7 +134,7 @@ link_execute(int server, char* identifier)
 }
 
 static int
-link_teardown(int server, char* identifier)
+link_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }

@@ -36,19 +36,29 @@
 /* system */
 #include <stdlib.h>
 
-static int lz4_setup(int, char*);
-static int lz4_execute(int, char*);
-static int lz4_teardown(int, char*);
+static int lz4_setup(int, char*, struct node*, struct node**);
+static int lz4_execute_compress(int, char*, struct node*, struct node**);
+static int lz4_execute_uncompress(int, char*, struct node*, struct node**);
+static int lz4_teardown(int, char*, struct node*, struct node**);
 
 struct workflow*
-pgmoneta_workflow_create_lz4(void)
+pgmoneta_workflow_create_lz4(bool compress)
 {
    struct workflow* wf = NULL;
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
    wf->setup = &lz4_setup;
-   wf->execute = &lz4_execute;
+
+   if (compress == true)
+   {
+      wf->execute = &lz4_execute_compress;
+   }
+   else
+   {
+      wf->execute = &lz4_execute_uncompress;
+   }
+
    wf->teardown = &lz4_teardown;
    wf->next = NULL;
 
@@ -56,15 +66,17 @@ pgmoneta_workflow_create_lz4(void)
 }
 
 static int
-lz4_setup(int server, char* identifier)
+lz4_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }
 
 static int
-lz4_execute(int server, char* identifier)
+lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* d = NULL;
+   char* to = NULL;
+   char* prefix = NULL;
    time_t compression_time;
    int total_seconds;
    int hours;
@@ -75,7 +87,26 @@ lz4_execute(int server, char* identifier)
 
    config = (struct configuration*)shmem;
 
-   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   if (i_nodes != NULL)
+   {
+      prefix = pgmoneta_get_node_string(i_nodes, "prefix");
+
+      if (!strcmp(prefix, "Restore"))
+      {
+         to = pgmoneta_get_node_string(*o_nodes, "to");
+         d = malloc(strlen(to) + 1);
+         memset(d, 0, strlen(to) + 1);
+         memcpy(d, to, strlen(to));
+      }
+      else
+      {
+         d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+      }
+   }
+   else
+   {
+      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   }
 
    compression_time = time(NULL);
 
@@ -90,14 +121,70 @@ lz4_execute(int server, char* identifier)
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
-
+   
    free(d);
 
    return 0;
 }
 
 static int
-lz4_teardown(int server, char* identifier)
+lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+{
+   char* d = NULL;
+   char* to = NULL;
+   char* prefix = NULL;
+   time_t decompress_time;
+   int total_seconds;
+   int hours;
+   int minutes;
+   int seconds;
+   char elapsed[128];
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (i_nodes != NULL)
+   {
+      prefix = pgmoneta_get_node_string(i_nodes, "prefix");
+
+      if (!strcmp(prefix, "Restore"))
+      {
+         to = pgmoneta_get_node_string(*o_nodes, "to");
+         d = malloc(strlen(to) + 1);
+         memset(d, 0, strlen(to) + 1);
+         memcpy(d, to, strlen(to));
+      }
+      else
+      {
+         d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+      }
+   }
+   else
+   {
+      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   }
+
+   decompress_time = time(NULL);
+
+   pgmoneta_lz4d_data(d);
+
+   total_seconds = (int)difftime(time(NULL), decompress_time);
+   hours = total_seconds / 3600;
+   minutes = (total_seconds % 3600) / 60;
+   seconds = total_seconds % 60;
+
+   memset(&elapsed[0], 0, sizeof(elapsed));
+   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+
+   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   
+   free(d);
+   
+   return 0;
+}
+
+static int
+lz4_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }
