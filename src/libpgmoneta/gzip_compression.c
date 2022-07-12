@@ -413,8 +413,6 @@ gz_decompress(char* from, char* to)
 
    fclose(out);
 
-   pgmoneta_delete_file(from);
-
    return 0;
 
 error:
