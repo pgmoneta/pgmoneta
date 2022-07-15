@@ -40,6 +40,7 @@ extern "C" {
 
 #define WORKFLOW_TYPE_BACKUP 0
 #define WORKFLOW_TYPE_RESTORE 1
+#define WORKFLOW_TYPE_ARCHIVE 2
 
 typedef int (* setup)(int, char*, struct node*, struct node**);
 typedef int (* execute)(int, char*, struct node*, struct node**);
@@ -90,6 +91,13 @@ pgmoneta_workflow_create_basebackup(void);
  */
 struct workflow*
 pgmoneta_workflow_create_restore(void);
+
+/**
+ * Create a workflow for the archive
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_archive(void);
 
 /**
  * Create a workflow for GZIP

@@ -35,6 +35,7 @@
 
 static struct workflow* wf_backup(void);
 static struct workflow* wf_restore(void);
+static struct workflow* wf_archive(void);
 
 struct workflow*
 pgmoneta_workflow_create(int workflow_type)
@@ -46,6 +47,9 @@ pgmoneta_workflow_create(int workflow_type)
          break;
       case WORKFLOW_TYPE_RESTORE:
          return wf_restore();
+         break;
+      case WORKFLOW_TYPE_ARCHIVE:
+         return wf_archive();
          break;
       default:
          break;
@@ -149,6 +153,38 @@ wf_restore(void)
    else if (config->compression_type == COMPRESSION_LZ4)
    {
       current->next = pgmoneta_workflow_create_lz4(false);
+      current = current->next;
+   }
+
+   return head;
+}
+
+static struct workflow*
+wf_archive(void)
+{
+   struct workflow* head = NULL;
+   struct workflow* current = NULL;
+   struct configuration* config = NULL;
+
+   config = (struct configuration*)shmem;
+
+   head = pgmoneta_workflow_create_archive();
+   current = head;
+
+   if (config->compression_type == COMPRESSION_GZIP)
+   {
+      current->next = pgmoneta_workflow_create_gzip(true);
+      current = current->next;
+   }
+   else if (config->compression_type == COMPRESSION_ZSTD)
+   {
+      current->next = pgmoneta_workflow_create_zstd(true);
+      current = current->next;
+   }
+   else if (config->compression_type == COMPRESSION_LZ4)
+   {
+      current->next = pgmoneta_workflow_create_lz4(true);
+
       current = current->next;
    }
 
