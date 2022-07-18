@@ -36,6 +36,7 @@
 static struct workflow* wf_backup(void);
 static struct workflow* wf_restore(void);
 static struct workflow* wf_archive(void);
+static struct workflow* wf_delete_backup(void);
 
 struct workflow*
 pgmoneta_workflow_create(int workflow_type)
@@ -50,6 +51,9 @@ pgmoneta_workflow_create(int workflow_type)
          break;
       case WORKFLOW_TYPE_ARCHIVE:
          return wf_archive();
+         break;
+      case WORKFLOW_TYPE_DELETE_BACKUP:
+         return wf_delete_backup();
          break;
       default:
          break;
@@ -187,6 +191,16 @@ wf_archive(void)
 
       current = current->next;
    }
+
+   return head;
+}
+
+static struct workflow*
+wf_delete_backup(void)
+{
+   struct workflow* head = NULL;
+
+   head = pgmoneta_workflow_delete_backup();
 
    return head;
 }
