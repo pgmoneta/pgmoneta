@@ -28,92 +28,65 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <delete.h>
-#include <info.h>
+#include <workflow.h>
 #include <logging.h>
 #include <retention.h>
 #include <utils.h>
 
-/* system */
-#include <stdatomic.h>
-#include <stdlib.h>
-#include <unistd.h>
-
 void
 pgmoneta_retention(char** argv)
 {
-   char* d;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
-   time_t t;
-   char check_date[128];
-   struct tm* time_info;
-   struct configuration* config;
+   struct workflow* workflow = NULL;
+   struct workflow* current = NULL;
+   struct node* i_nodes = NULL;
+   struct node* o_nodes = NULL;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
-
    pgmoneta_set_proc_title(1, argv, "retention", NULL);
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETAIN);
+
+   current = workflow;
+   while (current != NULL)
    {
-      int retention;
-
-      t = time(NULL);
-
-      retention = config->servers[i].retention;
-      if (retention <= 0)
+      if (current->setup(0, NULL, i_nodes, &o_nodes))
       {
-         retention = config->retention;
+         goto error;
       }
+      current = current->next;
+   }
 
-      memset(&check_date[0], 0, sizeof(check_date));
-      t = t - (retention * 24 * 60 * 60);
-      time_info = localtime(&t);
-      strftime(&check_date[0], sizeof(check_date), "%Y%m%d%H%M%S", time_info);
-
-      number_of_backups = 0;
-      backups = NULL;
-
-      d = pgmoneta_get_server_backup(i);
-
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
-
-      if (number_of_backups > 0)
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->execute(0, NULL, i_nodes, &o_nodes))
       {
-         for (int j = 0; j < number_of_backups; j++)
-         {
-            if (strcmp(backups[j]->label, &check_date[0]) < 0)
-            {
-               if (!backups[j]->keep)
-               {
-                  if (!atomic_load(&config->servers[i].delete))
-                  {
-                     pgmoneta_delete(i, backups[j]->label);
-                     pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[j]->label);
-                  }
-               }
-            }
-            else
-            {
-               break;
-            }
-         }
+         goto error;
       }
+      current = current->next;
+   }
 
-      pgmoneta_delete_wal(i);
-
-      for (int j = 0; j < number_of_backups; j++)
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->teardown(0, NULL, i_nodes, &o_nodes))
       {
-         free(backups[j]);
+         goto error;
       }
-      free(backups);
-
-      free(d);
+      current = current->next;
    }
 
    pgmoneta_stop_logging();
 
+   pgmoneta_workflow_delete(workflow);
+
    exit(0);
+
+error:
+   pgmoneta_stop_logging();
+
+   pgmoneta_workflow_delete(workflow);
+
+   exit(1);
 }
