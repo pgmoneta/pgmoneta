@@ -84,10 +84,6 @@ static int server_scram256(char* username, char* password, int server_fd);
 
 static char* get_admin_password(char* username);
 
-static int derive_key_iv(char* password, unsigned char* key, unsigned char* iv);
-static int aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphertext, int* ciphertext_length);
-static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext);
-
 static int sasl_prep(char* password, char** password_prep);
 static int generate_nounce(char** nounce);
 static int get_scram_attribute(char attribute, char* input, size_t size, char** value);
@@ -1691,40 +1687,6 @@ error:
 }
 
 int
-pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length)
-{
-   unsigned char key[EVP_MAX_KEY_LENGTH];
-   unsigned char iv[EVP_MAX_IV_LENGTH];
-
-   memset(&key, 0, sizeof(key));
-   memset(&iv, 0, sizeof(iv));
-
-   if (derive_key_iv(password, key, iv) != 0)
-   {
-      return 1;
-   }
-
-   return aes_encrypt(plaintext, key, iv, ciphertext, ciphertext_length);
-}
-
-int
-pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext)
-{
-   unsigned char key[EVP_MAX_KEY_LENGTH];
-   unsigned char iv[EVP_MAX_IV_LENGTH];
-
-   memset(&key, 0, sizeof(key));
-   memset(&iv, 0, sizeof(iv));
-
-   if (derive_key_iv(password, key, iv) != 0)
-   {
-      return 1;
-   }
-
-   return aes_decrypt(ciphertext, ciphertext_length, key, iv, plaintext);
-}
-
-int
 pgmoneta_tls_valid(void)
 {
    struct configuration* config;
@@ -1832,138 +1794,6 @@ pgmoneta_tls_valid(void)
    return 0;
 
 error:
-
-   return 1;
-}
-
-static int
-derive_key_iv(char* password, unsigned char* key, unsigned char* iv)
-{
-
-#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
-   OpenSSL_add_all_algorithms();
-#endif
-
-   if (!EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), NULL,
-                       (unsigned char*) password, strlen(password), 1,
-                       key, iv))
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphertext, int* ciphertext_length)
-{
-   EVP_CIPHER_CTX* ctx = NULL;
-   int length;
-   size_t size;
-   unsigned char* ct = NULL;
-   int ct_length;
-
-   if (!(ctx = EVP_CIPHER_CTX_new()))
-   {
-      goto error;
-   }
-
-   if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv) != 1)
-   {
-      goto error;
-   }
-
-   size = strlen(plaintext) + EVP_CIPHER_block_size(EVP_aes_256_cbc());
-   ct = malloc(size);
-   memset(ct, 0, size);
-
-   if (EVP_EncryptUpdate(ctx,
-                         ct, &length,
-                         (unsigned char*)plaintext, strlen((char*)plaintext)) != 1)
-   {
-      goto error;
-   }
-
-   ct_length = length;
-
-   if (EVP_EncryptFinal_ex(ctx, ct + length, &length) != 1)
-   {
-      goto error;
-   }
-
-   ct_length += length;
-
-   EVP_CIPHER_CTX_free(ctx);
-
-   *ciphertext = (char*)ct;
-   *ciphertext_length = ct_length;
-
-   return 0;
-
-error:
-   if (ctx)
-   {
-      EVP_CIPHER_CTX_free(ctx);
-   }
-
-   free(ct);
-
-   return 1;
-}
-
-static int
-aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext)
-{
-   EVP_CIPHER_CTX* ctx = NULL;
-   int plaintext_length;
-   int length;
-   size_t size;
-   char* pt = NULL;
-
-   if (!(ctx = EVP_CIPHER_CTX_new()))
-   {
-      goto error;
-   }
-
-   if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv) != 1)
-   {
-      goto error;
-   }
-
-   size = ciphertext_length + EVP_CIPHER_block_size(EVP_aes_256_cbc());
-   pt = malloc(size);
-   memset(pt, 0, size);
-
-   if (EVP_DecryptUpdate(ctx,
-                         (unsigned char*)pt, &length,
-                         (unsigned char*)ciphertext, ciphertext_length) != 1)
-   {
-      goto error;
-   }
-
-   plaintext_length = length;
-
-   if (EVP_DecryptFinal_ex(ctx, (unsigned char*)pt + length, &length) != 1)
-   {
-      goto error;
-   }
-
-   plaintext_length += length;
-
-   EVP_CIPHER_CTX_free(ctx);
-
-   pt[plaintext_length] = 0;
-   *plaintext = pt;
-
-   return 0;
-
-error:
-   if (ctx)
-   {
-      EVP_CIPHER_CTX_free(ctx);
-   }
-
-   free(pt);
 
    return 1;
 }

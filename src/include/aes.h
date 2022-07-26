@@ -26,69 +26,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_SECURITY_H
-#define PGMONETA_SECURITY_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <pgmoneta.h>
-
-#include <stdlib.h>
-
 #include <openssl/ssl.h>
 
 /**
- * Authenticate a user
- * @param server The server
- * @param database The database
- * @param username The username
- * @param password The password
- * @param fd The resulting socket
- * @return AUTH_SUCCESS, AUTH_BAD_PASSWORD or AUTH_ERROR
- */
-int
-pgmoneta_server_authenticate(int server, char* database, char* username, char* password, int* fd);
-
-/**
- * Authenticate a remote management user
- * @param client_fd The descriptor
- * @param address The client address
- * @param client_ssl The client SSL context
+ * Encrypt a string
+ * @param plaintext The string
+ * @param password The master password
+ * @param ciphertext The ciphertext output
+ * @param ciphertext_length The length of the ciphertext
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl);
+pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length);
 
 /**
- * Connect using SCRAM-SHA256
- * @param username The user name
- * @param password The password
- * @param server_fd The descriptor
- * @param s_ssl The SSL context
+ * Decrypt a string
+ * @param ciphertext The string
+ * @param ciphertext_length The length of the ciphertext
+ * @param password The master password
+ * @param plaintext The plaintext output
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_remote_management_scram_sha256(char* username, char* password, int server_fd, SSL** s_ssl);
-
-/**
- * Get the master key
- * @param masterkey The master key
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_get_master_key(char** masterkey);
-
-/**
- * Is the TLS configuration valid
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tls_valid(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext);

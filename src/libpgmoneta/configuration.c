@@ -33,6 +33,7 @@
 #include <security.h>
 #include <shmem.h>
 #include <utils.h>
+#include <aes.h>
 
 /* system */
 #include <errno.h>
