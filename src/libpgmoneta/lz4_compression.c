@@ -140,6 +140,7 @@ pgmoneta_lz4c_wal(char* directory)
          lz4_compress(from, to);
 
          pgmoneta_delete_file(from);
+         pgmoneta_permission(to, 6, 0, 0);
 
          free(from);
          free(to);

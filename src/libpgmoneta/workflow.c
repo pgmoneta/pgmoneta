@@ -130,6 +130,9 @@ wf_backup(void)
       current = current->next;
    }
 
+   current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_BACKUP);
+   current = current->next;
+
    return head;
 }
 
@@ -164,6 +167,9 @@ wf_restore(void)
       current = current->next;
    }
 
+   current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
+   current = current->next;
+
    return head;
 }
 
@@ -195,6 +201,9 @@ wf_archive(void)
 
       current = current->next;
    }
+
+   current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_ARCHIVE);
+   current = current->next;
 
    return head;
 }

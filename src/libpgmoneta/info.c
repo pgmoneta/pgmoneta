@@ -57,6 +57,8 @@ pgmoneta_create_info(char* directory, char* label, int status)
    snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
    fputs(&buffer[0], sfile);
 
+   pgmoneta_permission(s, 6, 0, 0);
+
    if (sfile != NULL)
    {
       fclose(sfile);
@@ -134,6 +136,7 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
    }
 
    pgmoneta_move_file(d, s);
+   pgmoneta_permission(s, 6, 0, 0);
 
    free(s);
    free(d);
@@ -208,6 +211,7 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
    }
 
    pgmoneta_move_file(d, s);
+   pgmoneta_permission(s, 6, 0, 0);
 
    free(s);
    free(d);
