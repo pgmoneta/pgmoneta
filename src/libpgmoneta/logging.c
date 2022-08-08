@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <utils.h>
 
 /* system */
 #include <errno.h>
@@ -76,10 +77,12 @@ pgmoneta_start_logging(void)
       if (strlen(config->log_path) > 0)
       {
          log_file = fopen(config->log_path, "a");
+         pgmoneta_permission(config->log_path, 6, 4, 0);
       }
       else
       {
          log_file = fopen("pgmoneta.log", "a");
+         pgmoneta_permission("pgmoneta.log", 6, 4, 0);
       }
 
       if (!log_file)
