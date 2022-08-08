@@ -502,6 +502,25 @@ pgmoneta_read_version(char* directory, char** version);
 int
 pgmoneta_read_wal(char* directory, char** wal);
 
+/**
+ * Recurive permissions (700 for directories, 600 for files)
+ * @param d The top-level directory
+ * @return The status
+ */
+int
+pgmoneta_permission_recursive(char* d);
+
+/**
+ * Permission
+ * @param e The entry
+ * @param user The user (0; nothing, 4; read, 6; read/write)
+ * @param group The group (0; nothing, 4; read, 6; read/write)
+ * @param all All (0; nothing, 4; read, 6; read/write)
+ * @return The status
+ */
+int
+pgmoneta_permission(char* e, int user, int group, int all);
+
 #ifdef DEBUG
 
 /**

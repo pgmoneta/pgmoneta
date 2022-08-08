@@ -1901,6 +1901,138 @@ error:
    return 1;
 }
 
+int
+pgmoneta_permission_recursive(char* d)
+{
+   DIR* dir = opendir(d);
+   char* f = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   if (dir)
+   {
+      while ((entry = readdir(dir)))
+      {
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         f = pgmoneta_append(f, d);
+         if (!pgmoneta_ends_with(f, "/"))
+         {
+            f = pgmoneta_append(f, "/");
+         }
+         f = pgmoneta_append(f, entry->d_name);
+
+         if (!stat(f, &statbuf))
+         {
+            if (S_ISDIR(statbuf.st_mode))
+            {
+               pgmoneta_permission(f, 7, 0, 0);
+               pgmoneta_permission_recursive(f);
+            }
+            else
+            {
+               pgmoneta_permission(f, 6, 0, 0);
+            }
+         }
+
+         free(f);
+         f = NULL;
+      }
+
+      closedir(dir);
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_permission(char* e, int user, int group, int all)
+{
+   int ret;
+   mode_t mode = 0;
+
+   switch (user)
+   {
+      case 7:
+      {
+         mode = S_IRUSR | S_IWUSR | S_IXUSR;
+         break;
+      }
+      case 6:
+      {
+         mode = S_IRUSR | S_IWUSR;
+         break;
+      }
+      case 4:
+      {
+         mode = S_IRUSR;
+         break;
+      }
+      default:
+      {
+         break;
+      }
+   }
+
+   switch (group)
+   {
+      case 7:
+      {
+         mode = S_IRGRP | S_IWGRP | S_IXGRP;
+         break;
+      }
+      case 6:
+      {
+         mode += S_IRGRP | S_IWGRP;
+         break;
+      }
+      case 4:
+      {
+         mode += S_IRGRP;
+         break;
+      }
+      default:
+      {
+         break;
+      }
+   }
+
+   switch (all)
+   {
+      case 7:
+      {
+         mode = S_IROTH | S_IWOTH | S_IXOTH;
+         break;
+      }
+      case 6:
+      {
+         mode += S_IROTH | S_IWOTH;
+         break;
+      }
+      case 4:
+      {
+         mode += S_IROTH;
+         break;
+      }
+      default:
+      {
+         break;
+      }
+   }
+
+   ret = chmod(e, mode);
+   if (ret == -1)
+   {
+      errno = 0;
+      ret = 1;
+   }
+
+   return ret;
+}
+
 static int
 string_compare(const void* a, const void* b)
 {

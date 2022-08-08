@@ -182,6 +182,7 @@ pgmoneta_zstandardc_wal(char* directory)
             }
 
             pgmoneta_delete_file(from);
+            pgmoneta_permission(to, 6, 0, 0);
          }
 
          free(from);

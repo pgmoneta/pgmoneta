@@ -290,6 +290,8 @@ pgmoneta_backup(int client_fd, int server, char** argv)
 
       size = pgmoneta_directory_size(d);
       pgmoneta_add_backup_info(root, size);
+
+      pgmoneta_permission_recursive(root);
    }
 
    atomic_store(&config->servers[server].backup, false);

@@ -318,7 +318,7 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
       tarfile = pgmoneta_append(tarfile, id);
       tarfile = pgmoneta_append(tarfile, ".tar");
 
-      tar_open(&tar, tarfile, NULL, O_WRONLY | O_CREAT, 0644);
+      tar_open(&tar, tarfile, NULL, O_WRONLY | O_CREAT, 0600);
       tar_append_tree(tar, output, ".");
       tar_close(tar);
 
@@ -339,6 +339,7 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
          }
 
          pgmoneta_gzip_file(tarfile, to);
+         pgmoneta_permission(to, 6, 0, 0);
       }
       else if (config->compression_type == COMPRESSION_ZSTD)
       {
@@ -355,6 +356,7 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
          }
 
          pgmoneta_zstandardc_file(tarfile, to);
+         pgmoneta_permission(to, 6, 0, 0);
       }
 
       total_seconds = (int)difftime(time(NULL), start_time);

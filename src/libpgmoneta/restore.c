@@ -310,6 +310,8 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
       {
          pgmoneta_zstandardd_data(to);
       }
+
+      pgmoneta_permission_recursive(to);
    }
 
    o = pgmoneta_append(o, directory);
