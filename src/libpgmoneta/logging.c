@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <utils.h>
 
 /* system */
 #include <errno.h>
@@ -75,29 +76,32 @@ pgmoneta_init_logging(void)
          if (config->log_mode == PGMONETA_LOGGING_MODE_APPEND)
          {
             log_file = fopen(config->log_path, "a");
+            pgmoneta_permission(config->log_path, 6, 4, 0);
          }
          else
          {
             log_file = fopen(config->log_path, "w");
+            pgmoneta_permission(config->log_path, 6, 4, 0);
          }
+
+         fclose(log_file);
+         log_file = NULL;
       }
       else
       {
          if (config->log_mode == PGMONETA_LOGGING_MODE_APPEND)
          {
             log_file = fopen("pgmoneta.log", "a");
+            pgmoneta_permission("pgmoneta.log", 6, 4, 0);
          }
          else
          {
             log_file = fopen("pgmoneta.log", "w");
+            pgmoneta_permission("pgmoneta.log", 6, 4, 0);
          }
-      }
 
-      if (!log_file)
-      {
-         printf("Failed to open log file %s due to %s\n", strlen(config->log_path) > 0 ? config->log_path : "pgmoneta.log", strerror(errno));
-         errno = 0;
-         return 1;
+         fclose(log_file);
+         log_file = NULL;
       }
    }
 
