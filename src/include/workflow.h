@@ -78,13 +78,6 @@ int
 pgmoneta_workflow_delete(struct workflow* workflow);
 
 /**
- * Create a workflow for the local storage engine
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_local_storage(void);
-
-/**
  * Create a workflow for the base backup
  * @return The workflow
  */

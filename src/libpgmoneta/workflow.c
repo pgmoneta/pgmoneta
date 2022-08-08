@@ -28,7 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <workflow.h>
+#include <logging.h>
+#include <storage.h>
 
 /* system */
 #include <stdlib.h>
@@ -102,11 +103,8 @@ wf_backup(void)
    head = pgmoneta_workflow_create_basebackup();
    current = head;
 
-   if (config->storage_engine == STORAGE_ENGINE_LOCAL)
-   {
-      current->next = pgmoneta_workflow_create_local_storage();
-      current = current->next;
-   }
+   current->next = pgmoneta_storage_create_local();
+   current = current->next;
 
    if (config->compression_type == COMPRESSION_GZIP)
    {
@@ -132,6 +130,12 @@ wf_backup(void)
 
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_BACKUP);
    current = current->next;
+
+   if (config->storage_engine == STORAGE_ENGINE_SSH)
+   {
+      current->next = pgmoneta_storage_create_ssh();
+      current = current->next;
+   }
 
    return head;
 }

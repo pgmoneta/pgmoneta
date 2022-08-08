@@ -97,6 +97,13 @@ else ()
   message(FATAL_ERROR "rst2man needed")
 endif()
 
+find_package(Libssh)
+if (LIBSSH_FOUND)
+  message(STATUS "libssh found")
+else ()
+  message(FATAL_ERROR "libssh needed")
+endif()
+
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   find_package(Systemd)
   if (SYSTEMD_FOUND)

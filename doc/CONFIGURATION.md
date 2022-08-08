@@ -30,7 +30,10 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | management | 0 | Int | No | The remote management port (disable = 0) |
 | compression | zstd | String | No | The compression type (none, gzip, zstd, lz4) |
 | compression_level | 3 | int | No | The compression level |
-| storage_engine | local | String | No | The storage engine type (local) |
+| storage_engine | local | String | No | The storage engine type (local, ssh) |
+| ssh_hostname | | String | Yes | Defines the hostname of the remote system for connection |
+| ssh_username | | String | Yes | Defines the username of the remote system for connection |
+| ssh_base_dir | | String | Yes | The base directory for the remote backup |
 | retention | 7 | Int | No | The retention time in days |
 | link | `on` | Bool | No | Use links to limit backup size |
 | log_type | console | String | No | The logging type (console, file, syslog) |

@@ -25,6 +25,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
     ${SYSTEMD_INCLUDE_DIRS}
+    ${LIBSSH_INCLUDE_DIRS}
   )
 
   #
@@ -37,6 +38,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBEV_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${SYSTEMD_LIBRARIES}
+    ${LIBSSH_LIBRARIES}
   )
 
 else()
@@ -56,6 +58,7 @@ else()
     ${LZ4_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
+    ${LIBSSH_INCLUDE_DIRS}
   )
 
   #
@@ -67,6 +70,7 @@ else()
     ${LZ4_LIBRARIES}
     ${LIBEV_LIBRARIES}
     ${OPENSSL_LIBRARIES}
+    ${LIBSSH_LIBRARIES}
   )
 endif()
 
@@ -164,7 +168,6 @@ add_library(pgmoneta SHARED ${SOURCES})
 set_target_properties(pgmoneta PROPERTIES LINKER_LANGUAGE C VERSION ${VERSION_STRING}
                                SOVERSION ${VERSION_MAJOR})
 target_link_libraries(pgmoneta PUBLIC)
-
 install(TARGETS pgmoneta DESTINATION ${CMAKE_INSTALL_LIBDIR}/)
 
 #

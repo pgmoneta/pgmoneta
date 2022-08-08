@@ -28,10 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <stdio.h>
-#include <workflow.h>
 #include <info.h>
 #include <logging.h>
+#include <storage.h>
 
 /* system */
 #include <stdlib.h>
@@ -41,7 +40,7 @@ static int local_storage_execute(int, char*, struct node*, struct node**);
 static int local_storage_teardown(int, char*, struct node*, struct node**);
 
 struct workflow*
-pgmoneta_workflow_create_local_storage(void)
+pgmoneta_storage_create_local(void)
 {
    struct workflow* wf = NULL;
 

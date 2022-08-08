@@ -78,6 +78,7 @@ extern "C" {
 #define COMPRESSION_LZ4  3
 
 #define STORAGE_ENGINE_LOCAL 0
+#define STORAGE_ENGINE_SSH   1
 
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
@@ -154,6 +155,10 @@ struct configuration
    int compression_level; /**< The compression level */
 
    int storage_engine;  /**< The storage engine */
+
+   char ssh_hostname[MISC_LENGTH]; /**< The SSH hostname */
+   char ssh_username[MISC_LENGTH]; /**< The SSH username */
+   char ssh_base_dir[MAX_PATH];  /**< The SSH base directory */
 
    int retention; /**< The retention */
    bool link;     /**< Use link */

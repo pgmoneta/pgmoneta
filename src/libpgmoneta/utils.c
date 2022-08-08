@@ -2119,6 +2119,16 @@ pgmoneta_permission(char* e, int user, int group, int all)
    return ret;
 }
 
+mode_t
+pgmoneta_get_permission(char* path)
+{
+   struct stat statbuf;
+
+   stat(path, &statbuf);
+
+   return statbuf.st_mode;
+}
+
 static char*
 get_server_basepath(int server)
 {

@@ -572,6 +572,14 @@ pgmoneta_permission_recursive(char* d);
 int
 pgmoneta_permission(char* e, int user, int group, int all);
 
+/**
+ * Get file permission.
+ * @param path The file path.
+ * @return The mode of file.
+ */
+mode_t
+pgmoneta_get_permission(char* path);
+
 #ifdef DEBUG
 
 /**

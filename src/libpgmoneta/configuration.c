@@ -693,6 +693,54 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "ssh_hostname"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->ssh_hostname, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "ssh_username"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->ssh_username, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "ssh_base_dir"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(&config->ssh_base_dir[0], value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "retention"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -1541,6 +1589,10 @@ as_storage_engine(char* str)
    if (!strcasecmp(str, "local"))
    {
       return STORAGE_ENGINE_LOCAL;
+   }
+   else if (!strcasecmp(str, "ssh"))
+   {
+      return STORAGE_ENGINE_SSH;
    }
 
    return STORAGE_ENGINE_LOCAL;
