@@ -1710,14 +1710,11 @@ create_pidfile(void)
    if (strlen(config->pidfile) > 0)
    {
 
-      if (strlen(config->pidfile) > 0)
+      // check pidfile is not there
+      if (access(config->pidfile, F_OK) == 0)
       {
-         // check pidfile is not there
-         if (access(config->pidfile, F_OK) == 0)
-         {
-            pgmoneta_log_fatal("PID file [%s] exists, is there another instance running ?", config->pidfile);
-            goto error;
-         }
+         pgmoneta_log_fatal("PID file [%s] exists, is there another instance running ?", config->pidfile);
+         goto error;
       }
 
       pid = getpid();
@@ -1730,6 +1727,8 @@ create_pidfile(void)
       }
 
       snprintf(&buffer[0], sizeof(buffer), "%u\n", (unsigned)pid);
+
+      pgmoneta_permission(config->pidfile, 6, 4, 0);
 
       r = write(fd, &buffer[0], strlen(buffer));
       if (r < 0)
