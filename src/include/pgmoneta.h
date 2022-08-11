@@ -41,7 +41,7 @@ extern "C" {
 #include <sys/types.h>
 #include <openssl/ssl.h>
 
-#define VERSION "0.5.7"
+#define VERSION "0.5.8"
 
 #define PGMONETA_HOMEPAGE "https://pgmoneta.github.io/"
 #define PGMONETA_ISSUES "https://github.com/pgmoneta/pgmoneta/issues"
