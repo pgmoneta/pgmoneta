@@ -279,7 +279,10 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
          }
 
          pgmoneta_get_backup(root, id, &backup);
-         create_recovery_info(server, to, primary, position, backup->version);
+         if (!primary)
+         {
+            create_recovery_info(server, to, primary, position, backup->version);
+         }
 
          if (copy_wal)
          {
