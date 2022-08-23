@@ -250,7 +250,7 @@ ssh_storage_execute(int server, char* identifier,
 
    local_root = pgmoneta_get_server_backup_identifier(server, identifier);
 
-   if (sftp_make_dir(local_root , remote_root) == 1)
+   if (sftp_make_dir(local_root, remote_root) == 1)
    {
       pgmoneta_log_error("could not create the backup directory: %s in the remote server: %s", remote_root, strerror(errno));
       goto error;
@@ -335,7 +335,7 @@ sftp_make_dir(char* local_dir, char* remote_dir)
          *p = '/';
       }
    }
-   
+
    rc = sftp_mkdir(sftp, remote_dir, mode);
    if (rc != SSH_OK)
    {
