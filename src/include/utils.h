@@ -468,6 +468,15 @@ bool
 pgmoneta_ends_with(char* str, char* suffix);
 
 /**
+ * Does a string contain another string
+ * @param str The string
+ * @param s The search string
+ * @return The result
+ */
+bool
+pgmoneta_contains(char* str, char* s);
+
+/**
  * Sort a string array
  * @param size The size of the array
  * @param array The array

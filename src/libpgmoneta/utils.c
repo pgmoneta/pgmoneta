@@ -1756,6 +1756,12 @@ pgmoneta_ends_with(char* str, char* suffix)
    return (str_len >= suffix_len) && (strcmp(str + (str_len - suffix_len), suffix) == 0);
 }
 
+bool
+pgmoneta_contains(char* str, char* s)
+{
+   return strstr(str, s) != NULL;
+}
+
 void
 pgmoneta_sort(size_t size, char** array)
 {
