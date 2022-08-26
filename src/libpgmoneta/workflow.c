@@ -133,6 +133,9 @@ wf_backup(void)
 
    if (config->storage_engine == STORAGE_ENGINE_SSH)
    {
+      current->next = pgmoneta_workflow_create_sha256();
+      current = current->next;
+
       current->next = pgmoneta_storage_create_ssh();
       current = current->next;
    }

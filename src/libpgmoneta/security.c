@@ -51,6 +51,7 @@
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
 #include <openssl/rand.h>
+#include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -2718,4 +2719,53 @@ error:
    SSL_CTX_free(ctx);
 
    return 1;
+}
+
+int
+pgmoneta_generate_sha256_hash(char* filename, char** sha256)
+{
+   char read_buf[16384];
+   unsigned long read_bytes = 0;
+   int i = 0;
+   FILE* file = NULL;
+   SHA256_CTX sha256_ctx;
+   unsigned char hash[SHA256_DIGEST_LENGTH];
+   char* sha256_buf;
+
+   *sha256 = NULL;
+
+   file = fopen(filename, "rb");
+
+   if (file == NULL)
+   {
+      return 1;
+   }
+
+   sha256_buf = malloc(65);
+
+   memset(sha256_buf, 0, 65);
+
+   memset(read_buf, 0, sizeof(read_buf));
+
+   SHA256_Init(&sha256_ctx);
+
+   while ((read_bytes = fread(read_buf, 1, sizeof(read_buf), file)) > 0)
+   {
+      SHA256_Update(&sha256_ctx, read_buf, read_bytes);
+   }
+
+   SHA256_Final(hash, &sha256_ctx);
+
+   for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+   {
+      sprintf(&sha256_buf[i * 2], "%02x", hash[i]);
+   }
+
+   sha256_buf[64] = 0;
+
+   *sha256 = sha256_buf;
+
+   fclose(file);
+
+   return 0;
 }
