@@ -87,6 +87,15 @@ pgmoneta_get_master_key(char** masterkey);
 int
 pgmoneta_tls_valid(void);
 
+/**
+ * Generate SHA256 for a file
+ * @param filename The file path
+ * @param sha256 The hash value
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_generate_sha256_hash(char* filename, char** sha256);
+
 #ifdef __cplusplus
 }
 #endif

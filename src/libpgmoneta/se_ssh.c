@@ -30,9 +30,12 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <hashmap.h>
+#include <info.h>
 #include <logging.h>
-#include <stdio.h>
+#include <string.h>
 #include <utils.h>
+#include <security.h>
 #include <storage.h>
 
 /* system */
@@ -46,13 +49,26 @@ static int ssh_storage_setup(int, char*, struct node*, struct node**);
 static int ssh_storage_execute(int, char*, struct node*, struct node**);
 static int ssh_storage_teardown(int, char*, struct node*, struct node**);
 
-static int sftp_make_dir(char* local_dir, char* remote_dir);
-static int sftp_copy_directory(char* from, char* to);
-static int sftp_copy_file(char* from, char* to);
+static char* get_remote_server_basepath(int server);
+static char* get_remote_server_backup(int server);
+static char* get_remote_server_backup_identifier(int server, char* identifier);
+
+static int read_latest_backup_sha256(char* path);
+
+static int sftp_make_directory(char* local_dir, char* remote_dir);
+static int sftp_copy_directory(char* local_root, char* remote_root, char* relative_path);
+static int sftp_copy_file(char* local_root, char* remote_root, char* relative_path);
 
 static ssh_session session = NULL;
 static sftp_session sftp = NULL;
+
+static struct hashmap* hash_map = NULL;
+
 static bool is_error = false;
+
+static char** file_paths = NULL;
+static char** hashes = NULL;
+static char* latest_remote_root = NULL;
 
 struct workflow*
 pgmoneta_storage_create_ssh(void)
@@ -232,31 +248,67 @@ static int
 ssh_storage_execute(int server, char* identifier,
                     struct node* i_nodes, struct node** o_nodes)
 {
+   char* server_path = NULL;
    char* local_root = NULL;
    char* remote_root = NULL;
-   struct configuration* config;
+   char* latest_backup_sha256 = NULL;
+   int next_newest = -1;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
 
-   config = (struct configuration*)shmem;
-
-   remote_root = pgmoneta_append(remote_root, config->ssh_base_dir);
-   if (!pgmoneta_ends_with(config->ssh_base_dir, "/"))
-   {
-      remote_root = pgmoneta_append(remote_root, "/");
-   }
-
-   remote_root = pgmoneta_append(remote_root, config->servers[server].name);
-   remote_root = pgmoneta_append(remote_root, "/backup/");
-   remote_root = pgmoneta_append(remote_root, identifier);
+   remote_root = get_remote_server_backup_identifier(server, identifier);
 
    local_root = pgmoneta_get_server_backup_identifier(server, identifier);
 
-   if (sftp_make_dir(local_root, remote_root) == 1)
+   if (sftp_make_directory(local_root, remote_root) == 1)
    {
       pgmoneta_log_error("could not create the backup directory: %s in the remote server: %s", remote_root, strerror(errno));
       goto error;
    }
 
-   if (sftp_copy_directory(local_root, remote_root) != 0)
+   server_path = pgmoneta_get_server_backup(server);
+
+   pgmoneta_get_backups(server_path, &number_of_backups, &backups);
+
+   if (number_of_backups >= 2)
+   {
+      for (int j = number_of_backups - 2; j >= 0 && next_newest == -1; j--)
+      {
+         if (backups[j]->valid == VALID_TRUE)
+         {
+            if (next_newest == -1)
+            {
+               next_newest = j;
+            }
+         }
+      }
+   }
+
+   if (pgmoneta_hashmap_create(16384, &hash_map))
+   {
+      goto error;
+   }
+
+   if (next_newest != -1)
+   {
+      latest_remote_root = get_remote_server_backup_identifier(server, backups[next_newest]->label);
+
+      latest_backup_sha256 = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
+      latest_backup_sha256 = pgmoneta_append(latest_backup_sha256, "backup.sha256");
+
+      if (read_latest_backup_sha256(latest_backup_sha256))
+      {
+         goto error;
+      }
+   }
+
+   sftp_copy_file(local_root, remote_root, "/backup.info");
+   sftp_copy_file(local_root, remote_root, "/backup.sha256");
+
+   local_root = pgmoneta_append(local_root, "/data");
+   remote_root = pgmoneta_append(remote_root, "/data");
+
+   if (sftp_copy_directory(local_root, remote_root, "") != 0)
    {
       pgmoneta_log_error("failed to transfer the backup directory from the local host to the remote server: %s", strerror(errno));
       goto error;
@@ -264,8 +316,19 @@ ssh_storage_execute(int server, char* identifier,
 
    is_error = false;
 
-   free(remote_root);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
 
+   if (latest_backup_sha256 != NULL)
+   {
+      free(latest_backup_sha256);
+   }
+
+   free(server_path);
+   free(remote_root);
    free(local_root);
 
    return 0;
@@ -274,8 +337,19 @@ error:
 
    is_error = true;
 
-   free(remote_root);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
 
+   if (latest_backup_sha256 != NULL)
+   {
+      free(latest_backup_sha256);
+   }
+
+   free(server_path);
+   free(remote_root);
    free(local_root);
 
    return 1;
@@ -298,7 +372,12 @@ ssh_storage_teardown(int server, char* identifier,
 
    pgmoneta_delete_directory(root);
 
+   pgmoneta_hashmap_destroy(hash_map);
+   free(hash_map);
+
    free(root);
+
+   free(latest_remote_root);
 
    sftp_free(sftp);
 
@@ -308,7 +387,7 @@ ssh_storage_teardown(int server, char* identifier,
 }
 
 static int
-sftp_make_dir(char* local_dir, char* remote_dir)
+sftp_make_directory(char* local_dir, char* remote_dir)
 {
    int rc;
    char* p;
@@ -353,14 +432,21 @@ error:
 }
 
 static int
-sftp_copy_directory(char* from, char* to)
+sftp_copy_directory(char* local_root, char* remote_root, char* relative_path)
 {
-   char* from_file;
-   char* to_file;
+   char* from = NULL;
+   char* to = NULL;
+   char* relative_file;
    int rc;
    DIR* dir;
    struct dirent* entry;
    mode_t mode = 0;
+
+   from = pgmoneta_append(from, local_root);
+   from = pgmoneta_append(from, relative_path);
+
+   to = pgmoneta_append(to, remote_root);
+   to = pgmoneta_append(to, relative_path);
 
    if (!(dir = opendir(from)))
    {
@@ -382,40 +468,39 @@ sftp_copy_directory(char* from, char* to)
    {
       if (entry->d_type == DT_DIR)
       {
-         char from_dir[1024];
-         char to_dir[1024];
+         char relative_dir[1024];
 
          if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
          {
             continue;
          }
 
-         snprintf(from_dir, sizeof(from_dir), "%s/%s", from, entry->d_name);
-         snprintf(to_dir, sizeof(to_dir), "%s/%s", to, entry->d_name);
+         snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
 
-         sftp_copy_directory(from_dir, to_dir);
+         sftp_copy_directory(local_root, remote_root, relative_dir);
       }
       else
       {
-         from_file = NULL;
-         to_file = NULL;
+         relative_file = NULL;
 
-         from_file = pgmoneta_append(from_file, from);
-         from_file = pgmoneta_append(from_file, "/");
-         from_file = pgmoneta_append(from_file, entry->d_name);
+         relative_file = pgmoneta_append(relative_file, relative_path);
+         relative_file = pgmoneta_append(relative_file, "/");
+         relative_file = pgmoneta_append(relative_file, entry->d_name);
 
-         to_file = pgmoneta_append(to_file, to);
-         to_file = pgmoneta_append(to_file, "/");
-         to_file = pgmoneta_append(to_file, entry->d_name);
+         if (sftp_copy_file(local_root, remote_root, relative_file))
+         {
+            free(relative_file);
+            goto error;
+         }
 
-         sftp_copy_file(from_file, to_file);
-
-         free(from_file);
-         free(to_file);
+         free(relative_file);
       }
    }
 
    closedir(dir);
+
+   free(from);
+   free(to);
 
    return 0;
 
@@ -423,44 +508,232 @@ error:
 
    closedir(dir);
 
+   free(from);
+   free(to);
+
    return 1;
 }
 
 static int
-sftp_copy_file(char* s, char* d)
+sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
 {
+   char* s = NULL;
+   char* d = NULL;
+   char* sha256 = NULL;
+   char* latest_sha256 = NULL;
+   char* latest_backup_path = NULL;
    char buffer[16384];
    FILE* sfile = NULL;
    sftp_file dfile = NULL;
    unsigned long read_bytes = 0;
    mode_t mode = 0;
+   bool is_link = false;
 
-   mode = pgmoneta_get_permission(s);
+   s = pgmoneta_append(s, local_root);
+   s = pgmoneta_append(s, relative_path);
 
-   sfile = fopen(s, "rb");
+   d = pgmoneta_append(d, remote_root);
+   d = pgmoneta_append(d, relative_path);
 
-   if (sfile == NULL)
+   pgmoneta_generate_sha256_hash(s, &sha256);
+
+   if (latest_remote_root != NULL)
    {
-      return 1;
+      latest_backup_path = pgmoneta_append(latest_backup_path, latest_remote_root);
+      latest_backup_path = pgmoneta_append(latest_backup_path, relative_path);
+
+      if (pgmoneta_hashmap_contains_key(hash_map, relative_path))
+      {
+         latest_sha256 = pgmoneta_hashmap_get(hash_map, relative_path);
+
+         if (!strcmp(latest_sha256, sha256))
+         {
+            is_link = true;
+         }
+      }
    }
 
-   dfile = sftp_open(sftp, d, O_WRONLY | O_CREAT | O_TRUNC, mode);
+   if (is_link)
+   {
+      if (sftp_symlink(sftp, latest_backup_path, d) < 0)
+      {
+         pgmoneta_log_error("Failed to link remotely: %s", ssh_get_error(session));
+         goto error;
+      }
+   }
+   else
+   {
+      mode = pgmoneta_get_permission(s);
 
-   if (dfile == NULL)
+      sfile = fopen(s, "rb");
+
+      if (sfile == NULL)
+      {
+         goto error;
+      }
+
+      dfile = sftp_open(sftp, d, O_WRONLY | O_CREAT | O_TRUNC, mode);
+
+      if (dfile == NULL)
+      {
+         goto error;
+      }
+
+      memset(buffer, 0, sizeof(buffer));
+
+      while ((read_bytes = fread(buffer, 1, sizeof(buffer), sfile)) > 0)
+      {
+         sftp_write(dfile, buffer, read_bytes);
+      }
+   }
+
+   if (sfile != NULL)
    {
       fclose(sfile);
-      return 1;
    }
 
-   memset(buffer, 0, sizeof(buffer));
-
-   while ((read_bytes = fread(buffer, 1, sizeof(buffer), sfile)) > 0)
+   if (dfile != NULL)
    {
-      sftp_write(dfile, buffer, read_bytes);
+      sftp_close(dfile);
    }
 
-   fclose(sfile);
-   sftp_close(dfile);
+   free(s);
+   free(d);
+   free(sha256);
+
+   if (latest_backup_path != NULL)
+   {
+      free(latest_backup_path);
+   }
 
    return 0;
+
+error:
+
+   if (sfile != NULL)
+   {
+      fclose(sfile);
+   }
+
+   if (dfile != NULL)
+   {
+      sftp_close(dfile);
+   }
+
+   free(s);
+   free(d);
+   free(sha256);
+
+   if (latest_backup_path != NULL)
+   {
+      free(latest_backup_path);
+   }
+
+   return 1;
+}
+
+static int
+read_latest_backup_sha256(char* path)
+{
+   char buffer[4096];
+   int n = 0;
+   int lines = 0;
+   FILE* file = NULL;
+
+   file = fopen(path, "r");
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
+   {
+      lines++;
+   }
+
+   fclose(file);
+
+   file = fopen(path, "r");
+
+   file_paths = (char**)malloc(sizeof(char*) * lines);
+   hashes = (char**)malloc(sizeof(char*) * lines);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+
+   while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
+   {
+      char* ptr = NULL;
+      ptr = strtok(&buffer[0], ":");
+
+      file_paths[n] = (char*)malloc(strlen(ptr) + 1);
+      memset(file_paths[n], 0, strlen(ptr) + 1);
+      memcpy(file_paths[n], ptr, strlen(ptr));
+
+      ptr = strtok(NULL, ":");
+
+      hashes[n] = (char*)malloc(strlen(ptr));
+      memset(hashes[n], 0, strlen(ptr));
+      memcpy(hashes[n], ptr, strlen(ptr) - 1);
+
+      if (pgmoneta_hashmap_put(hash_map, file_paths[n], hashes[n]))
+      {
+         goto error;
+      }
+
+      n++;
+   }
+
+   fclose(file);
+
+   return 0;
+
+error:
+
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+
+   return 1;
+}
+
+static char*
+get_remote_server_basepath(int server)
+{
+   char* d = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   d = pgmoneta_append(d, config->ssh_base_dir);
+   if (!pgmoneta_ends_with(config->ssh_base_dir, "/"))
+   {
+      d = pgmoneta_append(d, "/");
+   }
+   d = pgmoneta_append(d, config->servers[server].name);
+   d = pgmoneta_append(d, "/");
+
+   return d;
+}
+
+static char*
+get_remote_server_backup(int server)
+{
+   char* d = NULL;
+
+   d = get_remote_server_basepath(server);
+   d = pgmoneta_append(d, "backup/");
+
+   return d;
+}
+
+static char*
+get_remote_server_backup_identifier(int server, char* identifier)
+{
+   char* d = NULL;
+
+   d = get_remote_server_backup(server);
+   d = pgmoneta_append(d, identifier);
+
+   return d;
 }
