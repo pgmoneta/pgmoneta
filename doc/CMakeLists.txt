@@ -48,7 +48,7 @@ add_custom_command(
 #
 # Install configuration and documentation
 #
-install(FILES etc/pgmoneta.conf DESTINATION etc/pgmoneta)
+install(FILES etc/pgmoneta.conf DESTINATION share/doc/pgmoneta/etc)
 
 install(DIRECTORY . DESTINATION share/doc/pgmoneta FILES_MATCHING PATTERN "*.md" PATTERN "etc" EXCLUDE PATTERN "man" EXCLUDE)
 
