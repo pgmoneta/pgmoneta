@@ -29,6 +29,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__mkdir} -p %{buildroot}%{_bindir}
 %{__mkdir} -p %{buildroot}%{_libdir}
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/etc
+%{__mkdir} -p %{buildroot}%{_docdir}/%{name}/shell_comp
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/tutorial
 %{__mkdir} -p %{buildroot}%{_mandir}/man1
 %{__mkdir} -p %{buildroot}%{_mandir}/man5
@@ -45,6 +46,9 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.service %{buildroot}%{_docdir}/%{name}/etc/pgmoneta.service
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.conf %{buildroot}%{_sysconfdir}/pgmoneta/pgmoneta.conf
+
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/contrib/shell_comp/pgmoneta_comp.bash %{buildroot}%{_docdir}/%{name}/shell_comp/pgmoneta_comp.bash
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/contrib/shell_comp/pgmoneta_comp.zsh %{buildroot}%{_docdir}/%{name}/shell_comp/pgmoneta_comp.zsh
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/01_install.md %{buildroot}%{_docdir}/%{name}/tutorial/01_install.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/02_replication_slot.md %{buildroot}%{_docdir}/%{name}/tutorial/02_replication_slot.md
@@ -83,6 +87,8 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/README.md
 %{_docdir}/%{name}/RPM.md
 %{_docdir}/%{name}/etc/pgmoneta.service
+%{_docdir}/%{name}/shell_comp/pgmoneta_comp.bash
+%{_docdir}/%{name}/shell_comp/pgmoneta_comp.zsh
 %{_docdir}/%{name}/tutorial/01_install.md
 %{_docdir}/%{name}/tutorial/02_replication_slot.md
 %{_docdir}/%{name}/tutorial/03_remote_management.md

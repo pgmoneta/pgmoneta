@@ -207,3 +207,9 @@ Example
 ```
 pgmoneta-cli reset
 ```
+
+
+## Shell completions
+
+There is a minimal shell completion support for `pgmoneta-cli`.
+Please refer to the [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/01_install.md) tutorial for detailed information about how to enable and use shell completions.
