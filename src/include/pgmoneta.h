@@ -96,6 +96,49 @@ extern "C" {
       __typeof__ (b) _b = (b);  \
       _a < _b ? _a : _b; })
 
+/*
+ * Common piece of code to perform a sleeping.
+ *
+ * @param zzz the amount of time to
+ * sleep, expressed as nanoseconds.
+ *
+ * Example
+   SLEEP(5000000L)
+ *
+ */
+#define SLEEP(zzz)                  \
+   do                               \
+   {                                \
+      struct timespec ts_private;   \
+      ts_private.tv_sec = 0;        \
+      ts_private.tv_nsec = zzz;     \
+      nanosleep(&ts_private, NULL); \
+   } while (0);
+
+/*
+ * Commonly used block of code to sleep
+ * for a specified amount of time and
+ * then jump back to a specified label.
+ *
+ * @param zzz how much time to sleep (as long nanoseconds)
+ * @param goto_to the label to which jump to
+ *
+ * Example:
+ *
+     ...
+     else
+       SLEEP_AND_GOTO(100000L, retry)
+ */
+#define SLEEP_AND_GOTO(zzz, goto_to)    \
+   do                                   \
+   {                                    \
+      struct timespec ts_private;       \
+      ts_private.tv_sec = 0;            \
+      ts_private.tv_nsec = zzz;         \
+      nanosleep(&ts_private, NULL);     \
+      goto goto_to;                     \
+   } while (0);
+
 /**
  * The shared memory segment
  */

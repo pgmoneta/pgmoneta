@@ -842,12 +842,7 @@ retry:
          if (pgmoneta_socket_isvalid(client_fd))
          {
             /* Sleep for 100ms */
-            struct timespec ts;
-            ts.tv_sec = 0;
-            ts.tv_nsec = 100000000L;
-            nanosleep(&ts, NULL);
-
-            goto retry;
+            SLEEP_AND_GOTO(100000000L, retry);
          }
       }
    }

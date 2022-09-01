@@ -1638,10 +1638,7 @@ read:
    else if (r < needs)
    {
       /* Sleep for 10ms */
-      struct timespec ts;
-      ts.tv_sec = 0;
-      ts.tv_nsec = 10000000L;
-      nanosleep(&ts, NULL);
+      SLEEP(10000000L);
 
       if (retries < 100)
       {
