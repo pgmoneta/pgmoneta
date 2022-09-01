@@ -37,6 +37,7 @@
 #include <ev.h>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <pwd.h>
 #include <stdint.h>
 #include <stdio.h>

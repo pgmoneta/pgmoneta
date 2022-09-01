@@ -41,13 +41,16 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <libgen.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/param.h>
+#ifndef HAVE_OPENBSD
 #include <sys/sysmacros.h>
+#endif
 #include <sys/types.h>
 
 /* */
@@ -696,6 +699,7 @@ fail:
    return rv;
 }
 
+#ifndef HAVE_OPENBSD
 static size_t
 strlcpy(char* dst, const char* src, size_t siz)
 {
@@ -727,6 +731,7 @@ strlcpy(char* dst, const char* src, size_t siz)
 
    return (s - src - 1);
 }
+#endif
 
 static void
 th_set_path(TAR* t, const char* pathname)
