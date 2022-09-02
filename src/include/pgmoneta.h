@@ -51,6 +51,8 @@ extern "C" {
 
 #define MAIN_UDS ".s.pgmoneta"
 
+#define MAX_PROCESS_TITLE_LENGTH 256
+
 #define MAX_BUFFER_SIZE      65535
 #define DEFAULT_BUFFER_SIZE  65535
 
@@ -82,6 +84,11 @@ extern "C" {
 
 #define STORAGE_ENGINE_LOCAL 0
 #define STORAGE_ENGINE_SSH   1
+
+#define UPDATE_PROCESS_TITLE_NEVER   0
+#define UPDATE_PROCESS_TITLE_STRICT  1
+#define UPDATE_PROCESS_TITLE_MINIMAL 2
+#define UPDATE_PROCESS_TITLE_VERBOSE 3
 
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
@@ -223,6 +230,8 @@ struct configuration
    int blocking_timeout;       /**< The blocking timeout in seconds */
    int authentication_timeout; /**< The authentication timeout in seconds */
    char pidfile[MAX_PATH];     /**< File containing the PID */
+
+   unsigned int update_process_title;  /**< Behaviour for updating the process title */
 
    char libev[MISC_LENGTH]; /**< Name of libev mode */
    int buffer_size;         /**< Socket buffer size */

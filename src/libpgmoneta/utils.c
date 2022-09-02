@@ -59,7 +59,7 @@
 
 extern char** environ;
 static bool env_changed = false;
-static int max_process_title_size = -1;
+static int max_process_title_size = 0;
 
 static int string_compare(const void* a, const void* b);
 
@@ -644,10 +644,20 @@ void
 pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 {
 #ifdef HAVE_LINUX
-   char title[256];
+   char title[MAX_PROCESS_TITLE_LENGTH];
    size_t size;
    char** env = environ;
    int es = 0;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   // sanity check: if the user does not want to
+   // update the process title, do nothing
+   if (config->update_process_title == UPDATE_PROCESS_TITLE_NEVER)
+   {
+      return;
+   }
 
    if (!env_changed)
    {
@@ -679,46 +689,50 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
       env_changed = true;
    }
 
-   if (max_process_title_size == -1)
+   // compute how long was the command line
+   // when the application was started
+   if (max_process_title_size == 0)
    {
-      int m = 0;
-
       for (int i = 0; i < argc; i++)
       {
-         m += strlen(argv[i]);
-         m += 1;
+         max_process_title_size += strlen(argv[i]) + 1;
       }
-
-      max_process_title_size = m;
-      memset(*argv, 0, max_process_title_size);
    }
 
+   // compose the new title
    memset(&title, 0, sizeof(title));
+   snprintf(title, sizeof(title) - 1, "pgmoneta: %s%s%s",
+            s1 != NULL ? s1 : "",
+            s1 != NULL && s2 != NULL ? "/" : "",
+            s2 != NULL ? s2 : "");
 
-   if (s1 != NULL && s2 != NULL)
+   // nuke the command line info
+   memset(*argv, 0, max_process_title_size);
+
+   // copy the new title over argv checking
+   // the update_process_title policy
+   if (config->update_process_title == UPDATE_PROCESS_TITLE_STRICT)
    {
-      snprintf(title, sizeof(title) - 1, "pgmoneta: %s/%s", s1, s2);
+      size = max_process_title_size;
    }
    else
    {
-      snprintf(title, sizeof(title) - 1, "pgmoneta: %s", s1);
+      // here we can set the title to a full description
+      size = strlen(title) + 1;
    }
-
-   size = MIN(max_process_title_size, sizeof(title));
-   size = MIN(size, strlen(title) + 1);
 
    memcpy(*argv, title, size);
    memset(*argv + size, 0, 1);
 
+   // keep track of how long the title is now
+   max_process_title_size = size;
+
 #else
-   if (s1 != NULL && s2 != NULL)
-   {
-      setproctitle("-pgmoneta: %s/%s", s1, s2);
-   }
-   else
-   {
-      setproctitle("-pgmoneta: %s", s1);
-   }
+   setproctitle("-pgmoneta: %s%s%s",
+                s1 != NULL ? s1 : "",
+                s1 != NULL && s2 != NULL ? "/" : "",
+                s2 != NULL ? s2 : "");
+
 #endif
 }
 
