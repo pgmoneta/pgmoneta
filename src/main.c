@@ -52,6 +52,7 @@
 #include <zstandard_compression.h>
 
 /* system */
+#include <err.h>
 #include <errno.h>
 #include <ev.h>
 #include <fcntl.h>
@@ -287,7 +288,7 @@ main(int argc, char** argv)
 
    if (getuid() == 0)
    {
-      printf("pgmoneta: Using the root account is not allowed\n");
+      warnx("pgmoneta: Using the root account is not allowed");
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Using the root account is not allowed");
 #endif
@@ -297,7 +298,7 @@ main(int argc, char** argv)
    shmem_size = sizeof(struct configuration);
    if (pgmoneta_create_shared_memory(shmem_size, HUGEPAGE_OFF, &shmem))
    {
-      printf("pgmoneta: Error in creating shared memory\n");
+      warnx("pgmoneta: Error in creating shared memory");
 #ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Error in creating shared memory");
 #endif
@@ -311,7 +312,7 @@ main(int argc, char** argv)
    {
       if (pgmoneta_read_configuration(shmem, configuration_path))
       {
-         printf("pgmoneta: Configuration not found: %s\n", configuration_path);
+         warnx("pgmoneta: Configuration not found: %s", configuration_path);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Configuration not found: %s", configuration_path);
 #endif
@@ -322,7 +323,7 @@ main(int argc, char** argv)
    {
       if (pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
       {
-         printf("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf\n");
+         warnx("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #endif
@@ -337,7 +338,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_users_configuration(shmem, users_path);
       if (ret == 1)
       {
-         printf("pgmoneta: USERS configuration not found: %s\n", users_path);
+         warnx("pgmoneta: USERS configuration not found: %s", users_path);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
 #endif
@@ -345,7 +346,7 @@ main(int argc, char** argv)
       }
       else if (ret == 2)
       {
-         printf("pgmoneta: Invalid master key file\n");
+         warnx("pgmoneta: Invalid master key file");
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
@@ -353,7 +354,7 @@ main(int argc, char** argv)
       }
       else if (ret == 3)
       {
-         printf("pgmoneta: USERS: Too many users defined %d (max %d)\n", config->number_of_users, NUMBER_OF_USERS);
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
 #endif
@@ -376,7 +377,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_admins_configuration(shmem, admins_path);
       if (ret == 1)
       {
-         printf("pgmoneta: ADMINS configuration not found: %s\n", admins_path);
+         warnx("pgmoneta: ADMINS configuration not found: %s", admins_path);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=ADMINS configuration not found: %s", admins_path);
 #endif
@@ -384,7 +385,7 @@ main(int argc, char** argv)
       }
       else if (ret == 2)
       {
-         printf("pgmoneta: Invalid master key file\n");
+         warnx("pgmoneta: Invalid master key file");
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
@@ -392,7 +393,7 @@ main(int argc, char** argv)
       }
       else if (ret == 3)
       {
-         printf("pgmoneta: ADMINS: Too many admins defined %d (max %d)\n", config->number_of_admins, NUMBER_OF_ADMINS);
+         warnx("pgmoneta: ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
 #endif
@@ -454,7 +455,7 @@ main(int argc, char** argv)
    {
       if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
-         printf("pgmoneta: Daemon mode can't be used with console logging\n");
+         warnx("pgmoneta: Daemon mode can't be used with console logging");
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Daemon mode can't be used with console logging");
 #endif
@@ -465,7 +466,7 @@ main(int argc, char** argv)
 
       if (pid < 0)
       {
-         printf("pgmoneta: Daemon mode failed\n");
+         warnx("pgmoneta: Daemon mode failed");
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Daemon mode failed");
 #endif
@@ -1732,7 +1733,7 @@ create_pidfile(void)
       fd = open(config->pidfile, O_WRONLY | O_CREAT | O_EXCL, 0644);
       if (fd < 0)
       {
-         printf("Could not create PID file '%s' due to %s\n", config->pidfile, strerror(errno));
+         warn("Could not create PID file '%s'", config->pidfile);
          goto error;
       }
 
@@ -1743,7 +1744,7 @@ create_pidfile(void)
       r = write(fd, &buffer[0], strlen(buffer));
       if (r < 0)
       {
-         printf("Could not write pidfile '%s' due to %s\n", config->pidfile, strerror(errno));
+         warn("Could not write pidfile '%s'", config->pidfile);
          goto error;
       }
 

@@ -35,6 +35,7 @@
 
 /* system */
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
@@ -170,7 +171,7 @@ main(int argc, char** argv)
 
    if (getuid() == 0)
    {
-      printf("pgmoneta: Using the root account is not allowed\n");
+      warnx("pgmoneta: Using the root account is not allowed");
       exit(1);
    }
 
@@ -201,7 +202,7 @@ main(int argc, char** argv)
       {
          if (master_key(password, generate_pwd, pwd_length))
          {
-            printf("Error for master key\n");
+            warnx("Error for master key");
             exit_code = 1;
          }
       }
@@ -211,13 +212,13 @@ main(int argc, char** argv)
          {
             if (add_user(file_path, username, password, generate_pwd, pwd_length))
             {
-               printf("Error for add-user\n");
+               warnx("Error for add-user");
                exit_code = 1;
             }
          }
          else
          {
-            printf("Missing file argument\n");
+            warnx("Missing file argument");
             exit_code = 1;
          }
       }
@@ -227,13 +228,13 @@ main(int argc, char** argv)
          {
             if (update_user(file_path, username, password, generate_pwd, pwd_length))
             {
-               printf("Error for update-user\n");
+               warnx("Error for update-user");
                exit_code = 1;
             }
          }
          else
          {
-            printf("Missing file argument\n");
+            warnx("Missing file argument");
             exit_code = 1;
          }
       }
@@ -243,13 +244,13 @@ main(int argc, char** argv)
          {
             if (remove_user(file_path, username))
             {
-               printf("Error for remove-user\n");
+               warnx("Error for remove-user");
                exit_code = 1;
             }
          }
          else
          {
-            printf("Missing file argument\n");
+            warnx("Missing file argument");
             exit_code = 1;
          }
       }
@@ -259,13 +260,13 @@ main(int argc, char** argv)
          {
             if (list_users(file_path))
             {
-               printf("Error for list-users\n");
+               warnx("Error for list-users");
                exit_code = 1;
             }
          }
          else
          {
-            printf("Missing file argument\n");
+            warnx("Missing file argument");
             exit_code = 1;
          }
       }
@@ -295,11 +296,11 @@ master_key(char* password, bool generate_pwd, int pwd_length)
 
       if (username != NULL)
       {
-         printf("No home directory for user \'%s\'\n", username);
+         warnx("No home directory for user \'%s\'", username);
       }
       else
       {
-         printf("No home directory for user running pgmoneta\n");
+         warnx("No home directory for user running pgmoneta");
       }
 
       goto error;
@@ -320,7 +321,7 @@ master_key(char* password, bool generate_pwd, int pwd_length)
       }
       else
       {
-         printf("Wrong permissions for ~/.pgmoneta (must be 0700)\n");
+         warnx("Wrong permissions for ~/.pgmoneta (must be 0700)");
          goto error;
       }
    }
@@ -340,7 +341,7 @@ master_key(char* password, bool generate_pwd, int pwd_length)
       }
       else
       {
-         printf("Wrong permissions for ~/.pgmoneta/master.key (must be 0600)\n");
+         warnx("Wrong permissions for ~/.pgmoneta/master.key (must be 0600)");
          goto error;
       }
    }
@@ -348,7 +349,7 @@ master_key(char* password, bool generate_pwd, int pwd_length)
    file = fopen(&buf[0], "w+");
    if (file == NULL)
    {
-      printf("Could not write to master key file '%s' due to %s\n", &buf[0], strerror(errno));
+      warn("Could not write to master key file '%s'", &buf[0]);
       goto error;
    }
 
@@ -464,7 +465,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
 
    if (pgmoneta_get_master_key(&master_key))
    {
-      printf("Invalid master key\n");
+      warnx("Invalid master key");
       goto error;
    }
 
@@ -477,7 +478,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
    users_file = fopen(users_path, "a+");
    if (users_file == NULL)
    {
-      printf("Could not append to users file '%s' due to %s\n", users_path, strerror(errno));
+      warn("Could not append to users file '%s'", users_path);
       goto error;
    }
 
@@ -507,7 +508,7 @@ username:
       ptr = strtok(line, ":");
       if (!strcmp(username, ptr))
       {
-         printf("Existing user: %s\n", username);
+         warnx("Existing user: %s", username);
          goto error;
       }
 
@@ -516,7 +517,7 @@ username:
 
    if (number_of_users > NUMBER_OF_USERS)
    {
-      printf("Too many users\n");
+      warnx("Too many users");
       goto error;
    }
 
@@ -634,7 +635,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
 
    if (pgmoneta_get_master_key(&master_key))
    {
-      printf("Invalid master key\n");
+      warnx("Invalid master key");
       goto error;
    }
 
@@ -647,7 +648,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    users_file = fopen(users_path, "r");
    if (!users_file)
    {
-      printf("%s not found\n", users_path);
+      warnx("%s not found\n", users_path);
       goto error;
    }
 
@@ -655,7 +656,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    users_file_tmp = fopen(tmpfilename, "w+");
    if (users_file_tmp == NULL)
    {
-      printf("Could not write to temporary user file '%s' due to %s\n", tmpfilename, strerror(errno));
+      warn("Could not write to temporary user file '%s'", tmpfilename);
       goto error;
    }
 
@@ -758,7 +759,7 @@ password:
 
    if (!found)
    {
-      printf("User '%s' not found\n", username);
+      warnx("User '%s' not found", username);
       goto error;
    }
 
@@ -822,7 +823,7 @@ remove_user(char* users_path, char* username)
    users_file = fopen(users_path, "r");
    if (!users_file)
    {
-      printf("%s not found\n", users_path);
+      warnx("%s not found", users_path);
       goto error;
    }
 
@@ -831,7 +832,7 @@ remove_user(char* users_path, char* username)
    users_file_tmp = fopen(tmpfilename, "w+");
    if (users_file_tmp == NULL)
    {
-      printf("Could not write to temporary user file '%s' due to %s\n", tmpfilename, strerror(errno));
+      warn("Could not write to temporary user file '%s'", tmpfilename);
       goto error;
    }
 
@@ -874,7 +875,7 @@ username:
 
    if (!found)
    {
-      printf("User '%s' not found\n", username);
+      warnx("User '%s' not found", username);
       goto error;
    }
 

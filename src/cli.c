@@ -37,6 +37,7 @@
 #include <utils.h>
 
 /* system */
+#include <err.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -222,13 +223,13 @@ main(int argc, char** argv)
 
    if (getuid() == 0)
    {
-      printf("pgmoneta-cli: Using the root account is not allowed\n");
+      warnx("pgmoneta-cli: Using the root account is not allowed");
       exit(1);
    }
 
    if (configuration_path != NULL && (host != NULL || port != NULL))
    {
-      printf("pgmoneta-cli: Use either -c or -h/-p to define endpoint\n");
+      warnx("pgmoneta-cli: Use either -c or -h/-p to define endpoint");
       exit(1);
    }
 
@@ -241,7 +242,7 @@ main(int argc, char** argv)
    size = sizeof(struct configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
-      printf("pgmoneta-cli: Error creating shared memory\n");
+      warnx("pgmoneta-cli: Error creating shared memory");
       exit(1);
    }
    pgmoneta_init_configuration(shmem);
@@ -251,7 +252,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_configuration(shmem, configuration_path);
       if (ret)
       {
-         printf("pgmoneta-cli: Configuration not found: %s\n", configuration_path);
+         warnx("pgmoneta-cli: Configuration not found: %s", configuration_path);
          exit(1);
       }
 
@@ -278,7 +279,7 @@ main(int argc, char** argv)
       {
          if (host == NULL || port == NULL)
          {
-            printf("pgmoneta-cli: Host and port must be specified\n");
+            warnx("pgmoneta-cli: Host and port must be specified");
             exit(1);
          }
       }
@@ -458,7 +459,7 @@ main(int argc, char** argv)
             /* Remote connection */
             if (pgmoneta_connect(host, atoi(port), &socket))
             {
-               printf("pgmoneta-cli: No route to host: %s:%s\n", host, port);
+               warnx("pgmoneta-cli: No route to host: %s:%s", host, port);
                goto done;
             }
 
@@ -513,7 +514,7 @@ password:
             /* Authenticate */
             if (pgmoneta_remote_management_scram_sha256(username, password, socket, &s_ssl) != AUTH_SUCCESS)
             {
-               printf("pgmoneta-cli: Bad credentials for %s\n", username);
+               warnx("pgmoneta-cli: Bad credentials for %s", username);
                goto done;
             }
          }
@@ -604,7 +605,7 @@ done:
       }
       else if (action != ACTION_UNKNOWN && exit_code != 0)
       {
-         printf("No connection to pgmoneta on %s\n", config->unix_socket_dir);
+         warnx("No connection to pgmoneta on %s", config->unix_socket_dir);
       }
    }
 
