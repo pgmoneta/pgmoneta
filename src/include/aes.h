@@ -37,7 +37,7 @@
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length);
+pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length, int mode);
 
 /**
  * Decrypt a string
@@ -48,4 +48,37 @@ pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* cipher
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext);
+pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext, int mode);
+
+/**
+ * Encrypt the files under the directory in place recursively, also remvoe unencrypted files.
+ * @param d The wal directory
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encrypt_data(char* d);
+
+/**
+ * Encrypt the files under the directory in place, also remvoe unencrypted files.
+ * @param d The wal directory
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encrypt_wal(char* d);
+
+/**
+ * Encrypt a single file, also remvoe unencrypted file.
+ * @param from the path of file
+ * @param to the path that encrypted file will be
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encrypt_file(char* from, char* to);
+
+/**
+ * Decrypt the files under the directory in place, also remvoe encrypted files.
+ * @param d The wal directory
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_decrypt_data(char* d);

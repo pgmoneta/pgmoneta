@@ -9,6 +9,7 @@
 * Full backup
 * Restore
 * Compression (gzip, zstd, lz4)
+* AES encryption support
 * Symlink support
 * Prometheus support
 * Remote management

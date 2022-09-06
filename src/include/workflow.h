@@ -158,6 +158,13 @@ pgmoneta_workflow_create_recovery_info(void);
 struct workflow*
 pgmoneta_workflow_create_permissions(int type);
 
+/**
+ * Create a workflow for encryption
+ * @param encrypt true for encrypt and false for decrypt
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_encryption(bool encrypt);
 #ifdef __cplusplus
 }
 #endif

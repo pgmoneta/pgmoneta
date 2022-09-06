@@ -63,6 +63,7 @@ static int as_logging_mode(char* str);
 static int as_hugepage(char* str);
 static int as_compression(char* str);
 static int as_storage_engine(char* str);
+static int as_encryption_mode(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, unsigned int* size);
 static int as_logging_rotation_age(char* str, unsigned int* age);
@@ -90,6 +91,8 @@ pgmoneta_init_configuration(void* shm)
 
    config->compression_type = COMPRESSION_ZSTD;
    config->compression_level = 3;
+
+   config->encryption = ENCRYPTION_NONE;
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
@@ -841,6 +844,17 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "encryption"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     config->encryption = as_encryption_mode(value);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else
                {
                   unknown = true;
@@ -1071,7 +1085,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
                goto error;
             }
 
-            if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password))
+            if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
             {
                goto error;
             }
@@ -1243,7 +1257,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
                goto error;
             }
 
-            if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password))
+            if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
             {
                goto error;
             }
@@ -1963,6 +1977,43 @@ error:
 }
 
 static int
+as_encryption_mode(char* str)
+{
+   if (!strcasecmp(str, "none"))
+   {
+      return ENCRYPTION_NONE;
+   }
+
+   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes-256") || !strcasecmp(str, "aes-256-cbc"))
+   {
+      return ENCRYPTION_AES_256_CBC;
+   }
+
+   if (!strcasecmp(str, "aes-192") || !strcasecmp(str, "aes-192-cbc"))
+   {
+      return ENCRYPTION_AES_192_CBC;
+   }
+
+   if (!strcasecmp(str, "aes-128") || !strcasecmp(str, "aes-128-cbc"))
+   {
+      return ENCRYPTION_AES_128_CBC;
+   }
+   if (!strcasecmp(str, "aes-256-ctr"))
+   {
+      return ENCRYPTION_AES_256_CTR;
+   }
+   if (!strcasecmp(str, "aes-192-ctr"))
+   {
+      return ENCRYPTION_AES_192_CTR;
+   }
+   if (!strcasecmp(str, "aes-128-ctr"))
+   {
+      return ENCRYPTION_AES_128_CTR;
+   }
+   return ENCRYPTION_NONE;
+}
+
+static int
 transfer_configuration(struct configuration* config, struct configuration* reload)
 {
 #ifdef HAVE_LINUX
@@ -2026,7 +2077,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
 
    /* update_process_title */
    restart_int("update_process_title", config->update_process_title, reload->update_process_title);
-   
+
    /* unix_socket_dir */
    restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir);
 
