@@ -122,6 +122,12 @@ wf_backup(void)
       current = current->next;
    }
 
+   if (config->encryption != ENCRYPTION_NONE)
+   {
+      current->next = pgmoneta_workflow_encryption(true);
+      current = current->next;
+   }
+
    if (config->link)
    {
       current->next = pgmoneta_workflow_create_link();
@@ -154,6 +160,12 @@ wf_restore(void)
 
    current->next = pgmoneta_workflow_create_recovery_info();
    current = current->next;
+
+   if (config->encryption != ENCRYPTION_NONE)
+   {
+      current->next = pgmoneta_workflow_encryption(false);
+      current = current->next;
+   }
 
    if (config->compression_type == COMPRESSION_GZIP)
    {
@@ -203,6 +215,12 @@ wf_archive(void)
    {
       current->next = pgmoneta_workflow_create_lz4(true);
 
+      current = current->next;
+   }
+
+   if (config->encryption != ENCRYPTION_NONE)
+   {
+      current->next = pgmoneta_workflow_encryption(true);
       current = current->next;
    }
 
