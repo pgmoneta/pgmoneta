@@ -167,6 +167,7 @@ struct server
    bool synchronous;                   /**< Run in synchronous mode */
    atomic_bool backup;                 /**< Is there an active backup */
    atomic_bool delete;                 /**< Is there an active delete */
+   atomic_bool wal;                    /**< Is there an active wal */
    int wal_size;                       /**< The size of the WAL files */
    bool wal_streaming;                 /**< Is WAL streaming active */
    bool valid;                         /**< Is the server valid */

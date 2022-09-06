@@ -173,6 +173,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   srv.synchronous = false;
                   atomic_init(&srv.backup, false);
                   atomic_init(&srv.delete, false);
+                  atomic_init(&srv.wal, false);
                   srv.wal_streaming = false;
                   srv.valid = false;
 

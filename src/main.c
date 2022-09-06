@@ -1404,28 +1404,34 @@ wal_compress_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       /* Compression is always in a fork() */
       if (!fork())
       {
+         bool active = false;
          char* d = NULL;
 
          pgmoneta_set_proc_title(1, argv_ptr, "wal compress", config->servers[i].name);
 
          shutdown_ports();
 
-         d = pgmoneta_get_server_wal(i);
+         if (atomic_compare_exchange_strong(&config->servers[i].wal, &active, true))
+         {
+            d = pgmoneta_get_server_wal(i);
 
-         if (config->compression_type == COMPRESSION_GZIP)
-         {
-            pgmoneta_gzip_wal(d);
-         }
-         else if (config->compression_type == COMPRESSION_ZSTD)
-         {
-            pgmoneta_zstandardc_wal(d);
-         }
-         else if (config->compression_type == COMPRESSION_LZ4)
-         {
-            pgmoneta_lz4c_wal(d);
-         }
+            if (config->compression_type == COMPRESSION_GZIP)
+            {
+               pgmoneta_gzip_wal(d);
+            }
+            else if (config->compression_type == COMPRESSION_ZSTD)
+            {
+               pgmoneta_zstandardc_wal(d);
+            }
+            else if (config->compression_type == COMPRESSION_LZ4)
+            {
+               pgmoneta_lz4c_wal(d);
+            }
 
-         free(d);
+            free(d);
+
+            atomic_store(&config->servers[i].wal, false);
+         }
 
          exit(0);
       }
