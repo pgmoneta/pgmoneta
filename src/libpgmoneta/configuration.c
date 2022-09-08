@@ -36,6 +36,7 @@
 #include <aes.h>
 
 /* system */
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <stdatomic.h>
@@ -63,6 +64,10 @@ static int as_hugepage(char* str);
 static int as_compression(char* str);
 static int as_storage_engine(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
+static int as_logging_rotation_size(char* str, unsigned int* size);
+static int as_logging_rotation_age(char* str, unsigned int* age);
+static unsigned int as_seconds(char* str, unsigned int* age, unsigned int default_age);
+static unsigned int as_bytes(char* str, unsigned int* bytes, unsigned int default_bytes);
 
 static int transfer_configuration(struct configuration* config, struct configuration* reload);
 static void copy_server(struct server* dst, struct server* src);
@@ -537,6 +542,50 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(config->log_path, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_rotation_size"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_logging_rotation_size(value, &config->log_rotation_size))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_rotation_age"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_logging_rotation_age(value, &config->log_rotation_size))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_line_prefix"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->log_line_prefix, value, max);
                   }
                   else
                   {
@@ -1488,29 +1537,46 @@ as_logging_type(char* str)
 static int
 as_logging_level(char* str)
 {
-   if (!strcasecmp(str, "debug5"))
-   {
-      return PGMONETA_LOGGING_LEVEL_DEBUG5;
-   }
+   size_t size = 0;
+   int debug_level = 1;
+   char* debug_value = NULL;
 
-   if (!strcasecmp(str, "debug4"))
+   if (!strncasecmp(str, "debug", strlen("debug")))
    {
-      return PGMONETA_LOGGING_LEVEL_DEBUG4;
-   }
-
-   if (!strcasecmp(str, "debug3"))
-   {
-      return PGMONETA_LOGGING_LEVEL_DEBUG3;
-   }
-
-   if (!strcasecmp(str, "debug2"))
-   {
-      return PGMONETA_LOGGING_LEVEL_DEBUG2;
-   }
-
-   if (!strcasecmp(str, "debug1"))
-   {
-      return PGMONETA_LOGGING_LEVEL_DEBUG1;
+      if (strlen(str) > strlen("debug"))
+      {
+         size = strlen(str) - strlen("debug");
+         debug_value = (char*)malloc(size + 1);
+         memset(debug_value, 0, size + 1);
+         memcpy(debug_value, str + 5, size);
+         if (as_int(debug_value, &debug_level))
+         {
+            // cannot parse, set it to 1
+            debug_level = 1;
+         }
+         free(debug_value);
+      }
+ 
+      if (debug_level <= 1)
+      {
+         return PGMONETA_LOGGING_LEVEL_DEBUG1;
+      }
+      else if (debug_level == 2)
+      {
+         return PGMONETA_LOGGING_LEVEL_DEBUG2;
+      }
+      else if (debug_level == 3)
+      {
+         return PGMONETA_LOGGING_LEVEL_DEBUG3;
+      }
+      else if (debug_level == 4)
+      {
+         return PGMONETA_LOGGING_LEVEL_DEBUG4;
+      }
+      else if (debug_level >= 5)
+      {
+         return PGMONETA_LOGGING_LEVEL_DEBUG5;
+      }
    }
 
    if (!strcasecmp(str, "info"))
@@ -1653,6 +1719,249 @@ as_update_process_title(char* str, unsigned int default_policy)
    return default_policy;
 }
 
+/**
+ * Parses a string to see if it contains
+ * a valid value for log rotation size.
+ * Returns 0 if parsing ok, 1 otherwise.
+ *
+ */
+static int
+as_logging_rotation_size(char* str, unsigned int* size)
+{
+   return as_bytes(str, size, PGMONETA_LOGGING_ROTATION_DISABLED);
+}
+
+/**
+ * Parses the log_rotation_age string.
+ * The string accepts
+ * - s for seconds
+ * - m for minutes
+ * - h for hours
+ * - d for days
+ * - w for weeks
+ *
+ * The default is expressed in seconds.
+ * The function sets the number of rotationg age as minutes.
+ * Returns 1 for errors, 0 for correct parsing.
+ *
+ */
+static int
+as_logging_rotation_age(char* str, unsigned int* age)
+{
+   return as_seconds(str, age, PGMONETA_LOGGING_ROTATION_DISABLED);
+}
+
+/**
+ * Parses an age string, providing the resulting value as seconds.
+ * An age string is expressed by a number and a suffix that indicates
+ * the multiplier. Accepted suffixes, case insensitive, are:
+ * - s for seconds
+ * - m for minutes
+ * - h for hours
+ * - d for days
+ * - w for weeks
+ *
+ * The default is expressed in seconds.
+ *
+ * @param str the value to parse as retrieved from the configuration
+ * @param age a pointer to the value that is going to store
+ *        the resulting number of seconds
+ * @param default_age a value to set when the parsing is unsuccesful
+
+ */
+static unsigned int
+as_seconds(char* str, unsigned int* age, unsigned int default_age)
+{
+   int multiplier = 1;
+   int index;
+   char value[MISC_LENGTH];
+   bool multiplier_set = false;
+   int i_value = default_age;
+
+   if (is_empty_string(str))
+   {
+      *age = default_age;
+      return 0;
+   }
+
+   index = 0;
+   for (int i = 0; i < strlen(str); i++)
+   {
+      if (isdigit(str[i]))
+      {
+         value[index++] = str[i];
+      }
+      else if (isalpha(str[i]) && multiplier_set)
+      {
+         // another extra char not allowed
+         goto error;
+      }
+      else if (isalpha(str[i]) && !multiplier_set)
+      {
+         if (str[i] == 's' || str[i] == 'S')
+         {
+            multiplier = 1;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'm' || str[i] == 'M')
+         {
+            multiplier = 60;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'h' || str[i] == 'H')
+         {
+            multiplier = 3600;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'd' || str[i] == 'D')
+         {
+            multiplier = 24 * 3600;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'w' || str[i] == 'W')
+         {
+            multiplier = 24 * 3600 * 7;
+            multiplier_set = true;
+         }
+      }
+      else
+      {
+         // do not allow alien chars
+         goto error;
+      }
+   }
+
+   value[index] = '\0';
+   if (!as_int(value, &i_value))
+   {
+      // sanity check: the value
+      // must be a positive number!
+      if (i_value >= 0)
+      {
+         *age = i_value * multiplier;
+      }
+      else
+      {
+         goto error;
+      }
+
+      return 0;
+   }
+   else
+   {
+error:
+      *age = default_age;
+      return 1;
+   }
+}
+
+/**
+ * Converts a "size string" into the number of bytes.
+ *
+ * Valid strings have one of the suffixes:
+ * - b for bytes (default)
+ * - k for kilobytes
+ * - m for megabytes
+ * - g for gigabytes
+ *
+ * The default is expressed always as bytes.
+ * Uppercase letters work too.
+ * If no suffix is specified, the value is expressed as bytes.
+ *
+ * @param str the string to parse (e.g., "2M")
+ * @param bytes the value to set as result of the parsing stage
+ * @param default_bytes the default value to set when the parsing cannot proceed
+ * @return 1 if parsing is unable to understand the string, 0 is parsing is
+ *         performed correctly (or almost correctly, e.g., empty string)
+ */
+static unsigned int
+as_bytes(char* str, unsigned int* bytes, unsigned int default_bytes)
+{
+   int multiplier = 1;
+   int index;
+   char value[MISC_LENGTH];
+   bool multiplier_set = false;
+   int i_value = default_bytes;
+
+   if (is_empty_string(str))
+   {
+      *bytes = default_bytes;
+      return 0;
+   }
+
+   index = 0;
+   for (int i = 0; i < strlen(str); i++)
+   {
+      if (isdigit(str[i]))
+      {
+         value[index++] = str[i];
+      }
+      else if (isalpha(str[i]) && multiplier_set)
+      {
+         // allow a 'B' suffix on a multiplier
+         // like for instance 'MB', but don't allow it
+         // for bytes themselves ('BB')
+         if (multiplier == 1
+             || (str[i] != 'b' && str[i] != 'B'))
+         {
+            // another non-digit char not allowed
+            goto error;
+         }
+      }
+      else if (isalpha(str[i]) && !multiplier_set)
+      {
+         if (str[i] == 'M' || str[i] == 'm')
+         {
+            multiplier = 1024 * 1024;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'G' || str[i] == 'g')
+         {
+            multiplier = 1024 * 1024 * 1024;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'K' || str[i] == 'k')
+         {
+            multiplier = 1024;
+            multiplier_set = true;
+         }
+         else if (str[i] == 'B' || str[i] == 'b')
+         {
+            multiplier = 1;
+            multiplier_set = true;
+         }
+      }
+      else
+      {
+         // do not allow alien chars
+         goto error;
+      }
+   }
+
+   value[index] = '\0';
+   if (!as_int(value, &i_value))
+   {
+      // sanity check: the value
+      // must be a positive number!
+      if (i_value >= 0)
+      {
+         *bytes = i_value * multiplier;
+      }
+      else
+      {
+         goto error;
+      }
+
+      return 0;
+   }
+   else
+   {
+error:
+      *bytes = default_bytes;
+      return 1;
+   }
+}
+
 static int
 transfer_configuration(struct configuration* config, struct configuration* reload)
 {
@@ -1677,9 +1986,22 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    /* log_type */
    restart_int("log_type", config->log_type, reload->log_type);
    config->log_level = reload->log_level;
-   /* log_path */
-   restart_string("log_path", config->log_path, reload->log_path);
-   restart_int("log_mode", config->log_mode, reload->log_mode);
+   // if the log main parameters have changed, we need
+   // to restart the logging system
+   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH)
+       || config->log_rotation_size != reload->log_rotation_size
+       || config->log_rotation_age != reload->log_rotation_age
+       || config->log_mode != reload->log_mode)
+   {
+      pgmoneta_log_debug("Log restart triggered!");
+      pgmoneta_stop_logging();
+      config->log_rotation_size = reload->log_rotation_size;
+      config->log_rotation_age = reload->log_rotation_age;
+      config->log_mode = reload->log_mode;
+      memcpy(config->log_line_prefix, reload->log_line_prefix, MISC_LENGTH);
+      memcpy(config->log_path, reload->log_path, MISC_LENGTH);
+      pgmoneta_start_logging();
+   }
    /* log_lock */
 
    config->tls = reload->tls;
