@@ -60,7 +60,7 @@ log_level
   Not recognized values will make the log_level be INFO. Default is info
 
 log_path
-  The log file location. Default is pgagroal.log. Can be a strftime(3) compatible string
+  The log file location. Default is pgmoneta.log. Can be a strftime(3) compatible string
 
 log_rotation_age
   The age that will trigger a log file rotation. If expressed as a positive number, is managed as seconds.
