@@ -65,10 +65,10 @@ static int as_compression(char* str);
 static int as_storage_engine(char* str);
 static int as_encryption_mode(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
-static int as_logging_rotation_size(char* str, unsigned int* size);
-static int as_logging_rotation_age(char* str, unsigned int* age);
-static unsigned int as_seconds(char* str, unsigned int* age, unsigned int default_age);
-static unsigned int as_bytes(char* str, unsigned int* bytes, unsigned int default_bytes);
+static int as_logging_rotation_size(char* str, int* size);
+static int as_logging_rotation_age(char* str, int* age);
+static int as_seconds(char* str, int* age, int default_age);
+static int as_bytes(char* str, int* bytes, int default_bytes);
 
 static int transfer_configuration(struct configuration* config, struct configuration* reload);
 static void copy_server(struct server* dst, struct server* src);
@@ -387,6 +387,34 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->metrics))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "metrics_cache_max_size"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_bytes(value, &config->metrics_cache_max_size, 0))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "metrics_cache_max_age"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_seconds(value, &config->metrics_cache_max_age, 0))
                      {
                         unknown = true;
                      }
@@ -1740,7 +1768,7 @@ as_update_process_title(char* str, unsigned int default_policy)
  *
  */
 static int
-as_logging_rotation_size(char* str, unsigned int* size)
+as_logging_rotation_size(char* str, int* size)
 {
    return as_bytes(str, size, PGMONETA_LOGGING_ROTATION_DISABLED);
 }
@@ -1760,7 +1788,7 @@ as_logging_rotation_size(char* str, unsigned int* size)
  *
  */
 static int
-as_logging_rotation_age(char* str, unsigned int* age)
+as_logging_rotation_age(char* str, int* age)
 {
    return as_seconds(str, age, PGMONETA_LOGGING_ROTATION_DISABLED);
 }
@@ -1783,8 +1811,8 @@ as_logging_rotation_age(char* str, unsigned int* age)
  * @param default_age a value to set when the parsing is unsuccesful
 
  */
-static unsigned int
-as_seconds(char* str, unsigned int* age, unsigned int default_age)
+static int
+as_seconds(char* str, int* age, int default_age)
 {
    int multiplier = 1;
    int index;
@@ -1888,8 +1916,8 @@ error:
  * @return 1 if parsing is unable to understand the string, 0 is parsing is
  *         performed correctly (or almost correctly, e.g., empty string)
  */
-static unsigned int
-as_bytes(char* str, unsigned int* bytes, unsigned int default_bytes)
+static int
+as_bytes(char* str, int* bytes, int default_bytes)
 {
    int multiplier = 1;
    int index;
@@ -2022,6 +2050,8 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
 
    memcpy(config->host, reload->host, MISC_LENGTH);
    config->metrics = reload->metrics;
+   config->metrics_cache_max_age = reload->metrics_cache_max_age;
+   restart_int("metrics_cache_max_size", config->metrics_cache_max_size, reload->metrics_cache_max_size);
    config->management = reload->management;
 
    /* base_dir */

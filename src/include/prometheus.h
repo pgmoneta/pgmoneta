@@ -36,6 +36,27 @@ extern "C" {
 #include <ev.h>
 #include <stdlib.h>
 
+/*
+ * Value to disable the Prometheus cache,
+ * it is equivalent to set `metrics_cache`
+ * to 0 (seconds).
+ */
+#define PGMONETA_PROMETHEUS_CACHE_DISABLED 0
+
+/**
+ * Max size of the cache (in bytes).
+ * If the cache request exceeds this size
+ * the caching should be aborted in some way.
+ */
+#define PROMETHEUS_MAX_CACHE_SIZE (1024 * 1024)
+
+/**
+ * The default cache size in the case
+ * the user did not set any particular
+ * configuration option.
+ */
+#define PROMETHEUS_DEFAULT_CACHE_SIZE (256 * 1024)
+
 /**
  * Create a prometheus instance
  * @param fd The client descriptor
@@ -48,6 +69,30 @@ pgmoneta_prometheus(int fd);
  */
 void
 pgmoneta_prometheus_reset(void);
+
+/**
+ * Allocates, for the first time, the Prometheus cache.
+ *
+ * The cache structure, as well as its dynamically sized payload,
+ * are created as shared memory chunks.
+ *
+ * Assumes the shared memory for the cofiguration is already set.
+ *
+ * The cache will be allocated as soon as this method is invoked,
+ * even if the cache has not been configured at all!
+ *
+ * If the memory cannot be allocated, the function issues errors
+ * in the logs and disables the caching machinaery.
+ *
+ * @param p_size a pointer to where to store the size of
+ * allocated chunk of memory
+ * @param p_shmem the pointer to the pointer at which the allocated chunk
+ * of shared memory is going to be inserted
+ *
+ * @return 0 on success
+ */
+int
+pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem);
 
 #ifdef __cplusplus
 }

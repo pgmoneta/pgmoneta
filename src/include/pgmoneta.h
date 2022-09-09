@@ -159,6 +159,12 @@ extern "C" {
  */
 extern void* shmem;
 
+/**
+ * Shared memory used to contain the Prometheus
+ * response cache.
+ */
+extern void* prometheus_cache_shmem;
+
 /** @struct
  * Defines a server
  */
@@ -190,6 +196,28 @@ struct user
    char password[MAX_PASSWORD_LENGTH]; /**< The password */
 } __attribute__ ((aligned (64)));
 
+/**
+ * A structure to handle the Prometheus response
+ * so that it is possible to serve the very same
+ * response over and over depending on the cache
+ * settings.
+ *
+ * The `valid_until` field stores the result
+ * of `time(2)`.
+ *
+ * The cache is protected by the `lock` field.
+ *
+ * The `size` field stores the size of the allocated
+ * `data` payload.
+ */
+struct prometheus_cache
+{
+   time_t valid_until;   /**< when the cache will become not valid */
+   atomic_schar lock;    /**< lock to protect the cache */
+   size_t size;          /**< size of the cache */
+   char data[];          /**< the payload */
+} __attribute__ ((aligned (64)));
+
 /** @struct
  * Defines the Prometheus metrics
  */
@@ -206,9 +234,11 @@ struct configuration
    char users_path[MAX_PATH];         /**< The users path */
    char admins_path[MAX_PATH];        /**< The admins path */
 
-   char host[MISC_LENGTH]; /**< The host */
-   int metrics;            /**< The metrics port */
-   int management;         /**< The management port */
+   char host[MISC_LENGTH];     /**< The host */
+   int metrics;                /**< The metrics port */
+   int metrics_cache_max_age;  /**< Number of seconds to cache the Prometheus response */
+   int metrics_cache_max_size; /**< Number of bytes max to cache the Prometheus response */
+   int management;             /**< The management port */
 
    char base_dir[MAX_PATH];  /**< The base directory */
    char pgsql_dir[MAX_PATH]; /**< The PostgreSQL directory */
@@ -231,8 +261,8 @@ struct configuration
    int log_level;                     /**< The logging level */
    char log_path[MISC_LENGTH];        /**< The logging path */
    int log_mode;                      /**< The logging mode */
-   unsigned int log_rotation_size;    /**< bytes to force log rotation */
-   unsigned int log_rotation_age;     /**< minutes for log rotation */
+   int log_rotation_size;             /**< bytes to force log rotation */
+   int log_rotation_age;              /**< minutes for log rotation */
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
 

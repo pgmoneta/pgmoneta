@@ -234,6 +234,7 @@ main(int argc, char** argv)
    struct ev_periodic valid;
    struct ev_periodic wal_streaming;
    size_t shmem_size;
+   size_t prometheus_cache_shmem_size = 0;
    struct configuration* config = NULL;
    int ret;
    int c;
@@ -496,6 +497,14 @@ main(int argc, char** argv)
 
    pgmoneta_set_proc_title(argc, argv, "main", NULL);
 
+   if (pgmoneta_init_prometheus_cache(&prometheus_cache_shmem_size, &prometheus_cache_shmem))
+   {
+#ifdef HAVE_LINUX
+      sd_notifyf(0, "STATUS=Error in creating and initializing prometheus cache shared memory");
+#endif
+      errx(1, "Error in creating and initializing prometheus cache shared memory");
+   }
+
    /* Bind Unix Domain Socket */
    if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
    {
@@ -664,6 +673,7 @@ main(int argc, char** argv)
 
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, shmem_size);
+   pgmoneta_destroy_shared_memory(prometheus_cache_shmem, prometheus_cache_shmem_size);
 
    if (daemon || stop)
    {

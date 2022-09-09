@@ -34,6 +34,7 @@
 #include <message.h>
 #include <network.h>
 #include <prometheus.h>
+#include <shmem.h>
 #include <utils.h>
 
 /* system */
@@ -61,6 +62,13 @@ static void backup_information(int client_fd);
 static void size_information(int client_fd);
 
 static int send_chunk(int client_fd, char* data);
+
+static bool is_metrics_cache_configured(void);
+static bool is_metrics_cache_valid(void);
+static bool metrics_cache_append(char* data);
+static bool metrics_cache_finalize(void);
+static size_t metrics_cache_size_to_alloc(void);
+static void metrics_cache_invalidate(void);
 
 void
 pgmoneta_prometheus(int client_fd)
@@ -478,46 +486,86 @@ metrics_page(int client_fd)
    char time_buf[32];
    int status;
    struct message msg;
+   struct prometheus_cache* cache;
+   signed char cache_is_free;
+
+   cache = (struct prometheus_cache*)prometheus_cache_shmem;
 
    memset(&msg, 0, sizeof(struct message));
 
-   now = time(NULL);
-
-   memset(&time_buf, 0, sizeof(time_buf));
-   ctime_r(&now, &time_buf[0]);
-   time_buf[strlen(time_buf) - 1] = 0;
-
-   data = pgmoneta_append(data, "HTTP/1.1 200 OK\r\n");
-   data = pgmoneta_append(data, "Content-Type: text/plain; version=0.0.1; charset=utf-8\r\n");
-   data = pgmoneta_append(data, "Date: ");
-   data = pgmoneta_append(data, &time_buf[0]);
-   data = pgmoneta_append(data, "\r\n");
-   data = pgmoneta_append(data, "Transfer-Encoding: chunked\r\n");
-   data = pgmoneta_append(data, "\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
-
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
-   if (status != MESSAGE_STATUS_OK)
+retry_cache_locking:
+   cache_is_free = STATE_FREE;
+   if (atomic_compare_exchange_strong(&cache->lock, &cache_is_free, STATE_IN_USE))
    {
-      goto error;
+      // can serve the message out of cache?
+      if (is_metrics_cache_configured() && is_metrics_cache_valid())
+      {
+         // serve the message directly out of the cache
+         pgmoneta_log_debug("Serving metrics out of cache (%d/%d bytes valid until %lld)",
+                            strlen(cache->data),
+                            cache->size,
+                            cache->valid_until);
+
+         msg.kind = 0;
+         msg.length = strlen(cache->data);
+         msg.data = cache->data;
+      }
+      else
+      {
+         // build the message without the cache
+         metrics_cache_invalidate();
+
+         now = time(NULL);
+
+         memset(&time_buf, 0, sizeof(time_buf));
+         ctime_r(&now, &time_buf[0]);
+         time_buf[strlen(time_buf) - 1] = 0;
+
+         data = pgmoneta_append(data, "HTTP/1.1 200 OK\r\n");
+         data = pgmoneta_append(data, "Content-Type: text/plain; version=0.0.1; charset=utf-8\r\n");
+         data = pgmoneta_append(data, "Date: ");
+         data = pgmoneta_append(data, &time_buf[0]);
+         data = pgmoneta_append(data, "\r\n");
+         data = pgmoneta_append(data, "Transfer-Encoding: chunked\r\n");
+         data = pgmoneta_append(data, "\r\n");
+         metrics_cache_append(data);
+
+         msg.kind = 0;
+         msg.length = strlen(data);
+         msg.data = data;
+
+         status = pgmoneta_write_message(NULL, client_fd, &msg);
+         if (status != MESSAGE_STATUS_OK)
+         {
+            goto error;
+         }
+
+         free(data);
+         data = NULL;
+
+         general_information(client_fd);
+         backup_information(client_fd);
+         size_information(client_fd);
+
+         /* Footer */
+         data = pgmoneta_append(data, "0\r\n\r\n");
+         metrics_cache_append(data);
+
+         msg.kind = 0;
+         msg.length = strlen(data);
+         msg.data = data;
+
+         metrics_cache_finalize();
+      }
+
+      // free the cache
+      atomic_store(&cache->lock, STATE_FREE);
    }
-
-   free(data);
-   data = NULL;
-
-   general_information(client_fd);
-   backup_information(client_fd);
-   size_information(client_fd);
-
-   /* Footer */
-   data = pgmoneta_append(data, "0\r\n\r\n");
-
-   msg.kind = 0;
-   msg.length = strlen(data);
-   msg.data = data;
+   else
+   {
+      /* Sleep for 1ms */
+      SLEEP_AND_GOTO(1000000L, retry_cache_locking)
+   }
 
    status = pgmoneta_write_message(NULL, client_fd, &msg);
    if (status != MESSAGE_STATUS_OK)
@@ -707,6 +755,7 @@ general_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -772,6 +821,7 @@ backup_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -863,6 +913,7 @@ backup_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -922,6 +973,7 @@ backup_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -981,6 +1033,7 @@ backup_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1046,6 +1099,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1097,6 +1151,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1156,6 +1211,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1215,6 +1271,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1274,6 +1331,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1303,6 +1361,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1332,6 +1391,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1361,6 +1421,7 @@ size_information(int client_fd)
    if (data != NULL)
    {
       send_chunk(client_fd, data);
+      metrics_cache_append(data);
       free(data);
       data = NULL;
    }
@@ -1392,4 +1453,224 @@ send_chunk(int client_fd, char* data)
    free(m);
 
    return status;
+}
+
+/**
+ * Checks if the Prometheus cache configuration setting
+ * (`metrics_cache`) has a non-zero value, that means there
+ * are seconds to cache the response.
+ *
+ * @return true if there is a cache configuration,
+ *         false if no cache is active
+ */
+static bool
+is_metrics_cache_configured(void)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   // cannot have caching if not set metrics!
+   if (config->metrics == 0)
+   {
+      return false;
+   }
+
+   return config->metrics_cache_max_age != PGMONETA_PROMETHEUS_CACHE_DISABLED;
+}
+
+/**
+ * Checks if the cache is still valid, and therefore can be
+ * used to serve as a response.
+ * A cache is considred valid if it has non-empty payload and
+ * a timestamp in the future.
+ *
+ * @return true if the cache is still valid
+ */
+static bool
+is_metrics_cache_valid(void)
+{
+   time_t now;
+
+   struct prometheus_cache* cache;
+
+   cache = (struct prometheus_cache*)prometheus_cache_shmem;
+
+   if (cache->valid_until == 0 || strlen(cache->data) == 0)
+   {
+      return false;
+   }
+
+   now = time(NULL);
+   return now <= cache->valid_until;
+}
+
+int
+pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem)
+{
+   struct prometheus_cache* cache;
+   struct configuration* config;
+   size_t cache_size = 0;
+   size_t struct_size = 0;
+
+   config = (struct configuration*)shmem;
+
+   // first of all, allocate the overall cache structure
+   cache_size = metrics_cache_size_to_alloc();
+   struct_size = sizeof(struct prometheus_cache);
+
+   if (pgmoneta_create_shared_memory(struct_size + cache_size, config->hugepage, (void*) &cache))
+   {
+      goto error;
+   }
+
+   memset(cache, 0, struct_size + cache_size);
+   cache->valid_until = 0;
+   cache->size = cache_size;
+   atomic_init(&cache->lock, STATE_FREE);
+
+   // success! do the memory swap
+   *p_shmem = cache;
+   *p_size = cache_size + struct_size;
+   return 0;
+
+error:
+   // disable caching
+   config->metrics_cache_max_age = config->metrics_cache_max_size = PGMONETA_PROMETHEUS_CACHE_DISABLED;
+   pgmoneta_log_error("Cannot allocate shared memory for the Prometheus cache!");
+   *p_size = 0;
+   *p_shmem = NULL;
+
+   return 1;
+}
+
+/**
+ * Provides the size of the cache to allocate.
+ *
+ * It checks if the metrics cache is configured, and
+ * computers the right minimum value between the
+ * user configured requested size and the default
+ * cache size.
+ *
+ * @return the cache size to allocate
+ */
+static size_t
+metrics_cache_size_to_alloc(void)
+{
+   struct configuration* config;
+   size_t cache_size = 0;
+
+   config = (struct configuration*)shmem;
+
+   // which size to use ?
+   // either the configured (i.e., requested by user) if lower than the max size
+   // or the default value
+   if (is_metrics_cache_configured())
+   {
+      cache_size = config->metrics_cache_max_size > 0
+            ? MIN(config->metrics_cache_max_size, PROMETHEUS_MAX_CACHE_SIZE)
+            : PROMETHEUS_DEFAULT_CACHE_SIZE;
+   }
+
+   return cache_size;
+}
+
+/**
+ * Invalidates the cache.
+ *
+ * Requires the caller to hold the lock on the cache!
+ *
+ * Invalidating the cache means that the payload is zero-filled
+ * and that the valid_until field is set to zero too.
+ */
+static void
+metrics_cache_invalidate(void)
+{
+   struct prometheus_cache* cache;
+
+   cache = (struct prometheus_cache*)prometheus_cache_shmem;
+
+   memset(cache->data, 0, cache->size);
+   cache->valid_until = 0;
+}
+
+/**
+ * Appends data to the cache.
+ *
+ * Requires the caller to hold the lock on the cache!
+ *
+ * If the input data is empty, nothing happens.
+ * The data is appended only if the cache does not overflows, that
+ * means the current size of the cache plus the size of the data
+ * to append does not exceed the current cache size.
+ * If the cache overflows, the cache is flushed and marked
+ * as invalid.
+ * This makes safe to call this method along the workflow of
+ * building the Prometheus response.
+ *
+ * @param data the string to append to the cache
+ * @return true on success
+ */
+static bool
+metrics_cache_append(char* data)
+{
+   int origin_length = 0;
+   int append_length = 0;
+   struct prometheus_cache* cache;
+
+   cache = (struct prometheus_cache*)prometheus_cache_shmem;
+
+   if (!is_metrics_cache_configured())
+   {
+      return false;
+   }
+
+   origin_length = strlen(cache->data);
+   append_length = strlen(data);
+   // need to append the data to the cache
+   if (origin_length + append_length >= cache->size)
+   {
+      // cannot append new data, so invalidate cache
+      pgmoneta_log_debug("Cannot append %d bytes to the Prometheus cache because it will overflow the size of %d bytes (currently at %d bytes). HINT: try adjusting `metrics_cache_max_size`",
+                         append_length,
+                         cache->size,
+                         origin_length);
+      metrics_cache_invalidate();
+      return false;
+   }
+
+   // append the data to the data field
+   memcpy(cache->data + origin_length, data, append_length);
+   cache->data[origin_length + append_length + 1] = '\0';
+   return true;
+}
+
+/**
+ * Finalizes the cache.
+ *
+ * Requires the caller to hold the lock on the cache!
+ *
+ * This method should be invoked when the cache is complete
+ * and therefore can be served.
+ *
+ * @return true if the cache has a validity
+ */
+static bool
+metrics_cache_finalize(void)
+{
+   struct configuration* config;
+   struct prometheus_cache* cache;
+   time_t now;
+
+   cache = (struct prometheus_cache*)prometheus_cache_shmem;
+   config = (struct configuration*)shmem;
+
+   if (!is_metrics_cache_configured())
+   {
+      return false;
+   }
+
+   now = time(NULL);
+   cache->valid_until = now + config->metrics_cache_max_age;
+   return cache->valid_until > now;
 }

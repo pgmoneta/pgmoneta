@@ -36,7 +36,7 @@
 #include <sys/mman.h>
 
 void* shmem = NULL;
-void* pipeline_shmem = NULL;
+void* prometheus_cache_shmem = NULL;
 
 int
 pgmoneta_create_shared_memory(size_t size, unsigned char hp, void** shmem)
