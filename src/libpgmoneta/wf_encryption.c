@@ -157,7 +157,7 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       {
          tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
          enc_file = pgmoneta_append(enc_file, tarfile);
-         enc_file = pgmoneta_append(from, compress_suffix);
+         enc_file = pgmoneta_append(enc_file, compress_suffix);
          pgmoneta_encrypt_file(enc_file, d);
       }
       else
