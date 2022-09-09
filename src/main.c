@@ -959,7 +959,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             {
                int number_of_backups = pgmoneta_get_number_of_valid_backups(i);
 
-               if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2)))
+               if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2) || !strcmp("latest", payload_s2)))
                {
                   number_of_results++;
                }
@@ -981,7 +981,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                {
                   int number_of_backups = pgmoneta_get_number_of_valid_backups(i);
 
-                  if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2)))
+                  if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2) || !strcmp("latest", payload_s2)))
                   {
                      char* backup_id = NULL;
                      char* position = NULL;

@@ -27,7 +27,9 @@
  */
 
 /* pgmoneta */
+#include <pgmoneta.h>
 #include <aes.h>
+#include <info.h>
 #include <link.h>
 #include <logging.h>
 #include <node.h>
@@ -192,15 +194,63 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    char* d = NULL;
    char* to = NULL;
    char* prefix = NULL;
+   char* id = NULL;
    time_t decrypt_time;
    int total_seconds;
    int hours;
    int minutes;
    int seconds;
    char elapsed[128];
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   if (!strcmp(identifier, "oldest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+
+      free(d);
+      d = NULL;
+   }
+   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+
+      free(d);
+      d = NULL;
+   }
+   else
+   {
+      id = identifier;
+   }
 
    if (i_nodes != NULL)
    {
@@ -215,12 +265,12 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       }
       else
       {
-         d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+         d = pgmoneta_get_server_backup_identifier_data(server, id);
       }
    }
    else
    {
-      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+      d = pgmoneta_get_server_backup_identifier_data(server, id);
    }
 
    decrypt_time = time(NULL);
@@ -237,9 +287,26 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
    free(d);
 
    return 0;
+
+error:
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(d);
+
+   return 1;
 }
 
 static int
