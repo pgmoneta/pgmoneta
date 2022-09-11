@@ -208,6 +208,14 @@ Example
 pgmoneta-cli reset
 ```
 
+## decrypt
+Decrypt the file in place, remove encrypted file after successful decryption.
+
+Command
+
+```
+pgmoneta-cli decrypt <file>
+```
 
 ## Shell completions
 

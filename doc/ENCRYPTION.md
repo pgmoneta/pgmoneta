@@ -22,6 +22,17 @@ Longer the key length, safer the encryption. However, with 20% (192 bit) and 40%
 
 `aes-128-ctr`: AES CTR mode with 128 bit key length
 
+## Encryption / Decryption CLI Commands
+### decrypt
+Decrypt the file in place, remove encrypted file after successful decryption.
+
+Command
+
+```
+pgmoneta-cli decrypt <file>
+```
+
+
 ## Benchmark
 Check if your CPU have [AES-NI](https://en.wikipedia.org/wiki/AES_instruction_set)
 ```sh

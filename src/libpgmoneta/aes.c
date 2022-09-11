@@ -256,6 +256,33 @@ pgmoneta_decrypt_data(char* d)
 }
 
 int
+pgmoneta_decrypt_archive(char* path)
+{
+   char* to = NULL;
+
+   if (!pgmoneta_exists(path))
+   {
+      pgmoneta_log_error("pgmoneta_decrypt_archive: file not exist: %s", path);
+      return 1;
+
+   }
+
+   to = malloc(strlen(path) - 3);
+   memset(to, 0, strlen(path) - 3);
+   memcpy(to, path, strlen(path) - 4);
+
+   if (encrypt_file(path, to, 0))
+   {
+      pgmoneta_log_error("pgmoneta_decrypt_archive: error on decrypt file");
+      return 1;
+   }
+
+   pgmoneta_delete_file(path);
+   free(to);
+   return 0;
+}
+
+int
 pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* ciphertext_length, int mode)
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];

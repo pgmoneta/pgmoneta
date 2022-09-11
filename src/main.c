@@ -1218,6 +1218,11 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          free(payload_s1);
          free(payload_s2);
          break;
+      case MANAGEMENT_DECRYPT:
+         pgmoneta_log_debug("pgmoneta: Management decrypt: %s/%s", payload_s1);
+         pgmoneta_decrypt_archive(payload_s1);
+         free(payload_s1);
+         break;
       default:
          pgmoneta_log_debug("pgmoneta: Unknown management id: %d", id);
          break;
