@@ -689,6 +689,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
+   int ret;
    signed char id;
    char* payload_s1 = NULL;
    char* payload_s2 = NULL;
@@ -1217,6 +1218,12 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          free(payload_s1);
          free(payload_s2);
+         break;
+      case MANAGEMENT_DECRYPT:
+         pgmoneta_log_debug("pgmoneta: Management decrypt: %s", payload_s1);
+         ret = pgmoneta_decrypt_archive(payload_s1);
+         pgmoneta_management_write_int32(client_fd, ret);
+         free(payload_s1);
          break;
       default:
          pgmoneta_log_debug("pgmoneta: Unknown management id: %d", id);

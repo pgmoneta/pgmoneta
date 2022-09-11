@@ -1598,7 +1598,7 @@ as_logging_level(char* str)
          }
          free(debug_value);
       }
- 
+
       if (debug_level <= 1)
       {
          return PGMONETA_LOGGING_LEVEL_DEBUG1;

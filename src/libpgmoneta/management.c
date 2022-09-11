@@ -98,6 +98,7 @@ pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, 
    {
       case MANAGEMENT_BACKUP:
       case MANAGEMENT_LIST_BACKUP:
+      case MANAGEMENT_DECRYPT:
          read_string("pgmoneta_management_read_payload", socket, payload_s1);
          break;
       case MANAGEMENT_RESTORE:
@@ -1391,6 +1392,28 @@ pgmoneta_management_expunge(SSL* ssl, int socket, char* server, char* backup_id)
    }
 
    if (write_string("pgmoneta_management_expunge", socket, backup_id))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_decrypt(SSL* ssl, int socket, char* path)
+{
+   if (write_header(ssl, socket, MANAGEMENT_DECRYPT))
+   {
+      pgmoneta_log_warn("pgmoneta_management_decrypt: write: %d", socket);
+      errno = 0;
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_decrypt", socket, path))
    {
       goto error;
    }

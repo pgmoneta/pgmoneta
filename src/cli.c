@@ -63,6 +63,7 @@
 #define ACTION_RELOAD      11
 #define ACTION_RETAIN      12
 #define ACTION_EXPUNGE     13
+#define ACTION_DECRYPT     14
 #define ACTION_HELP        99
 
 static int find_action(int argc, char** argv, int* place);
@@ -74,6 +75,7 @@ static void help_archive(void);
 static void help_delete(void);
 static void help_retain(void);
 static void help_expunge(void);
+static void help_decrypt(void);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server);
@@ -88,6 +90,7 @@ static int reset(SSL* ssl, int socket);
 static int reload(SSL* ssl, int socket);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
+static int decrypt(SSL* ssl, int socket, char* path);
 
 static void
 version(void)
@@ -442,6 +445,18 @@ main(int argc, char** argv)
             action = ACTION_HELP;
          }
       }
+      else if (action == ACTION_DECRYPT)
+      {
+         if (argc == position + 2)
+         {
+            dir = argv[argc - 1];
+         }
+         else
+         {
+            help_decrypt();
+            action = ACTION_HELP;
+         }
+      }
 
       if (action != ACTION_UNKNOWN)
       {
@@ -571,6 +586,10 @@ password:
       else if (action == ACTION_EXPUNGE)
       {
          exit_code = expunge(s_ssl, socket, server, id);
+      }
+      else if (action == ACTION_DECRYPT)
+      {
+         exit_code = decrypt(s_ssl, socket, dir);
       }
    }
 
@@ -704,6 +723,11 @@ find_action(int argc, char** argv, int* place)
          *place = i;
          return ACTION_EXPUNGE;
       }
+      else if (!strcmp("decrypt", argv[i]))
+      {
+         *place = i;
+         return ACTION_DECRYPT;
+      }
    }
 
    return ACTION_UNKNOWN;
@@ -756,6 +780,13 @@ help_expunge(void)
 {
    printf("Expunge a backup for a server\n");
    printf("  pgmoneta-cli expunge <server> [<timestamp>|oldest|newest]\n");
+}
+
+static void
+help_decrypt(void)
+{
+   printf("Decrypt an .aes file created by pgmoneta-cli archive\n");
+   printf("  pgmoneta-cli decrypt <file>\n");
 }
 
 static int
@@ -950,4 +981,22 @@ expunge(SSL* ssl, int socket, char* server, char* backup_id)
    }
 
    return 0;
+}
+
+static int
+decrypt(SSL* ssl, int socket, char* path)
+{
+   int ret;
+   int number_of_returns = 0;
+   int code = 0;
+
+   ret = pgmoneta_management_decrypt(ssl, socket, path);
+   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
+
+   for (int i = 0; i < number_of_returns; i++)
+   {
+      pgmoneta_management_read_int32(ssl, socket, &code);
+   }
+
+   return ret;
 }

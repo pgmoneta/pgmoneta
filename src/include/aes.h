@@ -82,3 +82,11 @@ pgmoneta_encrypt_file(char* from, char* to);
  */
 int
 pgmoneta_decrypt_data(char* d);
+
+/**
+ * Decrypt the archive file created by pgmoneta-cli archive in place, also remvoe encrypted archive.
+ * @param d The archive file path
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_decrypt_archive(char* path);

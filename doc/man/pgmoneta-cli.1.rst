@@ -90,6 +90,9 @@ reload
 reset
   Reset the Prometheus statistics
 
+decrypt
+  Decrypt the file in place, remove encrypted file after successful decryption.
+
 REPORTING BUGS
 ==============
 
