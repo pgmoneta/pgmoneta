@@ -102,6 +102,13 @@ bool pgmoneta_get_node_bool(struct node* chain, char* t);
 void pgmoneta_append_node(struct node** chain, struct node* node);
 
 /**
+ * List the nodes
+ * @param chain The node chain
+ */
+void
+pgmoneta_list_nodes(struct node* chain);
+
+/**
  * Delete the node
  * @param in The node
  * @return 0 upon success, otherwise 1

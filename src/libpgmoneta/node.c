@@ -27,11 +27,12 @@
  */
 
 /* pgmoneta */
-#include <limits.h>
 #include <pgmoneta.h>
+#include <logging.h>
 #include <node.h>
 
 /* system */
+#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -276,6 +277,20 @@ pgmoneta_append_node(struct node** chain, struct node* node)
          head = head->next;
       }
       head->next = node;
+   }
+}
+
+void
+pgmoneta_list_nodes(struct node* chain)
+{
+   struct node* current = NULL;
+
+   current = chain;
+
+   while (current != NULL)
+   {
+      pgmoneta_log_trace("Node: %s -> %p", current->tag, current->data);
+      current = current->next;
    }
 }
 
