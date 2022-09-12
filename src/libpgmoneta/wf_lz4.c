@@ -76,9 +76,6 @@ lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct 
 {
    char* d = NULL;
    char* to = NULL;
-   char* prefix = NULL;
-   char* directory = NULL;
-   char* id = NULL;
    char* tarfile = NULL;
    time_t compression_time;
    int total_seconds;
@@ -90,62 +87,28 @@ lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct 
 
    config = (struct configuration*)shmem;
 
-   if (i_nodes != NULL)
-   {
-      prefix = pgmoneta_get_node_string(i_nodes, "prefix");
-
-      if (!strcmp(prefix, "Restore"))
-      {
-         to = pgmoneta_get_node_string(*o_nodes, "to");
-         d = malloc(strlen(to) + 1);
-         memset(d, 0, strlen(to) + 1);
-         memcpy(d, to, strlen(to));
-      }
-      else if (!strcmp(prefix, "Archive"))
-      {
-         directory = pgmoneta_get_node_string(i_nodes, "directory");
-         id = pgmoneta_get_node_string(i_nodes, "id");
-
-         d = pgmoneta_append(d, directory);
-         d = pgmoneta_append(d, "/");
-         d = pgmoneta_append(d, config->servers[server].name);
-         d = pgmoneta_append(d, "-");
-         d = pgmoneta_append(d, id);
-         d = pgmoneta_append(d, ".tar.lz4");
-
-         if (pgmoneta_exists(d))
-         {
-            pgmoneta_delete_file(d);
-         }
-      }
-      else
-      {
-         d = pgmoneta_get_server_backup_identifier_data(server, identifier);
-      }
-   }
-   else
-   {
-      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
-   }
-
    compression_time = time(NULL);
 
-   if (i_nodes != NULL)
-   {
-      if (!strcmp(prefix, "Archive"))
-      {
-         tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
+   tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
 
-         pgmoneta_lz4c_file(tarfile, d);
-      }
-      else
-      {
-         pgmoneta_lz4c_data(d);
-      }
+   if (tarfile == NULL)
+   {
+      to = pgmoneta_get_node_string(*o_nodes, "to");
+      d = pgmoneta_append(d, to);
+
+      pgmoneta_lz4c_data(d);
    }
    else
    {
-      pgmoneta_lz4c_data(d);
+      d = pgmoneta_append(d, tarfile);
+      d = pgmoneta_append(d, ".lz4");
+
+      if (pgmoneta_exists(d))
+      {
+         pgmoneta_delete_file(d);
+      }
+
+      pgmoneta_lz4c_file(tarfile, d);
    }
 
    total_seconds = (int)difftime(time(NULL), compression_time);
@@ -168,7 +131,6 @@ lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struc
 {
    char* d = NULL;
    char* to = NULL;
-   char* prefix = NULL;
    time_t decompress_time;
    int total_seconds;
    int hours;
@@ -179,21 +141,11 @@ lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struc
 
    config = (struct configuration*)shmem;
 
-   if (i_nodes != NULL)
-   {
-      prefix = pgmoneta_get_node_string(i_nodes, "prefix");
+   to = pgmoneta_get_node_string(*o_nodes, "to");
 
-      if (!strcmp(prefix, "Restore"))
-      {
-         to = pgmoneta_get_node_string(*o_nodes, "to");
-         d = malloc(strlen(to) + 1);
-         memset(d, 0, strlen(to) + 1);
-         memcpy(d, to, strlen(to));
-      }
-      else
-      {
-         d = pgmoneta_get_server_backup_identifier_data(server, identifier);
-      }
+   if (to != NULL)
+   {
+      d = pgmoneta_append(d, to);
    }
    else
    {

@@ -57,7 +57,6 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
    struct node* i_ident = NULL;
    struct node* i_directory = NULL;
    struct node* i_output = NULL;
-   struct node* i_prefix = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -68,16 +67,9 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
 
    start_time = time(NULL);
 
-   if (!pgmoneta_restore_backup("Archive", server, backup_id, position, directory, &output, &id))
+   if (!pgmoneta_restore_backup(server, backup_id, position, directory, &output, &id))
    {
       result = 0;
-
-      if (pgmoneta_create_node_string("Archive", "prefix", &i_prefix))
-      {
-         goto error;
-      }
-
-      pgmoneta_append_node(&i_nodes, i_prefix);
 
       if (pgmoneta_create_node_string(directory, "directory", &i_directory))
       {

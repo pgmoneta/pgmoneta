@@ -287,6 +287,11 @@ pgmoneta_list_nodes(struct node* chain)
 
    current = chain;
 
+   if (current == NULL)
+   {
+      pgmoneta_log_trace("No nodes");
+   }
+
    while (current != NULL)
    {
       pgmoneta_log_trace("Node: %s -> %p", current->tag, current->data);

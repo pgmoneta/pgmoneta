@@ -64,7 +64,7 @@ pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, cha
 
    start_time = time(NULL);
 
-   if (!pgmoneta_restore_backup("Restore", server, backup_id, position, directory, &output, &id))
+   if (!pgmoneta_restore_backup(server, backup_id, position, directory, &output, &id))
    {
       result = 0;
 
@@ -95,7 +95,7 @@ pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, cha
 }
 
 int
-pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* position, char* directory, char** output, char** identifier)
+pgmoneta_restore_backup(int server, char* backup_id, char* position, char* directory, char** output, char** identifier)
 {
    char* o = NULL;
    char* ident = NULL;
@@ -103,19 +103,11 @@ pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* positio
    struct workflow* current = NULL;
    struct node* i_nodes = NULL;
    struct node* o_nodes = NULL;
-   struct node* i_prefix = NULL;
    struct node* i_position = NULL;
    struct node* i_directory = NULL;
 
    *output = NULL;
    *identifier = NULL;
-
-   if (pgmoneta_create_node_string(prefix, "prefix", &i_prefix))
-   {
-      goto error;
-   }
-
-   pgmoneta_append_node(&i_nodes, i_prefix);
 
    if (pgmoneta_create_node_string(position, "position", &i_position))
    {

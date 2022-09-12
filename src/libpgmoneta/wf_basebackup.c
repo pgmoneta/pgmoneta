@@ -78,6 +78,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    int minutes;
    int seconds;
    char elapsed[128];
+   struct node* o_to = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -154,6 +155,13 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    else
    {
+      if (pgmoneta_create_node_string(d, "to", &o_to))
+      {
+         goto error;
+      }
+
+      pgmoneta_append_node(o_nodes, o_to);
+
       total_seconds = (int)difftime(time(NULL), start_time);
       hours = total_seconds / 3600;
       minutes = (total_seconds % 3600) / 60;

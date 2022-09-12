@@ -359,6 +359,8 @@ archive_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    tar_append_tree(tar, output, ".");
 
+   tar_close(tar);
+
    return 0;
 
 error:
@@ -377,8 +379,6 @@ archive_teardown(int server, char* identifier, struct node* i_nodes, struct node
    {
       goto error;
    }
-
-   tar_close(tar);
 
    pgmoneta_delete_directory(output);
 

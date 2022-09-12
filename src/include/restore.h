@@ -50,7 +50,6 @@ pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, cha
 
 /**
  * Restore to a directory
- * @param prefix The log prefix
  * @param server The server
  * @param backup_id The backup identifier
  * @param position The position
@@ -60,7 +59,7 @@ pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, cha
  * @return The result
  */
 int
-pgmoneta_restore_backup(char* prefix, int server, char* backup_id, char* position, char* directory, char** output, char** identifier);
+pgmoneta_restore_backup(int server, char* backup_id, char* position, char* directory, char** output, char** identifier);
 
 #ifdef __cplusplus
 }

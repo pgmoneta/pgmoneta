@@ -81,9 +81,6 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    char* d = NULL;
    char* enc_file = NULL;
    char* to = NULL;
-   char* prefix = NULL;
-   char* directory = NULL;
-   char* id = NULL;
    char* compress_suffix = NULL;
    char* tarfile = NULL;
    time_t encrypt_time;
@@ -96,80 +93,49 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    config = (struct configuration*)shmem;
 
-   if (i_nodes != NULL)
-   {
-      prefix = pgmoneta_get_node_string(i_nodes, "prefix");
-
-      if (!strcmp(prefix, "Restore"))
-      {
-         to = pgmoneta_get_node_string(*o_nodes, "to");
-         d = pgmoneta_append(d, to);
-      }
-      else if (!strcmp(prefix, "Archive"))
-      {
-         directory = pgmoneta_get_node_string(i_nodes, "directory");
-         id = pgmoneta_get_node_string(i_nodes, "id");
-
-         d = pgmoneta_append(d, directory);
-         d = pgmoneta_append(d, "/");
-         d = pgmoneta_append(d, config->servers[server].name);
-         d = pgmoneta_append(d, "-");
-         d = pgmoneta_append(d, id);
-         switch (config->compression_type)
-         {
-            case COMPRESSION_GZIP:
-               compress_suffix = ".gz";
-               break;
-            case COMPRESSION_ZSTD:
-               compress_suffix = ".zstd";
-               break;
-            case COMPRESSION_LZ4:
-               compress_suffix = ".lz4";
-               break;
-            case COMPRESSION_NONE:
-               compress_suffix = "";
-               break;
-            default:
-               pgmoneta_log_error("encryption_execute: Unknown compression type");
-               break;
-         }
-         d = pgmoneta_append(d, ".tar");
-         d = pgmoneta_append(d, compress_suffix);
-         d = pgmoneta_append(d, ".aes");
-         if (pgmoneta_exists(d))
-         {
-            pgmoneta_delete_file(d);
-         }
-      }
-      else
-      {
-         d = pgmoneta_get_server_backup_identifier_data(server, identifier);
-      }
-   }
-   else
-   {
-      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
-   }
+   tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
 
    encrypt_time = time(NULL);
 
-   if (i_nodes != NULL)
+   if (tarfile == NULL)
    {
-      if (!strcmp(prefix, "Archive"))
-      {
-         tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
-         enc_file = pgmoneta_append(enc_file, tarfile);
-         enc_file = pgmoneta_append(enc_file, compress_suffix);
-         pgmoneta_encrypt_file(enc_file, d);
-      }
-      else
-      {
-         pgmoneta_encrypt_data(d);
-      }
+      to = pgmoneta_get_node_string(*o_nodes, "to");
+      d = pgmoneta_append(d, to);
+
+      pgmoneta_encrypt_data(d);
    }
    else
    {
-      pgmoneta_encrypt_data(d);
+      switch (config->compression_type)
+      {
+         case COMPRESSION_GZIP:
+            compress_suffix = ".gz";
+            break;
+         case COMPRESSION_ZSTD:
+            compress_suffix = ".zstd";
+            break;
+         case COMPRESSION_LZ4:
+            compress_suffix = ".lz4";
+            break;
+         case COMPRESSION_NONE:
+            compress_suffix = "";
+            break;
+         default:
+            pgmoneta_log_error("encryption_execute: Unknown compression type");
+            break;
+      }
+
+      d = pgmoneta_append(d, tarfile);
+      d = pgmoneta_append(d, compress_suffix);
+      d = pgmoneta_append(d, ".aes");
+      if (pgmoneta_exists(d))
+      {
+         pgmoneta_delete_file(d);
+      }
+
+      enc_file = pgmoneta_append(enc_file, tarfile);
+      enc_file = pgmoneta_append(enc_file, compress_suffix);
+      pgmoneta_encrypt_file(enc_file, d);
    }
 
    total_seconds = (int)difftime(time(NULL), encrypt_time);
@@ -193,7 +159,6 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 {
    char* d = NULL;
    char* to = NULL;
-   char* prefix = NULL;
    char* id = NULL;
    time_t decrypt_time;
    int total_seconds;
@@ -252,21 +217,11 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       id = identifier;
    }
 
-   if (i_nodes != NULL)
-   {
-      prefix = pgmoneta_get_node_string(i_nodes, "prefix");
+   to = pgmoneta_get_node_string(*o_nodes, "to");
 
-      if (!strcmp(prefix, "Restore"))
-      {
-         to = pgmoneta_get_node_string(*o_nodes, "to");
-         d = malloc(strlen(to) + 1);
-         memset(d, 0, strlen(to) + 1);
-         memcpy(d, to, strlen(to));
-      }
-      else
-      {
-         d = pgmoneta_get_server_backup_identifier_data(server, id);
-      }
+   if (to != NULL)
+   {
+      d = pgmoneta_append(d, to);
    }
    else
    {

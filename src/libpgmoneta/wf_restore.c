@@ -87,7 +87,6 @@ restore_setup(int server, char* identifier, struct node* i_nodes, struct node** 
 static int
 restore_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
-   char* prefix = NULL;
    char* position = NULL;
    char* directory = NULL;
    char* o = NULL;
@@ -114,8 +113,6 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    struct configuration* config;
 
    config = (struct configuration*)shmem;
-
-   prefix = pgmoneta_get_node_string(i_nodes, "prefix");
 
    position = pgmoneta_get_node_string(i_nodes, "position");
 
@@ -162,7 +159,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    if (id == NULL)
    {
-      pgmoneta_log_error("%s: No identifier for %s/%s", prefix, config->servers[server].name, identifier);
+      pgmoneta_log_error("Restore: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
@@ -172,19 +169,19 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    if (!pgmoneta_exists(base))
    {
-      pgmoneta_log_error("%s: Unknown identifier for %s/%s", prefix, config->servers[server].name, id);
+      pgmoneta_log_error("Restore: Unknown identifier for %s/%s", config->servers[server].name, id);
       goto error;
    }
 
    if (pgmoneta_get_backup(root, id, &verify))
    {
-      pgmoneta_log_error("%s: Unable to get backup for %s/%s", prefix, config->servers[server].name, id);
+      pgmoneta_log_error("Restore: Unable to get backup for %s/%s", config->servers[server].name, id);
       goto error;
    }
 
    if (!verify->valid)
    {
-      pgmoneta_log_error("%s: Invalid backup for %s/%s", prefix, config->servers[server].name, id);
+      pgmoneta_log_error("Restore: Invalid backup for %s/%s", config->servers[server].name, id);
       goto error;
    }
 
@@ -201,7 +198,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    if (pgmoneta_copy_directory(from, to))
    {
-      pgmoneta_log_error("%s: Could not restore %s/%s", prefix, config->servers[server].name, id);
+      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, id);
       goto error;
    }
    else
