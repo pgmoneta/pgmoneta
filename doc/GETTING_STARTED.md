@@ -153,6 +153,8 @@ Commands:
   delete                   Delete a backup from a server
   retain                   Retain a backup from a server
   expunge                  Expunge a backup from a server
+  encrypt                  Encrypt a file using master-key
+  decrypt                  Decrypt a file using master-key
   is-alive                 Is pgmoneta alive
   stop                     Stop pgmoneta
   status                   Status of pgmoneta
@@ -255,6 +257,7 @@ There are a few short tutorials available to help you better understand and conf
 - [Doing backup and restore](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/05_backup_restore.md)
 - [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/06_archive.md)
 - [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/07_delete.md)
+- [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/08_encryption.md)
 
 ## Closing
 

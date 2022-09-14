@@ -217,6 +217,15 @@ Command
 pgmoneta-cli decrypt <file>
 ```
 
+## encrypt
+Encrypt the file in place, remove unencrypted file after successful encryption.
+
+Command
+
+```
+pgmoneta-cli encrypt <file>
+```
+
 ## Shell completions
 
 There is a minimal shell completion support for `pgmoneta-cli`.

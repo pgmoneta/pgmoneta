@@ -1225,6 +1225,12 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_management_write_int32(client_fd, ret);
          free(payload_s1);
          break;
+      case MANAGEMENT_ENCRYPT:
+         pgmoneta_log_debug("pgmoneta: Management encrypt: %s", payload_s1);
+         ret = pgmoneta_encrypt_file(payload_s1, NULL);
+         pgmoneta_management_write_int32(client_fd, ret);
+         free(payload_s1);
+         break;
       default:
          pgmoneta_log_debug("pgmoneta: Unknown management id: %d", id);
          break;

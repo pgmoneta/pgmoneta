@@ -2,3 +2,4 @@
 _site/
 build/
 vendor/
+.vscode/
