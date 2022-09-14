@@ -180,14 +180,26 @@ pgmoneta_encrypt_wal(char* d)
 int
 pgmoneta_encrypt_file(char* from, char* to)
 {
+   int flag = 0;
    if (!pgmoneta_exists(from))
    {
       pgmoneta_log_error("pgmoneta_encrypt_file: file not exist: %s", from);
       return 1;
    }
 
+   if (!to)
+   {
+      to = pgmoneta_append(to, from);
+      to = pgmoneta_append(to, ".aes");
+      flag = 1;
+   }
+
    encrypt_file(from, to, 1);
    pgmoneta_delete_file(from);
+   if(flag)
+   {
+      free(to);
+   }
    return 0;
 }
 

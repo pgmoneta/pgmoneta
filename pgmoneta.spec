@@ -41,6 +41,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/ARCHITECTURE.md %{buildroot}%{_docdir}/%{name}/ARCHITECTURE.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CLI.md %{buildroot}%{_docdir}/%{name}/CLI.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CONFIGURATION.md %{buildroot}%{_docdir}/%{name}/CONFIGURATION.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/ENCRYPTION.md %{buildroot}%{_docdir}/%{name}/ENCRYPTION.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/GETTING_STARTED.md %{buildroot}%{_docdir}/%{name}/GETTING_STARTED.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/RPM.md %{buildroot}%{_docdir}/%{name}/RPM.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.service %{buildroot}%{_docdir}/%{name}/etc/pgmoneta.service
@@ -57,6 +58,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/05_backup_restore.md %{buildroot}%{_docdir}/%{name}/tutorial/05_backup_restore.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/06_archive.md %{buildroot}%{_docdir}/%{name}/tutorial/06_archive.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/07_delete.md %{buildroot}%{_docdir}/%{name}/tutorial/07_delete.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/08_encryption.md %{buildroot}%{_docdir}/%{name}/tutorial/08_encryption.md
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
@@ -83,6 +85,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/CODE_OF_CONDUCT.md
 %{_docdir}/%{name}/CLI.md
 %{_docdir}/%{name}/CONFIGURATION.md
+%{_docdir}/%{name}/ENCRYPTION.md
 %{_docdir}/%{name}/GETTING_STARTED.md
 %{_docdir}/%{name}/README.md
 %{_docdir}/%{name}/RPM.md
@@ -96,6 +99,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/tutorial/05_backup_restore.md
 %{_docdir}/%{name}/tutorial/06_archive.md
 %{_docdir}/%{name}/tutorial/07_delete.md
+%{_docdir}/%{name}/tutorial/08_encryption.md
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*

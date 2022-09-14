@@ -64,6 +64,7 @@
 #define ACTION_RETAIN      12
 #define ACTION_EXPUNGE     13
 #define ACTION_DECRYPT     14
+#define ACTION_ENCRYPT     15
 #define ACTION_HELP        99
 
 static int find_action(int argc, char** argv, int* place);
@@ -76,6 +77,7 @@ static void help_delete(void);
 static void help_retain(void);
 static void help_expunge(void);
 static void help_decrypt(void);
+static void help_encrypt(void);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server);
@@ -91,6 +93,7 @@ static int reload(SSL* ssl, int socket);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
 static int decrypt(SSL* ssl, int socket, char* path);
+static int encrypt(SSL* ssl, int socket, char* path);
 
 static void
 version(void)
@@ -128,6 +131,8 @@ usage(void)
    printf("  delete                   Delete a backup from a server\n");
    printf("  retain                   Retain a backup from a server\n");
    printf("  expunge                  Expunge a backup from a server\n");
+   printf("  encrypt                  Encrypt a file using master-key\n");
+   printf("  decrypt                  Decrypt a file using master-key\n");
    printf("  is-alive                 Is pgmoneta alive\n");
    printf("  stop                     Stop pgmoneta\n");
    printf("  status                   Status of pgmoneta\n");
@@ -457,7 +462,18 @@ main(int argc, char** argv)
             action = ACTION_HELP;
          }
       }
-
+      else if (action == ACTION_ENCRYPT)
+      {
+         if (argc == position + 2)
+         {
+            dir = argv[argc - 1];
+         }
+         else
+         {
+            help_encrypt();
+            action = ACTION_HELP;
+         }
+      }
       if (action != ACTION_UNKNOWN)
       {
          if (configuration_path != NULL)
@@ -590,6 +606,10 @@ password:
       else if (action == ACTION_DECRYPT)
       {
          exit_code = decrypt(s_ssl, socket, dir);
+      }
+      else if (action == ACTION_ENCRYPT)
+      {
+         exit_code = encrypt(s_ssl, socket, dir);
       }
    }
 
@@ -728,6 +748,11 @@ find_action(int argc, char** argv, int* place)
          *place = i;
          return ACTION_DECRYPT;
       }
+      else if (!strcmp("encrypt", argv[i]))
+      {
+         *place = i;
+         return ACTION_ENCRYPT;
+      }
    }
 
    return ACTION_UNKNOWN;
@@ -787,6 +812,13 @@ help_decrypt(void)
 {
    printf("Decrypt an .aes file created by pgmoneta-cli archive\n");
    printf("  pgmoneta-cli decrypt <file>\n");
+}
+
+static void
+help_encrypt(void)
+{
+   printf("Encrypt a single file in place.\n");
+   printf("  pgmoneta-cli encrypt <file>\n");
 }
 
 static int
@@ -987,16 +1019,24 @@ static int
 decrypt(SSL* ssl, int socket, char* path)
 {
    int ret;
-   int number_of_returns = 0;
-   int code = 0;
 
-   ret = pgmoneta_management_decrypt(ssl, socket, path);
-   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
-
-   for (int i = 0; i < number_of_returns; i++)
+   if(pgmoneta_management_decrypt(ssl, socket, path))
    {
-      pgmoneta_management_read_int32(ssl, socket, &code);
+      return 1;
    }
+   pgmoneta_management_read_int32(ssl, socket, &ret);
+   return ret;
+}
 
+static int
+encrypt(SSL* ssl, int socket, char* path)
+{
+   int ret;
+
+   if(pgmoneta_management_encrypt(ssl, socket, path))
+   {
+      return 1;
+   }
+   pgmoneta_management_read_int32(ssl, socket, &ret);
    return ret;
 }

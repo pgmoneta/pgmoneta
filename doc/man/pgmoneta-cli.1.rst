@@ -93,6 +93,9 @@ reset
 decrypt
   Decrypt the file in place, remove encrypted file after successful decryption.
 
+encrypt
+  Encrypt the file in place, remove unencrypted file after successful encryption.
+
 REPORTING BUGS
 ==============
 

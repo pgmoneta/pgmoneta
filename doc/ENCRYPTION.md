@@ -32,6 +32,14 @@ Command
 pgmoneta-cli decrypt <file>
 ```
 
+### encrypt
+Encrypt the file in place, remove unencrypted file after successful encryption.
+
+Command
+
+```
+pgmoneta-cli encrypt <file>
+```
 
 ## Benchmark
 Check if your CPU have [AES-NI](https://en.wikipedia.org/wiki/AES_instruction_set)

@@ -69,7 +69,7 @@ pgmoneta_encrypt_wal(char* d);
 /**
  * Encrypt a single file, also remvoe unencrypted file.
  * @param from the path of file
- * @param to the path that encrypted file will be
+ * @param to the path that encrypted file will be stored and named, or in place if NULL.
  * @return 0 upon success, otherwise 1
  */
 int

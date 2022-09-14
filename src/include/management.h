@@ -54,6 +54,7 @@ extern "C" {
 #define MANAGEMENT_RETAIN     11
 #define MANAGEMENT_EXPUNGE    12
 #define MANAGEMENT_DECRYPT    13
+#define MANAGEMENT_ENCRYPT    14
 
 /**
  * Read the management header
@@ -302,11 +303,21 @@ pgmoneta_management_expunge(SSL* ssl, int socket, char* server, char* backup_id)
  * Management operation: Decrypt an archive file on server
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param server The server name
+ * @param path The file path
  * @return 0 upon success, otherwise 1
  */
 int
 pgmoneta_management_decrypt(SSL* ssl, int socket, char* path);
+
+/**
+ * Management operation: Encrypt a file on server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_encrypt(SSL* ssl, int socket, char* path);
 
 /**
  * Management: Read int32

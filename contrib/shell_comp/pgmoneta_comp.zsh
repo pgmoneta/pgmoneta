@@ -6,7 +6,7 @@ function _pgmoneta_cli()
 {
     local line
     _arguments -C \
-               "1: :(backup list-backup restore archive delete retain expunge is-alive stop status details reload reset)" \
+               "1: :(backup list-backup restore archive delete retain expunge encrypt decrypt is-alive stop status details reload reset)" \
                "*::arg:->args"
 }
 
