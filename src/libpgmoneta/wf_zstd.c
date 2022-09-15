@@ -108,9 +108,6 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
          pgmoneta_delete_file(d);
       }
 
-      pgmoneta_log_info("TARFILE %s", tarfile);
-      pgmoneta_log_info("D %s", d);
-
       pgmoneta_zstandardc_file(tarfile, d);
    }
 
