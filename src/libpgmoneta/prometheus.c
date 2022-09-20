@@ -128,6 +128,24 @@ error:
 void
 pgmoneta_prometheus_reset(void)
 {
+   signed char cache_is_free;
+   struct prometheus_cache* cache;
+
+   cache = (struct prometheus_cache*)prometheus_cache_shmem;
+
+retry_cache_locking:
+   cache_is_free = STATE_FREE;
+   if (atomic_compare_exchange_strong(&cache->lock, &cache_is_free, STATE_IN_USE))
+   {
+      metrics_cache_invalidate();
+
+      atomic_store(&cache->lock, STATE_FREE);
+   }
+   else
+   {
+      /* Sleep for 1ms */
+      SLEEP_AND_GOTO(1000000L, retry_cache_locking);
+   }
 }
 
 static int
