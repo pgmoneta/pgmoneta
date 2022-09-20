@@ -7,7 +7,7 @@ URL:           https://github.com/pgmoneta/pgmoneta
 Source0:       https://github.com/pgmoneta/pgmoneta/archive/%{version}.tar.gz
 
 BuildRequires: gcc cmake make python3-docutils zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel
-BuildRequires: libev libev-devel openssl openssl-devel systemd systemd-devel libssh libssh-dev
+BuildRequires: libev libev-devel openssl openssl-devel systemd systemd-devel libssh libssh-devel
 Requires:      libev openssl systemd postgresql zlib libzstd lz4 libssh
 
 %description
