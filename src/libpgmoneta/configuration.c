@@ -2026,18 +2026,24 @@ as_encryption_mode(char* str)
    {
       return ENCRYPTION_AES_128_CBC;
    }
+
    if (!strcasecmp(str, "aes-256-ctr"))
    {
       return ENCRYPTION_AES_256_CTR;
    }
+
    if (!strcasecmp(str, "aes-192-ctr"))
    {
       return ENCRYPTION_AES_192_CTR;
    }
+
    if (!strcasecmp(str, "aes-128-ctr"))
    {
       return ENCRYPTION_AES_128_CTR;
    }
+
+   warnx("Unknown encryption mode: %s", str);
+
    return ENCRYPTION_NONE;
 }
 
