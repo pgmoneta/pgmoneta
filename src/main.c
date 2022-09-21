@@ -84,7 +84,7 @@ static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, in
 static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
-static void wal_compress_cb(struct ev_loop* loop, ev_periodic* w, int revents);
+static void wal_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
@@ -229,7 +229,7 @@ main(int argc, char** argv)
    bool daemon = false;
    pid_t pid, sid;
    struct signal_info signal_watcher[5];
-   struct ev_periodic wal_compress;
+   struct ev_periodic wal;
    struct ev_periodic retention;
    struct ev_periodic valid;
    struct ev_periodic wal_streaming;
@@ -604,8 +604,8 @@ main(int argc, char** argv)
    /* Start WAL compression */
    if (config->compression_type != COMPRESSION_NONE)
    {
-      ev_periodic_init (&wal_compress, wal_compress_cb, 0., 60, 0);
-      ev_periodic_start (main_loop, &wal_compress);
+      ev_periodic_init (&wal, wal_cb, 0., 60, 0);
+      ev_periodic_start (main_loop, &wal);
    }
 
    ev_periodic_init (&retention, retention_cb, 0., 300, 0);
@@ -1411,7 +1411,7 @@ coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 }
 
 static void
-wal_compress_cb(struct ev_loop* loop, ev_periodic* w, int revents)
+wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
    struct configuration* config;
 
@@ -1419,7 +1419,7 @@ wal_compress_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
    if (EV_ERROR & revents)
    {
-      pgmoneta_log_trace("wal_compress_cb: got invalid event: %s", strerror(errno));
+      pgmoneta_log_trace("wal_cb: got invalid event: %s", strerror(errno));
       return;
    }
 
@@ -1431,7 +1431,7 @@ wal_compress_cb(struct ev_loop* loop, ev_periodic* w, int revents)
          bool active = false;
          char* d = NULL;
 
-         pgmoneta_set_proc_title(1, argv_ptr, "wal compress", config->servers[i].name);
+         pgmoneta_set_proc_title(1, argv_ptr, "wal", config->servers[i].name);
 
          shutdown_ports();
 
