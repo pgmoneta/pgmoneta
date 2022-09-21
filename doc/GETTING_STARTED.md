@@ -250,14 +250,14 @@ See [Configuration](./CONFIGURATION.md) for more information on these subjects.
 ## Tutorials
 
 There are a few short tutorials available to help you better understand and configure `pgmoneta`:
-- [Installing pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/01_install.md)
-- [Using a replication slot](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/02_replication_slot.md)
-- [Enabling remote management](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/03_remote_management.md)
-- [Enabling Prometheus metrics](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/04_prometheus.md)
-- [Doing backup and restore](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/05_backup_restore.md)
-- [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/06_archive.md)
-- [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/07_delete.md)
-- [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/master/doc/tutorial/08_encryption.md)
+- [Installing pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
+- [Using a replication slot](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_replication_slot.md)
+- [Enabling remote management](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/03_remote_management.md)
+- [Enabling Prometheus metrics](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/04_prometheus.md)
+- [Doing backup and restore](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_backup_restore.md)
+- [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_archive.md)
+- [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md)
+- [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
 
 ## Closing
 
