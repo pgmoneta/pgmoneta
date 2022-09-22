@@ -193,7 +193,11 @@ write_backup_sha256(char* root, char* relative_path)
    return 0;
 
 error:
-   closedir(dir);
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
 
    free(dir_path);
 
