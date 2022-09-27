@@ -807,6 +807,18 @@ pgmoneta_append(char* orig, char* s)
 }
 
 char*
+pgmoneta_append_char(char* orig, char c)
+{
+   char str[2];
+
+   memset(&str[0], 0, sizeof(str));
+   snprintf(&str[0], 2, "%c", c);
+   orig = pgmoneta_append(orig, str);
+
+   return orig;
+}
+
+char*
 pgmoneta_append_int(char* orig, int i)
 {
    char number[12];
@@ -843,6 +855,36 @@ pgmoneta_append_bool(char* orig, bool b)
    }
 
    return orig;
+}
+
+char*
+pgmoneta_remove_whitespace(char* orig)
+{
+   size_t length;
+   char c = 0;
+   char* result = NULL;
+
+   if (orig == NULL || strlen(orig) == 0)
+   {
+      return orig;
+   }
+
+   length = strlen(orig);
+
+   for (int i = 0; i < length; i++)
+   {
+      c = *(orig + i);
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+      {
+         /* Skip */
+      }
+      else
+      {
+         result = pgmoneta_append_char(result, c);
+      }
+   }
+
+   return result;
 }
 
 unsigned long

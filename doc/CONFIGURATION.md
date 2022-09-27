@@ -37,6 +37,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | ssh_hostname | | String | Yes | Defines the hostname of the remote system for connection |
 | ssh_username | | String | Yes | Defines the username of the remote system for connection |
 | ssh_base_dir | | String | Yes | The base directory for the remote backup |
+| ssh_ciphers | aes-256-ctr, aes-192-ctr, aes-128-ctr | String | No | The supported ciphers for communication. `aes \| aes-256 \| aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192 \| aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128 \| aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length. Otherwise verbatim |
 | retention | 7 | Int | No | The retention time in days |
 | link | `on` | Bool | No | Use links to limit backup size |
 | log_type | console | String | No | The logging type (console, file, syslog) |

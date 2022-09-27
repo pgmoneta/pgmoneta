@@ -252,7 +252,8 @@ struct configuration
 
    char ssh_hostname[MISC_LENGTH]; /**< The SSH hostname */
    char ssh_username[MISC_LENGTH]; /**< The SSH username */
-   char ssh_base_dir[MAX_PATH];  /**< The SSH base directory */
+   char ssh_base_dir[MAX_PATH];    /**< The SSH base directory */
+   char ssh_ciphers[MISC_LENGTH];  /**< The SSH supported ciphers */
 
    int retention; /**< The retention */
    bool link;     /**< Use link */
