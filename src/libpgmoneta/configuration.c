@@ -63,6 +63,7 @@ static int as_logging_mode(char* str);
 static int as_hugepage(char* str);
 static int as_compression(char* str);
 static int as_storage_engine(char* str);
+static char* as_ciphers(char *str);
 static int as_encryption_mode(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
@@ -837,6 +838,26 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "ssh_ciphers"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     char* ciphers = as_ciphers(value);
+
+                     max = strlen(ciphers);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&config->ssh_ciphers[0], ciphers, max);
+
+                     free(ciphers);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "retention"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -1468,37 +1489,127 @@ error:
 static void
 extract_key_value(char* str, char** key, char** value)
 {
-   int c = 0;
-   int offset = 0;
-   int length = strlen(str);
-   char* k;
-   char* v;
+   char* equal = NULL;
+   char* end = NULL;
+   char* ptr = NULL;
+   char left[MISC_LENGTH];
+   char right[MISC_LENGTH];
+   bool start_left = false;
+   bool start_right = false;
+   int idx = 0;
+   int i = 0;
+   char c = 0;
+   char* k = NULL;
+   char* v = NULL;
 
-   while (str[c] != ' ' && str[c] != '=' && c < length)
-      c++;
+   *key = NULL;
+   *value = NULL;
 
-   if (c < length)
+   equal = strchr(str, '=');
+
+   if (equal != NULL)
    {
-      k = malloc(c + 1);
-      memset(k, 0, c + 1);
-      memcpy(k, str, c);
-      *key = k;
+      memset(&left[0], 0, sizeof(left));
+      memset(&right[0], 0, sizeof(right));
 
-      while ((str[c] == ' ' || str[c] == '\t' || str[c] == '=') && c < length)
-         c++;
-
-      offset = c;
-
-      while (str[c] != ' ' && str[c] != '\r' && str[c] != '\n' && c < length)
-         c++;
-
-      if (c <= length)
+      i = 0;
+      while (true)
       {
-         v = malloc((c - offset) + 1);
-         memset(v, 0, (c - offset) + 1);
-         memcpy(v, str + offset, (c - offset));
-         *value = v;
+         ptr = str + i;
+         if (ptr != equal)
+         {
+            c = *(str + i);
+            if (c == '\t' || c == ' ' || c == '\"' || c == '\'')
+            {
+               /* Skip */
+            }
+            else
+            {
+               start_left = true;
+            }
+
+            if (start_left)
+            {
+               left[idx] = c;
+               idx++;
+            }
+         }
+         else
+         {
+            break;
+         }
+         i++;
       }
+
+      end = strchr(str, '\n');
+      idx = 0;
+
+      for (int i = 0; i < strlen(equal); i++)
+      {
+         ptr = equal + i;
+         if (ptr != end)
+         {
+            c = *(ptr);
+            if (c == '=' || c == ' ' || c == '\t' || c == '\"' || c == '\'')
+            {
+               /* Skip */
+            }
+            else
+            {
+               start_right = true;
+            }
+
+            if (start_right)
+            {
+               if (c != '#')
+               {
+                  right[idx] = c;
+                  idx++;
+               }
+               else
+               {
+                  break;
+               }
+            }
+         }
+         else
+         {
+            break;
+         }
+      }
+
+      for (int i = strlen(left); i >= 0; i--)
+      {
+         if (left[i] == '\t' || left[i] == ' ' || left[i] == '\0' || left[i] == '\"' || left[i] == '\'')
+         {
+            left[i] = '\0';
+         }
+         else
+         {
+            break;
+         }
+      }
+
+      for (int i = strlen(right); i >= 0; i--)
+      {
+         if (right[i] == '\t' || right[i] == ' ' || right[i] == '\0' || right[i] == '\r' || right[i] == '\"' || right[i] == '\'')
+         {
+            right[i] = '\0';
+         }
+         else
+         {
+            break;
+         }
+      }
+
+      k = calloc(1, strlen(left) + 1);
+      v = calloc(1, strlen(right) + 1);
+
+      memcpy(k, left, strlen(left));
+      memcpy(v, right, strlen(right));
+
+      *key = k;
+      *value = v;
    }
 }
 
@@ -1720,6 +1831,68 @@ as_storage_engine(char* str)
    }
 
    return STORAGE_ENGINE_LOCAL;
+}
+
+static char*
+as_ciphers(char *str)
+{
+   char* converted = NULL;
+   char* ptr = NULL;
+   char* result = NULL;
+
+   converted = pgmoneta_remove_whitespace(str);
+
+   if (converted == str)
+   {
+      return strdup("aes256-ctr,aes192-ctr,aes128-ctr");
+   }
+
+   ptr = strtok(converted, ",");
+   while (ptr != NULL)
+   {
+      if (strcmp("aes-256-ctr", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes256-ctr");
+      }
+      else if (strcmp("aes-192-ctr", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes192-ctr");
+      }
+      else if (strcmp("aes-128-ctr", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes128-ctr");
+      }
+      else if (strcmp("aes-256-cbc", ptr) == 0 || strcmp("aes-256", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes256-cbc");
+      }
+      else if (strcmp("aes-192-cbc", ptr) == 0 || strcmp("aes-192", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes192-cbc");
+      }
+      else if (strcmp("aes-128-cbc", ptr) == 0 || strcmp("aes-128", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes128-cbc");
+      }
+      else if (strcmp("aes", ptr) == 0)
+      {
+         result = pgmoneta_append(result, "aes256-cbc");
+      }
+      else
+      {
+         result = pgmoneta_append(result, ptr);
+      }
+
+      ptr = strtok(NULL, ",");
+      if (ptr != NULL)
+      {
+         result = pgmoneta_append(result, ",");
+      }
+   }
+
+   free(converted);
+
+   return result;
 }
 
 /**

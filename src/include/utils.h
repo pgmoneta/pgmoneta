@@ -262,6 +262,15 @@ char*
 pgmoneta_append(char* orig, char* s);
 
 /**
+ * Append a char
+ * @param orig The original string
+ * @param s The string
+ * @return The resulting string
+ */
+char*
+pgmoneta_append_char(char* orig, char c);
+
+/**
  * Append an integer
  * @param orig The original string
  * @param i The integer
@@ -287,6 +296,14 @@ pgmoneta_append_ulong(char* orig, unsigned long l);
  */
 char*
 pgmoneta_append_bool(char* orig, bool b);
+
+/**
+ * Remove whitespace from a string
+ * @param orig The original string
+ * @return The resulting string
+ */
+char*
+pgmoneta_remove_whitespace(char* orig);
 
 /**
  * Calculate the directory size

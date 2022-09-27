@@ -58,6 +58,9 @@ compression
 compression_level
   The compression level. Default is 3
 
+storage_engine
+  The storage engine type (local, ssh). Default is local
+
 encryption
   The encryption mode. Default is none.
 
@@ -76,6 +79,32 @@ encryption
   aes-192-ctr: AES CTR mode with 192 bit key length
 
   aes-128-ctr: AES CTR mode with 128 bit key length
+
+ssh_hostname
+  Defines the hostname of the remote system for connection
+
+ssh_username
+  Defines the username of the remote system for connection
+
+ssh_base_dir
+  The base directory for the remote backup
+
+ssh_ciphers
+  The supported ciphers for communication.
+
+  aes \| aes-256 \| aes-256-cbc: AES CBC (Cipher Block Chaining) mode with 256 bit key length
+
+  aes-192 \| aes-192-cbc: AES CBC mode with 192 bit key length
+
+  aes-128 \| aes-128-cbc: AES CBC mode with 128 bit key length
+
+  aes-256-ctr: AES CTR (Counter) mode with 256 bit key length
+
+  aes-192-ctr: AES CTR mode with 192 bit key length
+
+  aes-128-ctr: AES CTR mode with 128 bit key length
+
+  Otherwise verbatim. Default is aes-256-ctr, aes-192-ctr, aes-128-ctr
 
 retention
   The retention for pgmoneta. Default is 7

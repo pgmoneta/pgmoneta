@@ -120,6 +120,15 @@ ssh_storage_setup(int server, char* identifier, struct node* i_nodes,
    ssh_options_set(session, SSH_OPTIONS_USER, config->ssh_username);
    ssh_options_set(session, SSH_OPTIONS_HOST, config->ssh_hostname);
 
+   if (strlen(config->ssh_ciphers) == 0)
+   {
+      ssh_options_set(session, SSH_OPTIONS_CIPHERS_C_S, "aes256-ctr,aes192-ctr,aes128-ctr");
+   }
+   else
+   {
+      ssh_options_set(session, SSH_OPTIONS_CIPHERS_C_S, config->ssh_ciphers);
+   }
+
    rc = ssh_connect(session);
    if (rc != SSH_OK)
    {
