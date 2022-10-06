@@ -2722,7 +2722,7 @@ error:
 }
 
 int
-pgmoneta_generate_sha256_hash(char* filename, char** sha256)
+pgmoneta_generate_file_sha256_hash(char* filename, char** sha256)
 {
    char read_buf[16384];
    unsigned long read_bytes = 0;
@@ -2768,4 +2768,106 @@ pgmoneta_generate_sha256_hash(char* filename, char** sha256)
    fclose(file);
 
    return 0;
+}
+
+int
+pgmoneta_generate_string_sha256_hash(char* string, char** sha256)
+{
+   int i = 0;
+   SHA256_CTX sha256_ctx;
+   unsigned char hash[SHA256_DIGEST_LENGTH];
+   char* sha256_buf;
+
+   *sha256 = NULL;
+
+   sha256_buf = malloc(65);
+   memset(sha256_buf, 0, 65);
+
+   SHA256_Init(&sha256_ctx);
+   SHA256_Update(&sha256_ctx, string, strlen(string));
+   SHA256_Final(hash, &sha256_ctx);
+
+   for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+   {
+      sprintf(&sha256_buf[i * 2], "%02x", hash[i]);
+   }
+
+   sha256_buf[64] = 0;
+
+   *sha256 = sha256_buf;
+
+   return 0;
+}
+
+int
+pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* value,
+                                          int value_length, unsigned char** hmac,
+                                          int* hmac_length)
+{
+   int i = 0;
+   size_t size = 33;
+   unsigned char hash[SHA256_DIGEST_LENGTH];
+   char* hmac_buf;
+   unsigned int hmac_length_buf;
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+   HMAC_CTX* ctx = HMAC_CTX_new();
+#else
+   HMAC_CTX hctx;
+   HMAC_CTX* ctx = &hctx;
+   HMAC_CTX_init(ctx);
+#endif
+   if (ctx == NULL)
+   {
+      goto error;
+   }
+
+   *hmac = NULL;
+
+   hmac_buf = malloc(size);
+   memset(hmac_buf, 0, size);
+
+   if (HMAC_Init_ex(ctx, key, key_length, EVP_sha256(), NULL) != 1)
+   {
+      goto error;
+   }
+   if (HMAC_Update(ctx, (unsigned char*)value, value_length) != 1)
+   {
+      goto error;
+   }
+   if (HMAC_Final(ctx, hash, &hmac_length_buf) != 1)
+   {
+      goto error;
+   }
+
+   for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+   {
+      hmac_buf[i] = hash[i];
+   }
+   hmac_buf[size - 1] = 0;
+
+   *hmac = (unsigned char*)hmac_buf;
+   *hmac_length = hmac_length_buf;
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+   HMAC_CTX_free(ctx);
+#else
+   HMAC_CTX_cleanup(ctx);
+#endif
+
+   return 0;
+
+error:
+   *hmac = NULL;
+   *hmac_length = 0;
+
+   if (ctx != NULL)
+   {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+      HMAC_CTX_free(ctx);
+#else
+      HMAC_CTX_cleanup(ctx);
+#endif
+   }
+   return 1;
 }

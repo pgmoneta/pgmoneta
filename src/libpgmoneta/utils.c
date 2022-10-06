@@ -2211,6 +2211,57 @@ get_server_basepath(int server)
    return d;
 }
 
+int
+pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date)
+{
+   time_t now = time(&now);
+   if (now == -1)
+   {
+      return 1;
+   }
+
+   struct tm* ptm = gmtime(&now);
+   if (ptm == NULL)
+   {
+      return 1;
+   }
+
+   if (short_date != NULL)
+   {
+      strftime(short_date, SHORT_TIME_LENGHT, "%Y%m%d", ptm);
+   }
+
+   if (long_date != NULL)
+   {
+      strftime(long_date, LONG_TIME_LENGHT, "%Y%m%dT%H%M%SZ", ptm);
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length,
+                               unsigned char** hex)
+{
+   int i = 0;
+   char* hex_buf;
+
+   *hex = NULL;
+
+   hex_buf = malloc(base32_length * 2 + 1);
+   memset(hex_buf, 0, base32_length * 2 + 1);
+
+   for (i = 0; i < base32_length; i++)
+   {
+      sprintf(&hex_buf[i * 2], "%02x", base32[i]);
+   }
+   hex_buf[base32_length * 2] = 0;
+
+   *hex = (unsigned char*)hex_buf;
+
+   return 0;
+}
+
 #ifdef DEBUG
 
 int

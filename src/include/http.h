@@ -26,35 +26,59 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_STORAGE_H
-#define PGMONETA_STORAGE_H
+#ifndef PGMONETA_HTTP_H
+#define PGMONETA_HTTP_H
 
+#include <stdint.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <workflow.h>
+#include <curl/curl.h>
+#include <stdbool.h>
+#include <stdio.h>
+
+#define HTTP_GET 0
+#define HTTP_PUT 1
 
 /**
- * Create a workflow for the local storage engine
- * @return The workflow
+ * Add a header
+ * @param chunk A linked list of strings
+ * @param header The header
+ * @param value The header's value
+ * @return A new list pointer
  */
-struct workflow*
-pgmoneta_storage_create_local(void);
+struct curl_slist*
+pgmoneta_http_add_header(struct curl_slist* chunk, char* header, char* value);
 
 /**
- * Create a workflow for the SSH storage engine
- * @return The workflow
+ * set HTTP headers
+ * @param handle A CURL easy handle
+ * @param headers A pointer to a linked list of HTTP headers
+ * @return 0 upon success, otherwise 1
  */
-struct workflow*
-pgmoneta_storage_create_ssh(void);
+int
+pgmoneta_http_set_header_option(CURL* handle, struct curl_slist* chunk);
 
 /**
- * Create a workflow for the S3 storage engine
- * @return The workflow
+ * set HTTP request
+ * @param handle A CURL easy handle
+ * @param request_type A http request type
+ * @return 0 upon success, otherwise 1
  */
-struct workflow*
-pgmoneta_storage_create_s3(void);
+int
+pgmoneta_http_set_request_option(CURL* handle, bool request_type);
+
+/**
+ * set the URL
+ * @param handle A CURL easy handle
+ * @param url A URL for the transfer
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_http_set_url_option(CURL* handle, char* url);
 
 #ifdef __cplusplus
 }

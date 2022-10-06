@@ -92,6 +92,7 @@ extern "C" {
 
 #define STORAGE_ENGINE_LOCAL 0
 #define STORAGE_ENGINE_SSH   1
+#define STORAGE_ENGINE_S3    2
 
 #define UPDATE_PROCESS_TITLE_NEVER   0
 #define UPDATE_PROCESS_TITLE_STRICT  1
@@ -254,6 +255,12 @@ struct configuration
    char ssh_username[MISC_LENGTH]; /**< The SSH username */
    char ssh_base_dir[MAX_PATH];    /**< The SSH base directory */
    char ssh_ciphers[MISC_LENGTH];  /**< The SSH supported ciphers */
+
+   char s3_aws_region[MISC_LENGTH];         /**< The AWS region */
+   char s3_access_key_id[MISC_LENGTH];      /**< The IAM Access Key ID */
+   char s3_secret_access_key[MISC_LENGTH];  /**< The IAM Secret Access Key */
+   char s3_bucket[MISC_LENGTH];          /**< The S3 bucket */
+   char s3_base_dir[MAX_PATH];           /**< The S3 base directory */
 
    int retention; /**< The retention */
    bool link;     /**< Use link */

@@ -38,6 +38,9 @@ extern "C" {
 
 #include <stdlib.h>
 
+#define SHORT_TIME_LENGHT 8 + 1
+#define LONG_TIME_LENGHT  16 + 1
+
 /** @struct
  * Defines the signal structure
  */
@@ -620,6 +623,25 @@ pgmoneta_permission(char* e, int user, int group, int all);
  */
 mode_t
 pgmoneta_get_permission(char* path);
+
+/**
+ * Get short date and long date in ISO8601_format.
+ * @param short_date The short date <yymmdd>.
+ * @param long_date The long date <yymmddThhmmssZ>.
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date);
+
+/**
+ * Convert base32 to hexadecimal.
+ * @param base32 The base32.
+ * @param base32_length The base32 length.
+ * @param hex The hexadecimal.
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length, unsigned char** hex);
 
 #ifdef DEBUG
 

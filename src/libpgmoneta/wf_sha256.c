@@ -170,7 +170,7 @@ write_backup_sha256(char* root, char* relative_path)
          absolute_file_path = pgmoneta_append(absolute_file_path, "/");
          absolute_file_path = pgmoneta_append(absolute_file_path, relative_file_path);
 
-         pgmoneta_generate_sha256_hash(absolute_file_path, &sha256);
+         pgmoneta_generate_file_sha256_hash(absolute_file_path, &sha256);
 
          buffer = pgmoneta_append(buffer, relative_file_path);
          buffer = pgmoneta_append(buffer, ":");

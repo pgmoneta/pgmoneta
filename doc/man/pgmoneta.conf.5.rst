@@ -59,7 +59,7 @@ compression_level
   The compression level. Default is 3
 
 storage_engine
-  The storage engine type (local, ssh). Default is local
+  The storage engine type (local, ssh, s3). Default is local
 
 encryption
   The encryption mode. Default is none.
@@ -105,6 +105,18 @@ ssh_ciphers
   aes-128-ctr: AES CTR mode with 128 bit key length
 
   Otherwise verbatim. Default is aes-256-ctr, aes-192-ctr, aes-128-ctr
+
+s3_aws_region 
+  The AWS region 
+
+s3_access_key_id
+  The IAM access key ID
+
+s3_secret_access_key
+  The IAM secret access key
+
+s3_bucket
+  The IAM secret access key
 
 retention
   The retention for pgmoneta. Default is 7

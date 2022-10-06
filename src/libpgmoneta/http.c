@@ -26,38 +26,102 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_STORAGE_H
-#define PGMONETA_STORAGE_H
+/* pgmoneta */
+#include <pgmoneta.h>
+#include <http.h>
+#include "utils.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct curl_slist*
+pgmoneta_http_add_header(struct curl_slist* chunk, char* header, char* value)
+{
+   char* h = NULL;
 
-#include <workflow.h>
+   h = pgmoneta_append(h, header);
+   h = pgmoneta_append(h, ": ");
+   h = pgmoneta_append(h, value);
 
-/**
- * Create a workflow for the local storage engine
- * @return The workflow
- */
-struct workflow*
-pgmoneta_storage_create_local(void);
+   chunk = curl_slist_append(chunk, h);
 
-/**
- * Create a workflow for the SSH storage engine
- * @return The workflow
- */
-struct workflow*
-pgmoneta_storage_create_ssh(void);
+   free(h);
 
-/**
- * Create a workflow for the S3 storage engine
- * @return The workflow
- */
-struct workflow*
-pgmoneta_storage_create_s3(void);
-
-#ifdef __cplusplus
+   return chunk;
 }
-#endif
 
-#endif
+int
+pgmoneta_http_set_header_option(CURL* handle, struct curl_slist* chunk)
+{
+   CURLcode res;
+
+   if (handle == NULL)
+   {
+      goto error;
+   }
+
+   res = curl_easy_setopt(handle, CURLOPT_HTTPHEADER, chunk);
+
+   if (res != CURLE_OK)
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_http_set_request_option(CURL* handle, bool request_type)
+{
+   CURLcode res = -1;
+
+   if (handle == NULL)
+   {
+      goto error;
+   }
+
+   if (request_type == HTTP_GET)
+   {
+      res = curl_easy_setopt(handle, CURLOPT_HTTPGET, 1L);
+   }
+   else if (request_type == HTTP_PUT)
+   {
+      res = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
+   }
+
+   if (res != CURLE_OK)
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_http_set_url_option(CURL* handle, char* url)
+{
+   CURLcode res;
+
+   if (handle == NULL)
+   {
+      goto error;
+   }
+
+   res = curl_easy_setopt(handle, CURLOPT_URL, url);
+
+   if (res != CURLE_OK)
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}

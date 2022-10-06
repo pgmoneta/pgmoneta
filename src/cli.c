@@ -1020,7 +1020,7 @@ decrypt(SSL* ssl, int socket, char* path)
 {
    int ret;
 
-   if(pgmoneta_management_decrypt(ssl, socket, path))
+   if (pgmoneta_management_decrypt(ssl, socket, path))
    {
       return 1;
    }
@@ -1033,7 +1033,7 @@ encrypt(SSL* ssl, int socket, char* path)
 {
    int ret;
 
-   if(pgmoneta_management_encrypt(ssl, socket, path))
+   if (pgmoneta_management_encrypt(ssl, socket, path))
    {
       return 1;
    }

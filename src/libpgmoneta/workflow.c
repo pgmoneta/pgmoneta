@@ -146,6 +146,12 @@ wf_backup(void)
       current = current->next;
    }
 
+   if (config->storage_engine == STORAGE_ENGINE_S3)
+   {
+      current->next = pgmoneta_storage_create_s3();
+      current = current->next;
+   }
+
    return head;
 }
 

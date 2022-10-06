@@ -105,6 +105,13 @@ else ()
   message(FATAL_ERROR "libssh needed")
 endif()
 
+find_package(Libcurl)
+if (LIBCURL_FOUND)
+  message(STATUS "libcurl found")
+else ()
+  message(FATAL_ERROR "libcurl needed")
+endif()
+
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   find_package(Systemd)
   if (SYSTEMD_FOUND)

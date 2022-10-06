@@ -196,7 +196,7 @@ pgmoneta_encrypt_file(char* from, char* to)
 
    encrypt_file(from, to, 1);
    pgmoneta_delete_file(from);
-   if(flag)
+   if (flag)
    {
       free(to);
    }

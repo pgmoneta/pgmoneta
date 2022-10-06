@@ -63,7 +63,7 @@ static int as_logging_mode(char* str);
 static int as_hugepage(char* str);
 static int as_compression(char* str);
 static int as_storage_engine(char* str);
-static char* as_ciphers(char *str);
+static char* as_ciphers(char* str);
 static int as_encryption_mode(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
@@ -852,6 +852,86 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      memcpy(&config->ssh_ciphers[0], ciphers, max);
 
                      free(ciphers);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_aws_region"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->s3_aws_region, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_access_key_id"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->s3_access_key_id, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_secret_access_key"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->s3_secret_access_key, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_bucket"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->s3_bucket, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_base_dir"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(config->s3_base_dir, value, max);
                   }
                   else
                   {
@@ -1829,12 +1909,16 @@ as_storage_engine(char* str)
    {
       return STORAGE_ENGINE_SSH;
    }
+   else if (!strcasecmp(str, "s3"))
+   {
+      return STORAGE_ENGINE_S3;
+   }
 
    return STORAGE_ENGINE_LOCAL;
 }
 
 static char*
-as_ciphers(char *str)
+as_ciphers(char* str)
 {
    char* converted = NULL;
    char* ptr = NULL;

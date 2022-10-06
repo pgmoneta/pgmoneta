@@ -544,7 +544,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
    d = pgmoneta_append(d, remote_root);
    d = pgmoneta_append(d, relative_path);
 
-   pgmoneta_generate_sha256_hash(s, &sha256);
+   pgmoneta_generate_file_sha256_hash(s, &sha256);
 
    if (latest_remote_root != NULL)
    {

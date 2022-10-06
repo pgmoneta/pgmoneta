@@ -94,7 +94,30 @@ pgmoneta_tls_valid(void);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_generate_sha256_hash(char* filename, char** sha256);
+pgmoneta_generate_file_sha256_hash(char* filename, char** sha256);
+
+/**
+ * Generate SHA256 for a string.
+ * @param filename The string.
+ * @param sha256 The hash value.
+ * @return 0 upon success, otherwise 1.
+ */
+int
+pgmoneta_generate_string_sha256_hash(char* string, char** sha256);
+
+/**
+ * Generate HMAC by using the SHA256 algorithm for a string.
+ * @param key The key.
+ * @param key_length The length of the key.
+ * @param value The value.
+ * @param value_length The length of the value.
+ * @param hmac The digest.
+ * @param hmac_length The length of the digest.
+ * @return 0 upon success, otherwise 1.
+ */
+int pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* value,
+                                              int value_length, unsigned char** hmac,
+                                              int* hmac_length);
 
 #ifdef __cplusplus
 }
