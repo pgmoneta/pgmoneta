@@ -2240,6 +2240,29 @@ pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date)
 }
 
 int
+pgmoneta_get_timestamp_UTC_format(char* utc_date)
+{
+   time_t now = time(&now);
+   if (now == -1)
+   {
+      return 1;
+   }
+
+   struct tm* ptm = gmtime(&now);
+   if (ptm == NULL)
+   {
+      return 1;
+   }
+
+   if (utc_date != NULL)
+   {
+      strftime(utc_date, UTC_TIME_LENGTH, "%a, %d %b %Y %T GMT", ptm);
+   }
+
+   return 0;
+}
+
+int
 pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length,
                                unsigned char** hex)
 {

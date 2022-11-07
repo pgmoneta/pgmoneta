@@ -93,6 +93,7 @@ extern "C" {
 #define STORAGE_ENGINE_LOCAL 0
 #define STORAGE_ENGINE_SSH   1
 #define STORAGE_ENGINE_S3    2
+#define STORAGE_ENGINE_AZURE 3
 
 #define UPDATE_PROCESS_TITLE_NEVER   0
 #define UPDATE_PROCESS_TITLE_STRICT  1
@@ -261,6 +262,11 @@ struct configuration
    char s3_secret_access_key[MISC_LENGTH];  /**< The IAM Secret Access Key */
    char s3_bucket[MISC_LENGTH];          /**< The S3 bucket */
    char s3_base_dir[MAX_PATH];           /**< The S3 base directory */
+
+   char azure_storage_account[MISC_LENGTH];    /**< The Azure storage account name */
+   char azure_container[MISC_LENGTH];          /**< The Azure container name */
+   char azure_shared_key[MISC_LENGTH];         /**< The Azure storage account key */
+   char azure_base_dir[MAX_PATH];              /**< The Azure base directory */
 
    int retention; /**< The retention */
    bool link;     /**< Use link */

@@ -152,6 +152,12 @@ wf_backup(void)
       current = current->next;
    }
 
+   if (config->storage_engine == STORAGE_ENGINE_AZURE)
+   {
+      current->next = pgmoneta_storage_create_azure();
+      current = current->next;
+   }
+
    return head;
 }
 

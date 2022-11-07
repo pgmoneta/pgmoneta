@@ -56,6 +56,13 @@ pgmoneta_storage_create_ssh(void);
 struct workflow*
 pgmoneta_storage_create_s3(void);
 
+/**
+ * Create a workflow for the Azure storage engine
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_storage_create_azure(void);
+
 #ifdef __cplusplus
 }
 #endif

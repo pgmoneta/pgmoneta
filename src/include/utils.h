@@ -40,6 +40,7 @@ extern "C" {
 
 #define SHORT_TIME_LENGHT 8 + 1
 #define LONG_TIME_LENGHT  16 + 1
+#define UTC_TIME_LENGTH   29 + 1
 
 /** @struct
  * Defines the signal structure
@@ -632,6 +633,14 @@ pgmoneta_get_permission(char* path);
  */
 int
 pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date);
+
+/**
+ * Get the Coordinated Universal Time (UTC) timestamp.
+ * @param utc_date The date.
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_get_timestamp_UTC_format(char* utc_date);
 
 /**
  * Convert base32 to hexadecimal.

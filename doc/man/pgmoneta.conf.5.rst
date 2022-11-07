@@ -59,7 +59,7 @@ compression_level
   The compression level. Default is 3
 
 storage_engine
-  The storage engine type (local, ssh, s3). Default is local
+  The storage engine type (local, ssh, s3, azure). Default is local
 
 encryption
   The encryption mode. Default is none.
@@ -117,6 +117,18 @@ s3_secret_access_key
 
 s3_bucket
   The IAM secret access key
+
+azure_storage_account
+  The Azure storage account name
+
+azure_container
+  The Azure container name
+
+azure_shared_key
+  The Azure storage account key
+
+azure_base_dir
+  The base directory for the Azure container
 
 retention
   The retention for pgmoneta. Default is 7

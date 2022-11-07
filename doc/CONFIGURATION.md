@@ -32,7 +32,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | management | 0 | Int | No | The remote management port (disable = 0) |
 | compression | zstd | String | No | The compression type (none, gzip, zstd, lz4) |
 | compression_level | 3 | int | No | The compression level |
-| storage_engine | local | String | No | The storage engine type (local, ssh, s3) |
+| storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure) |
 | encryption | none | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes \| aes-256 \| aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192 \| aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128 \| aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length |
 | ssh_hostname | | String | Yes | Defines the hostname of the remote system for connection |
 | ssh_username | | String | Yes | Defines the username of the remote system for connection |
@@ -43,6 +43,10 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | s3_secret_access_key | | String | Yes | The IAM secret access key |
 | s3_bucket | | String | Yes | The AWS S3 bucket name |
 | s3_base_dir | | String | Yes | The base directory for the S3 bucket |
+| azure_storage_account | | String | Yes | The Azure storage account name |
+| azure_container | | String | Yes | The Azure container name |
+| azure_shared_key | | String | Yes | The Azure storage account key |
+| azure_base_dir | | String | Yes | The base directory for the Azure container |
 | retention | 7 | Int | No | The retention time in days |
 | link | `on` | Bool | No | Use links to limit backup size |
 | log_type | console | String | No | The logging type (console, file, syslog) |
