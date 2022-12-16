@@ -142,7 +142,7 @@ wf_backup(void)
       current->next = pgmoneta_workflow_create_sha256();
       current = current->next;
 
-      current->next = pgmoneta_storage_create_ssh();
+      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
       current = current->next;
    }
 
@@ -200,6 +200,12 @@ wf_restore(void)
 
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
    current = current->next;
+
+   if (config->storage_engine == STORAGE_ENGINE_SSH)
+   {
+      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_RESTORE);
+      current = current->next;
+   }
 
    return head;
 }

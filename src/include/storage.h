@@ -44,10 +44,11 @@ pgmoneta_storage_create_local(void);
 
 /**
  * Create a workflow for the SSH storage engine
+ * @param workflow_type The workflow type
  * @return The workflow
  */
 struct workflow*
-pgmoneta_storage_create_ssh(void);
+pgmoneta_storage_create_ssh(int workflow_type);
 
 /**
  * Create a workflow for the S3 storage engine

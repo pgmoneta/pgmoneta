@@ -397,12 +397,12 @@ error:
       free(key);
    }
 
-   if(local_path != NULL)
+   if (local_path != NULL)
    {
       free(local_path);
    }
 
-   if(s3_path != NULL)
+   if (s3_path != NULL)
    {
       free(s3_path);
    }
@@ -446,7 +446,7 @@ s3_get_host()
    return host;
 }
 
-static char* 
+static char*
 s3_get_basepath(int server, char* identifier)
 {
    char* d = NULL;
