@@ -452,6 +452,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
 {
    FILE* users_file = NULL;
    char line[MISC_LENGTH];
+   char* entry = NULL;
    char* master_key = NULL;
    char* ptr = NULL;
    char* encrypted = NULL;
@@ -576,10 +577,14 @@ password:
    pgmoneta_encrypt(password, master_key, &encrypted, &encrypted_length, ENCRYPTION_AES_256_CBC);
    pgmoneta_base64_encode(encrypted, encrypted_length, &encoded);
 
-   snprintf(line, sizeof(line), "%s:%s\n", username, encoded);
+   entry = pgmoneta_append(entry, username);
+   entry = pgmoneta_append(entry, ":");
+   entry = pgmoneta_append(entry, encoded);
+   entry = pgmoneta_append(entry, "\n");
 
-   fputs(line, users_file);
+   fputs(entry, users_file);
 
+   free(entry);
    free(master_key);
    free(encrypted);
    free(encoded);
@@ -595,6 +600,7 @@ password:
 
 error:
 
+   free(entry);
    free(master_key);
    free(encrypted);
    free(encoded);
@@ -620,6 +626,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    char tmpfilename[MISC_LENGTH];
    char line[MISC_LENGTH];
    char line_copy[MISC_LENGTH];
+   char* entry = NULL;
    char* master_key = NULL;
    char* ptr = NULL;
    char* encrypted = NULL;
@@ -745,9 +752,14 @@ password:
          pgmoneta_base64_encode(encrypted, encrypted_length, &encoded);
 
          memset(&line, 0, sizeof(line));
-         snprintf(line, sizeof(line), "%s:%s\n", username, encoded);
+         entry = NULL;
+         entry = pgmoneta_append(entry, username);
+         entry = pgmoneta_append(entry, ":");
+         entry = pgmoneta_append(entry, encoded);
+         entry = pgmoneta_append(entry, "\n");
 
-         fputs(line, users_file_tmp);
+         fputs(entry, users_file_tmp);
+         free(entry);
 
          found = true;
       }
