@@ -1129,6 +1129,11 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
             ptr = strtok(NULL, ":");
 
+            if (ptr == NULL)
+            {
+               goto error;
+            }
+
             if (pgmoneta_base64_decode(ptr, strlen(ptr), &decoded, &decoded_length))
             {
                goto error;
@@ -1300,6 +1305,11 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
             username = ptr;
 
             ptr = strtok(NULL, ":");
+
+            if (ptr == NULL)
+            {
+               goto error;
+            }
 
             if (pgmoneta_base64_decode(ptr, strlen(ptr), &decoded, &decoded_length))
             {
