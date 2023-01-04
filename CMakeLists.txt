@@ -106,6 +106,13 @@ else ()
 endif()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  find_package(Libatomic)
+  if (LIBATOMIC_FOUND)
+    message(STATUS "libatomic found")
+  else ()
+    message(FATAL_ERROR "libatomic needed")
+  endif()
+
   find_package(Systemd)
   if (SYSTEMD_FOUND)
     message(STATUS "systemd found")
