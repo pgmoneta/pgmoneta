@@ -283,6 +283,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    <li>1 = GZip</li>\n");
    data = pgmoneta_append(data, "    <li>2 = ZSTD</li>\n");
    data = pgmoneta_append(data, "    <li>3 = LZ4</li>\n");
+   data = pgmoneta_append(data, "    <li>4 = BZIP2</li>\n");
    data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_link</h2>\n");

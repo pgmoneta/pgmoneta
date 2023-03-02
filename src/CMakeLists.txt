@@ -20,6 +20,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${ZLIB_INCLUDE_DIRS}
+    ${BZIP2_INCLUDE_DIRS}
     ${ZSTD_INCLUDE_DIRS}
     ${LZ4_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
@@ -34,6 +35,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   #
   link_libraries(
     ${ZLIB_LIBRARIES}
+    ${BZIP2_LIBRARIES}
     ${ZSTD_LIBRARIES}
     ${LZ4_LIBRARIES}
     ${LIBEV_LIBRARIES}
@@ -60,6 +62,7 @@ else()
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${ZLIB_INCLUDE_DIRS}
+    ${BZIP2_INCLUDE_DIRS}
     ${ZSTD_INCLUDE_DIRS}
     ${LZ4_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
@@ -74,6 +77,7 @@ else()
   link_libraries(
     ${ZLIB_LIBRARIES}
     ${ZSTD_LIBRARIES}
+    ${BZIP2_LIBRARIES}
     ${LZ4_LIBRARIES}
     ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}

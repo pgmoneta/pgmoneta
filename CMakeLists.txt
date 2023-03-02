@@ -63,6 +63,13 @@ else ()
   message(FATAL_ERROR "zlib needed")
 endif()
 
+find_package(BZip2)
+if (BZIP2_FOUND)
+  message(STATUS "bzip2 found")
+else ()
+  message(FATAL_ERROR "bzip2 needed")
+endif()
+
 find_package(Zstd)
 if (ZSTD_FOUND)
   message(STATUS "zstd found")

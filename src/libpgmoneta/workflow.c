@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <storage.h>
+#include <workflow.h>
 
 /* system */
 #include <stdlib.h>
@@ -121,6 +122,11 @@ wf_backup(void)
       current->next = pgmoneta_workflow_create_lz4(true);
       current = current->next;
    }
+   else if (config->compression_type == COMPRESSION_BZIP2)
+   {
+      current->next = pgmoneta_workflow_create_bzip2(true);
+      current = current->next;
+   }
 
    if (config->encryption != ENCRYPTION_NONE)
    {
@@ -197,6 +203,11 @@ wf_restore(void)
       current->next = pgmoneta_workflow_create_lz4(false);
       current = current->next;
    }
+   else if (config->compression_type == COMPRESSION_BZIP2)
+   {
+      current->next = pgmoneta_workflow_create_bzip2(false);
+      current = current->next;
+   }
 
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
    current = current->next;
@@ -229,6 +240,12 @@ wf_archive(void)
    else if (config->compression_type == COMPRESSION_LZ4)
    {
       current->next = pgmoneta_workflow_create_lz4(true);
+
+      current = current->next;
+   }
+   else if (config->compression_type == COMPRESSION_BZIP2)
+   {
+      current->next = pgmoneta_workflow_create_bzip2(true);
 
       current = current->next;
    }

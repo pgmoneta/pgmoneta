@@ -249,7 +249,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    string_to_sign_length = sprintf(string_to_sign, "AWS4-HMAC-SHA256\n%s\n%s/%s/s3/aws4_request\n%s", long_date, short_date, config->s3_aws_region, canonical_request_sha256);
 
    key = malloc(4 + 40 + 1);
-   key_length = sprintf(key, "AWS4%s", config->s3_secret_access_key);
+   key_length = snprintf(key, 4 + 40 + 1, "AWS4%s", config->s3_secret_access_key);
 
    if (pgmoneta_generate_string_hmac_sha256_hash(key, key_length, short_date, SHORT_TIME_LENGHT - 1, &date_key_hmac, &hmac_length))
    {
@@ -397,12 +397,12 @@ error:
       free(key);
    }
 
-   if(local_path != NULL)
+   if (local_path != NULL)
    {
       free(local_path);
    }
 
-   if(s3_path != NULL)
+   if (s3_path != NULL)
    {
       free(s3_path);
    }
@@ -431,7 +431,7 @@ error:
 }
 
 static char*
-s3_get_host()
+s3_get_host(void)
 {
    char* host = NULL;
    struct configuration* config;
@@ -446,7 +446,7 @@ s3_get_host()
    return host;
 }
 
-static char* 
+static char*
 s3_get_basepath(int server, char* identifier)
 {
    char* d = NULL;

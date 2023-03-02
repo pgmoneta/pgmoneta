@@ -31,6 +31,7 @@
 #include <aes.h>
 #include <archive.h>
 #include <backup.h>
+#include <bzip2_compression.h>
 #include <configuration.h>
 #include <delete.h>
 #include <gzip_compression.h>
@@ -1450,6 +1451,10 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
             else if (config->compression_type == COMPRESSION_LZ4)
             {
                pgmoneta_lz4c_wal(d);
+            }
+            else if (config->compression_type == COMPRESSION_BZIP2)
+            {
+               pgmoneta_bzip2_wal(d);
             }
 
             if (config->encryption != 0)

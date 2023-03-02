@@ -1969,6 +1969,11 @@ as_compression(char* str)
       return COMPRESSION_LZ4;
    }
 
+   if (!strcasecmp(str, "bz2"))
+   {
+      return COMPRESSION_BZIP2;
+   }
+
    return COMPRESSION_ZSTD;
 }
 

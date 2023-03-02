@@ -33,6 +33,10 @@
 extern "C" {
 #endif
 
+/* pgmoneta */
+#include <pgmoneta.h>
+
+/* system */
 #include <stdlib.h>
 
 #define INFO_STATUS  "STATUS"

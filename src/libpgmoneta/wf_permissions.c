@@ -251,6 +251,10 @@ permissions_execute_archive(int server, char* identifier, struct node* i_nodes, 
    {
       path = pgmoneta_append(path, ".lz4");
    }
+   else if (config->compression_type == COMPRESSION_BZIP2)
+   {
+      path = pgmoneta_append(path, ".bz2");
+   }
 
    pgmoneta_permission(path, 6, 0, 0);
 
