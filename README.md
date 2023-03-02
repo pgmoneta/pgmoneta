@@ -8,7 +8,7 @@
 
 * Full backup
 * Restore
-* Compression (gzip, zstd, lz4)
+* Compression (gzip, zstd, lz4, bzip2)
 * AES encryption support
 * Symlink support
 * Prometheus support

@@ -127,6 +127,9 @@ pgmoneta_encrypt_wal(char* d)
       case COMPRESSION_LZ4:
          compress_suffix = ".lz4";
          break;
+      case COMPRESSION_BZIP2:
+         compress_suffix = ".bz2";
+         break;
       case COMPRESSION_NONE:
          compress_suffix = "";
          break;

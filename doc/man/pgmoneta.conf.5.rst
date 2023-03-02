@@ -53,7 +53,7 @@ management
   The remote management port. Default is 0 (disabled)
 
 compression
-  The compression type (none, gzip, zstd). Default is zstd
+  The compression type (none, gzip, zstd, bzip2). Default is zstd
 
 compression_level
   The compression level. Default is 3
@@ -106,8 +106,8 @@ ssh_ciphers
 
   Otherwise verbatim. Default is aes-256-ctr, aes-192-ctr, aes-128-ctr
 
-s3_aws_region 
-  The AWS region 
+s3_aws_region
+  The AWS region
 
 s3_access_key_id
   The IAM access key ID
@@ -221,7 +221,7 @@ host
 
 port
   The port of the PostgreSQL instance. Mandatory
-  
+
 user
   The user name for the replication role. Mandatory
 

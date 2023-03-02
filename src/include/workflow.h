@@ -144,6 +144,14 @@ struct workflow*
 pgmoneta_workflow_create_lz4(bool compress);
 
 /**
+ * Create a workflow for BZip2
+ * @param compress The compress
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_bzip2(bool compress);
+
+/**
  * Create a workflow for symlinking
  * @return The workflow
  */

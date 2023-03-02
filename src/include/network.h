@@ -35,6 +35,7 @@ extern "C" {
 
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <stdbool.h>
 
 /**
  * Bind sockets for a host
