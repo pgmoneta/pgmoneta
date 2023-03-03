@@ -3,7 +3,10 @@
 This tutorial will show you how to do a simple installation of pgmoneta.
 
 At the end of this tutorial you will have a backup of a PostgreSQL cluster,
-and will be streaming Write-Ahead Log (WAL) to pgmoneta.
+and will be streaming Write-Ahead Log (WAL) to pgmoneta. 
+
+Please note that inside the brackets at the end of each step it's the user account
+you should be using, switch the account when needed.
 
 ## Preface
 
@@ -19,6 +22,9 @@ dnf install -y postgresql10 postgresql10-server pgmoneta
 ## Initialize cluster
 
 ```
+# If you use dnf to install your postgres, 
+# chances are the binary file is in /usr/bin/,
+# so use that instead of /usr/pgsql-10/bin
 export PATH=/usr/pgsql-10/bin:$PATH
 initdb /tmp/pgsql
 ```
@@ -143,11 +149,16 @@ Add the master key and create vault
 pgmoneta-admin master-key
 pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword add-user
 ```
-
 You have to choose a password for the master key - remember it !
+
+If you see an error saying `error while loading shared libraries: libpgmoneta.so.0: cannot open shared object` running 
+the above command. you may need to locate where your `libpgmoneta.so.0` is. It could be in `/usr/local/lib` or `/usr/local/lib64`
+depending on your environment. Add the corresponding directory into `/etc/ld.so.conf`, or alternatively, create a file
+called `pgmoneta_shared_library.conf` under `/etc/ld.so.conf.d/`, and add your directory into it. Remember to run `ldconfig` to make the change effective
 
 Create the `pgmoneta.conf` configuration
 
+Again, use `/usr/bin/` as `pgsql_dir` instead of `/usr/pgsql-10/bin/` if you used dnf to install postgres
 ```
 cat > pgmoneta.conf
 [pgmoneta]
