@@ -273,6 +273,7 @@ lz4_decompress(char* from, char* to)
    char buffIn[2][BLOCK_BYTES];
    int buffInIndex = 0;
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
+   size_t read = 0;
 
    lz4StreamDecode = &lz4StreamDecodeBody;
    fin = fopen(from, "rb");
@@ -283,9 +284,20 @@ lz4_decompress(char* from, char* to)
    for (;;)
    {
       int compression = 0;
-      fread(&compression, sizeof(compression), 1, fin);
 
-      fread(buffOut, sizeof(char), compression, fin);
+      //If return value 1,read bytes == sizeof(int)
+      //If return value 0,read bytes  < sizeof(int)
+      if ((read = fread(&compression, sizeof(compression), 1, fin ) < sizeof(compression)))
+      {
+          pgmoneta_log_error("lz4_decompression from file compression bytes < sizeof(int)");
+          goto error;
+      }
+
+      read = fread(buffOut, sizeof(char), compression, fin);
+      if (read == 0)
+      {
+          break;
+      }
 
       int decompression = LZ4_decompress_safe_continue(lz4StreamDecode, buffOut, buffIn[buffInIndex], compression, BLOCK_BYTES);
       if (decompression <= 0)
@@ -302,4 +314,17 @@ lz4_decompress(char* from, char* to)
    fclose(fin);
 
    return 0;
+
+error:
+   if (fin != NULL)
+   {
+      fclose(fin);
+   }
+
+   if (fout != NULL)
+   {
+      fclose(fout);
+   }
+
+   return 1;
 }
