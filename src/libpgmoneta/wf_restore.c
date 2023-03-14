@@ -169,8 +169,28 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    if (!pgmoneta_exists(base))
    {
-      pgmoneta_log_error("Restore: Unknown identifier for %s/%s", config->servers[server].name, id);
-      goto error;
+      if (pgmoneta_get_backups(root, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      bool prefix_found = false;
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (backups[i]->valid == VALID_TRUE && pgmoneta_starts_with(backups[i]->label, id))
+         {
+            prefix_found = true;
+            id = backups[i]->label;
+            break;
+         }
+      }
+
+      if (!prefix_found)
+      {
+         pgmoneta_log_error("Restore: Unknown identifier for %s/%s", config->servers[server].name, id);
+         goto error;
+      }
    }
 
    if (pgmoneta_get_backup(root, id, &verify))
