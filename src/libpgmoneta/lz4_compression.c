@@ -287,16 +287,16 @@ lz4_decompress(char* from, char* to)
 
       //If return value 1,read bytes == sizeof(int)
       //If return value 0,read bytes  < sizeof(int)
-      if ((read = fread(&compression, sizeof(compression), 1, fin ) < sizeof(compression)))
+      if ((read = fread(&compression, sizeof(compression), 1, fin) < sizeof(compression)))
       {
-          pgmoneta_log_error("lz4_decompression from file compression bytes < sizeof(int)");
-          goto error;
+         pgmoneta_log_error("lz4_decompression from file compression bytes < sizeof(int)");
+         goto error;
       }
 
       read = fread(buffOut, sizeof(char), compression, fin);
       if (read == 0)
       {
-          break;
+         break;
       }
 
       int decompression = LZ4_decompress_safe_continue(lz4StreamDecode, buffOut, buffIn[buffInIndex], compression, BLOCK_BYTES);

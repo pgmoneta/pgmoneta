@@ -61,6 +61,7 @@ extern "C" {
 
 #define MAX_PATH 1024
 #define MISC_LENGTH 128
+#define MAX_RETENTION_LENGTH 4
 #define NUMBER_OF_SERVERS 64
 #define NUMBER_OF_USERS    64
 #define NUMBER_OF_ADMINS    8
@@ -180,7 +181,10 @@ struct server
    char backup_slot[MISC_LENGTH];      /**< The backup slot name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
    char follow[MISC_LENGTH];           /**< Follow a server */
-   int retention;                      /**< The retention for the server */
+   int retention_days;                 /**< The retention days for the server */
+   int retention_weeks;                /**< The retention weeks for the server */
+   int retention_months;               /**< The retention months for the server */
+   int retention_years;                /**< The retention years for the server */
    bool synchronous;                   /**< Run in synchronous mode */
    atomic_bool backup;                 /**< Is there an active backup */
    atomic_bool delete;                 /**< Is there an active delete */
@@ -269,7 +273,10 @@ struct configuration
    char azure_shared_key[MISC_LENGTH];         /**< The Azure storage account key */
    char azure_base_dir[MAX_PATH];              /**< The Azure base directory */
 
-   int retention; /**< The retention */
+   int retention_days;                  /**< The retention days for the server */
+   int retention_weeks;                 /**< The retention weeks for the server */
+   int retention_months;                /**< The retention months for the server */
+   int retention_years;                 /**< The retention years for the server */
    bool link;     /**< Use link */
 
    int log_type;                      /**< The logging type */

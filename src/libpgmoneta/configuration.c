@@ -56,6 +56,7 @@
 
 static void extract_key_value(char* str, char** key, char** value);
 static int as_int(char* str, int* i);
+static int as_int_array(char* str, int* array, int max_len, int* len);
 static int as_bool(char* str, bool* b);
 static int as_logging_type(char* str);
 static int as_logging_level(char* str);
@@ -97,7 +98,11 @@ pgmoneta_init_configuration(void* shm)
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
-   config->retention = 7;
+   config->retention_days = 7;
+   config->retention_weeks = 0;
+   config->retention_months = 0;
+   config->retention_years = 0;
+
    config->link = true;
 
    config->tls = false;
@@ -1006,17 +1011,32 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_int(value, &config->retention))
+                     int retention_len = 0;
+                     int retention[MAX_RETENTION_LENGTH];
+                     // init retention array, populate with -1
+                     memset(retention, 0, sizeof(retention));
+                     if (as_int_array(value, retention, MAX_RETENTION_LENGTH, &retention_len))
                      {
                         unknown = true;
                      }
+                     config->retention_days = retention[0];
+                     config->retention_weeks = retention[1];
+                     config->retention_months = retention[2];
+                     config->retention_years = retention[3];
                   }
                   else if (strlen(section) > 0)
                   {
-                     if (as_int(value, &srv.retention))
+                     int retention_len = 0;
+                     int retention[MAX_RETENTION_LENGTH];
+                     memset(retention, 0, sizeof(retention));
+                     if (as_int_array(value, retention, MAX_RETENTION_LENGTH, &retention_len))
                      {
                         unknown = true;
                      }
+                     srv.retention_days = retention[0];
+                     srv.retention_weeks = retention[1];
+                     srv.retention_months = retention[2];
+                     srv.retention_years = retention[3];
                   }
                   else
                   {
@@ -1144,10 +1164,48 @@ pgmoneta_validate_configuration(void* shm)
       pgmoneta_log_fatal("pgmoneta: pgsql_dir is not a directory (%s)", config->pgsql_dir);
       return 1;
    }
-
-   if (config->retention < 0)
+   if (config->retention_years != 0 && config->retention_years < 1)
    {
-      config->retention = 0;
+      pgmoneta_log_fatal("pgmoneta: %d is an invalid year configuration", config->retention_years);
+      return 1;
+   }
+   if (config->retention_months != 0)
+   {
+      if (config->retention_years != 0)
+      {
+         if (config->retention_months < 1 || config->retention_months > 12)
+         {
+            pgmoneta_log_fatal("pgmoneta: %d is an invalid month configuration", config->retention_months);
+            return 1;
+         }
+      }
+      else if (config->retention_months < 1)
+      {
+         pgmoneta_log_fatal("pgmoneta: %d is an invalid month configuration", config->retention_months);
+         return 1;
+      }
+   }
+
+   if (config->retention_weeks != 0)
+   {
+      if (config->retention_months != 0)
+      {
+         if (config->retention_weeks < 1 || config->retention_weeks > 4)
+         {
+            pgmoneta_log_fatal("pgmoneta: %d is an invalid week configuration", config->retention_weeks);
+            return 1;
+         }
+      }
+      else if (config->retention_weeks < 1)
+      {
+         pgmoneta_log_fatal("pgmoneta: %d is an invalid week configuration", config->retention_weeks);
+         return 1;
+      }
+   }
+   if (config->retention_days < 1)
+   {
+      pgmoneta_log_fatal("pgmoneta: retention days should be at least 1");
+      return 1;
    }
 
    if (config->backlog < 16)
@@ -1765,6 +1823,60 @@ extract_key_value(char* str, char** key, char** value)
       *key = k;
       *value = v;
    }
+}
+
+/**
+ * parse a str of numbers into an int array
+ * default delimiter is ','
+ */
+static int
+as_int_array(char* str, int* array, int max_len, int* len)
+{
+   int str_len = 0;
+   errno = 0;
+   char* token = strtok(str, ",");
+   while (token != NULL && str_len < max_len)
+   {
+      // skip the intervals
+      while (*token != '\0' && isspace((unsigned char)*token))
+      {
+         token++;
+      }
+      if (*token == '\0')
+      {
+         goto error;
+      }
+      char* endptr;
+      long val = strtol(token, &endptr, 10);
+      if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) || (errno != 0 && val == 0))
+      {
+         goto error;
+      }
+
+      if (token == endptr)
+      {
+         goto error;
+      }
+
+      if (*endptr != '\0')
+      {
+         goto error;
+      }
+      array[str_len++] = (int) val;
+      token = strtok(NULL, ",");
+   }
+
+   if (token != NULL || str_len == 0)
+   {
+      goto error;
+   }
+
+   *len = str_len;
+   return 0;
+error:
+   errno = 0;
+
+   return 1;
 }
 
 static int
@@ -2407,7 +2519,10 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
 
-   config->retention = reload->retention;
+   config->retention_days = reload->retention_days;
+   config->retention_weeks = reload->retention_weeks;
+   config->retention_months = reload->retention_months;
+   config->retention_years = reload->retention_years;
    config->link = reload->link;
 
    /* log_type */
@@ -2497,7 +2612,10 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
-   dst->retention = src->retention;
+   dst->retention_days = src->retention_days;
+   dst->retention_weeks = src->retention_weeks;
+   dst->retention_months = src->retention_months;
+   dst->retention_years = src->retention_years;
    restart_bool("synchronous", dst->synchronous, src->synchronous);
    /* dst->backup = src->backup; */
    /* dst->delete = src->delete; */
