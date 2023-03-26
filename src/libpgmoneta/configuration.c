@@ -70,6 +70,7 @@ static int as_logging_rotation_size(char* str, int* size);
 static int as_logging_rotation_age(char* str, int* age);
 static int as_seconds(char* str, int* age, int default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
+static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
 
 static int transfer_configuration(struct configuration* config, struct configuration* reload);
 static void copy_server(struct server* dst, struct server* src);
@@ -97,7 +98,11 @@ pgmoneta_init_configuration(void* shm)
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
-   config->retention = 7;
+   config->retention_days = 7;
+   config->retention_weeks = -1;
+   config->retention_months = -1;
+   config->retention_years = -1;
+
    config->link = true;
 
    config->tls = false;
@@ -1006,14 +1011,28 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_int(value, &config->retention))
+                     config->retention_days = -1;
+                     config->retention_weeks = -1;
+                     config->retention_months = -1;
+                     config->retention_years = -1;
+                     if (as_retention(value, &config->retention_days,
+                                      &config->retention_weeks,
+                                      &config->retention_months,
+                                      &config->retention_years))
                      {
                         unknown = true;
                      }
                   }
                   else if (strlen(section) > 0)
                   {
-                     if (as_int(value, &srv.retention))
+                     srv.retention_days = -1;
+                     srv.retention_weeks = -1;
+                     srv.retention_months = -1;
+                     srv.retention_years = -1;
+                     if (as_retention(value, &srv.retention_days,
+                                      &srv.retention_weeks,
+                                      &srv.retention_months,
+                                      &srv.retention_years))
                      {
                         unknown = true;
                      }
@@ -1144,10 +1163,48 @@ pgmoneta_validate_configuration(void* shm)
       pgmoneta_log_fatal("pgmoneta: pgsql_dir is not a directory (%s)", config->pgsql_dir);
       return 1;
    }
-
-   if (config->retention < 0)
+   if (config->retention_years != -1 && config->retention_years < 1)
    {
-      config->retention = 0;
+      pgmoneta_log_fatal("pgmoneta: %d is an invalid year configuration", config->retention_years);
+      return 1;
+   }
+   if (config->retention_months != -1)
+   {
+      if (config->retention_years != -1)
+      {
+         if (config->retention_months < 1 || config->retention_months > 12)
+         {
+            pgmoneta_log_fatal("pgmoneta: %d is an invalid month configuration", config->retention_months);
+            return 1;
+         }
+      }
+      else if (config->retention_months < 1)
+      {
+         pgmoneta_log_fatal("pgmoneta: %d is an invalid month configuration", config->retention_months);
+         return 1;
+      }
+   }
+
+   if (config->retention_weeks != -1)
+   {
+      if (config->retention_months != -1)
+      {
+         if (config->retention_weeks < 1 || config->retention_weeks > 4)
+         {
+            pgmoneta_log_fatal("pgmoneta: %d is an invalid week configuration", config->retention_weeks);
+            return 1;
+         }
+      }
+      else if (config->retention_weeks < 1)
+      {
+         pgmoneta_log_fatal("pgmoneta: %d is an invalid week configuration", config->retention_weeks);
+         return 1;
+      }
+   }
+   if (config->retention_days < 1)
+   {
+      pgmoneta_log_fatal("pgmoneta: retention days should be at least 1");
+      return 1;
    }
 
    if (config->backlog < 16)
@@ -1978,6 +2035,196 @@ as_compression(char* str)
 }
 
 static int
+as_retention(char* str, int* days, int* weeks, int* months, int* years)
+{
+   // make a deep copy because the parsing break the input string
+   char* copied_str = (char*)malloc(strlen(str) + 1);
+   strncpy(copied_str, str, strlen(str));
+   copied_str[strlen(str)] = '\0';
+   char* token = strtok(copied_str, ",");
+   if (token == NULL)
+   {
+      goto error;
+   }
+   while (*token != '\0' && isspace((unsigned char)*token))
+   {
+      token++;
+   }
+   if (*token == '\0')
+   {
+      // allowing spaces or empty values
+      *days = -1;
+   }
+   else
+   {
+      // remove trailing spaces
+      size_t len = strlen(token);
+      while (len > 0 && isspace(token[len - 1]))
+      {
+         token[len - 1] = '\0';
+         len--;
+      }
+      if (as_int(token, days))
+      {
+         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         {
+            *days = -1;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      if (*days < 0)
+      {
+         goto error;
+      }
+      if (*days == 0)
+      {
+         *days = -1;
+      }
+   }
+   token = strtok(NULL, ",");
+   if (token == NULL)
+   {
+      // input stops on days
+      free(copied_str);
+      return 0;
+   }
+   while (*token != '\0' && isspace((unsigned char)*token))
+   {
+      token++;
+   }
+   if (*token == '\0')
+   {
+      *weeks = -1;
+   }
+   else
+   {
+      // remove trailing spaces
+      size_t len = strlen(token);
+      while (len > 0 && isspace(token[len - 1]))
+      {
+         token[len - 1] = '\0';
+         len--;
+      }
+      if (as_int(token, weeks))
+      {
+         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         {
+            *weeks = -1;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      if (*weeks < 0)
+      {
+         goto error;
+      }
+      if (*weeks == 0)
+      {
+         *weeks = -1;
+      }
+   }
+   token = strtok(NULL, ",");
+   if (token == NULL)
+   {
+      // input stops on weeks
+      free(copied_str);
+      return 0;
+   }
+   while (*token != '\0' && isspace((unsigned char)*token))
+   {
+      token++;
+   }
+   if (*token == '\0')
+   {
+      *weeks = -1;
+   }
+   else
+   {
+      // remove trailing spaces
+      size_t len = strlen(token);
+      while (len > 0 && isspace(token[len - 1]))
+      {
+         token[len - 1] = '\0';
+         len--;
+      }
+      if (as_int(token, months))
+      {
+         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         {
+            *months = -1;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      if (*months < 0)
+      {
+         goto error;
+      }
+      if (*months == 0)
+      {
+         *months = -1;
+      }
+   }
+   token = strtok(NULL, ",");
+   if (token == NULL)
+   {
+      // input stops on months
+      free(copied_str);
+      return 0;
+   }
+   while (*token != '\0' && isspace((unsigned char)*token))
+   {
+      token++;
+   }
+   if (*token == '\0')
+   {
+      *years = -1;
+   }
+   else
+   {
+      // remove trailing spaces
+      size_t len = strlen(token);
+      while (len > 0 && isspace(token[len - 1]))
+      {
+         token[len - 1] = '\0';
+         len--;
+      }
+      if (as_int(token, years))
+      {
+         if (!strcmp(token, "X") || !strcmp(token, "x") || !strcmp(token, "-"))
+         {
+            *years = -1;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      if (*years < 0)
+      {
+         goto error;
+      }
+      if (*years == 0)
+      {
+         *years = -1;
+      }
+   }
+   free(copied_str);
+   return 0;
+error:
+   errno = 0;
+   free(copied_str);
+   return 1;
+}
+
+static int
 as_storage_engine(char* str)
 {
    if (!strcasecmp(str, "local"))
@@ -2407,7 +2654,10 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
 
-   config->retention = reload->retention;
+   config->retention_days = reload->retention_days;
+   config->retention_weeks = reload->retention_weeks;
+   config->retention_months = reload->retention_months;
+   config->retention_years = reload->retention_years;
    config->link = reload->link;
 
    /* log_type */
@@ -2497,7 +2747,10 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
-   dst->retention = src->retention;
+   dst->retention_days = src->retention_days;
+   dst->retention_weeks = src->retention_weeks;
+   dst->retention_months = src->retention_months;
+   dst->retention_years = src->retention_years;
    restart_bool("synchronous", dst->synchronous, src->synchronous);
    /* dst->backup = src->backup; */
    /* dst->delete = src->delete; */

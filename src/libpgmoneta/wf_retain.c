@@ -39,11 +39,14 @@
 /* system */
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 
 static int retain_setup(int, char*, struct node*, struct node**);
 static int retain_execute(int, char*, struct node*, struct node**);
 static int retain_teardown(int, char*, struct node*, struct node**);
+static void mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int retention_months,
+                        int retention_years, int number_of_backups, struct backup** backups);
 
 struct workflow*
 pgmoneta_workflow_create_retention(void)
@@ -72,29 +75,37 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
    char* d;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   time_t t;
-   char check_date[128];
-   struct tm* time_info;
+   bool* retain_flags = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      int retention;
-
-      t = time(NULL);
-
-      retention = config->servers[i].retention;
-      if (retention <= 0)
+      int retention_days = -1;
+      int retention_weeks = -1;
+      int retention_months = -1;
+      int retention_years = -1;
+      retention_days = config->servers[i].retention_days;
+      if (retention_days <= 0)
       {
-         retention = config->retention;
+         retention_days = config->retention_days;
       }
-
-      memset(&check_date[0], 0, sizeof(check_date));
-      t = t - (retention * 24 * 60 * 60);
-      time_info = localtime(&t);
-      strftime(&check_date[0], sizeof(check_date), "%Y%m%d%H%M%S", time_info);
+      retention_weeks = config->servers[i].retention_weeks;
+      if (retention_weeks <= 0)
+      {
+         retention_weeks = config->retention_weeks;
+      }
+      retention_months = config->servers[i].retention_months;
+      if (retention_months <= 0)
+      {
+         retention_months = config->retention_months;
+      }
+      retention_years = config->servers[i].retention_years;
+      if (retention_years <= 0)
+      {
+         retention_years = config->retention_years;
+      }
 
       number_of_backups = 0;
       backups = NULL;
@@ -105,9 +116,11 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
 
       if (number_of_backups > 0)
       {
+         mark_retain(&retain_flags, retention_days, retention_weeks, retention_months,
+                     retention_years, number_of_backups, backups);
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (strcmp(backups[j]->label, &check_date[0]) < 0)
+            if (!retain_flags[j])
             {
                if (!backups[j]->keep)
                {
@@ -132,7 +145,7 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
          free(backups[j]);
       }
       free(backups);
-
+      free(retain_flags);
       free(d);
    }
 
@@ -143,4 +156,165 @@ static int
 retain_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
+}
+
+static void
+mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int retention_months,
+            int retention_years, int number_of_backups, struct backup** backups)
+{
+   bool* flags = NULL;
+   time_t t;
+   char check_date[128];
+   struct tm* time_info;
+
+   flags = (bool*) malloc(sizeof (bool*) * number_of_backups);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      flags[i] = false;
+   }
+   t = time(NULL);
+   memset(&check_date[0], 0, sizeof(check_date));
+   // retention for nearest days, always happen, so no need to check
+   time_t tmp_time = t;
+   tmp_time = tmp_time - (retention_days * 24 * 60 * 60);
+   time_info = localtime(&tmp_time);
+   strftime(&check_date[0], sizeof(check_date), "%Y%m%d%H%M%S", time_info);
+   // this is the same logic as previous implementation
+   // construct the timestamp 7 days before
+   // and mark retain for backups later than that
+   for (int j = number_of_backups - 1; j >= 0; j--)
+   {
+      if (strcmp(backups[j]->label, &check_date[0]) >= 0)
+      {
+         flags[j] = true;
+      }
+      else
+      {
+         break;
+      }
+   }
+   if (retention_weeks != -1)
+   {
+      // reset tmp time
+      tmp_time = t;
+      // use global variable k to traverse backups from latest to oldest
+      int k = number_of_backups - 1;
+      for (int j = 0; j < retention_weeks; j++)
+      {
+         // push the time a week back
+         tmp_time = tmp_time - (j * 7 * 24 * 60 * 60);
+         time_info = localtime(&tmp_time);
+         // tm_wday starts with Sunday, wind tmp_time to the nearest Monday
+         tmp_time = tmp_time - ((time_info->tm_wday + 6) % 7) * 24 * 60 * 60;
+         time_info = localtime(&tmp_time);
+         // scan will resume from where it left off in the previous loop
+         // and try to find the first backup whose date with the new Monday
+         while (k >= 0)
+         {
+            // find the latest label on that Monday
+            // check backups from latest to earliest,
+            // mark retain for the first backup whose date matches with that Monday
+            struct tm backup_time_info = {0};
+            // construct tm struct from the timestamp label
+            strptime(backups[k]->label, "%Y%m%d%H%M%S", &backup_time_info);
+            if (time_info->tm_year == backup_time_info.tm_year &&
+                time_info->tm_yday == backup_time_info.tm_yday)
+            {
+               flags[k--] = true;
+               break;
+            }
+            else if ((time_info->tm_year == backup_time_info.tm_year &&
+                      time_info->tm_yday > backup_time_info.tm_yday) ||
+                     time_info->tm_year > backup_time_info.tm_year)
+            {
+               // stop if one week's Monday doesn't backup and k goes too far back
+               break;
+            }
+            k--;
+         }
+      }
+   }
+   if (retention_months != -1)
+   {
+      // use global variable k to traverse backups from latest to oldest
+      int k = number_of_backups - 1;
+      // get the time info for the current time
+      time_info = localtime(&t);
+      int cur_year = time_info->tm_year;
+      int cur_month = time_info->tm_mon;
+
+      for (int j = 0; j < retention_months; j++)
+      {
+         // first we look at the first day on this month,
+         // then push the time one month back at a time
+         if (j > 0)
+         {
+            cur_month--;
+         }
+         // if we cross years, change month to December of the previous year
+         if (cur_month < 0)
+         {
+            cur_month = 11;
+            cur_year--;
+         }
+         // scan through backups from latest to earliest,
+         // scan will resume from where it left off in the previous loop
+         // and try to find the first backup whose month and year matches with cur_month and cur_year
+         while (k >= 0)
+         {
+            struct tm backup_time_info = {0};
+            strptime(backups[k]->label, "%Y%m%d%H%M%S", &backup_time_info);
+            // find the latest backup on the first day of that month
+            if (cur_month == backup_time_info.tm_mon &&
+                cur_year == backup_time_info.tm_year &&
+                backup_time_info.tm_mday == 1)
+            {
+               flags[k--] = true;
+               break;
+            }
+            else if ((cur_year == backup_time_info.tm_year &&
+                      cur_month > backup_time_info.tm_mon) ||
+                     cur_year > backup_time_info.tm_year)
+            {
+               // stop when k goes too far back
+               break;
+            }
+            k--;
+         }
+      }
+   }
+   if (retention_years != -1)
+   {
+      int k = number_of_backups - 1;
+      time_info = localtime(&t);
+      int cur_year = time_info->tm_year;
+
+      for (int j = 0; j < retention_years; j++)
+      {
+         // go to previous year
+         if (j > 0)
+         {
+            cur_year--;
+         }
+
+         while (k >= 0)
+         {
+            struct tm backup_time_info = {0};
+            strptime(backups[k]->label, "%Y%m%d%H%M%S", &backup_time_info);
+            // find the latest backup on the first day of that year
+            if (cur_year == backup_time_info.tm_year && backup_time_info.tm_yday == 0)
+            {
+               flags[k--] = true;
+               break;
+            }
+            else if (cur_year > backup_time_info.tm_year)
+            {
+               // in case one year doesn't have backups and the pointer k goes too far back
+               break;
+            }
+            k--;
+         }
+      }
+   }
+   *retain_flags = flags;
 }
