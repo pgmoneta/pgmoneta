@@ -60,7 +60,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [libcurl](https://curl.se/libcurl/)
 
 ```sh
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic
+dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel
 ```
 
 Alternative [clang 8+](https://clang.llvm.org/) can be used.
