@@ -270,8 +270,14 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    <li>1 = Running</li>\n");
    data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_retention</h2>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_retention_days</h2>\n");
    data = pgmoneta_append(data, "  The retention of pgmoneta in days\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_retention_weeks</h2>\n");
+   data = pgmoneta_append(data, "  The retention of pgmoneta in weeks\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_retention_months</h2>\n");
+   data = pgmoneta_append(data, "  The retention of pgmoneta in months\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_retention_years</h2>\n");
+   data = pgmoneta_append(data, "  The retention of pgmoneta in years\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention_server</h2>\n");
    data = pgmoneta_append(data, "  The retention a server in days\n");
@@ -654,10 +660,28 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "1");
    data = pgmoneta_append(data, "\n\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_retention The retention of pgmoneta\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_retention gauge\n");
-   data = pgmoneta_append(data, "pgmoneta_retention ");
-   data = pgmoneta_append_int(data, config->retention);
+   data = pgmoneta_append(data, "#HELP pgmoneta_retention_days The retention days of pgmoneta\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_days gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_retention_days ");
+   data = pgmoneta_append_int(data, config->retention_days <= 0 ? 0 : config->retention_days);
+   data = pgmoneta_append(data, "\n\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_retention_weeks The retention weeks of pgmoneta\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_weeks gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_retention_weeks ");
+   data = pgmoneta_append_int(data, config->retention_weeks <= 0 ? 0 : config->retention_weeks);
+   data = pgmoneta_append(data, "\n\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_retention_months The retention months of pgmoneta\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_months gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_retention_months ");
+   data = pgmoneta_append_int(data, config->retention_months <= 0 ? 0 : config->retention_months);
+   data = pgmoneta_append(data, "\n\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_retention_years The retention years of pgmoneta\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_retention_years gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_retention_years ");
+   data = pgmoneta_append_int(data, config->retention_years <= 0 ? 0 : config->retention_years);
    data = pgmoneta_append(data, "\n\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_server The retention of a server\n");
@@ -668,16 +692,61 @@ general_information(int client_fd)
 
       data = pgmoneta_append(data, "name=\"");
       data = pgmoneta_append(data, config->servers[i].name);
-      data = pgmoneta_append(data, "\"} ");
-
-      retention = config->servers[i].retention;
+      data = pgmoneta_append(data, "\"");
+      data = pgmoneta_append(data, ", ");
+      data = pgmoneta_append(data, "parameter= \"days\"");
+      data = pgmoneta_append(data, "} ");
+      retention = config->servers[i].retention_days;
       if (retention <= 0)
       {
-         retention = config->retention;
+         retention = config->retention_days;
       }
+      data = pgmoneta_append_int(data, retention <= 0 ? 0 : retention);
+      data = pgmoneta_append(data, "\n");
 
-      data = pgmoneta_append_int(data, retention);
+      data = pgmoneta_append(data, "pgmoneta_retention_server{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"");
+      data = pgmoneta_append(data, ", ");
+      data = pgmoneta_append(data, "parameter= \"weeks\"");
+      data = pgmoneta_append(data, "} ");
+      retention = config->servers[i].retention_weeks;
+      if (retention <= 0)
+      {
+         retention = config->retention_weeks;
+      }
+      data = pgmoneta_append_int(data, retention <= 0 ? 0 : retention);
+      data = pgmoneta_append(data, "\n");
 
+      data = pgmoneta_append(data, "pgmoneta_retention_server{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"");
+      data = pgmoneta_append(data, ", ");
+      data = pgmoneta_append(data, "parameter= \"months\"");
+      data = pgmoneta_append(data, "} ");
+      retention = config->servers[i].retention_months;
+      if (retention <= 0)
+      {
+         retention = config->retention_months;
+      }
+      data = pgmoneta_append_int(data, retention <= 0 ? 0 : retention);
+      data = pgmoneta_append(data, "\n");
+
+      data = pgmoneta_append(data, "pgmoneta_retention_server{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"");
+      data = pgmoneta_append(data, ", ");
+      data = pgmoneta_append(data, "parameter= \"years\"");
+      data = pgmoneta_append(data, "} ");
+      retention = config->servers[i].retention_years;
+      if (retention <= 0)
+      {
+         retention = config->retention_years;
+      }
+      data = pgmoneta_append_int(data, retention <= 0 ? 0 : retention);
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");

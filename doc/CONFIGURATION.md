@@ -47,7 +47,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | azure_container | | String | Yes | The Azure container name |
 | azure_shared_key | | String | Yes | The Azure storage account key |
 | azure_base_dir | | String | Yes | The base directory for the Azure container |
-| retention | 7 | Int | No | The retention time in days |
+| retention | 7, - , - , - | Array | No | The retention time in days, weeks, months, years |
 | link | `on` | Bool | No | Use links to limit backup size |
 | log_type | console | String | No | The logging type (console, file, syslog) |
 | log_level | info | String | No | The logging level, any of the (case insensitive) strings `FATAL`, `ERROR`, `WARN`, `INFO` and `DEBUG` (that can be more specific as `DEBUG1` thru `DEBUG5`). Debug level greater than 5 will be set to `DEBUG5`. Not recognized values will make the log_level be `INFO` |
@@ -81,7 +81,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | backup_slot | | String | No | The replication slot for the backup |
 | wal_slot | | String | No | The replication slot for WAL |
 | follow | | String | No | Failover to this server if follow server fails |
-| retention | | Int | No | The retention for the server |
+| retention | | Array | No | The retention for the server in days, weeks, months, years |
 | synchronous | `off` | Bool | No | Use synchronous receive |
 
 The `user` specified must have the `REPLICATION` option in order to stream the Write-Ahead Log (WAL), and must
