@@ -195,9 +195,9 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 {
    char short_date[SHORT_TIME_LENGHT];
    char long_date[LONG_TIME_LENGHT];
-   char canonical_request[4096];
-   char auth_value[4096];
-   char string_to_sign[1024];
+   char* canonical_request = NULL;
+   char* auth_value = NULL;
+   char* string_to_sign = NULL;
    char* s3_host = NULL;
    char* s3_url = NULL;
    char* file_sha256 = NULL;
@@ -211,8 +211,6 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    unsigned char* signing_key_hmac = NULL;
    unsigned char* signature_hmac = NULL;
    unsigned char* signature_hex = NULL;
-   size_t string_to_sign_length = 0;
-   size_t key_length = 0;
    int hmac_length = 0;
    FILE* file = NULL;
    struct stat file_info;
@@ -238,20 +236,36 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    pgmoneta_generate_file_sha256_hash(local_path, &file_sha256);
 
+   s3_host = s3_get_host();
+
    // Construct canonical request.
-   memset(canonical_request, 0, sizeof(canonical_request));
-   sprintf(canonical_request, "PUT\n/%s\n\nhost:%s.s3.%s.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-date:%s\nx-amz-storage-class:REDUCED_REDUNDANCY\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-storage-class\n%s", s3_path, config->s3_bucket, config->s3_aws_region, file_sha256, long_date, file_sha256);
+   canonical_request = pgmoneta_append(canonical_request, "PUT\n/");
+   canonical_request = pgmoneta_append(canonical_request, s3_path);
+   canonical_request = pgmoneta_append(canonical_request, "\n\nhost:");
+   canonical_request = pgmoneta_append(canonical_request, s3_host);
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-content-sha256:");
+   canonical_request = pgmoneta_append(canonical_request, file_sha256);
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
+   canonical_request = pgmoneta_append(canonical_request, long_date);
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-storage-class:REDUCED_REDUNDANCY\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-storage-class\n");
+   canonical_request = pgmoneta_append(canonical_request, file_sha256);
 
    pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
 
    // Construct string to sign.
-   memset(string_to_sign, 0, sizeof(string_to_sign));
-   string_to_sign_length = sprintf(string_to_sign, "AWS4-HMAC-SHA256\n%s\n%s/%s/s3/aws4_request\n%s", long_date, short_date, config->s3_aws_region, canonical_request_sha256);
+   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
+   string_to_sign = pgmoneta_append(string_to_sign, long_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\n");
+   string_to_sign = pgmoneta_append(string_to_sign, short_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, config->s3_aws_region);
+   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
+   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
 
-   key = malloc(4 + 40 + 1);
-   key_length = snprintf(key, 4 + 40 + 1, "AWS4%s", config->s3_secret_access_key);
+   key = pgmoneta_append(key, "AWS4");
+   key = pgmoneta_append(key, config->s3_secret_access_key);
 
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, key_length, short_date, SHORT_TIME_LENGHT - 1, &date_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGHT - 1, &date_key_hmac, &hmac_length))
    {
       goto error;
    }
@@ -271,19 +285,23 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, string_to_sign_length, &signature_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
    {
       goto error;
    }
 
    pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
 
-   memset(&auth_value[0], 0, sizeof(auth_value));
-   sprintf(auth_value, "AWS4-HMAC-SHA256 Credential=%s/%s/%s/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=%s", config->s3_access_key_id, short_date, config->s3_aws_region, signature_hex);
+   auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
+   auth_value = pgmoneta_append(auth_value, config->s3_access_key_id);
+   auth_value = pgmoneta_append(auth_value, "/");
+   auth_value = pgmoneta_append(auth_value, short_date);
+   auth_value = pgmoneta_append(auth_value, "/");
+   auth_value = pgmoneta_append(auth_value, config->s3_aws_region);
+   auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=");
+   auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
 
    chunk = pgmoneta_http_add_header(chunk, "Authorization", auth_value);
-
-   s3_host = s3_get_host();
 
    chunk = pgmoneta_http_add_header(chunk, "Host", s3_host);
 
@@ -344,6 +362,9 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    free(local_path);
    free(s3_path);
    free(canonical_request_sha256);
+   free(canonical_request);
+   free(string_to_sign);
+   free(auth_value);
 
    curl_slist_free_all(chunk);
 
@@ -415,6 +436,21 @@ error:
    if (file_sha256 != NULL)
    {
       free(file_sha256);
+   }
+
+   if(canonical_request != NULL)
+   {
+      free(canonical_request);
+   }
+
+   if(string_to_sign != NULL)
+   {
+      free(string_to_sign);
+   }
+
+   if(auth_value != NULL)
+   {
+      free(auth_value);
    }
 
    if (chunk != NULL)
