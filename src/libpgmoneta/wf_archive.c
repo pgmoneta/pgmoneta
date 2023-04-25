@@ -126,7 +126,7 @@ static void int_to_oct(int num, char* oct, size_t octlen);
 
 #define th_get_size(t) oct_to_size((t)->th_buf.size)
 #define th_set_size(t, fsize) \
-   int_to_oct_nonull((fsize), (t)->th_buf.size, 12)
+        int_to_oct_nonull((fsize), (t)->th_buf.size, 12)
 
 typedef unsigned int (* libtar_hashfunc_t)(void*, unsigned int);
 typedef void (* libtar_freefunc_t)(void*);
@@ -224,7 +224,7 @@ typedef struct
 tartype_t;
 
 #define tar_block_write(t, buf) \
-   (*((t)->type->writefunc))((t)->fd, (char*)(buf), T_BLOCKSIZE)
+        (*((t)->type->writefunc))((t)->fd, (char*)(buf), T_BLOCKSIZE)
 
 static tartype_t default_type = {open, close, read, write};
 
@@ -281,7 +281,7 @@ static int dev_hash(dev_t* dev);
 static int ino_hash(ino_t* inode);
 
 #define th_set_mtime(t, fmtime)                                 \
-   int_to_oct_nonull((fmtime), (t)->th_buf.mtime, 12)
+        int_to_oct_nonull((fmtime), (t)->th_buf.mtime, 12)
 
 static TAR* tar = NULL;
 

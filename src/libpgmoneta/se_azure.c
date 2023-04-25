@@ -226,7 +226,7 @@ static int
 azure_send_upload_request(char* local_root, char* azure_root, char* relative_path)
 {
    char utc_date[UTC_TIME_LENGTH];
-   char string_to_sign[4096];
+   char* string_to_sign = NULL;
    char* signing_key = NULL;
    char* signature = NULL;
    char* base64_signature = NULL;
@@ -234,10 +234,9 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    char* azure_path = NULL;
    char* azure_host = NULL;
    char* azure_url = NULL;
-   char auth_value[4096];
+   char* auth_value = NULL;
    unsigned char* signature_hmac = NULL;
    unsigned char* signature_hex = NULL;
-   size_t string_to_sign_length = 0;
    int hmac_length = 0;
    int signing_key_length = 0;
    FILE* file = NULL;
@@ -273,23 +272,30 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    }
 
    // Construct string to sign.
-   memset(string_to_sign, 0, sizeof(string_to_sign));
-
-   // In case file is empty.
    if (file_info.st_size == 0)
    {
-      string_to_sign_length = sprintf(string_to_sign, "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:%s\nx-ms-version:2021-08-06\n/%s/%s/%s", utc_date, config->azure_storage_account, config->azure_container, azure_path);
+      string_to_sign = pgmoneta_append(string_to_sign, "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
    }
    else
    {
-      string_to_sign_length = sprintf(string_to_sign, "PUT\n\n\n%ld\n\n\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:%s\nx-ms-version:2021-08-06\n/%s/%s/%s", file_info.st_size, utc_date, config->azure_storage_account, config->azure_container, azure_path);
+      string_to_sign = pgmoneta_append(string_to_sign, "PUT\n\n\n");
+      string_to_sign = pgmoneta_append(string_to_sign, (char*)file_info.st_size);
+      string_to_sign = pgmoneta_append(string_to_sign, "\n\n\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:");
    }
+
+   string_to_sign = pgmoneta_append(string_to_sign, utc_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\nx-ms-version:2021-08-06\n/");
+   string_to_sign = pgmoneta_append(string_to_sign, config->azure_storage_account);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, config->azure_container);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, azure_path);
 
    // Decode the Azure storage account shared key.
    pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key), &signing_key, &signing_key_length);
 
    // Construct the signature.
-   if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign, string_to_sign_length, &signature_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
    {
       goto error;
    }
@@ -298,8 +304,10 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    pgmoneta_base64_encode((char*) signature_hmac, hmac_length, &base64_signature);
 
    // Construct the authorization header.
-   memset(&auth_value[0], 0, sizeof(auth_value));
-   sprintf(auth_value, "SharedKey %s:%s", config->azure_storage_account, base64_signature);
+   auth_value = pgmoneta_append(auth_value, "SharedKey ");
+   auth_value = pgmoneta_append(auth_value, config->azure_storage_account);
+   auth_value = pgmoneta_append(auth_value, ":");
+   auth_value = pgmoneta_append(auth_value, base64_signature);
 
    chunk = pgmoneta_http_add_header(chunk, "Authorization", auth_value);
 
@@ -329,8 +337,6 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
 
    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)file_info.st_size);
 
-   //curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-
    res = curl_easy_perform(curl);
    if (res != CURLE_OK)
    {
@@ -346,6 +352,8 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    free(base64_signature);
    free(signature_hmac);
    free(signature_hex);
+   free(string_to_sign);
+   free(auth_value);
 
    curl_slist_free_all(chunk);
 
@@ -392,6 +400,16 @@ error:
    if (signature_hex != NULL)
    {
       free(signature_hex);
+   }
+
+   if (string_to_sign != NULL)
+   {
+      free(string_to_sign);
+   }
+
+   if (auth_value != NULL)
+   {
+      free(auth_value);
    }
 
    if (chunk != NULL)
