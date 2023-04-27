@@ -42,6 +42,15 @@ extern "C" {
 void
 pgmoneta_server_info(int srv);
 
+/**
+ * Get the WAL size for a server
+ * @param socket The socket
+ * @param ws The WAL size
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_server_get_wal_size(int socket, int* ws);
+
 #ifdef __cplusplus
 }
 #endif

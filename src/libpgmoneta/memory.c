@@ -122,3 +122,40 @@ pgmoneta_memory_destroy(void)
    data = NULL;
    message = NULL;
 }
+
+void*
+pgmoneta_memory_dynamic_create(size_t* size)
+{
+   *size = 0;
+
+   return NULL;
+}
+
+void
+pgmoneta_memory_dynamic_destroy(void* data)
+{
+   free(data);
+}
+
+void*
+pgmoneta_memory_dynamic_append(void* orig, size_t orig_size, void* append, size_t append_size, size_t* new_size)
+{
+   void* d = NULL;
+   size_t s;
+
+   if (append != NULL)
+   {
+      s = orig_size + append_size;
+      d = realloc(orig, s);
+      memcpy(d + orig_size, append, append_size);
+   }
+   else
+   {
+      s = orig_size;
+      d = orig;
+   }
+
+   *new_size = s;
+
+   return d;
+}

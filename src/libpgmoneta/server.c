@@ -43,7 +43,6 @@
 #include <sys/types.h>
 
 static int get_wal_level(int socket, bool* replica);
-static int get_wal_size(int socket, int* ws);
 
 void
 pgmoneta_server_info(int srv)
@@ -73,7 +72,7 @@ pgmoneta_server_info(int srv)
       goto done;
    }
 
-   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, &socket);
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &socket);
 
    if (auth != AUTH_SUCCESS)
    {
@@ -92,7 +91,7 @@ pgmoneta_server_info(int srv)
       config->servers[srv].valid = replica;
    }
 
-   if (get_wal_size(socket, &ws))
+   if (pgmoneta_server_get_wal_size(socket, &ws))
    {
       pgmoneta_log_trace("Unable to get wal_segment_size for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
@@ -118,73 +117,8 @@ done:
    }
 }
 
-static int
-get_wal_level(int socket, bool* replica)
-{
-   int status;
-   size_t size = 21;
-   char wal_level[size];
-   int vlength;
-   char* value = NULL;
-   struct message qmsg;
-   struct message* tmsg = NULL;
-   struct message* dmsg = NULL;
-
-   *replica = false;
-
-   memset(&qmsg, 0, sizeof(struct message));
-   memset(&wal_level, 0, size);
-
-   pgmoneta_write_byte(&wal_level, 'Q');
-   pgmoneta_write_int32(&(wal_level[1]), size - 1);
-   pgmoneta_write_string(&(wal_level[5]), "SHOW wal_level;");
-
-   qmsg.kind = 'Q';
-   qmsg.length = size;
-   qmsg.data = &wal_level;
-
-   status = pgmoneta_write_message(NULL, socket, &qmsg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      goto error;
-   }
-
-   status = pgmoneta_read_block_message(NULL, socket, &tmsg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      goto error;
-   }
-
-   pgmoneta_extract_message('D', tmsg, &dmsg);
-
-   vlength = pgmoneta_read_int32(dmsg->data + 7);
-   value = (char*)malloc(vlength + 1);
-   memset(value, 0, vlength + 1);
-   memcpy(value, dmsg->data + 11, vlength);
-
-   if (!strcmp("replica", value) || !strcmp("logical", value))
-   {
-      *replica = true;
-   }
-
-   pgmoneta_free_copy_message(dmsg);
-   pgmoneta_free_message(tmsg);
-   free(value);
-
-   return 0;
-
-error:
-   pgmoneta_log_trace("get_wal_level: socket %d status %d", socket, status);
-
-   pgmoneta_free_copy_message(dmsg);
-   pgmoneta_free_message(tmsg);
-   free(value);
-
-   return 1;
-}
-
-static int
-get_wal_size(int socket, int* ws)
+int
+pgmoneta_server_get_wal_size(int socket, int* ws)
 {
    int status;
    size_t size = 28;
@@ -249,12 +183,77 @@ get_wal_size(int socket, int* ws)
    return 0;
 
 error:
-   pgmoneta_log_trace("get_wal_segment_size: socket %d status %d", socket, status);
+   pgmoneta_log_trace("pgmoneta_server_get_wal_size: socket %d status %d", socket, status);
 
    pgmoneta_free_copy_message(dmsg);
    pgmoneta_free_message(tmsg);
    free(value);
    free(number);
+
+   return 1;
+}
+
+static int
+get_wal_level(int socket, bool* replica)
+{
+   int status;
+   size_t size = 21;
+   char wal_level[size];
+   int vlength;
+   char* value = NULL;
+   struct message qmsg;
+   struct message* tmsg = NULL;
+   struct message* dmsg = NULL;
+
+   *replica = false;
+
+   memset(&qmsg, 0, sizeof(struct message));
+   memset(&wal_level, 0, size);
+
+   pgmoneta_write_byte(&wal_level, 'Q');
+   pgmoneta_write_int32(&(wal_level[1]), size - 1);
+   pgmoneta_write_string(&(wal_level[5]), "SHOW wal_level;");
+
+   qmsg.kind = 'Q';
+   qmsg.length = size;
+   qmsg.data = &wal_level;
+
+   status = pgmoneta_write_message(NULL, socket, &qmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_read_block_message(NULL, socket, &tmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   pgmoneta_extract_message('D', tmsg, &dmsg);
+
+   vlength = pgmoneta_read_int32(dmsg->data + 7);
+   value = (char*)malloc(vlength + 1);
+   memset(value, 0, vlength + 1);
+   memcpy(value, dmsg->data + 11, vlength);
+
+   if (!strcmp("replica", value) || !strcmp("logical", value))
+   {
+      *replica = true;
+   }
+
+   pgmoneta_free_copy_message(dmsg);
+   pgmoneta_free_message(tmsg);
+   free(value);
+
+   return 0;
+
+error:
+   pgmoneta_log_trace("get_wal_level: socket %d status %d", socket, status);
+
+   pgmoneta_free_copy_message(dmsg);
+   pgmoneta_free_message(tmsg);
+   free(value);
 
    return 1;
 }

@@ -359,7 +359,7 @@ aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphe
    size_t size;
    unsigned char* ct = NULL;
    int ct_length;
-   const EVP_CIPHER* (*cipher_fp)(void) = get_cipher(mode);
+   const EVP_CIPHER* (* cipher_fp)(void) = get_cipher(mode);
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
       goto error;
@@ -417,7 +417,7 @@ aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigne
    int length;
    size_t size;
    char* pt = NULL;
-   const EVP_CIPHER* (*cipher_fp)(void) = get_cipher(mode);
+   const EVP_CIPHER* (* cipher_fp)(void) = get_cipher(mode);
 
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
@@ -505,7 +505,7 @@ encrypt_file(char* from, char* to, int enc)
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
    struct configuration* config;
-   const EVP_CIPHER* (*cipher_fp)(void) = NULL;
+   const EVP_CIPHER* (* cipher_fp)(void) = NULL;
    int cipher_block_size = 0;
    int inbuf_size = 0;
    int outbuf_size = 0;

@@ -46,7 +46,7 @@
 #define HASHMAP_PTR_CAST(type, x) ((type)x)
 #define HASHMAP_MAX_CHAIN_LENGTH 8
 
-static int hashmap_iterate(struct hashmap* hashmap, int (*f)(void*, struct hashmap_element*), void* context);
+static int hashmap_iterate(struct hashmap* hashmap, int (* f)(void*, struct hashmap_element*), void* context);
 static unsigned int hashmap_crc32_helper(char* s, unsigned int len);
 static unsigned int hashmap_hash_helper_int_helper(struct hashmap* m, char* keystring, unsigned int len);
 static int hashmap_match_helper(struct hashmap_element* element, char* key, unsigned int len);
@@ -282,7 +282,7 @@ pgmoneta_hashmap_destroy(struct hashmap* hashmap)
 
 static int
 hashmap_iterate(struct hashmap* hashmap,
-                int (*f)(void*, struct hashmap_element*),
+                int (* f)(void*, struct hashmap_element*),
                 void* context)
 {
    struct hashmap_element* p;
