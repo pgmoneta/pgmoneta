@@ -45,11 +45,12 @@ extern "C" {
  * @param database The database
  * @param username The username
  * @param password The password
+ * @param replication Is replication enabled
  * @param fd The resulting socket
  * @return AUTH_SUCCESS, AUTH_BAD_PASSWORD or AUTH_ERROR
  */
 int
-pgmoneta_server_authenticate(int server, char* database, char* username, char* password, int* fd);
+pgmoneta_server_authenticate(int server, char* database, char* username, char* password, bool replication, int* fd);
 
 /**
  * Authenticate a remote management user

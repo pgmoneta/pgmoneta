@@ -55,6 +55,26 @@ struct message
    void* data;        /**< The message data */
 } __attribute__ ((aligned (64)));
 
+/** @struct
+ * Defines a tuple
+ */
+struct tuple
+{
+   char** data;                   /**< The data */
+   struct tuple* next;            /**< The next tuple */
+} __attribute__ ((aligned (64)));
+
+/** @struct
+ * Defines the response to a query
+ */
+struct query_response
+{
+   char names[MAX_NUMBER_OF_COLUMNS][MISC_LENGTH]; /**< The column names */
+   int number_of_columns;                          /**< The number of columns */
+
+   struct tuple* tuples;
+} __attribute__ ((aligned (64)));
+
 /**
  * Read a message in blocking mode
  * @param ssl The SSL struct
@@ -256,11 +276,105 @@ pgmoneta_create_ssl_message(struct message** msg);
  * Create a startup message
  * @param username The user name
  * @param database The database
+ * @param replication Should replication be enabled
  * @param msg The resulting message
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_startup_message(char* username, char* database, struct message** msg);
+pgmoneta_create_startup_message(char* username, char* database, bool replication, struct message** msg);
+
+/**
+ * Create an IDENTIFY SYSTEM message
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_identify_system_message(struct message** msg);
+
+/**
+ * Create a TIMELINE_HISTORY message
+ * @param timeline The timeline
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_timeline_history_message(int timeline, struct message** msg);
+
+/**
+ * Create a READ_REPLICATION_SLOT message
+ * @param slot The slot
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_read_replication_slot_message(char* slot, struct message** msg);
+
+/**
+ * Create a START_REPLICATION message
+ * @param xlogpos The WAL position (can be NULL)
+ * @param timeline The timeline (can be -1)
+ * @param slot The slot
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_start_replication_message(char* xlogpos, int timeline, char* slot, struct message** msg);
+
+/**
+ * Create a standby status update message
+ * @param received The received position
+ * @param flushed The flushed position
+ * @param applied The applied position
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed, int64_t applied, struct message** msg);
+
+/**
+ * Has a message
+ * @param type The message type to be extracted
+ * @param data The data
+ * @param data_size The data size
+ * @return true if found, otherwise false
+ */
+bool
+pgmoneta_has_message(char type, void* data, size_t data_size);
+
+/**
+ * Query execute
+ * @param socket The socket
+ * @param msg The query message
+ * @param query The query response
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_query_execute(int socket, struct message* msg, struct query_response** response);
+
+/**
+ * Get data from a query response
+ * @param response The response
+ * @param column The column
+ * @return The data
+ */
+char*
+pgmoneta_query_response_get_data(struct query_response* response, int column);
+
+/**
+ * Free query
+ * @param query The query
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_free_query_response(struct query_response* response);
+
+/**
+ * Debug query
+ * @param query The resulting query
+ * @return 0 upon success, otherwise 1
+ */
+void
+pgmoneta_query_response_debug(struct query_response* response);
 
 #ifdef __cplusplus
 }

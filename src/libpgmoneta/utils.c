@@ -47,6 +47,7 @@
 #include <unistd.h>
 #include <openssl/pem.h>
 #include <sys/statvfs.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 #ifndef EVBACKEND_LINUXAIO
@@ -216,10 +217,93 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
    return 1;
 }
 
+size_t
+pgmoneta_extract_message_offset(size_t offset, void* data, struct message** extracted)
+{
+   char type;
+   int m_length;
+   void* m_data;
+   struct message* result = NULL;
+
+   *extracted = NULL;
+
+   type = (char)pgmoneta_read_byte(data + offset);
+   m_length = pgmoneta_read_int32(data + offset + 1);
+
+   result = (struct message*)malloc(sizeof(struct message));
+   m_data = malloc(1 + m_length);
+
+   memcpy(m_data, data + offset, 1 + m_length);
+
+   result->kind = type;
+   result->length = 1 + m_length;
+   result->max_length = 1 + m_length;
+   result->data = m_data;
+
+   *extracted = result;
+
+   return offset + 1 + m_length;
+}
+
+int
+pgmoneta_extract_message_from_data(char type, void* data, size_t data_size, struct message** extracted)
+{
+   int offset;
+   void* m_data = NULL;
+   int m_length;
+   struct message* result = NULL;
+
+   offset = 0;
+   *extracted = NULL;
+
+   while (result == NULL && offset < data_size)
+   {
+      char t = (char)pgmoneta_read_byte(data + offset);
+
+      if (type == t)
+      {
+         m_length = pgmoneta_read_int32(data + offset + 1);
+
+         result = (struct message*)malloc(sizeof(struct message));
+         m_data = (void*)malloc(1 + m_length);
+
+         memcpy(m_data, data + offset, 1 + m_length);
+
+         result->kind = pgmoneta_read_byte(m_data);
+         result->length = 1 + m_length;
+         result->max_length = 1 + m_length;
+         result->data = m_data;
+
+         *extracted = result;
+
+         return 0;
+      }
+      else
+      {
+         offset += 1;
+         offset += pgmoneta_read_int32(data + offset);
+      }
+   }
+
+   return 1;
+}
+
 signed char
 pgmoneta_read_byte(void* data)
 {
    return (signed char) *((char*)data);
+}
+
+int16_t
+pgmoneta_read_int16(void* data)
+{
+   unsigned char bytes[] = {*((unsigned char*)data),
+                            *((unsigned char*)(data + 1))};
+
+   int16_t res = (int16_t)((bytes[0] << 8)) |
+                 ((bytes[1]));
+
+   return res;
 }
 
 int32_t
@@ -2260,6 +2344,31 @@ pgmoneta_get_timestamp_UTC_format(char* utc_date)
    }
 
    return 0;
+}
+
+int64_t
+pgmoneta_get_current_timestamp(void)
+{
+   struct timeval tv;
+
+   gettimeofday(&tv, NULL);
+   return tv.tv_sec * (int64_t)1000000 + tv.tv_usec;
+}
+
+int64_t
+pgmoneta_get_y2000_timestamp(void)
+{
+   struct tm tm_y2000 = {0};
+   time_t y2000;
+
+   tm_y2000.tm_year = 2000 - 1900;
+   tm_y2000.tm_mon = 0;
+   tm_y2000.tm_mday = 1;
+
+   y2000 = mktime(&tm_y2000);
+   y2000 = timegm(localtime(&y2000));
+
+   return y2000 * (int64_t)1000000;
 }
 
 int

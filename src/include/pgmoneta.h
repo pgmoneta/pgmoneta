@@ -65,6 +65,8 @@ extern "C" {
 #define NUMBER_OF_USERS    64
 #define NUMBER_OF_ADMINS    8
 
+#define MAX_NUMBER_OF_COLUMNS 8
+
 #define STATE_FREE        0
 #define STATE_IN_USE      1
 
@@ -236,6 +238,8 @@ struct prometheus
  */
 struct configuration
 {
+   bool running; /**< Is pgmoneta running */
+
    char configuration_path[MAX_PATH]; /**< The configuration path */
    char users_path[MAX_PATH];         /**< The users path */
    char admins_path[MAX_PATH];        /**< The admins path */

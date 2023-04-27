@@ -81,12 +81,41 @@ int
 pgmoneta_extract_message(char type, struct message* msg, struct message** extracted);
 
 /**
+ * Extract a message based on an offset
+ * @param offset The offset
+ * @param data The data segment
+ * @param extracted The resulting message
+ * @return The next offset
+ */
+size_t
+pgmoneta_extract_message_offset(size_t offset, void* data, struct message** extracted);
+
+/**
+ * Extract a message based on a type
+ * @param type The type
+ * @param data The data segment
+ * @param data_size The data size
+ * @param extracted The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_message_from_data(char type, void* data, size_t data_size, struct message** extracted);
+
+/**
  * Read a byte
  * @param data Pointer to the data
  * @return The byte
  */
 signed char
 pgmoneta_read_byte(void* data);
+
+/**
+ * Read an int16
+ * @param data Pointer to the data
+ * @return The int16
+ */
+int16_t
+pgmoneta_read_int16(void* data);
 
 /**
  * Read an int32
@@ -641,6 +670,20 @@ pgmoneta_get_timestamp_ISO8601_format(char* short_date, char* long_date);
  */
 int
 pgmoneta_get_timestamp_UTC_format(char* utc_date);
+
+/**
+ * Get the current local time
+ * @return The microseconds
+ */
+int64_t
+pgmoneta_get_current_timestamp(void);
+
+/**
+ * Get the local time since 2000-01-01 at midnight
+ * @return The microseconds
+ */
+int64_t
+pgmoneta_get_y2000_timestamp(void);
 
 /**
  * Convert base32 to hexadecimal.

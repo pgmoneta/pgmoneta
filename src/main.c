@@ -1091,6 +1091,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          ev_break(loop, EVBREAK_ALL);
          keep_running = 0;
          stop = 1;
+         config->running = false;
          break;
       case MANAGEMENT_STATUS:
          pgmoneta_log_debug("pgmoneta: Management status");
@@ -1392,9 +1393,14 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 static void
 shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
    pgmoneta_log_debug("pgmoneta: shutdown requested");
    ev_break(loop, EVBREAK_ALL);
    keep_running = 0;
+   config->running = false;
 }
 
 static void

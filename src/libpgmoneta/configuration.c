@@ -91,6 +91,8 @@ pgmoneta_init_configuration(void* shm)
 
    config = (struct configuration*)shm;
 
+   config->running = true;
+
    config->compression_type = COMPRESSION_ZSTD;
    config->compression_level = 3;
 

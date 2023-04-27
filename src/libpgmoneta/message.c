@@ -32,6 +32,7 @@
 #include <memory.h>
 #include <message.h>
 #include <network.h>
+#include <security.h>
 #include <utils.h>
 
 #include <assert.h>
@@ -47,6 +48,10 @@ static int write_message(int socket, struct message* msg);
 
 static int ssl_read_message(SSL* ssl, int timeout, struct message** msg);
 static int ssl_write_message(SSL* ssl, struct message* msg);
+
+static int create_D_tuple(int number_of_columns, struct message* msg, struct tuple** tuple);
+static int get_number_of_columns(struct message* msg);
+static int get_column_name(struct message* msg, int index, char** name);
 
 int
 pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
@@ -524,7 +529,7 @@ pgmoneta_create_ssl_message(struct message** msg)
 }
 
 int
-pgmoneta_create_startup_message(char* username, char* database, struct message** msg)
+pgmoneta_create_startup_message(char* username, char* database, bool replication, struct message** msg)
 {
    struct message* m = NULL;
    size_t size;
@@ -534,6 +539,11 @@ pgmoneta_create_startup_message(char* username, char* database, struct message**
    us = strlen(username);
    ds = strlen(database);
    size = 4 + 4 + 4 + 1 + us + 1 + 8 + 1 + ds + 1 + 17 + 9 + 1;
+
+   if (replication)
+   {
+      size += 14;
+   }
 
    m = (struct message*)malloc(sizeof(struct message));
    m->data = malloc(size);
@@ -552,9 +562,496 @@ pgmoneta_create_startup_message(char* username, char* database, struct message**
    pgmoneta_write_string(m->data + 13 + us + 1 + 9 + ds + 1, "application_name");
    pgmoneta_write_string(m->data + 13 + us + 1 + 9 + ds + 1 + 17, "pgmoneta");
 
+   if (replication)
+   {
+      pgmoneta_write_string(m->data + 13 + us + 1 + 9 + ds + 1 + 17 + 9, "replication");
+      pgmoneta_write_string(m->data + 13 + us + 1 + 9 + ds + 1 + 17 + 9 + 12, "1");
+   }
+
    *msg = m;
 
    return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_create_identify_system_message(struct message** msg)
+{
+   struct message* m = NULL;
+   size_t size;
+
+   size = 1 + 4 + 17;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   pgmoneta_write_string(m->data + 5, "IDENTIFY_SYSTEM;");
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_create_timeline_history_message(int timeline, struct message** msg)
+{
+   char tl[8];
+   struct message* m = NULL;
+   size_t size;
+
+   memset(&tl[0], 0, sizeof(tl));
+   snprintf(&tl[0], sizeof(tl), "%d", timeline);
+
+   size = 1 + 4 + 17 + strlen(tl) + 1 + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   pgmoneta_write_string(m->data + 5, "TIMELINE_HISTORY ");
+   memcpy(m->data + 5 + 17, tl, strlen(tl));
+   pgmoneta_write_string(m->data + 5 + 17 + strlen(tl), ";");
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_create_read_replication_slot_message(char* slot, struct message** msg)
+{
+   struct message* m = NULL;
+   size_t size;
+
+   size = 1 + 4 + 22 + strlen(slot) + 1 + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   pgmoneta_write_string(m->data + 5, "READ_REPLICATION_SLOT ");
+   pgmoneta_write_string(m->data + 5 + 22, slot);
+   pgmoneta_write_string(m->data + 5 + 22 + strlen(slot), ";");
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_create_start_replication_message(char* xlogpos, int timeline, char* slot, struct message** msg)
+{
+   char cmd[1024];
+   struct message* m = NULL;
+   size_t size;
+
+   memset(&cmd[0], 0, sizeof(cmd));
+
+   if (slot != NULL && strlen(slot) > 0)
+   {
+      if (xlogpos != NULL && strlen(xlogpos) > 0)
+      {
+         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL %s;", slot, xlogpos);
+      }
+      else
+      {
+         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL 0/0 TIMELINE %d;", slot, timeline);
+      }
+   }
+   else
+   {
+      if (xlogpos != NULL && strlen(xlogpos) > 0)
+      {
+         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL %s;", xlogpos);
+      }
+      else
+      {
+         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL 0/0 TIMELINE %d;", timeline);
+      }
+   }
+
+   size = 1 + 4 + strlen(cmd) + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   memcpy(m->data + 5, &cmd[0], strlen(cmd));
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed, int64_t applied, struct message** msg)
+{
+   struct message* m = NULL;
+   size_t size;
+
+   size = 1 + 8 + 8 + 8 + 8 + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'r';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'r');
+   pgmoneta_write_int64(m->data + 1, received);
+   pgmoneta_write_int64(m->data + 9, flushed);
+   pgmoneta_write_int64(m->data + 17, applied);
+   pgmoneta_write_int64(m->data + 25, pgmoneta_get_current_timestamp() - pgmoneta_get_y2000_timestamp());
+   pgmoneta_write_byte(m->data + 33, 0);
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_query_execute(int socket, struct message* msg, struct query_response** response)
+{
+   int status;
+   int fd = -1;
+   bool cont;
+   int cols;
+   char* name = NULL;
+   struct message* tmsg = NULL;
+   char* content = NULL;
+   struct message* reply = NULL;
+   struct query_response* r = NULL;
+   struct tuple* current = NULL;
+   size_t data_size;
+   void* data = pgmoneta_memory_dynamic_create(&data_size);
+   size_t offset = 0;
+
+   *response = NULL;
+
+   status = pgmoneta_write_message(NULL, socket, msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   cont = true;
+   while (cont)
+   {
+      status = pgmoneta_read_block_message(NULL, socket, &reply);
+
+      if (status == MESSAGE_STATUS_OK)
+      {
+         data = pgmoneta_memory_dynamic_append(data, data_size, reply->data, reply->length, &data_size);
+
+         if (pgmoneta_has_message('Z', data, data_size))
+         {
+            cont = false;
+         }
+      }
+      else if (status == MESSAGE_STATUS_ZERO)
+      {
+         SLEEP(1000000L);
+      }
+      else
+      {
+         goto error;
+      }
+
+      pgmoneta_free_message(reply);
+      reply = NULL;
+   }
+
+   if (pgmoneta_has_message('E', data, data_size))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_extract_message_from_data('T', data, data_size, &tmsg))
+   {
+      goto error;
+   }
+
+   cols = get_number_of_columns(tmsg);
+
+   r = (struct query_response*)malloc(sizeof(struct query_response));
+   memset(r, 0, sizeof(struct query_response));
+
+   r->number_of_columns = cols;
+
+   for (int i = 0; i < cols; i++)
+   {
+      if (get_column_name(tmsg, i, &name))
+      {
+         goto error;
+      }
+
+      memcpy(&r->names[i][0], name, strlen(name));
+
+      free(name);
+      name = NULL;
+   }
+
+   while (offset < data_size)
+   {
+      offset = pgmoneta_extract_message_offset(offset, data, &msg);
+
+      if (msg != NULL && msg->kind == 'D')
+      {
+         struct tuple* dtuple = NULL;
+
+         create_D_tuple(cols, msg, &dtuple);
+
+         if (r->tuples == NULL)
+         {
+            r->tuples = dtuple;
+         }
+         else
+         {
+            current->next = dtuple;
+         }
+
+         current = dtuple;
+      }
+
+      pgmoneta_free_copy_message(msg);
+      msg = NULL;
+   }
+
+   *response = r;
+
+   pgmoneta_free_copy_message(tmsg);
+   pgmoneta_memory_dynamic_destroy(data);
+
+   free(content);
+
+   return 0;
+
+error:
+
+   pgmoneta_disconnect(fd);
+
+   pgmoneta_free_message(msg);
+   pgmoneta_free_copy_message(tmsg);
+   pgmoneta_memory_dynamic_destroy(data);
+
+   free(content);
+
+   return 1;
+}
+
+bool
+pgmoneta_has_message(char type, void* data, size_t data_size)
+{
+   int offset;
+
+   offset = 0;
+
+   while (offset < data_size)
+   {
+      char t = (char)pgmoneta_read_byte(data + offset);
+
+      if (type == t)
+      {
+         return true;
+      }
+      else
+      {
+         offset += 1;
+         offset += pgmoneta_read_int32(data + offset);
+      }
+   }
+
+   return false;
+}
+
+char*
+pgmoneta_query_response_get_data(struct query_response* response, int column)
+{
+   if (response == NULL || column > response->number_of_columns)
+   {
+      return NULL;
+   }
+
+   return response->tuples->data[column];
+}
+
+int
+pgmoneta_free_query_response(struct query_response* response)
+{
+   struct tuple* current = NULL;
+   struct tuple* next = NULL;
+
+   if (response != NULL)
+   {
+      current = response->tuples;
+
+      while (current != NULL)
+      {
+         next = current->next;
+
+         for (int i = 0; i < response->number_of_columns; i++)
+         {
+            free(current->data[i]);
+         }
+         free(current->data);
+         free(current);
+
+         current = next;
+      }
+
+      free(response);
+   }
+
+   return 0;
+}
+
+void
+pgmoneta_query_response_debug(struct query_response* response)
+{
+   int number_of_tuples = 0;
+   struct tuple* t = NULL;
+
+   if (response == NULL)
+   {
+      pgmoneta_log_info("Query is NULL");
+      return;
+   }
+
+   pgmoneta_log_trace("Query Response");
+   pgmoneta_log_trace("Columns: %d", response->number_of_columns);
+
+   for (int i = 0; i < response->number_of_columns; i++)
+   {
+      pgmoneta_log_trace("Column: %s", response->names[i]);
+   }
+
+   t = response->tuples;
+   while (t != NULL)
+   {
+      number_of_tuples++;
+      t = t->next;
+   }
+
+   pgmoneta_log_trace("Tuples: %d", number_of_tuples);
+}
+
+static int
+create_D_tuple(int number_of_columns, struct message* msg, struct tuple** tuple)
+{
+   int offset;
+   int length;
+   struct tuple* result = NULL;
+
+   result = (struct tuple*)malloc(sizeof(struct tuple));
+   memset(result, 0, sizeof(struct tuple));
+
+   result->data = (char**)malloc(number_of_columns * sizeof(char*));
+   result->next = NULL;
+
+   offset = 7;
+
+   for (int i = 0; i < number_of_columns; i++)
+   {
+      length = pgmoneta_read_int32(msg->data + offset);
+      offset += 4;
+
+      if (length > 0)
+      {
+         result->data[i] = (char*)malloc(length + 1);
+         memset(result->data[i], 0, length + 1);
+         memcpy(result->data[i], msg->data + offset, length);
+         offset += length;
+      }
+      else
+      {
+         result->data[i] = NULL;
+      }
+   }
+
+   *tuple = result;
+
+   return 0;
+}
+
+static int
+get_number_of_columns(struct message* msg)
+{
+   if (msg->kind == 'T')
+   {
+      return pgmoneta_read_int16(msg->data + 5);
+   }
+
+   return 0;
+}
+
+static int
+get_column_name(struct message* msg, int index, char** name)
+{
+   int current = 0;
+   int offset;
+   int16_t cols;
+   char* tmp = NULL;
+
+   *name = NULL;
+
+   if (msg->kind == 'T')
+   {
+      cols = pgmoneta_read_int16(msg->data + 5);
+
+      if (index < cols)
+      {
+         offset = 7;
+
+         while (current < index)
+         {
+            tmp = pgmoneta_read_string(msg->data + offset);
+
+            offset += strlen(tmp) + 1;
+            offset += 4;
+            offset += 2;
+            offset += 4;
+            offset += 2;
+            offset += 4;
+            offset += 2;
+
+            current++;
+         }
+
+         tmp = pgmoneta_read_string(msg->data + offset);
+
+         *name = pgmoneta_append(*name, tmp);
+
+         return 0;
+      }
+   }
+
+   return 1;
 }
 
 static int
