@@ -332,6 +332,15 @@ int
 pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed, int64_t applied, struct message** msg);
 
 /**
+ * Create a query message for a simple query
+ * @param query The query to be executed on server
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_query_message(char* query, struct message** msg);
+
+/**
  * Has a message
  * @param type The message type to be extracted
  * @param data The data

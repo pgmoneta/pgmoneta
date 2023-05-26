@@ -193,6 +193,7 @@ struct server
    int wal_size;                       /**< The size of the WAL files */
    bool wal_streaming;                 /**< Is WAL streaming active */
    bool valid;                         /**< Is the server valid */
+   int version;                        /**< The major version of the server*/
 } __attribute__ ((aligned (64)));
 
 /** @struct

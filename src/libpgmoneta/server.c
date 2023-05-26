@@ -257,3 +257,35 @@ error:
 
    return 1;
 }
+
+int
+pgmoneta_server_get_version(int socket, int server)
+{
+   int ret;
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   ret = pgmoneta_create_query_message("SELECT split_part(split_part(version(), ' ', 2), '.', 1);", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_query_execute(socket, query_msg, &response) || response == NULL)
+   {
+      goto error;
+   }
+
+   config->servers[server].version = atoi(response->tuples->data[0]);
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+   pgmoneta_free_query_response(response);
+   return 1;
+}

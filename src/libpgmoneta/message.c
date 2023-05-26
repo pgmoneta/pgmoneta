@@ -736,6 +736,33 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 }
 
 int
+pgmoneta_create_query_message(char* query, struct message** msg)
+{
+   struct message* m = NULL;
+   size_t size;
+   char cmd[1024];
+
+   memset(&cmd[0], 0, sizeof(cmd));
+   strcpy(cmd, query);
+   size = 1 + 4 + strlen(cmd) + 1;
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   memcpy(m->data + 5, &cmd[0], strlen(cmd));
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
 pgmoneta_query_execute(int socket, struct message* msg, struct query_response** response)
 {
    int status;
