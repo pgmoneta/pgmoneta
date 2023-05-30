@@ -334,6 +334,18 @@ int
 pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed, int64_t applied, struct message** msg);
 
 /**
+ * Create a base backup message
+ * @param server_version The version of the PostgreSQL server to backup
+ * @param label The label of the backup
+ * @param include_wal The indication of whether to also include WAL
+ * @param checksum_algorithm The checksum algorithm to be applied to backup manifest (only work for server version > 12)
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm, struct message** msg);
+
+/**
  * Create a query message for a simple query
  * @param query The query to be executed on server
  * @param msg The resulting message

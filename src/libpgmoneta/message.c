@@ -738,6 +738,96 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 }
 
 int
+pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm, struct message** msg)
+{
+   bool use_new_format = server_version >= 15;
+   char cmd[1024];
+   char* options = NULL;
+   struct message* m = NULL;
+   size_t size;
+
+   memset(&cmd[0], 0, sizeof(cmd));
+   // other options are
+   if (use_new_format)
+   {
+      options = pgmoneta_append(options, "LABEL '");
+      options = pgmoneta_append(options, label);
+      options = pgmoneta_append(options, "', ");
+
+      if (include_wal)
+      {
+         options = pgmoneta_append(options, "WAL true, ");
+
+         options = pgmoneta_append(options, "WAIT false, ");
+      }
+      else
+      {
+         options = pgmoneta_append(options, "WAL false, ");
+      }
+
+      options = pgmoneta_append(options, "CHECKPOINT 'fast', ");
+
+      options = pgmoneta_append(options, "MANIFEST 'yes', ");
+
+      options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
+      options = pgmoneta_append(options, checksum_algorithm);
+      options = pgmoneta_append(options, "'");
+
+      snprintf(cmd, sizeof(cmd), "BASE_BACKUP (%s)", options);
+   }
+   else
+   {
+      options = pgmoneta_append(options, "LABEL '");
+      options = pgmoneta_append(options, label);
+      options = pgmoneta_append(options, "' ");
+
+      options = pgmoneta_append(options, "FAST ");
+
+      if (include_wal)
+      {
+         options = pgmoneta_append(options, "WAL ");
+
+         options = pgmoneta_append(options, "NOWAIT ");
+      }
+
+      if (server_version > 12)
+      {
+         options = pgmoneta_append(options, "MANIFEST 'yes' ");
+
+         options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
+         options = pgmoneta_append(options, checksum_algorithm);
+         options = pgmoneta_append(options, "' ");
+      }
+
+      snprintf(cmd, sizeof(cmd), "BASE_BACKUP %s;", options);
+   }
+
+   if (options != NULL)
+   {
+      free(options);
+      options = NULL;
+   }
+
+   size = 1 + 4 + strlen(cmd) + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   memcpy(m->data + 5, &cmd[0], strlen(cmd));
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
 pgmoneta_create_query_message(char* query, struct message** msg)
 {
    struct message* m = NULL;
@@ -1743,7 +1833,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
             goto error;
          }
 
-         if (msg->kind == 'd')
+         if (msg->kind == 'd' && msg->length > 0)
          {
             // copy data
             if (fwrite(msg->data, msg->length, 1, file) != 1)
@@ -1982,6 +2072,10 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
             case 'd':
             {
                // real data
+               if (msg->length <= 1)
+               {
+                   break;
+               }
                if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)
                {
                   pgmoneta_log_error("could not write to file %s", file_path);
@@ -2095,7 +2189,7 @@ pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* b
          pgmoneta_log_message(msg);
          goto error;
       }
-      if (msg->kind == 'd')
+      if (msg->kind == 'd' && msg->length > 0)
       {
          // copy data
          if (fwrite(msg->data, msg->length, 1, file) != 1)
