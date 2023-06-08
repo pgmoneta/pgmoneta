@@ -37,6 +37,18 @@ extern "C" {
 
 #include <stdlib.h>
 
+/** @struct
+ * Defines a streaming buffer
+ */
+struct stream_buffer
+{
+   char* buffer;  /**< allocated buffer holding streaming data */
+   int size;      /**< allocated buffer size */
+   int start;     /**< offset to the first unconsumed data in buffer */
+   int end;       /**< offset to the first position after available data */
+   int cursor;    /**< next byte to consume */
+} __attribute__ ((aligned (64)));
+
 /**
  * Initialize a memory segment for the process local message structure
  */
@@ -95,6 +107,29 @@ pgmoneta_memory_dynamic_destroy(void* data);
  */
 void*
 pgmoneta_memory_dynamic_append(void* orig, size_t orig_size, void* append, size_t append_size, size_t* new_size);
+
+/**
+ * Initialize a stream buffer
+ * @param buffer The stream buffer to be initialized
+ */
+void
+pgmoneta_memory_stream_buffer_init(struct stream_buffer** buffer);
+
+/**
+ * Enlarge the buffer, doesn't guarantee success
+ * @param buffer The stream buffer
+ * @param bytes_needed The number of bytes needed
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_memory_stream_buffer_enlarge(struct stream_buffer* buffer, int bytes_needed);
+
+/**
+ * Free a stream buffer
+ * @param buffer The stream buffer to be freed
+ */
+void
+pgmoneta_memory_stream_buffer_free(struct stream_buffer* buffer);
 
 #ifdef __cplusplus
 }

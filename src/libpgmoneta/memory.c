@@ -159,3 +159,44 @@ pgmoneta_memory_dynamic_append(void* orig, size_t orig_size, void* append, size_
 
    return d;
 }
+
+void
+pgmoneta_memory_stream_buffer_init(struct stream_buffer** buffer)
+{
+   struct stream_buffer* b = malloc(sizeof(struct stream_buffer));
+   b->size = DEFAULT_BUFFER_SIZE;
+   b->start = b->end = b->cursor = 0;
+   b->buffer = malloc(DEFAULT_BUFFER_SIZE);
+   *buffer = b;
+}
+
+int
+pgmoneta_memory_stream_buffer_enlarge(struct stream_buffer* buffer, int bytes_needed)
+{
+   char* new_buf = NULL;
+   // subtract the space we have left to avoid wasting space
+   bytes_needed -= (buffer->size - buffer->end);
+   buffer->size += bytes_needed;
+   new_buf = realloc(buffer->buffer, buffer->size);
+   if (new_buf == NULL)
+   {
+      return 1;
+   }
+   buffer->buffer = new_buf;
+   return 0;
+}
+
+void
+pgmoneta_memory_stream_buffer_free(struct stream_buffer* buffer)
+{
+   if (buffer == NULL)
+   {
+      return;
+   }
+   if (buffer->buffer != NULL)
+   {
+      free(buffer->buffer);
+      buffer->buffer = NULL;
+   }
+   free(buffer);
+}

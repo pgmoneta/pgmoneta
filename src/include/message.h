@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <memory.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -384,6 +385,27 @@ pgmoneta_free_query_response(struct query_response* response);
  */
 void
 pgmoneta_query_response_debug(struct query_response* response);
+
+/**
+ * Read the copy stream into the streaming buffer in blocking mode
+ * @param socket The socket
+ * @param buffer The streaming buffer
+ * @return 1 upon success, 0 if no data received, otherwise 2
+ */
+int
+pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer);
+
+/**
+ * Consume the data in copy stream buffer, get the next valid message in the copy stream buffer
+ * Recognized message types are DataRow, CopyOutResponse, CopyInResponse, CopyData, CopyDone, CopyFail and ErrorResponse
+ * Other message will be ignored
+ * @param socket The socket
+ * @param buffer The stream buffer
+ * @param message [out] The message
+ * @return 1 upon success, 0 if no data to consume, otherwise 2
+ */
+int
+pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct message** message);
 
 #ifdef __cplusplus
 }

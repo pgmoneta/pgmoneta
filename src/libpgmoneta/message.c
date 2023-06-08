@@ -1396,3 +1396,166 @@ ssl_write_message(SSL* ssl, struct message* msg)
 
    return MESSAGE_STATUS_ERROR;
 }
+
+int
+pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
+{
+   int numbytes = 0;
+   bool keep_read = false;
+   // left shift unconsumed data to reuse space
+   if (buffer->start < buffer->end)
+   {
+      if (buffer->start > 0)
+      {
+         memmove(buffer->buffer, buffer->buffer + buffer->start, buffer->end - buffer->start);
+         buffer->end -= buffer->start;
+         buffer->cursor -= buffer->start;
+         buffer->start = 0;
+      }
+   }
+   else
+   {
+      buffer->start = buffer->end = buffer->cursor = 0;
+   }
+   /*
+    * if buffer is still too full,
+    * try enlarging it to be at least big enough for one TCP packet (I'm using 1500B here)
+    * we don't expect it to absolutely work
+    */
+   if (buffer->size - buffer->end < 1500)
+   {
+      pgmoneta_log_info("Stream buffer too full");
+      if (pgmoneta_memory_stream_buffer_enlarge(buffer, 1500))
+      {
+         pgmoneta_log_error("Fail to enlarge stream buffer");
+      }
+   }
+   if (buffer->end >= buffer->size)
+   {
+      pgmoneta_log_error("Not enough space to read new copy-out data");
+      goto error;
+   }
+   do
+   {
+      numbytes = read(socket, buffer->buffer + buffer->end, buffer->size - buffer->end);
+
+      if (likely(numbytes > 0))
+      {
+         buffer->end += numbytes;
+         return MESSAGE_STATUS_OK;
+      }
+      else if (numbytes == 0)
+      {
+         if (errno == EAGAIN || errno == EWOULDBLOCK)
+         {
+            keep_read = true;
+            errno = 0;
+         }
+         else
+         {
+            return MESSAGE_STATUS_ZERO;
+         }
+      }
+      else
+      {
+         if (errno == EAGAIN || errno == EWOULDBLOCK)
+         {
+            keep_read = true;
+            errno = 0;
+         }
+         else
+         {
+            keep_read = false;
+         }
+      }
+   }
+   while (keep_read);
+   return MESSAGE_STATUS_ERROR;
+
+error:
+   return MESSAGE_STATUS_ERROR;
+}
+
+int
+pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct message** message)
+{
+   struct message* m = NULL;
+   bool keep_read = false;
+   int status;
+   int length;
+
+   pgmoneta_free_copy_message(*message);
+   do
+   {
+      while (buffer->cursor >= buffer->end)
+      {
+         status = pgmoneta_read_copy_stream(socket, buffer);
+         if (status == MESSAGE_STATUS_ZERO)
+         {
+            SLEEP(1000000L);
+         }
+         else if (status != MESSAGE_STATUS_OK)
+         {
+            goto error;
+         }
+      }
+      m = (struct message*)malloc(sizeof(struct message));
+      m->kind = buffer->buffer[buffer->cursor++];
+      // try to get message length
+      while (buffer->cursor + 4 >= buffer->end)
+      {
+         status = pgmoneta_read_copy_stream(socket, buffer);
+         if (status == MESSAGE_STATUS_ZERO)
+         {
+            SLEEP(1000000L);
+         }
+         else if (status != MESSAGE_STATUS_OK)
+         {
+            goto error;
+         }
+      }
+      length = pgmoneta_read_int32(buffer->buffer + buffer->cursor);
+      // receive the whole message even if we are going to skip it
+      while (buffer->cursor + length >= buffer->end)
+      {
+         status = pgmoneta_read_copy_stream(socket, buffer);
+         if (status == MESSAGE_STATUS_ZERO)
+         {
+            SLEEP(1000000L);
+         }
+         else if (status != MESSAGE_STATUS_OK)
+         {
+            goto error;
+         }
+      }
+      if (m->kind != 'D' && m->kind != 'H' && m->kind != 'W' &&
+          m->kind != 'c' && m->kind != 'f' && m->kind != 'E' && m->kind != 'd')
+      {
+         // skip this message
+         keep_read = true;
+         buffer->cursor += length;
+         buffer->start = buffer->cursor;
+         continue;
+      }
+
+      m->data = (void*) malloc(length - 4 + 1);
+      m->length = length - 4;
+      memset(m->data, 0, m->length + 1);
+      memcpy(m->data, buffer->buffer + (buffer->cursor + 4), m->length);
+      *message = m;
+
+      buffer->cursor += length;
+      buffer->start = buffer->cursor;
+
+      keep_read = false;
+
+   }
+   while (keep_read);
+
+   return MESSAGE_STATUS_OK;
+
+error:
+   pgmoneta_free_copy_message(m);
+   *message = NULL;
+   return status;
+}
