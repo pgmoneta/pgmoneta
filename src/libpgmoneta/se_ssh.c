@@ -46,8 +46,10 @@
 #include <libssh/sftp.h>
 
 static int ssh_storage_setup(int, char*, struct node*, struct node**);
-static int ssh_storage_execute(int, char*, struct node*, struct node**);
-static int ssh_storage_teardown(int, char*, struct node*, struct node**);
+static int ssh_storage_backup_execute(int, char*, struct node*, struct node**);
+static int ssh_storage_restore_execute(int, char*, struct node*, struct node**);
+static int ssh_storage_backup_teardown(int, char*, struct node*, struct node**);
+static int ssh_storage_restore_teardown(int, char*, struct node*, struct node**);
 
 static char* get_remote_server_basepath(int server);
 static char* get_remote_server_backup(int server);
@@ -71,15 +73,28 @@ static char** hashes = NULL;
 static char* latest_remote_root = NULL;
 
 struct workflow*
-pgmoneta_storage_create_ssh(void)
+pgmoneta_storage_create_ssh(int workflow_type)
 {
    struct workflow* wf = NULL;
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
    wf->setup = &ssh_storage_setup;
-   wf->execute = &ssh_storage_execute;
-   wf->teardown = &ssh_storage_teardown;
+
+   switch (workflow_type)
+   {
+      case WORKFLOW_TYPE_BACKUP:
+         wf->execute = &ssh_storage_backup_execute;
+         wf->teardown = &ssh_storage_backup_teardown;
+         break;
+      case WORKFLOW_TYPE_RESTORE:
+         wf->execute = &ssh_storage_restore_execute;
+         wf->teardown = &ssh_storage_restore_teardown;
+         break;
+      default:
+         break;
+   }
+
    wf->next = NULL;
 
    return wf;
@@ -254,8 +269,8 @@ error:
 }
 
 static int
-ssh_storage_execute(int server, char* identifier,
-                    struct node* i_nodes, struct node** o_nodes)
+ssh_storage_backup_execute(int server, char* identifier,
+                           struct node* i_nodes, struct node** o_nodes)
 {
    char* server_path = NULL;
    char* local_root = NULL;
@@ -365,8 +380,50 @@ error:
 }
 
 static int
-ssh_storage_teardown(int server, char* identifier,
-                     struct node* i_nodes, struct node** o_nodes)
+ssh_storage_restore_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+{
+   char* directory = NULL;
+   char* ident = NULL;
+   char* restore_path = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   directory = pgmoneta_get_node_string(i_nodes, "directory");
+   ident = pgmoneta_get_node_string(*o_nodes, "identifier");
+
+   restore_path = pgmoneta_append(restore_path, directory);
+   restore_path = pgmoneta_append(restore_path, "/");
+   restore_path = pgmoneta_append(restore_path, config->servers[server].name);
+   restore_path = pgmoneta_append(restore_path, "-");
+   restore_path = pgmoneta_append(restore_path, ident);
+
+   // The restore path is the same locally and remotely.
+   if (sftp_make_directory(restore_path, restore_path) == 1)
+   {
+      pgmoneta_log_error("could not create the restore directory: %s in the remote server: %s", restore_path, strerror(errno));
+      goto error;
+   }
+
+   if (sftp_copy_directory(restore_path, restore_path, "") != 0)
+   {
+      pgmoneta_log_error("failed to transfer the restore directory from the local host to the remote server: %s", strerror(errno));
+      goto error;
+   }
+
+   free(restore_path);
+
+   return 0;
+
+error:
+   free(restore_path);
+
+   return 1;
+}
+
+static int
+ssh_storage_backup_teardown(int server, char* identifier,
+                            struct node* i_nodes, struct node** o_nodes)
 {
    char* root = NULL;
 
@@ -388,6 +445,17 @@ ssh_storage_teardown(int server, char* identifier,
 
    free(latest_remote_root);
 
+   sftp_free(sftp);
+
+   ssh_free(session);
+
+   return 0;
+}
+
+static int
+ssh_storage_restore_teardown(int server, char* identifier,
+                             struct node* i_nodes, struct node** o_nodes)
+{
    sftp_free(sftp);
 
    ssh_free(session);
