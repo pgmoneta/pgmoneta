@@ -397,7 +397,7 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer);
 
 /**
  * Consume the data in copy stream buffer, get the next valid message in the copy stream buffer
- * Recognized message types are DataRow, CopyOutResponse, CopyInResponse, CopyData, CopyDone, CopyFail and ErrorResponse
+ * Recognized message types are DataRow, CopyOutResponse, CopyInResponse, CopyData, CopyDone, CopyFail, RowDescription, CommandComplete and ErrorResponse
  * Other message will be ignored
  * @param socket The socket
  * @param buffer The stream buffer
@@ -406,6 +406,16 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer);
  */
 int
 pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct message** message);
+
+/**
+ * Receive and parse the DataRow messages into tuples
+ * @param socket The socket
+ * @param buffer The stream buffer holding the messages
+ * @param response The query response
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, struct query_response** response);
 
 #ifdef __cplusplus
 }
