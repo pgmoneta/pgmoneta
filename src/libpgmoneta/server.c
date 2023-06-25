@@ -282,7 +282,7 @@ pgmoneta_server_get_version(int socket, int server)
    config->servers[server].version = atoi(response->tuples->data[0]);
 
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
+   pgmoneta_free_copy_message(query_msg);
 
    return 0;
 error:

@@ -28,7 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <archive.h>
+#include <achv.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
@@ -36,6 +36,10 @@
 #include <workflow.h>
 #include <restore.h>
 #include <utils.h>
+
+#include <archive.h>
+#include <archive_entry.h>
+#include <stdio.h>
 
 void
 pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
@@ -172,4 +176,50 @@ error:
    free(directory);
 
    exit(1);
+}
+
+int
+pgmoneta_extract_tar_file(char* file_path, char* destination)
+{
+   struct archive* a;
+   struct archive_entry* entry;
+   a = archive_read_new();
+   archive_read_support_format_tar(a);
+   // open tar file in a suitable buffer size, I'm using 10240 here
+   if (archive_read_open_filename(a, file_path, 10240) != ARCHIVE_OK)
+   {
+      pgmoneta_log_error("Failed to open the tar file for reading");
+      goto error;
+   }
+
+   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+   {
+      char dst_file_path[MAX_PATH];
+      memset(dst_file_path, 0, sizeof(dst_file_path));
+      const char* entry_path = archive_entry_pathname(entry);
+      if (pgmoneta_ends_with(destination, "/"))
+      {
+         snprintf(dst_file_path, sizeof(dst_file_path), "%s%s", destination, entry_path);
+      }
+      else
+      {
+         snprintf(dst_file_path, sizeof(dst_file_path), "%s/%s", destination, entry_path);
+      }
+
+      archive_entry_set_pathname(entry, dst_file_path);
+      if (archive_read_extract(a, entry, 0) != ARCHIVE_OK)
+      {
+         pgmoneta_log_error("Failed to extract entry: %s", archive_error_string(a));
+         goto error;
+      }
+   }
+
+   archive_read_close(a);
+   archive_read_free(a);
+   return 0;
+
+error:
+   archive_read_close(a);
+   archive_read_free(a);
+   return 1;
 }

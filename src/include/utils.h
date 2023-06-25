@@ -175,6 +175,15 @@ void
 pgmoneta_write_string(void* data, char* s);
 
 /**
+ * Compare two strings
+ * @param str1 The first string
+ * @param str2 The second string
+ * @return true if the strings are the same, otherwise false
+ */
+bool
+pgmoneta_compare_string(const char* str1, const char* str2);
+
+/**
  * Is the machine big endian ?
  * @return True if big, otherwise false for little
  */

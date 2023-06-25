@@ -48,6 +48,15 @@ extern "C" {
 void
 pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
 
+/**
+ * Extract from a tar file to a given directory
+ * @param file_path The tar file path
+ * @param destination The destination to extract to
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_tar_file(char* file_path, char* destination);
+
 #ifdef __cplusplus
 }
 #endif

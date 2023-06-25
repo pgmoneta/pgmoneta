@@ -29,6 +29,8 @@ jobs:
       run: sudo apt install -y liblz4-dev
     - name: Install libssh
       run: sudo apt install -y libssh-dev
+    - name: Install libarchive
+      run: sudo apt install -y libarchive-dev
     - name: Install libcurl
       run: sudo apt install -y libcurl4-nss-dev
     - name: Install clang

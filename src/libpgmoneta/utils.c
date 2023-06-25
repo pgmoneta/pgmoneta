@@ -70,7 +70,6 @@ static char* get_server_basepath(int server);
 
 static int copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup);
 
-
 int32_t
 pgmoneta_get_request(struct message* msg)
 {
@@ -401,6 +400,20 @@ void
 pgmoneta_write_string(void* data, char* s)
 {
    memcpy(data, s, strlen(s));
+}
+
+bool
+pgmoneta_compare_string(const char* str1, const char* str2)
+{
+   if (str1 == NULL && str2 == NULL)
+   {
+      return true;
+   }
+   if ((str1 == NULL && str2 != NULL) || (str1 != NULL && str2 == NULL))
+   {
+      return false;
+   }
+   return strcmp(str1, str2) == 0;
 }
 
 bool

@@ -28,6 +28,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${SYSTEMD_INCLUDE_DIRS}
     ${LIBSSH_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
+    ${LibArchive_INCLUDE_DIRS}
   )
 
   #
@@ -45,6 +46,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBSSH_LIBRARIES}
     ${CURL_LIBRARIES}
     ${LIBATOMIC_LIBRARY}
+    ${LibArchive_LIBRARY}
   )
 
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
@@ -69,6 +71,7 @@ else()
     ${OPENSSL_INCLUDE_DIR}
     ${LIBSSH_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
+    ${LibArchive_INCLUDE_DIRS}
   )
 
   #
@@ -84,6 +87,7 @@ else()
     ${OPENSSL_SSL_LIBRARY}
     ${LIBSSH_LIBRARIES}
     ${CURL_LIBRARIES}
+    ${LibArchive_LIBRARIES}
   )
 
   if (${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")

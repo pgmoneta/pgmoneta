@@ -12,7 +12,7 @@ Backup is handled in [backup.h](../src/include/backup.h) ([backup.c](../src/libp
 Restore is handled in [restore.h](../src/include/restore.h) ([restore.c](../src/libpgmoneta/restore.c)) with linking
 handled in [link.h](../src/include/link.h) ([link.c](../src/libpgmoneta/link.c)).
 
-Archive is handled in [archive.h](../src/include/archive.h) ([archive.c](../src/libpgmoneta/archive.c)) backed by
+Archive is handled in [achv.h](../src/include/achv.h) ([archive.c](../src/libpgmoneta/archive.c)) backed by
 restore.
 
 Write-Ahead Log is handled in [wal.h](../src/include/wal.h) ([wal.c](../src/libpgmoneta/wal.c)).

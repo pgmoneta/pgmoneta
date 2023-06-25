@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <achv.h>
 #include <logging.h>
 #include <memory.h>
 #include <message.h>
@@ -42,6 +43,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 static int read_message(int socket, bool block, int timeout, struct message** msg);
 static int write_message(int socket, struct message* msg);
@@ -1593,7 +1595,7 @@ pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, str
          goto error;
       }
 
-      if (msg == NULL || msg->kind == 'E' || msg->kind == 'F')
+      if (msg == NULL || msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_message(msg);
          goto error;
@@ -1651,5 +1653,470 @@ error:
    pgmoneta_free_copy_message(msg);
    pgmoneta_disconnect(socket);
    pgmoneta_free_query_response(r);
+   return 1;
+}
+
+int
+pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version)
+{
+   struct query_response* response = NULL;
+   struct message* msg = NULL;
+   struct tuple* tup = NULL;
+   char null_buffer[2 * 512]; // 2 tar block size of terminator null bytes
+   FILE* file = NULL;
+
+   // Receive the second result set
+   if (pgmoneta_consume_data_row_messages(socket, buffer, &response))
+   {
+      goto error;
+   }
+   tup = response->tuples;
+   while (tup != NULL)
+   {
+      char file_path[MAX_PATH];
+      char directory[MAX_PATH];
+      memset(file_path, 0, sizeof(file_path));
+      memset(directory, 0, sizeof(directory));
+      if (tup->data[1] == NULL)
+      {
+         // main data directory
+         if (pgmoneta_ends_with(basedir, "/"))
+         {
+            snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "base.tar");
+            snprintf(directory, sizeof(directory), "%sdata/", basedir);
+         }
+         else
+         {
+            snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "base.tar");
+            snprintf(directory, sizeof(directory), "%s/data/", basedir);
+         }
+      }
+      else
+      {
+         // user level tablespace
+         struct tablespace* tblspc = tablespaces;
+         while (tblspc != NULL)
+         {
+            if (pgmoneta_compare_string(tup->data[1], tblspc->path))
+            {
+               tblspc->oid = atoi(tup->data[0]);
+               break;
+            }
+            tblspc = tblspc->next;
+         }
+         if (pgmoneta_ends_with(basedir, "/"))
+         {
+            snprintf(file_path, sizeof(file_path), "%s%s/%s.tar", basedir, tblspc->name, tblspc->name);
+            snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+         }
+         else
+         {
+            snprintf(file_path, sizeof(file_path), "%s/%s/%s.tar", basedir, tblspc->name, tblspc->name);
+            snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+         }
+      }
+      pgmoneta_mkdir(directory);
+      file = fopen(file_path, "wb");
+      if (file == NULL)
+      {
+         pgmoneta_log_error("Could not create archive tar file");
+         goto error;
+      }
+      // get the copy out response
+      while (msg == NULL || msg->kind != 'H')
+      {
+         pgmoneta_consume_copy_stream(socket, buffer, &msg);
+         if (msg->kind == 'E' || msg->kind == 'f')
+         {
+            pgmoneta_log_message(msg);
+            fclose(file);
+            goto error;
+         }
+      }
+      while (msg->kind != 'c')
+      {
+         pgmoneta_consume_copy_stream(socket, buffer, &msg);
+         if (msg->kind == 'E' || msg->kind == 'f')
+         {
+            pgmoneta_log_message(msg);
+            fclose(file);
+            goto error;
+         }
+
+         if (msg->kind == 'd')
+         {
+            // copy data
+            if (fwrite(msg->data, msg->length, 1, file) != 1)
+            {
+               pgmoneta_log_error("could not write to file %s", file_path);
+               fclose(file);
+               goto error;
+            }
+         }
+      }
+      //append two blocks of null bytes to the end of the tar file
+      memset(null_buffer, 0, 2 * 512);
+      if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
+      {
+         pgmoneta_log_error("could not write to file %s", file_path);
+         fclose(file);
+         goto error;
+      }
+      fclose(file);
+
+      // extract the file
+      pgmoneta_extract_tar_file(file_path, directory);
+      remove(file_path);
+      pgmoneta_free_copy_message(msg);
+
+      msg = NULL;
+      tup = tup->next;
+   }
+   // If server version >= 13, receive manifest as well
+   if (version >= 13)
+   {
+      if (pgmoneta_receive_manifest_file(socket, buffer, basedir))
+      {
+         goto error;
+      }
+   }
+
+   // update symbolic link
+   struct tablespace* tblspc = tablespaces;
+   while (tblspc != NULL)
+   {
+      // update symlink
+      char directory[MAX_PATH];
+      char link_path[MAX_PATH];
+      memset(link_path, 0, sizeof(link_path));
+      memset(directory, 0, sizeof(directory));
+      if (pgmoneta_ends_with(basedir, "/"))
+      {
+         snprintf(link_path, sizeof(link_path), "%sdata/pg_tblspc/%d", basedir, tblspc->oid);
+         snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+      }
+      else
+      {
+         snprintf(link_path, sizeof(link_path), "%s/data/pg_tblspc/%d", basedir, tblspc->oid);
+         snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+      }
+      unlink(link_path);
+      pgmoneta_symlink_file(link_path, directory);
+      tblspc = tblspc->next;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_copy_message(msg);
+   return 0;
+
+error:
+   if (socket != -1)
+   {
+      pgmoneta_disconnect(socket);
+   }
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_copy_message(msg);
+   return 1;
+}
+
+int
+pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces)
+{
+   struct query_response* response = NULL;
+   struct message* msg = NULL;
+   struct tuple* tup = NULL;
+   struct tablespace* tblspc = NULL;
+   char null_buffer[2 * 512];
+   char file_path[MAX_PATH];
+   char directory[MAX_PATH];
+   char link_path[MAX_PATH];
+   char tmp_manifest_file_path[MAX_PATH];
+   char manifest_file_path[MAX_PATH];
+   memset(file_path, 0, sizeof(file_path));
+   memset(directory, 0, sizeof(directory));
+   memset(link_path, 0, sizeof(link_path));
+   memset(manifest_file_path, 0, sizeof(manifest_file_path));
+   memset(tmp_manifest_file_path, 0, sizeof(tmp_manifest_file_path));
+   memset(null_buffer, 0, 2 * 512);
+   char type;
+   FILE* file = NULL;
+
+   // Receive the second result set
+   if (pgmoneta_consume_data_row_messages(socket, buffer, &response))
+   {
+      goto error;
+   }
+   while (msg == NULL || msg->kind != 'H')
+   {
+      pgmoneta_consume_copy_stream(socket, buffer, &msg);
+      if (msg->kind == 'E' || msg->kind == 'f')
+      {
+         pgmoneta_log_message(msg);
+         goto error;
+      }
+   }
+
+   while (msg->kind != 'c')
+   {
+      pgmoneta_consume_copy_stream(socket, buffer, &msg);
+      if (msg->kind == 'E' || msg->kind == 'f')
+      {
+         pgmoneta_log_message(msg);
+         goto error;
+      }
+      if (msg->kind == 'd')
+      {
+         type = *((char*)msg->data);
+         switch (type)
+         {
+            case 'n':
+            {
+               // append two blocks of null buffer and extract the tar file
+               if (file != NULL)
+               {
+                  if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  {
+                     pgmoneta_log_error("could not write to file %s", file_path);
+                     fclose(file);
+                     file = NULL;
+                     goto error;
+                  }
+                  fclose(file);
+                  file = NULL;
+                  pgmoneta_extract_tar_file(file_path, directory);
+                  remove(file_path);
+               }
+               // new tablespace or main directory tar file
+               char* archive_name = pgmoneta_read_string(msg->data + 1);
+               char* archive_path = pgmoneta_read_string(msg->data + 1 + strlen(archive_name) + 1);
+
+               memset(file_path, 0, sizeof(file_path));
+               memset(directory, 0, sizeof(directory));
+               // The tablespace order in the second result set is presumably the same as the order in which the server sends tablespaces
+               tblspc = tablespaces;
+               if (tup == NULL)
+               {
+                  tup = response->tuples;
+               }
+               else
+               {
+                  tup = tup->next;
+               }
+               if (tup->data[1] == NULL)
+               {
+                  // main data directory
+                  if (pgmoneta_ends_with(basedir, "/"))
+                  {
+                     snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "base.tar");
+                     snprintf(directory, sizeof(directory), "%sdata/", basedir);
+                  }
+                  else
+                  {
+                     snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "base.tar");
+                     snprintf(directory, sizeof(directory), "%s/data/", basedir);
+                  }
+               }
+               else
+               {
+                  // user level tablespace
+                  tblspc = tablespaces;
+                  while (tblspc != NULL)
+                  {
+                     if (pgmoneta_compare_string(tblspc->path, archive_path))
+                     {
+                        tblspc->oid = atoi(tup->data[0]);
+                        break;
+                     }
+                     tblspc = tblspc->next;
+                  }
+                  if (pgmoneta_ends_with(basedir, "/"))
+                  {
+                     snprintf(file_path, sizeof(file_path), "%s%s/%s.tar", basedir, tblspc->name, tblspc->name);
+                     snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+                  }
+                  else
+                  {
+                     snprintf(file_path, sizeof(file_path), "%s/%s/%s.tar", basedir, tblspc->name, tblspc->name);
+                     snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+                  }
+               }
+               pgmoneta_mkdir(directory);
+               file = fopen(file_path, "wb");
+               if (file == NULL)
+               {
+                  pgmoneta_log_error("Could not create archive tar file");
+                  goto error;
+               }
+               break;
+            }
+            case 'm':
+            {
+               // start of manifest, finish off previous data archive receiving
+               if (file != NULL)
+               {
+                  if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  {
+                     pgmoneta_log_error("could not write to file %s", file_path);
+                     fclose(file);
+                     file = NULL;
+                     goto error;
+                  }
+                  fclose(file);
+                  file = NULL;
+                  pgmoneta_extract_tar_file(file_path, directory);
+                  remove(file_path);
+               }
+               if (pgmoneta_ends_with(basedir, "/"))
+               {
+                  snprintf(tmp_manifest_file_path, sizeof(tmp_manifest_file_path), "%sdata/%s", basedir, "backup_manifest.tmp");
+                  snprintf(manifest_file_path, sizeof(manifest_file_path), "%sdata/%s", basedir, "backup_manifest");
+               }
+               else
+               {
+                  snprintf(tmp_manifest_file_path, sizeof(tmp_manifest_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
+                  snprintf(manifest_file_path, sizeof(manifest_file_path), "%s/data/%s", basedir, "backup_manifest");
+               }
+               file = fopen(tmp_manifest_file_path, "wb");
+               break;
+            }
+            case 'd':
+            {
+               // real data
+               if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)
+               {
+                  pgmoneta_log_error("could not write to file %s", file_path);
+                  goto error;
+               }
+               break;
+            }
+            case 'p':
+            {
+               // progress report, ignore this for now
+               break;
+            }
+            default:
+            {
+               // should not happen, error
+               pgmoneta_log_error("Invalid copy out data type");
+               goto error;
+            }
+         }
+      }
+   }
+
+   if (file != NULL)
+   {
+      if (rename(tmp_manifest_file_path, manifest_file_path) != 0)
+      {
+         pgmoneta_log_error("could not rename file %s to %s", tmp_manifest_file_path, manifest_file_path);
+         goto error;
+      }
+      fclose(file);
+      file = NULL;
+   }
+
+   // update symlink
+   tblspc = tablespaces;
+   while (tblspc != NULL)
+   {
+      // update symlink
+      memset(link_path, 0, sizeof(link_path));
+      memset(directory, 0, sizeof(directory));
+      if (pgmoneta_ends_with(basedir, "/"))
+      {
+         snprintf(link_path, sizeof(link_path), "%sdata/pg_tblspc/%d", basedir, tblspc->oid);
+         snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+      }
+      else
+      {
+         snprintf(link_path, sizeof(link_path), "%s/data/pg_tblspc/%d", basedir, tblspc->oid);
+         snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+      }
+      unlink(link_path);
+      pgmoneta_symlink_file(link_path, directory);
+      tblspc = tblspc->next;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_copy_message(msg);
+   return 0;
+
+error:
+   if (socket != -1)
+   {
+      pgmoneta_disconnect(socket);
+   }
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_copy_message(msg);
+   return 1;
+}
+
+int
+pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* basedir)
+{
+   char tmp_file_path[MAX_PATH];
+   char file_path[MAX_PATH];
+   FILE* file = NULL;
+   struct message* msg = NULL;
+
+   memset(tmp_file_path, 0, sizeof(tmp_file_path));
+   memset(file_path, 0, sizeof(file_path));
+   // Name the manifest with .tmp suffix so that we know backup is invalid if replication is interrupted
+   if (pgmoneta_ends_with(basedir, "/"))
+   {
+      snprintf(tmp_file_path, sizeof(tmp_file_path), "%sdata/%s", basedir, "backup_manifest.tmp");
+      snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "backup_manifest");
+   }
+   else
+   {
+      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
+      snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
+   }
+   file = fopen(tmp_file_path, "wb");
+   // get the copy out response
+   while (msg == NULL || msg->kind != 'H')
+   {
+      pgmoneta_consume_copy_stream(socket, buffer, &msg);
+      if (msg->kind == 'E' || msg->kind == 'f')
+      {
+         pgmoneta_log_message(msg);
+         goto error;
+      }
+   }
+   while (msg->kind != 'c')
+   {
+      pgmoneta_consume_copy_stream(socket, buffer, &msg);
+      if (msg->kind == 'E' || msg->kind == 'f')
+      {
+         pgmoneta_log_message(msg);
+         goto error;
+      }
+      if (msg->kind == 'd')
+      {
+         // copy data
+         if (fwrite(msg->data, msg->length, 1, file) != 1)
+         {
+            pgmoneta_log_error("could not write to file %s", file_path);
+            goto error;
+         }
+      }
+   }
+   // finish, remove the .tmp suffix
+   if (rename(tmp_file_path, file_path) != 0)
+   {
+      pgmoneta_log_error("could not rename file %s to %s", tmp_file_path, file_path);
+      goto error;
+   }
+   fclose(file);
+   pgmoneta_free_copy_message(msg);
+   return 0;
+
+error:
+   fclose(file);
+   pgmoneta_free_copy_message(msg);
    return 1;
 }

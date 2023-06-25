@@ -98,6 +98,13 @@ else ()
   message(FATAL_ERROR "OpenSSL needed")
 endif()
 
+find_package(LibArchive)
+if (LibArchive_FOUND)
+  message(STATUS "libarchive found")
+else ()
+  message(FATAL_ERROR "libarchive needed")
+endif()
+
 find_package(Rst2man)
 if (RST2MAN_FOUND)
   message(STATUS "rst2man found")

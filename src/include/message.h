@@ -33,8 +33,9 @@
 extern "C" {
 #endif
 
-#include <pgmoneta.h>
 #include <memory.h>
+#include <pgmoneta.h>
+#include <tablespace.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -416,6 +417,42 @@ pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct me
  */
 int
 pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, struct query_response** response);
+
+/**
+ * Receive backup tar files from the copy stream and write to disk
+ * This functionality is for server version < 15
+ * @param socket The socket
+ * @param buffer The stream buffer
+ * @param basedir The base directory for the backup data
+ * @param tablespaces The user level tablespaces
+ * @param version The server version
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version);
+
+/**
+ * Receive backup tar files from the copy stream and write to disk
+ * This functionality is for server version >= 15
+ * @param socket The socket
+ * @param buffer The stream buffer
+ * @param basedir The base directory for the backup data
+ * @param tablespaces The user level tablespaces
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces);
+
+/**
+ * Receive mainfest file from the copy stream and write to disk
+ * This functionality is for server version >= 13,
+ * @param socket The socket
+ * @param buffer The stream buffer
+ * @param basedir The base directory for the manifest
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* basedir);
 
 #ifdef __cplusplus
 }

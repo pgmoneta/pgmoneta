@@ -38,9 +38,10 @@ extern "C" {
 
 struct tablespace
 {
-   char* name;
-   char* path;
-   struct tablespace* next;
+   char* name;              /**< The name of the table space */
+   char* path;              /**< The path of the table space in the original server */
+   unsigned int oid;        /**< [[maybe_unused]] The oid of the table space */
+   struct tablespace* next; /**< The pointer to the next table space */
 };
 
 /**
