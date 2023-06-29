@@ -216,7 +216,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    pgmoneta_delete_directory(to);
 
-   if (pgmoneta_copy_directory(from, to))
+   if (pgmoneta_copy_postgresql(from, to, directory, config->servers[server].name, id, verify))
    {
       pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, id);
       goto error;
@@ -374,7 +374,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    return 0;
 
 error:
-   pgmoneta_log_info("error in wf_restore");
+
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);

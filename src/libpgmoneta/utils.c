@@ -68,6 +68,9 @@ static bool is_wal_file(char* file);
 
 static char* get_server_basepath(int server);
 
+static int copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup);
+
+
 int32_t
 pgmoneta_get_request(struct message* msg)
 {
@@ -1393,13 +1396,11 @@ pgmoneta_delete_file(char* file)
 }
 
 int
-pgmoneta_copy_directory(char* from, char* to)
+pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* id, struct backup* backup)
 {
    DIR* d = opendir(from);
-   char* from_buffer;
-   char* to_buffer;
-   size_t from_length;
-   size_t to_length;
+   char* from_buffer = NULL;
+   char* to_buffer = NULL;
    struct dirent* entry;
    struct stat statbuf;
 
@@ -1414,14 +1415,198 @@ pgmoneta_copy_directory(char* from, char* to)
             continue;
          }
 
-         from_length = strlen(from) + strlen(entry->d_name) + 2;
-         from_buffer = malloc(from_length);
+         from_buffer = pgmoneta_append(from_buffer, from);
+         from_buffer = pgmoneta_append(from_buffer, "/");
+         from_buffer = pgmoneta_append(from_buffer, entry->d_name);
 
-         to_length = strlen(to) + strlen(entry->d_name) + 2;
-         to_buffer = malloc(to_length);
+         to_buffer = pgmoneta_append(to_buffer, to);
+         to_buffer = pgmoneta_append(to_buffer, "/");
+         to_buffer = pgmoneta_append(to_buffer, entry->d_name);
 
-         snprintf(from_buffer, from_length, "%s/%s", from, entry->d_name);
-         snprintf(to_buffer, to_length, "%s/%s", to, entry->d_name);
+         if (!stat(from_buffer, &statbuf))
+         {
+            if (S_ISDIR(statbuf.st_mode))
+            {
+               if (!strcmp(entry->d_name, "pg_tblspc"))
+               {
+                  copy_tablespaces(from, to, base, server, id, backup);
+               }
+               else
+               {
+                  pgmoneta_copy_directory(from_buffer, to_buffer);
+               }
+            }
+            else
+            {
+               pgmoneta_copy_file(from_buffer, to_buffer);
+            }
+         }
+
+         free(from_buffer);
+         free(to_buffer);
+
+         from_buffer = NULL;
+         to_buffer = NULL;
+      }
+      closedir(d);
+   }
+   else
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup)
+{
+   char* from_tblspc = NULL;
+   char* to_tblspc = NULL;
+   int idx = -1;
+   DIR* d = NULL;
+   struct dirent* entry;
+
+   from_tblspc = pgmoneta_append(from_tblspc, from);
+   if (!pgmoneta_ends_with(from_tblspc, "/"))
+   {
+      from_tblspc = pgmoneta_append(from_tblspc, "/");
+   }
+   from_tblspc = pgmoneta_append(from_tblspc, "pg_tblspc/");
+
+   to_tblspc = pgmoneta_append(to_tblspc, to);
+   if (!pgmoneta_ends_with(to_tblspc, "/"))
+   {
+      to_tblspc = pgmoneta_append(to_tblspc, "/");
+   }
+   to_tblspc = pgmoneta_append(to_tblspc, "pg_tblspc/");
+
+   pgmoneta_mkdir(to_tblspc);
+
+   if (backup->number_of_tablespaces > 0)
+   {
+      d = opendir(from_tblspc);
+
+      if (d == NULL)
+      {
+         pgmoneta_log_error("Could not open the %s directory", from_tblspc);
+         goto error;
+      }
+
+      while ((entry = readdir(d)))
+      {
+         char* link = NULL;
+         char path[MAX_PATH];
+         char* tblspc_name = NULL;
+
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         link = pgmoneta_append(link, from_tblspc);
+         link = pgmoneta_append(link, entry->d_name);
+
+         memset(&path[0], 0, sizeof(path));
+         readlink(link, &path[0], sizeof(path));
+
+         tblspc_name = strrchr(&path[0], '/') + 1;
+
+         for (int i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
+         {
+            if (!strcmp(tblspc_name, backup->tablespaces[i]))
+            {
+               idx = i;
+            }
+         }
+
+         if (idx >= 0)
+         {
+            char* to_oid = NULL;
+            char* to_directory = NULL;
+
+            pgmoneta_log_trace("Tablespace %s -> %s was found in the backup", entry->d_name, &path[0]);
+
+            to_oid = pgmoneta_append(to_oid, to_tblspc);
+            to_oid = pgmoneta_append(to_oid, entry->d_name);
+
+            to_directory = pgmoneta_append(to_directory, base);
+            to_directory = pgmoneta_append(to_directory, "/");
+            to_directory = pgmoneta_append(to_directory, server);
+            to_directory = pgmoneta_append(to_directory, "-");
+            to_directory = pgmoneta_append(to_directory, id);
+            to_directory = pgmoneta_append(to_directory, "-");
+            to_directory = pgmoneta_append(to_directory, tblspc_name);
+            to_directory = pgmoneta_append(to_directory, "/");
+
+            pgmoneta_delete_directory(to_directory);
+            pgmoneta_mkdir(to_directory);
+            pgmoneta_symlink_file(to_oid, to_directory);
+
+            pgmoneta_copy_directory(&path[0], to_directory);
+
+            free(to_oid);
+            free(to_directory);
+
+            to_oid = NULL;
+            to_directory = NULL;
+         }
+         else
+         {
+            pgmoneta_log_trace("Tablespace %s -> %s was not found in the backup", entry->d_name, &path[0]);
+         }
+
+         free(link);
+         link = NULL;
+      }
+
+      closedir(d);
+   }
+
+   free(from_tblspc);
+   free(to_tblspc);
+
+   return 0;
+
+error:
+
+   free(from_tblspc);
+   free(to_tblspc);
+
+   return 1;
+}
+
+int
+pgmoneta_copy_directory(char* from, char* to)
+{
+   DIR* d = opendir(from);
+   char* from_buffer = NULL;
+   char* to_buffer = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   pgmoneta_mkdir(to);
+
+   if (d)
+   {
+      while ((entry = readdir(d)))
+      {
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         from_buffer = pgmoneta_append(from_buffer, from);
+         from_buffer = pgmoneta_append(from_buffer, "/");
+         from_buffer = pgmoneta_append(from_buffer, entry->d_name);
+
+         to_buffer = pgmoneta_append(to_buffer, to);
+         to_buffer = pgmoneta_append(to_buffer, "/");
+         to_buffer = pgmoneta_append(to_buffer, entry->d_name);
 
          if (!stat(from_buffer, &statbuf))
          {
@@ -1437,11 +1622,22 @@ pgmoneta_copy_directory(char* from, char* to)
 
          free(from_buffer);
          free(to_buffer);
+
+         from_buffer = NULL;
+         to_buffer = NULL;
       }
       closedir(d);
    }
+   else
+   {
+      goto error;
+   }
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 int
@@ -1700,7 +1896,7 @@ pgmoneta_symlink_file(char* from, char* to)
 
    if (ret != 0)
    {
-      pgmoneta_log_warn("pgmoneta_symlink_file: %s -> %s (%s)", from, to, strerror(errno));
+      pgmoneta_log_debug("pgmoneta_symlink_file: %s -> %s (%s)", from, to, strerror(errno));
       errno = 0;
       ret = 1;
    }
@@ -2119,6 +2315,18 @@ pgmoneta_get_server_backup_identifier_data(int server, char* identifier)
 
    d = pgmoneta_get_server_backup_identifier(server, identifier);
    d = pgmoneta_append(d, "data/");
+
+   return d;
+}
+
+char*
+pgmoneta_get_server_backup_identifier_tablespace(int server, char* identifier, char* name)
+{
+   char* d = NULL;
+
+   d = pgmoneta_get_server_backup_identifier(server, identifier);
+   d = pgmoneta_append(d, name);
+   d = pgmoneta_append(d, "/");
 
    return d;
 }

@@ -39,14 +39,15 @@ extern "C" {
 /* system */
 #include <stdlib.h>
 
-#define INFO_STATUS  "STATUS"
-#define INFO_LABEL   "LABEL"
-#define INFO_WAL     "WAL"
-#define INFO_ELAPSED "ELAPSED"
-#define INFO_VERSION "VERSION"
-#define INFO_KEEP    "KEEP"
-#define INFO_BACKUP  "BACKUP"
-#define INFO_RESTORE "RESTORE"
+#define INFO_STATUS      "STATUS"
+#define INFO_LABEL       "LABEL"
+#define INFO_WAL         "WAL"
+#define INFO_ELAPSED     "ELAPSED"
+#define INFO_VERSION     "VERSION"
+#define INFO_KEEP        "KEEP"
+#define INFO_BACKUP      "BACKUP"
+#define INFO_RESTORE     "RESTORE"
+#define INFO_TABLESPACES "TABLESPACES"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -57,14 +58,16 @@ extern "C" {
  */
 struct backup
 {
-   char label[MISC_LENGTH];    /**< The label of the backup */
-   char wal[MISC_LENGTH];      /**< The name of the WAL file */
-   unsigned long backup_size;  /**< The backup size */
-   unsigned long restore_size; /**< The restore size */
-   int elapsed_time;           /**< The elapsed time in seconds */
-   int version;                /**< The version */
-   bool keep;                  /**< Keep the backup */
-   char valid;                 /**< Is the backup valid */
+   char label[MISC_LENGTH];                                  /**< The label of the backup */
+   char wal[MISC_LENGTH];                                    /**< The name of the WAL file */
+   unsigned long backup_size;                                /**< The backup size */
+   unsigned long restore_size;                               /**< The restore size */
+   int elapsed_time;                                         /**< The elapsed time in seconds */
+   int version;                                              /**< The version */
+   bool keep;                                                /**< Keep the backup */
+   char valid;                                               /**< Is the backup valid */
+   unsigned long number_of_tablespaces;                      /**< The number of tablespaces */
+   char tablespaces[MAX_NUMBER_OF_TABLESPACES][MISC_LENGTH]; /**< The names of the tablespaces */
 } __attribute__ ((aligned (64)));
 
 /**
@@ -102,6 +105,16 @@ pgmoneta_update_info_string(char* directory, char* key, char* value);
  */
 void
 pgmoneta_update_info_bool(char* directory, char* key, bool value);
+
+/**
+ * Get a backup string value
+ * @param backup The backup
+ * @param key The key
+ * @param value The value
+ * @return The result
+ */
+int
+pgmoneta_get_info_string(struct backup* backup, char* key, char** value);
 
 /**
  * Get the backups

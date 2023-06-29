@@ -61,11 +61,13 @@ extern "C" {
 
 #define MAX_PATH 1024
 #define MISC_LENGTH 128
-#define NUMBER_OF_SERVERS 64
-#define NUMBER_OF_USERS    64
-#define NUMBER_OF_ADMINS    8
 
-#define MAX_NUMBER_OF_COLUMNS 8
+#define NUMBER_OF_SERVERS 64
+#define NUMBER_OF_USERS   64
+#define NUMBER_OF_ADMINS   8
+
+#define MAX_NUMBER_OF_COLUMNS      8
+#define MAX_NUMBER_OF_TABLESPACES 64
 
 #define STATE_FREE        0
 #define STATE_IN_USE      1

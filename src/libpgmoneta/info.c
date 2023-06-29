@@ -57,6 +57,10 @@ pgmoneta_create_info(char* directory, char* label, int status)
    snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
    fputs(&buffer[0], sfile);
 
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "TABLESPACES=0\n");
+   fputs(&buffer[0], sfile);
+
    pgmoneta_permission(s, 6, 0, 0);
 
    if (sfile != NULL)
@@ -224,6 +228,39 @@ pgmoneta_update_info_bool(char* directory, char* key, bool value)
 }
 
 int
+pgmoneta_get_info_string(struct backup* backup, char* key, char** value)
+{
+   char* result = NULL;
+
+   if (!strcmp(INFO_LABEL, key))
+   {
+      result = pgmoneta_append(result, backup->label);
+   }
+   else if (!strcmp(INFO_WAL, key))
+   {
+      result = pgmoneta_append(result, backup->wal);
+   }
+   else if (pgmoneta_starts_with(key, "TABLESPACE"))
+   {
+      unsigned long number = strtoul(key + 10, NULL, 10);
+
+      result = pgmoneta_append(result, backup->tablespaces[number - 1]);
+   }
+   else
+   {
+      goto error;
+   }
+
+   *value = result;
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
 pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** backups)
 {
    char* d;
@@ -270,6 +307,7 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    char buffer[MISC_LENGTH];
    char* fn;
    FILE* file = NULL;
+   int tbl_idx = 0;
    struct backup* bck;
 
    *backup = NULL;
@@ -343,6 +381,15 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          else if (!strcmp(INFO_KEEP, &key[0]))
          {
             bck->keep = atoi(&value[0]) == 1 ? true : false;
+         }
+         else if (!strcmp(INFO_TABLESPACES, &key[0]))
+         {
+            bck->number_of_tablespaces = strtoul(&value[0], &ptr, 10);
+         }
+         else if (pgmoneta_starts_with(&key[0], "TABLESPACE"))
+         {
+            memcpy(&bck->tablespaces[tbl_idx], &value[0], strlen(&value[0]));
+            tbl_idx++;
          }
       }
    }

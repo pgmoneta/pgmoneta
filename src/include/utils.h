@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <info.h>
 #include <message.h>
 
 #include <stdlib.h>
@@ -393,6 +394,19 @@ int
 pgmoneta_delete_file(char* file);
 
 /**
+ * Copy a PostgreSQL installation
+ * @param from The from directory
+ * @param to The to directory
+ * @param base The base directory
+ * @param server The server name
+ * @param id The identifier
+ * @param backup The backup
+ * @return The result
+ */
+int
+pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* id, struct backup* backup);
+
+/**
  * Copy a directory
  * @param from The from directory
  * @param to The to directory
@@ -617,6 +631,16 @@ pgmoneta_get_server_backup_identifier(int server, char* identifier);
  */
 char*
 pgmoneta_get_server_backup_identifier_data(int server, char* identifier);
+
+/**
+ * Get the tablespace directory for a server with an identifier
+ * @param server The server
+ * @param identifier The identifier
+ * @param name The tablespace name
+ * @return The backup directory
+ */
+char*
+pgmoneta_get_server_backup_identifier_tablespace(int server, char* identifier, char* name);
 
 /**
  * Get the pg_wal directory for a server with an identifier

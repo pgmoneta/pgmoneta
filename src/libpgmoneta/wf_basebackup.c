@@ -30,6 +30,10 @@
 #include <pgmoneta.h>
 #include <info.h>
 #include <logging.h>
+#include <message.h>
+#include <network.h>
+#include <security.h>
+#include <tablespace.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -67,6 +71,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    time_t start_time;
    char* root = NULL;
    char* d = NULL;
+   char* tbl = NULL;
    char* cmd = NULL;
    int status;
    int usr;
@@ -78,7 +83,15 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    int minutes;
    int seconds;
    char elapsed[128];
+   int socket = -1;
+   int ret;
+   int number_of_tablespaces = 0;
    struct node* o_to = NULL;
+   struct message* query_msg = NULL;
+   struct query_response* query_resp = NULL;
+   struct tuple* tp = NULL;
+   struct tablespace* tablespaces = NULL;
+   struct tablespace* current_tablespace = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -92,6 +105,54 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       {
          usr = i;
       }
+   }
+
+   /* Tablespace */
+   pgmoneta_memory_init();
+
+   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, false, &socket))
+   {
+      goto error;
+   }
+
+   ret = pgmoneta_create_query_message("SELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_query_execute(socket, query_msg, &query_resp) || query_resp == NULL)
+   {
+      goto error;
+   }
+
+   tp = query_resp->tuples;
+   while (tp != NULL)
+   {
+      char* tablespace_name = tp->data[0];
+      char* tablespace_path = tp->data[1];
+
+      if (tablespace_name != NULL && tablespace_path != NULL)
+      {
+         if (tablespaces == NULL)
+         {
+            pgmoneta_create_tablespace(tablespace_name, tablespace_path, &tablespaces);
+         }
+         else
+         {
+            struct tablespace* append = NULL;
+
+            pgmoneta_create_tablespace(tablespace_name, tablespace_path, &append);
+            pgmoneta_append_tablespace(&tablespaces, append);
+         }
+      }
+
+      tp = tp->next;
+   }
+
+   if (pgmoneta_disconnect(socket))
+   {
+      goto error;
    }
 
    root = pgmoneta_get_server_backup_identifier(server, identifier);
@@ -135,6 +196,23 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    cmd = pgmoneta_append(cmd, "-l ");
    cmd = pgmoneta_append(cmd, identifier);
    cmd = pgmoneta_append(cmd, " ");
+
+   current_tablespace = tablespaces;
+   while (current_tablespace != NULL)
+   {
+      tbl = pgmoneta_get_server_backup_identifier_tablespace(server, identifier, current_tablespace->name);
+
+      cmd = pgmoneta_append(cmd, "--tablespace-mapping=");
+      cmd = pgmoneta_append(cmd, current_tablespace->path);
+      cmd = pgmoneta_append(cmd, "=");
+      cmd = pgmoneta_append(cmd, tbl);
+      cmd = pgmoneta_append(cmd, " ");
+
+      free(tbl);
+      tbl = NULL;
+
+      current_tablespace = current_tablespace->next;
+   }
 
    cmd = pgmoneta_append(cmd, "-X stream ");
    cmd = pgmoneta_append(cmd, "--no-password ");
@@ -181,10 +259,31 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
       pgmoneta_update_info_string(root, INFO_VERSION, version);
       pgmoneta_update_info_bool(root, INFO_KEEP, false);
+
+      current_tablespace = tablespaces;
+      while (current_tablespace != NULL)
+      {
+         char key[MISC_LENGTH];
+
+         number_of_tablespaces++;
+         pgmoneta_update_info_unsigned_long(root, INFO_TABLESPACES, number_of_tablespaces);
+
+         snprintf(key, sizeof(key) - 1, "TABLESPACE%d", number_of_tablespaces);
+         pgmoneta_update_info_string(root, key, current_tablespace->name);
+
+         current_tablespace = current_tablespace->next;
+      }
    }
+
+   pgmoneta_memory_destroy();
+   pgmoneta_free_query_response(query_resp);
+   pgmoneta_free_message(query_msg);
+
+   pgmoneta_free_tablespaces(tablespaces);
 
    free(root);
    free(d);
+   free(tbl);
    free(cmd);
    free(wal);
    free(version);
@@ -193,8 +292,17 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
 error:
 
+   pgmoneta_disconnect(socket);
+
+   pgmoneta_memory_destroy();
+   pgmoneta_free_query_response(query_resp);
+   pgmoneta_free_message(query_msg);
+
+   pgmoneta_free_tablespaces(tablespaces);
+
    free(root);
    free(d);
+   free(tbl);
    free(cmd);
    free(wal);
    free(version);
