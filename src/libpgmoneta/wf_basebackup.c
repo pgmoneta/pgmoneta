@@ -277,7 +277,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    pgmoneta_memory_destroy();
    pgmoneta_free_query_response(query_resp);
-   pgmoneta_free_message(query_msg);
+   pgmoneta_free_copy_message(query_msg);
 
    pgmoneta_free_tablespaces(tablespaces);
 
@@ -296,7 +296,7 @@ error:
 
    pgmoneta_memory_destroy();
    pgmoneta_free_query_response(query_resp);
-   pgmoneta_free_message(query_msg);
+   pgmoneta_free_copy_message(query_msg);
 
    pgmoneta_free_tablespaces(tablespaces);
 
