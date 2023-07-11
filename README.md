@@ -54,6 +54,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [zlib](https://zlib.net)
 * [zstd](http://www.zstd.net)
 * [lz4](https://lz4.github.io/lz4/)
+* [bzip2](http://sourceware.org/bzip2/)
 * [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
 * [rst2man](https://docutils.sourceforge.io/)
 * [libssh](https://www.libssh.org/)
