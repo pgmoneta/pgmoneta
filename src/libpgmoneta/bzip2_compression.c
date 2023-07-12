@@ -91,7 +91,7 @@ pgmoneta_bzip2_data(char* directory)
 
          pgmoneta_bzip2_data(path);
       }
-      else
+      else if (entry->d_type == DT_REG)
       {
          if (!pgmoneta_ends_with(entry->d_name, ".bz2") &&
              !pgmoneta_ends_with(entry->d_name, ".aes"))

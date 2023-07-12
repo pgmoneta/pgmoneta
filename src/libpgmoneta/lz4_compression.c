@@ -75,7 +75,7 @@ pgmoneta_lz4c_data(char* directory)
 
          pgmoneta_lz4c_data(path);
       }
-      else
+      else if (entry->d_type == DT_REG)
       {
          from = NULL;
 

@@ -89,7 +89,7 @@ pgmoneta_gzip_data(char* directory)
 
          pgmoneta_gzip_data(path);
       }
-      else
+      else if (entry->d_type == DT_REG)
       {
          if (!pgmoneta_ends_with(entry->d_name, ".gz") &&
              !pgmoneta_ends_with(entry->d_name, ".aes"))
