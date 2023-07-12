@@ -87,7 +87,7 @@ pgmoneta_zstandardc_data(char* directory)
 
          pgmoneta_zstandardc_data(path);
       }
-      else
+      else if (entry->d_type == DT_REG)
       {
          if (!pgmoneta_ends_with(entry->d_name, ".zstd") &&
              !pgmoneta_ends_with(entry->d_name, ".aes"))
