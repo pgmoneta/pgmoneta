@@ -14,7 +14,7 @@ instance.
 All properties are in the format `key = value`.
 
 The characters `#` and `;` can be used for comments; must be the first character on the line.
-The `Bool` data type supports the following values: `on`, `1`, `true`, `off`, `0` and `false`.
+The `Bool` data type supports the following values: `on`, `yes`, `1`, `true`, `off`, `no`, `0` and `false`.
 
 See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `localhost`.
 
