@@ -1512,6 +1512,7 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
 
       while ((entry = readdir(d)))
       {
+         char tmp_tblspc_name[MISC_LENGTH];
          char* link = NULL;
          char path[MAX_PATH];
          char* tblspc_name = NULL;
@@ -1527,7 +1528,17 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
          memset(&path[0], 0, sizeof(path));
          readlink(link, &path[0], sizeof(path));
 
-         tblspc_name = strrchr(&path[0], '/') + 1;
+         if (pgmoneta_ends_with(&path[0], "/"))
+         {
+            memset(&tmp_tblspc_name[0], 0, sizeof(tmp_tblspc_name));
+            memcpy(&tmp_tblspc_name[0], &path[0], strlen(&path[0]) - 1);
+
+            tblspc_name = strrchr(&tmp_tblspc_name[0], '/') + 1;
+         }
+         else
+         {
+            tblspc_name = strrchr(&path[0], '/') + 1;
+         }
 
          for (int i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
          {

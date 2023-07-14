@@ -104,6 +104,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    char* origwal = NULL;
    char* waldir = NULL;
    char* waltarget = NULL;
+   struct node* o_root = NULL;
    struct node* o_output = NULL;
    struct node* o_identifier = NULL;
    struct node* o_to = NULL;
@@ -204,6 +205,13 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
       pgmoneta_log_error("Restore: Invalid backup for %s/%s", config->servers[server].name, id);
       goto error;
    }
+
+   if (pgmoneta_create_node_string(directory, "root", &o_root))
+   {
+      goto error;
+   }
+
+   pgmoneta_append_node(o_nodes, o_root);
 
    from = pgmoneta_get_server_backup_identifier_data(server, id);
 

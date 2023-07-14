@@ -77,6 +77,7 @@ static int
 gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* d = NULL;
+   char* root = NULL;
    char* to = NULL;
    char* tarfile = NULL;
    time_t compression_time;
@@ -95,10 +96,12 @@ gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 
    if (tarfile == NULL)
    {
+      root = pgmoneta_get_node_string(*o_nodes, "root");
       to = pgmoneta_get_node_string(*o_nodes, "to");
       d = pgmoneta_append(d, to);
 
       pgmoneta_gzip_data(d);
+      pgmoneta_gzip_tablespaces(root);
    }
    else
    {

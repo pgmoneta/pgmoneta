@@ -51,15 +51,23 @@ int
 pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char** plaintext, int mode);
 
 /**
- * Encrypt the files under the directory in place recursively, also remvoe unencrypted files.
- * @param d The wal directory
+ * Encrypt the files under the directory in place recursively, also remove unencrypted files.
+ * @param d The data directory
  * @return 0 upon success, otherwise 1
  */
 int
 pgmoneta_encrypt_data(char* d);
 
 /**
- * Encrypt the files under the directory in place, also remvoe unencrypted files.
+ * Encrypt the files under the tablespace directories in place recursively, also remove unencrypted files.
+ * @param root The root directory
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encrypt_tablespaces(char* root);
+
+/**
+ * Encrypt the files under the directory in place, also remove unencrypted files.
  * @param d The wal directory
  * @return 0 upon success, otherwise 1
  */
@@ -76,15 +84,15 @@ int
 pgmoneta_encrypt_file(char* from, char* to);
 
 /**
- * Decrypt the files under the directory in place, also remvoe encrypted files.
- * @param d The wal directory
+ * Decrypt the files under the directory in place, also remove encrypted files.
+ * @param d wal directory
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_data(char* d);
+pgmoneta_decrypt_directory(char* d);
 
 /**
- * Decrypt the archive file created by pgmoneta-cli archive in place, also remvoe encrypted archive.
+ * Decrypt the archive file created by pgmoneta-cli archive in place, also remove encrypted archive.
  * @param d The archive file path
  * @return 0 upon success, otherwise 1
  */

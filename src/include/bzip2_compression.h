@@ -43,6 +43,13 @@ void
 pgmoneta_bzip2_data(char* directory);
 
 /**
+ * Compress tablespace directories
+ * @param root The root directory
+ */
+void
+pgmoneta_bzip2_tablespaces(char* root);
+
+/**
  * BZip a WAL directory
  * @param directory The directory
  */

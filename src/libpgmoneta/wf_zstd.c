@@ -75,6 +75,7 @@ static int
 zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* d = NULL;
+   char* root = NULL;
    char* to = NULL;
    char* tarfile = NULL;
    time_t compression_time;
@@ -93,10 +94,13 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 
    if (tarfile == NULL)
    {
+      root = pgmoneta_get_node_string(*o_nodes, "root");
       to = pgmoneta_get_node_string(*o_nodes, "to");
+
       d = pgmoneta_append(d, to);
 
       pgmoneta_zstandardc_data(d);
+      pgmoneta_zstandardc_tablespaces(root);
    }
    else
    {
@@ -129,8 +133,7 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 static int
 zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
-   char* d = NULL;
-   char* to = NULL;
+   char* root = NULL;
    time_t decompress_time;
    int total_seconds;
    int hours;
@@ -141,20 +144,15 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
 
    config = (struct configuration*)shmem;
 
-   to = pgmoneta_get_node_string(*o_nodes, "to");
-
-   if (to != NULL)
+   root = pgmoneta_get_node_string(*o_nodes, "root");
+   if (root == NULL)
    {
-      d = pgmoneta_append(d, to);
-   }
-   else
-   {
-      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+      root = pgmoneta_get_node_string(*o_nodes, "to");
    }
 
    decompress_time = time(NULL);
 
-   pgmoneta_zstandardd_data(d);
+   pgmoneta_zstandardd_directory(root);
 
    total_seconds = (int)difftime(time(NULL), decompress_time);
    hours = total_seconds / 3600;
@@ -165,8 +163,6 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
-
-   free(d);
 
    return 0;
 }

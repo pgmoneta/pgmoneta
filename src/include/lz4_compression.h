@@ -45,6 +45,13 @@ void
 pgmoneta_lz4c_data(char* directory);
 
 /**
+ * Compress tablespace directories
+ * @param root The root directory
+ */
+void
+pgmoneta_lz4c_tablespaces(char* root);
+
+/**
  * Compress a WAL directory with Lz4
  * @param directory The directory
  */

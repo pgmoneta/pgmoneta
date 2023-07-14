@@ -43,6 +43,13 @@ void
 pgmoneta_zstandardc_data(char* directory);
 
 /**
+ * Compress tablespaces directories with Zstandard
+ * @param root The root directory
+ */
+void
+pgmoneta_zstandardc_tablespaces(char* root);
+
+/**
  * Compress a WAL directory with Zstandard
  * @param directory The directory
  */
@@ -54,7 +61,7 @@ pgmoneta_zstandardc_wal(char* directory);
  * @param directory The directory
  */
 void
-pgmoneta_zstandardd_data(char* directory);
+pgmoneta_zstandardd_directory(char* directory);
 
 /**
  * Compress a file

@@ -51,6 +51,14 @@ pgmoneta_link(char* from, char* to);
 void
 pgmoneta_relink(char* from, char* to);
 
+/**
+ * Create link between two tablespaces
+ * @param from The from tablespace
+ * @param to The to tablespace
+ */
+void
+pgmoneta_link_tablespaces(char* from, char* to);
+
 #ifdef __cplusplus
 }
 #endif

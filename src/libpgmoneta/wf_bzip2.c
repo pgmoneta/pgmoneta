@@ -77,6 +77,7 @@ static int
 bzip2_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* d = NULL;
+   char* root = NULL;
    char* to = NULL;
    char* tarfile = NULL;
    time_t compression_time;
@@ -95,10 +96,12 @@ bzip2_execute_compress(int server, char* identifier, struct node* i_nodes, struc
 
    if (tarfile == NULL)
    {
+      root = pgmoneta_get_node_string(*o_nodes, "root");
       to = pgmoneta_get_node_string(*o_nodes, "to");
       d = pgmoneta_append(d, to);
 
       pgmoneta_bzip2_data(d);
+      pgmoneta_bzip2_tablespaces(root);
    }
    else
    {

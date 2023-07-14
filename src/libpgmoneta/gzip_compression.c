@@ -128,6 +128,37 @@ pgmoneta_gzip_data(char* directory)
 }
 
 void
+pgmoneta_gzip_tablespaces(char* root)
+{
+   DIR* dir;
+   struct dirent* entry;
+
+   if (!(dir = opendir(root)))
+   {
+      return;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[1024];
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0  || strcmp(entry->d_name, "data") == 0)
+         {
+            continue;
+         }
+
+         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
+
+         pgmoneta_gzip_data(path);
+      }
+   }
+
+   closedir(dir);
+}
+
+void
 pgmoneta_gzip_wal(char* directory)
 {
    char* from = NULL;

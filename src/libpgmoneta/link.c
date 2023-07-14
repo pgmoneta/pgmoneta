@@ -46,10 +46,8 @@ pgmoneta_link(char* from, char* to)
 {
    DIR* from_dir = opendir(from);
    DIR* to_dir = opendir(to);
-   size_t from_length;
-   char* from_entry;
-   size_t to_length;
-   char* to_entry;
+   char* from_entry = NULL;
+   char* to_entry = NULL;
    struct dirent* entry;
    struct stat statbuf;
 
@@ -65,37 +63,24 @@ pgmoneta_link(char* from, char* to)
 
    while ((entry = readdir(from_dir)))
    {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, "pg_tblspc"))
       {
          continue;
       }
 
-      from_length = strlen(from) + strlen(entry->d_name) + 2;
-      from_entry = malloc(from_length);
-
-      to_length = strlen(to) + strlen(entry->d_name) + 2;
-      to_entry = malloc(to_length);
-
-      memset(from_entry, 0, from_length);
-      memset(to_entry, 0, to_length);
-
-      if (pgmoneta_ends_with(from, "/"))
+      from_entry = pgmoneta_append(from_entry, from);
+      if (!pgmoneta_ends_with(from, "/"))
       {
-         snprintf(from_entry, from_length, "%s%s", from, entry->d_name);
+         from_entry = pgmoneta_append(from_entry, "/");
       }
-      else
-      {
-         snprintf(from_entry, from_length, "%s/%s", from, entry->d_name);
-      }
+      from_entry = pgmoneta_append(from_entry, entry->d_name);
 
-      if (pgmoneta_ends_with(to, "/"))
+      to_entry = pgmoneta_append(to_entry, to);
+      if (!pgmoneta_ends_with(to, "/"))
       {
-         snprintf(to_entry, to_length, "%s%s", to, entry->d_name);
+         to_entry = pgmoneta_append(to_entry, "/");
       }
-      else
-      {
-         snprintf(to_entry, to_length, "%s/%s", to, entry->d_name);
-      }
+      to_entry = pgmoneta_append(to_entry, entry->d_name);
 
       if (!stat(from_entry, &statbuf))
       {
@@ -143,11 +128,9 @@ pgmoneta_relink(char* from, char* to)
 {
    DIR* from_dir = opendir(from);
    DIR* to_dir = opendir(to);
-   size_t from_length;
-   char* from_entry;
-   size_t to_length;
-   char* to_entry;
-   char* link;
+   char* from_entry = NULL;
+   char* to_entry = NULL;
+   char* link = NULL;
    struct dirent* entry;
    struct stat statbuf;
 
@@ -168,32 +151,19 @@ pgmoneta_relink(char* from, char* to)
          continue;
       }
 
-      from_length = strlen(from) + strlen(entry->d_name) + 2;
-      from_entry = malloc(from_length);
-
-      to_length = strlen(to) + strlen(entry->d_name) + 2;
-      to_entry = malloc(to_length);
-
-      memset(from_entry, 0, from_length);
-      memset(to_entry, 0, to_length);
-
-      if (pgmoneta_ends_with(from, "/"))
+      from_entry = pgmoneta_append(from_entry, from);
+      if (!pgmoneta_ends_with(from, "/"))
       {
-         snprintf(from_entry, from_length, "%s%s", from, entry->d_name);
+         from_entry = pgmoneta_append(from_entry, "/");
       }
-      else
-      {
-         snprintf(from_entry, from_length, "%s/%s", from, entry->d_name);
-      }
+      from_entry = pgmoneta_append(from_entry, entry->d_name);
 
-      if (pgmoneta_ends_with(to, "/"))
+      to_entry = pgmoneta_append(to_entry, to);
+      if (!pgmoneta_ends_with(to, "/"))
       {
-         snprintf(to_entry, to_length, "%s%s", to, entry->d_name);
+         to_entry = pgmoneta_append(to_entry, "/");
       }
-      else
-      {
-         snprintf(to_entry, to_length, "%s/%s", to, entry->d_name);
-      }
+      to_entry = pgmoneta_append(to_entry, entry->d_name);
 
       if (!lstat(from_entry, &statbuf))
       {
@@ -218,6 +188,88 @@ pgmoneta_relink(char* from, char* to)
                   pgmoneta_symlink_file(to_entry, link);
 
                   free(link);
+               }
+            }
+         }
+      }
+
+      free(from_entry);
+      free(to_entry);
+
+      from_entry = NULL;
+      to_entry = NULL;
+   }
+
+done:
+
+   if (from_dir != NULL)
+   {
+      closedir(from_dir);
+   }
+
+   if (to_dir != NULL)
+   {
+      closedir(to_dir);
+   }
+}
+
+void
+pgmoneta_link_tablespaces(char* from, char* to)
+{
+   DIR* from_dir = opendir(from);
+   DIR* to_dir = opendir(to);
+   char* from_entry = NULL;
+   char* to_entry = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   if (from_dir == NULL)
+   {
+      goto done;
+   }
+
+   if (to_dir == NULL)
+   {
+      goto done;
+   }
+
+   while ((entry = readdir(from_dir)))
+   {
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, "data"))
+      {
+         continue;
+      }
+
+      from_entry = pgmoneta_append(from_entry, from);
+      if (!pgmoneta_ends_with(from, "/"))
+      {
+         from_entry = pgmoneta_append(from_entry, "/");
+      }
+      from_entry = pgmoneta_append(from_entry, entry->d_name);
+
+      to_entry = pgmoneta_append(to_entry, to);
+      if (!pgmoneta_ends_with(to, "/"))
+      {
+         to_entry = pgmoneta_append(to_entry, "/");
+      }
+      to_entry = pgmoneta_append(to_entry, entry->d_name);
+
+      if (!stat(from_entry, &statbuf))
+      {
+         if (S_ISDIR(statbuf.st_mode))
+         {
+            pgmoneta_link(from_entry, to_entry);
+         }
+         else
+         {
+            if (pgmoneta_exists(to))
+            {
+               bool equal = pgmoneta_compare_files(from_entry, to_entry);
+
+               if (equal)
+               {
+                  pgmoneta_delete_file(from_entry);
+                  pgmoneta_symlink_file(from_entry, to_entry);
                }
             }
          }

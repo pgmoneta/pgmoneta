@@ -126,6 +126,37 @@ pgmoneta_zstandardc_data(char* directory)
 }
 
 void
+pgmoneta_zstandardc_tablespaces(char* root)
+{
+   DIR* dir;
+   struct dirent* entry;
+
+   if (!(dir = opendir(root)))
+   {
+      return;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[1024];
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0  || strcmp(entry->d_name, "data") == 0)
+         {
+            continue;
+         }
+
+         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
+
+         pgmoneta_zstandardc_data(path);
+      }
+   }
+
+   closedir(dir);
+}
+
+void
 pgmoneta_zstandardc_wal(char* directory)
 {
    char* from = NULL;
@@ -197,7 +228,7 @@ pgmoneta_zstandardc_wal(char* directory)
 }
 
 void
-pgmoneta_zstandardd_data(char* directory)
+pgmoneta_zstandardd_directory(char* directory)
 {
    char* from = NULL;
    char* to = NULL;
@@ -205,10 +236,17 @@ pgmoneta_zstandardd_data(char* directory)
    DIR* dir;
    struct dirent* entry;
 
+   if (pgmoneta_ends_with(directory, "pg_tblspc"))
+   {
+      return;
+   }
+
    if (!(dir = opendir(directory)))
    {
       return;
    }
+
+   pgmoneta_log_info("%s", directory);
 
    while ((entry = readdir(dir)) != NULL)
    {
@@ -223,7 +261,7 @@ pgmoneta_zstandardd_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_zstandardd_data(path);
+         pgmoneta_zstandardd_directory(path);
       }
       else
       {
@@ -232,7 +270,10 @@ pgmoneta_zstandardd_data(char* directory)
             from = NULL;
 
             from = pgmoneta_append(from, directory);
-            from = pgmoneta_append(from, "/");
+            if (!pgmoneta_ends_with(from, "/"))
+            {
+               from = pgmoneta_append(from, "/");
+            }
             from = pgmoneta_append(from, entry->d_name);
 
             name = malloc(strlen(entry->d_name) - 4);
@@ -242,7 +283,10 @@ pgmoneta_zstandardd_data(char* directory)
             to = NULL;
 
             to = pgmoneta_append(to, directory);
-            to = pgmoneta_append(to, "/");
+            if (!pgmoneta_ends_with(to, "/"))
+            {
+               to = pgmoneta_append(to, "/");
+            }
             to = pgmoneta_append(to, name);
 
             if (zstd_decompress(from, to))

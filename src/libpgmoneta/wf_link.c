@@ -69,6 +69,8 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    char* server_path = NULL;
    char* from = NULL;
    char* to = NULL;
+   char* from_tablespaces = NULL;
+   char* to_tablespaces = NULL;
    int next_newest = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
@@ -106,7 +108,11 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
          from = pgmoneta_get_server_backup_identifier_data(server, identifier);
          to = pgmoneta_get_server_backup_identifier_data(server, backups[next_newest]->label);
 
+         from_tablespaces = pgmoneta_get_server_backup_identifier(server, identifier);
+         to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
+
          pgmoneta_link(from, to);
+         pgmoneta_link_tablespaces(from_tablespaces, to_tablespaces);
 
          total_seconds = (int)difftime(time(NULL), link_time);
          hours = total_seconds / 3600;
@@ -129,6 +135,8 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    free(server_path);
    free(from);
    free(to);
+   free(from_tablespaces);
+   free(to_tablespaces);
 
    return 0;
 }

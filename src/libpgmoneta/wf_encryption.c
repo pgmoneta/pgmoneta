@@ -80,6 +80,7 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 {
    char* d = NULL;
    char* enc_file = NULL;
+   char* root = NULL;
    char* to = NULL;
    char* compress_suffix = NULL;
    char* tarfile = NULL;
@@ -99,10 +100,12 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    if (tarfile == NULL)
    {
+      root = pgmoneta_get_node_string(*o_nodes, "root");
       to = pgmoneta_get_node_string(*o_nodes, "to");
       d = pgmoneta_append(d, to);
 
       pgmoneta_encrypt_data(d);
+      pgmoneta_encrypt_tablespaces(root);
    }
    else
    {
@@ -160,6 +163,7 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 static int
 decryption_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   char* root = NULL;
    char* d = NULL;
    char* to = NULL;
    char* id = NULL;
@@ -220,6 +224,7 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       id = identifier;
    }
 
+   root = pgmoneta_get_node_string(*o_nodes, "root");
    to = pgmoneta_get_node_string(*o_nodes, "to");
 
    if (to != NULL)
@@ -233,7 +238,7 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    decrypt_time = time(NULL);
 
-   pgmoneta_decrypt_data(d);
+   pgmoneta_decrypt_directory(root);
 
    total_seconds = (int)difftime(time(NULL), decrypt_time);
    hours = total_seconds / 3600;

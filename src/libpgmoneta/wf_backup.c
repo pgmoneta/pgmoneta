@@ -88,6 +88,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    char* label = NULL;
    char version[10];
    char* wal = NULL;
+   struct node* o_root = NULL;
    struct node* o_to = NULL;
    struct configuration* config;
    struct message* basebackup_msg = NULL;
@@ -228,6 +229,12 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    size = pgmoneta_directory_size(d);
    pgmoneta_read_wal(d, &wal);
+
+   if (pgmoneta_create_node_string(root, "root", &o_root))
+   {
+      goto error;
+   }
+   pgmoneta_append_node(o_nodes, o_root);
 
    if (pgmoneta_create_node_string(d, "to", &o_to))
    {

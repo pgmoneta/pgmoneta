@@ -43,6 +43,13 @@ void
 pgmoneta_gzip_data(char* directory);
 
 /**
+ * GZip tablespace directories
+ * @param root The root directory
+ */
+void
+pgmoneta_gzip_tablespaces(char* root);
+
+/**
  * GZip a WAL directory
  * @param directory The directory
  */

@@ -153,6 +153,37 @@ pgmoneta_lz4c_wal(char* directory)
 }
 
 void
+pgmoneta_lz4c_tablespaces(char* root)
+{
+   DIR* dir;
+   struct dirent* entry;
+
+   if (!(dir = opendir(root)))
+   {
+      return;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[1024];
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0  || strcmp(entry->d_name, "data") == 0)
+         {
+            continue;
+         }
+
+         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
+
+         pgmoneta_lz4c_data(path);
+      }
+   }
+
+   closedir(dir);
+}
+
+void
 pgmoneta_lz4d_data(char* directory)
 {
    char* from = NULL;

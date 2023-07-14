@@ -61,7 +61,7 @@ pgmoneta_encrypt_data(char* d)
       {
          char path[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "pg_tblspc") == 0)
          {
             continue;
          }
@@ -98,6 +98,38 @@ pgmoneta_encrypt_data(char* d)
             free(from);
             free(to);
          }
+      }
+   }
+
+   closedir(dir);
+   return 0;
+}
+
+int
+pgmoneta_encrypt_tablespaces(char* root)
+{
+   DIR* dir;
+   struct dirent* entry;
+
+   if (!(dir = opendir(root)))
+   {
+      return 1;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[1024];
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, "data") == 0)
+         {
+            continue;
+         }
+
+         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
+
+         pgmoneta_encrypt_data(path);
       }
    }
 
@@ -207,7 +239,7 @@ pgmoneta_encrypt_file(char* from, char* to)
 }
 
 int
-pgmoneta_decrypt_data(char* d)
+pgmoneta_decrypt_directory(char* d)
 {
    char* from = NULL;
    char* to = NULL;
@@ -217,7 +249,7 @@ pgmoneta_decrypt_data(char* d)
 
    if (!(dir = opendir(d)))
    {
-      pgmoneta_log_error("pgmoneta_decrypt_data: Could not open directory %s", d);
+      pgmoneta_log_error("pgmoneta_decrypt_directory: Could not open directory %s", d);
       return 1;
    }
 
@@ -234,7 +266,7 @@ pgmoneta_decrypt_data(char* d)
 
          snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
 
-         pgmoneta_decrypt_data(path);
+         pgmoneta_decrypt_directory(path);
       }
       else
       {
