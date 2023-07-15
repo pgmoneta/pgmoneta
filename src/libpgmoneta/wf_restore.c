@@ -339,10 +339,6 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    o = pgmoneta_append(o, directory);
    o = pgmoneta_append(o, "/");
-   o = pgmoneta_append(o, config->servers[server].name);
-   o = pgmoneta_append(o, "-");
-   o = pgmoneta_append(o, id);
-   o = pgmoneta_append(o, "/");
 
    ident = pgmoneta_append(ident, id);
 

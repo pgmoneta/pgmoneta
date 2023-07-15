@@ -38,6 +38,7 @@
 #include <execinfo.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <pwd.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1183,7 +1184,7 @@ pgmoneta_delete_directory(char* path)
             struct stat statbuf;
 
             snprintf(buf, len, "%s/%s", path, entry->d_name);
-            if (!stat(buf, &statbuf))
+            if (!lstat(buf, &statbuf))
             {
                if (S_ISDIR(statbuf.st_mode))
                {
@@ -1552,6 +1553,7 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
          {
             char* to_oid = NULL;
             char* to_directory = NULL;
+            char* relative_directory = NULL;
 
             pgmoneta_log_trace("Tablespace %s -> %s was found in the backup", entry->d_name, &path[0]);
 
@@ -1567,14 +1569,23 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
             to_directory = pgmoneta_append(to_directory, tblspc_name);
             to_directory = pgmoneta_append(to_directory, "/");
 
+            relative_directory = pgmoneta_append(relative_directory, "../../");
+            relative_directory = pgmoneta_append(relative_directory, server);
+            relative_directory = pgmoneta_append(relative_directory, "-");
+            relative_directory = pgmoneta_append(relative_directory, id);
+            relative_directory = pgmoneta_append(relative_directory, "-");
+            relative_directory = pgmoneta_append(relative_directory, tblspc_name);
+            relative_directory = pgmoneta_append(relative_directory, "/");
+
             pgmoneta_delete_directory(to_directory);
             pgmoneta_mkdir(to_directory);
-            pgmoneta_symlink_file(to_oid, to_directory);
+            pgmoneta_symlink_at_file(to_oid, relative_directory);
 
             pgmoneta_copy_directory(&path[0], to_directory);
 
             free(to_oid);
             free(to_directory);
+            free(relative_directory);
 
             to_oid = NULL;
             to_directory = NULL;
@@ -1926,6 +1937,47 @@ pgmoneta_symlink_file(char* from, char* to)
    }
 
    return ret;
+}
+
+int
+pgmoneta_symlink_at_file(char* from, char* to)
+{
+   int dirfd;
+   int ret;
+   char* dir_path;
+   char absolute_path[MAX_PATH];
+
+   dir_path = dirname(strdup(from));
+   dirfd = open(dir_path, O_PATH | O_DIRECTORY | O_NOFOLLOW);
+   if (dirfd == -1)
+   {
+      pgmoneta_log_debug("Could not open parent directory: %s (%s)", dir_path, strerror(errno));
+      errno = 0;
+      ret = 1;
+   }
+
+   if (!pgmoneta_starts_with(from, "/"))
+   {
+      memset(absolute_path, 0, sizeof(absolute_path));
+      realpath(from, absolute_path);
+      ret = symlinkat(to, dirfd, absolute_path);
+   }
+   else
+   {
+      ret = symlinkat(to, dirfd, from);
+   }
+
+   if (ret != 0)
+   {
+      pgmoneta_log_debug("pgmoneta_symlink_at_file: %s -> %s (%s)", from, to, strerror(errno));
+      errno = 0;
+      ret = 1;
+   }
+   close(dirfd);
+   free(dir_path);
+
+   return ret;
+
 }
 
 bool

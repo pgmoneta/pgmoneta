@@ -1864,7 +1864,7 @@ error:
 static int
 as_bool(char* str, bool* b)
 {
-   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") || !strcasecmp(str, "yes")  || !strcasecmp(str, "1"))
+   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") || !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
    {
       *b = true;
       return 0;
