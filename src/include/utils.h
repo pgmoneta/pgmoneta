@@ -486,6 +486,15 @@ int
 pgmoneta_symlink_file(char* from, char* to);
 
 /**
+ * Symlinkat file
+ * @param from The from file
+ * @param to The to file (relative path to where the symlink is located)
+ * @return The result
+ */
+int
+pgmoneta_symlink_at_file(char* from, char* to);
+
+/**
  * Check for symlink
  * @param file The file
  * @return The result

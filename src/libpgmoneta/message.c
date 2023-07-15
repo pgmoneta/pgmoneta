@@ -2074,7 +2074,7 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
                // real data
                if (msg->length <= 1)
                {
-                   break;
+                  break;
                }
                if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)
                {

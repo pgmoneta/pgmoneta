@@ -39,12 +39,16 @@
 
 #include <archive.h>
 #include <archive_entry.h>
+#include <dirent.h>
 #include <stdio.h>
+
+static void write_tar_file(struct archive* a, char* current_real_path, char* current_save_path);
 
 void
 pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
 {
    char elapsed[128];
+   char real_directory[MAX_PATH];
    time_t start_time;
    int total_seconds;
    int hours;
@@ -52,14 +56,18 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
    int seconds;
    char* to = NULL;
    char* id = NULL;
+   char* d = NULL;
    char* output = NULL;
    int result = 1;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct node* i_nodes = NULL;
    struct node* o_nodes = NULL;
    struct node* i_ident = NULL;
    struct node* i_directory = NULL;
+   struct node* i_destination = NULL;
    struct node* i_output = NULL;
    struct configuration* config;
 
@@ -71,11 +79,60 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
 
    start_time = time(NULL);
 
-   if (!pgmoneta_restore_backup(server, backup_id, position, directory, &output, &id))
+   // we used to get id after restore workflow, but now we need it first to create a wrapping directory, so...
+   if (!strcmp(backup_id, "oldest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else
+   {
+      id = backup_id;
+   }
+
+   if (id == NULL)
+   {
+      pgmoneta_log_error("Restore: No identifier for %s/%s", config->servers[server].name, backup_id);
+      goto error;
+   }
+
+   memset(real_directory, 0, sizeof(real_directory));
+   snprintf(real_directory, sizeof(real_directory), "%s/archive-%s-%s", directory, config->servers[server].name, id);
+
+   if (!pgmoneta_restore_backup(server, backup_id, position, real_directory, &output, &id))
    {
       result = 0;
 
-      if (pgmoneta_create_node_string(directory, "directory", &i_directory))
+      if (pgmoneta_create_node_string(real_directory, "directory", &i_directory))
       {
          goto error;
       }
@@ -95,6 +152,13 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
       }
 
       pgmoneta_append_node(&i_nodes, i_output);
+
+      if (pgmoneta_create_node_string(directory, "destination", &i_destination))
+      {
+         goto error;
+      }
+
+      pgmoneta_append_node(&i_nodes, i_destination);
 
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE);
 
@@ -139,6 +203,12 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
 
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
    pgmoneta_management_write_int32(client_fd, result);
    pgmoneta_disconnect(client_fd);
 
@@ -150,9 +220,12 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
 
    pgmoneta_free_nodes(o_nodes);
 
+   pgmoneta_free_nodes(i_destination);
+
    free(id);
    free(output);
    free(to);
+   free(d);
 
    free(backup_id);
    free(position);
@@ -161,15 +234,23 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
    exit(0);
 
 error:
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
    pgmoneta_workflow_delete(workflow);
 
    pgmoneta_free_nodes(i_nodes);
 
    pgmoneta_free_nodes(o_nodes);
 
+   pgmoneta_free_nodes(i_destination);
+
    free(id);
    free(output);
    free(to);
+   free(d);
 
    free(backup_id);
    free(position);
@@ -222,4 +303,119 @@ error:
    archive_read_close(a);
    archive_read_free(a);
    return 1;
+}
+
+int
+pgmoneta_tar_directory(char* src_path, char* dst_path, char* save_path)
+{
+   struct archive* a = NULL;
+   int status;
+
+   a = archive_write_new();
+   archive_write_set_format_ustar(a);  // Set tar format
+   status = archive_write_open_filename(a, dst_path);
+
+   if (status != ARCHIVE_OK)
+   {
+      pgmoneta_log_error("Could not create tar file %s", dst_path);
+      goto error;
+   }
+   write_tar_file(a, src_path, save_path);
+
+   archive_write_close(a);
+   archive_write_free(a);
+
+   return 0;
+
+error:
+   archive_write_close(a);
+   archive_write_free(a);
+
+   return 1;
+}
+
+static void
+write_tar_file(struct archive* a, char* current_real_path, char* current_save_path)
+{
+   char real_path[MAX_PATH];
+   char save_path[MAX_PATH];
+   struct archive_entry* entry;
+   struct stat s;
+   struct dirent* dent;
+
+   DIR* dir = opendir(current_real_path);
+   if (!dir)
+   {
+      pgmoneta_log_error("Could not open directory: %s\n", current_real_path);
+      return;
+   }
+   while ((dent = readdir(dir)) != NULL)
+   {
+      char* entry_name = dent->d_name;
+
+      if (pgmoneta_compare_string(entry_name, ".") || pgmoneta_compare_string(entry_name, ".."))
+      {
+         continue;
+      }
+
+      snprintf(real_path, sizeof(real_path), "%s/%s", current_real_path, entry_name);
+      snprintf(save_path, sizeof(save_path), "%s/%s", current_save_path, entry_name);
+
+      entry = archive_entry_new();
+      archive_entry_copy_pathname(entry, save_path);
+
+      lstat(real_path, &s);
+      if (S_ISDIR(s.st_mode))
+      {
+         archive_entry_set_filetype(entry, AE_IFDIR);
+         archive_entry_set_perm(entry, s.st_mode);
+         archive_write_header(a, entry);
+         write_tar_file(a, real_path, save_path);
+      }
+      else if (S_ISLNK(s.st_mode))
+      {
+         char target[MAX_PATH];
+         memset(target, 0, sizeof(target));
+         readlink(real_path, target, sizeof(target));
+
+         archive_entry_set_filetype(entry, AE_IFLNK);
+         archive_entry_set_perm(entry, s.st_mode);
+         archive_entry_set_symlink(entry, target);
+         archive_write_header(a, entry);
+      }
+      else if (S_ISREG(s.st_mode))
+      {
+         FILE* file = NULL;
+
+         archive_entry_set_filetype(entry, AE_IFREG);
+         archive_entry_set_perm(entry, s.st_mode);
+         archive_entry_set_size(entry, s.st_size);
+         int status = archive_write_header(a, entry);
+         if (status != ARCHIVE_OK)
+         {
+            pgmoneta_log_error("Could not write header: %s\n", archive_error_string(a));
+            return;
+         }
+
+         file = fopen(real_path, "rb");
+
+         if (file != NULL)
+         {
+            char buf[DEFAULT_BUFFER_SIZE];
+            size_t bytes_read = 0;
+
+            memset(buf, 0, sizeof(buf));
+            while ((bytes_read = fread(buf, 1, sizeof(buf), file)) > 0)
+            {
+               archive_write_data(a, buf, bytes_read);
+               memset(buf, 0, sizeof(buf));
+            }
+            fclose(file);
+         }
+      }
+
+      archive_entry_free(entry);
+   }
+
+   closedir(dir);
 }
