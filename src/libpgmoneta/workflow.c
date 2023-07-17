@@ -189,6 +189,9 @@ wf_restore(void)
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
    current = current->next;
 
+   current->next = pgmoneta_workflow_create_cleanup(CLEANUP_TYPE_RESTORE);
+   current = current->next;
+
    return head;
 }
 

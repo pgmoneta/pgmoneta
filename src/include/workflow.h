@@ -48,6 +48,8 @@ extern "C" {
 #define PERMISSION_TYPE_RESTORE 1
 #define PERMISSION_TYPE_ARCHIVE 2
 
+#define CLEANUP_TYPE_RESTORE 0
+
 typedef int (* setup)(int, char*, struct node*, struct node**);
 typedef int (* execute)(int, char*, struct node*, struct node**);
 typedef int (* teardown)(int, char*, struct node*, struct node**);
@@ -164,6 +166,14 @@ pgmoneta_workflow_create_recovery_info(void);
  */
 struct workflow*
 pgmoneta_workflow_create_permissions(int type);
+
+/**
+ * Create a workflow for cleanup
+ * @param type The type of operation
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_cleanup(int type);
 
 /**
  * Create a workflow for encryption
