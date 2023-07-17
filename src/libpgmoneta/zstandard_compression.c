@@ -246,8 +246,6 @@ pgmoneta_zstandardd_directory(char* directory)
       return;
    }
 
-   pgmoneta_log_info("%s", directory);
-
    while ((entry = readdir(dir)) != NULL)
    {
       if (entry->d_type == DT_DIR)
