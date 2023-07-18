@@ -258,6 +258,7 @@ There are a few short tutorials available to help you better understand and conf
 - [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_archive.md)
 - [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md)
 - [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
+- [Retention](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_retention.md)
 
 ## Closing
 
