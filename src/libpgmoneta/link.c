@@ -214,21 +214,15 @@ done:
 }
 
 void
-pgmoneta_link_tablespaces(char* from, char* to)
+pgmoneta_link_tablespaces(char* root)
 {
-   DIR* from_dir = opendir(from);
-   DIR* to_dir = opendir(to);
+   DIR* from_dir = opendir(root);
    char* from_entry = NULL;
    char* to_entry = NULL;
    struct dirent* entry;
    struct stat statbuf;
 
    if (from_dir == NULL)
-   {
-      goto done;
-   }
-
-   if (to_dir == NULL)
    {
       goto done;
    }
@@ -240,18 +234,14 @@ pgmoneta_link_tablespaces(char* from, char* to)
          continue;
       }
 
-      from_entry = pgmoneta_append(from_entry, from);
-      if (!pgmoneta_ends_with(from, "/"))
+      from_entry = pgmoneta_append(from_entry, root);
+      if (!pgmoneta_ends_with(from_entry, "/"))
       {
          from_entry = pgmoneta_append(from_entry, "/");
       }
       from_entry = pgmoneta_append(from_entry, entry->d_name);
 
-      to_entry = pgmoneta_append(to_entry, to);
-      if (!pgmoneta_ends_with(to, "/"))
-      {
-         to_entry = pgmoneta_append(to_entry, "/");
-      }
+      to_entry = pgmoneta_append(to_entry, "../../");
       to_entry = pgmoneta_append(to_entry, entry->d_name);
 
       if (!stat(from_entry, &statbuf))
@@ -262,15 +252,12 @@ pgmoneta_link_tablespaces(char* from, char* to)
          }
          else
          {
-            if (pgmoneta_exists(to))
-            {
-               bool equal = pgmoneta_compare_files(from_entry, to_entry);
+            bool equal = pgmoneta_compare_files(from_entry, to_entry);
 
-               if (equal)
-               {
-                  pgmoneta_delete_file(from_entry);
-                  pgmoneta_symlink_file(from_entry, to_entry);
-               }
+            if (equal)
+            {
+               pgmoneta_delete_file(from_entry);
+               pgmoneta_symlink_file(from_entry, to_entry);
             }
          }
       }
@@ -287,10 +274,5 @@ done:
    if (from_dir != NULL)
    {
       closedir(from_dir);
-   }
-
-   if (to_dir != NULL)
-   {
-      closedir(to_dir);
    }
 }

@@ -112,7 +112,7 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
          to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
 
          pgmoneta_link(from, to);
-         pgmoneta_link_tablespaces(from_tablespaces, to_tablespaces);
+         pgmoneta_link_tablespaces(from_tablespaces);
 
          total_seconds = (int)difftime(time(NULL), link_time);
          hours = total_seconds / 3600;
