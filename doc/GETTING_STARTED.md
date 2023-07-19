@@ -259,6 +259,7 @@ There are a few short tutorials available to help you better understand and conf
 - [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md)
 - [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
 - [Retention](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_retention.md)
+- [Enabling Grafana dashboard](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_grafana.md)
 
 ## Closing
 
