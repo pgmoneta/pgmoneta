@@ -715,22 +715,24 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
    struct message* m = NULL;
    size_t size;
 
-   size = 1 + 8 + 8 + 8 + 8 + 1;
+   size = 1 + 4 + 1 + 8 + 8 + 8 + 8 + 1;
 
    m = (struct message*)malloc(sizeof(struct message));
    m->data = malloc(size);
 
    memset(m->data, 0, size);
 
-   m->kind = 'r';
+   m->kind = 'd';
    m->length = size;
 
-   pgmoneta_write_byte(m->data, 'r');
-   pgmoneta_write_int64(m->data + 1, received);
-   pgmoneta_write_int64(m->data + 9, flushed);
-   pgmoneta_write_int64(m->data + 17, applied);
-   pgmoneta_write_int64(m->data + 25, pgmoneta_get_current_timestamp() - pgmoneta_get_y2000_timestamp());
-   pgmoneta_write_byte(m->data + 33, 0);
+   pgmoneta_write_byte(m->data, 'd');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   pgmoneta_write_byte(m->data + 1 + 4, 'r');
+   pgmoneta_write_int64(m->data + 1 + 4 + 1, received);
+   pgmoneta_write_int64(m->data + 1 + 4 + 1 + 8, flushed);
+   pgmoneta_write_int64(m->data + 1 + 4 + 1 + 8 + 8, applied);
+   pgmoneta_write_int64(m->data + 1 + 4 + 1 + 8 + 8 + 8, pgmoneta_get_current_timestamp() - pgmoneta_get_y2000_timestamp());
+   pgmoneta_write_byte(m->data + 1 + 4 + 1 + 8 + 8 + 8 + 8, 0);
 
    *msg = m;
 
@@ -825,6 +827,37 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
    *msg = m;
 
    return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_send_copy_done_message(int socket)
+{
+   struct message* msg = NULL;
+   int size = 1 + 4;
+
+   msg = (struct message*)malloc(sizeof(struct message));
+   msg->data = malloc(size);
+
+   memset(msg->data, 0, size);
+
+   msg->kind = 'c';
+   msg->length = size;
+
+   pgmoneta_write_byte(msg->data, 'c');
+   pgmoneta_write_int32(msg->data + 1, size - 1);
+
+   if (pgmoneta_write_message(NULL, socket, msg) != MESSAGE_STATUS_OK)
+   {
+      pgmoneta_log_error("Could not send CopyDone message");
+      goto error;
+   }
+
+   pgmoneta_free_copy_message(msg);
+   return 0;
+
+error:
+   pgmoneta_free_copy_message(msg);
+   return 1;
 }
 
 int
@@ -1516,7 +1549,6 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
     */
    if (buffer->size - buffer->end < 1500)
    {
-      pgmoneta_log_info("Stream buffer too full");
       if (pgmoneta_memory_stream_buffer_enlarge(buffer, 1500))
       {
          pgmoneta_log_error("Fail to enlarge stream buffer");
@@ -1542,6 +1574,7 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
          {
             keep_read = true;
             errno = 0;
+            SLEEP(1000000L);
          }
          else
          {
@@ -1554,6 +1587,7 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
          {
             keep_read = true;
             errno = 0;
+            SLEEP(1000000L);
          }
          else
          {

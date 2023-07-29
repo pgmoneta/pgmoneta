@@ -346,6 +346,14 @@ int
 pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm, struct message** msg);
 
 /**
+ * Send a CopyDone message
+ * @param socket The socket
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_send_copy_done_message(int socket);
+
+/**
  * Create a query message for a simple query
  * @param query The query to be executed on server
  * @param msg The resulting message

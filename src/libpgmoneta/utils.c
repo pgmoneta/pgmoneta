@@ -49,6 +49,7 @@
 #include <openssl/pem.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #ifndef EVBACKEND_LINUXAIO
@@ -2676,6 +2677,21 @@ pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length,
    *hex = (unsigned char*)hex_buf;
 
    return 0;
+}
+
+size_t
+pgmoneta_get_file_size(char* file_path)
+{
+   struct stat file_stat;
+
+   if (stat(file_path, &file_stat) != 0)
+   {
+      pgmoneta_log_warn("pgmoneta_get_file_size: %s (%s)", file_path, strerror(errno));
+      errno = 0;
+      return 0;
+   }
+
+   return file_stat.st_size;
 }
 
 #ifdef DEBUG
