@@ -746,6 +746,14 @@ pgmoneta_get_y2000_timestamp(void);
 int
 pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length, unsigned char** hex);
 
+/**
+ * Get the file size of a given file
+ * @param file_path The file path
+ * @return The file size, 0 if error occurred
+ */
+size_t
+pgmoneta_get_file_size(char* file_path);
+
 #ifdef DEBUG
 
 /**
