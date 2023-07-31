@@ -1066,6 +1066,66 @@ backup_information(int client_fd)
       data = NULL;
    }
 
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_version The version of postgresql for a backup\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_version gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_version{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_int(data, backups[j]->version);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_version{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_elapsed_time The backup in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_elapsed_time gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
@@ -1304,6 +1364,73 @@ size_information(int client_fd)
       data = NULL;
    }
 
+   data = pgmoneta_append(data, "#HELP pgmoneta_restore_size_increment The size increment of a restore for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_restore_size_increment gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_restore_size_increment{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (j == 0)
+               {
+                  data = pgmoneta_append_int(data, backups[0]->restore_size);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, backups[j]->restore_size - backups[j - 1]->restore_size);
+               }
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_restore_size_increment{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_size The size of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_size gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
@@ -1338,6 +1465,66 @@ size_information(int client_fd)
       else
       {
          data = pgmoneta_append(data, "pgmoneta_backup_size{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_ratio The ratio of backup size to restore size for each backup\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_ratio gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_ratio{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double(data, 1.0 * backups[j]->backup_size / backups[j]->restore_size);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_ratio{");
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->servers[i].name);

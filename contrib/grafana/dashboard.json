@@ -761,10 +761,71 @@
       "title": "Retention",
       "transformations": [
         {
-          "id": "renameByRegex",
+          "id": "calculateField",
           "options": {
-            "regex": "pgmoneta_retention_(.*)",
-            "renamePattern": "$1"
+            "alias": "Days",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "pgmoneta_retention_days"
+              ],
+              "reducer": "lastNotNull"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Weeks",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "pgmoneta_retention_weeks"
+              ],
+              "reducer": "lastNotNull"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Months",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "pgmoneta_retention_months"
+              ],
+              "reducer": "lastNotNull"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Years",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "pgmoneta_retention_years"
+              ],
+              "reducer": "lastNotNull"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "Days",
+                "Weeks",
+                "Months",
+                "Years"
+              ]
+            }
           }
         }
       ],
@@ -893,18 +954,6 @@
         {
           "id": "merge",
           "options": {}
-        },
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "Value #pgmoneta_server_valid",
-                "Value #pgmoneta_wal_streaming"
-              ]
-            }
-          }
         },
         {
           "id": "groupBy",
@@ -1134,24 +1183,18 @@
       "title": "Total Size",
       "transformations": [
         {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "Value"
-              ]
-            }
-          }
-        },
-        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
             "indexByName": {},
             "renameByName": {
-              "Value": "size",
-              "name": "server"
+              "Value": "Size",
+              "name": "Server"
             }
           }
         }
@@ -1320,6 +1363,10 @@
                     "type": "value"
                   }
                 ]
+              },
+              {
+                "id": "custom.width",
+                "value": 77
               }
             ]
           },
@@ -1332,6 +1379,10 @@
               {
                 "id": "unit",
                 "value": "bytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
               }
             ]
           },
@@ -1344,6 +1395,10 @@
               {
                 "id": "unit",
                 "value": "bytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
               }
             ]
           },
@@ -1372,6 +1427,70 @@
                     "type": "value"
                   }
                 ]
+              },
+              {
+                "id": "custom.width",
+                "value": 81
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Restore Size Increment"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Version"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Elapsed Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Label"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Server"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
               }
             ]
           }
@@ -1379,7 +1498,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 16,
+        "w": 24,
         "x": 0,
         "y": 35
       },
@@ -1394,7 +1513,13 @@
           "show": false
         },
         "frameIndex": 1,
-        "showHeader": true
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Server"
+          }
+        ]
       },
       "pluginVersion": "9.4.3",
       "targets": [
@@ -1471,6 +1596,51 @@
           "legendFormat": "__auto",
           "range": false,
           "refId": "pgmoneta_backup_retain"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "1lep3G_4k"
+          },
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "pgmoneta_backup_version",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "pgmoneta_backup_version"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "1lep3G_4k"
+          },
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "pgmoneta_restore_size_increment",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "pgmoneta_restore_size_increment"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "1lep3G_4k"
+          },
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "pgmoneta_backup_compression_ratio",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "pgmoneta_backup_compression_ratio"
         }
       ],
       "title": "Backup Infomation",
@@ -1480,26 +1650,16 @@
           "options": {}
         },
         {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "label",
-                "name",
-                "Value #pgmoneta_backup",
-                "Value #pgmoneta_backup_elapsed_time",
-                "Value #pgmoneta_backup_size",
-                "Value #pgmoneta_backup_retain",
-                "Value #pgmoneta_restore_size"
-              ]
-            }
-          }
-        },
-        {
           "id": "groupBy",
           "options": {
             "fields": {
               "Value #pgmoneta_backup": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #pgmoneta_backup_compression_ratio": {
                 "aggregations": [
                   "lastNotNull"
                 ],
@@ -1523,7 +1683,19 @@
                 ],
                 "operation": "aggregate"
               },
+              "Value #pgmoneta_backup_version": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
               "Value #pgmoneta_restore_size": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #pgmoneta_restore_size_increment": {
                 "aggregations": [
                   "lastNotNull"
                 ],
@@ -1555,10 +1727,13 @@
             },
             "renameByName": {
               "Value #pgmoneta_backup (lastNotNull)": "Valid",
+              "Value #pgmoneta_backup_compression_ratio (lastNotNull)": "Compression Ratio",
               "Value #pgmoneta_backup_elapsed_time (lastNotNull)": "Elapsed Time",
               "Value #pgmoneta_backup_retain (lastNotNull)": "Retain",
               "Value #pgmoneta_backup_size (lastNotNull)": "Backup Size",
+              "Value #pgmoneta_backup_version (lastNotNull)": "Version",
               "Value #pgmoneta_restore_size (lastNotNull)": "Restore Size",
+              "Value #pgmoneta_restore_size_increment (lastNotNull)": "Restore Size Increment",
               "label": "Label",
               "name": "Server"
             }
@@ -1602,8 +1777,8 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 16,
-        "y": 35
+        "x": 0,
+        "y": 43
       },
       "id": 46,
       "options": {
@@ -1655,18 +1830,6 @@
         {
           "id": "merge",
           "options": {}
-        },
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "Value #pgmoneta_backup_oldest",
-                "Value #pgmoneta_backup_newest"
-              ]
-            }
-          }
         },
         {
           "id": "groupBy",
@@ -1746,6 +1909,116 @@
               }
             ]
           },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 43
+      },
+      "id": 76,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 1,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.4.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "1lep3G_4k"
+          },
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "pgmoneta_restore_newest_size",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "pgmoneta_restore_newest_size"
+        }
+      ],
+      "title": "Newest Restore Size",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "Size",
+              "name": "Server"
+            }
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "1lep3G_4k"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
@@ -1754,7 +2027,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 43
+        "y": 51
       },
       "id": 48,
       "options": {
@@ -1798,24 +2071,18 @@
       "title": "Backup Count",
       "transformations": [
         {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "Value"
-              ]
-            }
-          }
-        },
-        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
             "indexByName": {},
             "renameByName": {
-              "Value": "count",
-              "name": "server"
+              "Value": "Count",
+              "name": "Server"
             }
           }
         }
@@ -1880,7 +2147,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 43
+        "y": 51
       },
       "id": 68,
       "options": {
@@ -1963,7 +2230,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 51
+        "y": 59
       },
       "id": 60,
       "options": {
@@ -2007,24 +2274,18 @@
       "title": "Total Backup Size",
       "transformations": [
         {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "Value"
-              ]
-            }
-          }
-        },
-        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
             "indexByName": {},
             "renameByName": {
-              "Value": "size",
-              "name": "server"
+              "Value": "Size",
+              "name": "Server"
             }
           }
         }
@@ -2089,7 +2350,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 51
+        "y": 59
       },
       "id": 70,
       "options": {
@@ -2130,7 +2391,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 67
       },
       "id": 56,
       "panels": [],
@@ -2185,7 +2446,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 60
+        "y": 68
       },
       "id": 58,
       "options": {
@@ -2229,24 +2490,18 @@
       "title": "WAL Size",
       "transformations": [
         {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "Value"
-              ]
-            }
-          }
-        },
-        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
             "indexByName": {},
             "renameByName": {
-              "Value": "size",
-              "name": "server"
+              "Value": "Size",
+              "name": "Server"
             }
           }
         }
@@ -2311,7 +2566,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 60
+        "y": 68
       },
       "id": 62,
       "options": {
@@ -2356,12 +2611,32 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               }
             ]
@@ -2374,22 +2649,29 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "id": 74,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "textMode": "auto"
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "9.4.3",
       "targets": [
@@ -2401,6 +2683,7 @@
           "editorMode": "builder",
           "exemplar": false,
           "expr": "rate(pgmoneta_wal_total_size[5m])",
+          "format": "table",
           "instant": true,
           "legendFormat": "{{name}}",
           "range": false,
@@ -2408,8 +2691,24 @@
         }
       ],
       "title": "WAL Rate",
-      "transformations": [],
-      "type": "stat"
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "instance": true,
+              "job": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "Rate",
+              "name": "Server"
+            }
+          }
+        }
+      ],
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -2469,7 +2768,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 68
+        "y": 76
       },
       "id": 72,
       "options": {
@@ -2521,6 +2820,6 @@
   "timezone": "",
   "title": "pgmoneta dashboard",
   "uid": "IGBRf7_Vz",
-  "version": 44,
+  "version": 47,
   "weekStart": ""
 }

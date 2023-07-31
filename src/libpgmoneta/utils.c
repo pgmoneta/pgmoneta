@@ -944,6 +944,18 @@ pgmoneta_append_ulong(char* orig, unsigned long l)
 }
 
 char*
+pgmoneta_append_double(char* orig, double d)
+{
+   char number[21];
+
+   memset(&number[0], 0, sizeof(number));
+   snprintf(&number[0], 20, "%lf", d);
+   orig = pgmoneta_append(orig, number);
+
+   return orig;
+}
+
+char*
 pgmoneta_append_bool(char* orig, bool b)
 {
    if (b)

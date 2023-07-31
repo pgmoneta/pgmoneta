@@ -332,6 +332,15 @@ char*
 pgmoneta_append_ulong(char* orig, unsigned long l);
 
 /**
+ * Append a double
+ * @param orig The original string
+ * @param d The double
+ * @return The resulting string
+ */
+char*
+pgmoneta_append_double(char* orig, double d);
+
+/**
  * Append a bool
  * @param orig The original string
  * @param b The bool
