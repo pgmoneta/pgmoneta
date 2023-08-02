@@ -178,6 +178,7 @@ pgmoneta_delete_wal(int srv)
             d = pgmoneta_get_server_wal(srv);
             d = pgmoneta_append(d, wal_files[i]);
 
+            pgmoneta_log_trace("WAL: Deleting %s", d);
             pgmoneta_delete_file(d);
 
             free(d);
