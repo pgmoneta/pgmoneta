@@ -318,7 +318,7 @@ pgmoneta_read_int32(void* data)
                             *((unsigned char*)(data + 2)),
                             *((unsigned char*)(data + 3))};
 
-   int32_t res = (int32_t)((bytes[0] << 24)) |
+   int32_t res = (int32_t)(((uint32_t)bytes[0] << 24)) |
                  ((bytes[1] << 16)) |
                  ((bytes[2] << 8)) |
                  ((bytes[3]));
