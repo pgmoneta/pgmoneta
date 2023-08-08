@@ -157,8 +157,6 @@ depending on your environment. Add the corresponding directory into `/etc/ld.so.
 called `pgmoneta_shared_library.conf` under `/etc/ld.so.conf.d/`, and add your directory into it. Remember to run `ldconfig` to make the change effective
 
 Create the `pgmoneta.conf` configuration
-
-Again, use `/usr/bin/` as `pgsql_dir` instead of `/usr/pgsql-10/bin/` if you used dnf to install postgres
 ```
 cat > pgmoneta.conf
 [pgmoneta]
@@ -178,7 +176,6 @@ log_level = info
 log_path = /tmp/pgmoneta.log
 
 unix_socket_dir = /tmp/
-pgsql_dir = /usr/pgsql-10/bin/
 
 [primary]
 host = localhost

@@ -44,7 +44,6 @@ log_level = info
 log_path = /tmp/pgmoneta.log
 
 unix_socket_dir = /tmp/
-pgsql_dir = /usr/bin/
 
 [primary]
 host = localhost

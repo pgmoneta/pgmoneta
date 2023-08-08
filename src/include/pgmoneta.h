@@ -254,7 +254,6 @@ struct configuration
    int management;             /**< The management port */
 
    char base_dir[MAX_PATH];  /**< The base directory */
-   char pgsql_dir[MAX_PATH]; /**< The PostgreSQL directory */
 
    int compression_type;  /**< The compression type */
    int compression_level; /**< The compression level */

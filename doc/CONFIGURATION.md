@@ -25,7 +25,6 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | host | | String | Yes | The bind address for pgmoneta |
 | unix_socket_dir | | String | Yes | The Unix Domain Socket location |
 | base_dir | | String | Yes | The base directory for the backup |
-| pgsql_dir | | String | Yes | The directory for the PostgreSQL binaries |
 | metrics | 0 | Int | No | The metrics port (disable = 0) |
 | metrics_cache_max_age | 0 | String | No | The number of seconds to keep in cache a Prometheus (metrics) response. If set to zero, the caching will be disabled. Can be a string with a suffix, like `2m` to indicate 2 minutes |
 | metrics_cache_max_size | 256k | String | No | The maximum amount of data to keep in cache when serving Prometheus responses. Changes require restart. This parameter determines the size of memory allocated for the cache even if `metrics_cache_max_age` or `metrics` are disabled. Its value, however, is taken into account only if `metrics_cache_max_age` is set to a non-zero value. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes).|

@@ -374,22 +374,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "pgsql_dir"))
-               {
-                  if (!strcmp(section, "pgmoneta"))
-                  {
-                     max = strlen(value);
-                     if (max > MAX_PATH - 1)
-                     {
-                        max = MAX_PATH - 1;
-                     }
-                     memcpy(&config->pgsql_dir[0], value, max);
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
                else if (!strcmp(key, "metrics"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -1150,21 +1134,6 @@ pgmoneta_validate_configuration(void* shm)
       return 1;
    }
 
-   if (strlen(config->pgsql_dir) == 0)
-   {
-      pgmoneta_log_fatal("pgmoneta: No PostgreSQL directory defined");
-      return 1;
-   }
-
-   if (stat(config->pgsql_dir, &st) == 0 && S_ISDIR(st.st_mode))
-   {
-      /* Ok */
-   }
-   else
-   {
-      pgmoneta_log_fatal("pgmoneta: pgsql_dir is not a directory (%s)", config->pgsql_dir);
-      return 1;
-   }
    if (config->retention_years != -1 && config->retention_years < 1)
    {
       pgmoneta_log_fatal("pgmoneta: %d is an invalid year configuration", config->retention_years);
@@ -2651,7 +2620,6 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
 
    /* base_dir */
    restart_string("base_dir", config->base_dir, reload->base_dir);
-   memcpy(config->pgsql_dir, reload->pgsql_dir, MAX_PATH);
 
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;

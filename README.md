@@ -29,7 +29,6 @@ See [Configuration](./doc/CONFIGURATION.md) on how to configure `pgmoneta`.
 * Shared memory model across processes
 * [libev](http://software.schmorp.de/pkg/libev.html) for fast network interactions
 * [Atomic operations](https://en.cppreference.com/w/c/atomic) are used to keep track of state
-* The [PostgreSQL](https://www.postgresql.org) command line tools
 
 See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 
@@ -79,14 +78,6 @@ cd build
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
 make
 sudo make install
-```
-
-Note, that `pgmoneta` requires [PostgreSQL](https://www.postgresql.org) 10 or later to run as the command line tools
-are required. These can be installed from the [PostgreSQL YUM](https://yum.postgresql.org/) repository, or from the
-official distribution repository, if supported, like
-
-```sh
-dnf install -y postgresql
 ```
 
 See [RPM](./doc/RPM.md) for how to build a RPM of `pgmoneta`.
