@@ -35,6 +35,8 @@ jobs:
       run: sudo apt install -y libcurl4-nss-dev
     - name: Install clang
       run: sudo apt install -y clang
+    - name: Install cJSON
+      run: sudo apt install -y libcjson-dev
     - name: GCC/mkdir
       run: mkdir build
       working-directory: /home/runner/work/pgmoneta/pgmoneta/

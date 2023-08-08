@@ -105,6 +105,13 @@ else ()
   message(FATAL_ERROR "libarchive needed")
 endif()
 
+find_package(CJSON)
+if (CJSON_FOUND)
+  message(STATUS "cJSON found")
+else ()
+  message(FATAL_ERROR "cJSON needed")
+endif()
+
 find_package(Rst2man)
 if (RST2MAN_FOUND)
   message(STATUS "rst2man found")

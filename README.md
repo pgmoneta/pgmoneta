@@ -59,9 +59,10 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 * [libssh](https://www.libssh.org/)
 * [libcurl](https://curl.se/libcurl/)
 * [libarchive](http://www.libarchive.org/)
+* [cJSON](https://github.com/DaveGamble/cJSON)
 
 ```sh
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel
+dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel
 ```
 
 Alternative [clang 8+](https://clang.llvm.org/) can be used.

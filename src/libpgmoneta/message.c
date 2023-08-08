@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <achv.h>
 #include <logging.h>
+#include <manifest.h>
 #include <memory.h>
 #include <message.h>
 #include <network.h>
@@ -1929,6 +1930,26 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
       tblspc = tblspc->next;
    }
 
+   // verify manifest checksum if available
+   if (version >= 13)
+   {
+      char directory[MAX_PATH];
+      memset(directory, 0, sizeof(directory));
+      if (pgmoneta_ends_with(basedir, "/"))
+      {
+         snprintf(directory, sizeof(directory), "%sdata", basedir);
+      }
+      else
+      {
+         snprintf(directory, sizeof(directory), "%s/data", basedir);
+      }
+      if (pgmoneta_manifest_checksum_verify(directory))
+      {
+         pgmoneta_log_error("Manifest verification failed");
+         goto error;
+      }
+   }
+
    pgmoneta_free_query_response(response);
    pgmoneta_free_copy_message(msg);
    return 0;
@@ -2163,6 +2184,23 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
       unlink(link_path);
       pgmoneta_symlink_file(link_path, directory);
       tblspc = tblspc->next;
+   }
+
+   // verify checksum if available
+   char dir[MAX_PATH];
+   memset(dir, 0, sizeof(dir));
+   if (pgmoneta_ends_with(basedir, "/"))
+   {
+      snprintf(dir, sizeof(dir), "%sdata", basedir);
+   }
+   else
+   {
+      snprintf(dir, sizeof(dir), "%s/data", basedir);
+   }
+   if (pgmoneta_manifest_checksum_verify(dir))
+   {
+      pgmoneta_log_error("Manifest verification failed");
+      goto error;
    }
 
    pgmoneta_free_query_response(response);
