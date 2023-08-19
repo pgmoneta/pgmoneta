@@ -196,6 +196,10 @@ struct server
    bool wal_streaming;                 /**< Is WAL streaming active */
    bool valid;                         /**< Is the server valid */
    int version;                        /**< The major version of the server*/
+   int operation_count;          /**< Operation count of the server */
+   int failed_operation_count;         /**< Failed operation count of the server */
+   char last_operation_time[MISC_LENGTH];         /**< Last operation time of the server */
+   char last_failed_operation_time[MISC_LENGTH];  /**< Last failed operation time of the server */
 } __attribute__ ((aligned (64)));
 
 /** @struct

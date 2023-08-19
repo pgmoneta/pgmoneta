@@ -840,6 +840,84 @@ general_information(int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_operation_count The count of client operations of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_operation_count gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_operation_count{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_int(data, config->servers[i].operation_count);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_failed_operation_count The count of failed client operations of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_failed_operation_count gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_failed_operation_count{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_int(data, config->servers[i].failed_operation_count);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_last_operation_time The time of the latest client operation of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_operation_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_last_operation_time{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      if (config->servers[i].operation_count > 0)
+      {
+         data = pgmoneta_append(data, config->servers[i].last_operation_time);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_last_failed_operation_time The time of the latest failed client operation of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_failed_operation_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_last_failed_operation_time{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      if (config->servers[i].failed_operation_count > 0)
+      {
+         data = pgmoneta_append(data, config->servers[i].last_failed_operation_time);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
    if (data != NULL)
    {
       send_chunk(client_fd, data);
@@ -1516,7 +1594,15 @@ size_information(int client_fd)
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double(data, 1.0 * backups[j]->backup_size / backups[j]->restore_size);
+               if (backups[j]->restore_size)
+               {
+                  data = pgmoneta_append_double(data, 1.0 * backups[j]->backup_size / backups[j]->restore_size);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+
 
                data = pgmoneta_append(data, "\n");
             }

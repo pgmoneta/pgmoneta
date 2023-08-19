@@ -404,12 +404,16 @@ pgmoneta_management_write_list_backup(int socket, int server)
    free(d);
    free(wal_dir);
 
+   pgmoneta_management_process_result(socket, server, NULL, 0, false);
+
    return 0;
 
 error:
 
    free(d);
    free(wal_dir);
+
+   pgmoneta_management_process_result(socket, server, NULL, 1, false);
 
    return 1;
 }
@@ -607,6 +611,8 @@ pgmoneta_management_write_delete(int socket, int server, int result)
 
    free(d);
 
+   pgmoneta_management_process_result(socket, server, NULL, 0, false);
+
    return 0;
 
 error:
@@ -618,6 +624,8 @@ error:
    free(array);
 
    free(d);
+
+   pgmoneta_management_process_result(socket, server, NULL, 1, false);
 
    return 1;
 }
@@ -1593,6 +1601,51 @@ pgmoneta_management_read_int32(SSL* ssl, int socket, int* status)
 error:
 
    return 1;
+}
+
+int
+pgmoneta_management_process_result(int socket, int srv, char* server, int code, bool send)
+{
+   struct configuration* config;
+   time_t end_time;
+   struct tm* end_time_info;
+   char end_time_str[128];
+
+   config = (struct configuration*)shmem;
+
+   if (srv == -1)
+   {
+      for (int i = 0; i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
+         {
+            srv = i;
+            break;
+         }
+      }
+   }
+
+   if (srv != -1)
+   {
+      time(&end_time);
+      end_time_info = localtime(&end_time);
+      memset(&end_time_str[0], 0, sizeof(end_time_str));
+      strftime(&end_time_str[0], sizeof(end_time_str), "%Y%m%d%H%M%S", end_time_info);
+
+      config->servers[srv].operation_count++;
+      memcpy(config->servers[srv].last_operation_time, end_time_str, strlen(end_time_str));
+      if (code)
+      {
+         config->servers[srv].failed_operation_count++;
+         memcpy(config->servers[srv].last_failed_operation_time, end_time_str, strlen(end_time_str));
+      }
+   }
+
+   if (send)
+   {
+      return pgmoneta_management_write_int32(socket, code);
+   }
+   return 0;
 }
 
 int

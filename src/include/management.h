@@ -337,6 +337,18 @@ pgmoneta_management_read_int32(SSL* ssl, int socket, int* status);
 int
 pgmoneta_management_write_int32(int socket, int code);
 
+/**
+ * Management: Write result
+ * @param socket The socket
+ * @param srv The server index
+ * @param server The server
+ * @param code The code
+ * @param send Whether to send
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_process_result(int socket, int srv, char* server, int code, bool send);
+
 #ifdef __cplusplus
 }
 #endif

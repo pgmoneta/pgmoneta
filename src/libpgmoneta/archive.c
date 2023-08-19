@@ -209,7 +209,7 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
    }
    free(backups);
 
-   pgmoneta_management_write_int32(client_fd, result);
+   pgmoneta_management_process_result(client_fd, server, NULL, result, true);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();

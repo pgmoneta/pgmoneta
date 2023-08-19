@@ -773,7 +773,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                   pid = fork();
                   if (pid == -1)
                   {
-                     pgmoneta_management_write_int32(client_fd, 1);
+                     pgmoneta_management_process_result(client_fd, i, NULL, 1, true);
 
                      /* No process */
                      pgmoneta_log_error("Cannot create process");
@@ -804,7 +804,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                pid = fork();
                if (pid == -1)
                {
-                  pgmoneta_management_write_int32(client_fd, 1);
+                  pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
 
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
@@ -840,6 +840,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
+            pgmoneta_management_process_result(client_fd, srv, NULL, 1, false);
+
             /* No process */
             pgmoneta_log_error("Cannot create process");
          }
@@ -872,6 +874,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
+            pgmoneta_management_process_result(client_fd, srv, NULL, 1, false);
+
             /* No process */
             pgmoneta_log_error("Cannot create process");
          }
@@ -920,7 +924,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pid = fork();
             if (pid == -1)
             {
-               pgmoneta_management_write_int32(client_fd, 1);
+               pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
 
                /* No process */
                pgmoneta_log_error("Cannot create process");
@@ -984,7 +988,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                pid = fork();
                if (pid == -1)
                {
-                  pgmoneta_management_write_int32(client_fd, 1);
+                  pgmoneta_management_process_result(client_fd, i, NULL, 1, true);
 
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
@@ -1043,7 +1047,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                pid = fork();
                if (pid == -1)
                {
-                  pgmoneta_management_write_int32(client_fd, 1);
+                  pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
 
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
@@ -1224,13 +1228,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       case MANAGEMENT_DECRYPT:
          pgmoneta_log_debug("pgmoneta: Management decrypt: %s", payload_s1);
          ret = pgmoneta_decrypt_archive(payload_s1);
-         pgmoneta_management_write_int32(client_fd, ret);
+         pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
          break;
       case MANAGEMENT_ENCRYPT:
          pgmoneta_log_debug("pgmoneta: Management encrypt: %s", payload_s1);
          ret = pgmoneta_encrypt_file(payload_s1, NULL);
-         pgmoneta_management_write_int32(client_fd, ret);
+         pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
          break;
       default:
