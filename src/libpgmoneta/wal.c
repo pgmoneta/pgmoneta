@@ -74,7 +74,7 @@ pgmoneta_wal(int srv, char** argv)
    char* remain_buffer = NULL;
    char cmd[MISC_LENGTH];
    size_t xlogpos_size = 0;
-   size_t xlogptr;
+   size_t xlogptr = 0;
    size_t segno;
    int xlogoff;
    int curr_xlogoff = 0;
