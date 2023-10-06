@@ -2010,8 +2010,10 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
 {
    // make a deep copy because the parsing break the input string
    char* copied_str = (char*)malloc(strlen(str) + 1);
-   strncpy(copied_str, str, strlen(str));
-   copied_str[strlen(str)] = '\0';
+
+   memset(copied_str, 0, strlen(str) + 1);
+   memcpy(copied_str, str, strlen(str));
+
    char* token = strtok(copied_str, ",");
    if (token == NULL)
    {
