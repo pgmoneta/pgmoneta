@@ -1496,6 +1496,7 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
    char* to_tblspc = NULL;
    int idx = -1;
    DIR* d = NULL;
+   ssize_t size;
    struct dirent* entry;
 
    from_tblspc = pgmoneta_append(from_tblspc, from);
@@ -1540,7 +1541,11 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
          link = pgmoneta_append(link, entry->d_name);
 
          memset(&path[0], 0, sizeof(path));
-         readlink(link, &path[0], sizeof(path));
+         size = readlink(link, &path[0], sizeof(path));
+         if (size == -1)
+         {
+            goto error;
+         }
 
          if (pgmoneta_ends_with(&path[0], "/"))
          {
@@ -1958,6 +1963,7 @@ pgmoneta_symlink_at_file(char* from, char* to)
    int dirfd;
    int ret;
    char* dir_path;
+   char* ret_path;
    char absolute_path[MAX_PATH];
 
    dir_path = dirname(strdup(from));
@@ -1972,7 +1978,12 @@ pgmoneta_symlink_at_file(char* from, char* to)
    if (!pgmoneta_starts_with(from, "/"))
    {
       memset(absolute_path, 0, sizeof(absolute_path));
-      realpath(from, absolute_path);
+      ret_path = realpath(from, absolute_path);
+      if (ret_path == NULL)
+      {
+         return 1;
+      }
+
       ret = symlinkat(to, dirfd, absolute_path);
    }
    else
