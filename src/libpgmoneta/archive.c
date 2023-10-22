@@ -339,6 +339,7 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
 {
    char real_path[MAX_PATH];
    char save_path[MAX_PATH];
+   ssize_t size;
    struct archive_entry* entry;
    struct stat s;
    struct dirent* dent;
@@ -376,7 +377,11 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
       {
          char target[MAX_PATH];
          memset(target, 0, sizeof(target));
-         readlink(real_path, target, sizeof(target));
+         size = readlink(real_path, target, sizeof(target));
+         if (size == -1)
+         {
+            return;
+         }
 
          archive_entry_set_filetype(entry, AE_IFLNK);
          archive_entry_set_perm(entry, s.st_mode);

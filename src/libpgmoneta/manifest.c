@@ -150,7 +150,7 @@ pgmoneta_parse_manifest(char* manifest_path, struct manifest** manifest)
       goto error;
    }
 
-   fread(json, 1, size, f);
+   size = fread(json, 1, size, f);
 
    manifest_json = cJSON_Parse(json);
    if (manifest_json == NULL)
