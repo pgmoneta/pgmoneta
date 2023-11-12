@@ -37,7 +37,19 @@
 
 /* system */
 #include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+/**
+ * Delete wal files older than the given srv_wal file under the base directory
+ * Base directory could be the wal/ or the wal_shipping directory
+ * @param srv_wal The oldest wal segment file we would like to keep
+ * @param base The base directory holding the wal segments
+ * @param backup_index The index of the oldest backup
+ */
+static void
+delete_wal_older_than(char* srv_wal, char* base, int backup_index);
 
 int
 pgmoneta_delete(int srv, char* backup_id)
@@ -98,11 +110,9 @@ pgmoneta_delete_wal(int srv)
    int number_of_backups = 0;
    struct backup** backups = NULL;
    char* srv_wal = NULL;
+   char* wal_shipping = NULL;
    int number_of_srv_wal_files = 0;
    char** srv_wal_files = NULL;
-   int number_of_wal_files = 0;
-   char** wal_files = NULL;
-   bool delete;
 
    /* Find the oldest backup */
    d = pgmoneta_get_server_backup(srv);
@@ -145,50 +155,21 @@ pgmoneta_delete_wal(int srv)
    /* Delete WAL if there are no backups, or the oldest one is valid */
    if (number_of_backups == 0 || backup_index == 0)
    {
-      /* Find WAL files */
+
       d = pgmoneta_get_server_wal(srv);
-
-      number_of_wal_files = 0;
-      wal_files = NULL;
-
-      pgmoneta_get_wal_files(d, &number_of_wal_files, &wal_files);
-
+      delete_wal_older_than(srv_wal, d, backup_index);
       free(d);
       d = NULL;
 
-      /* Delete outdated WAL files */
-      for (int i = 0; i < number_of_wal_files; i++)
+      /* Also delete WAL under wal_shipping directory */
+      wal_shipping = pgmoneta_get_server_wal_shipping_wal(srv);
+      if (wal_shipping != NULL)
       {
-         delete = false;
-
-         if (backup_index == -1)
-         {
-            delete = true;
-         }
-         else if (srv_wal != NULL)
-         {
-            if (strcmp(wal_files[i], srv_wal) < 0)
-            {
-               delete = true;
-            }
-         }
-
-         if (delete)
-         {
-            d = pgmoneta_get_server_wal(srv);
-            d = pgmoneta_append(d, wal_files[i]);
-
-            pgmoneta_log_trace("WAL: Deleting %s", d);
-            pgmoneta_delete_file(d);
-
-            free(d);
-            d = NULL;
-         }
-         else
-         {
-            break;
-         }
+         delete_wal_older_than(srv_wal, wal_shipping, backup_index);
       }
+
+      free(wal_shipping);
+      wal_shipping = NULL;
    }
 
    for (int i = 0; i < number_of_srv_wal_files; i++)
@@ -196,12 +177,6 @@ pgmoneta_delete_wal(int srv)
       free(srv_wal_files[i]);
    }
    free(srv_wal_files);
-
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -214,18 +189,13 @@ pgmoneta_delete_wal(int srv)
 error:
 
    free(d);
+   free(wal_shipping);
 
    for (int i = 0; i < number_of_srv_wal_files; i++)
    {
       free(srv_wal_files[i]);
    }
    free(srv_wal_files);
-
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -234,4 +204,68 @@ error:
    free(backups);
 
    return 1;
+}
+
+static void
+delete_wal_older_than(char* srv_wal, char* base, int backup_index)
+{
+   int number_of_wal_files = 0;
+   char** wal_files = NULL;
+   char wal_address[MAX_PATH];
+   bool delete;
+
+   if (pgmoneta_get_wal_files(base, &number_of_wal_files, &wal_files))
+   {
+      pgmoneta_log_warn("Unable to get WAL segments under %s", base);
+      goto error;
+   }
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      delete = false;
+
+      if (backup_index == -1)
+      {
+         delete = true;
+      }
+      else if (srv_wal != NULL)
+      {
+         if (strcmp(wal_files[i], srv_wal) < 0)
+         {
+            delete = true;
+         }
+      }
+
+      if (delete)
+      {
+         memset(wal_address, 0, MAX_PATH);
+         if (pgmoneta_ends_with(base, "/"))
+         {
+            snprintf(wal_address, MAX_PATH, "%s%s", base, wal_files[i]);
+         }
+         else
+         {
+            snprintf(wal_address, MAX_PATH, "%s/%s", base, wal_files[i]);
+         }
+
+         pgmoneta_log_trace("WAL: Deleting %s", wal_address);
+         pgmoneta_delete_file(wal_address);
+      }
+      else
+      {
+         break;
+      }
+   }
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+error:
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
 }

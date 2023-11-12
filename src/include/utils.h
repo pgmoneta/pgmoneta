@@ -642,6 +642,22 @@ char*
 pgmoneta_get_server_wal(int server);
 
 /**
+ * Get the wal shipping directory for a server
+ * @param server The server
+ * @return The wal shipping directory
+ */
+char*
+pgmoneta_get_server_wal_shipping(int server);
+
+/**
+ * Get the wal address of the wal shipping directory for a server
+ * @param server The server
+ * @return The wal subdirectory under wal shipping directory
+ */
+char*
+pgmoneta_get_server_wal_shipping_wal(int server);
+
+/**
  * Get the backup directory for a server with an identifier
  * @param server The server
  * @param identifier The identifier

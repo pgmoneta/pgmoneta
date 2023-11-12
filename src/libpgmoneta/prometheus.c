@@ -314,6 +314,18 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_wal_streaming</h2>\n");
    data = pgmoneta_append(data, "  The WAL streaming status of a server\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_wal_shipping</h2>\n");
+   data = pgmoneta_append(data, "  The disk space used for WAL shipping for a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_wal_shipping_used_space</h2>\n");
+   data = pgmoneta_append(data, "  The disk space used for everything under the WAL shipping directory of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_wal_shipping_free_space</h2>\n");
+   data = pgmoneta_append(data, "  The free disk space for the WAL shipping directory of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_wal_shipping_total_space</h2>\n");
+   data = pgmoneta_append(data, "  The total disk space for the WAL shipping directory of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_backup_oldest</h2>\n");
    data = pgmoneta_append(data, "  The oldest backup for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -807,6 +819,123 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n\n");
 
    free(d);
+
+   d = NULL;
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping The disk space used for WAL shipping for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_wal_shipping{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_wal_shipping_wal(i);
+
+      if (d != NULL)
+      {
+         size = pgmoneta_directory_size(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_used_space The disk space used for WAL shipping of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_used_space\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_wal_shipping_used_space{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_wal_shipping(i);
+      if (d != NULL)
+      {
+         size = pgmoneta_directory_size(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_free_space The free disk space for WAL shipping of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_free_space\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_wal_shipping_free_space{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_wal_shipping(i);
+
+      if (d != NULL)
+      {
+         size = pgmoneta_free_space(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_total_space The total disk space for WAL shipping of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_total_space\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_wal_shipping_total_space{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_wal_shipping(i);
+
+      if (d != NULL)
+      {
+         size = pgmoneta_total_space(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_valid Is the server in a valid state\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_valid gauge\n");
@@ -1603,7 +1732,6 @@ size_information(int client_fd)
                   data = pgmoneta_append_int(data, 0);
                }
 
-
                data = pgmoneta_append(data, "\n");
             }
          }
@@ -1735,6 +1863,16 @@ size_information(int client_fd)
 
       size = pgmoneta_directory_size(d);
 
+      free(d);
+
+      d = pgmoneta_get_server_wal_shipping_wal(i);
+
+      if (d != NULL)
+      {
+
+         size += pgmoneta_directory_size(d);
+      }
+
       data = pgmoneta_append(data, "pgmoneta_wal_total_size{");
 
       data = pgmoneta_append(data, "name=\"");
@@ -1764,6 +1902,15 @@ size_information(int client_fd)
       d = pgmoneta_get_server(i);
 
       size = pgmoneta_directory_size(d);
+
+      free(d);
+
+      d = pgmoneta_get_server_wal_shipping(i);
+
+      if (d != NULL)
+      {
+         size += pgmoneta_directory_size(d);
+      }
 
       data = pgmoneta_append(data, "pgmoneta_total_size{");
 

@@ -56,6 +56,7 @@ static int wal_prepare(FILE* file, int segsize);
 static int wal_send_status_report(int socket, int64_t received, int64_t flushed, int64_t applied);
 static int wal_xlog_offset(size_t xlogptr, int segsize);
 static int wal_convert_xlogpos(char* xlogpos, int* high32, int* low32, int segsize);
+static int wal_shipping_setup(int srv, char** wal_shipping);
 
 void
 pgmoneta_wal(int srv, char** argv)
@@ -67,6 +68,7 @@ pgmoneta_wal(int srv, char** argv)
    int high32 = 0;
    int low32 = 0;
    char* d = NULL;
+   char* wal_shipping = NULL;
    int timeline = -1;
    int hdrlen = 1 + 8 + 8 + 8;
    int bytes_left = 0;
@@ -83,6 +85,7 @@ pgmoneta_wal(int srv, char** argv)
    signed char type;
    int ret;
    FILE* wal_file = NULL;
+   FILE* wal_shipping_file = NULL;
    struct message* identify_system_msg = NULL;
    struct query_response* identify_system_response = NULL;
    struct message* start_replication_msg = NULL;
@@ -116,6 +119,12 @@ pgmoneta_wal(int srv, char** argv)
    segsize = config->servers[srv].wal_size;
    d = pgmoneta_get_server_wal(srv);
    pgmoneta_mkdir(d);
+
+   // Setup WAL shipping directory
+   if (wal_shipping_setup(srv, &wal_shipping))
+   {
+      pgmoneta_log_warn("Unable to create WAL shipping directory");
+   }
 
    auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &socket);
 
@@ -224,13 +233,24 @@ pgmoneta_wal(int srv, char** argv)
                      filename = wal_file_name(timeline, segno, segsize);
                      if ((wal_file = wal_open(d, filename, segsize)) == NULL)
                      {
-                        pgmoneta_log_error("Could not create or open WAL segment file");
+                        pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
                         goto error;
+                     }
+                     if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
+                     {
+                        if (wal_shipping != NULL)
+                        {
+                           pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
+                        }
                      }
                      if (bytes_left > 0)
                      {
                         curr_xlogoff += bytes_left;
                         fwrite(remain_buffer, 1, bytes_left, wal_file);
+                        if (wal_shipping_file != NULL)
+                        {
+                           fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
+                        }
                         bytes_left = 0;
                         free(remain_buffer);
                      }
@@ -261,6 +281,11 @@ pgmoneta_wal(int srv, char** argv)
                      pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                      goto error;
                   }
+                  if (wal_shipping_file != NULL)
+                  {
+                     fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_shipping_file);
+                  }
+
                   bytes_written += bytes_to_write;
                   bytes_left -= bytes_to_write;
                   xlogptr += bytes_written;
@@ -272,9 +297,15 @@ pgmoneta_wal(int srv, char** argv)
                      // the end of WAL segment
                      fflush(wal_file);
                      wal_close(d, filename, false, wal_file);
+                     wal_file = NULL;
+                     if (wal_shipping_file != NULL)
+                     {
+                        fflush(wal_shipping_file);
+                        wal_close(wal_shipping, filename, false, wal_shipping_file);
+                        wal_shipping_file = NULL;
+                     }
                      free(filename);
                      filename = NULL;
-                     wal_file = NULL;
 
                      xlogoff = 0;
                      curr_xlogoff = 0;
@@ -313,6 +344,8 @@ pgmoneta_wal(int srv, char** argv)
             // Next file would be at a new timeline, so we treat the current wal file completed
             wal_close(d, filename, false, wal_file);
             wal_file = NULL;
+            wal_close(wal_shipping, filename, false, wal_shipping_file);
+            wal_shipping_file = NULL;
          }
          break;
       }
@@ -339,6 +372,7 @@ pgmoneta_wal(int srv, char** argv)
    {
       bool partial = (wal_xlog_offset(xlogptr, segsize) != 0);
       wal_close(d, filename, partial, wal_file);
+      wal_close(wal_shipping, filename, partial, wal_shipping_file);
    }
 
    pgmoneta_memory_destroy();
@@ -351,6 +385,7 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_memory_stream_buffer_free(buffer);
 
    free(d);
+   free(wal_shipping);
    free(filename);
    free(xlogpos);
    exit(0);
@@ -365,6 +400,7 @@ error:
    if (wal_file != NULL)
    {
       wal_close(d, filename, true, wal_file);
+      wal_close(wal_shipping, filename, true, wal_shipping_file);
    }
    pgmoneta_free_copy_message(identify_system_msg);
    pgmoneta_free_copy_message(start_replication_msg);
@@ -375,6 +411,7 @@ error:
    pgmoneta_stop_logging();
 
    free(d);
+   free(wal_shipping);
    free(filename);
    free(xlogpos);
    exit(1);
@@ -399,6 +436,10 @@ wal_file_name(int timeline, size_t segno, int segsize)
 static FILE*
 wal_open(char* root, char* filename, int segsize)
 {
+   if (root == NULL || strlen(root) == 0 || !pgmoneta_exists(root))
+   {
+      return NULL;
+   }
    char* path = NULL;
    FILE* file = NULL;
    path = pgmoneta_append(path, root);
@@ -467,7 +508,7 @@ error:
 static int
 wal_close(char* root, char* filename, bool partial, FILE* file)
 {
-   if (file == NULL)
+   if (file == NULL || root == NULL || filename == NULL || strlen(root) == 0 || strlen(filename) == 0)
    {
       return 1;
    }
@@ -574,5 +615,24 @@ wal_convert_xlogpos(char* xlogpos, int* high32, int* low32, int segsize)
    ptr = strtok(NULL, "/");
    sscanf(ptr, "%x", &num);
    *low32 = num & (~(segsize - 1));
+   return 0;
+}
+
+static int
+wal_shipping_setup(int srv, char** wal_shipping)
+{
+   char* ws = NULL;
+   ws = pgmoneta_get_server_wal_shipping_wal(srv);
+   if (ws != NULL)
+   {
+      if (pgmoneta_mkdir(ws))
+      {
+         *wal_shipping = NULL;
+         return 1;
+      }
+      *wal_shipping = ws;
+      return 0;
+   }
+   *wal_shipping = NULL;
    return 0;
 }

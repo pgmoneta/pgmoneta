@@ -2397,6 +2397,38 @@ pgmoneta_get_server_wal(int server)
 }
 
 char*
+pgmoneta_get_server_wal_shipping(int server)
+{
+   struct configuration* config;
+   char* ws = NULL;
+   config = (struct configuration*) shmem;
+   if (strlen(config->servers[server].wal_shipping) > 0)
+   {
+      ws = pgmoneta_append(ws, config->servers[server].wal_shipping);
+      if (!pgmoneta_ends_with(ws, "/"))
+      {
+         ws = pgmoneta_append(ws, "/");
+      }
+      ws = pgmoneta_append(ws, config->servers[server].name);
+      return ws;
+   }
+   return NULL;
+}
+
+char*
+pgmoneta_get_server_wal_shipping_wal(int server)
+{
+   char* ws = NULL;
+   ws = pgmoneta_get_server_wal_shipping(server);
+
+   if (ws != NULL)
+   {
+      ws = pgmoneta_append(ws, "/wal/");
+   }
+   return ws;
+}
+
+char*
 pgmoneta_get_server_backup_identifier(int server, char* identifier)
 {
    char* d = NULL;

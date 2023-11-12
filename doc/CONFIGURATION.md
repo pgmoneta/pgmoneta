@@ -82,6 +82,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | synchronous | `off` | Bool | No | Use synchronous receive |
+| wal_shipping | | String | No | The WAL shipping directory |
 
 The `user` specified must have the `REPLICATION` option in order to stream the Write-Ahead Log (WAL), and must
 have access to the `postgres` database in order to get the necessary configuration parameters.

@@ -192,6 +192,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   atomic_init(&srv.wal, false);
                   srv.wal_streaming = false;
                   srv.valid = false;
+                  memset(srv.wal_shipping, 0, MAX_PATH);
 
                   idx_server++;
                }
@@ -372,6 +373,18 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   else
                   {
                      unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "wal_shipping"))
+               {
+                  if (strcmp(section, "pgmoneta") && strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(&srv.wal_shipping[0], value, max);
                   }
                }
                else if (!strcmp(key, "metrics"))
@@ -2719,6 +2732,7 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
+   memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);
    dst->retention_days = src->retention_days;
    dst->retention_weeks = src->retention_weeks;
    dst->retention_months = src->retention_months;
