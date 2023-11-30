@@ -1307,7 +1307,6 @@ error:
 int
 pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
 {
-   char* d = NULL;
    char** array = NULL;
    int nof = 0;
    int n;
@@ -1345,39 +1344,39 @@ pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
    closedir(dir);
    dir = NULL;
 
-   dir = opendir(base);
-
-   array = (char**)malloc(sizeof(char*) * nof);
-   n = 0;
-
-   while ((entry = readdir(dir)) != NULL)
+   if (nof > 0)
    {
-      if (pgmoneta_ends_with(entry->d_name, ".partial"))
+      dir = opendir(base);
+
+      array = (char**)malloc(sizeof(char*) * nof);
+      n = 0;
+
+      while ((entry = readdir(dir)) != NULL)
       {
-         continue;
+         if (pgmoneta_ends_with(entry->d_name, ".partial"))
+         {
+            continue;
+         }
+
+         if (strstr(entry->d_name, ".history") != NULL)
+         {
+            continue;
+         }
+
+         if (entry->d_type == DT_REG)
+         {
+            array[n] = (char*)malloc(strlen(entry->d_name) + 1);
+            memset(array[n], 0, strlen(entry->d_name) + 1);
+            memcpy(array[n], entry->d_name, strlen(entry->d_name));
+            n++;
+         }
       }
 
-      if (strstr(entry->d_name, ".history") != NULL)
-      {
-         continue;
-      }
+      closedir(dir);
+      dir = NULL;
 
-      if (entry->d_type == DT_REG)
-      {
-         array[n] = (char*)malloc(strlen(entry->d_name) + 1);
-         memset(array[n], 0, strlen(entry->d_name) + 1);
-         memcpy(array[n], entry->d_name, strlen(entry->d_name));
-         n++;
-      }
+      pgmoneta_sort(nof, array);
    }
-
-   closedir(dir);
-   dir = NULL;
-
-   pgmoneta_sort(nof, array);
-
-   free(d);
-   d = NULL;
 
    *number_of_files = nof;
    *files = array;
@@ -1396,8 +1395,6 @@ error:
       free(array[i]);
    }
    free(array);
-
-   free(d);
 
    *number_of_files = 0;
    *files = NULL;
