@@ -308,7 +308,6 @@ pgmoneta_free_nodes(struct node* node)
    if (node != NULL)
    {
       current = node;
-      nxt = current->next;
 
       while (current != NULL)
       {

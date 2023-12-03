@@ -146,6 +146,10 @@ done:
 
    pgmoneta_workflow_delete(workflow);
 
+   pgmoneta_free_nodes(i_nodes);
+
+   pgmoneta_free_nodes(o_nodes);
+
    free(root);
    free(d);
 
@@ -159,6 +163,10 @@ done:
 error:
 
    pgmoneta_workflow_delete(workflow);
+
+   pgmoneta_free_nodes(i_nodes);
+
+   pgmoneta_free_nodes(o_nodes);
 
    free(root);
    free(d);

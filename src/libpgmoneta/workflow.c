@@ -77,7 +77,6 @@ pgmoneta_workflow_delete(struct workflow* workflow)
    if (workflow != NULL)
    {
       wf = workflow;
-      nxt = wf->next;
 
       while (wf != NULL)
       {
