@@ -220,8 +220,6 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
 
    pgmoneta_free_nodes(o_nodes);
 
-   pgmoneta_free_nodes(i_destination);
-
    free(id);
    free(output);
    free(to);
@@ -244,8 +242,6 @@ error:
    pgmoneta_free_nodes(i_nodes);
 
    pgmoneta_free_nodes(o_nodes);
-
-   pgmoneta_free_nodes(i_destination);
 
    free(id);
    free(output);
