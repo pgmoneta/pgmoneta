@@ -1,0 +1,225 @@
+#
+# pgmoneta rules
+#
+
+{
+   pgmoneta_set_proc_title
+   Memcheck:Leak
+   match-leak-kinds: indirect
+   fun:malloc
+   fun:pgmoneta_set_proc_title
+   fun:main
+}
+
+{
+   pgmoneta_set_proc_title_2
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:pgmoneta_set_proc_title
+   fun:main
+}
+
+#
+# Non pgmoneta rules
+#
+
+{
+   dl_open_malloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:UnknownInlinedFun
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_exception
+   fun:_dl_catch_error
+}
+
+{
+   dl_open_malloc_inline
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:UnknownInlinedFun
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_exception
+   fun:_dl_catch_error
+}
+
+{
+   dl_open_calloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:UnknownInlinedFun
+   fun:_dl_check_map_versions
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_exception
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:UnknownInlinedFun
+   fun:dlopen@@GLIBC_2.34
+}
+
+{
+   dl_open_calloc_inline
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:UnknownInlinedFun
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_exception
+   fun:_dl_catch_error
+}
+
+{
+   dl_open_worker_malloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:malloc
+   fun:strdup
+   fun:_dl_map_object
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_exception
+   fun:_dl_catch_error
+   fun:_dlerror_run
+}
+
+{
+   ev_loop_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:feed_reverse
+   fun:periodics_reify
+   fun:ev_run
+   fun:ev_run.cold
+   fun:ev_loop
+   fun:main
+}
+
+{
+   ev_io_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:fd_change
+   fun:ev_io_start.cold
+   fun:evtimerfd_init
+   fun:ev_periodic_start.cold
+   fun:main
+}
+
+{
+   ev_io_start_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:ev_io_start.cold
+   fun:start_management
+   fun:main
+}
+
+{
+   ev_periodics_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:ev_feed_event.cold
+   fun:feed_reverse_done
+   fun:periodics_reify
+   fun:ev_run
+   fun:ev_run
+   fun:ev_loop
+   fun:main
+}
+
+{
+   ev_periodics_start_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:ev_periodic_start.cold
+   fun:main
+}
+
+{
+   ev_epoll_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:epoll_init
+   fun:epoll_init
+   fun:loop_init
+   fun:ev_default_loop
+   fun:main
+}
+
+{
+   ev_fd_event_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:ev_feed_event.cold
+   fun:fd_event_nocheck
+   fun:fd_event
+   fun:epoll_poll
+   fun:ev_run
+   fun:ev_run
+   fun:ev_loop
+   fun:main
+}
+
+{
+   ev_fd_change_realloc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:ev_realloc
+   fun:fd_change
+   fun:ev_io_start.cold
+   fun:start_metrics
+   fun:main
+}
