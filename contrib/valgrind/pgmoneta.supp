@@ -3,6 +3,16 @@
 #
 
 {
+   pgmoneta_bind_host
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:bind_host
+   fun:pgmoneta_bind
+   fun:main
+}
+
+{
    pgmoneta_set_proc_title
    Memcheck:Leak
    match-leak-kinds: indirect
