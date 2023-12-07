@@ -225,17 +225,20 @@ port
 user
   The user name for the replication role. Mandatory
 
-backup_slot
-  The backup slot
-
 wal_slot
   The WAL slot
 
+follow
+  Failover to this server if follow server fails
+
 retention
-  The retention for the server
+  The retention for the server in days, weeks, months, years
 
 synchronous
   Use synchronous receive. Default is off
+
+wal_shipping
+  The WAL shipping directory
 
 REPORTING BUGS
 ==============

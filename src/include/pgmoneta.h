@@ -181,7 +181,6 @@ struct server
    char host[MISC_LENGTH];             /**< The host name of the server */
    int port;                           /**< The port of the server */
    char username[MAX_USERNAME_LENGTH]; /**< The user name */
-   char backup_slot[MISC_LENGTH];      /**< The backup slot name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
    char follow[MISC_LENGTH];           /**< Follow a server */
    int retention_days;                 /**< The retention days for the server */

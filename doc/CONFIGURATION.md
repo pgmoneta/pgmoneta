@@ -77,7 +77,6 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
-| backup_slot | | String | No | The replication slot for the backup |
 | wal_slot | | String | No | The replication slot for WAL |
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |

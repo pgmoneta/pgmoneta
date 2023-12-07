@@ -279,28 +279,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "backup_slot"))
-               {
-                  if (strlen(section) > 0)
-                  {
-                     max = strlen(section);
-                     if (max > MISC_LENGTH - 1)
-                     {
-                        max = MISC_LENGTH - 1;
-                     }
-                     memcpy(&srv.name, section, max);
-                     max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
-                     {
-                        max = MISC_LENGTH - 1;
-                     }
-                     memcpy(&srv.backup_slot, value, max);
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
                else if (!strcmp(key, "wal_slot"))
                {
                   if (strlen(section) > 0)
@@ -1232,11 +1210,6 @@ pgmoneta_validate_configuration(void* shm)
       {
          pgmoneta_log_fatal("pgmoneta: No user defined for %s", config->servers[i].name);
          return 1;
-      }
-
-      if (strlen(config->servers[i].backup_slot) == 0)
-      {
-         pgmoneta_log_info("pgmoneta: No backup slot defined for %s", config->servers[i].name);
       }
 
       if (strlen(config->servers[i].wal_slot) == 0)
@@ -2729,7 +2702,6 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->host[0], &src->host[0], MISC_LENGTH);
    dst->port = src->port;
    memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
-   memcpy(&dst->backup_slot[0], &src->backup_slot[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
    memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);
