@@ -1223,7 +1223,7 @@ pgmoneta_validate_configuration(void* shm)
 
       if (strlen(config->servers[i].backup_slot) == 0)
       {
-         pgmoneta_log_info("pgmoneta: No backup slot defined for %s", config->servers[i].name);
+         pgmoneta_log_warn("pgmoneta: Backup slot is deprecated for %s", config->servers[i].name);
       }
 
       if (strlen(config->servers[i].wal_slot) == 0)
