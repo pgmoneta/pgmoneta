@@ -94,7 +94,7 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    {
       for (int j = number_of_backups - 2; j >= 0 && next_newest == -1; j--)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (backups[j]->valid == VALID_TRUE && backups[j]->version == backups[number_of_backups - 1]->version)
          {
             if (next_newest == -1)
             {
