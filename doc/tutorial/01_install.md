@@ -10,7 +10,7 @@ you should be using, switch the account when needed.
 
 ## Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 10+ and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 12+ and pgmoneta.
 
 For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
