@@ -71,6 +71,7 @@ static int as_logging_rotation_age(char* str, int* age);
 static int as_seconds(char* str, int* age, int default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
 static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
+static int as_create_slot(char* str, int* create_slot);
 
 static int transfer_configuration(struct configuration* config, struct configuration* reload);
 static void copy_server(struct server* dst, struct server* src);
@@ -295,6 +296,76 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(&srv.wal_slot, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "create_slot"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+
+                     if (as_create_slot(value, &config->create_slot))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+
+                     if (as_create_slot(value, &srv.create_slot))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "create_slot_name"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->create_slot_name, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.create_slot_name, value, max);
                   }
                   else
                   {
@@ -1180,6 +1251,15 @@ pgmoneta_validate_configuration(void* shm)
       return 1;
    }
 
+   if (config->create_slot == CREATE_SLOT_YES)
+   {
+      if (strlen(config->create_slot_name) == 0)
+      {
+         pgmoneta_log_fatal("pgmoneta: No create_slot_name defined");
+         return 1;
+      }
+   }
+
    for (int i = 0; i < config->number_of_servers; i++)
    {
       if (!strcmp(config->servers[i].name, "pgmoneta"))
@@ -1231,6 +1311,15 @@ pgmoneta_validate_configuration(void* shm)
          if (!found)
          {
             pgmoneta_log_fatal("pgmoneta: Invalid follow value for %s", config->servers[i].name);
+            return 1;
+         }
+      }
+
+      if (config->servers[i].create_slot == CREATE_SLOT_YES)
+      {
+         if (strlen(config->create_slot_name) == 0 && strlen(config->servers[i].create_slot_name) == 0)
+         {
+            pgmoneta_log_fatal("pgmoneta: No create_slot_name defined for %s", config->servers[i].name);
             return 1;
          }
       }
@@ -2594,6 +2683,26 @@ as_encryption_mode(char* str)
 }
 
 static int
+as_create_slot(char* str, int* create_slot)
+{
+   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") || !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
+   {
+      *create_slot = CREATE_SLOT_YES;
+      return 0;
+   }
+
+   if (!strcasecmp(str, "false") || !strcasecmp(str, "off") || !strcasecmp(str, "no") || !strcasecmp(str, "0"))
+   {
+      *create_slot = CREATE_SLOT_NO;
+      return 0;
+   }
+
+   *create_slot = CREATE_SLOT_UNDEFINED;
+
+   return 1;
+}
+
+static int
 transfer_configuration(struct configuration* config, struct configuration* reload)
 {
 #ifdef HAVE_LINUX
@@ -2608,6 +2717,9 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
 
    /* base_dir */
    restart_string("base_dir", config->base_dir, reload->base_dir);
+
+   config->create_slot = reload->create_slot;
+   memcpy(config->create_slot_name, reload->create_slot_name, MISC_LENGTH);
 
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
@@ -2702,6 +2814,8 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->host[0], &src->host[0], MISC_LENGTH);
    dst->port = src->port;
    memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
+   dst->create_slot = src->create_slot;
+   memcpy(&dst->create_slot_name[0], &src->create_slot_name[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
    memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);

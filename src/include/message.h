@@ -346,6 +346,15 @@ int
 pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm, struct message** msg);
 
 /**
+ * Create a replication slot
+ * @param create_slot_name The name of the slot
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_replication_slot_message(char* create_slot_name, struct message** msg);
+
+/**
  * Send a CopyDone message
  * @param socket The socket
  * @return 0 upon success, otherwise 1

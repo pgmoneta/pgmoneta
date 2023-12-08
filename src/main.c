@@ -41,6 +41,7 @@
 #include <lz4_compression.h>
 #include <management.h>
 #include <memory.h>
+#include <message.h>
 #include <network.h>
 #include <prometheus.h>
 #include <remote.h>
@@ -92,6 +93,7 @@ static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
 static void reload_configuration(void);
 static void init_receivewals(void);
+static void init_replication_slots(void);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
 static void shutdown_ports(void);
@@ -598,6 +600,9 @@ main(int argc, char** argv)
 
       start_management();
    }
+
+   /* Create and/or validate replication slots */
+   init_replication_slots();
 
    /* Start all pg_receivewal processes */
    init_receivewals();
@@ -1746,6 +1751,93 @@ init_receivewals(void)
    {
       pgmoneta_log_error("No active WAL streaming");
    }
+}
+
+static void
+init_replication_slots(void)
+{
+   int usr;
+   int auth = AUTH_ERROR;
+   int socket;
+   char* create_slot_name = NULL;
+   struct message* slot_request_msg = NULL;
+   struct message* slot_response_msg = NULL;
+   struct configuration* config = NULL;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_memory_init();
+
+   for (int srv = 0; srv < config->number_of_servers; srv++)
+   {
+      if (config->servers[srv].create_slot == CREATE_SLOT_YES ||
+          (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO))
+      {
+         usr = -1;
+         for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+         {
+            if (!strcmp(config->servers[srv].username, config->users[i].username))
+            {
+               usr = i;
+            }
+         }
+
+         if (usr != -1)
+         {
+            socket = 0;
+            auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &socket);
+
+            if (auth == AUTH_SUCCESS)
+            {
+               if (strlen(config->servers[srv].create_slot_name) > 0)
+               {
+                  create_slot_name = config->servers[srv].create_slot_name;
+               }
+               else
+               {
+                  create_slot_name = config->create_slot_name;
+               }
+
+               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, create_slot_name);
+
+               pgmoneta_create_replication_slot_message(create_slot_name, &slot_request_msg);
+               if (pgmoneta_write_message(NULL, socket, slot_request_msg) == MESSAGE_STATUS_OK)
+               {
+                  if (pgmoneta_read_block_message(NULL, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
+                  {
+                     pgmoneta_log_info("pgmoneta: Created replication slot %s on %s", create_slot_name, config->servers[srv].name);
+                  }
+                  else
+                  {
+                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->servers[srv].name);
+                  }
+               }
+               else
+               {
+                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->servers[srv].name);
+               }
+
+               pgmoneta_free_copy_message(slot_request_msg);
+               slot_request_msg = NULL;
+
+               pgmoneta_free_message(slot_response_msg);
+               slot_response_msg = NULL;
+            }
+            else
+            {
+               pgmoneta_log_error("Authentication failed for user on %s", config->servers[srv].name);
+            }
+
+            pgmoneta_disconnect(socket);
+         }
+         else
+         {
+            pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
+         }
+      }
+   }
+
+   pgmoneta_memory_destroy();
 }
 
 static int

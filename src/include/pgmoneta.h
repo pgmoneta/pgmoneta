@@ -105,6 +105,10 @@ extern "C" {
 #define UPDATE_PROCESS_TITLE_MINIMAL 2
 #define UPDATE_PROCESS_TITLE_VERBOSE 3
 
+#define CREATE_SLOT_UNDEFINED 0
+#define CREATE_SLOT_YES       1
+#define CREATE_SLOT_NO        2
+
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 
@@ -188,6 +192,8 @@ struct server
    int retention_months;               /**< The retention months for the server */
    int retention_years;                /**< The retention years for the server */
    bool synchronous;                   /**< Run in synchronous mode */
+   int create_slot;                    /**< Create a slot */
+   char create_slot_name[MISC_LENGTH]; /**< Name of the slot */
    atomic_bool backup;                 /**< Is there an active backup */
    atomic_bool delete;                 /**< Is there an active delete */
    atomic_bool wal;                    /**< Is there an active wal */
@@ -261,6 +267,9 @@ struct configuration
 
    int compression_type;  /**< The compression type */
    int compression_level; /**< The compression level */
+
+   int create_slot;                    /**< Create a slot */
+   char create_slot_name[MISC_LENGTH]; /**< Name of the slot */
 
    int storage_engine;  /**< The storage engine */
 
