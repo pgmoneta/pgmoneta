@@ -82,6 +82,16 @@ int
 pgmoneta_extract_message(char type, struct message* msg, struct message** extracted);
 
 /**
+ * Extract a error message field from a message
+ * @param type The error message field type to be extracted
+ * @param msg The error message
+ * @param extracted The resulting error message field
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_error_fields(char type, struct message* msg, char** extracted);
+
+/**
  * Extract a message based on an offset
  * @param offset The offset
  * @param data The data segment

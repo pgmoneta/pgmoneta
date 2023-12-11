@@ -188,9 +188,16 @@ pgmoneta_wal(int srv, char** argv)
          goto error;
       }
 
-      if (msg == NULL || msg->kind == 'E' || msg->kind == 'f')
+      if (msg == NULL)
       {
-         pgmoneta_log_message(msg);
+         pgmoneta_log_error("wal: received NULL message");
+         goto error;
+      }
+
+      if (msg->kind == 'E' || msg->kind == 'f')
+      {
+         pgmoneta_log_copyfail_message(msg);
+         pgmoneta_log_error_response_message(msg);
          goto error;
       }
       if (msg->kind == 'd')
