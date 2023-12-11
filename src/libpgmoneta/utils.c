@@ -221,6 +221,49 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
    return 1;
 }
 
+int
+pgmoneta_extract_error_fields(char type, struct message* msg, char** extracted)
+{
+   size_t offset = 0;
+   char* result = NULL;
+   *extracted = NULL;
+
+   if (msg == NULL || msg->kind != 'E')
+   {
+      return 1;
+   }
+
+   while (result == NULL && offset < msg->length)
+   {
+      char t = (char)pgmoneta_read_byte(msg->data + offset);
+
+      if (t == '\0')
+      {
+         return 1;
+      }
+
+      size_t field_len = strlen(msg->data + offset + 1) + 1;
+
+      if (type == t)
+      {
+         result = (char*) malloc(field_len);
+         memset(result, 0, field_len);
+         strcpy(result, msg->data + offset + 1);
+
+         *extracted = result;
+
+         return 0;
+      }
+      else
+      {
+         offset += 1;
+         offset += strlen(msg->data + offset) + 1;
+      }
+   }
+
+   return 1;
+}
+
 size_t
 pgmoneta_extract_message_offset(size_t offset, void* data, struct message** extracted)
 {

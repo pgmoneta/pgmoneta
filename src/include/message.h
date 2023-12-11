@@ -138,6 +138,20 @@ void
 pgmoneta_log_message(struct message* msg);
 
 /**
+ * Log a COPY-failure message
+ * @param msg The copyfail message
+ */
+void
+pgmoneta_log_copyfail_message(struct message* msg);
+
+/**
+ * Log an Error Response message
+ * @param msg The Error Response message
+ */
+void
+pgmoneta_log_error_response_message(struct message* msg);
+
+/**
  * Write a notice message
  * @param ssl The SSL struct
  * @param socket The socket descriptor

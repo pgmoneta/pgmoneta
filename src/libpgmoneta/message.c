@@ -149,6 +149,58 @@ pgmoneta_log_message(struct message* msg)
    }
 }
 
+void
+pgmoneta_log_copyfail_message(struct message* msg)
+{
+   if (msg == NULL || msg->kind != 'f')
+   {
+      return;
+   }
+
+   pgmoneta_log_error("COPY-failure: %s", (char*) msg->data);
+}
+
+void
+pgmoneta_log_error_response_message(struct message* msg)
+{
+   size_t offset = 0;
+   signed char field_type = 0;
+   char* error = NULL;
+   char* error_code = NULL;
+
+   if (msg == NULL || msg->kind != 'E')
+   {
+      return;
+   }
+
+   pgmoneta_extract_error_fields('M', msg, &error);
+   pgmoneta_extract_error_fields('C', msg, &error_code);
+
+   pgmoneta_log_error("error response message: %s (SQLSTATE code: %s)", error, error_code);
+
+   while (offset < msg->length)
+   {
+      field_type = pgmoneta_read_byte(msg->data + offset);
+
+      if (field_type == '\0')
+      {
+         break;
+      }
+
+      offset += 1;
+
+      if (field_type != 'M' && field_type != 'C')
+      {
+         pgmoneta_log_debug("error response field type: %c, message: %s", field_type, msg->data + offset);
+      }
+
+      offset += (strlen(msg->data + offset) + 1);
+   }
+
+   free(error_code);
+   free(error);
+}
+
 int
 pgmoneta_write_empty(SSL* ssl, int socket)
 {
@@ -1750,9 +1802,16 @@ pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, str
          goto error;
       }
 
-      if (msg == NULL || msg->kind == 'E' || msg->kind == 'f')
+      if (msg == NULL)
       {
-         pgmoneta_log_message(msg);
+         pgmoneta_log_error("wal: received NULL message");
+         goto error;
+      }
+
+      if (msg->kind == 'E' || msg->kind == 'f')
+      {
+         pgmoneta_log_copyfail_message(msg);
+         pgmoneta_log_error_response_message(msg);
          goto error;
       }
 
@@ -1883,7 +1942,8 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
          pgmoneta_consume_copy_stream(socket, buffer, &msg);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
-            pgmoneta_log_message(msg);
+            pgmoneta_log_copyfail_message(msg);
+            pgmoneta_log_error_response_message(msg);
             fclose(file);
             goto error;
          }
@@ -1893,7 +1953,8 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
          pgmoneta_consume_copy_stream(socket, buffer, &msg);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
-            pgmoneta_log_message(msg);
+            pgmoneta_log_copyfail_message(msg);
+            pgmoneta_log_error_response_message(msg);
             fclose(file);
             goto error;
          }
@@ -2026,7 +2087,8 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
       pgmoneta_consume_copy_stream(socket, buffer, &msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
-         pgmoneta_log_message(msg);
+         pgmoneta_log_copyfail_message(msg);
+         pgmoneta_log_error_response_message(msg);
          goto error;
       }
    }
@@ -2036,7 +2098,8 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
       pgmoneta_consume_copy_stream(socket, buffer, &msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
-         pgmoneta_log_message(msg);
+         pgmoneta_log_copyfail_message(msg);
+         pgmoneta_log_error_response_message(msg);
          goto error;
       }
       if (msg->kind == 'd')
@@ -2279,7 +2342,8 @@ pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* b
       pgmoneta_consume_copy_stream(socket, buffer, &msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
-         pgmoneta_log_message(msg);
+         pgmoneta_log_copyfail_message(msg);
+         pgmoneta_log_error_response_message(msg);
          goto error;
       }
    }
@@ -2288,7 +2352,8 @@ pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* b
       pgmoneta_consume_copy_stream(socket, buffer, &msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
-         pgmoneta_log_message(msg);
+         pgmoneta_log_copyfail_message(msg);
+         pgmoneta_log_error_response_message(msg);
          goto error;
       }
       if (msg->kind == 'd' && msg->length > 0)
