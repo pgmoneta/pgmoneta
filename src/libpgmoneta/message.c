@@ -913,6 +913,36 @@ pgmoneta_create_replication_slot_message(char* create_slot_name, struct message*
 }
 
 int
+pgmoneta_create_search_replication_slot_message(char* slot_name, struct message** msg)
+{
+   char cmd[1024];
+   struct message* m = NULL;
+   size_t size;
+
+   memset(&cmd[0], 0, sizeof(cmd));
+
+   snprintf(cmd, sizeof(cmd), "SELECT slot_name, slot_type FROM pg_replication_slots WHERE slot_name = '%s';", slot_name);
+
+   size = 1 + 4 + strlen(cmd) + 1;
+
+   m = (struct message*)malloc(sizeof(struct message));
+   m->data = malloc(size);
+
+   memset(m->data, 0, size);
+
+   m->kind = 'Q';
+   m->length = size;
+
+   pgmoneta_write_byte(m->data, 'Q');
+   pgmoneta_write_int32(m->data + 1, size - 1);
+   memcpy(m->data + 5, &cmd[0], strlen(cmd));
+
+   *msg = m;
+
+   return MESSAGE_STATUS_OK;
+}
+
+int
 pgmoneta_send_copy_done_message(int socket)
 {
    struct message* msg = NULL;

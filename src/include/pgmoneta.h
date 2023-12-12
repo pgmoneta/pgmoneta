@@ -109,6 +109,10 @@ extern "C" {
 #define CREATE_SLOT_YES       1
 #define CREATE_SLOT_NO        2
 
+#define VALID_SLOT            0
+#define SLOT_NOT_FOUND        1
+#define INCORRECT_SLOT_TYPE       2
+
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 
