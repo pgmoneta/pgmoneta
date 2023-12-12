@@ -93,7 +93,8 @@ static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
 static void reload_configuration(void);
 static void init_receivewals(void);
-static void init_replication_slots(void);
+static int init_replication_slots(void);
+static int verify_replication_slot(char* slot_name, int srv);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
 static void shutdown_ports(void);
@@ -230,6 +231,10 @@ main(int argc, char** argv)
    char* users_path = NULL;
    char* admins_path = NULL;
    bool daemon = false;
+   bool pid_file_created = false;
+   bool management_started = false;
+   bool mgt_started = false;
+   bool metrics_started = false;
    pid_t pid, sid;
    struct signal_info signal_watcher[5];
    struct ev_periodic wal;
@@ -241,6 +246,7 @@ main(int argc, char** argv)
    struct configuration* config = NULL;
    int ret;
    int c;
+   int exit_code = 0;
 
    argv_ptr = argv;
 
@@ -497,6 +503,7 @@ main(int argc, char** argv)
    {
       exit(1);
    }
+   pid_file_created = true;
 
    pgmoneta_set_proc_title(argc, argv, "main", NULL);
 
@@ -552,6 +559,7 @@ main(int argc, char** argv)
    }
 
    start_mgt();
+   mgt_started = true;
 
    if (config->metrics > 0)
    {
@@ -575,6 +583,7 @@ main(int argc, char** argv)
       }
 
       start_metrics();
+      metrics_started = true;
    }
 
    if (config->management > 0)
@@ -599,10 +608,15 @@ main(int argc, char** argv)
       }
 
       start_management();
+      management_started = true;
    }
 
    /* Create and/or validate replication slots */
-   init_replication_slots();
+   if (init_replication_slots())
+   {
+      exit_code = 1;
+      goto error;
+   }
 
    /* Start all pg_receivewal processes */
    init_receivewals();
@@ -687,6 +701,47 @@ main(int argc, char** argv)
    }
 
    return 0;
+
+error:
+
+   if (pid_file_created)
+   {
+      remove_pidfile();
+      pid_file_created = false;
+   }
+
+   if (mgt_started)
+   {
+      shutdown_mgt();
+   }
+
+   if (metrics_started)
+   {
+      shutdown_metrics();
+   }
+
+   if (management_started)
+   {
+      shutdown_management();
+   }
+
+   free(metrics_fds);
+   free(management_fds);
+
+   config->running = false;
+
+   pgmoneta_stop_logging();
+   pgmoneta_destroy_shared_memory(shmem, shmem_size);
+   pgmoneta_destroy_shared_memory(prometheus_cache_shmem, prometheus_cache_shmem_size);
+
+   if (daemon || stop)
+   {
+      kill(0, SIGTERM);
+   }
+
+   exit(exit_code);
+
+   return 1;
 }
 
 static void
@@ -1753,16 +1808,18 @@ init_receivewals(void)
    }
 }
 
-static void
+static int
 init_replication_slots(void)
 {
    int usr;
    int auth = AUTH_ERROR;
+   int slot_status;
    int socket;
    char* create_slot_name = NULL;
    struct message* slot_request_msg = NULL;
    struct message* slot_response_msg = NULL;
    struct configuration* config = NULL;
+   bool create_slot = false;
 
    config = (struct configuration*)shmem;
 
@@ -1770,8 +1827,31 @@ init_replication_slots(void)
 
    for (int srv = 0; srv < config->number_of_servers; srv++)
    {
-      if (config->servers[srv].create_slot == CREATE_SLOT_YES ||
-          (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO))
+      create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
+                    (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
+      if (strlen(config->servers[srv].wal_slot) > 0)
+      {
+         // verify replication slot
+         slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv);
+         if (slot_status == VALID_SLOT)
+         {
+            goto done;
+         }
+         else if (!create_slot)
+         {
+            if (slot_status == SLOT_NOT_FOUND)
+            {
+               pgmoneta_log_fatal("replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
+            }
+            else if (slot_status == INCORRECT_SLOT_TYPE)
+            {
+               pgmoneta_log_fatal("replication slot '%s' should be physical", config->servers[srv].wal_slot);
+            }
+            pgmoneta_log_info("configure create_slot to create slot automatically");
+            goto error;
+         }
+      }
+      if (create_slot)
       {
          usr = -1;
          for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -1837,7 +1917,81 @@ init_replication_slots(void)
       }
    }
 
+done:
    pgmoneta_memory_destroy();
+
+   return 0;
+
+error:
+   pgmoneta_memory_destroy();
+
+   return 1;
+}
+
+static int
+verify_replication_slot(char* slot_name, int srv)
+{
+   int usr;
+   int auth = AUTH_ERROR;
+   int socket;
+   struct message* query;
+   struct query_response* response;
+   struct configuration* config = NULL;
+   struct tuple* current = NULL;
+
+   config = (struct configuration*)shmem;
+
+   usr = -1;
+
+   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+   {
+      if (!strcmp(config->servers[srv].username, config->users[i].username))
+      {
+         usr = i;
+      }
+   }
+
+   if (usr == -1)
+   {
+      pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
+   }
+   else
+   {
+      socket = 0;
+      auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &socket);
+
+      if (auth == AUTH_SUCCESS)
+      {
+         pgmoneta_create_search_replication_slot_message(slot_name, &query);
+         if (pgmoneta_query_execute(socket, query, &response) || response == NULL)
+         {
+            pgmoneta_log_error("Could not execute verify replication slot query for %s", config->servers[srv].name);
+         }
+         else
+         {
+            current = response->tuples;
+            if (current == NULL)
+            {
+               return SLOT_NOT_FOUND;
+            }
+            else if (strcmp(current->data[1], "physical"))
+            {
+               return INCORRECT_SLOT_TYPE;
+            }
+         }
+
+         pgmoneta_disconnect(socket);
+         pgmoneta_free_copy_message(query);
+         pgmoneta_free_query_response(response);
+      }
+      else
+      {
+         pgmoneta_log_error("Could not write verify replication slot query for %s", config->servers[srv].name);
+      }
+
+   }
+
+   return VALID_SLOT;
 }
 
 static int

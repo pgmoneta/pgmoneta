@@ -369,6 +369,15 @@ int
 pgmoneta_create_replication_slot_message(char* create_slot_name, struct message** msg);
 
 /**
+ * Create a message to search if a replication slot exists
+ * @param slot_name The name of the slot
+ * @param msg The resulting message
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_search_replication_slot_message(char* slot_name, struct message** msg);
+
+/**
  * Send a CopyDone message
  * @param socket The socket
  * @return 0 upon success, otherwise 1
