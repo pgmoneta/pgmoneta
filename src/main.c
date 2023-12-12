@@ -1762,9 +1762,18 @@ create_pidfile(void)
    if (strlen(config->pidfile) == 0)
    {
       // no pidfile set, use a default one
-      snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
-               config->unix_socket_dir,
-               !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
+      if (!pgmoneta_ends_with(config->unix_socket_dir, "/"))
+      {
+         snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
+                  config->unix_socket_dir,
+                  !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
+      }
+      else
+      {
+         snprintf(config->pidfile, sizeof(config->pidfile), "%spgmoneta.%s.pid",
+                  config->unix_socket_dir,
+                  !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
+      }
       pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);
    }
 
