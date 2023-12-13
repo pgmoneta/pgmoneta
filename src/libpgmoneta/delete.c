@@ -262,6 +262,8 @@ delete_wal_older_than(char* srv_wal, char* base, int backup_index)
    }
    free(wal_files);
 
+   return;
+
 error:
    for (int i = 0; i < number_of_wal_files; i++)
    {
