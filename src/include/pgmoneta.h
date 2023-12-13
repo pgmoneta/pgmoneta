@@ -49,6 +49,8 @@ extern "C" {
 #define PGMONETA_HOMEPAGE "https://pgmoneta.github.io/"
 #define PGMONETA_ISSUES "https://github.com/pgmoneta/pgmoneta/issues"
 
+#define POSTGRESQL_MIN_VERSION 12
+
 #define MAIN_UDS ".s.pgmoneta"
 
 #define MAX_PROCESS_TITLE_LENGTH 256

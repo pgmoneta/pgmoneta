@@ -121,9 +121,12 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       goto error;
    }
 
-   if (pgmoneta_server_get_version(socket, server))
+   if (config->servers[server].version == 0)
    {
-      goto error;
+      if (pgmoneta_server_get_version(socket, server))
+      {
+         goto error;
+      }
    }
    memset(version, 0, sizeof(version));
    snprintf(version, sizeof(version), "%d", config->servers[server].version);

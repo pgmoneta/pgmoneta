@@ -1160,13 +1160,13 @@ pgmoneta_validate_configuration(void* shm)
 
    if (strlen(config->host) == 0)
    {
-      pgmoneta_log_fatal("pgmoneta: No host defined");
+      pgmoneta_log_fatal("No host defined");
       return 1;
    }
 
    if (strlen(config->unix_socket_dir) == 0)
    {
-      pgmoneta_log_fatal("pgmoneta: No unix_socket_dir defined");
+      pgmoneta_log_fatal("No unix_socket_dir defined");
       return 1;
    }
 
@@ -1176,13 +1176,13 @@ pgmoneta_validate_configuration(void* shm)
    }
    else
    {
-      pgmoneta_log_fatal("pgmoneta: unix_socket_dir is not a directory (%s)", config->unix_socket_dir);
+      pgmoneta_log_fatal("unix_socket_dir is not a directory (%s)", config->unix_socket_dir);
       return 1;
    }
 
    if (strlen(config->base_dir) == 0)
    {
-      pgmoneta_log_fatal("pgmoneta: No base directory defined");
+      pgmoneta_log_fatal("No base directory defined");
       return 1;
    }
 
@@ -1192,13 +1192,13 @@ pgmoneta_validate_configuration(void* shm)
    }
    else
    {
-      pgmoneta_log_fatal("pgmoneta: base_dir is not a directory (%s)", config->base_dir);
+      pgmoneta_log_fatal("base_dir is not a directory (%s)", config->base_dir);
       return 1;
    }
 
    if (config->retention_years != -1 && config->retention_years < 1)
    {
-      pgmoneta_log_fatal("pgmoneta: %d is an invalid year configuration", config->retention_years);
+      pgmoneta_log_fatal("%d is an invalid year configuration", config->retention_years);
       return 1;
    }
    if (config->retention_months != -1)
@@ -1207,13 +1207,13 @@ pgmoneta_validate_configuration(void* shm)
       {
          if (config->retention_months < 1 || config->retention_months > 12)
          {
-            pgmoneta_log_fatal("pgmoneta: %d is an invalid month configuration", config->retention_months);
+            pgmoneta_log_fatal("%d is an invalid month configuration", config->retention_months);
             return 1;
          }
       }
       else if (config->retention_months < 1)
       {
-         pgmoneta_log_fatal("pgmoneta: %d is an invalid month configuration", config->retention_months);
+         pgmoneta_log_fatal("%d is an invalid month configuration", config->retention_months);
          return 1;
       }
    }
@@ -1224,19 +1224,19 @@ pgmoneta_validate_configuration(void* shm)
       {
          if (config->retention_weeks < 1 || config->retention_weeks > 4)
          {
-            pgmoneta_log_fatal("pgmoneta: %d is an invalid week configuration", config->retention_weeks);
+            pgmoneta_log_fatal("%d is an invalid week configuration", config->retention_weeks);
             return 1;
          }
       }
       else if (config->retention_weeks < 1)
       {
-         pgmoneta_log_fatal("pgmoneta: %d is an invalid week configuration", config->retention_weeks);
+         pgmoneta_log_fatal("%d is an invalid week configuration", config->retention_weeks);
          return 1;
       }
    }
    if (config->retention_days < 1)
    {
-      pgmoneta_log_fatal("pgmoneta: retention days should be at least 1");
+      pgmoneta_log_fatal("retention days should be at least 1");
       return 1;
    }
 
@@ -1247,7 +1247,7 @@ pgmoneta_validate_configuration(void* shm)
 
    if (config->number_of_servers <= 0)
    {
-      pgmoneta_log_fatal("pgmoneta: No servers defined");
+      pgmoneta_log_fatal("No servers defined");
       return 1;
    }
 
@@ -1255,7 +1255,7 @@ pgmoneta_validate_configuration(void* shm)
    {
       if (strlen(config->create_slot_name) == 0)
       {
-         pgmoneta_log_fatal("pgmoneta: No create_slot_name defined");
+         pgmoneta_log_fatal("No create_slot_name defined");
          return 1;
       }
    }
@@ -1264,37 +1264,37 @@ pgmoneta_validate_configuration(void* shm)
    {
       if (!strcmp(config->servers[i].name, "pgmoneta"))
       {
-         pgmoneta_log_fatal("pgmoneta: pgmoneta is a reserved word for a host");
+         pgmoneta_log_fatal("pgmoneta is a reserved word for a host");
          return 1;
       }
 
       if (!strcmp(config->servers[i].name, "all"))
       {
-         pgmoneta_log_fatal("pgmoneta: all is a reserved word for a host");
+         pgmoneta_log_fatal("all is a reserved word for a host");
          return 1;
       }
 
       if (strlen(config->servers[i].host) == 0)
       {
-         pgmoneta_log_fatal("pgmoneta: No host defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No host defined for %s", config->servers[i].name);
          return 1;
       }
 
       if (config->servers[i].port == 0)
       {
-         pgmoneta_log_fatal("pgmoneta: No port defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No port defined for %s", config->servers[i].name);
          return 1;
       }
 
       if (strlen(config->servers[i].username) == 0)
       {
-         pgmoneta_log_fatal("pgmoneta: No user defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No user defined for %s", config->servers[i].name);
          return 1;
       }
 
       if (strlen(config->servers[i].wal_slot) == 0)
       {
-         pgmoneta_log_info("pgmoneta: No WAL slot defined for %s", config->servers[i].name);
+         pgmoneta_log_info("No WAL slot defined for %s", config->servers[i].name);
       }
 
       if (strlen(config->servers[i].follow) > 0)
@@ -1310,7 +1310,7 @@ pgmoneta_validate_configuration(void* shm)
 
          if (!found)
          {
-            pgmoneta_log_fatal("pgmoneta: Invalid follow value for %s", config->servers[i].name);
+            pgmoneta_log_fatal("Invalid follow value for %s", config->servers[i].name);
             return 1;
          }
       }
@@ -1319,7 +1319,7 @@ pgmoneta_validate_configuration(void* shm)
       {
          if (strlen(config->create_slot_name) == 0 && strlen(config->servers[i].create_slot_name) == 0)
          {
-            pgmoneta_log_fatal("pgmoneta: No create_slot_name defined for %s", config->servers[i].name);
+            pgmoneta_log_fatal("No create_slot_name defined for %s", config->servers[i].name);
             return 1;
          }
       }
@@ -1479,7 +1479,7 @@ pgmoneta_validate_users_configuration(void* shm)
 
    if (config->number_of_users <= 0)
    {
-      pgmoneta_log_fatal("pgmoneta: No users defined");
+      pgmoneta_log_fatal("No users defined");
       return 1;
    }
 
@@ -1497,7 +1497,7 @@ pgmoneta_validate_users_configuration(void* shm)
 
       if (!found)
       {
-         pgmoneta_log_fatal("pgmoneta: Unknown user (\'%s\') defined for %s", config->servers[i].username, config->servers[i].name);
+         pgmoneta_log_fatal("Unknown user (\'%s\') defined for %s", config->servers[i].username, config->servers[i].name);
          return 1;
       }
    }
@@ -1656,11 +1656,11 @@ pgmoneta_validate_admins_configuration(void* shm)
 
    if (config->management > 0 && config->number_of_admins == 0)
    {
-      pgmoneta_log_warn("pgmoneta: Remote management enabled, but no admins are defined");
+      pgmoneta_log_warn("Remote management enabled, but no admins are defined");
    }
    else if (config->management == 0 && config->number_of_admins > 0)
    {
-      pgmoneta_log_warn("pgmoneta: Remote management disabled, but admins are defined");
+      pgmoneta_log_warn("Remote management disabled, but admins are defined");
    }
 
    return 0;

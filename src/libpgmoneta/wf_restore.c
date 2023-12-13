@@ -420,7 +420,6 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
    char* position = NULL;
    bool primary;
    bool is_recovery_info;
-   int version;
    char tokens[256];
    char buffer[256];
    char line[1024];
@@ -457,20 +456,10 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
 
    primary = pgmoneta_get_node_bool(*o_nodes, "primary");
 
-   version = pgmoneta_get_node_int(*o_nodes, "version");
-
    if (!primary)
    {
       f = pgmoneta_append(f, base);
-
-      if (version < 12)
-      {
-         f = pgmoneta_append(f, "/recovery.conf");
-      }
-      else
-      {
-         f = pgmoneta_append(f, "/postgresql.conf");
-      }
+      f = pgmoneta_append(f, "/postgresql.conf");
 
       t = pgmoneta_append(t, f);
       t = pgmoneta_append(t, ".tmp");
@@ -516,13 +505,6 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
       memset(&line[0], 0, sizeof(line));
       snprintf(&line[0], sizeof(line), "#\n");
       fputs(&line[0], tfile);
-
-      if (version < 12)
-      {
-         memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "standby_mode = %s\n", primary ? "off" : "on");
-         fputs(&line[0], tfile);
-      }
 
       if (strlen(config->servers[server].wal_slot) == 0)
       {

@@ -94,7 +94,7 @@ static bool accept_fatal(int error);
 static void reload_configuration(void);
 static void init_receivewals(void);
 static int init_replication_slots(void);
-static int verify_replication_slot(char* slot_name, int srv);
+static int verify_replication_slot(char* slot_name, int srv, int socket);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
 static void shutdown_ports(void);
@@ -518,7 +518,7 @@ main(int argc, char** argv)
    /* Bind Unix Domain Socket */
    if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
    {
-      pgmoneta_log_fatal("pgmoneta: Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
+      pgmoneta_log_fatal("Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
 #ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
 #endif
@@ -529,7 +529,7 @@ main(int argc, char** argv)
    main_loop = ev_default_loop(pgmoneta_libev(config->libev));
    if (!main_loop)
    {
-      pgmoneta_log_fatal("pgmoneta: No loop implementation (%x) (%x)",
+      pgmoneta_log_fatal("No loop implementation (%x) (%x)",
                          pgmoneta_libev(config->libev), ev_supported_backends());
 #ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=No loop implementation (%x) (%x)", pgmoneta_libev(config->libev), ev_supported_backends());
@@ -551,7 +551,7 @@ main(int argc, char** argv)
 
    if (pgmoneta_tls_valid())
    {
-      pgmoneta_log_fatal("pgmoneta: Invalid TLS configuration");
+      pgmoneta_log_fatal("Invalid TLS configuration");
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid TLS configuration");
 #endif
@@ -566,7 +566,7 @@ main(int argc, char** argv)
       /* Bind metrics socket */
       if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
       {
-         pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->metrics);
+         pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->metrics);
 #endif
@@ -575,7 +575,7 @@ main(int argc, char** argv)
 
       if (metrics_fds_length > MAX_FDS)
       {
-         pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", metrics_fds_length);
+         pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Too many descriptors %d", metrics_fds_length);
 #endif
@@ -591,7 +591,7 @@ main(int argc, char** argv)
       /* Bind management socket */
       if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
       {
-         pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->management);
+         pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->management);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->management);
 #endif
@@ -600,7 +600,7 @@ main(int argc, char** argv)
 
       if (management_fds_length > MAX_FDS)
       {
-         pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", management_fds_length);
+         pgmoneta_log_fatal("Too many descriptors %d", management_fds_length);
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Too many descriptors %d", management_fds_length);
 #endif
@@ -637,7 +637,7 @@ main(int argc, char** argv)
    ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
    ev_periodic_start (main_loop, &wal_streaming);
 
-   pgmoneta_log_info("pgmoneta: started on %s", config->host);
+   pgmoneta_log_info("Started on %s", config->host);
    pgmoneta_log_debug("Management: %d", unix_management_socket);
    for (int i = 0; i < metrics_fds_length; i++)
    {
@@ -670,7 +670,7 @@ main(int argc, char** argv)
       ev_loop(main_loop, 0);
    }
 
-   pgmoneta_log_info("pgmoneta: shutdown");
+   pgmoneta_log_info("Shutdown");
 #ifdef HAVE_LINUX
    sd_notify(0, "STOPPING=1");
 #endif
@@ -783,7 +783,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
          {
-            pgmoneta_log_fatal("pgmoneta: Could not bind to %s", config->unix_socket_dir);
+            pgmoneta_log_fatal("Could not bind to %s", config->unix_socket_dir);
             exit(1);
          }
 
@@ -812,7 +812,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    switch (id)
    {
       case MANAGEMENT_BACKUP:
-         pgmoneta_log_debug("pgmoneta: Management backup: %s", payload_s1);
+         pgmoneta_log_debug("Management backup: %s", payload_s1);
 
          if (!strcmp("all", payload_s1))
          {
@@ -879,14 +879,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             {
                pgmoneta_management_write_int32(client_fd, 1);
 
-               pgmoneta_log_error("Backup: Unknown server %s", payload_s1);
+               pgmoneta_log_error("Backup - Unknown server %s", payload_s1);
             }
          }
 
          free(payload_s1);
          break;
       case MANAGEMENT_LIST_BACKUP:
-         pgmoneta_log_debug("pgmoneta: Management list backup: %s", payload_s1);
+         pgmoneta_log_debug("Management list backup: %s", payload_s1);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -914,13 +914,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (srv == -1)
          {
-            pgmoneta_log_error("List backup: Unknown server %s", payload_s1);
+            pgmoneta_log_error("List backup - Unknown server %s", payload_s1);
          }
 
          free(payload_s1);
          break;
       case MANAGEMENT_DELETE:
-         pgmoneta_log_debug("pgmoneta: Management delete: %s/%s", payload_s1, payload_s2);
+         pgmoneta_log_debug("Management delete: %s/%s", payload_s1, payload_s2);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -959,14 +959,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (srv == -1)
          {
-            pgmoneta_log_error("Delete: Unknown server %s", payload_s1);
+            pgmoneta_log_error("Delete - Unknown server %s", payload_s1);
          }
 
          free(payload_s1);
          free(payload_s2);
          break;
       case MANAGEMENT_RESTORE:
-         pgmoneta_log_debug("pgmoneta: Management restore: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
+         pgmoneta_log_debug("Management restore: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -1018,7 +1018,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          {
             pgmoneta_management_write_int32(client_fd, 1);
 
-            pgmoneta_log_error("Restore: Unknown server %s", payload_s1);
+            pgmoneta_log_error("Restore - Unknown server %s", payload_s1);
          }
 
          free(payload_s1);
@@ -1027,7 +1027,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          free(payload_s4);
          break;
       case MANAGEMENT_ARCHIVE:
-         pgmoneta_log_debug("pgmoneta: Management archive: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
+         pgmoneta_log_debug("Management archive: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
 
          if (!strcmp("all", payload_s1))
          {
@@ -1141,7 +1141,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             {
                pgmoneta_management_write_int32(client_fd, 1);
 
-               pgmoneta_log_error("Archive: Unknown server %s", payload_s1);
+               pgmoneta_log_error("Archive - Unknown server %s", payload_s1);
             }
 
             free(payload_s1);
@@ -1151,14 +1151,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          break;
       case MANAGEMENT_STOP:
-         pgmoneta_log_debug("pgmoneta: Management stop");
+         pgmoneta_log_debug("Management stop");
          ev_break(loop, EVBREAK_ALL);
          keep_running = 0;
          stop = 1;
          config->running = false;
          break;
       case MANAGEMENT_STATUS:
-         pgmoneta_log_debug("pgmoneta: Management status");
+         pgmoneta_log_debug("Management status");
 
          pid = fork();
          if (pid == -1)
@@ -1175,7 +1175,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          break;
       case MANAGEMENT_DETAILS:
-         pgmoneta_log_debug("pgmoneta: Management details");
+         pgmoneta_log_debug("Management details");
 
          pid = fork();
          if (pid == -1)
@@ -1192,19 +1192,19 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          break;
       case MANAGEMENT_ISALIVE:
-         pgmoneta_log_debug("pgmoneta: Management isalive");
+         pgmoneta_log_debug("Management isalive");
          pgmoneta_management_write_isalive(client_fd);
          break;
       case MANAGEMENT_RESET:
-         pgmoneta_log_debug("pgmoneta: Management reset");
+         pgmoneta_log_debug("Management reset");
          pgmoneta_prometheus_reset();
          break;
       case MANAGEMENT_RELOAD:
-         pgmoneta_log_debug("pgmoneta: Management reload");
+         pgmoneta_log_debug("Management reload");
          reload_configuration();
          break;
       case MANAGEMENT_RETAIN:
-         pgmoneta_log_debug("pgmoneta: Management retain: %s/%s", payload_s1, payload_s2);
+         pgmoneta_log_debug("Management retain: %s/%s", payload_s1, payload_s2);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -1238,14 +1238,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (srv == -1)
          {
-            pgmoneta_log_error("Retain: Unknown server %s", payload_s1);
+            pgmoneta_log_error("Retain - Unknown server %s", payload_s1);
          }
 
          free(payload_s1);
          free(payload_s2);
          break;
       case MANAGEMENT_EXPUNGE:
-         pgmoneta_log_debug("pgmoneta: Management expunge: %s/%s", payload_s1, payload_s2);
+         pgmoneta_log_debug("Management expunge: %s/%s", payload_s1, payload_s2);
 
          srv = -1;
          for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
@@ -1279,26 +1279,26 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (srv == -1)
          {
-            pgmoneta_log_error("Expunge: Unknown server %s", payload_s1);
+            pgmoneta_log_error("Expunge - Unknown server %s", payload_s1);
          }
 
          free(payload_s1);
          free(payload_s2);
          break;
       case MANAGEMENT_DECRYPT:
-         pgmoneta_log_debug("pgmoneta: Management decrypt: %s", payload_s1);
+         pgmoneta_log_debug("Management decrypt: %s", payload_s1);
          ret = pgmoneta_decrypt_archive(payload_s1);
          pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
          break;
       case MANAGEMENT_ENCRYPT:
-         pgmoneta_log_debug("pgmoneta: Management encrypt: %s", payload_s1);
+         pgmoneta_log_debug("Management encrypt: %s", payload_s1);
          ret = pgmoneta_encrypt_file(payload_s1, NULL);
          pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
          break;
       default:
-         pgmoneta_log_debug("pgmoneta: Unknown management id: %d", id);
+         pgmoneta_log_debug("Unknown management id: %d", id);
          break;
    }
 
@@ -1340,13 +1340,13 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
          {
-            pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->metrics);
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
             exit(1);
          }
 
          if (metrics_fds_length > MAX_FDS)
          {
-            pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", metrics_fds_length);
+            pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
             exit(1);
          }
 
@@ -1412,13 +1412,13 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
          {
-            pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->management);
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->management);
             exit(1);
          }
 
          if (management_fds_length > MAX_FDS)
          {
-            pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", management_fds_length);
+            pgmoneta_log_fatal("Too many descriptors %d", management_fds_length);
             exit(1);
          }
 
@@ -1461,7 +1461,7 @@ shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("pgmoneta: shutdown requested");
+   pgmoneta_log_debug("shutdown requested");
    ev_break(loop, EVBREAK_ALL);
    keep_running = 0;
    config->running = false;
@@ -1470,14 +1470,14 @@ shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 static void
 reload_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
-   pgmoneta_log_debug("pgmoneta: reload requested");
+   pgmoneta_log_debug("reload requested");
    reload_configuration();
 }
 
 static void
 coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
-   pgmoneta_log_info("pgmoneta: core dump requested");
+   pgmoneta_log_info("core dump requested");
    abort();
 }
 
@@ -1656,7 +1656,7 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
             if (pid == -1)
             {
                /* No process */
-               pgmoneta_log_error("WAL: Cannot create process");
+               pgmoneta_log_error("pgmoenta: WAL - Cannot create process");
             }
             else if (pid == 0)
             {
@@ -1718,13 +1718,13 @@ reload_configuration(void)
          /* Bind metrics socket */
          if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
          {
-            pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->metrics);
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
             exit(1);
          }
 
          if (metrics_fds_length > MAX_FDS)
          {
-            pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", metrics_fds_length);
+            pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
             exit(1);
          }
 
@@ -1750,13 +1750,13 @@ reload_configuration(void)
          /* Bind management socket */
          if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
          {
-            pgmoneta_log_fatal("pgmoneta: Could not bind to %s:%d", config->host, config->management);
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->management);
             exit(1);
          }
 
          if (management_fds_length > MAX_FDS)
          {
-            pgmoneta_log_fatal("pgmoneta: Too many descriptors %d", management_fds_length);
+            pgmoneta_log_fatal("Too many descriptors %d", management_fds_length);
             exit(1);
          }
 
@@ -1788,7 +1788,7 @@ init_receivewals(void)
          if (pid == -1)
          {
             /* No process */
-            pgmoneta_log_error("WAL: Cannot create process");
+            pgmoneta_log_error("WAL - Cannot create process");
          }
          else if (pid == 0)
          {
@@ -1815,6 +1815,7 @@ init_replication_slots(void)
    int auth = AUTH_ERROR;
    int slot_status;
    int socket;
+   int ret = 0;
    char* create_slot_name = NULL;
    struct message* slot_request_msg = NULL;
    struct message* slot_response_msg = NULL;
@@ -1827,44 +1828,73 @@ init_replication_slots(void)
 
    for (int srv = 0; srv < config->number_of_servers; srv++)
    {
-      create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
-                    (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
-      if (strlen(config->servers[srv].wal_slot) > 0)
+      usr = -1;
+
+      for (int i = 0; usr == -1 && i < config->number_of_users; i++)
       {
-         // verify replication slot
-         slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv);
-         if (slot_status == VALID_SLOT)
+         if (!strcmp(config->servers[srv].username, config->users[i].username))
          {
-            goto done;
-         }
-         else if (!create_slot)
-         {
-            if (slot_status == SLOT_NOT_FOUND)
-            {
-               pgmoneta_log_fatal("replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
-            }
-            else if (slot_status == INCORRECT_SLOT_TYPE)
-            {
-               pgmoneta_log_fatal("replication slot '%s' should be physical", config->servers[srv].wal_slot);
-            }
-            pgmoneta_log_info("configure create_slot to create slot automatically");
-            goto error;
+            usr = i;
          }
       }
-      if (create_slot)
+
+      if (usr != -1)
       {
-         usr = -1;
-         for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+         socket = 0;
+         auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &socket);
+
+         if (auth == AUTH_SUCCESS)
          {
-            if (!strcmp(config->servers[srv].username, config->users[i].username))
+            if (pgmoneta_server_get_version(socket, srv))
             {
-               usr = i;
+               pgmoneta_log_fatal("Could not get version for server %s", config->servers[srv].name);
+               ret = 1;
+               goto server_done;
+            }
+
+            if (config->servers[srv].version < POSTGRESQL_MIN_VERSION)
+            {
+               pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->servers[srv].name);
+               ret = 1;
+               goto server_done;
+            }
+
+            if (strlen(config->servers[srv].wal_slot) > 0)
+            {
+               /* Verify replication slot */
+               slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, socket);
+               if (slot_status == VALID_SLOT)
+               {
+                  /* Ok */
+               }
+               else if (!create_slot)
+               {
+                  if (slot_status == SLOT_NOT_FOUND)
+                  {
+                     pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
+                     ret = 1;
+                  }
+                  else if (slot_status == INCORRECT_SLOT_TYPE)
+                  {
+                     pgmoneta_log_fatal("Replication slot '%s' should be physical", config->servers[srv].wal_slot);
+                     ret = 1;
+                  }
+               }
             }
          }
-
-         if (usr != -1)
+         else
          {
-            socket = 0;
+            pgmoneta_log_error("Authentication failed for user on %s", config->servers[srv].name);
+         }
+
+         pgmoneta_disconnect(socket);
+         socket = 0;
+
+         if (create_slot && slot_status == SLOT_NOT_FOUND && strlen(config->servers[srv].wal_slot) > 0)
+         {
+            create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
+               (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
+
             auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &socket);
 
             if (auth == AUTH_SUCCESS)
@@ -1885,7 +1915,7 @@ init_replication_slots(void)
                {
                   if (pgmoneta_read_block_message(NULL, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                   {
-                     pgmoneta_log_info("pgmoneta: Created replication slot %s on %s", create_slot_name, config->servers[srv].name);
+                     pgmoneta_log_info("Created replication slot %s on %s", create_slot_name, config->servers[srv].name);
                   }
                   else
                   {
@@ -1908,32 +1938,25 @@ init_replication_slots(void)
                pgmoneta_log_error("Authentication failed for user on %s", config->servers[srv].name);
             }
 
+server_done:
             pgmoneta_disconnect(socket);
          }
-         else
-         {
-            pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
-         }
+      }
+      else
+      {
+         pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
       }
    }
 
-done:
    pgmoneta_memory_destroy();
 
-   return 0;
-
-error:
-   pgmoneta_memory_destroy();
-
-   return 1;
+   return ret;
 }
 
 static int
-verify_replication_slot(char* slot_name, int srv)
+verify_replication_slot(char* slot_name, int srv, int socket)
 {
-   int usr;
-   int auth = AUTH_ERROR;
-   int socket;
+   int ret = VALID_SLOT;
    struct message* query;
    struct query_response* response;
    struct configuration* config = NULL;
@@ -1941,57 +1964,28 @@ verify_replication_slot(char* slot_name, int srv)
 
    config = (struct configuration*)shmem;
 
-   usr = -1;
-
-   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+   pgmoneta_create_search_replication_slot_message(slot_name, &query);
+   if (pgmoneta_query_execute(socket, query, &response) || response == NULL)
    {
-      if (!strcmp(config->servers[srv].username, config->users[i].username))
-      {
-         usr = i;
-      }
-   }
-
-   if (usr == -1)
-   {
-      pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
+      pgmoneta_log_error("Could not execute verify replication slot query for %s", config->servers[srv].name);
    }
    else
    {
-      socket = 0;
-      auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &socket);
-
-      if (auth == AUTH_SUCCESS)
+      current = response->tuples;
+      if (current == NULL)
       {
-         pgmoneta_create_search_replication_slot_message(slot_name, &query);
-         if (pgmoneta_query_execute(socket, query, &response) || response == NULL)
-         {
-            pgmoneta_log_error("Could not execute verify replication slot query for %s", config->servers[srv].name);
-         }
-         else
-         {
-            current = response->tuples;
-            if (current == NULL)
-            {
-               return SLOT_NOT_FOUND;
-            }
-            else if (strcmp(current->data[1], "physical"))
-            {
-               return INCORRECT_SLOT_TYPE;
-            }
-         }
-
-         pgmoneta_disconnect(socket);
-         pgmoneta_free_copy_message(query);
-         pgmoneta_free_query_response(response);
+         ret = SLOT_NOT_FOUND;
       }
-      else
+      else if (strcmp(current->data[1], "physical"))
       {
-         pgmoneta_log_error("Could not write verify replication slot query for %s", config->servers[srv].name);
+         ret = INCORRECT_SLOT_TYPE;
       }
-
    }
 
-   return VALID_SLOT;
+   pgmoneta_free_copy_message(query);
+   pgmoneta_free_query_response(response);
+
+   return ret;
 }
 
 static int
