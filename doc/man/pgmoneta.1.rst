@@ -33,6 +33,9 @@ OPTIONS
 -d, --daemon
   Run as a daemon
 
+--offline
+  Run in offline mode
+
 -V, --version
   Display version information
 

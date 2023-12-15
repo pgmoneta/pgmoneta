@@ -668,6 +668,7 @@ int
 pgmoneta_management_read_status(SSL* ssl, int socket)
 {
    char* name = NULL;
+   int offline;
    unsigned long used_size;
    unsigned long free_size;
    unsigned long total_size;
@@ -680,6 +681,20 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
    int link;
    int servers;
    int number_of_directories;
+
+   if (read_int32("pgmoneta_management_read_status", socket, &offline))
+   {
+      goto error;
+   }
+
+   if (offline == 0)
+   {
+      printf("Mode             : Running\n");
+   }
+   else
+   {
+      printf("Mode             : Offline\n");
+   }
 
    if (read_int64("pgmoneta_management_read_status", socket, &used_size))
    {
@@ -793,7 +808,7 @@ error:
 }
 
 int
-pgmoneta_management_write_status(int socket)
+pgmoneta_management_write_status(int socket, bool offline)
 {
    char* d = NULL;
    int retention_days;
@@ -821,6 +836,11 @@ pgmoneta_management_write_status(int socket)
 
    free_size = pgmoneta_free_space(config->base_dir);
    total_size = pgmoneta_total_space(config->base_dir);
+
+   if (write_int32("pgmoneta_management_write_status", socket, offline))
+   {
+      goto error;
+   }
 
    if (write_int64("pgmoneta_management_write_status", socket, used_size))
    {
@@ -959,6 +979,7 @@ int
 pgmoneta_management_read_details(SSL* ssl, int socket)
 {
    char* name = NULL;
+   int offline;
    unsigned long used_size;
    unsigned long free_size;
    unsigned long total_size;
@@ -981,6 +1002,20 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
    char* res = NULL;
    char* ws = NULL;
    char* ds = NULL;
+
+   if (read_int32("pgmoneta_management_read_details", socket, &offline))
+   {
+      goto error;
+   }
+
+   if (offline == 0)
+   {
+      printf("Mode             : Running\n");
+   }
+   else
+   {
+      printf("Mode             : Offline\n");
+   }
 
    if (read_int64("pgmoneta_management_read_details", socket, &used_size))
    {
@@ -1182,7 +1217,7 @@ error:
 }
 
 int
-pgmoneta_management_write_details(int socket)
+pgmoneta_management_write_details(int socket, bool offline)
 {
    char* d = NULL;
    char* wal_dir = NULL;
@@ -1213,6 +1248,11 @@ pgmoneta_management_write_details(int socket)
 
    free_size = pgmoneta_free_space(config->base_dir);
    total_size = pgmoneta_total_space(config->base_dir);
+
+   if (write_int32("pgmoneta_management_write_details", socket, offline))
+   {
+      goto error;
+   }
 
    if (write_int64("pgmoneta_management_write_details", socket, used_size))
    {

@@ -79,6 +79,7 @@
 #endif
 
 #define MAX_FDS 64
+#define OFFLINE 1000
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
@@ -118,6 +119,7 @@ static int metrics_fds_length = -1;
 static struct accept_io io_management[MAX_FDS];
 static int* management_fds = NULL;
 static int management_fds_length = -1;
+static bool offline = false;
 
 static void
 start_mgt(void)
@@ -217,6 +219,7 @@ usage(void)
    printf("  -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file\n");
    printf("  -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file\n");
    printf("  -d, --daemon             Run as a daemon\n");
+   printf("      --offline            Run in offline mode\n");
    printf("  -V, --version            Display version information\n");
    printf("  -?, --help               Display help\n");
    printf("\n");
@@ -258,6 +261,7 @@ main(int argc, char** argv)
          {"users", required_argument, 0, 'u'},
          {"admins", required_argument, 0, 'A'},
          {"daemon", no_argument, 0, 'd'},
+         {"offline", no_argument, 0, OFFLINE},
          {"version", no_argument, 0, 'V'},
          {"help", no_argument, 0, '?'}
       };
@@ -284,6 +288,9 @@ main(int argc, char** argv)
             break;
          case 'd':
             daemon = true;
+            break;
+         case OFFLINE:
+            offline = true;
             break;
          case 'V':
             version();
@@ -462,7 +469,7 @@ main(int argc, char** argv)
 
    config = (struct configuration*)shmem;
 
-   if (daemon)
+   if (!offline && daemon)
    {
       if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
@@ -497,6 +504,10 @@ main(int argc, char** argv)
       {
          exit(1);
       }
+   }
+   else
+   {
+      daemon = false;
    }
 
    if (create_pidfile())
@@ -612,14 +623,25 @@ main(int argc, char** argv)
    }
 
    /* Create and/or validate replication slots */
-   if (init_replication_slots())
+   if (!offline && init_replication_slots())
    {
       exit_code = 1;
       goto error;
    }
 
-   /* Start all pg_receivewal processes */
-   init_receivewals();
+   if (!offline)
+   {
+      /* Start to retrieve WAL */
+      init_receivewals();
+
+      /* Start to validate server configuration */
+      ev_periodic_init (&valid, valid_cb, 0., 600, 0);
+      ev_periodic_start (main_loop, &valid);
+
+      /* Start to verify WAL streaming */
+      ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
+      ev_periodic_start (main_loop, &wal_streaming);
+   }
 
    /* Start WAL compression */
    if (config->compression_type != COMPRESSION_NONE)
@@ -628,16 +650,18 @@ main(int argc, char** argv)
       ev_periodic_start (main_loop, &wal);
    }
 
+   /* Start backup retention policy */
    ev_periodic_init (&retention, retention_cb, 0., 300, 0);
    ev_periodic_start (main_loop, &retention);
 
-   ev_periodic_init (&valid, valid_cb, 0., 600, 0);
-   ev_periodic_start (main_loop, &valid);
-
-   ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
-   ev_periodic_start (main_loop, &wal_streaming);
-
-   pgmoneta_log_info("Started on %s", config->host);
+   if (!offline)
+   {
+      pgmoneta_log_info("Started on %s", config->host);
+   }
+   else
+   {
+      pgmoneta_log_info("Started on %s (offline)", config->host);
+   }
    pgmoneta_log_debug("Management: %d", unix_management_socket);
    for (int i = 0; i < metrics_fds_length; i++)
    {
@@ -814,26 +838,59 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       case MANAGEMENT_BACKUP:
          pgmoneta_log_debug("Management backup: %s", payload_s1);
 
-         if (!strcmp("all", payload_s1))
+         if (!offline)
          {
-            for (int i = 0; i < config->number_of_servers; i++)
+            if (!strcmp("all", payload_s1))
             {
-               if (config->servers[i].wal_streaming)
+               for (int i = 0; i < config->number_of_servers; i++)
                {
-                  number_of_results++;
+                  if (config->servers[i].wal_streaming)
+                  {
+                     number_of_results++;
+                  }
+               }
+
+               pgmoneta_management_write_int32(client_fd, number_of_results);
+
+               for (int i = 0; i < config->number_of_servers; i++)
+               {
+                  if (config->servers[i].wal_streaming)
+                  {
+                     pid = fork();
+                     if (pid == -1)
+                     {
+                        pgmoneta_management_process_result(client_fd, i, NULL, 1, true);
+
+                        /* No process */
+                        pgmoneta_log_error("Cannot create process");
+                     }
+                     else if (pid == 0)
+                     {
+                        shutdown_ports();
+                        pgmoneta_backup(client_fd, i, ai->argv);
+                     }
+                  }
                }
             }
-
-            pgmoneta_management_write_int32(client_fd, number_of_results);
-
-            for (int i = 0; i < config->number_of_servers; i++)
+            else
             {
-               if (config->servers[i].wal_streaming)
+               srv = -1;
+               for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
                {
+                  if (!strcmp(config->servers[i].name, payload_s1))
+                  {
+                     srv = i;
+                  }
+               }
+
+               if (srv != -1)
+               {
+                  pgmoneta_management_write_int32(client_fd, 1);
+
                   pid = fork();
                   if (pid == -1)
                   {
-                     pgmoneta_management_process_result(client_fd, i, NULL, 1, true);
+                     pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
 
                      /* No process */
                      pgmoneta_log_error("Cannot create process");
@@ -841,46 +898,21 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                   else if (pid == 0)
                   {
                      shutdown_ports();
-                     pgmoneta_backup(client_fd, i, ai->argv);
+                     pgmoneta_backup(client_fd, srv, ai->argv);
                   }
+               }
+               else
+               {
+                  pgmoneta_management_write_int32(client_fd, 0);
+
+                  pgmoneta_log_error("Backup - Unknown server %s", payload_s1);
                }
             }
          }
          else
          {
-            srv = -1;
-            for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-            {
-               if (!strcmp(config->servers[i].name, payload_s1))
-               {
-                  srv = i;
-               }
-            }
-
-            pgmoneta_management_write_int32(client_fd, 1);
-
-            if (srv != -1)
-            {
-               pid = fork();
-               if (pid == -1)
-               {
-                  pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
-
-                  /* No process */
-                  pgmoneta_log_error("Cannot create process");
-               }
-               else if (pid == 0)
-               {
-                  shutdown_ports();
-                  pgmoneta_backup(client_fd, srv, ai->argv);
-               }
-            }
-            else
-            {
-               pgmoneta_management_write_int32(client_fd, 1);
-
-               pgmoneta_log_error("Backup - Unknown server %s", payload_s1);
-            }
+            pgmoneta_management_write_int32(client_fd, 0);
+            pgmoneta_log_warn("Can not create backups in offline mode");
          }
 
          free(payload_s1);
@@ -1169,7 +1201,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_management_write_status(client_fd);
+            pgmoneta_management_write_status(client_fd, offline);
             exit(0);
          }
 
@@ -1186,7 +1218,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_management_write_details(client_fd);
+            pgmoneta_management_write_details(client_fd, offline);
             exit(0);
          }
 

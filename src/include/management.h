@@ -204,10 +204,11 @@ pgmoneta_management_read_status(SSL* ssl, int socket);
 /**
  * Management: Write status
  * @param socket The socket
+ * @param offline Offline status
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_status(int socket);
+pgmoneta_management_write_status(int socket, bool offline);
 
 /**
  * Management operation: Details
@@ -229,10 +230,11 @@ pgmoneta_management_read_details(SSL* ssl, int socket);
 /**
  * Management: Write details
  * @param socket The socket
+ * @param offline Offline status
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_details(int socket);
+pgmoneta_management_write_details(int socket, bool offline);
 
 /**
  * Management operation: isalive

@@ -15,6 +15,7 @@ Options:
   -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file
   -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file
   -d, --daemon             Run as a daemon
+      --offline            Run in offline mode
   -V, --version            Display version information
   -?, --help               Display help
 ```
