@@ -89,9 +89,10 @@ pgmoneta_wal(int srv, char** argv)
    struct message* identify_system_msg = NULL;
    struct query_response* identify_system_response = NULL;
    struct message* start_replication_msg = NULL;
-   struct message* msg = NULL;
+   struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct configuration* config;
    struct stream_buffer* buffer = NULL;
+   memset(msg, 0, sizeof (struct message));
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
@@ -169,7 +170,7 @@ pgmoneta_wal(int srv, char** argv)
    // wait for the CopyBothResponse message
    while (config->running && (msg == NULL || type != 'W'))
    {
-      ret = pgmoneta_consume_copy_stream(socket, buffer, &msg);
+      ret = pgmoneta_consume_copy_stream_start(socket, buffer, msg);
       if (ret != 1)
       {
          pgmoneta_log_error("Error occurred when starting stream replication");
@@ -181,13 +182,14 @@ pgmoneta_wal(int srv, char** argv)
          pgmoneta_log_error("Error occurred when starting stream replication");
          goto error;
       }
+      pgmoneta_consume_copy_stream_end(buffer, msg);
    }
 
    type = 0;
 
    while (config->running)
    {
-      ret = pgmoneta_consume_copy_stream(socket, buffer, &msg);
+      ret = pgmoneta_consume_copy_stream_start(socket, buffer, msg);
       if (ret == 0)
       {
          break;
@@ -354,13 +356,15 @@ pgmoneta_wal(int srv, char** argv)
             wal_close(wal_shipping, filename, false, wal_shipping_file);
             wal_shipping_file = NULL;
          }
+         pgmoneta_consume_copy_stream_end(buffer, msg);
          break;
       }
+      pgmoneta_consume_copy_stream_end(buffer, msg);
    }
    // there should be two CommandComplete messages, receive them
    while (config->running && cnt < 2)
    {
-      if (pgmoneta_consume_copy_stream(socket, buffer, &msg) != MESSAGE_STATUS_OK || msg->kind == 'E' || msg->kind == 'f')
+      if (pgmoneta_consume_copy_stream_start(socket, buffer, msg) != MESSAGE_STATUS_OK || msg->kind == 'E' || msg->kind == 'f')
       {
          goto error;
       }
@@ -368,6 +372,7 @@ pgmoneta_wal(int srv, char** argv)
       {
          cnt++;
       }
+      pgmoneta_consume_copy_stream_end(buffer, msg);
    }
 
    config->servers[srv].wal_streaming = false;
@@ -411,6 +416,7 @@ error:
    }
    pgmoneta_free_copy_message(identify_system_msg);
    pgmoneta_free_copy_message(start_replication_msg);
+   pgmoneta_free_copy_message(msg);
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_memory_stream_buffer_free(buffer);
 

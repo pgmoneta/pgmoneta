@@ -461,6 +461,26 @@ int
 pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct message** message);
 
 /**
+ * Consume the data in copy stream buffer similar to pgmoneta_consume_copy_stream.
+ * Instead of creating a new message each time, reuse the same message buffer each time
+ * Must be used with pgmoneta_consume_copy_stream_end
+ * @param socket The socket
+ * @param buffer The stream buffer
+ * @param message The message buffer
+ * @return 1 upon success, 0 if no data to consume, otherwise 2
+ */
+int
+pgmoneta_consume_copy_stream_start(int socket, struct stream_buffer* buffer, struct message* message);
+
+/**
+ * Finish consuming the buffer, prepare for the next message to be consumed
+ * @param buffer The stream buffer
+ * @param message The message buffer
+ */
+void
+pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* message);
+
+/**
  * Receive and parse the DataRow messages into tuples
  * @param socket The socket
  * @param buffer The stream buffer holding the messages
