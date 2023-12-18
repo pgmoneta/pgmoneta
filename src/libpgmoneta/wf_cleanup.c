@@ -129,7 +129,10 @@ cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, stru
    path = pgmoneta_append(path, id);
    path = pgmoneta_append(path, "/backup_label.old");
 
-   pgmoneta_delete_file(path);
+   if (pgmoneta_exists_file(path))
+   {
+      pgmoneta_delete_file(path);
+   }
 
    for (int i = 0; i < number_of_backups; i++)
    {
