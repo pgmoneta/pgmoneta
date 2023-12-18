@@ -127,7 +127,7 @@ cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, stru
    path = pgmoneta_append(path, config->servers[server].name);
    path = pgmoneta_append(path, "-");
    path = pgmoneta_append(path, id);
-   path = pgmoneta_append(path, "/backup_label");
+   path = pgmoneta_append(path, "/backup_label.old");
 
    pgmoneta_delete_file(path);
 
