@@ -88,6 +88,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    char* label = NULL;
    char version[10];
    char* wal = NULL;
+   char old_label_path[MAX_PATH];
    struct node* o_root = NULL;
    struct node* o_to = NULL;
    struct configuration* config;
@@ -212,6 +213,23 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
          goto error;
       }
    }
+
+   // remove backup_label.old if it exists
+   memset(old_label_path, 0, MAX_PATH);
+   if (pgmoneta_ends_with(root, "/"))
+   {
+      snprintf(old_label_path, MAX_PATH, "%sdata/%s", root, "backup_label.old");
+   }
+   else
+   {
+      snprintf(old_label_path, MAX_PATH, "%s/data/%s", root, "backup_label.old");
+   }
+
+   if (pgmoneta_exists(old_label_path))
+   {
+      pgmoneta_delete_file(old_label_path);
+   }
+
    // receive and ignore the last result set, it's just a summary
    pgmoneta_consume_data_row_messages(socket, buffer, &response);
 
