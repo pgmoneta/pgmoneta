@@ -1445,17 +1445,6 @@ error:
    return 1;
 }
 
-bool
-pgmoneta_exists_file(char* file)
-{
-   if (access(file, F_OK) == 0)
-   {
-      return true;
-   }
-
-   return false;
-}
-
 int
 pgmoneta_delete_file(char* file)
 {

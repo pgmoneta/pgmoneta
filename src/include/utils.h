@@ -414,14 +414,6 @@ int
 pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files);
 
 /**
- * Does a file exist ?
- * @param file The file
- * @return The result
- */
-bool
-pgmoneta_exists_file(char* file);
-
-/**
  * Remove a file
  * @param file The file
  * @return The result
