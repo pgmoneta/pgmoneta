@@ -178,9 +178,6 @@ wf_restore(void)
    head = pgmoneta_workflow_create_restore();
    current = head;
 
-   current->next = pgmoneta_workflow_create_recovery_info();
-   current = current->next;
-
    if (config->encryption != ENCRYPTION_NONE)
    {
       current->next = pgmoneta_workflow_encryption(false);
@@ -207,6 +204,9 @@ wf_restore(void)
       current->next = pgmoneta_workflow_create_bzip2(false);
       current = current->next;
    }
+
+   current->next = pgmoneta_workflow_create_recovery_info();
+   current = current->next;
 
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
    current = current->next;
