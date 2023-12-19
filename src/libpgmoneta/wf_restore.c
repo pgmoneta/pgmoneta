@@ -36,6 +36,7 @@
 #include <workflow.h>
 
 /* system */
+#include <fcntl.h>
 #include <stdlib.h>
 
 static int restore_setup(int, char*, struct node*, struct node**);
@@ -47,6 +48,8 @@ static int recovery_info_execute(int, char*, struct node*, struct node**);
 static int recovery_info_teardown(int, char*, struct node*, struct node**);
 
 static char* get_user_password(char* username);
+static void create_standby_signal(char* basedir);
+
 
 struct workflow*
 pgmoneta_workflow_create_restore(void)
@@ -216,7 +219,10 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    from = pgmoneta_get_server_backup_identifier_data(server, id);
 
    to = pgmoneta_append(to, directory);
-   to = pgmoneta_append(to, "/");
+   if (!pgmoneta_ends_with(to, "/"))
+   {
+      to = pgmoneta_append(to, "/");
+   }
    to = pgmoneta_append(to, config->servers[server].name);
    to = pgmoneta_append(to, "-");
    to = pgmoneta_append(to, id);
@@ -428,6 +434,7 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
    FILE* ffile = NULL;
    char* t = NULL;
    FILE* tfile = NULL;
+   char* path = NULL;
    bool mode = false;
    char* ptr = NULL;
    struct configuration* config;
@@ -478,6 +485,11 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
       if (pgmoneta_exists(f))
       {
          ffile = fopen(f, "r");
+      }
+      else
+      {
+         pgmoneta_log_error("%s does not exists", f);
+         goto error;
       }
 
       tfile = fopen(t, "w");
@@ -665,12 +677,79 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
       }
 
       pgmoneta_move_file(t, f);
+
+      create_standby_signal(base);
+   }
+   else
+   {
+      f = pgmoneta_append(f, base);
+      if (!pgmoneta_ends_with(f, "/"))
+      {
+         f = pgmoneta_append(f, "/");
+      }
+      f = pgmoneta_append(f, "postgresql.auto.conf");
+
+      t = pgmoneta_append(t, f);
+      t = pgmoneta_append(t, ".tmp");
+
+      if (pgmoneta_exists(f))
+      {
+         ffile = fopen(f, "r");
+      }
+      else
+      {
+         pgmoneta_log_error("%s does not exists", f);
+         goto error;
+      }
+
+      tfile = fopen(t, "w");
+
+      if (ffile != NULL)
+      {
+         while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
+         {
+            if (pgmoneta_starts_with(&buffer[0], "primary_conninfo"))
+            {
+               memset(&line[0], 0, sizeof(line));
+               snprintf(&line[0], sizeof(line), "#%s", &buffer[0]);
+               fputs(&line[0], tfile);
+            }
+            else
+            {
+               fputs(&buffer[0], tfile);
+            }
+         }
+      }
+
+      if (ffile != NULL)
+      {
+         fclose(ffile);
+      }
+      if (tfile != NULL)
+      {
+         fclose(tfile);
+      }
+
+      pgmoneta_move_file(t, f);
+
+      path = pgmoneta_append(path, base);
+      if (!pgmoneta_ends_with(path, "/"))
+      {
+         path = pgmoneta_append(path, "/");
+      }
+      path = pgmoneta_append(path, "standby.signal");
+
+      if (pgmoneta_exists(path))
+      {
+         pgmoneta_delete_file(path);
+      }
    }
 
 done:
 
    free(f);
    free(t);
+   free(path);
 
    return 0;
 
@@ -678,6 +757,7 @@ error:
 
    free(f);
    free(t);
+   free(path);
 
    return 1;
 }
@@ -704,4 +784,30 @@ get_user_password(char* username)
    }
 
    return NULL;
+}
+
+static void
+create_standby_signal(char* basedir)
+{
+   char* f = NULL;
+   int fd = 0;
+
+   f = pgmoneta_append(f, basedir);
+   if (!pgmoneta_ends_with(f, "/"))
+   {
+      f = pgmoneta_append(f, "/");
+   }
+   f = pgmoneta_append(f, "standby.signal");
+
+   if ((fd = creat(f, 0600)) < 0)
+   {
+      pgmoneta_log_error("Unable to create: %s", f);
+   }
+
+   if (fd > 0)
+   {
+      close(fd);
+   }
+
+   free(f);
 }
