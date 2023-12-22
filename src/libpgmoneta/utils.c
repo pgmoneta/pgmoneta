@@ -61,8 +61,10 @@
 #endif
 
 extern char** environ;
+#ifdef HAVE_LINUX
 static bool env_changed = false;
 static int max_process_title_size = 0;
+#endif
 
 static int string_compare(const void* a, const void* b);
 

@@ -38,6 +38,7 @@
 /* system */
 #include <fcntl.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static int restore_setup(int, char*, struct node*, struct node**);
 static int restore_execute(int, char*, struct node*, struct node**);
