@@ -2009,7 +2009,11 @@ pgmoneta_symlink_at_file(char* from, char* to)
    char absolute_path[MAX_PATH];
 
    dir_path = dirname(strdup(from));
+#ifndef HAVE_OPENBSD
    dirfd = open(dir_path, O_PATH | O_DIRECTORY | O_NOFOLLOW);
+#else
+   dirfd = open(dir_path, O_DIRECTORY | O_NOFOLLOW);
+#endif
    if (dirfd == -1)
    {
       pgmoneta_log_debug("Could not open parent directory: %s (%s)", dir_path, strerror(errno));
