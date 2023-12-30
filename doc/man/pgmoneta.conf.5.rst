@@ -246,9 +246,6 @@ follow
 retention
   The retention for the server in days, weeks, months, years
 
-synchronous
-  Use synchronous receive. Default is off
-
 wal_shipping
   The WAL shipping directory
 

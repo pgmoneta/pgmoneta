@@ -197,7 +197,6 @@ struct server
    int retention_weeks;                /**< The retention weeks for the server */
    int retention_months;               /**< The retention months for the server */
    int retention_years;                /**< The retention years for the server */
-   bool synchronous;                   /**< Run in synchronous mode */
    int create_slot;                    /**< Create a slot */
    char create_slot_name[MISC_LENGTH]; /**< Name of the slot */
    atomic_bool backup;                 /**< Is there an active backup */

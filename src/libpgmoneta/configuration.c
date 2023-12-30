@@ -78,7 +78,6 @@ static void copy_server(struct server* dst, struct server* src);
 static void copy_user(struct user* dst, struct user* src);
 static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
-static int restart_bool(char* name, bool e, bool n);
 
 static bool is_empty_string(char* s);
 
@@ -187,7 +186,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   memset(&srv, 0, sizeof(struct server));
                   memcpy(&srv.name, &section, strlen(section));
 
-                  srv.synchronous = false;
                   atomic_init(&srv.backup, false);
                   atomic_init(&srv.delete, false);
                   atomic_init(&srv.wal, false);
@@ -388,20 +386,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(&srv.follow, value, max);
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
-               else if (!strcmp(key, "synchronous"))
-               {
-                  if (strlen(section) > 0)
-                  {
-                     if (as_bool(value, &srv.synchronous))
-                     {
-                        unknown = true;
-                     }
                   }
                   else
                   {
@@ -2823,7 +2807,6 @@ copy_server(struct server* dst, struct server* src)
    dst->retention_weeks = src->retention_weeks;
    dst->retention_months = src->retention_months;
    dst->retention_years = src->retention_years;
-   restart_bool("synchronous", dst->synchronous, src->synchronous);
    /* dst->backup = src->backup; */
    /* dst->delete = src->delete; */
    dst->wal_streaming = src->wal_streaming;
@@ -2855,18 +2838,6 @@ restart_string(char* name, char* e, char* n)
    if (strcmp(e, n))
    {
       pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e, n);
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-restart_bool(char* name, bool e, bool n)
-{
-   if (e != n)
-   {
-      pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e ? "true" : "false", n ? "true" : "false");
       return 1;
    }
 
