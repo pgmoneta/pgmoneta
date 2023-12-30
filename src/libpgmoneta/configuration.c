@@ -1231,6 +1231,11 @@ pgmoneta_validate_configuration(void* shm)
          pgmoneta_log_info("pgmoneta: No WAL slot defined for %s", config->servers[i].name);
       }
 
+      if (config->servers[i].synchronous)
+      {
+         pgmoneta_log_warn("pgmoneta: synchronous is deprecated for %s", config->servers[i].name);
+      }
+
       if (strlen(config->servers[i].follow) > 0)
       {
          found = false;
