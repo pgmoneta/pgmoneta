@@ -51,7 +51,6 @@ static int recovery_info_teardown(int, char*, struct node*, struct node**);
 static char* get_user_password(char* username);
 static void create_standby_signal(char* basedir);
 
-
 struct workflow*
 pgmoneta_workflow_create_restore(void)
 {
