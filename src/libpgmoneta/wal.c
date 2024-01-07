@@ -392,6 +392,10 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_free_copy_message(identify_system_msg);
    pgmoneta_free_copy_message(start_replication_msg);
+   if (msg != NULL)
+   {
+      msg->data = NULL;
+   }
    pgmoneta_free_copy_message(msg);
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_memory_stream_buffer_free(buffer);
@@ -416,6 +420,10 @@ error:
    }
    pgmoneta_free_copy_message(identify_system_msg);
    pgmoneta_free_copy_message(start_replication_msg);
+   if (msg != NULL)
+   {
+      msg->data = NULL;
+   }
    pgmoneta_free_copy_message(msg);
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_memory_stream_buffer_free(buffer);
