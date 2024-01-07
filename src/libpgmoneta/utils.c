@@ -2763,6 +2763,21 @@ pgmoneta_get_file_size(char* file_path)
    return file_stat.st_size;
 }
 
+bool
+pgmoneta_is_file_archive(char* file_path)
+{
+   if (pgmoneta_ends_with(file_path, ".aes") ||
+       pgmoneta_ends_with(file_path, ".zstd") ||
+       pgmoneta_ends_with(file_path, ".lz4") ||
+       pgmoneta_ends_with(file_path, ".bz2") ||
+       pgmoneta_ends_with(file_path, ".gz"))
+   {
+      return true;
+   }
+
+   return false;
+}
+
 #ifdef DEBUG
 
 int
