@@ -109,8 +109,7 @@ pgmoneta_zstandardc_data(char* directory)
       }
       else if (entry->d_type == DT_REG)
       {
-         if (!pgmoneta_ends_with(entry->d_name, ".zstd") &&
-             !pgmoneta_ends_with(entry->d_name, ".aes"))
+         if (!pgmoneta_is_file_archive(entry->d_name))
          {
             from = NULL;
 
@@ -247,9 +246,8 @@ pgmoneta_zstandardc_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, ".zstd") ||
-             pgmoneta_ends_with(entry->d_name, ".partial") ||
-             pgmoneta_ends_with(entry->d_name, ".aes"))
+         if (pgmoneta_is_file_archive(entry->d_name) ||
+             pgmoneta_ends_with(entry->d_name, ".partial"))
          {
             continue;
          }

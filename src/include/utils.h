@@ -780,6 +780,14 @@ pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length, unsigne
 size_t
 pgmoneta_get_file_size(char* file_path);
 
+/**
+ * Is the file is compressed and/or encrypted
+ * @param file_path The file path
+ * @return True if archive, otherwise false
+ */
+bool
+pgmoneta_is_file_archive(char* file_path);
+
 #ifdef DEBUG
 
 /**

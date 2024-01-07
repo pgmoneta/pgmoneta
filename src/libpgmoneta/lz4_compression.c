@@ -119,9 +119,8 @@ pgmoneta_lz4c_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, ".lz4") ||
-             pgmoneta_ends_with(entry->d_name, ".partial") ||
-             pgmoneta_ends_with(entry->d_name, ".aes"))
+         if (pgmoneta_is_file_archive(entry->d_name) ||
+             pgmoneta_ends_with(entry->d_name, ".partial"))
          {
             continue;
          }
