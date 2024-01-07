@@ -74,6 +74,7 @@ pgmoneta_wal(int srv, char** argv)
    int bytes_left = 0;
    char* xlogpos = NULL;
    char* remain_buffer = NULL;
+   size_t remain_buffer_alloc_size = 0;
    char cmd[MISC_LENGTH];
    size_t xlogpos_size = 0;
    size_t xlogptr = 0;
@@ -261,7 +262,6 @@ pgmoneta_wal(int srv, char** argv)
                            fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
                         }
                         bytes_left = 0;
-                        free(remain_buffer);
                      }
                   }
                }
@@ -321,9 +321,18 @@ pgmoneta_wal(int srv, char** argv)
 
                      if (bytes_left > 0)
                      {
-                        // save the rest of the data for the next wal segment
-                        remain_buffer = malloc(bytes_left);
-                        memset(remain_buffer, 0, bytes_left);
+                        /* Save the rest of the data for the next WAL segment */
+                        if (remain_buffer == NULL)
+                        {
+                           remain_buffer = malloc(bytes_left);
+                           remain_buffer_alloc_size = bytes_left;
+                        }
+                        else if (bytes_left > remain_buffer_alloc_size)
+                        {
+                           remain_buffer = realloc(remain_buffer, bytes_left);
+                           remain_buffer_alloc_size = bytes_left;
+                        }
+                        memset(remain_buffer, 0, remain_buffer_alloc_size);
                         memcpy(remain_buffer, msg->data + bytes_written, bytes_left);
                      }
                      break;
@@ -400,6 +409,7 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_memory_stream_buffer_free(buffer);
 
+   free(remain_buffer);
    free(d);
    free(wal_shipping);
    free(filename);
@@ -431,6 +441,7 @@ error:
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
+   free(remain_buffer);
    free(d);
    free(wal_shipping);
    free(filename);
