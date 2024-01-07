@@ -153,7 +153,7 @@ pgmoneta_zstandardc_data(char* directory)
 
    return;
 
- error:
+error:
 
    if (cctx != NULL)
    {
@@ -408,7 +408,7 @@ pgmoneta_zstandardd_directory(char* directory)
 
    return;
 
- error:
+error:
 
    if (dctx != NULL)
    {
