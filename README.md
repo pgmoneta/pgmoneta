@@ -11,8 +11,10 @@
 * Compression (gzip, zstd, lz4, bzip2)
 * AES encryption support
 * Symlink support
+* WAL shipping support
 * Prometheus support
 * Remote management
+* Offline mode
 * Transport Layer Security (TLS) v1.2+ support
 * Daemon mode
 * User vault
