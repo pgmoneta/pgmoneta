@@ -29,9 +29,9 @@
  */
 
 /* pgmoneta */
+#include <pgmoneta.h>
 #include <logging.h>
 #include <lz4_compression.h>
-#include <pgmoneta.h>
 #include <utils.h>
 
 /* system */
@@ -240,6 +240,31 @@ pgmoneta_lz4d_data(char* directory)
    }
 
    closedir(dir);
+}
+
+int
+pgmoneta_lz4d_file(char* from, char* to)
+{
+   if (pgmoneta_ends_with(from, ".lz4"))
+   {
+      if (lz4_decompress(from, to))
+      {
+         pgmoneta_log_error("LZ4: Could not decompress %s", from);
+         goto error;
+      }
+
+      pgmoneta_delete_file(from);
+   }
+   else
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
 }
 
 int

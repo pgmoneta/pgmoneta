@@ -227,6 +227,31 @@ pgmoneta_gzip_wal(char* directory)
    closedir(dir);
 }
 
+int
+pgmoneta_gunzip_file(char* from, char* to)
+{
+   if (pgmoneta_ends_with(from, ".gz"))
+   {
+      if (gz_decompress(from, to))
+      {
+         pgmoneta_log_error("Gzip: Could not decompress %s", from);
+         goto error;
+      }
+
+      pgmoneta_delete_file(from);
+   }
+   else
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
 void
 pgmoneta_gunzip_data(char* directory)
 {

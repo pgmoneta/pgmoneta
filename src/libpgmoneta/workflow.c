@@ -106,22 +106,22 @@ wf_backup(void)
    current->next = pgmoneta_storage_create_local();
    current = current->next;
 
-   if (config->compression_type == COMPRESSION_GZIP)
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
       current->next = pgmoneta_workflow_create_gzip(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_ZSTD)
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
    {
       current->next = pgmoneta_workflow_create_zstd(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_LZ4)
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
    {
       current->next = pgmoneta_workflow_create_lz4(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_BZIP2)
+   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
    {
       current->next = pgmoneta_workflow_create_bzip2(true);
       current = current->next;
@@ -184,22 +184,22 @@ wf_restore(void)
       current = current->next;
    }
 
-   if (config->compression_type == COMPRESSION_GZIP)
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
       current->next = pgmoneta_workflow_create_gzip(false);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_ZSTD)
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
    {
       current->next = pgmoneta_workflow_create_zstd(false);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_LZ4)
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
    {
       current->next = pgmoneta_workflow_create_lz4(false);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_BZIP2)
+   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
    {
       current->next = pgmoneta_workflow_create_bzip2(false);
       current = current->next;
@@ -229,23 +229,23 @@ wf_archive(void)
    head = pgmoneta_workflow_create_archive();
    current = head;
 
-   if (config->compression_type == COMPRESSION_GZIP)
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
       current->next = pgmoneta_workflow_create_gzip(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_ZSTD)
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
    {
       current->next = pgmoneta_workflow_create_zstd(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_LZ4)
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
    {
       current->next = pgmoneta_workflow_create_lz4(true);
 
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_BZIP2)
+   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
    {
       current->next = pgmoneta_workflow_create_bzip2(true);
 

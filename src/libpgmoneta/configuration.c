@@ -93,7 +93,7 @@ pgmoneta_init_configuration(void* shm)
 
    config->running = true;
 
-   config->compression_type = COMPRESSION_ZSTD;
+   config->compression_type = COMPRESSION_CLIENT_ZSTD;
    config->compression_level = 3;
 
    config->encryption = ENCRYPTION_NONE;
@@ -1244,6 +1244,51 @@ pgmoneta_validate_configuration(void* shm)
       }
    }
 
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   {
+      if (config->compression_level < 1)
+      {
+         config->compression_level = 1;
+      }
+      else if (config->compression_level > 9)
+      {
+         config->compression_level = 9;
+      }
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   {
+      if (config->compression_level < -131072)
+      {
+         config->compression_level = -131072;
+      }
+      else if (config->compression_level > 22)
+      {
+         config->compression_level = 22;
+      }
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   {
+      if (config->compression_level < 1)
+      {
+         config->compression_level = 1;
+      }
+      else if (config->compression_level > 12)
+      {
+         config->compression_level = 12;
+      }
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+   {
+      if (config->compression_level < 1)
+      {
+         config->compression_level = 1;
+      }
+      else if (config->compression_level > 9)
+      {
+         config->compression_level = 9;
+      }
+   }
+
    for (int i = 0; i < config->number_of_servers; i++)
    {
       if (!strcmp(config->servers[i].name, "pgmoneta"))
@@ -2041,27 +2086,42 @@ as_compression(char* str)
       return COMPRESSION_NONE;
    }
 
-   if (!strcasecmp(str, "gzip"))
+   if (!strcasecmp(str, "gzip") || !strcasecmp(str, "client-gzip"))
    {
-      return COMPRESSION_GZIP;
+      return COMPRESSION_CLIENT_GZIP;
    }
 
-   if (!strcasecmp(str, "zstd"))
+   if (!strcasecmp(str, "server-gzip"))
    {
-      return COMPRESSION_ZSTD;
+      return COMPRESSION_SERVER_GZIP;
    }
 
-   if (!strcasecmp(str, "lz4"))
+   if (!strcasecmp(str, "zstd") || !strcasecmp(str, "client-zstd"))
    {
-      return COMPRESSION_LZ4;
+      return COMPRESSION_CLIENT_ZSTD;
    }
 
-   if (!strcasecmp(str, "bz2"))
+   if (!strcasecmp(str, "server-zstd"))
    {
-      return COMPRESSION_BZIP2;
+      return COMPRESSION_SERVER_ZSTD;
    }
 
-   return COMPRESSION_ZSTD;
+   if (!strcasecmp(str, "lz4") || !strcasecmp(str, "client-lz4"))
+   {
+      return COMPRESSION_CLIENT_LZ4;
+   }
+
+   if (!strcasecmp(str, "server-lz4"))
+   {
+      return COMPRESSION_SERVER_LZ4;
+   }
+
+   if (!strcasecmp(str, "bz2") || !strcasecmp(str, "client-bz2"))
+   {
+      return COMPRESSION_CLIENT_BZIP2;
+   }
+
+   return COMPRESSION_CLIENT_ZSTD;
 }
 
 static int

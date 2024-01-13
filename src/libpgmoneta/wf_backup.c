@@ -170,7 +170,9 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    label = pgmoneta_append(label, "pgmoneta_base_backup_");
    label = pgmoneta_append(label, identifier);
-   pgmoneta_create_base_backup_message(config->servers[server].version, label, true, "SHA256", &basebackup_msg);
+   pgmoneta_create_base_backup_message(config->servers[server].version, label, true, "SHA256",
+                                       config->compression_type, config->compression_level,
+                                       &basebackup_msg);
 
    status = pgmoneta_write_message(NULL, socket, basebackup_msg);
    if (status != MESSAGE_STATUS_OK)

@@ -53,7 +53,7 @@ management
   The remote management port. Default is 0 (disabled)
 
 compression
-  The compression type (none, gzip, zstd, bzip2). Default is zstd
+  The compression type (none, gzip, client-gzip, server-gzip, zstd, client-zstd, server-zstd, lz4, client-lz4, server-lz4, bzip2, client-bzip2). Default is zstd
 
 compression_level
   The compression level. Default is 3

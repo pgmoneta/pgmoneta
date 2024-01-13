@@ -29,18 +29,22 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
+#include <gzip_compression.h>
 #include <info.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <network.h>
-#include <workflow.h>
 #include <restore.h>
 #include <utils.h>
+#include <workflow.h>
+#include <zstandard_compression.h>
 
 #include <archive.h>
 #include <archive_entry.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <string.h>
 
 static void write_tar_file(struct archive* a, char* current_real_path, char* current_save_path);
 
@@ -258,10 +262,42 @@ error:
 int
 pgmoneta_extract_tar_file(char* file_path, char* destination)
 {
+   char* archive_name = NULL;
    struct archive* a;
    struct archive_entry* entry;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
    a = archive_read_new();
    archive_read_support_format_tar(a);
+
+   if (config->compression_type == COMPRESSION_SERVER_GZIP)
+   {
+      archive_name = pgmoneta_append(archive_name, file_path);
+      archive_name = pgmoneta_append(archive_name, ".gz");
+      pgmoneta_move_file(file_path, archive_name);
+      pgmoneta_gunzip_file(archive_name, file_path);
+   }
+   else if (config->compression_type == COMPRESSION_SERVER_ZSTD)
+   {
+      archive_name = pgmoneta_append(archive_name, file_path);
+      archive_name = pgmoneta_append(archive_name, ".zstd");
+      pgmoneta_move_file(file_path, archive_name);
+      pgmoneta_zstandardd_file(archive_name, file_path);
+   }
+   else if (config->compression_type == COMPRESSION_SERVER_LZ4)
+   {
+      archive_name = pgmoneta_append(archive_name, file_path);
+      archive_name = pgmoneta_append(archive_name, ".lz4");
+      pgmoneta_move_file(file_path, archive_name);
+      pgmoneta_lz4d_file(archive_name, file_path);
+   }
+   else
+   {
+      archive_name = pgmoneta_append(archive_name, file_path);
+   }
+
    // open tar file in a suitable buffer size, I'm using 10240 here
    if (archive_read_open_filename(a, file_path, 10240) != ARCHIVE_OK)
    {
@@ -291,11 +327,15 @@ pgmoneta_extract_tar_file(char* file_path, char* destination)
       }
    }
 
+   free(archive_name);
+
    archive_read_close(a);
    archive_read_free(a);
    return 0;
 
 error:
+   free(archive_name);
+
    archive_read_close(a);
    archive_read_free(a);
    return 1;

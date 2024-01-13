@@ -56,6 +56,8 @@ static int create_D_tuple(int number_of_columns, struct message* msg, struct tup
 static int get_number_of_columns(struct message* msg);
 static int get_column_name(struct message* msg, int index, char** name);
 
+static bool is_server_side_compression(void);
+
 int
 pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
 {
@@ -793,7 +795,9 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 }
 
 int
-pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm, struct message** msg)
+pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm,
+                                    int compression, int compression_level,
+                                    struct message** msg)
 {
    bool use_new_format = server_version >= 15;
    char cmd[1024];
@@ -818,6 +822,28 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
       else
       {
          options = pgmoneta_append(options, "WAL false, ");
+      }
+
+      if (compression == COMPRESSION_SERVER_GZIP)
+      {
+         options = pgmoneta_append(options, "COMPRESSION 'gzip', ");
+         options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
+         options = pgmoneta_append_int(options, compression_level);
+         options = pgmoneta_append(options, "', ");
+      }
+      else if (compression == COMPRESSION_SERVER_ZSTD)
+      {
+         options = pgmoneta_append(options, "COMPRESSION 'zstd', ");
+         options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
+         options = pgmoneta_append_int(options, compression_level);
+         options = pgmoneta_append(options, ",workers=4', ");
+      }
+      else if (compression == COMPRESSION_SERVER_LZ4)
+      {
+         options = pgmoneta_append(options, "COMPRESSION 'lz4', ");
+         options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
+         options = pgmoneta_append_int(options, compression_level);
+         options = pgmoneta_append(options, "', ");
       }
 
       options = pgmoneta_append(options, "CHECKPOINT 'fast', ");
@@ -1224,6 +1250,14 @@ pgmoneta_query_response_debug(struct query_response* response)
    }
 
    pgmoneta_log_trace("Tuples: %d", number_of_tuples);
+}
+
+static bool
+is_server_side_compression(void) {
+    struct configuration* config;
+
+   config = (struct configuration*)shmem;
+   return config->compression_type == COMPRESSION_SERVER_GZIP || config->compression_type == COMPRESSION_SERVER_LZ4 || config->compression_type == COMPRESSION_SERVER_ZSTD;
 }
 
 static int
@@ -2069,6 +2103,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
          {
             pgmoneta_log_copyfail_message(msg);
             pgmoneta_log_error_response_message(msg);
+            fflush(file);
             fclose(file);
             goto error;
          }
@@ -2081,6 +2116,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
          {
             pgmoneta_log_copyfail_message(msg);
             pgmoneta_log_error_response_message(msg);
+            fflush(file);
             fclose(file);
             goto error;
          }
@@ -2091,6 +2127,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
             if (fwrite(msg->data, msg->length, 1, file) != 1)
             {
                pgmoneta_log_error("could not write to file %s", file_path);
+               fflush(file);
                fclose(file);
                goto error;
             }
@@ -2102,9 +2139,11 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
       if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
       {
          pgmoneta_log_error("could not write to file %s", file_path);
+         fflush(file);
          fclose(file);
          goto error;
       }
+      fflush(file);
       fclose(file);
 
       // extract the file
@@ -2242,13 +2281,15 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
                // append two blocks of null buffer and extract the tar file
                if (file != NULL)
                {
-                  if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
+                     fflush(file);
                      fclose(file);
                      file = NULL;
                      goto error;
                   }
+                  fflush(file);
                   fclose(file);
                   file = NULL;
                   pgmoneta_extract_tar_file(file_path, directory);
@@ -2322,13 +2363,15 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
                // start of manifest, finish off previous data archive receiving
                if (file != NULL)
                {
-                  if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
+                     fflush(file);
                      fclose(file);
                      file = NULL;
                      goto error;
                   }
+                  fflush(file);
                   fclose(file);
                   file = NULL;
                   pgmoneta_extract_tar_file(file_path, directory);
@@ -2384,6 +2427,7 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
          pgmoneta_log_error("could not rename file %s to %s", tmp_manifest_file_path, manifest_file_path);
          goto error;
       }
+      fflush(file);
       fclose(file);
       file = NULL;
    }
@@ -2438,6 +2482,7 @@ error:
    }
    if (file != NULL)
    {
+      fflush(file);
       fclose(file);
    }
    pgmoneta_free_query_response(response);
@@ -2506,11 +2551,13 @@ pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* b
       pgmoneta_log_error("could not rename file %s to %s", tmp_file_path, file_path);
       goto error;
    }
+   fflush(file);
    fclose(file);
    pgmoneta_free_copy_message(msg);
    return 0;
 
 error:
+   fflush(file);
    fclose(file);
    pgmoneta_free_copy_message(msg);
    return 1;

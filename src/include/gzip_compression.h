@@ -57,6 +57,15 @@ void
 pgmoneta_gzip_wal(char* directory);
 
 /**
+ * GUNZip a file
+ * @param from The from file
+ * @param to The to file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_gunzip_file(char* from, char* to);
+
+/**
  * GUNZip a directory
  * @param directory The directory
  */

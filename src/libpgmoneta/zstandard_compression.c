@@ -305,6 +305,61 @@ error:
    free(zout);
 }
 
+int
+pgmoneta_zstandardd_file(char* from, char* to)
+{
+   ZSTD_DCtx* dctx = NULL;
+   size_t zin_size = -1;
+   void* zin = NULL;
+   size_t zout_size = -1;
+   void* zout = NULL;
+
+   if (pgmoneta_ends_with(from, ".zstd"))
+   {
+      zin_size = ZSTD_DStreamInSize();
+      zin = malloc(zin_size);
+      zout_size = ZSTD_DStreamOutSize();
+      zout = malloc(zout_size);
+
+      dctx = ZSTD_createDCtx();
+      if (dctx == NULL)
+      {
+         goto error;
+      }
+
+      if (zstd_decompress(from, to, dctx, zin_size, zin, zout_size, zout))
+      {
+         pgmoneta_log_error("ZSTD: Could not decompress %s", from);
+         goto error;
+      }
+
+      pgmoneta_delete_file(from);
+   }
+   else
+   {
+      goto error;
+   }
+
+   ZSTD_freeDCtx(dctx);
+
+   free(zin);
+   free(zout);
+
+   return 0;
+
+error:
+
+   if (dctx != NULL)
+   {
+      ZSTD_freeDCtx(dctx);
+   }
+
+   free(zin);
+   free(zout);
+
+   return 1;
+}
+
 void
 pgmoneta_zstandardd_directory(char* directory)
 {

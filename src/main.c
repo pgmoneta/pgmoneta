@@ -1542,19 +1542,19 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
          {
             d = pgmoneta_get_server_wal(i);
 
-            if (config->compression_type == COMPRESSION_GZIP)
+            if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
             {
                pgmoneta_gzip_wal(d);
             }
-            else if (config->compression_type == COMPRESSION_ZSTD)
+            else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
             {
                pgmoneta_zstandardc_wal(d);
             }
-            else if (config->compression_type == COMPRESSION_LZ4)
+            else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
             {
                pgmoneta_lz4c_wal(d);
             }
-            else if (config->compression_type == COMPRESSION_BZIP2)
+            else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
             {
                pgmoneta_bzip2_wal(d);
             }
@@ -1887,6 +1887,15 @@ init_replication_slots(void)
             if (config->servers[srv].version < POSTGRESQL_MIN_VERSION)
             {
                pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->servers[srv].name);
+               ret = 1;
+               goto server_done;
+            }
+
+            if (config->servers[srv].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
+                                                      config->compression_type == COMPRESSION_SERVER_ZSTD ||
+                                                      config->compression_type == COMPRESSION_SERVER_LZ4))
+            {
+               pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->servers[srv].name);
                ret = 1;
                goto server_done;
             }

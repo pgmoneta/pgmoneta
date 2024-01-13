@@ -66,6 +66,15 @@ void
 pgmoneta_lz4d_data(char* directory);
 
 /**
+ * Decompress a Lz4 file
+ * @param from The from file
+ * @param to The to file
+ * @retrun 0 upon success, otherwise 1
+ */
+int
+pgmoneta_lz4d_file(char* from, char* to);
+
+/**
  * Compress a file
  * @param from The from name
  * @param to The to name

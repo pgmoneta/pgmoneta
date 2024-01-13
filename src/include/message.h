@@ -353,11 +353,15 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  * @param label The label of the backup
  * @param include_wal The indication of whether to also include WAL
  * @param checksum_algorithm The checksum algorithm to be applied to backup manifest (only work for server version > 12)
+ * @param compression The compression type
+ * @param compression_level The compression level
  * @param msg The resulting message
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm, struct message** msg);
+pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm,
+                                    int compression, int compression_level,
+                                    struct message** msg);
 
 /**
  * Create a replication slot

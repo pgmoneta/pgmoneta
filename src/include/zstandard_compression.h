@@ -57,6 +57,15 @@ void
 pgmoneta_zstandardc_wal(char* directory);
 
 /**
+ * Decompress a Zstandard file
+ * @param from The from file
+ * @param to The to file
+ * @return 0 if successful, otherwise 1
+ */
+int
+pgmoneta_zstandardd_file(char* from, char* to);
+
+/**
  * Decompress a Zstandard directory
  * @param directory The directory
  */

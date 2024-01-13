@@ -150,16 +150,19 @@ pgmoneta_encrypt_wal(char* d)
    config = (struct configuration*)shmem;
    switch (config->compression_type)
    {
-      case COMPRESSION_GZIP:
+      case COMPRESSION_CLIENT_GZIP:
+      case COMPRESSION_SERVER_GZIP:
          compress_suffix = ".gz";
          break;
-      case COMPRESSION_ZSTD:
+      case COMPRESSION_CLIENT_ZSTD:
+      case COMPRESSION_SERVER_ZSTD:
          compress_suffix = ".zstd";
          break;
-      case COMPRESSION_LZ4:
+      case COMPRESSION_CLIENT_LZ4:
+      case COMPRESSION_SERVER_LZ4:
          compress_suffix = ".lz4";
          break;
-      case COMPRESSION_BZIP2:
+      case COMPRESSION_CLIENT_BZIP2:
          compress_suffix = ".bz2";
          break;
       case COMPRESSION_NONE:
