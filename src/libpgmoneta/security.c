@@ -1179,6 +1179,7 @@ server_password(char* username, char* password, int server_fd)
    status = pgmoneta_read_block_message(NULL, server_fd, &auth_msg);
    if (auth_msg->length > SECURITY_BUFFER_SIZE)
    {
+      pgmoneta_log_message(auth_msg);
       pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
       goto error;
    }
@@ -1190,6 +1191,7 @@ server_password(char* username, char* password, int server_fd)
    {
       if (auth_msg->length > SECURITY_BUFFER_SIZE)
       {
+         pgmoneta_log_message(auth_msg);
          pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
          goto error;
       }
@@ -1292,6 +1294,7 @@ server_md5(char* username, char* password, int server_fd)
    status = pgmoneta_read_block_message(NULL, server_fd, &auth_msg);
    if (auth_msg->length > SECURITY_BUFFER_SIZE)
    {
+      pgmoneta_log_message(auth_msg);
       pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
       goto error;
    }
@@ -1303,6 +1306,7 @@ server_md5(char* username, char* password, int server_fd)
    {
       if (auth_msg->length > SECURITY_BUFFER_SIZE)
       {
+         pgmoneta_log_message(auth_msg);
          pgmoneta_log_error("Security message too large: %ld", auth_msg->length);
          goto error;
       }
@@ -1417,6 +1421,7 @@ server_scram256(char* username, char* password, int server_fd)
    status = pgmoneta_read_block_message(NULL, server_fd, &msg);
    if (msg->length > SECURITY_BUFFER_SIZE)
    {
+      pgmoneta_log_message(msg);
       pgmoneta_log_error("Security message too large: %ld", msg->length);
       goto error;
    }
@@ -1481,6 +1486,7 @@ server_scram256(char* username, char* password, int server_fd)
    status = pgmoneta_read_block_message(NULL, server_fd, &msg);
    if (msg->length > SECURITY_BUFFER_SIZE)
    {
+      pgmoneta_log_message(msg);
       pgmoneta_log_error("Security message too large: %ld", msg->length);
       goto error;
    }
