@@ -65,8 +65,8 @@
 #define SECURITY_SCRAM256 10
 #define SECURITY_ALL      99
 
-#define NUMBER_OF_SECURITY_MESSAGES   5
-#define SECURITY_BUFFER_SIZE        512
+#define NUMBER_OF_SECURITY_MESSAGES    5
+#define SECURITY_BUFFER_SIZE        1024
 
 static signed char has_security;
 static ssize_t security_lengths[NUMBER_OF_SECURITY_MESSAGES];
