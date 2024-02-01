@@ -155,7 +155,13 @@ pgmoneta_server_get_wal_size(int socket, int* ws)
       goto error;
    }
 
+   pgmoneta_log_message(tmsg);
    pgmoneta_extract_message('D', tmsg, &dmsg);
+
+   if (dmsg == NULL)
+   {
+      goto error;
+   }
 
    vlength = pgmoneta_read_int32(dmsg->data + 7);
    value = (char*)malloc(vlength + 1);
@@ -230,7 +236,13 @@ get_wal_level(int socket, bool* replica)
       goto error;
    }
 
+   pgmoneta_log_message(tmsg);
    pgmoneta_extract_message('D', tmsg, &dmsg);
+
+   if (dmsg == NULL)
+   {
+      goto error;
+   }
 
    vlength = pgmoneta_read_int32(dmsg->data + 7);
    value = (char*)malloc(vlength + 1);
