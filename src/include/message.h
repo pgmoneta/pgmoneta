@@ -152,6 +152,13 @@ void
 pgmoneta_log_error_response_message(struct message* msg);
 
 /**
+ * Log a Notice Response message
+ * @param msg The Notice Response message
+ */
+void
+pgmoneta_log_notice_response_message(struct message* msg);
+
+/**
  * Write a notice message
  * @param ssl The SSL struct
  * @param socket The socket descriptor

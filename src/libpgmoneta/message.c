@@ -203,6 +203,47 @@ pgmoneta_log_error_response_message(struct message* msg)
    free(error);
 }
 
+void
+pgmoneta_log_notice_response_message(struct message* msg)
+{
+   size_t offset = 0;
+   signed char field_type = 0;
+   char* error = NULL;
+   char* error_code = NULL;
+
+   if (msg == NULL || msg->kind != 'N')
+   {
+      return;
+   }
+
+   pgmoneta_extract_error_fields('M', msg, &error);
+   pgmoneta_extract_error_fields('C', msg, &error_code);
+
+   pgmoneta_log_warn("notice response message: %s (SQLSTATE code: %s)", error, error_code);
+
+   while (offset < msg->length)
+   {
+      field_type = pgmoneta_read_byte(msg->data + offset);
+
+      if (field_type == '\0')
+      {
+         break;
+      }
+
+      offset += 1;
+
+      if (field_type != 'M' && field_type != 'C')
+      {
+         pgmoneta_log_debug("notice response field type: %c, message: %s", field_type, msg->data + offset);
+      }
+
+      offset += (strlen(msg->data + offset) + 1);
+   }
+
+   free(error_code);
+   free(error);
+}
+
 int
 pgmoneta_write_empty(SSL* ssl, int socket)
 {
@@ -1169,6 +1210,14 @@ pgmoneta_has_message(char type, void* data, size_t data_size)
 
       if (type == t)
       {
+         // log error response message when we find it
+         if (type == 'E')
+         {
+            struct message* msg = NULL;
+            pgmoneta_extract_message_offset(offset, data, &msg);
+            pgmoneta_log_error_response_message(msg);
+            pgmoneta_free_copy_message(msg);
+         }
          return true;
       }
       else
@@ -1253,8 +1302,9 @@ pgmoneta_query_response_debug(struct query_response* response)
 }
 
 static bool
-is_server_side_compression(void) {
-    struct configuration* config;
+is_server_side_compression(void)
+{
+   struct configuration* config;
 
    config = (struct configuration*)shmem;
    return config->compression_type == COMPRESSION_SERVER_GZIP || config->compression_type == COMPRESSION_SERVER_LZ4 || config->compression_type == COMPRESSION_SERVER_ZSTD;
