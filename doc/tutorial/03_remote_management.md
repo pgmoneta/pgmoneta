@@ -55,3 +55,30 @@ pgmoneta-cli -h localhost -p 5002 -U admin details
 and use `admin1234` as the password
 
 (`pgmoneta` user)
+
+## Using Transport Level Security for access
+
+You can security the administration level interface by using Transport Level Security (TLS).
+
+It is done by setting the following options,
+
+```
+[pgmoneta]
+tls_cert_file=/path/to/server.crt
+tls_key_file=/path/to/server.key
+tls_ca_file=/path/to/root.crt
+
+...
+```
+
+in `pgmoneta.conf`.
+
+The client side setup must go into `~/.pgmoneta/` with the following files
+
+```
+~/.pgmoneta/pgmoneta.key
+~/.pgmoneta/pgmoneta.crt
+~/.pgmoneta/root.crt
+```
+
+They must have 0600 permission.
