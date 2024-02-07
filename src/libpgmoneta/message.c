@@ -1728,6 +1728,8 @@ pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer)
 {
    int numbytes = 0;
    bool keep_read = false;
+   int err;
+
    /*
     * if buffer is still too full,
     * try enlarging it to be at least big enough for one TCP packet (I'm using 1500B here)
@@ -1784,8 +1786,6 @@ pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer)
          if (ssl != NULL)
          {
 ssl_error:
-            int err;
-
             err = SSL_get_error(ssl, numbytes);
             switch (err)
             {
