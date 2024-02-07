@@ -260,6 +260,8 @@ There are a few short tutorials available to help you better understand and conf
 - [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
 - [Retention](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_retention.md)
 - [Enabling Grafana dashboard](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_grafana.md)
+- [Add WAL shipping](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/11_wal_shipping.md)
+- [Working with Transport Level Security](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_tls.md)
 
 ## Closing
 
