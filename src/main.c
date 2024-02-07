@@ -95,7 +95,7 @@ static bool accept_fatal(int error);
 static void reload_configuration(void);
 static void init_receivewals(void);
 static int init_replication_slots(void);
-static int verify_replication_slot(char* slot_name, int srv, int socket);
+static int verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
 static void shutdown_ports(void);
@@ -1846,6 +1846,7 @@ init_replication_slots(void)
    int usr;
    int auth = AUTH_ERROR;
    int slot_status;
+   SSL* ssl = NULL;
    int socket;
    int ret = 0;
    char* create_slot_name = NULL;
@@ -1873,11 +1874,11 @@ init_replication_slots(void)
       if (usr != -1)
       {
          socket = 0;
-         auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &socket);
+         auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket);
 
          if (auth == AUTH_SUCCESS)
          {
-            if (pgmoneta_server_get_version(socket, srv))
+            if (pgmoneta_server_get_version(ssl, socket, srv))
             {
                pgmoneta_log_fatal("Could not get version for server %s", config->servers[srv].name);
                ret = 1;
@@ -1903,7 +1904,7 @@ init_replication_slots(void)
             if (strlen(config->servers[srv].wal_slot) > 0)
             {
                /* Verify replication slot */
-               slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, socket);
+               slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, ssl, socket);
                if (slot_status == VALID_SLOT)
                {
                   /* Ok */
@@ -1925,9 +1926,10 @@ init_replication_slots(void)
          }
          else
          {
-            pgmoneta_log_error("Authentication failed for user on %s", config->servers[srv].name);
+            pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
          }
 
+         pgmoneta_close_ssl(ssl);
          pgmoneta_disconnect(socket);
          socket = 0;
 
@@ -1936,7 +1938,7 @@ init_replication_slots(void)
             create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
                           (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
 
-            auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &socket);
+            auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
 
             if (auth == AUTH_SUCCESS)
             {
@@ -1952,9 +1954,9 @@ init_replication_slots(void)
                pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, create_slot_name);
 
                pgmoneta_create_replication_slot_message(create_slot_name, &slot_request_msg);
-               if (pgmoneta_write_message(NULL, socket, slot_request_msg) == MESSAGE_STATUS_OK)
+               if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
                {
-                  if (pgmoneta_read_block_message(NULL, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
+                  if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                   {
                      pgmoneta_log_info("Created replication slot %s on %s", create_slot_name, config->servers[srv].name);
                   }
@@ -1980,6 +1982,7 @@ init_replication_slots(void)
             }
 
 server_done:
+            pgmoneta_close_ssl(ssl);
             pgmoneta_disconnect(socket);
          }
       }
@@ -1995,7 +1998,7 @@ server_done:
 }
 
 static int
-verify_replication_slot(char* slot_name, int srv, int socket)
+verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket)
 {
    int ret = VALID_SLOT;
    struct message* query;
@@ -2006,7 +2009,7 @@ verify_replication_slot(char* slot_name, int srv, int socket)
    config = (struct configuration*)shmem;
 
    pgmoneta_create_search_replication_slot_message(slot_name, &query);
-   if (pgmoneta_query_execute(socket, query, &response) || response == NULL)
+   if (pgmoneta_query_execute(ssl, socket, query, &response) || response == NULL)
    {
       pgmoneta_log_error("Could not execute verify replication slot query for %s", config->servers[srv].name);
    }

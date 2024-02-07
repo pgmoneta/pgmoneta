@@ -46,11 +46,12 @@ extern "C" {
  * @param username The username
  * @param password The password
  * @param replication Is replication enabled
+ * @param ssl The resulting SSL structure
  * @param fd The resulting socket
  * @return AUTH_SUCCESS, AUTH_BAD_PASSWORD or AUTH_ERROR
  */
 int
-pgmoneta_server_authenticate(int server, char* database, char* username, char* password, bool replication, int* fd);
+pgmoneta_server_authenticate(int server, char* database, char* username, char* password, bool replication, SSL** ssl, int* fd);
 
 /**
  * Authenticate a remote management user
@@ -119,6 +120,13 @@ pgmoneta_generate_string_sha256_hash(char* string, char** sha256);
 int pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* value,
                                               int value_length, unsigned char** hmac,
                                               int* hmac_length);
+
+/**
+ * Close a SSL structure
+ * @param ssl The SSL structure
+ */
+void
+pgmoneta_close_ssl(SSL* ssl);
 
 #ifdef __cplusplus
 }

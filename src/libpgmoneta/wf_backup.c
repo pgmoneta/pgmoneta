@@ -78,6 +78,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    char* d = NULL;
    unsigned long size = 0;
    int usr;
+   SSL* ssl = NULL;
    int socket = -1;
    int total_seconds;
    int hours;
@@ -116,7 +117,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       }
    }
    // establish a connection, with replication flag set
-   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, false, &socket) != AUTH_SUCCESS)
+   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
       pgmoneta_log_info("Invalid credentials for %s", config->users[usr].username);
       goto error;
@@ -124,7 +125,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    if (config->servers[server].version == 0)
    {
-      if (pgmoneta_server_get_version(socket, server))
+      if (pgmoneta_server_get_version(ssl, socket, server))
       {
          goto error;
       }
@@ -133,7 +134,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    snprintf(version, sizeof(version), "%d", config->servers[server].version);
 
    pgmoneta_create_query_message("SELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &tablespace_msg);
-   if (pgmoneta_query_execute(socket, tablespace_msg, &response) || response == NULL)
+   if (pgmoneta_query_execute(ssl, socket, tablespace_msg, &response) || response == NULL)
    {
       goto error;
    }
@@ -161,9 +162,10 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    pgmoneta_free_query_response(response);
    response = NULL;
+   pgmoneta_close_ssl(ssl);
    pgmoneta_disconnect(socket);
 
-   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, true, &socket) != AUTH_SUCCESS)
+   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket) != AUTH_SUCCESS)
    {
       pgmoneta_log_info("Invalid credentials for %s", config->users[usr].username);
       goto error;
@@ -174,7 +176,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
                                        config->compression_type, config->compression_level,
                                        &basebackup_msg);
 
-   status = pgmoneta_write_message(NULL, socket, basebackup_msg);
+   status = pgmoneta_write_message(ssl, socket, basebackup_msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -182,7 +184,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    pgmoneta_memory_stream_buffer_init(&buffer);
    // Receive and ignore the first result set, it is for receiving wal
-   if (pgmoneta_consume_data_row_messages(socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
    {
       goto error;
    }
@@ -198,7 +200,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_mkdir(root);
    if (config->servers[server].version < 15)
    {
-      if (pgmoneta_receive_archive_files(socket, buffer, root, tablespaces, config->servers[server].version))
+      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, config->servers[server].version))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -209,7 +211,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    else
    {
-      if (pgmoneta_receive_archive_stream(socket, buffer, root, tablespaces))
+      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, root, tablespaces))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -236,7 +238,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
 
    // receive and ignore the last result set, it's just a summary
-   pgmoneta_consume_data_row_messages(socket, buffer, &response);
+   pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response);
 
    total_seconds = (int) difftime(time(NULL), start_time);
    hours = total_seconds / 3600;
@@ -284,7 +286,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
       current_tablespace = current_tablespace->next;
    }
-
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
@@ -303,6 +305,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    return 0;
 
 error:
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);

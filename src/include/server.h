@@ -44,21 +44,23 @@ pgmoneta_server_info(int srv);
 
 /**
  * Get the WAL size for a server
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param ws The WAL size
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_server_get_wal_size(int socket, int* ws);
+pgmoneta_server_get_wal_size(SSL* ssl, int socket, int* ws);
 
 /**
  * Get the version of a server
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param server The server index
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_server_get_version(int socket, int server);
+pgmoneta_server_get_version(SSL* ssl, int socket, int server);
 
 #ifdef __cplusplus
 }

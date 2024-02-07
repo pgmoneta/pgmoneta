@@ -79,9 +79,9 @@ static int generate_md5(char* str, int length, char** md5);
 static int client_scram256(SSL* c_ssl, int client_fd, char* username, char* password, int slot);
 
 static int server_trust(void);
-static int server_password(char* username, char* password, int server_fd);
-static int server_md5(char* username, char* password, int server_fd);
-static int server_scram256(char* username, char* password, int server_fd);
+static int server_password(char* username, char* password, SSL* ssl, int server_fd);
+static int server_md5(char* username, char* password, SSL* ssl, int server_fd);
+static int server_scram256(char* username, char* password, SSL* ssl, int server_fd);
 
 static char* get_admin_password(char* username);
 
@@ -1010,16 +1010,20 @@ error:
 }
 
 int
-pgmoneta_server_authenticate(int server, char* database, char* username, char* password, bool replication, int* fd)
+pgmoneta_server_authenticate(int server, char* database, char* username, char* password, bool replication, SSL** ssl, int* fd)
 {
    int server_fd;
    int auth_type;
    int ret;
    int status = AUTH_ERROR;
+   int connect;
+   SSL* c_ssl = NULL;
+   struct message* ssl_msg = NULL;
    struct message* startup_msg = NULL;
    struct message* msg = NULL;
    struct configuration* config;
 
+   *ssl = NULL;
    *fd = -1;
 
    auth_type = SECURITY_INVALID;
@@ -1049,13 +1053,13 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
       goto error;
    }
 
-   ret = pgmoneta_create_startup_message(username, database, replication, &startup_msg);
+   ret = pgmoneta_create_ssl_message(&ssl_msg);
    if (ret != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   ret = pgmoneta_write_message(NULL, server_fd, startup_msg);
+   ret = pgmoneta_write_message(NULL, server_fd, ssl_msg);
    if (ret != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -1064,6 +1068,89 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    ret = pgmoneta_read_block_message(NULL, server_fd, &msg);
    if (ret != MESSAGE_STATUS_OK)
    {
+      goto error;
+   }
+
+   if (msg->kind == 'S')
+   {
+      SSL_CTX* ctx = NULL;
+
+      if (create_ssl_ctx(true, &ctx))
+      {
+         goto error;
+      }
+
+      pgmoneta_log_trace("%s: Key file @ %s", config->servers[server].name, config->servers[server].tls_key_file);
+      pgmoneta_log_trace("%s: Certificate file @ %s", config->servers[server].name, config->servers[server].tls_cert_file);
+      pgmoneta_log_trace("%s: CA file @ %s", config->servers[server].name, config->servers[server].tls_ca_file);
+
+      if (create_ssl_client(ctx, config->servers[server].tls_key_file, config->servers[server].tls_cert_file, config->servers[server].tls_ca_file, server_fd, &c_ssl))
+      {
+         goto error;
+      }
+
+      do
+      {
+         connect = SSL_connect(c_ssl);
+
+         if (connect != 1)
+         {
+            int err = SSL_get_error(c_ssl, connect);
+            switch (err)
+            {
+               case SSL_ERROR_ZERO_RETURN:
+               case SSL_ERROR_WANT_READ:
+               case SSL_ERROR_WANT_WRITE:
+               case SSL_ERROR_WANT_CONNECT:
+               case SSL_ERROR_WANT_ACCEPT:
+               case SSL_ERROR_WANT_X509_LOOKUP:
+#ifndef HAVE_OPENBSD
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+               case SSL_ERROR_WANT_ASYNC:
+               case SSL_ERROR_WANT_ASYNC_JOB:
+#if (OPENSSL_VERSION_NUMBER >= 0x10101000L)
+               case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+#endif
+#endif
+#endif
+                  break;
+               case SSL_ERROR_SYSCALL:
+                  pgmoneta_log_error("SSL_ERROR_SYSCALL: %s (%d)", strerror(errno), server_fd);
+                  errno = 0;
+                  goto error;
+                  break;
+               case SSL_ERROR_SSL:
+                  pgmoneta_log_error("SSL_ERROR_SSL: %s (%d)", strerror(errno), server_fd);
+                  pgmoneta_log_error("%s", ERR_error_string(err, NULL));
+                  pgmoneta_log_error("%s", ERR_lib_error_string(err));
+                  pgmoneta_log_error("%s", ERR_reason_error_string(err));
+                  errno = 0;
+                  goto error;
+                  break;
+            }
+            ERR_clear_error();
+         }
+      }
+      while (connect != 1);
+   }
+
+   ret = pgmoneta_create_startup_message(username, database, replication, &startup_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   ret = pgmoneta_write_message(c_ssl, server_fd, startup_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      pgmoneta_log_info("pgmoneta_create_startup_message: %d", ret);
+      goto error;
+   }
+
+   ret = pgmoneta_read_block_message(c_ssl, server_fd, &msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      pgmoneta_log_info("pgmoneta_read_block_message (STARTUP): %d", ret);
       goto error;
    }
 
@@ -1087,15 +1174,15 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    }
    else if (auth_type == SECURITY_PASSWORD)
    {
-      status = server_password(username, password, server_fd);
+      status = server_password(username, password, c_ssl, server_fd);
    }
    else if (auth_type == SECURITY_MD5)
    {
-      status = server_md5(username, password, server_fd);
+      status = server_md5(username, password, c_ssl, server_fd);
    }
    else if (auth_type == SECURITY_SCRAM256)
    {
-      status = server_scram256(username, password, server_fd);
+      status = server_scram256(username, password, c_ssl, server_fd);
    }
 
    if (status == AUTH_BAD_PASSWORD)
@@ -1108,7 +1195,9 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    }
 
    *fd = server_fd;
+   *ssl = c_ssl;
 
+   pgmoneta_free_copy_message(ssl_msg);
    pgmoneta_free_copy_message(startup_msg);
    pgmoneta_free_message(msg);
 
@@ -1116,9 +1205,11 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
 
 bad_password:
 
+   pgmoneta_free_copy_message(ssl_msg);
    pgmoneta_free_copy_message(startup_msg);
    pgmoneta_free_message(msg);
 
+   pgmoneta_close_ssl(c_ssl);
    if (server_fd != -1)
    {
       pgmoneta_disconnect(server_fd);
@@ -1128,9 +1219,11 @@ bad_password:
 
 error:
 
+   pgmoneta_free_copy_message(ssl_msg);
    pgmoneta_free_copy_message(startup_msg);
    pgmoneta_free_message(msg);
 
+   pgmoneta_close_ssl(c_ssl);
    if (server_fd != -1)
    {
       pgmoneta_disconnect(server_fd);
@@ -1150,7 +1243,7 @@ server_trust(void)
 }
 
 static int
-server_password(char* username, char* password, int server_fd)
+server_password(char* username, char* password, SSL* ssl, int server_fd)
 {
    int status = MESSAGE_STATUS_ERROR;
    int auth_index = 1;
@@ -1166,7 +1259,7 @@ server_password(char* username, char* password, int server_fd)
       goto error;
    }
 
-   status = pgmoneta_write_message(NULL, server_fd, password_msg);
+   status = pgmoneta_write_message(ssl, server_fd, password_msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -1176,7 +1269,7 @@ server_password(char* username, char* password, int server_fd)
    memcpy(&security_messages[auth_index], password_msg->data, password_msg->length);
    auth_index++;
 
-   status = pgmoneta_read_block_message(NULL, server_fd, &auth_msg);
+   status = pgmoneta_read_block_message(ssl, server_fd, &auth_msg);
    if (auth_msg->length > SECURITY_BUFFER_SIZE)
    {
       pgmoneta_log_message(auth_msg);
@@ -1229,7 +1322,7 @@ error:
 }
 
 static int
-server_md5(char* username, char* password, int server_fd)
+server_md5(char* username, char* password, SSL* ssl, int server_fd)
 {
    int status = MESSAGE_STATUS_ERROR;
    int auth_index = 1;
@@ -1281,7 +1374,7 @@ server_md5(char* username, char* password, int server_fd)
       goto error;
    }
 
-   status = pgmoneta_write_message(NULL, server_fd, md5_msg);
+   status = pgmoneta_write_message(ssl, server_fd, md5_msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -1291,7 +1384,7 @@ server_md5(char* username, char* password, int server_fd)
    memcpy(&security_messages[auth_index], md5_msg->data, md5_msg->length);
    auth_index++;
 
-   status = pgmoneta_read_block_message(NULL, server_fd, &auth_msg);
+   status = pgmoneta_read_block_message(ssl, server_fd, &auth_msg);
    if (auth_msg->length > SECURITY_BUFFER_SIZE)
    {
       pgmoneta_log_message(auth_msg);
@@ -1362,7 +1455,7 @@ error:
 }
 
 static int
-server_scram256(char* username, char* password, int server_fd)
+server_scram256(char* username, char* password, SSL* ssl, int server_fd)
 {
    int status = MESSAGE_STATUS_ERROR;
    int auth_index = 1;
@@ -1412,13 +1505,13 @@ server_scram256(char* username, char* password, int server_fd)
    memcpy(&security_messages[auth_index], sasl_response->data, sasl_response->length);
    auth_index++;
 
-   status = pgmoneta_write_message(NULL, server_fd, sasl_response);
+   status = pgmoneta_write_message(ssl, server_fd, sasl_response);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   status = pgmoneta_read_block_message(NULL, server_fd, &msg);
+   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
    if (msg->length > SECURITY_BUFFER_SIZE)
    {
       pgmoneta_log_message(msg);
@@ -1477,13 +1570,13 @@ server_scram256(char* username, char* password, int server_fd)
    memcpy(&security_messages[auth_index], sasl_continue_response->data, sasl_continue_response->length);
    auth_index++;
 
-   status = pgmoneta_write_message(NULL, server_fd, sasl_continue_response);
+   status = pgmoneta_write_message(ssl, server_fd, sasl_continue_response);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   status = pgmoneta_read_block_message(NULL, server_fd, &msg);
+   status = pgmoneta_read_block_message(ssl, server_fd, &msg);
    if (msg->length > SECURITY_BUFFER_SIZE)
    {
       pgmoneta_log_message(msg);
@@ -2535,7 +2628,7 @@ create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, S
    bool have_cert = false;
    bool have_rootcert = false;
 
-   if (strlen(root) > 0)
+   if (root != NULL && strlen(root) > 0)
    {
       if (SSL_CTX_load_verify_locations(ctx, root, NULL) != 1)
       {
@@ -2550,7 +2643,7 @@ create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, S
       have_rootcert = true;
    }
 
-   if (strlen(cert) > 0)
+   if (cert != NULL && strlen(cert) > 0)
    {
       if (SSL_CTX_use_certificate_chain_file(ctx, cert) != 1)
       {
@@ -2577,7 +2670,7 @@ create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, S
       goto error;
    }
 
-   if (have_cert && strlen(key) > 0)
+   if (have_cert && key != NULL && strlen(key) > 0)
    {
       if (SSL_use_PrivateKey_file(s, key, SSL_FILETYPE_PEM) != 1)
       {
@@ -2611,12 +2704,7 @@ create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, S
 
 error:
 
-   if (s != NULL)
-   {
-      SSL_shutdown(s);
-      SSL_free(s);
-   }
-   SSL_CTX_free(ctx);
+   pgmoneta_close_ssl(s);
 
    return 1;
 }
@@ -2717,12 +2805,7 @@ create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
 
 error:
 
-   if (s != NULL)
-   {
-      SSL_shutdown(s);
-      SSL_free(s);
-   }
-   SSL_CTX_free(ctx);
+   pgmoneta_close_ssl(s);
 
    return 1;
 }
@@ -2876,4 +2959,23 @@ error:
 #endif
    }
    return 1;
+}
+
+void
+pgmoneta_close_ssl(SSL* ssl)
+{
+   int res;
+   SSL_CTX* ctx;
+
+   if (ssl != NULL)
+   {
+      ctx = SSL_get_SSL_CTX(ssl);
+      res = SSL_shutdown(ssl);
+      if (res == 0)
+      {
+         SSL_shutdown(ssl);
+      }
+      SSL_free(ssl);
+      SSL_CTX_free(ctx);
+   }
 }

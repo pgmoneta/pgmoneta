@@ -42,13 +42,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int get_wal_level(int socket, bool* replica);
+static int get_wal_level(SSL* ssl, int socket, bool* replica);
 
 void
 pgmoneta_server_info(int srv)
 {
    int usr;
    int auth;
+   SSL* ssl = NULL;
    int socket = -1;
    bool replica;
    int ws;
@@ -72,17 +73,17 @@ pgmoneta_server_info(int srv)
       goto done;
    }
 
-   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &socket);
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket);
 
    if (auth != AUTH_SUCCESS)
    {
-      pgmoneta_log_trace("Invalid credentials for %s", config->users[usr].username);
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
       goto done;
    }
 
-   if (get_wal_level(socket, &replica))
+   if (get_wal_level(ssl, socket, &replica))
    {
-      pgmoneta_log_trace("Unable to get wal_level for %s", config->servers[srv].name);
+      pgmoneta_log_error("Unable to get wal_level for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
       goto done;
    }
@@ -91,9 +92,9 @@ pgmoneta_server_info(int srv)
       config->servers[srv].valid = replica;
    }
 
-   if (pgmoneta_server_get_wal_size(socket, &ws))
+   if (pgmoneta_server_get_wal_size(ssl, socket, &ws))
    {
-      pgmoneta_log_trace("Unable to get wal_segment_size for %s", config->servers[srv].name);
+      pgmoneta_log_error("Unable to get wal_segment_size for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
       goto done;
    }
@@ -102,10 +103,11 @@ pgmoneta_server_info(int srv)
       config->servers[srv].wal_size = ws;
    }
 
-   pgmoneta_write_terminate(NULL, socket);
+   pgmoneta_write_terminate(ssl, socket);
 
 done:
 
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
@@ -118,7 +120,7 @@ done:
 }
 
 int
-pgmoneta_server_get_wal_size(int socket, int* ws)
+pgmoneta_server_get_wal_size(SSL* ssl, int socket, int* ws)
 {
    int status;
    size_t size = 28;
@@ -143,13 +145,13 @@ pgmoneta_server_get_wal_size(int socket, int* ws)
    qmsg.length = size;
    qmsg.data = &wal_segment_size;
 
-   status = pgmoneta_write_message(NULL, socket, &qmsg);
+   status = pgmoneta_write_message(ssl, socket, &qmsg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   status = pgmoneta_read_block_message(NULL, socket, &tmsg);
+   status = pgmoneta_read_block_message(ssl, socket, &tmsg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -200,7 +202,7 @@ error:
 }
 
 static int
-get_wal_level(int socket, bool* replica)
+get_wal_level(SSL* ssl, int socket, bool* replica)
 {
    int status;
    size_t size = 21;
@@ -224,13 +226,13 @@ get_wal_level(int socket, bool* replica)
    qmsg.length = size;
    qmsg.data = &wal_level;
 
-   status = pgmoneta_write_message(NULL, socket, &qmsg);
+   status = pgmoneta_write_message(ssl, socket, &qmsg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   status = pgmoneta_read_block_message(NULL, socket, &tmsg);
+   status = pgmoneta_read_block_message(ssl, socket, &tmsg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -271,7 +273,7 @@ error:
 }
 
 int
-pgmoneta_server_get_version(int socket, int server)
+pgmoneta_server_get_version(SSL* ssl, int socket, int server)
 {
    int ret;
    struct message* query_msg = NULL;
@@ -286,7 +288,7 @@ pgmoneta_server_get_version(int socket, int server)
       goto error;
    }
 
-   if (pgmoneta_query_execute(socket, query_msg, &response) || response == NULL)
+   if (pgmoneta_query_execute(ssl, socket, query_msg, &response) || response == NULL)
    {
       goto error;
    }

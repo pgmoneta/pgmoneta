@@ -1010,7 +1010,7 @@ pgmoneta_create_search_replication_slot_message(char* slot_name, struct message*
 }
 
 int
-pgmoneta_send_copy_done_message(int socket)
+pgmoneta_send_copy_done_message(SSL* ssl, int socket)
 {
    struct message* msg = NULL;
    int size = 1 + 4;
@@ -1026,7 +1026,7 @@ pgmoneta_send_copy_done_message(int socket)
    pgmoneta_write_byte(msg->data, 'c');
    pgmoneta_write_int32(msg->data + 1, size - 1);
 
-   if (pgmoneta_write_message(NULL, socket, msg) != MESSAGE_STATUS_OK)
+   if (pgmoneta_write_message(ssl, socket, msg) != MESSAGE_STATUS_OK)
    {
       pgmoneta_log_error("Could not send CopyDone message");
       goto error;
@@ -1068,7 +1068,7 @@ pgmoneta_create_query_message(char* query, struct message** msg)
 }
 
 int
-pgmoneta_query_execute(int socket, struct message* msg, struct query_response** response)
+pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_response** response)
 {
    int status;
    int fd = -1;
@@ -1086,7 +1086,7 @@ pgmoneta_query_execute(int socket, struct message* msg, struct query_response** 
 
    *response = NULL;
 
-   status = pgmoneta_write_message(NULL, socket, msg);
+   status = pgmoneta_write_message(ssl, socket, msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -1095,7 +1095,7 @@ pgmoneta_query_execute(int socket, struct message* msg, struct query_response** 
    cont = true;
    while (cont)
    {
-      status = pgmoneta_read_block_message(NULL, socket, &reply);
+      status = pgmoneta_read_block_message(ssl, socket, &reply);
 
       if (status == MESSAGE_STATUS_OK)
       {
@@ -1673,7 +1673,7 @@ ssl_write_message(SSL* ssl, struct message* msg)
       }
       else
       {
-         int err = SSL_get_error(ssl, numbytes);
+         unsigned long err = SSL_get_error(ssl, numbytes);
 
          switch (err)
          {
@@ -1696,12 +1696,16 @@ ssl_write_message(SSL* ssl, struct message* msg)
                keep_write = true;
                break;
             case SSL_ERROR_SYSCALL:
+               err = ERR_get_error();
                pgmoneta_log_error("SSL_ERROR_SYSCALL: %s (%d)", strerror(errno), SSL_get_fd(ssl));
+               pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
                errno = 0;
                keep_write = false;
                break;
             case SSL_ERROR_SSL:
+               err = ERR_get_error();
                pgmoneta_log_error("SSL_ERROR_SSL: %s (%d)", strerror(errno), SSL_get_fd(ssl));
+               pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
                errno = 0;
                keep_write = false;
                break;
@@ -1720,7 +1724,7 @@ ssl_write_message(SSL* ssl, struct message* msg)
 }
 
 int
-pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
+pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer)
 {
    int numbytes = 0;
    bool keep_read = false;
@@ -1743,7 +1747,14 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
    }
    do
    {
-      numbytes = read(socket, buffer->buffer + buffer->end, buffer->size - buffer->end);
+      if (ssl != NULL)
+      {
+         numbytes = SSL_read(ssl, buffer->buffer + buffer->end, buffer->size - buffer->end);
+      }
+      else
+      {
+         numbytes = read(socket, buffer->buffer + buffer->end, buffer->size - buffer->end);
+      }
 
       if (likely(numbytes > 0))
       {
@@ -1752,6 +1763,11 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
       }
       else if (numbytes == 0)
       {
+         if (ssl != NULL)
+         {
+            goto ssl_error;
+         }
+
          if (errno == EAGAIN || errno == EWOULDBLOCK)
          {
             keep_read = true;
@@ -1765,27 +1781,68 @@ pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer)
       }
       else
       {
-         if (errno == EAGAIN || errno == EWOULDBLOCK)
+         if (ssl != NULL)
          {
-            keep_read = true;
-            errno = 0;
-            SLEEP(1000000L);
+ssl_error:
+            int err;
+
+            err = SSL_get_error(ssl, numbytes);
+            switch (err)
+            {
+               case SSL_ERROR_ZERO_RETURN:
+                  /* Sleep for 100ms */
+                  SLEEP(100000000L);
+               case SSL_ERROR_WANT_READ:
+               case SSL_ERROR_WANT_WRITE:
+               case SSL_ERROR_WANT_CONNECT:
+               case SSL_ERROR_WANT_ACCEPT:
+               case SSL_ERROR_WANT_X509_LOOKUP:
+#ifndef HAVE_OPENBSD
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+               case SSL_ERROR_WANT_ASYNC:
+               case SSL_ERROR_WANT_ASYNC_JOB:
+#if (OPENSSL_VERSION_NUMBER >= 0x10101000L)
+               case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+#endif
+#endif
+#endif
+                  keep_read = true;
+                  break;
+               case SSL_ERROR_SYSCALL:
+                  pgmoneta_log_error("SSL_ERROR_SYSCALL: %s (%d)", strerror(errno), SSL_get_fd(ssl));
+                  errno = 0;
+                  keep_read = false;
+                  break;
+               case SSL_ERROR_SSL:
+                  pgmoneta_log_error("SSL_ERROR_SSL: %s (%d)", strerror(errno), SSL_get_fd(ssl));
+                  keep_read = false;
+                  break;
+            }
+            ERR_clear_error();
          }
          else
          {
-            keep_read = false;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+               keep_read = true;
+               errno = 0;
+               SLEEP(1000000L);
+            }
+            else
+            {
+               keep_read = false;
+            }
          }
       }
    }
    while (keep_read);
-   return MESSAGE_STATUS_ERROR;
 
 error:
    return MESSAGE_STATUS_ERROR;
 }
 
 int
-pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct message** message)
+pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer, struct message** message)
 {
    struct message* m = NULL;
    bool keep_read = false;
@@ -1797,7 +1854,7 @@ pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct me
    {
       while (buffer->cursor >= buffer->end)
       {
-         status = pgmoneta_read_copy_stream(socket, buffer);
+         status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
          {
             SLEEP(1000000L);
@@ -1812,7 +1869,7 @@ pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct me
       // try to get message length
       while (buffer->cursor + 4 >= buffer->end)
       {
-         status = pgmoneta_read_copy_stream(socket, buffer);
+         status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
          {
             SLEEP(1000000L);
@@ -1826,7 +1883,7 @@ pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct me
       // receive the whole message even if we are going to skip it
       while (buffer->cursor + length >= buffer->end)
       {
-         status = pgmoneta_read_copy_stream(socket, buffer);
+         status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
          {
             SLEEP(1000000L);
@@ -1882,7 +1939,7 @@ error:
 }
 
 int
-pgmoneta_consume_copy_stream_start(int socket, struct stream_buffer* buffer, struct message* message)
+pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message)
 {
    bool keep_read = false;
    int status;
@@ -1891,7 +1948,7 @@ pgmoneta_consume_copy_stream_start(int socket, struct stream_buffer* buffer, str
    {
       while (buffer->cursor >= buffer->end)
       {
-         status = pgmoneta_read_copy_stream(socket, buffer);
+         status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
          {
             SLEEP(1000000L);
@@ -1905,7 +1962,7 @@ pgmoneta_consume_copy_stream_start(int socket, struct stream_buffer* buffer, str
       // try to get message length
       while (buffer->cursor + 1 + 4 >= buffer->end)
       {
-         status = pgmoneta_read_copy_stream(socket, buffer);
+         status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
          {
             SLEEP(1000000L);
@@ -1919,7 +1976,7 @@ pgmoneta_consume_copy_stream_start(int socket, struct stream_buffer* buffer, str
       // receive the whole message even if we are going to skip it
       while (buffer->cursor + 1 + length >= buffer->end)
       {
-         status = pgmoneta_read_copy_stream(socket, buffer);
+         status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
          {
             SLEEP(1000000L);
@@ -1992,7 +2049,7 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
 }
 
 int
-pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, struct query_response** response)
+pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response)
 {
    int cols;
    int status;
@@ -2006,7 +2063,7 @@ pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, str
    // consume DataRow messages from stream buffer until CommandComplete
    while (msg == NULL || msg->kind != 'C')
    {
-      status = pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      status = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
 
       if (status != MESSAGE_STATUS_OK)
       {
@@ -2071,6 +2128,7 @@ pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, str
 
    return 0;
 error:
+   pgmoneta_close_ssl(ssl);
    pgmoneta_free_copy_message(msg);
    pgmoneta_disconnect(socket);
    pgmoneta_free_query_response(r);
@@ -2078,7 +2136,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version)
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version)
 {
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
@@ -2089,7 +2147,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
    memset(msg, 0, sizeof (struct message));
 
    // Receive the second result set
-   if (pgmoneta_consume_data_row_messages(socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
    {
       goto error;
    }
@@ -2148,7 +2206,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
       // get the copy out response
       while (msg == NULL || msg->kind != 'H')
       {
-         pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+         pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -2161,7 +2219,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
       }
       while (msg->kind != 'c')
       {
-         pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+         pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -2207,7 +2265,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
    // If server version >= 13, receive manifest as well
    if (version >= 13)
    {
-      if (pgmoneta_receive_manifest_file(socket, buffer, basedir))
+      if (pgmoneta_receive_manifest_file(ssl, socket, buffer, basedir))
       {
          goto error;
       }
@@ -2262,6 +2320,7 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
    return 0;
 
 error:
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
@@ -2272,7 +2331,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces)
+pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces)
 {
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
@@ -2296,13 +2355,13 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
    memset(msg, 0, sizeof(struct message));
 
    // Receive the second result set
-   if (pgmoneta_consume_data_row_messages(socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
    {
       goto error;
    }
    while (msg == NULL || msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -2314,7 +2373,7 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
 
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -2526,6 +2585,7 @@ pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* 
    return 0;
 
 error:
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
@@ -2541,7 +2601,7 @@ error:
 }
 
 int
-pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* basedir)
+pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir)
 {
    char tmp_file_path[MAX_PATH];
    char file_path[MAX_PATH];
@@ -2566,7 +2626,7 @@ pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* b
    // get the copy out response
    while (msg == NULL || msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -2577,7 +2637,7 @@ pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* b
    }
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);

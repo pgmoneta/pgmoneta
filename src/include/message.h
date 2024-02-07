@@ -390,11 +390,12 @@ pgmoneta_create_search_replication_slot_message(char* slot_name, struct message*
 
 /**
  * Send a CopyDone message
+ * @param ssl The SSL structure
  * @param socket The socket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_send_copy_done_message(int socket);
+pgmoneta_send_copy_done_message(SSL* ssl, int socket);
 
 /**
  * Create a query message for a simple query
@@ -417,13 +418,14 @@ pgmoneta_has_message(char type, void* data, size_t data_size);
 
 /**
  * Query execute
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param msg The query message
  * @param query The query response
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_query_execute(int socket, struct message* msg, struct query_response** response);
+pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_response** response);
 
 /**
  * Get data from a query response
@@ -452,36 +454,39 @@ pgmoneta_query_response_debug(struct query_response* response);
 
 /**
  * Read the copy stream into the streaming buffer in blocking mode
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The streaming buffer
  * @return 1 upon success, 0 if no data received, otherwise 2
  */
 int
-pgmoneta_read_copy_stream(int socket, struct stream_buffer* buffer);
+pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer);
 
 /**
  * Consume the data in copy stream buffer, get the next valid message in the copy stream buffer
  * Recognized message types are DataRow, CopyOutResponse, CopyInResponse, CopyData, CopyDone, CopyFail, RowDescription, CommandComplete and ErrorResponse
  * Other message will be ignored
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
  * @param message [out] The message
  * @return 1 upon success, 0 if no data to consume, otherwise 2
  */
 int
-pgmoneta_consume_copy_stream(int socket, struct stream_buffer* buffer, struct message** message);
+pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer, struct message** message);
 
 /**
  * Consume the data in copy stream buffer similar to pgmoneta_consume_copy_stream.
  * Instead of creating a new message each time, reuse the same message buffer each time
  * Must be used with pgmoneta_consume_copy_stream_end
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
  * @param message The message buffer
  * @return 1 upon success, 0 if no data to consume, otherwise 2
  */
 int
-pgmoneta_consume_copy_stream_start(int socket, struct stream_buffer* buffer, struct message* message);
+pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message);
 
 /**
  * Finish consuming the buffer, prepare for the next message to be consumed
@@ -493,17 +498,19 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
 
 /**
  * Receive and parse the DataRow messages into tuples
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer holding the messages
  * @param response The query response
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, struct query_response** response);
+pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response);
 
 /**
  * Receive backup tar files from the copy stream and write to disk
  * This functionality is for server version < 15
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
  * @param basedir The base directory for the backup data
@@ -512,11 +519,12 @@ pgmoneta_consume_data_row_messages(int socket, struct stream_buffer* buffer, str
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version);
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version);
 
 /**
  * Receive backup tar files from the copy stream and write to disk
  * This functionality is for server version >= 15
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
  * @param basedir The base directory for the backup data
@@ -524,18 +532,19 @@ pgmoneta_receive_archive_files(int socket, struct stream_buffer* buffer, char* b
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_stream(int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces);
+pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces);
 
 /**
  * Receive mainfest file from the copy stream and write to disk
  * This functionality is for server version >= 13,
+ * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
  * @param basedir The base directory for the manifest
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_manifest_file(int socket, struct stream_buffer* buffer, char* basedir);
+pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir);
 
 #ifdef __cplusplus
 }

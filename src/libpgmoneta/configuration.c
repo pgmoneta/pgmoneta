@@ -501,6 +501,21 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      }
                      memcpy(config->tls_ca_file, value, max);
                   }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.tls_ca_file, value, max);
+                  }
                   else
                   {
                      unknown = true;
@@ -517,6 +532,21 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      }
                      memcpy(config->tls_cert_file, value, max);
                   }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.tls_cert_file, value, max);
+                  }
                   else
                   {
                      unknown = true;
@@ -532,6 +562,21 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(config->tls_key_file, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.tls_key_file, value, max);
                   }
                   else
                   {
@@ -1113,6 +1158,10 @@ pgmoneta_read_configuration(void* shm, char* filename)
                free(value);
                key = NULL;
                value = NULL;
+            }
+            else
+            {
+               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
             }
          }
       }

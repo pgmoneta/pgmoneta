@@ -53,7 +53,7 @@ static char* wal_file_name(int timeline, size_t segno, int segsize);
 static FILE* wal_open(char* root, char* filename, int segsize);
 static int wal_close(char* root, char* filename, bool partial, FILE* file);
 static int wal_prepare(FILE* file, int segsize);
-static int wal_send_status_report(int socket, int64_t received, int64_t flushed, int64_t applied);
+static int wal_send_status_report(SSL* ssl, int socket, int64_t received, int64_t flushed, int64_t applied);
 static int wal_xlog_offset(size_t xlogptr, int segsize);
 static int wal_convert_xlogpos(char* xlogpos, int* high32, int* low32, int segsize);
 static int wal_shipping_setup(int srv, char** wal_shipping);
@@ -64,6 +64,7 @@ pgmoneta_wal(int srv, char** argv)
    int usr;
    int auth;
    int cnt = 0;
+   SSL* ssl = NULL;
    int socket = -1;
    int high32 = 0;
    int low32 = 0;
@@ -128,16 +129,16 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_log_warn("Unable to create WAL shipping directory");
    }
 
-   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &socket);
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
 
    if (auth != AUTH_SUCCESS)
    {
-      pgmoneta_log_trace("Invalid credentials for %s", config->users[usr].username);
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
       goto error;
    }
 
    pgmoneta_create_identify_system_message(&identify_system_msg);
-   pgmoneta_query_execute(socket, identify_system_msg, &identify_system_response);
+   pgmoneta_query_execute(ssl, socket, identify_system_msg, &identify_system_response);
 
    timeline = atoi(pgmoneta_query_response_get_data(identify_system_response, 1));
    xlogpos_size = strlen(pgmoneta_query_response_get_data(identify_system_response, 2)) + 1;
@@ -158,7 +159,7 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_create_start_replication_message(cmd, timeline, config->servers[srv].wal_slot, &start_replication_msg);
 
-   ret = pgmoneta_write_message(NULL, socket, start_replication_msg);
+   ret = pgmoneta_write_message(ssl, socket, start_replication_msg);
 
    if (ret != MESSAGE_STATUS_OK)
    {
@@ -171,7 +172,7 @@ pgmoneta_wal(int srv, char** argv)
    // wait for the CopyBothResponse message
    while (config->running && (msg == NULL || type != 'W'))
    {
-      ret = pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
       if (ret != 1)
       {
          pgmoneta_log_error("Error occurred when starting stream replication");
@@ -190,7 +191,7 @@ pgmoneta_wal(int srv, char** argv)
 
    while (config->running)
    {
-      ret = pgmoneta_consume_copy_stream_start(socket, buffer, msg);
+      ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
       if (ret == 0)
       {
          break;
@@ -338,13 +339,13 @@ pgmoneta_wal(int srv, char** argv)
                      break;
                   }
                }
-               wal_send_status_report(socket, xlogptr, xlogptr, 0);
+               wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
                break;
             }
             case 'k':
             {
                // keep alive request
-               wal_send_status_report(socket, xlogptr, xlogptr, 0);
+               wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
                break;
             }
             default:
@@ -356,7 +357,7 @@ pgmoneta_wal(int srv, char** argv)
       else if (msg->kind == 'c')
       {
          // handle CopyDone
-         pgmoneta_send_copy_done_message(socket);
+         pgmoneta_send_copy_done_message(ssl, socket);
          if (wal_file != NULL)
          {
             // Next file would be at a new timeline, so we treat the current wal file completed
@@ -373,7 +374,7 @@ pgmoneta_wal(int srv, char** argv)
    // there should be two CommandComplete messages, receive them
    while (config->running && cnt < 2)
    {
-      if (pgmoneta_consume_copy_stream_start(socket, buffer, msg) != MESSAGE_STATUS_OK || msg->kind == 'E' || msg->kind == 'f')
+      if (pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg) != MESSAGE_STATUS_OK || msg->kind == 'E' || msg->kind == 'f')
       {
          goto error;
       }
@@ -385,6 +386,7 @@ pgmoneta_wal(int srv, char** argv)
    }
 
    config->servers[srv].wal_streaming = false;
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
@@ -418,6 +420,7 @@ pgmoneta_wal(int srv, char** argv)
 
 error:
    config->servers[srv].wal_streaming = false;
+   pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
@@ -606,12 +609,12 @@ wal_prepare(FILE* file, int segsize)
 }
 
 static int
-wal_send_status_report(int socket, int64_t received, int64_t flushed, int64_t applied)
+wal_send_status_report(SSL* ssl, int socket, int64_t received, int64_t flushed, int64_t applied)
 {
    struct message* status_report_msg = NULL;
    pgmoneta_create_standby_status_update_message(received, flushed, applied, &status_report_msg);
 
-   if (pgmoneta_write_message(NULL, socket, status_report_msg) != MESSAGE_STATUS_OK)
+   if (pgmoneta_write_message(ssl, socket, status_report_msg) != MESSAGE_STATUS_OK)
    {
       goto error;
    }
