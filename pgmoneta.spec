@@ -39,11 +39,15 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/CODE_OF_CONDUCT.md %{buildroot}%{_docdir}/%{name}/CODE_OF_CONDUCT.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/README.md %{buildroot}%{_docdir}/%{name}/README.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/ARCHITECTURE.md %{buildroot}%{_docdir}/%{name}/ARCHITECTURE.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/Azure.md %{buildroot}%{_docdir}/%{name}/Azure.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CLI.md %{buildroot}%{_docdir}/%{name}/CLI.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CONFIGURATION.md %{buildroot}%{_docdir}/%{name}/CONFIGURATION.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/DISTRIBUTIONS.md %{buildroot}%{_docdir}/%{name}/DISTRIBUTIONS.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/ENCRYPTION.md %{buildroot}%{_docdir}/%{name}/ENCRYPTION.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/GETTING_STARTED.md %{buildroot}%{_docdir}/%{name}/GETTING_STARTED.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/RPM.md %{buildroot}%{_docdir}/%{name}/RPM.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/S3.md %{buildroot}%{_docdir}/%{name}/S3.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/SSH.md %{buildroot}%{_docdir}/%{name}/SSH.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.service %{buildroot}%{_docdir}/%{name}/etc/pgmoneta.service
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/etc/pgmoneta.conf %{buildroot}%{_sysconfdir}/pgmoneta/pgmoneta.conf
@@ -59,6 +63,10 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/06_archive.md %{buildroot}%{_docdir}/%{name}/tutorial/06_archive.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/07_delete.md %{buildroot}%{_docdir}/%{name}/tutorial/07_delete.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/08_encryption.md %{buildroot}%{_docdir}/%{name}/tutorial/08_encryption.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/09_retention.md %{buildroot}%{_docdir}/%{name}/tutorial/09_retention.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/10_grafana.md %{buildroot}%{_docdir}/%{name}/tutorial/10_grafana.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/11_wal_shipping.md %{buildroot}%{_docdir}/%{name}/tutorial/11_wal_shipping.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/12_tls.md %{buildroot}%{_docdir}/%{name}/tutorial/12_tls.md
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
@@ -82,13 +90,17 @@ cd %{buildroot}%{_libdir}/
 %files
 %license %{_docdir}/%{name}/LICENSE
 %{_docdir}/%{name}/ARCHITECTURE.md
+%{_docdir}/%{name}/Azure.md
 %{_docdir}/%{name}/CODE_OF_CONDUCT.md
 %{_docdir}/%{name}/CLI.md
 %{_docdir}/%{name}/CONFIGURATION.md
+%{_docdir}/%{name}/DISTRIBUTIONS.md
 %{_docdir}/%{name}/ENCRYPTION.md
 %{_docdir}/%{name}/GETTING_STARTED.md
 %{_docdir}/%{name}/README.md
 %{_docdir}/%{name}/RPM.md
+%{_docdir}/%{name}/S3.md
+%{_docdir}/%{name}/SSH.md
 %{_docdir}/%{name}/etc/pgmoneta.service
 %{_docdir}/%{name}/shell_comp/pgmoneta_comp.bash
 %{_docdir}/%{name}/shell_comp/pgmoneta_comp.zsh
@@ -100,6 +112,10 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/tutorial/06_archive.md
 %{_docdir}/%{name}/tutorial/07_delete.md
 %{_docdir}/%{name}/tutorial/08_encryption.md
+%{_docdir}/%{name}/tutorial/09_retention.md
+%{_docdir}/%{name}/tutorial/10_grafana.md
+%{_docdir}/%{name}/tutorial/11_wal_shipping.md
+%{_docdir}/%{name}/tutorial/12_tls.md
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
