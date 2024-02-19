@@ -1873,6 +1873,8 @@ init_replication_slots(void)
 
       if (usr != -1)
       {
+         create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
+                       (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
          socket = 0;
          auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket);
 
@@ -1935,9 +1937,6 @@ init_replication_slots(void)
 
          if (create_slot && slot_status == SLOT_NOT_FOUND && strlen(config->servers[srv].wal_slot) > 0)
          {
-            create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
-                          (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
-
             auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
 
             if (auth == AUTH_SUCCESS)

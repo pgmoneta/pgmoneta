@@ -165,7 +165,7 @@ pgmoneta_log_copyfail_message(struct message* msg)
 void
 pgmoneta_log_error_response_message(struct message* msg)
 {
-   size_t offset = 0;
+   size_t offset = 1 + 4;
    signed char field_type = 0;
    char* error = NULL;
    char* error_code = NULL;
@@ -206,7 +206,7 @@ pgmoneta_log_error_response_message(struct message* msg)
 void
 pgmoneta_log_notice_response_message(struct message* msg)
 {
-   size_t offset = 0;
+   size_t offset = 1 + 4;
    signed char field_type = 0;
    char* error = NULL;
    char* error_code = NULL;
@@ -767,7 +767,7 @@ pgmoneta_create_start_replication_message(char* xlogpos, int timeline, char* slo
    {
       if (xlogpos != NULL && strlen(xlogpos) > 0)
       {
-         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL %s;", slot, xlogpos);
+         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION SLOT %s PHYSICAL %s TIMELINE %d;", slot, xlogpos, timeline);
       }
       else
       {
@@ -778,7 +778,7 @@ pgmoneta_create_start_replication_message(char* xlogpos, int timeline, char* slo
    {
       if (xlogpos != NULL && strlen(xlogpos) > 0)
       {
-         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL %s;", xlogpos);
+         snprintf(&cmd[0], sizeof(cmd), "START_REPLICATION PHYSICAL %s TIMELINE %d;", xlogpos, timeline);
       }
       else
       {
@@ -1729,6 +1729,9 @@ pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer)
    int numbytes = 0;
    bool keep_read = false;
    int err;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    /*
     * if buffer is still too full,
@@ -1835,7 +1838,7 @@ ssl_error:
          }
       }
    }
-   while (keep_read);
+   while (keep_read && config->running);
 
 error:
    return MESSAGE_STATUS_ERROR;
@@ -1903,7 +1906,7 @@ pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer,
          continue;
       }
 
-      if (m->kind != 'D' && m->kind != 'T')
+      if (m->kind != 'D' && m->kind != 'T' && m->kind != 'E')
       {
          m->data = (void*) malloc(length - 4 + 1);
          m->length = length - 4;
@@ -1913,8 +1916,8 @@ pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer,
       else
       {
          /** include all the data in message's data buffer, i.e. include type and length info,
-          * if it's a DataRow or RowDescription message
-          * This is to accommodate our existing message parsing APIs for these two types of messages
+          * if it's a DataRow, RowDescription or ErrorResponse message
+          * This is to accommodate our existing message parsing APIs for these types of messages
           */
          m->data = (void*) malloc(length + 1);
          m->length = length + 1;
@@ -1944,9 +1947,12 @@ pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* b
    bool keep_read = false;
    int status;
    int length;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
    do
    {
-      while (buffer->cursor >= buffer->end)
+      while (config->running && buffer->cursor >= buffer->end)
       {
          status = pgmoneta_read_copy_stream(ssl, socket, buffer);
          if (status == MESSAGE_STATUS_ZERO)
@@ -2014,7 +2020,7 @@ pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* b
       keep_read = false;
 
    }
-   while (keep_read);
+   while (keep_read && config->running);
 
    return MESSAGE_STATUS_OK;
 
@@ -2057,11 +2063,14 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct tuple* current = NULL;
    struct query_response* r = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    memset(msg, 0, sizeof (struct message));
 
    // consume DataRow messages from stream buffer until CommandComplete
-   while (msg == NULL || msg->kind != 'C')
+   while (config->running && (msg == NULL || msg->kind != 'C'))
    {
       status = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
 

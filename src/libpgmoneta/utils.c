@@ -235,7 +235,7 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
 int
 pgmoneta_extract_error_fields(char type, struct message* msg, char** extracted)
 {
-   size_t offset = 0;
+   size_t offset = 1 + 4;
    char* result = NULL;
    *extracted = NULL;
 
