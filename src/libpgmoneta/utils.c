@@ -74,6 +74,8 @@ static char* get_server_basepath(int server);
 
 static int copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup);
 
+static int get_permissions(char* from, int* permissions);
+
 int32_t
 pgmoneta_get_request(struct message* msg)
 {
@@ -1753,6 +1755,21 @@ error:
    return 1;
 }
 
+static int
+get_permissions(char* from, int* permissions)
+{
+   struct stat from_stat;
+
+   if (stat(from, &from_stat) == -1)
+   {
+      return 1;
+   }
+
+   *permissions = from_stat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+
+   return 0;
+}
+
 int
 pgmoneta_copy_file(char* from, char* to)
 {
@@ -1761,15 +1778,18 @@ pgmoneta_copy_file(char* from, char* to)
    char buffer[8192];
    ssize_t nread = -1;
    int saved_errno = -1;
+   int permissions = -1;
 
    fd_from = open(from, O_RDONLY);
    if (fd_from < 0)
    {
       goto error;
    }
-
-   /* TODO: Permissions */
-   fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, 0664);
+   if (get_permissions(from, &permissions))
+   {
+      goto error;
+   }
+   fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, permissions);
    if (fd_to < 0)
    {
       goto error;
