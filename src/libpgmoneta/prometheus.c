@@ -488,6 +488,16 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_active_backup</h2>\n");
+   data = pgmoneta_append(data, "  Is there an active backup for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <a href=\"https://pgmoneta.github.io/\">pgmoneta.github.io/</a>\n");
    data = pgmoneta_append(data, "</body>\n");
@@ -1923,6 +1933,22 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "\n");
 
       free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_active_backup Is there an active backup for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_active_backup gauge\n");
+
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_active_backup{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_bool(data, atomic_load(&config->servers[i].backup));
+
+      data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
 
