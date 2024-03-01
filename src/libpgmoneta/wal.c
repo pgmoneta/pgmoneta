@@ -40,6 +40,7 @@
 #include <utils.h>
 
 /* system */
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <ev.h>
@@ -158,6 +159,7 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_log_error("identify system: timeline should at least be 1, getting %d", timeline);
       goto error;
    }
+   config->servers[srv].cur_timeline = cur_timeline;
 
    wal_find_streaming_start(d, &timeline, &high32, &low32, segsize);
    if (timeline == 0)
@@ -502,6 +504,99 @@ error:
    free(filename);
    free(xlogpos);
    exit(1);
+}
+
+int
+pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** history)
+{
+   struct timeline_history* h = NULL;
+   struct timeline_history* curh = NULL;
+   struct timeline_history* nexth = NULL;
+   char filename[MISC_LENGTH];
+   char* path = NULL;
+   char buffer[MAX_PATH];
+   int numfields = 0;
+   FILE* file = NULL;
+
+   if (tli == 1)
+   {
+      return 0;
+   }
+
+   snprintf(filename, sizeof(filename), "%08X.history", tli);
+   path = pgmoneta_get_server_wal(srv);
+   path = pgmoneta_append(path, filename);
+   file = fopen(path, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Unable to open history file: %s", strerror(errno));
+      goto error;
+   }
+   memset(buffer, 0, sizeof(buffer));
+   while (fgets(buffer, sizeof(buffer), file) != NULL)
+   {
+      char* ptr = buffer;
+      // ignore empty spaces
+      while (*ptr != '\0' && isspace(*ptr))
+      {
+         ptr++;
+      }
+      // ignore empty lines and comments
+      if (*ptr == '\0' || *ptr == '#')
+      {
+         continue;
+      }
+      nexth = (struct timeline_history*) malloc(sizeof(struct timeline_history));
+      nexth->parent_tli = 0;
+      nexth->next = NULL;
+      if (h == NULL)
+      {
+         curh = nexth;
+         h = curh;
+      }
+      else
+      {
+         curh->next = nexth;
+         curh = curh->next;
+      }
+      numfields = sscanf(ptr, "%u\t%X/%X", &curh->parent_tli, &curh->switchpos_hi, &curh->switchpos_lo);
+      if (numfields != 3)
+      {
+         pgmoneta_log_error("error parsing history file %s", filename);
+         goto error;
+      }
+      memset(buffer, 0, sizeof(buffer));
+   }
+
+   *history = h;
+
+   free(path);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   return 0;
+
+error:
+   free(path);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   pgmoneta_free_timeline_history(h);
+   return 1;
+}
+
+void
+pgmoneta_free_timeline_history(struct timeline_history* history)
+{
+   struct timeline_history* h = history;
+   while (h != NULL)
+   {
+      struct timeline_history* next = h->next;
+      free(h);
+      h = next;
+   }
 }
 
 static char*

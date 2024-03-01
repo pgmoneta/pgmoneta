@@ -191,6 +191,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   atomic_init(&srv.wal, false);
                   srv.wal_streaming = false;
                   srv.valid = false;
+                  srv.cur_timeline = 1; // by default current timeline is 1
                   memset(srv.wal_shipping, 0, MAX_PATH);
 
                   idx_server++;

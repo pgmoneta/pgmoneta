@@ -36,6 +36,7 @@ extern "C" {
 #include <ev.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
 #if HAVE_OPENBSD
@@ -211,6 +212,7 @@ struct server
    int version;                        /**< The major version of the server*/
    int operation_count;                /**< Operation count of the server */
    int failed_operation_count;         /**< Failed operation count of the server */
+   uint32_t cur_timeline;              /**< Current timeline the server is on*/
    char last_operation_time[MISC_LENGTH];         /**< Last operation time of the server */
    char last_failed_operation_time[MISC_LENGTH];  /**< Last failed operation time of the server */
    char wal_shipping[MAX_PATH];                   /**< The WAL shipping directory */
