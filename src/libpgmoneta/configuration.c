@@ -138,7 +138,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
    FILE* file;
    char section[LINE_LENGTH];
    char line[LINE_LENGTH];
-   char* parsed_line = NULL;
    char* key = NULL;
    char* value = NULL;
    char* ptr = NULL;
@@ -159,21 +158,20 @@ pgmoneta_read_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      parsed_line = pgmoneta_remove_whitespace(line);
-      if (!is_empty_string(parsed_line))
+      if (!is_empty_string(line))
       {
-         if (parsed_line[0] == '[')
+         if (line[0] == '[')
          {
-            ptr = strchr(parsed_line, ']');
+            ptr = strchr(line, ']');
             if (ptr)
             {
                memset(&section, 0, LINE_LENGTH);
-               max = ptr - parsed_line - 1;
+               max = ptr - line - 1;
                if (max > MISC_LENGTH - 1)
                {
                   max = MISC_LENGTH - 1;
                }
-               memcpy(&section, parsed_line + 1, max);
+               memcpy(&section, line + 1, max);
                if (strcmp(section, "pgmoneta"))
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
@@ -199,13 +197,13 @@ pgmoneta_read_configuration(void* shm, char* filename)
                }
             }
          }
-         else if (parsed_line[0] == '#' || parsed_line[0] == ';')
+         else if (line[0] == '#' || line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
-            extract_key_value(parsed_line, &key, &value);
+            extract_key_value(line, &key, &value);
 
             if (key && value)
             {
@@ -1157,15 +1155,13 @@ pgmoneta_read_configuration(void* shm, char* filename)
                }
 
                free(key);
-               free(parsed_line);
                free(value);
                key = NULL;
                value = NULL;
-               parsed_line = NULL;
             }
             else
             {
-               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", parsed_line);
+               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
             }
          }
       }
@@ -1418,7 +1414,6 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 {
    FILE* file;
    char line[LINE_LENGTH];
-   char* parsed_line = NULL;
    int index;
    char* master_key = NULL;
    char* username = NULL;
@@ -1445,16 +1440,15 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      parsed_line = pgmoneta_remove_whitespace(line);
-      if (!is_empty_string(parsed_line))
+      if (!is_empty_string(line))
       {
-         if (parsed_line[0] == '#' || parsed_line[0] == ';')
+         if (line[0] == '#' || line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
-            ptr = strtok(parsed_line, ":");
+            ptr = strtok(line, ":");
 
             username = ptr;
 
@@ -1484,16 +1478,15 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
             else
             {
                warnx("pgmoneta: Invalid USER entry");
-               warnx("%s", parsed_line);
+               warnx("%s", line);
             }
 
             free(password);
             free(decoded);
-            free(parsed_line);
 
             password = NULL;
             decoded = NULL;
-            parsed_line = NULL;
+
             index++;
          }
       }
@@ -1517,7 +1510,6 @@ error:
    free(master_key);
    free(password);
    free(decoded);
-   free(parsed_line);
 
    if (file)
    {
@@ -1531,7 +1523,6 @@ masterkey:
    free(master_key);
    free(password);
    free(decoded);
-   free(parsed_line);
 
    if (file)
    {
@@ -1545,7 +1536,7 @@ above:
    free(master_key);
    free(password);
    free(decoded);
-   free(parsed_line);
+
    if (file)
    {
       fclose(file);
@@ -1600,7 +1591,6 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 {
    FILE* file;
    char line[LINE_LENGTH];
-   char* parsed_line = NULL;
    int index;
    char* master_key = NULL;
    char* username = NULL;
@@ -1627,16 +1617,15 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      parsed_line = pgmoneta_remove_whitespace(line);
-      if (!is_empty_string(parsed_line))
+      if (!is_empty_string(line))
       {
-         if (parsed_line[0] == '#' || parsed_line[0] == ';')
+         if (line[0] == '#' || line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
-            ptr = strtok(parsed_line, ":");
+            ptr = strtok(line, ":");
 
             username = ptr;
 
@@ -1666,15 +1655,14 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
             else
             {
                warnx("pgmoneta: Invalid ADMIN entry");
-               warnx("%s", parsed_line);
+               warnx("%s", line);
             }
 
             free(password);
             free(decoded);
-            free(parsed_line);
+
             password = NULL;
             decoded = NULL;
-            parsed_line = NULL;
 
             index++;
          }
@@ -1699,7 +1687,7 @@ error:
    free(master_key);
    free(password);
    free(decoded);
-   free(parsed_line);
+
    if (file)
    {
       fclose(file);
@@ -1712,7 +1700,7 @@ masterkey:
    free(master_key);
    free(password);
    free(decoded);
-   free(parsed_line);
+
    if (file)
    {
       fclose(file);
@@ -1725,7 +1713,7 @@ above:
    free(master_key);
    free(password);
    free(decoded);
-   free(parsed_line);
+
    if (file)
    {
       fclose(file);
