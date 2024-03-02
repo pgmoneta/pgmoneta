@@ -1157,11 +1157,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                }
 
                free(key);
-               free(parsed_line);
                free(value);
                key = NULL;
                value = NULL;
-               parsed_line = NULL;
             }
             else
             {
@@ -1169,6 +1167,8 @@ pgmoneta_read_configuration(void* shm, char* filename)
             }
          }
       }
+       free(parsed_line);
+       parsed_line = NULL;
    }
 
    if (strlen(srv.name) > 0)
