@@ -547,8 +547,7 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
          continue;
       }
       nexth = (struct timeline_history*) malloc(sizeof(struct timeline_history));
-      nexth->parent_tli = 0;
-      nexth->next = NULL;
+      memset(nexth, 0, sizeof(struct timeline_history));
       if (h == NULL)
       {
          curh = nexth;

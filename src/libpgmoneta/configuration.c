@@ -2913,6 +2913,7 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
    memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);
+   dst->cur_timeline = src->cur_timeline;
    dst->retention_days = src->retention_days;
    dst->retention_weeks = src->retention_weeks;
    dst->retention_months = src->retention_months;
