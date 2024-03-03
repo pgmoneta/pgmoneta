@@ -2430,6 +2430,81 @@ error:
    return 1;
 }
 
+int
+pgmoneta_read_wal_info(char* directory, char** startpos, char** chkptpos, uint32_t* start_timeline)
+{
+   char label[MAX_PATH];
+   char buffer[MAX_PATH];
+   char* start = NULL;
+   char* chkpt = NULL;
+   FILE* file = NULL;
+   uint32_t tli = 0;
+   int numfields = 0;
+
+   start = (char*)malloc(MISC_LENGTH);
+   chkpt = (char*)malloc(MISC_LENGTH);
+
+   memset(start, 0, MISC_LENGTH);
+   memset(chkpt, 0, MISC_LENGTH);
+   memset(buffer, 0, sizeof(buffer));
+   memset(label, 0, MAX_PATH);
+   snprintf(label, MAX_PATH, "%s/backup_label", directory);
+
+   file = fopen(label, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Unable to open backup_label file: %s", strerror(errno));
+      goto error;
+   }
+   while (fgets(buffer, sizeof(buffer), file) != NULL)
+   {
+      if (pgmoneta_starts_with(buffer, "START WAL LOCATION"))
+      {
+         numfields = sscanf(buffer, "START WAL LOCATION: %s (file ", start);
+         if (numfields != 1)
+         {
+            pgmoneta_log_error("Error parsing start wal location");
+            goto error;
+         }
+         *startpos = start;
+      }
+      else if (pgmoneta_starts_with(buffer, "CHECKPOINT LOCATION"))
+      {
+         numfields = sscanf(buffer, "CHECKPOINT LOCATION: %s\n", chkpt);
+         if (numfields != 1)
+         {
+            pgmoneta_log_error("Error parsing checkpoint wal location");
+            goto error;
+         }
+         *chkptpos = chkpt;
+      }
+      else if (pgmoneta_starts_with(buffer, "START TIMELINE"))
+      {
+         numfields = sscanf(buffer, "START TIMELINE: %u\n", &tli);
+         if (numfields != 1)
+         {
+            pgmoneta_log_error("Error parsing backup start timeline");
+            goto error;
+         }
+         *start_timeline = tli;
+      }
+
+      memset(buffer, 0, sizeof(buffer));
+   }
+
+   fclose(file);
+   return 0;
+
+error:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   free(start);
+   free(chkpt);
+   return 1;
+}
+
 static int
 string_compare(const void* a, const void* b)
 {

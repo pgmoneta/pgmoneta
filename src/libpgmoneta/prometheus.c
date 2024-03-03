@@ -436,6 +436,59 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_start_timeline</h2>\n");
+   data = pgmoneta_append(data, "  The starting timeline of a backup for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_start_walpos</h2>\n");
+   data = pgmoneta_append(data, "  The starting WAL position of a backup for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>walpos</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup starting WAL position</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_checkpoint_walpos</h2>\n");
+   data = pgmoneta_append(data, "  The checkpoint WAL pos for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>walpos</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup checkpoint WAL position</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_restore_newest_size</h2>\n");
    data = pgmoneta_append(data, "  The size of the newest restore for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -1546,6 +1599,177 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_timeline The starting timeline of a backup for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_start_timeline gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_start_timeline{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_int(data, backups[j]->start_timeline);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_start_timeline{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_walpos The starting WAL position of a backup for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_start_walpos gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               char walpos[MISC_LENGTH];
+               memset(walpos, 0, MISC_LENGTH);
+               data = pgmoneta_append(data, "pgmoneta_backup_start_walpos{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\", ");
+
+               snprintf(walpos, MISC_LENGTH, "%X/%X", backups[j]->start_lsn_hi32, backups[j]->start_lsn_lo32);
+               data = pgmoneta_append(data, "walpos=\"");
+               data = pgmoneta_append(data, walpos);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_int(data, 1);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_start_walpos{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\", ");
+         data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_checkpoint_walpos The checkpoint WAL position of a backup for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_checkpoint_walpos gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               char walpos[MISC_LENGTH];
+               memset(walpos, 0, MISC_LENGTH);
+               data = pgmoneta_append(data, "pgmoneta_backup_checkpoint_walpos{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\", ");
+
+               snprintf(walpos, MISC_LENGTH, "%X/%X", backups[j]->checkpoint_lsn_hi32, backups[j]->checkpoint_lsn_lo32);
+               data = pgmoneta_append(data, "walpos=\"");
+               data = pgmoneta_append(data, walpos);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_int(data, 1);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_checkpoint_walpos{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\", ");
+         data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
