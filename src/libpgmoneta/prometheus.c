@@ -36,9 +36,11 @@
 #include <prometheus.h>
 #include <shmem.h>
 #include <utils.h>
+#include <wal.h>
 
 /* system */
 #include <ev.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -325,6 +327,51 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_wal_shipping_total_space</h2>\n");
    data = pgmoneta_append(data, "  The total disk space for the WAL shipping directory of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_timeline</h2>\n");
+   data = pgmoneta_append(data, "  The current timeline a server is on\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_parent_tli</h2>\n");
+   data = pgmoneta_append(data, "  The parent timeline of a timeline on a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>tli</td>\n");
+   data = pgmoneta_append(data, "        <td>The current/previous timeline ID in the server history</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_timeline_switchpos</h2>\n");
+   data = pgmoneta_append(data, "  The WAL switch position of a timeline on a server (showed in hex as a parameter)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>tli</td>\n");
+   data = pgmoneta_append(data, "        <td>The current/previous timeline ID in the server history</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>walpos</td>\n");
+   data = pgmoneta_append(data, "        <td>The WAL switch position of this timeline</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_backup_oldest</h2>\n");
    data = pgmoneta_append(data, "  The oldest backup for a server\n");
@@ -944,6 +991,124 @@ general_information(int client_fd)
 
       free(d);
       d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline The current timeline a server is on\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline counter\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_timeline{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_int(data, config->servers[i].cur_timeline);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_parent_tli The parent timeline of a timeline on a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_parent_tli gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      struct timeline_history* history = NULL;
+      struct timeline_history* curh = NULL;
+      int tli = 2;
+
+      data = pgmoneta_append(data, "pgmoneta_server_parent_tli{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\", ");
+
+      data = pgmoneta_append(data, "tli=\"");
+      data = pgmoneta_append_int(data, 1);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_int(data, 0);
+
+      data = pgmoneta_append(data, "\n");
+
+      pgmoneta_get_timeline_history(i, config->servers[i].cur_timeline, &history);
+      curh = history;
+      while (curh != NULL)
+      {
+         data = pgmoneta_append(data, "pgmoneta_server_parent_tli{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\", ");
+
+         data = pgmoneta_append(data, "tli=\"");
+         data = pgmoneta_append_int(data, tli);
+         data = pgmoneta_append(data, "\"} ");
+
+         data = pgmoneta_append_int(data, curh->parent_tli);
+
+         data = pgmoneta_append(data, "\n");
+
+         curh = curh->next;
+         tli++;
+      }
+      pgmoneta_free_timeline_history(history);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline_switchpos The WAL switch position of a timeline on a server (showed in hex as a parameter)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline_switchpos gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      struct timeline_history* history = NULL;
+      struct timeline_history* curh = NULL;
+      int tli = 2;
+
+      data = pgmoneta_append(data, "pgmoneta_server_timeline_switchpos{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\", ");
+
+      data = pgmoneta_append(data, "tli=\"1\", ");
+
+      data = pgmoneta_append(data, "walpos=\"0/0\"} ");
+
+      data = pgmoneta_append(data, "1");
+
+      data = pgmoneta_append(data, "\n");
+
+      pgmoneta_get_timeline_history(i, config->servers[i].cur_timeline, &history);
+      curh = history;
+      while (curh != NULL)
+      {
+         char xlogpos[MISC_LENGTH];
+         memset(xlogpos, 0, MISC_LENGTH);
+         snprintf(xlogpos, MISC_LENGTH, "%X/%X", curh->switchpos_hi, curh->switchpos_lo);
+
+         data = pgmoneta_append(data, "pgmoneta_server_timeline_switchpos{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\", ");
+
+         data = pgmoneta_append(data, "tli=\"");
+         data = pgmoneta_append_int(data, tli);
+         data = pgmoneta_append(data, "\", ");
+
+         data = pgmoneta_append(data, "walpos=\"");
+         data = pgmoneta_append(data, xlogpos);
+         data = pgmoneta_append(data, "\"} ");
+
+         data = pgmoneta_append_int(data, 1);
+
+         data = pgmoneta_append(data, "\n");
+
+         curh = curh->next;
+         tli++;
+      }
+      pgmoneta_free_timeline_history(history);
    }
    data = pgmoneta_append(data, "\n");
 

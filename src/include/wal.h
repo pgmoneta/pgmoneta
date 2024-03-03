@@ -34,7 +34,16 @@ extern "C" {
 #endif
 
 #include <ev.h>
+#include <stdint.h>
 #include <stdlib.h>
+
+struct timeline_history
+{
+   uint32_t parent_tli;           /**< the previous timeline current timeline switched off from */
+   uint32_t switchpos_hi;         /**< the high 32 bit in decimal of xlog pos where the switch happened */
+   uint32_t switchpos_lo;         /**< the low 32 bit in decimal of xlog pos where the switch happened */
+   struct timeline_history* next; /**< the next history entry */
+};
 
 /**
  * Receive WAL
@@ -43,6 +52,23 @@ extern "C" {
  */
 void
 pgmoneta_wal(int srv, char** argv);
+
+/**
+ * Find and extract the history info from .history file of given server and timeline
+ * @param srv The server index
+ * @param tli The timeline
+ * @param history [out] the history info
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** history);
+
+/**
+ * Free the history
+ * @param history The history
+ */
+void
+pgmoneta_free_timeline_history(struct timeline_history* history);
 
 #ifdef __cplusplus
 }
