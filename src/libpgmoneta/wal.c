@@ -285,6 +285,8 @@ pgmoneta_wal(int srv, char** argv)
                            pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
                            goto error;
                         }
+                        memset(config->servers[srv].current_wal_filename, 0, MISC_LENGTH);
+                        snprintf(config->servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
                         if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
                         {
                            if (wal_shipping != NULL)

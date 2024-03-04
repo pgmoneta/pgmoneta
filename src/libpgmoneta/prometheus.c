@@ -588,6 +588,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_active_backup</h2>\n");
    data = pgmoneta_append(data, "  Is there an active backup for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -595,6 +596,21 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "      <tr>\n");
    data = pgmoneta_append(data, "        <td>name</td>\n");
    data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_current_wal_file</h2>\n");
+   data = pgmoneta_append(data, "  The current streaming WAL filename of a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>server</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>file</td>\n");
+   data = pgmoneta_append(data, "        <td>The current WAL filename for this server</td>\n");
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
@@ -2336,6 +2352,26 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_bool(data, atomic_load(&config->servers[i].backup));
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_current_wal_file The current streaming WAL filename of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_current_wal_file gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_current_wal_file{");
+
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\", ");
+
+      data = pgmoneta_append(data, "file=\"");
+      data = pgmoneta_append(data, config->servers[i].current_wal_filename);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);
 
       data = pgmoneta_append(data, "\n");
    }

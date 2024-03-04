@@ -196,6 +196,7 @@ struct server
    int port;                           /**< The port of the server */
    char username[MAX_USERNAME_LENGTH]; /**< The user name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
+   char current_wal_filename[MISC_LENGTH]; /**< The current WAL filename*/
    char follow[MISC_LENGTH];           /**< Follow a server */
    int retention_days;                 /**< The retention days for the server */
    int retention_weeks;                /**< The retention weeks for the server */
