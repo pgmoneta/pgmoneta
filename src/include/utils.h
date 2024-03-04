@@ -628,6 +628,17 @@ int
 pgmoneta_read_wal(char* directory, char** wal);
 
 /**
+ * Read the start WAL location and checkpoint WAL location from a backup_label file
+ * @param directory The base directory
+ * @param startpos [out] The start WAL position
+ * @param chkptpos [out] The checkpoint WAL position
+ * @param start_timeline [out] The timeline this backup starts with
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_read_wal_info(char* directory, char** startpos, char** chkptpos, uint32_t* start_timeline);
+
+/**
  * Get the directory for a server
  * @param server The server
  * @return The directory

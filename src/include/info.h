@@ -39,15 +39,18 @@ extern "C" {
 /* system */
 #include <stdlib.h>
 
-#define INFO_STATUS      "STATUS"
-#define INFO_LABEL       "LABEL"
-#define INFO_WAL         "WAL"
-#define INFO_ELAPSED     "ELAPSED"
-#define INFO_VERSION     "VERSION"
-#define INFO_KEEP        "KEEP"
-#define INFO_BACKUP      "BACKUP"
-#define INFO_RESTORE     "RESTORE"
-#define INFO_TABLESPACES "TABLESPACES"
+#define INFO_STATUS         "STATUS"
+#define INFO_LABEL          "LABEL"
+#define INFO_WAL            "WAL"
+#define INFO_ELAPSED        "ELAPSED"
+#define INFO_VERSION        "VERSION"
+#define INFO_KEEP           "KEEP"
+#define INFO_BACKUP         "BACKUP"
+#define INFO_RESTORE        "RESTORE"
+#define INFO_TABLESPACES    "TABLESPACES"
+#define INFO_START_WALPOS   "START_WALPOS"
+#define INFO_CHKPT_WALPOS   "CHKPT_WALPOS"
+#define INFO_START_TIMELINE "START_TIMELINE"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -68,6 +71,11 @@ struct backup
    char valid;                                               /**< Is the backup valid */
    unsigned long number_of_tablespaces;                      /**< The number of tablespaces */
    char tablespaces[MAX_NUMBER_OF_TABLESPACES][MISC_LENGTH]; /**< The names of the tablespaces */
+   uint32_t start_lsn_hi32;                                  /**< The high 32 bits of WAL starting position of the backup */
+   uint32_t start_lsn_lo32;                                  /**< The low 32 bits of WAL starting position of the backup */
+   uint32_t checkpoint_lsn_hi32;                             /**< The high 32 bits of WAL checkpoint position of the backup */
+   uint32_t checkpoint_lsn_lo32;                             /**< The low 32 bits of WAL checkpoint position of the backup */
+   uint32_t start_timeline;                                  /**< The starting timeline of the backup */
 } __attribute__ ((aligned (64)));
 
 /**

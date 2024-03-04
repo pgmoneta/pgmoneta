@@ -391,6 +391,18 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
             memcpy(&bck->tablespaces[tbl_idx], &value[0], strlen(&value[0]));
             tbl_idx++;
          }
+         else if (pgmoneta_starts_with(&key[0], INFO_START_WALPOS))
+         {
+            sscanf(&value[0], "%X/%X", &bck->start_lsn_hi32, &bck->start_lsn_lo32);
+         }
+         else if (pgmoneta_starts_with(&key[0], INFO_CHKPT_WALPOS))
+         {
+            sscanf(&value[0], "%X/%X", &bck->checkpoint_lsn_hi32, &bck->checkpoint_lsn_lo32);
+         }
+         else if (pgmoneta_starts_with(&key[0], INFO_START_TIMELINE))
+         {
+            bck->start_timeline = atoi(&value[0]);
+         }
       }
    }
 

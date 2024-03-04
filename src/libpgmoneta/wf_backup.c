@@ -89,6 +89,9 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    char* label = NULL;
    char version[10];
    char* wal = NULL;
+   char* startpos = NULL;
+   char* chkptpos = NULL;
+   uint32_t start_timeline = 0;
    char old_label_path[MAX_PATH];
    struct node* o_root = NULL;
    struct node* o_to = NULL;
@@ -254,6 +257,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    size = pgmoneta_directory_size(d);
    pgmoneta_read_wal(d, &wal);
+   pgmoneta_read_wal_info(d, &startpos, &chkptpos, &start_timeline);
 
    if (pgmoneta_create_node_string(root, "root", &o_root))
    {
@@ -272,6 +276,19 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
    pgmoneta_update_info_string(root, INFO_VERSION, version);
    pgmoneta_update_info_bool(root, INFO_KEEP, false);
+   // in case of parsing error
+   if (startpos != NULL)
+   {
+      pgmoneta_update_info_string(root, INFO_START_WALPOS, startpos);
+   }
+   if (chkptpos != NULL)
+   {
+      pgmoneta_update_info_string(root, INFO_CHKPT_WALPOS, chkptpos);
+   }
+   if (start_timeline != 0)
+   {
+      pgmoneta_update_info_unsigned_long(root, INFO_START_TIMELINE, start_timeline);
+   }
 
    current_tablespace = tablespaces;
    while (current_tablespace != NULL)
