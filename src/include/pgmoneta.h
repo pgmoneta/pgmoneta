@@ -221,6 +221,7 @@ struct server
    char tls_cert_file[MISC_LENGTH];   /**< TLS certificate path */
    char tls_key_file[MISC_LENGTH];    /**< TLS key path */
    char tls_ca_file[MISC_LENGTH];     /**< TLS CA certificate path */
+   int workers;                       /**< The number of workers */
 } __attribute__ ((aligned (64)));
 
 /** @struct
@@ -329,6 +330,8 @@ struct configuration
    int blocking_timeout;       /**< The blocking timeout in seconds */
    int authentication_timeout; /**< The authentication timeout in seconds */
    char pidfile[MAX_PATH];     /**< File containing the PID */
+
+   int workers;                /**< The number of workers */
 
    unsigned int update_process_title;  /**< Behaviour for updating the process title */
 

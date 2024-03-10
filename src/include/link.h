@@ -33,30 +33,35 @@
 extern "C" {
 #endif
 
+#include <workers.h>
+
 #include <stdlib.h>
 
 /**
  * Create link two directories
  * @param from The from directory
  * @param to The to directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_link(char* from, char* to);
+pgmoneta_link(char* from, char* to, struct workers* workers);
 
 /**
  * Relink link two directories
  * @param from The from directory
  * @param to The to directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_relink(char* from, char* to);
+pgmoneta_relink(char* from, char* to, struct workers* workers);
 
 /**
  * Create link between two tablespaces
  * @param from The root directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_link_tablespaces(char* root);
+pgmoneta_link_tablespaces(char* root, struct workers* workers);
 
 #ifdef __cplusplus
 }

@@ -31,6 +31,7 @@
 #include <logging.h>
 #include <utils.h>
 #include <zstandard_compression.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
@@ -84,6 +85,8 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
    int minutes;
    int seconds;
    char elapsed[128];
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -94,13 +97,25 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 
    if (tarfile == NULL)
    {
+      number_of_workers = pgmoneta_get_number_of_workers(server);
+      if (number_of_workers > 0)
+      {
+         pgmoneta_workers_initialize(number_of_workers, &workers);
+      }
+
       root = pgmoneta_get_node_string(*o_nodes, "root");
       to = pgmoneta_get_node_string(*o_nodes, "to");
 
       d = pgmoneta_append(d, to);
 
-      pgmoneta_zstandardc_data(d);
-      pgmoneta_zstandardc_tablespaces(root);
+      pgmoneta_zstandardc_data(d, workers);
+      pgmoneta_zstandardc_tablespaces(root, workers);
+
+      if (number_of_workers > 0)
+      {
+         pgmoneta_workers_wait(workers);
+         pgmoneta_workers_destroy(workers);
+      }
    }
    else
    {
@@ -140,6 +155,8 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
    int minutes;
    int seconds;
    char elapsed[128];
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -152,7 +169,19 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
 
    decompress_time = time(NULL);
 
-   pgmoneta_zstandardd_directory(root);
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   pgmoneta_zstandardd_directory(root, workers);
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_wait(workers);
+      pgmoneta_workers_destroy(workers);
+   }
 
    total_seconds = (int)difftime(time(NULL), decompress_time);
    hours = total_seconds / 3600;

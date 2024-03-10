@@ -33,6 +33,7 @@
 #include <logging.h>
 #include <string.h>
 #include <utils.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
@@ -107,6 +108,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    char* origwal = NULL;
    char* waldir = NULL;
    char* waltarget = NULL;
+   int number_of_workers = 0;
    struct node* o_root = NULL;
    struct node* o_output = NULL;
    struct node* o_identifier = NULL;
@@ -114,6 +116,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    struct node* o_version = NULL;
    struct node* o_primary = NULL;
    struct node* o_recovery_info = NULL;
+   struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -230,7 +233,13 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    pgmoneta_delete_directory(to);
 
-   if (pgmoneta_copy_postgresql(from, to, directory, config->servers[server].name, id, verify))
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (pgmoneta_copy_postgresql(from, to, directory, config->servers[server].name, id, verify, workers))
    {
       pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, id);
       goto error;
@@ -330,7 +339,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
             waltarget = pgmoneta_append(waltarget, id);
             waltarget = pgmoneta_append(waltarget, "/pg_wal/");
 
-            pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0]);
+            pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
          }
       }
 
@@ -341,6 +350,12 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
       pgmoneta_append_node(o_nodes, o_to);
 
+   }
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_wait(workers);
+      pgmoneta_workers_destroy(workers);
    }
 
    o = pgmoneta_append(o, directory);
@@ -384,6 +399,12 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    return 0;
 
 error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_wait(workers);
+      pgmoneta_workers_destroy(workers);
+   }
 
    for (int i = 0; i < number_of_backups; i++)
    {

@@ -33,21 +33,25 @@
 extern "C" {
 #endif
 
+#include <workers.h>
+
 #include <stdlib.h>
 
 /**
  * Compress a data directory with Zstandard
  * @param directory The directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_zstandardc_data(char* directory);
+pgmoneta_zstandardc_data(char* directory, struct workers* workers);
 
 /**
  * Compress tablespaces directories with Zstandard
  * @param root The root directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_zstandardc_tablespaces(char* root);
+pgmoneta_zstandardc_tablespaces(char* root, struct workers* workers);
 
 /**
  * Compress a WAL directory with Zstandard
@@ -68,9 +72,10 @@ pgmoneta_zstandardd_file(char* from, char* to);
 /**
  * Decompress a Zstandard directory
  * @param directory The directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_zstandardd_directory(char* directory);
+pgmoneta_zstandardd_directory(char* directory, struct workers* workers);
 
 /**
  * Compress a file

@@ -33,6 +33,7 @@
 #include <link.h>
 #include <logging.h>
 #include <utils.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
@@ -80,6 +81,8 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    int minutes;
    int seconds;
    char elapsed[128];
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -105,14 +108,26 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
 
       if (next_newest != -1)
       {
+         number_of_workers = pgmoneta_get_number_of_workers(server);
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_initialize(number_of_workers, &workers);
+         }
+
          from = pgmoneta_get_server_backup_identifier_data(server, identifier);
          to = pgmoneta_get_server_backup_identifier_data(server, backups[next_newest]->label);
 
          from_tablespaces = pgmoneta_get_server_backup_identifier(server, identifier);
          to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
 
-         pgmoneta_link(from, to);
-         pgmoneta_link_tablespaces(from_tablespaces);
+         pgmoneta_link(from, to, workers);
+         pgmoneta_link_tablespaces(from_tablespaces, workers);
+
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_wait(workers);
+            pgmoneta_workers_destroy(workers);
+         }
 
          total_seconds = (int)difftime(time(NULL), link_time);
          hours = total_seconds / 3600;

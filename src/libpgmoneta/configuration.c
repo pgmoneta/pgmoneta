@@ -100,6 +100,8 @@ pgmoneta_init_configuration(void* shm)
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
+   config->workers = 0;
+
    config->retention_days = 7;
    config->retention_weeks = -1;
    config->retention_months = -1;
@@ -193,6 +195,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   srv.valid = false;
                   srv.cur_timeline = 1; // by default current timeline is 1
                   memset(srv.wal_shipping, 0, MAX_PATH);
+                  srv.workers = -1;
 
                   idx_server++;
                }
@@ -623,6 +626,27 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   else
                   {
                      unknown = false;
+                  }
+               }
+               else if (!strcmp(key, "workers"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->workers))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  if (strlen(section) > 0)
+                  {
+                     if (as_int(value, &srv.workers))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
                   }
                }
                else if (!strcmp(key, "log_type"))
@@ -1339,6 +1363,11 @@ pgmoneta_validate_configuration(void* shm)
       }
    }
 
+   if (config->workers < 0)
+   {
+      config->workers = 0;
+   }
+
    for (int i = 0; i < config->number_of_servers; i++)
    {
       if (!strcmp(config->servers[i].name, "pgmoneta"))
@@ -1401,6 +1430,11 @@ pgmoneta_validate_configuration(void* shm)
             pgmoneta_log_fatal("No create_slot_name defined for %s", config->servers[i].name);
             return 1;
          }
+      }
+
+      if (config->servers[i].workers < -1)
+      {
+         config->servers[i].workers = -1;
       }
    }
 
@@ -2892,6 +2926,8 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    }
    config->number_of_admins = reload->number_of_admins;
 
+   config->workers = reload->workers;
+
    /* prometheus */
 
 #ifdef HAVE_LINUX
@@ -2924,6 +2960,7 @@ copy_server(struct server* dst, struct server* src)
    /* dst->valid = src->valid; */
    memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH);
    memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH);
+   dst->workers = src->workers;
 }
 
 static void

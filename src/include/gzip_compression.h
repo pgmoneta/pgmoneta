@@ -33,21 +33,25 @@
 extern "C" {
 #endif
 
+#include <workers.h>
+
 #include <stdlib.h>
 
 /**
  * GZip a data directory
  * @param directory The directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_gzip_data(char* directory);
+pgmoneta_gzip_data(char* directory, struct workers* workers);
 
 /**
  * GZip tablespace directories
  * @param root The root directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_gzip_tablespaces(char* root);
+pgmoneta_gzip_tablespaces(char* root, struct workers* workers);
 
 /**
  * GZip a WAL directory
@@ -68,9 +72,10 @@ pgmoneta_gunzip_file(char* from, char* to);
 /**
  * GUNZip a directory
  * @param directory The directory
+ * @param workers The optional workers
  */
 void
-pgmoneta_gunzip_data(char* directory);
+pgmoneta_gunzip_data(char* directory, struct workers* workers);
 
 /**
  * GZip a file

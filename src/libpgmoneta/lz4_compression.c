@@ -33,6 +33,7 @@
 #include <logging.h>
 #include <lz4_compression.h>
 #include <utils.h>
+#include <workers.h>
 
 /* system */
 #include <dirent.h>
@@ -47,12 +48,16 @@
 static int lz4_compress(char* from, char* to);
 static int lz4_decompress(char* from, char* to);
 
+static void do_lz4_compress(void* arg);
+static void do_lz4_decompress(void* arg);
+
 void
-pgmoneta_lz4c_data(char* directory)
+pgmoneta_lz4c_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
    char* to = NULL;
    DIR* dir;
+   struct worker_input* wi = NULL;
    struct dirent* entry;
 
    if (!(dir = opendir(directory)))
@@ -73,7 +78,7 @@ pgmoneta_lz4c_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_lz4c_data(path);
+         pgmoneta_lz4c_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
       {
@@ -90,9 +95,17 @@ pgmoneta_lz4c_data(char* directory)
          to = pgmoneta_append(to, entry->d_name);
          to = pgmoneta_append(to, ".lz4");
 
-         lz4_compress(from, to);
-
-         pgmoneta_delete_file(from);
+         if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+         {
+            if (workers != NULL)
+            {
+               pgmoneta_workers_add(workers, do_lz4_compress, (void*)wi);
+            }
+            else
+            {
+               do_lz4_compress(wi);
+            }
+         }
 
          free(from);
          free(to);
@@ -100,6 +113,28 @@ pgmoneta_lz4c_data(char* directory)
    }
 
    closedir(dir);
+}
+
+static void
+do_lz4_compress(void* arg)
+{
+   struct worker_input* wi = NULL;
+
+   wi = (struct worker_input*)arg;
+
+   if (pgmoneta_exists(wi->from))
+   {
+      if (lz4_compress(wi->from, wi->to))
+      {
+         pgmoneta_log_error("lz4: Could not compress %s", wi->from);
+      }
+      else
+      {
+         pgmoneta_delete_file(wi->from);
+      }
+   }
+
+   free(wi);
 }
 
 void
@@ -153,7 +188,7 @@ pgmoneta_lz4c_wal(char* directory)
 }
 
 void
-pgmoneta_lz4c_tablespaces(char* root)
+pgmoneta_lz4c_tablespaces(char* root, struct workers* workers)
 {
    DIR* dir;
    struct dirent* entry;
@@ -176,7 +211,7 @@ pgmoneta_lz4c_tablespaces(char* root)
 
          snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
 
-         pgmoneta_lz4c_data(path);
+         pgmoneta_lz4c_data(path, workers);
       }
    }
 
@@ -184,12 +219,13 @@ pgmoneta_lz4c_tablespaces(char* root)
 }
 
 void
-pgmoneta_lz4d_data(char* directory)
+pgmoneta_lz4d_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
    DIR* dir;
+   struct worker_input* wi = NULL;
    struct dirent* entry;
 
    if (!(dir = opendir(directory)))
@@ -210,7 +246,7 @@ pgmoneta_lz4d_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_lz4d_data(path);
+         pgmoneta_lz4d_data(path, workers);
       }
       else
       {
@@ -230,9 +266,17 @@ pgmoneta_lz4d_data(char* directory)
          to = pgmoneta_append(to, "/");
          to = pgmoneta_append(to, name);
 
-         lz4_decompress(from, to);
-
-         pgmoneta_delete_file(from);
+         if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+         {
+            if (workers != NULL)
+            {
+               pgmoneta_workers_add(workers, do_lz4_decompress, (void*)wi);
+            }
+            else
+            {
+               do_lz4_decompress(wi);
+            }
+         }
 
          free(name);
          free(from);
@@ -241,6 +285,25 @@ pgmoneta_lz4d_data(char* directory)
    }
 
    closedir(dir);
+}
+
+static void
+do_lz4_decompress(void* arg)
+{
+   struct worker_input* wi = NULL;
+
+   wi = (struct worker_input*)arg;
+
+   if (lz4_decompress(wi->from, wi->to))
+   {
+      pgmoneta_log_error("Lz4: Could not decompress %s", wi->from);
+   }
+   else
+   {
+      pgmoneta_delete_file(wi->from);
+   }
+
+   free(wi);
 }
 
 int

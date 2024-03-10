@@ -31,6 +31,8 @@
 #include <pgmoneta.h>
 #include <security.h>
 #include <utils.h>
+#include <workers.h>
+
 /* System */
 #include <dirent.h>
 
@@ -42,8 +44,11 @@ static int aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, c
 static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext, int mode);
 static const EVP_CIPHER* (*get_cipher(int mode))(void);
 
+static void do_encrypt_file(void* arg);
+static void do_decrypt_file(void* arg);
+
 int
-pgmoneta_encrypt_data(char* d)
+pgmoneta_encrypt_data(char* d, struct workers* workers)
 {
    char* from = NULL;
    char* to = NULL;
@@ -68,7 +73,7 @@ pgmoneta_encrypt_data(char* d)
 
          snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
 
-         pgmoneta_encrypt_data(path);
+         pgmoneta_encrypt_data(path, workers);
       }
       else
       {
@@ -91,8 +96,19 @@ pgmoneta_encrypt_data(char* d)
 
             if (pgmoneta_exists(from))
             {
-               encrypt_file(from, to, 1);
-               pgmoneta_delete_file(from);
+               struct worker_input* wi = NULL;
+
+               if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+               {
+                  if (workers != NULL)
+                  {
+                     pgmoneta_workers_add(workers, do_encrypt_file, (void*)wi);
+                  }
+                  else
+                  {
+                     do_encrypt_file(wi);
+                  }
+               }
             }
 
             free(from);
@@ -105,8 +121,21 @@ pgmoneta_encrypt_data(char* d)
    return 0;
 }
 
+static void
+do_encrypt_file(void* arg)
+{
+   struct worker_input* wi = NULL;
+
+   wi = (struct worker_input*)arg;
+
+   encrypt_file(wi->from, wi->to, 1);
+   pgmoneta_delete_file(wi->from);
+
+   free(wi);
+}
+
 int
-pgmoneta_encrypt_tablespaces(char* root)
+pgmoneta_encrypt_tablespaces(char* root, struct workers* workers)
 {
    DIR* dir;
    struct dirent* entry;
@@ -129,7 +158,7 @@ pgmoneta_encrypt_tablespaces(char* root)
 
          snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
 
-         pgmoneta_encrypt_data(path);
+         pgmoneta_encrypt_data(path, workers);
       }
    }
 
@@ -242,7 +271,7 @@ pgmoneta_encrypt_file(char* from, char* to)
 }
 
 int
-pgmoneta_decrypt_directory(char* d)
+pgmoneta_decrypt_directory(char* d, struct workers* workers)
 {
    char* from = NULL;
    char* to = NULL;
@@ -269,12 +298,14 @@ pgmoneta_decrypt_directory(char* d)
 
          snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
 
-         pgmoneta_decrypt_directory(path);
+         pgmoneta_decrypt_directory(path, workers);
       }
       else
       {
          if (pgmoneta_ends_with(entry->d_name, ".aes"))
          {
+            struct worker_input* wi = NULL;
+
             from = NULL;
 
             from = pgmoneta_append(from, d);
@@ -291,8 +322,17 @@ pgmoneta_decrypt_directory(char* d)
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            encrypt_file(from, to, 0);
-            pgmoneta_delete_file(from);
+            if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+            {
+               if (workers != NULL)
+               {
+                  pgmoneta_workers_add(workers, do_decrypt_file, (void*)wi);
+               }
+               else
+               {
+                  do_decrypt_file(wi);
+               }
+            }
 
             free(name);
             free(from);
@@ -303,6 +343,19 @@ pgmoneta_decrypt_directory(char* d)
 
    closedir(dir);
    return 0;
+}
+
+static void
+do_decrypt_file(void* arg)
+{
+   struct worker_input* wi = NULL;
+
+   wi = (struct worker_input*)arg;
+
+   encrypt_file(wi->from, wi->to, 0);
+   pgmoneta_delete_file(wi->from);
+
+   free(wi);
 }
 
 int

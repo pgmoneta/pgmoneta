@@ -373,6 +373,17 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_workers</h2>\n");
+   data = pgmoneta_append(data, "  The number of workers for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_backup_oldest</h2>\n");
    data = pgmoneta_append(data, "  The oldest backup for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -1193,6 +1204,24 @@ general_information(int client_fd)
          tli++;
       }
       pgmoneta_free_timeline_history(history);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_workers The numbeer of workers for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_workers gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      int workers = config->servers[i].workers != -1 ? config->servers[i].workers : config->workers;
+
+      data = pgmoneta_append(data, "pgmoneta_server_workers{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "} ");
+
+      data = pgmoneta_append_int(data, workers);
+
+      data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
 

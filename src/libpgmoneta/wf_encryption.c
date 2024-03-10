@@ -35,6 +35,7 @@
 #include <node.h>
 #include <pgmoneta.h>
 #include <utils.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
@@ -90,6 +91,8 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    int minutes;
    int seconds;
    char elapsed[128];
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -100,12 +103,24 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    if (tarfile == NULL)
    {
+      number_of_workers = pgmoneta_get_number_of_workers(server);
+      if (number_of_workers > 0)
+      {
+         pgmoneta_workers_initialize(number_of_workers, &workers);
+      }
+
       root = pgmoneta_get_node_string(*o_nodes, "root");
       to = pgmoneta_get_node_string(*o_nodes, "to");
       d = pgmoneta_append(d, to);
 
-      pgmoneta_encrypt_data(d);
-      pgmoneta_encrypt_tablespaces(root);
+      pgmoneta_encrypt_data(d, workers);
+      pgmoneta_encrypt_tablespaces(root, workers);
+
+      if (number_of_workers > 0)
+      {
+         pgmoneta_workers_wait(workers);
+         pgmoneta_workers_destroy(workers);
+      }
    }
    else
    {
@@ -177,6 +192,8 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    int seconds;
    char elapsed[128];
    int number_of_backups = 0;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
    struct backup** backups = NULL;
    struct configuration* config;
 
@@ -241,7 +258,19 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    decrypt_time = time(NULL);
 
-   pgmoneta_decrypt_directory(root);
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   pgmoneta_decrypt_directory(root, workers);
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_wait(workers);
+      pgmoneta_workers_destroy(workers);
+   }
 
    total_seconds = (int)difftime(time(NULL), decrypt_time);
    hours = total_seconds / 3600;

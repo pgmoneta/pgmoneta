@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
+#include <workers.h>
 
 /* system */
 #include <dirent.h>
@@ -72,9 +73,12 @@ static bool is_wal_file(char* file);
 
 static char* get_server_basepath(int server);
 
-static int copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup);
+static int copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers);
 
 static int get_permissions(char* from, int* permissions);
+
+static void copy_file(void* arg);
+
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -1485,7 +1489,7 @@ pgmoneta_delete_file(char* file)
 }
 
 int
-pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* id, struct backup* backup)
+pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer = NULL;
@@ -1518,16 +1522,16 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
             {
                if (!strcmp(entry->d_name, "pg_tblspc"))
                {
-                  copy_tablespaces(from, to, base, server, id, backup);
+                  copy_tablespaces(from, to, base, server, id, backup, workers);
                }
                else
                {
-                  pgmoneta_copy_directory(from_buffer, to_buffer);
+                  pgmoneta_copy_directory(from_buffer, to_buffer, workers);
                }
             }
             else
             {
-               pgmoneta_copy_file(from_buffer, to_buffer);
+               pgmoneta_copy_file(from_buffer, to_buffer, workers);
             }
          }
 
@@ -1552,7 +1556,7 @@ error:
 }
 
 static int
-copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup)
+copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)
 {
    char* from_tblspc = NULL;
    char* to_tblspc = NULL;
@@ -1661,7 +1665,7 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
             pgmoneta_mkdir(to_directory);
             pgmoneta_symlink_at_file(to_oid, relative_directory);
 
-            pgmoneta_copy_directory(&path[0], to_directory);
+            pgmoneta_copy_directory(&path[0], to_directory, workers);
 
             free(to_oid);
             free(to_directory);
@@ -1696,7 +1700,7 @@ error:
 }
 
 int
-pgmoneta_copy_directory(char* from, char* to)
+pgmoneta_copy_directory(char* from, char* to, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer = NULL;
@@ -1727,11 +1731,11 @@ pgmoneta_copy_directory(char* from, char* to)
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               pgmoneta_copy_directory(from_buffer, to_buffer);
+               pgmoneta_copy_directory(from_buffer, to_buffer, workers);
             }
             else
             {
-               pgmoneta_copy_file(from_buffer, to_buffer);
+               pgmoneta_copy_file(from_buffer, to_buffer, workers);
             }
          }
 
@@ -1771,7 +1775,29 @@ get_permissions(char* from, int* permissions)
 }
 
 int
-pgmoneta_copy_file(char* from, char* to)
+pgmoneta_copy_file(char* from, char* to, struct workers* workers)
+{
+   struct worker_input* fi = NULL;
+
+   if (pgmoneta_create_worker_input(NULL, from, to, 0, workers, &fi))
+   {
+      return 1;
+   }
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_add(workers, copy_file, (void*)fi);
+   }
+   else
+   {
+      copy_file(fi);
+   }
+
+   return 0;
+}
+
+static void
+copy_file(void* arg)
 {
    int fd_from = -1;
    int fd_to = -1;
@@ -1779,17 +1805,20 @@ pgmoneta_copy_file(char* from, char* to)
    ssize_t nread = -1;
    int saved_errno = -1;
    int permissions = -1;
+   struct worker_input* fi = NULL;
 
-   fd_from = open(from, O_RDONLY);
+   fi = (struct worker_input*)arg;
+
+   fd_from = open(fi->from, O_RDONLY);
    if (fd_from < 0)
    {
       goto error;
    }
-   if (get_permissions(from, &permissions))
+   if (get_permissions(fi->from, &permissions))
    {
       goto error;
    }
-   fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, permissions);
+   fd_to = open(fi->to, O_WRONLY | O_CREAT | O_EXCL, permissions);
    if (fd_to < 0)
    {
       goto error;
@@ -1827,7 +1856,9 @@ pgmoneta_copy_file(char* from, char* to)
       close(fd_from);
    }
 
-   return 0;
+   free(fi);
+
+   return;
 
 error:
    saved_errno = errno;
@@ -1839,7 +1870,8 @@ error:
    }
 
    errno = saved_errno;
-   return 1;
+
+   free(fi);
 }
 
 int
@@ -2127,7 +2159,7 @@ pgmoneta_get_symlink(char* symlink)
 }
 
 int
-pgmoneta_copy_wal_files(char* from, char* to, char* start)
+pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers)
 {
    int number_of_wal_files = 0;
    char** wal_files = NULL;
@@ -2176,7 +2208,7 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start)
             tf = pgmoneta_append(tf, wal_files[i]);
          }
 
-         pgmoneta_copy_file(ff, tf);
+         pgmoneta_copy_file(ff, tf, workers);
       }
 
       free(basename);

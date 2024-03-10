@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
+#include <workers.h>
 #include <zstandard_compression.h>
 
 /* system */
@@ -42,11 +43,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define ZSTD_DEFAULT_NUMBER_OF_WORKERS 4
+
 static int zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 static int zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 
 void
-pgmoneta_zstandardc_data(char* directory)
+pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 {
    size_t zin_size = -1;
    void* zin = NULL;
@@ -58,6 +61,7 @@ pgmoneta_zstandardc_data(char* directory)
    DIR* dir;
    struct dirent* entry;
    int level;
+   int ws;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -77,6 +81,8 @@ pgmoneta_zstandardc_data(char* directory)
       level = 19;
    }
 
+   ws = config->workers != 0 ? config->workers : ZSTD_DEFAULT_NUMBER_OF_WORKERS;
+
    zin_size = ZSTD_CStreamInSize();
    zin = malloc(zin_size);
    zout_size = ZSTD_CStreamOutSize();
@@ -90,7 +96,7 @@ pgmoneta_zstandardc_data(char* directory)
 
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, 4);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, ws);
 
    while ((entry = readdir(dir)) != NULL)
    {
@@ -105,7 +111,7 @@ pgmoneta_zstandardc_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_zstandardc_data(path);
+         pgmoneta_zstandardc_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
       {
@@ -165,7 +171,7 @@ error:
 }
 
 void
-pgmoneta_zstandardc_tablespaces(char* root)
+pgmoneta_zstandardc_tablespaces(char* root, struct workers* workers)
 {
    DIR* dir;
    struct dirent* entry;
@@ -188,7 +194,7 @@ pgmoneta_zstandardc_tablespaces(char* root)
 
          snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
 
-         pgmoneta_zstandardc_data(path);
+         pgmoneta_zstandardc_data(path, workers);
       }
    }
 
@@ -208,6 +214,7 @@ pgmoneta_zstandardc_wal(char* directory)
    DIR* dir;
    struct dirent* entry;
    int level;
+   int workers;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -227,6 +234,8 @@ pgmoneta_zstandardc_wal(char* directory)
       level = 19;
    }
 
+   workers = config->workers != 0 ? config->workers : ZSTD_DEFAULT_NUMBER_OF_WORKERS;
+
    zin_size = ZSTD_CStreamInSize();
    zin = malloc(zin_size);
    zout_size = ZSTD_CStreamOutSize();
@@ -240,7 +249,7 @@ pgmoneta_zstandardc_wal(char* directory)
 
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, 4);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
 
    while ((entry = readdir(dir)) != NULL)
    {
@@ -362,7 +371,7 @@ error:
 }
 
 void
-pgmoneta_zstandardd_directory(char* directory)
+pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 {
    ZSTD_DCtx* dctx = NULL;
    size_t zin_size = -1;
@@ -409,7 +418,7 @@ pgmoneta_zstandardd_directory(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_zstandardd_directory(path);
+         pgmoneta_zstandardd_directory(path, workers);
       }
       else
       {
@@ -484,6 +493,7 @@ pgmoneta_zstandardc_file(char* from, char* to)
    void* zout = NULL;
    ZSTD_CCtx* cctx = NULL;
    int level;
+   int workers;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -498,6 +508,8 @@ pgmoneta_zstandardc_file(char* from, char* to)
       level = 19;
    }
 
+   workers = config->workers != 0 ? config->workers : ZSTD_DEFAULT_NUMBER_OF_WORKERS;
+
    zin_size = ZSTD_CStreamInSize();
    zin = malloc(zin_size);
    zout_size = ZSTD_CStreamOutSize();
@@ -511,7 +523,7 @@ pgmoneta_zstandardc_file(char* from, char* to)
 
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, 4);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
 
    if (zstd_compress(from, level, to, cctx, zin_size, zin, zout_size, zout))
    {

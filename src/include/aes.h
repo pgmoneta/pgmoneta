@@ -26,6 +26,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef PGMONETA_AES_H
+#define PGMONETA_AES_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <workers.h>
+
 #include <openssl/ssl.h>
 
 /**
@@ -53,18 +62,20 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
 /**
  * Encrypt the files under the directory in place recursively, also remove unencrypted files.
  * @param d The data directory
+ * @param workers The optional workers
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_data(char* d);
+pgmoneta_encrypt_data(char* d, struct workers* workers);
 
 /**
  * Encrypt the files under the tablespace directories in place recursively, also remove unencrypted files.
  * @param root The root directory
+ * @param workers The optional workers
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_tablespaces(char* root);
+pgmoneta_encrypt_tablespaces(char* root, struct workers* workers);
 
 /**
  * Encrypt the files under the directory in place, also remove unencrypted files.
@@ -86,10 +97,11 @@ pgmoneta_encrypt_file(char* from, char* to);
 /**
  * Decrypt the files under the directory in place, also remove encrypted files.
  * @param d wal directory
+ * @param workers The optional workers
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_directory(char* d);
+pgmoneta_decrypt_directory(char* d, struct workers* workers);
 
 /**
  * Decrypt the archive file created by pgmoneta-cli archive in place, also remove encrypted archive.
@@ -98,3 +110,9 @@ pgmoneta_decrypt_directory(char* d);
  */
 int
 pgmoneta_decrypt_archive(char* path);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

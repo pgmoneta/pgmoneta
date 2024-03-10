@@ -36,6 +36,7 @@ extern "C" {
 #include <pgmoneta.h>
 #include <info.h>
 #include <message.h>
+#include <workers.h>
 
 #include <stdlib.h>
 
@@ -429,28 +430,31 @@ pgmoneta_delete_file(char* file);
  * @param server The server name
  * @param id The identifier
  * @param backup The backup
+ * @param workers The optional workers
  * @return The result
  */
 int
-pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* id, struct backup* backup);
+pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers);
 
 /**
  * Copy a directory
  * @param from The from directory
  * @param to The to directory
+ * @param workers The workers
  * @return The result
  */
 int
-pgmoneta_copy_directory(char* from, char* to);
+pgmoneta_copy_directory(char* from, char* to, struct workers* workers);
 
 /**
  * Copy a file
  * @param from The from file
  * @param to The to file
+ * @param workers The workers
  * @return The result
  */
 int
-pgmoneta_copy_file(char* from, char* to);
+pgmoneta_copy_file(char* from, char* to, struct workers* workers);
 
 /**
  * Move a file
@@ -534,10 +538,11 @@ pgmoneta_get_symlink(char* symlink);
  * @param from The from directory
  * @param to The to directory
  * @param start The start file
+ * @param workers The optional workers
  * @return The result
  */
 int
-pgmoneta_copy_wal_files(char* from, char* to, char* start);
+pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers);
 
 /**
  * Get the number of WAL files

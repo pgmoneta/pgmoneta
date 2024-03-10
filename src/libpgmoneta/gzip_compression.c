@@ -31,6 +31,7 @@
 #include <gzip_compression.h>
 #include <logging.h>
 #include <utils.h>
+#include <workers.h>
 
 /* system */
 #include <dirent.h>
@@ -47,14 +48,18 @@
 static int gz_compress(char* from, int level, char* to);
 static int gz_decompress(char* from, char* to);
 
+static void do_gz_compress(void* arg);
+static void do_gz_decompress(void* arg);
+
 void
-pgmoneta_gzip_data(char* directory)
+pgmoneta_gzip_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
    char* to = NULL;
    DIR* dir;
    struct dirent* entry;
    int level;
+   struct worker_input* wi = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -87,7 +92,7 @@ pgmoneta_gzip_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_gzip_data(path);
+         pgmoneta_gzip_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
       {
@@ -106,15 +111,16 @@ pgmoneta_gzip_data(char* directory)
             to = pgmoneta_append(to, entry->d_name);
             to = pgmoneta_append(to, ".gz");
 
-            if (pgmoneta_exists(from))
+            if (!pgmoneta_create_worker_input(directory, from, to, level, workers, &wi))
             {
-               if (gz_compress(from, level, to))
+               if (workers != NULL)
                {
-                  pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, entry->d_name);
-                  break;
+                  pgmoneta_workers_add(workers, do_gz_compress, (void*)wi);
                }
-
-               pgmoneta_delete_file(from);
+               else
+               {
+                  do_gz_compress(wi);
+               }
             }
 
             free(from);
@@ -126,8 +132,30 @@ pgmoneta_gzip_data(char* directory)
    closedir(dir);
 }
 
+static void
+do_gz_compress(void* arg)
+{
+   struct worker_input* wi = NULL;
+
+   wi = (struct worker_input*)arg;
+
+   if (pgmoneta_exists(wi->from))
+   {
+      if (gz_compress(wi->from, wi->level, wi->to))
+      {
+         pgmoneta_log_error("Gzip: Could not compress %s", wi->from);
+      }
+      else
+      {
+         pgmoneta_delete_file(wi->from);
+      }
+   }
+
+   free(wi);
+}
+
 void
-pgmoneta_gzip_tablespaces(char* root)
+pgmoneta_gzip_tablespaces(char* root, struct workers* workers)
 {
    DIR* dir;
    struct dirent* entry;
@@ -150,7 +178,7 @@ pgmoneta_gzip_tablespaces(char* root)
 
          snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
 
-         pgmoneta_gzip_data(path);
+         pgmoneta_gzip_data(path, workers);
       }
    }
 
@@ -254,12 +282,13 @@ error:
 }
 
 void
-pgmoneta_gunzip_data(char* directory)
+pgmoneta_gunzip_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
    DIR* dir;
+   struct worker_input* wi = NULL;
    struct dirent* entry;
 
    if (!(dir = opendir(directory)))
@@ -280,7 +309,7 @@ pgmoneta_gunzip_data(char* directory)
 
          snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
 
-         pgmoneta_gunzip_data(path);
+         pgmoneta_gunzip_data(path, workers);
       }
       else
       {
@@ -302,13 +331,17 @@ pgmoneta_gunzip_data(char* directory)
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            if (gz_decompress(from, to))
+            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
             {
-               pgmoneta_log_error("Gzip: Could not decompress %s/%s", directory, entry->d_name);
-               break;
+               if (workers != NULL)
+               {
+                  pgmoneta_workers_add(workers, do_gz_decompress, (void*)wi);
+               }
+               else
+               {
+                  do_gz_decompress(wi);
+               }
             }
-
-            pgmoneta_delete_file(from);
 
             free(name);
             free(from);
@@ -318,6 +351,25 @@ pgmoneta_gunzip_data(char* directory)
    }
 
    closedir(dir);
+}
+
+static void
+do_gz_decompress(void* arg)
+{
+   struct worker_input* wi = NULL;
+
+   wi = (struct worker_input*)arg;
+
+   if (gz_decompress(wi->from, wi->to))
+   {
+      pgmoneta_log_error("Gzip: Could not decompress %s", wi->from);
+   }
+   else
+   {
+      pgmoneta_delete_file(wi->from);
+   }
+
+   free(wi);
 }
 
 int

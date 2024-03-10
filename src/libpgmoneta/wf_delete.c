@@ -33,6 +33,7 @@
 #include <link.h>
 #include <logging.h>
 #include <utils.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
@@ -76,7 +77,9 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
    char* to = NULL;
    unsigned long size;
    int number_of_backups = 0;
+   int number_of_workers = 0;
    struct backup** backups = NULL;
+   struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -155,6 +158,12 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
 
    d = pgmoneta_get_server_backup_identifier(server, backups[backup_index]->label);
 
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
    if (backups[backup_index]->valid == VALID_TRUE)
    {
       if (prev_index != -1 && next_index != -1)
@@ -163,7 +172,7 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
          from = pgmoneta_get_server_backup_identifier_data(server, backups[backup_index]->label);
          to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
 
-         pgmoneta_relink(from, to);
+         pgmoneta_relink(from, to, workers);
 
          /* Delete from */
          pgmoneta_delete_directory(d);
@@ -192,7 +201,7 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
          from = pgmoneta_get_server_backup_identifier_data(server, backups[backup_index]->label);
          to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
 
-         pgmoneta_relink(from, to);
+         pgmoneta_relink(from, to, workers);
 
          /* Delete from */
          pgmoneta_delete_directory(d);
@@ -220,6 +229,12 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
    {
       /* Just delete */
       pgmoneta_delete_directory(d);
+   }
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_wait(workers);
+      pgmoneta_workers_destroy(workers);
    }
 
    pgmoneta_log_info("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);

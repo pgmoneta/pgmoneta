@@ -681,6 +681,7 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
    int link;
    int servers;
    int number_of_directories;
+   int workers;
 
    if (read_int32("pgmoneta_management_read_status", socket, &offline))
    {
@@ -730,6 +731,13 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
 
    printf("Link             : %s\n", link == 1 ? "Yes" : "No");
 
+   if (read_int32("pgmoneta_management_read_status", socket, &workers))
+   {
+      goto error;
+   }
+
+   printf("Workers          : %d\n", workers);
+
    if (read_int32("pgmoneta_management_read_status", socket, &servers))
    {
       goto error;
@@ -773,6 +781,11 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
          goto error;
       }
 
+      if (read_int32("pgmoneta_management_read_status", socket, &workers))
+      {
+         goto error;
+      }
+
       printf("Server           : %s\n", &name[0]);
       printf("  Retention      : ");
       printf("%d day(s) ", retention_days);
@@ -792,6 +805,7 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
 
       printf("  Backups        : %d\n", number_of_directories);
       printf("  Space          : %s\n", size_string);
+      printf("  Workers        : %d\n", workers);
 
       free(size_string);
       size_string = NULL;
@@ -858,6 +872,11 @@ pgmoneta_management_write_status(int socket, bool offline)
    }
 
    if (write_int32("pgmoneta_management_write_status", socket, config->link ? 1 : 0))
+   {
+      goto error;
+   }
+
+   if (write_int32("pgmoneta_management_write_status", socket, config->workers))
    {
       goto error;
    }
@@ -932,6 +951,11 @@ pgmoneta_management_write_status(int socket, bool offline)
          goto error;
       }
 
+      if (write_int32("pgmoneta_management_write_status", socket, config->servers[i].workers != -1 ? config->servers[i].workers : config->workers))
+      {
+         goto error;
+      }
+
       for (int j = 0; j < number_of_directories; j++)
       {
          free(array[j]);
@@ -1002,6 +1026,7 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
    char* res = NULL;
    char* ws = NULL;
    char* ds = NULL;
+   int workers;
 
    if (read_int32("pgmoneta_management_read_details", socket, &offline))
    {
@@ -1051,6 +1076,13 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
 
    printf("Link             : %s\n", link == 1 ? "Yes" : "No");
 
+   if (read_int32("pgmoneta_management_read_status", socket, &workers))
+   {
+      goto error;
+   }
+
+   printf("Workers          : %d\n", workers);
+
    if (read_int32("pgmoneta_management_read_details", socket, &servers))
    {
       goto error;
@@ -1061,6 +1093,11 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
    for (int i = 0; i < servers; i++)
    {
       if (read_string("pgmoneta_management_read_details", socket, &name))
+      {
+         goto error;
+      }
+
+      if (read_int32("pgmoneta_management_read_status", socket, &workers))
       {
          goto error;
       }
@@ -1118,6 +1155,7 @@ pgmoneta_management_read_details(SSL* ssl, int socket)
 
       printf("\n");
 
+      printf("  Workers        : %d\n", workers);
       printf("  Backups        : %d\n", number_of_backups);
 
       free(name);
@@ -1274,6 +1312,11 @@ pgmoneta_management_write_details(int socket, bool offline)
       goto error;
    }
 
+   if (write_int32("pgmoneta_management_write_status", socket, config->workers))
+   {
+      goto error;
+   }
+
    if (write_int32("pgmoneta_management_write_details", socket, config->number_of_servers))
    {
       goto error;
@@ -1287,38 +1330,55 @@ pgmoneta_management_write_details(int socket, bool offline)
       {
          goto error;
       }
+
+      if (write_int32("pgmoneta_management_write_status", socket, config->servers[i].workers != -1 ? config->servers[i].workers : config->workers))
+      {
+         goto error;
+      }
+
       retention_days = config->servers[i].retention_days;
+
       if (retention_days <= 0)
       {
          retention_days = config->retention_days;
       }
+
       retention_weeks = config->servers[i].retention_weeks;
+
       if (retention_weeks <= 0)
       {
          retention_weeks = config->retention_weeks;
       }
+
       retention_months = config->servers[i].retention_months;
+
       if (retention_months <= 0)
       {
          retention_months = config->retention_months;
       }
+
       retention_years = config->servers[i].retention_years;
+
       if (retention_years <= 0)
       {
          retention_years = config->retention_years;
       }
+
       if (write_int32("pgmoneta_management_write_details", socket, retention_days))
       {
          goto error;
       }
+
       if (write_int32("pgmoneta_management_write_details", socket, retention_weeks))
       {
          goto error;
       }
+
       if (write_int32("pgmoneta_management_write_details", socket, retention_months))
       {
          goto error;
       }
+
       if (write_int32("pgmoneta_management_write_details", socket, retention_years))
       {
          goto error;
