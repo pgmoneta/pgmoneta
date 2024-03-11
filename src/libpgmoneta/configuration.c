@@ -2923,6 +2923,7 @@ copy_server(struct server* dst, struct server* src)
    dst->wal_streaming = src->wal_streaming;
    /* dst->valid = src->valid; */
    memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH);
+   memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH);
 }
 
 static void

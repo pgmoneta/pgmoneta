@@ -62,6 +62,7 @@ static int wal_xlog_offset(size_t xlogptr, int segsize);
 static int wal_convert_xlogpos(char* xlogpos, uint32_t* high32, uint32_t* low32, int segsize);
 static int wal_find_streaming_start(char* basedir, uint32_t* timeline, uint32_t* high32, uint32_t* low32, int segsize);
 static int wal_shipping_setup(int srv, char** wal_shipping);
+static void update_wal_lsn(int srv, size_t xlogptr);
 
 void
 pgmoneta_wal(int srv, char** argv)
@@ -170,7 +171,6 @@ pgmoneta_wal(int srv, char** argv)
       xlogpos = (char*)malloc(xlogpos_size);
       memset(xlogpos, 0, xlogpos_size);
       memcpy(xlogpos, pgmoneta_query_response_get_data(identify_system_response, 2), xlogpos_size);
-
       if (wal_convert_xlogpos(xlogpos, &high32, &low32, segsize))
       {
          goto error;
@@ -200,6 +200,10 @@ pgmoneta_wal(int srv, char** argv)
          pgmoneta_log_error("Error during START_REPLICATION for server %s", config->servers[srv].name);
          goto error;
       }
+
+      // assign xlogpos at the beginning of the streaming to LSN
+      memset(config->servers[srv].current_wal_lsn, 0, MISC_LENGTH);
+      snprintf(config->servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
 
       type = 0;
 
@@ -379,6 +383,9 @@ pgmoneta_wal(int srv, char** argv)
                         break;
                      }
                   }
+                  // update LSN after a message data is written to the segment
+                  update_wal_lsn(srv, xlogptr);
+
                   wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
                   break;
                }
@@ -506,6 +513,16 @@ error:
    free(filename);
    free(xlogpos);
    exit(1);
+}
+
+static void
+update_wal_lsn(int srv, size_t xlogptr)
+{
+   struct configuration* config = (struct configuration*) shmem;
+   uint32_t low32 = xlogptr & 0xffffffff;
+   uint32_t high32 = xlogptr >> 32 & 0xffffffff;
+   memset(config->servers[srv].current_wal_lsn, 0, MISC_LENGTH);
+   snprintf(config->servers[srv].current_wal_lsn, MISC_LENGTH, "%X/%X", high32, low32);
 }
 
 int

@@ -615,6 +615,21 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_current_wal_lsn</h2>\n");
+   data = pgmoneta_append(data, "  The current WAL log sequence number\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>server</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>lsn</td>\n");
+   data = pgmoneta_append(data, "        <td>The current WAL log sequence number</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <a href=\"https://pgmoneta.github.io/\">pgmoneta.github.io/</a>\n");
    data = pgmoneta_append(data, "</body>\n");
    data = pgmoneta_append(data, "</html>\n");
@@ -2369,6 +2384,34 @@ size_information(int client_fd)
 
       data = pgmoneta_append(data, "file=\"");
       data = pgmoneta_append(data, config->servers[i].current_wal_filename);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   // Append the WAL LSN of every server
+   data = pgmoneta_append(data, "#HELP pgmoneta_current_wal_lsn The current WAL log sequence number\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_current_wal_lsn gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_current_wal_lsn{");
+
+      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\", ");
+
+      data = pgmoneta_append(data, "lsn=\"");
+      if (!strcmp(config->servers[i].current_wal_lsn, ""))
+      {
+         data = pgmoneta_append(data, "0/0");
+      }
+      else
+      {
+         data = pgmoneta_append(data, config->servers[i].current_wal_lsn);
+      }
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);

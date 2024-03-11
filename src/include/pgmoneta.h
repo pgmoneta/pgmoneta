@@ -197,6 +197,7 @@ struct server
    char username[MAX_USERNAME_LENGTH]; /**< The user name */
    char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
    char current_wal_filename[MISC_LENGTH]; /**< The current WAL filename*/
+   char current_wal_lsn[MISC_LENGTH]; /**< The current WAL log sequence number*/
    char follow[MISC_LENGTH];           /**< Follow a server */
    int retention_days;                 /**< The retention days for the server */
    int retention_weeks;                /**< The retention weeks for the server */
