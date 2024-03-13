@@ -775,7 +775,7 @@ pgmoneta_management_read_status(SSL* ssl, int socket)
 
       printf("Server           : %s\n", &name[0]);
       printf("  Retention      : ");
-      printf("%d day(g) ", retention_days);
+      printf("%d day(s) ", retention_days);
       if (retention_weeks != -1)
       {
          printf("%d week(s) ", retention_weeks);
