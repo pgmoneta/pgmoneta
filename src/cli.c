@@ -80,14 +80,14 @@ static void help_decrypt(void);
 static void help_encrypt(void);
 
 static int backup(SSL* ssl, int socket, char* server);
-static int list_backup(SSL* ssl, int socket, char* server);
+static int list_backup(SSL* ssl, int socket, char* server, char output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
-static int delete(SSL* ssl, int socket, char* server, char* backup_id);
+static int delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format);
 static int stop(SSL* ssl, int socket);
-static int status(SSL* ssl, int socket);
-static int details(SSL* ssl, int socket);
-static int isalive(SSL* ssl, int socket);
+static int status(SSL* ssl, int socket, char output_format);
+static int details(SSL* ssl, int socket, char output_format);
+static int isalive(SSL* ssl, int socket, char output_format);
 static int reset(SSL* ssl, int socket);
 static int reload(SSL* ssl, int socket);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id);
@@ -121,6 +121,7 @@ usage(void)
    printf("  -L, --logfile FILE       Set the log file\n");
    printf("  -v, --verbose            Output text string of result\n");
    printf("  -V, --version            Display version information\n");
+   printf("  -F, --format text|json   Set the output format\n");
    printf("  -?, --help               Display help\n");
    printf("\n");
    printf("Commands:\n");
@@ -170,6 +171,7 @@ main(int argc, char** argv)
    int32_t action = ACTION_UNKNOWN;
    char un[MAX_USERNAME_LENGTH];
    struct configuration* config = NULL;
+   char output_format = COMMAND_OUTPUT_FORMAT_TEXT;
 
    while (1)
    {
@@ -183,10 +185,11 @@ main(int argc, char** argv)
          {"logfile", required_argument, 0, 'L'},
          {"verbose", no_argument, 0, 'v'},
          {"version", no_argument, 0, 'V'},
+         {"format", required_argument, 0, 'F'},
          {"help", no_argument, 0, '?'}
       };
 
-      c = getopt_long(argc, argv, "vV?c:h:p:U:P:L:",
+      c = getopt_long(argc, argv, "vV?c:h:p:U:P:L:F:",
                       long_options, &option_index);
 
       if (c == -1)
@@ -219,6 +222,16 @@ main(int argc, char** argv)
             break;
          case 'V':
             version();
+            break;
+         case 'F':
+            if (!strncmp(optarg, "json", MISC_LENGTH))
+            {
+               output_format = COMMAND_OUTPUT_FORMAT_JSON;
+            }
+            else
+            {
+               output_format = COMMAND_OUTPUT_FORMAT_TEXT;
+            }
             break;
          case '?':
             usage();
@@ -557,7 +570,7 @@ password:
       }
       else if (action == ACTION_LIST_BACKUP)
       {
-         exit_code = list_backup(s_ssl, socket, server);
+         exit_code = list_backup(s_ssl, socket, server, output_format);
       }
       else if (action == ACTION_RESTORE)
       {
@@ -569,7 +582,7 @@ password:
       }
       else if (action == ACTION_DELETE)
       {
-         exit_code = delete(s_ssl, socket, server, id);
+         exit_code = delete(s_ssl, socket, server, id, output_format);
       }
       else if (action == ACTION_STOP)
       {
@@ -577,15 +590,15 @@ password:
       }
       else if (action == ACTION_STATUS)
       {
-         exit_code = status(s_ssl, socket);
+         exit_code = status(s_ssl, socket, output_format);
       }
       else if (action == ACTION_DETAILS)
       {
-         exit_code = details(s_ssl, socket);
+         exit_code = details(s_ssl, socket, output_format);
       }
       else if (action == ACTION_ISALIVE)
       {
-         exit_code = isalive(s_ssl, socket);
+         exit_code = isalive(s_ssl, socket, output_format);
       }
       else if (action == ACTION_RESET)
       {
@@ -840,11 +853,11 @@ backup(SSL* ssl, int socket, char* server)
 }
 
 static int
-list_backup(SSL* ssl, int socket, char* server)
+list_backup(SSL* ssl, int socket, char* server, char output_format)
 {
    if (pgmoneta_management_list_backup(ssl, socket, server) == 0)
    {
-      pgmoneta_management_read_list_backup(ssl, socket, server);
+      pgmoneta_management_read_list_backup(ssl, socket, server, output_format);
    }
    else
    {
@@ -891,11 +904,11 @@ archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, cha
 }
 
 static int
-delete(SSL* ssl, int socket, char* server, char* backup_id)
+delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format)
 {
    if (pgmoneta_management_delete(ssl, socket, server, backup_id) == 0)
    {
-      pgmoneta_management_read_delete(ssl, socket, server, backup_id);
+      pgmoneta_management_read_delete(ssl, socket, server, backup_id, output_format);
    }
    else
    {
@@ -917,11 +930,11 @@ stop(SSL* ssl, int socket)
 }
 
 static int
-status(SSL* ssl, int socket)
+status(SSL* ssl, int socket, char output_format)
 {
    if (pgmoneta_management_status(ssl, socket) == 0)
    {
-      pgmoneta_management_read_status(ssl, socket);
+      pgmoneta_management_read_status(ssl, socket, output_format);
    }
    else
    {
@@ -932,11 +945,11 @@ status(SSL* ssl, int socket)
 }
 
 static int
-details(SSL* ssl, int socket)
+details(SSL* ssl, int socket, char output_format)
 {
    if (pgmoneta_management_details(ssl, socket) == 0)
    {
-      pgmoneta_management_read_details(ssl, socket);
+      pgmoneta_management_read_details(ssl, socket, output_format);
    }
    else
    {
@@ -947,13 +960,13 @@ details(SSL* ssl, int socket)
 }
 
 static int
-isalive(SSL* ssl, int socket)
+isalive(SSL* ssl, int socket, char output_format)
 {
    int status = -1;
 
    if (pgmoneta_management_isalive(ssl, socket) == 0)
    {
-      if (pgmoneta_management_read_isalive(ssl, socket, &status))
+      if (pgmoneta_management_read_isalive(ssl, socket, &status, output_format))
       {
          return 1;
       }

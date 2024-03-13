@@ -57,6 +57,12 @@ extern "C" {
 #define MANAGEMENT_ENCRYPT    14
 
 /**
+ * Available command output formats
+ */
+#define COMMAND_OUTPUT_FORMAT_TEXT 'T'
+#define COMMAND_OUTPUT_FORMAT_JSON 'J'
+
+/**
  * Read the management header
  * @param socket The socket descriptor
  * @param id The resulting management identifier
@@ -103,10 +109,11 @@ pgmoneta_management_list_backup(SSL* ssl, int socket, char* server);
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server name
+ * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server);
+pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server, char output_format);
 
 /**
  * Management operation: List backups for a server (Write)
@@ -160,10 +167,11 @@ pgmoneta_management_delete(SSL* ssl, int socket, char* server, char* backup_id);
  * @param socket The socket descriptor
  * @param server The server name
  * @param backup_id The backup identifier
+ * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup_id);
+pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format);
 
 /**
  * Management operation: Delete a backup for a server (Write)
@@ -196,10 +204,11 @@ pgmoneta_management_status(SSL* ssl, int socket);
 /**
  * Management: Read status
  * @param socket The socket
+ * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_status(SSL* ssl, int socket);
+pgmoneta_management_read_status(SSL* ssl, int socket, char output_format);
 
 /**
  * Management: Write status
@@ -222,10 +231,11 @@ pgmoneta_management_details(SSL* ssl, int socket);
 /**
  * Management: Read details
  * @param socket The socket
+ * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_details(SSL* ssl, int socket);
+pgmoneta_management_read_details(SSL* ssl, int socket, char output_format);
 
 /**
  * Management: Write details
@@ -248,10 +258,11 @@ pgmoneta_management_isalive(SSL* ssl, int socket);
  * Management: Read isalive
  * @param socket The socket
  * @param status The resulting status
+ * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status);
+pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status, char output_format);
 
 /**
  * Management: Write isalive

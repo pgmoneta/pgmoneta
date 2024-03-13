@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <info.h>
+#include <json.h>
 #include <logging.h>
 #include <network.h>
 #include <management.h>
@@ -63,6 +64,14 @@ static int write_complete(SSL* ssl, int socket, void* buf, size_t size);
 static int write_socket(int socket, void* buf, size_t size);
 static int write_ssl(SSL* ssl, void* buf, size_t size);
 static int write_header(SSL* ssl, int fd, signed char type);
+static int print_status_json(cJSON* json);
+static int print_details_json(cJSON* json);
+static int print_list_backup_json(cJSON* json);
+static int print_delete_json(cJSON* json);
+static cJSON* read_status_json(SSL* ssl, int socket);
+static cJSON* read_details_json(SSL* ssl, int socket);
+static cJSON* read_list_backup_json(SSL* ssl, int socket, char* server);
+static cJSON* read_delete_json(SSL* ssl, int socket, char* server);
 
 int
 pgmoneta_management_read_header(int socket, signed char* id)
@@ -178,124 +187,40 @@ error:
 }
 
 int
-pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server)
+pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server, char output_format)
 {
-   char* name = NULL;
-   int srv;
-   int number_of_backups;
-   int keep;
-   int valid;
-   unsigned long backup_size;
-   unsigned long restore_size;
-   unsigned long wal_size;
-   unsigned long delta_size;
-   char* bck = NULL;
-   char* res = NULL;
-   char* ws = NULL;
-   char* ds = NULL;
-
-   if (read_int32("pgmoneta_management_read_list_backup", socket, &srv))
+   cJSON* json = read_list_backup_json(ssl, socket, server);
+   if (json == NULL)
+   {
+      goto error;
+   }
+   if (output_format == COMMAND_OUTPUT_FORMAT_TEXT)
+   {
+      if (print_list_backup_json(json))
+      {
+         goto error;
+      }
+   }
+   else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_print_and_free_json_object(json);
+      json = NULL;
+   }
+   else
    {
       goto error;
    }
 
-   printf("Server           : %s\n", (srv == -1 ? "Unknown" : server));
-
-   if (srv != -1)
+   if (json != NULL)
    {
-      if (read_int32("pgmoneta_management_read_list_backup", socket, &number_of_backups))
-      {
-         goto error;
-      }
-
-      printf("Number of backups: %d\n", number_of_backups);
-
-      if (number_of_backups > 0)
-      {
-         printf("Backup           :\n");
-         for (int i = 0; i < number_of_backups; i++)
-         {
-            if (read_string("pgmoneta_management_read_list_backup", socket, &name))
-            {
-               goto error;
-            }
-
-            if (read_int32("pgmoneta_management_read_list_backup", socket, &keep))
-            {
-               goto error;
-            }
-
-            if (read_int32("pgmoneta_management_read_list_backup", socket, &valid))
-            {
-               goto error;
-            }
-
-            if (read_int64("pgmoneta_management_read_list_backup", socket, &backup_size))
-            {
-               goto error;
-            }
-
-            bck = pgmoneta_bytes_to_string(backup_size);
-
-            if (read_int64("pgmoneta_management_read_list_backup", socket, &restore_size))
-            {
-               goto error;
-            }
-
-            res = pgmoneta_bytes_to_string(restore_size);
-
-            if (read_int64("pgmoneta_management_read_list_backup", socket, &wal_size))
-            {
-               goto error;
-            }
-
-            ws = pgmoneta_bytes_to_string(wal_size);
-
-            if (read_int64("pgmoneta_management_read_list_backup", socket, &delta_size))
-            {
-               goto error;
-            }
-
-            ds = pgmoneta_bytes_to_string(delta_size);
-
-            if (valid == VALID_UNKNOWN)
-            {
-               printf("                   %s (Unknown)\n", &name[0]);
-            }
-            else
-            {
-               printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                      &name[0], bck, res, ws, ds, keep ? "Yes" : "No", valid == VALID_TRUE ? "Yes" : "No");
-            }
-
-            free(bck);
-            bck = NULL;
-
-            free(res);
-            res = NULL;
-
-            free(ws);
-            ws = NULL;
-
-            free(ds);
-            ds = NULL;
-
-            free(name);
-            name = NULL;
-         }
-      }
+      cJSON_Delete(json);
    }
-
    return 0;
-
 error:
-
-   free(bck);
-   free(res);
-   free(ws);
-   free(ds);
-   free(name);
-
+   if (json != NULL)
+   {
+      cJSON_Delete(json);
+   }
    return 1;
 }
 
@@ -520,50 +445,40 @@ error:
 }
 
 int
-pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup_id)
+pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format)
 {
-   char* name = NULL;
-   int srv;
-   int number_of_backups;
-
-   if (read_int32("pgmoneta_management_read_delete", socket, &srv))
+   cJSON* json = read_delete_json(ssl, socket, server);
+   if (json == NULL)
+   {
+      goto error;
+   }
+   if (output_format == COMMAND_OUTPUT_FORMAT_TEXT)
+   {
+      if (print_delete_json(json))
+      {
+         goto error;
+      }
+   }
+   else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_print_and_free_json_object(json);
+      json = NULL;
+   }
+   else
    {
       goto error;
    }
 
-   printf("Server           : %s\n", (srv == -1 ? "Unknown" : server));
-
-   if (srv != -1)
+   if (json != NULL)
    {
-      if (read_int32("pgmoneta_management_read_delete", socket, &number_of_backups))
-      {
-         goto error;
-      }
-
-      printf("Number of backups: %d\n", number_of_backups);
-
-      if (number_of_backups > 0)
-      {
-         printf("Backup           :\n");
-         for (int i = 0; i < number_of_backups; i++)
-         {
-            if (read_string("pgmoneta_management_read_delete", socket, &name))
-            {
-               goto error;
-            }
-
-            printf("                   %s\n", name);
-
-            free(name);
-            name = NULL;
-         }
-      }
+      cJSON_Delete(json);
    }
-
    return 0;
-
 error:
-
+   if (json != NULL)
+   {
+      cJSON_Delete(json);
+   }
    return 1;
 }
 
@@ -665,159 +580,40 @@ error:
 }
 
 int
-pgmoneta_management_read_status(SSL* ssl, int socket)
+pgmoneta_management_read_status(SSL* ssl, int socket, char output_format)
 {
-   char* name = NULL;
-   int offline;
-   unsigned long used_size;
-   unsigned long free_size;
-   unsigned long total_size;
-   unsigned long server_size;
-   char* size_string;
-   int retention_days;
-   int retention_weeks;
-   int retention_months;
-   int retention_years;
-   int link;
-   int servers;
-   int number_of_directories;
-   int workers;
-
-   if (read_int32("pgmoneta_management_read_status", socket, &offline))
+   cJSON* json = read_status_json(ssl, socket);
+   if (json == NULL)
    {
       goto error;
    }
-
-   if (offline == 0)
+   if (output_format == COMMAND_OUTPUT_FORMAT_TEXT)
    {
-      printf("Mode             : Running\n");
+      if (print_status_json(json))
+      {
+         goto error;
+      }
+   }
+   else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_print_and_free_json_object(json);
+      json = NULL;
    }
    else
    {
-      printf("Mode             : Offline\n");
-   }
-
-   if (read_int64("pgmoneta_management_read_status", socket, &used_size))
-   {
       goto error;
    }
 
-   size_string = pgmoneta_bytes_to_string(used_size);
-   printf("Used space       : %s\n", size_string);
-   free(size_string);
-
-   if (read_int64("pgmoneta_management_read_status", socket, &free_size))
+   if (json != NULL)
    {
-      goto error;
+      cJSON_Delete(json);
    }
-
-   size_string = pgmoneta_bytes_to_string(free_size);
-   printf("Free space       : %s\n", size_string);
-   free(size_string);
-
-   if (read_int64("pgmoneta_management_read_status", socket, &total_size))
-   {
-      goto error;
-   }
-
-   size_string = pgmoneta_bytes_to_string(total_size);
-   printf("Total space      : %s\n", size_string);
-   free(size_string);
-
-   if (read_int32("pgmoneta_management_read_status", socket, &link))
-   {
-      goto error;
-   }
-
-   printf("Link             : %s\n", link == 1 ? "Yes" : "No");
-
-   if (read_int32("pgmoneta_management_read_status", socket, &workers))
-   {
-      goto error;
-   }
-
-   printf("Workers          : %d\n", workers);
-
-   if (read_int32("pgmoneta_management_read_status", socket, &servers))
-   {
-      goto error;
-   }
-
-   printf("Number of servers: %d\n", servers);
-
-   for (int i = 0; i < servers; i++)
-   {
-      if (read_int32("pgmoneta_management_read_status", socket, &retention_days))
-      {
-         goto error;
-      }
-      if (read_int32("pgmoneta_management_read_status", socket, &retention_weeks))
-      {
-         goto error;
-      }
-      if (read_int32("pgmoneta_management_read_status", socket, &retention_months))
-      {
-         goto error;
-      }
-      if (read_int32("pgmoneta_management_read_status", socket, &retention_years))
-      {
-         goto error;
-      }
-
-      if (read_int64("pgmoneta_management_read_status", socket, &server_size))
-      {
-         goto error;
-      }
-
-      size_string = pgmoneta_bytes_to_string(server_size);
-
-      if (read_int32("pgmoneta_management_read_status", socket, &number_of_directories))
-      {
-         goto error;
-      }
-
-      if (read_string("pgmoneta_management_read_status", socket, &name))
-      {
-         goto error;
-      }
-
-      if (read_int32("pgmoneta_management_read_status", socket, &workers))
-      {
-         goto error;
-      }
-
-      printf("Server           : %s\n", &name[0]);
-      printf("  Retention      : ");
-      printf("%d day(s) ", retention_days);
-      if (retention_weeks != -1)
-      {
-         printf("%d week(s) ", retention_weeks);
-      }
-      if (retention_months != -1)
-      {
-         printf("%d month(s) ", retention_months);
-      }
-      if (retention_years != -1)
-      {
-         printf("%d year(s)", retention_years);
-      }
-      printf("\n");
-
-      printf("  Backups        : %d\n", number_of_directories);
-      printf("  Space          : %s\n", size_string);
-      printf("  Workers        : %d\n", workers);
-
-      free(size_string);
-      size_string = NULL;
-
-      free(name);
-      name = NULL;
-   }
-
    return 0;
-
 error:
-
+   if (json != NULL)
+   {
+      cJSON_Delete(json);
+   }
    return 1;
 }
 
@@ -1000,257 +796,40 @@ error:
 }
 
 int
-pgmoneta_management_read_details(SSL* ssl, int socket)
+pgmoneta_management_read_details(SSL* ssl, int socket, char output_format)
 {
-   char* name = NULL;
-   int offline;
-   unsigned long used_size;
-   unsigned long free_size;
-   unsigned long total_size;
-   unsigned long server_size;
-   char* size_string;
-   int retention_days;
-   int retention_weeks;
-   int retention_months;
-   int retention_years;
-   int link;
-   int servers;
-   int number_of_backups;
-   unsigned long backup_size;
-   unsigned long restore_size;
-   unsigned long wal_size;
-   unsigned long delta_size;
-   int keep;
-   int valid;
-   char* bck = NULL;
-   char* res = NULL;
-   char* ws = NULL;
-   char* ds = NULL;
-   int workers;
-
-   if (read_int32("pgmoneta_management_read_details", socket, &offline))
+   cJSON* json = read_details_json(ssl, socket);
+   if (json == NULL)
    {
       goto error;
    }
-
-   if (offline == 0)
+   if (output_format == COMMAND_OUTPUT_FORMAT_TEXT)
    {
-      printf("Mode             : Running\n");
+      if (print_details_json(json))
+      {
+         goto error;
+      }
+   }
+   else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_print_and_free_json_object(json);
+      json = NULL;
    }
    else
    {
-      printf("Mode             : Offline\n");
-   }
-
-   if (read_int64("pgmoneta_management_read_details", socket, &used_size))
-   {
       goto error;
    }
 
-   size_string = pgmoneta_bytes_to_string(used_size);
-   printf("Used space       : %s\n", size_string);
-   free(size_string);
-
-   if (read_int64("pgmoneta_management_read_details", socket, &free_size))
+   if (json != NULL)
    {
-      goto error;
+      cJSON_Delete(json);
    }
-
-   size_string = pgmoneta_bytes_to_string(free_size);
-   printf("Free space       : %s\n", size_string);
-   free(size_string);
-
-   if (read_int64("pgmoneta_management_read_details", socket, &total_size))
-   {
-      goto error;
-   }
-
-   size_string = pgmoneta_bytes_to_string(total_size);
-   printf("Total space      : %s\n", size_string);
-   free(size_string);
-
-   if (read_int32("pgmoneta_management_read_details", socket, &link))
-   {
-      goto error;
-   }
-
-   printf("Link             : %s\n", link == 1 ? "Yes" : "No");
-
-   if (read_int32("pgmoneta_management_read_status", socket, &workers))
-   {
-      goto error;
-   }
-
-   printf("Workers          : %d\n", workers);
-
-   if (read_int32("pgmoneta_management_read_details", socket, &servers))
-   {
-      goto error;
-   }
-
-   printf("Number of servers: %d\n", servers);
-
-   for (int i = 0; i < servers; i++)
-   {
-      if (read_string("pgmoneta_management_read_details", socket, &name))
-      {
-         goto error;
-      }
-
-      if (read_int32("pgmoneta_management_read_status", socket, &workers))
-      {
-         goto error;
-      }
-
-      if (read_int32("pgmoneta_management_read_details", socket, &retention_days))
-      {
-         goto error;
-      }
-      if (read_int32("pgmoneta_management_read_details", socket, &retention_weeks))
-      {
-         goto error;
-      }
-      if (read_int32("pgmoneta_management_read_details", socket, &retention_months))
-      {
-         goto error;
-      }
-      if (read_int32("pgmoneta_management_read_details", socket, &retention_years))
-      {
-         goto error;
-      }
-
-      if (read_int64("pgmoneta_management_read_details", socket, &server_size))
-      {
-         goto error;
-      }
-
-      size_string = pgmoneta_bytes_to_string(server_size);
-
-      if (read_int32("pgmoneta_management_read_details", socket, &number_of_backups))
-      {
-         goto error;
-      }
-
-      printf("Server           : %s\n", name);
-      printf("  Retention      : ");
-      if (retention_days != -1)
-      {
-         printf("%d day(s) ", retention_days);
-      }
-
-      if (retention_weeks != -1)
-      {
-         printf("%d week(s) ", retention_weeks);
-      }
-
-      if (retention_months != -1)
-      {
-         printf("%d month(s) ", retention_months);
-      }
-
-      if (retention_years != -1)
-      {
-         printf("%d year(s)", retention_years);
-      }
-
-      printf("\n");
-
-      printf("  Workers        : %d\n", workers);
-      printf("  Backups        : %d\n", number_of_backups);
-
-      free(name);
-      name = NULL;
-
-      for (int j = 0; j < number_of_backups; j++)
-      {
-         if (read_string("pgmoneta_management_read_details", socket, &name))
-         {
-            goto error;
-         }
-
-         if (read_int32("pgmoneta_management_read_details", socket, &keep))
-         {
-            goto error;
-         }
-
-         if (read_int32("pgmoneta_management_read_details", socket, &valid))
-         {
-            goto error;
-         }
-
-         if (read_int64("pgmoneta_management_read_details", socket, &backup_size))
-         {
-            goto error;
-         }
-
-         bck = pgmoneta_bytes_to_string(backup_size);
-
-         if (read_int64("pgmoneta_management_read_details", socket, &restore_size))
-         {
-            goto error;
-         }
-
-         res = pgmoneta_bytes_to_string(restore_size);
-
-         if (read_int64("pgmoneta_management_read_details", socket, &wal_size))
-         {
-            goto error;
-         }
-
-         ws = pgmoneta_bytes_to_string(wal_size);
-
-         if (read_int64("pgmoneta_management_read_details", socket, &delta_size))
-         {
-            goto error;
-         }
-
-         ds = pgmoneta_bytes_to_string(delta_size);
-
-         if (valid == VALID_UNKNOWN)
-         {
-            printf("                   %s (Unknown)\n", name);
-         }
-         else
-         {
-            printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                   name, bck, res, ws, ds, keep ? "Yes" : "No", valid == VALID_TRUE ? "Yes" : "No");
-         }
-
-         free(bck);
-         bck = NULL;
-
-         free(res);
-         res = NULL;
-
-         free(ws);
-         ws = NULL;
-
-         free(ds);
-         ds = NULL;
-
-         free(name);
-         name = NULL;
-      }
-
-      printf("  Space          : %s\n", size_string);
-
-      free(size_string);
-      size_string = NULL;
-
-      free(name);
-      name = NULL;
-   }
-
    return 0;
-
 error:
-
-   free(bck);
-   free(res);
-   free(ws);
-   free(ds);
-   free(name);
-
+   if (json != NULL)
+   {
+      cJSON_Delete(json);
+   }
    return 1;
 }
 
@@ -1503,7 +1082,7 @@ error:
 }
 
 int
-pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status)
+pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status, char output_format)
 {
    char buf[4];
 
@@ -2144,4 +1723,996 @@ write_header(SSL* ssl, int socket, signed char type)
    pgmoneta_write_byte(&(header), type);
 
    return write_complete(ssl, socket, &(header), MANAGEMENT_HEADER_SIZE);
+}
+
+static cJSON*
+read_status_json(SSL* ssl, int socket)
+{
+   char* name = NULL;
+   int offline;
+   unsigned long used_size;
+   unsigned long free_size;
+   unsigned long total_size;
+   unsigned long server_size;
+   char* size_string;
+   int retention_days;
+   int retention_weeks;
+   int retention_months;
+   int retention_years;
+   int link;
+   int num_servers;
+   int number_of_directories;
+   int workers;
+   cJSON* json = NULL;
+   cJSON* output = NULL;
+   cJSON* status = NULL;
+   cJSON* servers_array = NULL;
+
+   json = pgmoneta_json_create_new_command_object("status", true, "pgmoneta-cli");
+   status = cJSON_CreateObject();
+   if (status == NULL || json == NULL)
+   {
+      goto error;
+   }
+
+   output = pgmoneta_json_extract_command_output_object(json);
+
+   if (read_int32("pgmoneta_management_read_status", socket, &offline))
+   {
+      goto error;
+   }
+   cJSON_AddStringToObject(status, "Mode", (offline == 0 ? "Running" : "Offline"));
+
+   if (read_int64("pgmoneta_management_read_status", socket, &used_size))
+   {
+      goto error;
+   }
+   size_string = pgmoneta_bytes_to_string(used_size);
+   cJSON_AddStringToObject(status, "Used space", size_string);
+   free(size_string);
+
+   if (read_int64("pgmoneta_management_read_status", socket, &free_size))
+   {
+      goto error;
+   }
+   size_string = pgmoneta_bytes_to_string(free_size);
+   cJSON_AddStringToObject(status, "Free space", size_string);
+   free(size_string);
+
+   if (read_int64("pgmoneta_management_read_status", socket, &total_size))
+   {
+      goto error;
+   }
+   size_string = pgmoneta_bytes_to_string(total_size);
+   cJSON_AddStringToObject(status, "Total space", size_string);
+   free(size_string);
+
+   if (read_int32("pgmoneta_management_read_status", socket, &link))
+   {
+      goto error;
+   }
+   cJSON_AddStringToObject(status, "Link", link == 1 ? "Yes" : "No");
+
+   if (read_int32("pgmoneta_management_read_status", socket, &workers))
+   {
+      goto error;
+   }
+   cJSON_AddNumberToObject(status, "Workers", workers);
+
+   if (read_int32("pgmoneta_management_read_status", socket, &num_servers))
+   {
+      goto error;
+   }
+   cJSON_AddNumberToObject(status, "Number of servers", num_servers);
+
+   servers_array = cJSON_CreateArray();
+   if (servers_array == NULL)
+   {
+      goto error;
+   }
+   for (int i = 0; i < num_servers; i++)
+   {
+      if (read_int32("pgmoneta_management_read_status", socket, &retention_days))
+      {
+         goto error;
+      }
+
+      if (read_int32("pgmoneta_management_read_status", socket, &retention_weeks))
+      {
+         goto error;
+      }
+      if (read_int32("pgmoneta_management_read_status", socket, &retention_months))
+      {
+         goto error;
+      }
+      if (read_int32("pgmoneta_management_read_status", socket, &retention_years))
+      {
+         goto error;
+      }
+
+      if (read_int64("pgmoneta_management_read_status", socket, &server_size))
+      {
+         goto error;
+      }
+
+      size_string = pgmoneta_bytes_to_string(server_size);
+
+      if (read_int32("pgmoneta_management_read_status", socket, &number_of_directories))
+      {
+         goto error;
+      }
+
+      if (read_string("pgmoneta_management_read_status", socket, &name))
+      {
+         goto error;
+      }
+
+      if (read_int32("pgmoneta_management_read_status", socket, &workers))
+      {
+         goto error;
+      }
+      cJSON* server = cJSON_CreateObject();
+      cJSON_AddStringToObject(server, "Server", &name[0]);
+      cJSON_AddNumberToObject(server, "Retention days", retention_days);
+      if (retention_weeks != -1)
+      {
+         cJSON_AddNumberToObject(server, "Retention weeks", retention_weeks);
+      }
+      if (retention_months != -1)
+      {
+         cJSON_AddNumberToObject(server, "Retention months", retention_months);
+      }
+      if (retention_years != -1)
+      {
+         cJSON_AddNumberToObject(server, "Retention years", retention_years);
+      }
+      cJSON_AddNumberToObject(server, "Backups", number_of_directories);
+      cJSON_AddStringToObject(server, "Space", size_string);
+      cJSON_AddNumberToObject(server, "Workers", workers);
+
+      cJSON_AddItemToArray(servers_array, server);
+
+      free(size_string);
+      size_string = NULL;
+
+      free(name);
+      name = NULL;
+   }
+
+   cJSON_AddItemToObject(status, "servers", servers_array);
+   cJSON_AddItemToObject(output, "status", status);
+
+   return json;
+
+error:
+   // return json anyway with error code set
+   if (json != NULL)
+   {
+      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+   }
+   errno = 0;
+   return json;
+}
+
+static cJSON*
+read_details_json(SSL* ssl, int socket)
+{
+   char* name = NULL;
+   int offline;
+   unsigned long used_size;
+   unsigned long free_size;
+   unsigned long total_size;
+   unsigned long server_size;
+   char* size_string;
+   int retention_days;
+   int retention_weeks;
+   int retention_months;
+   int retention_years;
+   int link;
+   int num_servers;
+   int number_of_backups;
+   unsigned long backup_size;
+   unsigned long restore_size;
+   unsigned long wal_size;
+   unsigned long delta_size;
+   int keep;
+   int valid;
+   char* bck = NULL;
+   char* res = NULL;
+   char* ws = NULL;
+   char* ds = NULL;
+   int workers;
+   cJSON* json = NULL;
+   cJSON* output = NULL;
+   cJSON* status = NULL;
+   cJSON* servers_array = NULL;
+
+   json = pgmoneta_json_create_new_command_object("details", true, "pgmoneta-cli");
+   status = cJSON_CreateObject();
+   if (status == NULL || json == NULL)
+   {
+      goto error;
+   }
+
+   output = pgmoneta_json_extract_command_output_object(json);
+
+   if (read_int32("pgmoneta_management_read_details", socket, &offline))
+   {
+      goto error;
+   }
+   cJSON_AddStringToObject(status, "Mode", (offline == 0 ? "Running" : "Offline"));
+
+   if (read_int64("pgmoneta_management_read_details", socket, &used_size))
+   {
+      goto error;
+   }
+   size_string = pgmoneta_bytes_to_string(used_size);
+   cJSON_AddStringToObject(status, "Used space", size_string);
+   free(size_string);
+
+   if (read_int64("pgmoneta_management_read_details", socket, &free_size))
+   {
+      goto error;
+   }
+   size_string = pgmoneta_bytes_to_string(free_size);
+   cJSON_AddStringToObject(status, "Free space", size_string);
+   free(size_string);
+
+   if (read_int64("pgmoneta_management_read_details", socket, &total_size))
+   {
+      goto error;
+   }
+   size_string = pgmoneta_bytes_to_string(total_size);
+   cJSON_AddStringToObject(status, "Total space", size_string);
+   free(size_string);
+
+   if (read_int32("pgmoneta_management_read_details", socket, &link))
+   {
+      goto error;
+   }
+   cJSON_AddStringToObject(status, "Link", link == 1 ? "Yes" : "No");
+
+   if (read_int32("pgmoneta_management_read_status", socket, &workers))
+   {
+      goto error;
+   }
+   cJSON_AddNumberToObject(status, "Workers", workers);
+
+   if (read_int32("pgmoneta_management_read_details", socket, &num_servers))
+   {
+      goto error;
+   }
+   cJSON_AddNumberToObject(status, "Number of servers", num_servers);
+   servers_array = cJSON_CreateArray();
+   if (servers_array == NULL)
+   {
+      goto error;
+   }
+   for (int i = 0; i < num_servers; i++)
+   {
+      if (read_string("pgmoneta_management_read_details", socket, &name))
+      {
+         goto error;
+      }
+
+      if (read_int32("pgmoneta_management_read_status", socket, &workers))
+      {
+         goto error;
+      }
+
+      if (read_int32("pgmoneta_management_read_details", socket, &retention_days))
+      {
+         goto error;
+      }
+      if (read_int32("pgmoneta_management_read_details", socket, &retention_weeks))
+      {
+         goto error;
+      }
+      if (read_int32("pgmoneta_management_read_details", socket, &retention_months))
+      {
+         goto error;
+      }
+      if (read_int32("pgmoneta_management_read_details", socket, &retention_years))
+      {
+         goto error;
+      }
+
+      if (read_int64("pgmoneta_management_read_details", socket, &server_size))
+      {
+         goto error;
+      }
+
+      size_string = pgmoneta_bytes_to_string(server_size);
+
+      if (read_int32("pgmoneta_management_read_details", socket, &number_of_backups))
+      {
+         goto error;
+      }
+
+      cJSON* server = cJSON_CreateObject();
+      cJSON_AddStringToObject(server, "Server", &name[0]);
+      cJSON_AddNumberToObject(server, "Retention days", retention_days);
+      if (retention_weeks != -1)
+      {
+         cJSON_AddNumberToObject(server, "Retention weeks", retention_weeks);
+      }
+      if (retention_months != -1)
+      {
+         cJSON_AddNumberToObject(server, "Retention months", retention_months);
+      }
+      if (retention_years != -1)
+      {
+         cJSON_AddNumberToObject(server, "Retention years", retention_years);
+      }
+      cJSON_AddNumberToObject(server, "Backups", number_of_backups);
+      cJSON_AddStringToObject(server, "Space", size_string);
+      cJSON_AddNumberToObject(server, "Workers", workers);
+      free(size_string);
+      size_string = NULL;
+
+      free(name);
+      name = NULL;
+
+      cJSON* backups_array = cJSON_CreateArray();
+      if (backups_array == NULL)
+      {
+         goto error;
+      }
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         if (read_string("pgmoneta_management_read_details", socket, &name))
+         {
+            goto error;
+         }
+
+         if (read_int32("pgmoneta_management_read_details", socket, &keep))
+         {
+            goto error;
+         }
+
+         if (read_int32("pgmoneta_management_read_details", socket, &valid))
+         {
+            goto error;
+         }
+
+         if (read_int64("pgmoneta_management_read_details", socket, &backup_size))
+         {
+            goto error;
+         }
+
+         bck = pgmoneta_bytes_to_string(backup_size);
+
+         if (read_int64("pgmoneta_management_read_details", socket, &restore_size))
+         {
+            goto error;
+         }
+
+         res = pgmoneta_bytes_to_string(restore_size);
+
+         if (read_int64("pgmoneta_management_read_details", socket, &wal_size))
+         {
+            goto error;
+         }
+
+         ws = pgmoneta_bytes_to_string(wal_size);
+
+         if (read_int64("pgmoneta_management_read_details", socket, &delta_size))
+         {
+            goto error;
+         }
+
+         ds = pgmoneta_bytes_to_string(delta_size);
+         cJSON* backup = cJSON_CreateObject();
+         cJSON_AddStringToObject(backup, "Backup name", name);
+
+         if (valid != VALID_UNKNOWN)
+         {
+            cJSON_AddStringToObject(backup, "Backup", bck);
+            cJSON_AddStringToObject(backup, "Restore", res);
+            cJSON_AddStringToObject(backup, "WAL", ws);
+            cJSON_AddStringToObject(backup, "Delta", ds);
+            cJSON_AddStringToObject(backup, "Retain", keep ? "Yes" : "No");
+            cJSON_AddStringToObject(backup, "Valid", valid == VALID_TRUE ? "Yes" : "No");
+         }
+         else
+         {
+            cJSON_AddStringToObject(backup, "Backup", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Restore", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "WAL", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Delta", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Retain", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Valid", "UNKNOWN");
+         }
+
+         free(bck);
+         bck = NULL;
+
+         free(res);
+         res = NULL;
+
+         free(ws);
+         ws = NULL;
+
+         free(ds);
+         ds = NULL;
+
+         free(name);
+         name = NULL;
+
+         cJSON_AddItemToArray(backups_array, backup);
+      }
+      cJSON_AddItemToObject(server, "backups", backups_array);
+      cJSON_AddItemToArray(servers_array, server);
+   }
+
+   cJSON_AddItemToObject(status, "servers", servers_array);
+   cJSON_AddItemToObject(output, "status", status);
+
+   return json;
+error:
+   free(bck);
+   free(res);
+   free(ws);
+   free(ds);
+   free(name);
+   // return json anyway with error code set
+   if (json != NULL)
+   {
+      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+   }
+   errno = 0;
+   return json;
+}
+
+static cJSON*
+read_delete_json(SSL* ssl, int socket, char* server)
+{
+   char* name = NULL;
+   int srv;
+   int number_of_backups;
+   cJSON* json = NULL;
+   cJSON* output = NULL;
+   cJSON* status = NULL;
+   cJSON* backups_array = NULL;
+   json = pgmoneta_json_create_new_command_object("delete", true, "pgmoneta-cli");
+   status = cJSON_CreateObject();
+   if (status == NULL || json == NULL)
+   {
+      goto error;
+   }
+
+   output = pgmoneta_json_extract_command_output_object(json);
+   if (read_int32("pgmoneta_management_read_delete", socket, &srv))
+   {
+      goto error;
+   }
+   cJSON_AddStringToObject(status, "Server", srv == -1 ? "Unknown" : server);
+   if (srv != -1)
+   {
+      if (read_int32("pgmoneta_management_read_delete", socket, &number_of_backups))
+      {
+         goto error;
+      }
+      cJSON_AddNumberToObject(status, "Number of backups", number_of_backups);
+      backups_array = cJSON_CreateArray();
+      if (backups_array == NULL)
+      {
+         goto error;
+      }
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (read_string("pgmoneta_management_read_delete", socket, &name))
+         {
+            goto error;
+         }
+         cJSON* backup = cJSON_CreateObject();
+         if (backup == NULL)
+         {
+            goto error;
+         }
+         cJSON_AddStringToObject(backup, "Backup name", name);
+         cJSON_AddItemToArray(backups_array, backup);
+         free(name);
+         name = NULL;
+      }
+   }
+
+   cJSON_AddItemToObject(status, "backups", backups_array);
+   cJSON_AddItemToObject(output, "status", status);
+   return json;
+
+error:
+   // return json anyway with error code set
+   if (json != NULL)
+   {
+      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+   }
+   errno = 0;
+   return json;
+}
+
+static cJSON*
+read_list_backup_json(SSL* ssl, int socket, char* server)
+{
+   char* name = NULL;
+   int srv;
+   int number_of_backups;
+   int keep;
+   int valid;
+   unsigned long backup_size;
+   unsigned long restore_size;
+   unsigned long wal_size;
+   unsigned long delta_size;
+   char* bck = NULL;
+   char* res = NULL;
+   char* ws = NULL;
+   char* ds = NULL;
+   cJSON* json = NULL;
+   cJSON* output = NULL;
+   cJSON* status = NULL;
+   cJSON* backups_array = NULL;
+   json = pgmoneta_json_create_new_command_object("list-backup", true, "pgmoneta-cli");
+   status = cJSON_CreateObject();
+   if (status == NULL || json == NULL)
+   {
+      goto error;
+   }
+   backups_array = cJSON_CreateArray();
+   if (backups_array == NULL)
+   {
+      goto error;
+   }
+
+   output = pgmoneta_json_extract_command_output_object(json);
+   if (read_int32("pgmoneta_management_read_list_backup", socket, &srv))
+   {
+      goto error;
+   }
+   cJSON_AddStringToObject(status, "Server", (srv == -1 ? "Unknown" : server));
+   if (srv != -1)
+   {
+      if (read_int32("pgmoneta_management_read_list_backup", socket, &number_of_backups))
+      {
+         goto error;
+      }
+      cJSON_AddNumberToObject(status, "Number of backups", number_of_backups);
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (read_string("pgmoneta_management_read_list_backup", socket, &name))
+         {
+            goto error;
+         }
+
+         if (read_int32("pgmoneta_management_read_list_backup", socket, &keep))
+         {
+            goto error;
+         }
+
+         if (read_int32("pgmoneta_management_read_list_backup", socket, &valid))
+         {
+            goto error;
+         }
+
+         if (read_int64("pgmoneta_management_read_list_backup", socket, &backup_size))
+         {
+            goto error;
+         }
+
+         bck = pgmoneta_bytes_to_string(backup_size);
+
+         if (read_int64("pgmoneta_management_read_list_backup", socket, &restore_size))
+         {
+            goto error;
+         }
+
+         res = pgmoneta_bytes_to_string(restore_size);
+
+         if (read_int64("pgmoneta_management_read_list_backup", socket, &wal_size))
+         {
+            goto error;
+         }
+
+         ws = pgmoneta_bytes_to_string(wal_size);
+
+         if (read_int64("pgmoneta_management_read_list_backup", socket, &delta_size))
+         {
+            goto error;
+         }
+
+         ds = pgmoneta_bytes_to_string(delta_size);
+         cJSON* backup = cJSON_CreateObject();
+         cJSON_AddStringToObject(backup, "Backup name", name);
+
+         if (valid != VALID_UNKNOWN)
+         {
+            cJSON_AddStringToObject(backup, "Backup", bck);
+            cJSON_AddStringToObject(backup, "Restore", res);
+            cJSON_AddStringToObject(backup, "WAL", ws);
+            cJSON_AddStringToObject(backup, "Delta", ds);
+            cJSON_AddStringToObject(backup, "Retain", keep ? "Yes" : "No");
+            cJSON_AddStringToObject(backup, "Valid", valid == VALID_TRUE ? "Yes" : "No");
+         }
+         else
+         {
+            cJSON_AddStringToObject(backup, "Backup", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Restore", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "WAL", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Delta", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Retain", "UNKNOWN");
+            cJSON_AddStringToObject(backup, "Valid", "UNKNOWN");
+         }
+
+         free(bck);
+         bck = NULL;
+
+         free(res);
+         res = NULL;
+
+         free(ws);
+         ws = NULL;
+
+         free(ds);
+         ds = NULL;
+
+         free(name);
+         name = NULL;
+         cJSON_AddItemToArray(backups_array, backup);
+      }
+   }
+   else
+   {
+      cJSON_AddNumberToObject(status, "Number of backups", 0);
+   }
+
+   cJSON_AddItemToObject(status, "backups", backups_array);
+   cJSON_AddItemToObject(output, "status", status);
+   return json;
+
+error:
+   free(bck);
+   free(res);
+   free(ws);
+   free(ds);
+   free(name);
+   // return json anyway with error code set
+   if (json != NULL)
+   {
+      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+   }
+   errno = 0;
+   return json;
+}
+
+static int
+print_status_json(cJSON* json)
+{
+   cJSON* server = NULL;
+   if (!json)
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_json_command_name_equals_to(json, "status"))
+   {
+      return 1;
+   }
+
+   cJSON* output = pgmoneta_json_extract_command_output_object(json);
+
+   cJSON* status = cJSON_GetObjectItemCaseSensitive(output, "status");
+   if (status == NULL)
+   {
+      return 1;
+   }
+
+   cJSON* mode = cJSON_GetObjectItemCaseSensitive(status, "Mode");
+   if (mode != NULL)
+   {
+      printf("Mode             : %s\n", mode->valuestring);
+   }
+
+   cJSON* used_space = cJSON_GetObjectItemCaseSensitive(status, "Used space");
+   if (used_space != NULL)
+   {
+      printf("Used space       : %s\n", used_space->valuestring);
+   }
+
+   cJSON* free_space = cJSON_GetObjectItemCaseSensitive(status, "Free space");
+   if (free_space != NULL)
+   {
+      printf("Free space       : %s\n", free_space->valuestring);
+   }
+
+   cJSON* total_space = cJSON_GetObjectItemCaseSensitive(status, "Total space");
+   if (total_space != NULL)
+   {
+      printf("Free space       : %s\n", total_space->valuestring);
+   }
+
+   cJSON* link = cJSON_GetObjectItemCaseSensitive(status, "Link");
+   if (link != NULL)
+   {
+      printf("Link             : %s\n", link->valuestring);
+   }
+
+   cJSON* workers = cJSON_GetObjectItemCaseSensitive(status, "Workers");
+   if (workers != NULL)
+   {
+      printf("Workers          : %d\n", workers->valueint);
+   }
+
+   cJSON* num_servers = cJSON_GetObjectItemCaseSensitive(status, "Number of servers");
+   if (num_servers != NULL)
+   {
+      printf("Number of servers: %d\n", num_servers->valueint);
+   }
+
+   cJSON* servers = cJSON_GetObjectItemCaseSensitive(status, "servers");
+   if (servers != NULL)
+   {
+      cJSON_ArrayForEach(server, servers)
+      {
+         printf("Server           : %s\n", cJSON_GetObjectItemCaseSensitive(server, "Server")->valuestring);
+         printf("  Retention      : ");
+         printf("%d day(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention days")->valueint);
+         if (cJSON_GetObjectItemCaseSensitive(server, "Retention weeks") != NULL)
+         {
+            printf("%d week(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention weeks")->valueint);
+         }
+         if (cJSON_GetObjectItemCaseSensitive(server, "Retention months") != NULL)
+         {
+            printf("%d month(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention months")->valueint);
+         }
+         if (cJSON_GetObjectItemCaseSensitive(server, "Retention years") != NULL)
+         {
+            printf("%d year(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention years")->valueint);
+         }
+         printf("\n");
+         printf("  Backups        : %d\n", cJSON_GetObjectItemCaseSensitive(server, "Backups")->valueint);
+         printf("  Space          : %s\n", cJSON_GetObjectItemCaseSensitive(server, "Space")->valuestring);
+         printf("  Workers        : %d\n", cJSON_GetObjectItemCaseSensitive(server, "Workers")->valueint);
+      }
+   }
+   return 0;
+}
+
+static int
+print_details_json(cJSON* json)
+{
+   cJSON* server = NULL;
+   cJSON* backup = NULL;
+   char* valid = NULL;
+   if (!json)
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_json_command_name_equals_to(json, "details"))
+   {
+      return 1;
+   }
+
+   cJSON* output = pgmoneta_json_extract_command_output_object(json);
+
+   cJSON* status = cJSON_GetObjectItemCaseSensitive(output, "status");
+   if (status == NULL)
+   {
+      return 1;
+   }
+
+   cJSON* mode = cJSON_GetObjectItemCaseSensitive(status, "Mode");
+   if (mode != NULL)
+   {
+      printf("Mode             : %s\n", mode->valuestring);
+   }
+
+   cJSON* used_space = cJSON_GetObjectItemCaseSensitive(status, "Used space");
+   if (used_space != NULL)
+   {
+      printf("Used space       : %s\n", used_space->valuestring);
+   }
+
+   cJSON* free_space = cJSON_GetObjectItemCaseSensitive(status, "Free space");
+   if (free_space != NULL)
+   {
+      printf("Free space       : %s\n", free_space->valuestring);
+   }
+
+   cJSON* total_space = cJSON_GetObjectItemCaseSensitive(status, "Total space");
+   if (total_space != NULL)
+   {
+      printf("Free space       : %s\n", total_space->valuestring);
+   }
+
+   cJSON* link = cJSON_GetObjectItemCaseSensitive(status, "Link");
+   if (link != NULL)
+   {
+      printf("Link             : %s\n", link->valuestring);
+   }
+
+   cJSON* workers = cJSON_GetObjectItemCaseSensitive(status, "Workers");
+   if (workers != NULL)
+   {
+      printf("Workers          : %d\n", workers->valueint);
+   }
+
+   cJSON* num_servers = cJSON_GetObjectItemCaseSensitive(status, "Number of servers");
+   if (num_servers != NULL)
+   {
+      printf("Number of servers: %d\n", num_servers->valueint);
+   }
+
+   cJSON* servers = cJSON_GetObjectItemCaseSensitive(status, "servers");
+   if (servers != NULL)
+   {
+      cJSON_ArrayForEach(server, servers)
+      {
+         printf("Server           : %s\n", cJSON_GetObjectItemCaseSensitive(server, "Server")->valuestring);
+         printf("  Retention      : ");
+         printf("%d day(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention days")->valueint);
+         if (cJSON_GetObjectItemCaseSensitive(server, "Retention weeks") != NULL)
+         {
+            printf("%d week(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention weeks")->valueint);
+         }
+         if (cJSON_GetObjectItemCaseSensitive(server, "Retention months") != NULL)
+         {
+            printf("%d month(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention months")->valueint);
+         }
+         if (cJSON_GetObjectItemCaseSensitive(server, "Retention years") != NULL)
+         {
+            printf("%d year(s) ", cJSON_GetObjectItemCaseSensitive(server, "Retention years")->valueint);
+         }
+         printf("\n");
+         printf("  Workers        : %d\n", cJSON_GetObjectItemCaseSensitive(server, "Workers")->valueint);
+         printf("  Backups        : %d\n", cJSON_GetObjectItemCaseSensitive(server, "Backups")->valueint);
+
+         cJSON* backups = cJSON_GetObjectItemCaseSensitive(server, "backups");
+         if (backups != NULL)
+         {
+            cJSON_ArrayForEach(backup, backups)
+            {
+               valid = cJSON_GetObjectItemCaseSensitive(backup, "Valid")->valuestring;
+               if (pgmoneta_compare_string(valid, "Unknown"))
+               {
+                  printf("                   %s (Unknown)\n", cJSON_GetObjectItemCaseSensitive(backup, "Backup name")->valuestring);
+               }
+               else
+               {
+                  printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
+                         cJSON_GetObjectItemCaseSensitive(backup, "Backup name")->valuestring,
+                         cJSON_GetObjectItemCaseSensitive(backup, "Backup")->valuestring,
+                         cJSON_GetObjectItemCaseSensitive(backup, "Restore")->valuestring,
+                         cJSON_GetObjectItemCaseSensitive(backup, "WAL")->valuestring,
+                         cJSON_GetObjectItemCaseSensitive(backup, "Delta")->valuestring,
+                         cJSON_GetObjectItemCaseSensitive(backup, "Retain")->valuestring,
+                         cJSON_GetObjectItemCaseSensitive(backup, "Valid")->valuestring);
+               }
+            }
+            printf("  Space          : %s\n", cJSON_GetObjectItemCaseSensitive(server, "Space")->valuestring);
+         }
+      }
+   }
+   return 0;
+}
+
+static int
+print_delete_json(cJSON* json)
+{
+   cJSON* backup = NULL;
+   char* srv = NULL;
+   int number_of_backups = 0;
+   if (!json || pgmoneta_json_is_command_object_faulty(json))
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_json_command_name_equals_to(json, "delete"))
+   {
+      return 1;
+   }
+
+   cJSON* output = pgmoneta_json_extract_command_output_object(json);
+
+   cJSON* status = cJSON_GetObjectItemCaseSensitive(output, "status");
+   if (status == NULL)
+   {
+      return 1;
+   }
+   cJSON* server = cJSON_GetObjectItemCaseSensitive(status, "Server");
+   if (server == NULL)
+   {
+      return 1;
+   }
+   srv = server->valuestring;
+   printf("Server           : %s\n", srv);
+   if (!pgmoneta_compare_string(srv, "Unknown"))
+   {
+      number_of_backups = cJSON_GetObjectItemCaseSensitive(status, "Number of backups")->valueint;
+      printf("Number of backups: %d\n", number_of_backups);
+
+      if (number_of_backups > 0)
+      {
+         printf("Backup           :\n");
+         cJSON* backups = cJSON_GetObjectItemCaseSensitive(status, "backups");
+         if (backups != NULL)
+         {
+            cJSON_ArrayForEach(backup, backups)
+            {
+               printf("                   %s\n", cJSON_GetObjectItemCaseSensitive(backup, "Backup name")->valuestring);
+            }
+         }
+      }
+   }
+   return 0;
+}
+
+static int
+print_list_backup_json(cJSON* json)
+{
+   cJSON* backup = NULL;
+   char* valid = NULL;
+   char* srv = NULL;
+   int number_of_backups = 0;
+   if (!json || pgmoneta_json_is_command_object_faulty(json))
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_json_command_name_equals_to(json, "list-backup"))
+   {
+      return 1;
+   }
+
+   cJSON* output = pgmoneta_json_extract_command_output_object(json);
+
+   cJSON* status = cJSON_GetObjectItemCaseSensitive(output, "status");
+   if (status == NULL)
+   {
+      return 1;
+   }
+   cJSON* server = cJSON_GetObjectItemCaseSensitive(status, "Server");
+   if (server == NULL)
+   {
+      return 1;
+   }
+   srv = server->valuestring;
+   cJSON* number = cJSON_GetObjectItemCaseSensitive(status, "Number of backups");
+   if (number == NULL)
+   {
+      return 1;
+   }
+   number_of_backups = number->valueint;
+
+   printf("Server           : %s\n", srv);
+   if (!pgmoneta_compare_string(srv, "Unknown"))
+   {
+      printf("Number of backups: %d\n", number_of_backups);
+
+      cJSON* backups = cJSON_GetObjectItemCaseSensitive(status, "backups");
+      if (number_of_backups > 0)
+      {
+         printf("Backup           :\n");
+      }
+      cJSON_ArrayForEach(backup, backups)
+      {
+         valid = cJSON_GetObjectItemCaseSensitive(backup, "Valid")->valuestring;
+         if (pgmoneta_compare_string(valid, "Unknown"))
+         {
+            printf("                   %s (Unknown)\n", cJSON_GetObjectItemCaseSensitive(backup, "Backup name")->valuestring);
+         }
+         else
+         {
+            printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
+                   cJSON_GetObjectItemCaseSensitive(backup, "Backup name")->valuestring,
+                   cJSON_GetObjectItemCaseSensitive(backup, "Backup")->valuestring,
+                   cJSON_GetObjectItemCaseSensitive(backup, "Restore")->valuestring,
+                   cJSON_GetObjectItemCaseSensitive(backup, "WAL")->valuestring,
+                   cJSON_GetObjectItemCaseSensitive(backup, "Delta")->valuestring,
+                   cJSON_GetObjectItemCaseSensitive(backup, "Retain")->valuestring,
+                   cJSON_GetObjectItemCaseSensitive(backup, "Valid")->valuestring);
+         }
+      }
+   }
+
+   return 0;
 }
