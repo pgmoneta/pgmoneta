@@ -1845,7 +1845,7 @@ init_replication_slots(void)
 {
    int usr;
    int auth = AUTH_ERROR;
-   int slot_status;
+   int slot_status = INCORRECT_SLOT_TYPE;
    SSL* ssl = NULL;
    int socket;
    int ret = 0;
