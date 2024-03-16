@@ -42,6 +42,33 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static char* restore_last_files_names[] = {"/global/pg_control"};
+
+int
+pgmoneta_get_restore_last_files_names(char*** output)
+{
+   int number_of_elements = 0;
+   number_of_elements = sizeof(restore_last_files_names) / sizeof(restore_last_files_names[0]);
+
+   *output = (char**)malloc((number_of_elements + 1) * sizeof(char*));
+   if (*output == NULL)
+   {
+      return 1;
+   }
+
+   for (int i = 0; i < number_of_elements; i++)
+   {
+      (*output)[i] = strdup(restore_last_files_names[i]);
+      if ((*output)[i] == NULL)
+      {
+         return 1;
+      }
+   }
+   (*output)[number_of_elements] = NULL;
+
+   return 0;
+}
+
 void
 pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
 {

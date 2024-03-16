@@ -168,6 +168,13 @@ struct workflow*
 pgmoneta_workflow_create_recovery_info(void);
 
 /**
+ * Create a workflow to restore the excluded files in the first round of restore
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_restore_excluded_files(void);
+
+/**
  * Create a workflow for permissions
  * @param type The type of operation
  * @return The workflow

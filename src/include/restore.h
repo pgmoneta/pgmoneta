@@ -37,6 +37,14 @@ extern "C" {
 #include <stdlib.h>
 
 /**
+ * Fill the passed arugment with the last files names to restore
+ * @param output The string array that will be filled with the last files names to restore
+ * @return integer showing the status of the operation
+ */
+int
+pgmoneta_get_restore_last_files_names(char*** output);
+
+/**
  * Create a restore
  * @param client_fd The client
  * @param server The server

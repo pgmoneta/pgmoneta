@@ -208,6 +208,9 @@ wf_restore(void)
    current->next = pgmoneta_workflow_create_recovery_info();
    current = current->next;
 
+   current->next = pgmoneta_restore_excluded_files();
+   current = current->next;
+
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
    current = current->next;
 

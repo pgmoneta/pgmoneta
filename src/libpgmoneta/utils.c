@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <restore.h>
 #include <utils.h>
 #include <workers.h>
 
@@ -78,7 +79,6 @@ static int copy_tablespaces(char* from, char* to, char* base, char* server, char
 static int get_permissions(char* from, int* permissions);
 
 static void copy_file(void* arg);
-
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -1496,6 +1496,27 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
    char* to_buffer = NULL;
    struct dirent* entry;
    struct stat statbuf;
+   char** restore_last_files_names = NULL;
+
+   if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
+   {
+      goto error;
+   }
+
+   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   {
+      char* temp = NULL;
+      temp = (char*)malloc((strlen(restore_last_files_names[i]) + strlen(from)) * sizeof(char) + 1);
+
+      if (temp == NULL)
+      {
+         goto error;
+      }
+      snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
+      free(restore_last_files_names[i]);
+
+      restore_last_files_names[i] = temp;
+   }
 
    pgmoneta_mkdir(to);
 
@@ -1526,12 +1547,20 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
                }
                else
                {
-                  pgmoneta_copy_directory(from_buffer, to_buffer, workers);
+                  pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
                }
             }
             else
             {
-               pgmoneta_copy_file(from_buffer, to_buffer, workers);
+               bool file_is_excluded = false;
+               for (int i = 0; restore_last_files_names[i] != NULL; i++)
+               {
+                  file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+               }
+               if (!file_is_excluded)
+               {
+                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+               }
             }
          }
 
@@ -1548,9 +1577,20 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
       goto error;
    }
 
+   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   {
+      free(restore_last_files_names[i]);
+   }
+   free(restore_last_files_names);
+
    return 0;
 
 error:
+   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   {
+      free(restore_last_files_names[i]);
+   }
+   free(restore_last_files_names);
 
    return 1;
 }
@@ -1665,7 +1705,7 @@ copy_tablespaces(char* from, char* to, char* base, char* server, char* id, struc
             pgmoneta_mkdir(to_directory);
             pgmoneta_symlink_at_file(to_oid, relative_directory);
 
-            pgmoneta_copy_directory(&path[0], to_directory, workers);
+            pgmoneta_copy_directory(&path[0], to_directory, NULL, workers);
 
             free(to_oid);
             free(to_directory);
@@ -1700,7 +1740,7 @@ error:
 }
 
 int
-pgmoneta_copy_directory(char* from, char* to, struct workers* workers)
+pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer = NULL;
@@ -1731,11 +1771,19 @@ pgmoneta_copy_directory(char* from, char* to, struct workers* workers)
          {
             if (S_ISDIR(statbuf.st_mode))
             {
-               pgmoneta_copy_directory(from_buffer, to_buffer, workers);
+               pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
             }
             else
             {
-               pgmoneta_copy_file(from_buffer, to_buffer, workers);
+               bool file_is_excluded = false;
+               for (int i = 0; restore_last_files_names[i] != NULL; i++)
+               {
+                  file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+               }
+               if (!file_is_excluded)
+               {
+                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+               }
             }
          }
 

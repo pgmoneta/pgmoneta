@@ -31,6 +31,7 @@
 #include <pgmoneta.h>
 #include <info.h>
 #include <logging.h>
+#include <restore.h>
 #include <string.h>
 #include <utils.h>
 #include <workers.h>
@@ -48,6 +49,10 @@ static int restore_teardown(int, char*, struct node*, struct node**);
 static int recovery_info_setup(int, char*, struct node*, struct node**);
 static int recovery_info_execute(int, char*, struct node*, struct node**);
 static int recovery_info_teardown(int, char*, struct node*, struct node**);
+
+static int restore_excluded_files_setup(int, char*, struct node*, struct node**);
+static int restore_excluded_files_execute(int, char*, struct node*, struct node**);
+static int restore_excluded_files_teardown(int, char*, struct node*, struct node**);
 
 static char* get_user_password(char* username);
 static void create_standby_signal(char* basedir);
@@ -77,6 +82,21 @@ pgmoneta_workflow_create_recovery_info(void)
    wf->setup = &recovery_info_setup;
    wf->execute = &recovery_info_execute;
    wf->teardown = &recovery_info_teardown;
+   wf->next = NULL;
+
+   return wf;
+}
+
+struct workflow*
+pgmoneta_restore_excluded_files(void)
+{
+   struct workflow* wf = NULL;
+
+   wf = (struct workflow*)malloc(sizeof(struct workflow));
+
+   wf->setup = &restore_excluded_files_setup;
+   wf->execute = &restore_excluded_files_execute;
+   wf->teardown = &restore_excluded_files_teardown;
    wf->next = NULL;
 
    return wf;
@@ -771,6 +791,167 @@ error:
 
 static int
 recovery_info_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+{
+   return 0;
+}
+
+static int
+restore_excluded_files_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+{
+   return 0;
+}
+
+static int
+restore_excluded_files_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+{
+   char* id = NULL;
+   char* from = NULL;
+   char* to = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   char* d = NULL;
+   struct workers* workers = NULL;
+   int number_of_workers = 0;
+   char** restore_last_files_names = NULL;
+   char* directory = NULL;
+   struct configuration* config = (struct configuration*)shmem;
+
+   if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
+   {
+      goto error;
+   }
+
+   if (!strcmp(identifier, "oldest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else
+   {
+      id = identifier;
+   }
+
+   directory = pgmoneta_get_node_string(i_nodes, "directory");
+
+   from = pgmoneta_get_server_backup_identifier_data(server, id);
+
+   to = pgmoneta_append(to, directory);
+   if (!pgmoneta_ends_with(to, "/"))
+   {
+      to = pgmoneta_append(to, "/");
+   }
+   to = pgmoneta_append(to, config->servers[server].name);
+   to = pgmoneta_append(to, "-");
+   to = pgmoneta_append(to, id);
+   to = pgmoneta_append(to, "/");
+
+   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   {
+      char* from_file = NULL;
+      char* to_file = NULL;
+
+      from_file = (char*)malloc((strlen(from) + strlen(restore_last_files_names[i])) * sizeof(char) + 1);
+      if (from_file == NULL)
+      {
+         pgmoneta_log_error("Restore: Could not allocate memory for from_file");
+         goto error;
+      }
+      from_file = strcpy(from_file, from);
+      from_file = strcat(from_file, restore_last_files_names[i]);
+
+      to_file = (char*)malloc((strlen(to) + strlen(restore_last_files_names[i])) * sizeof(char) + 1);
+      if (to_file == NULL)
+      {
+         pgmoneta_log_error("Restore: Could not allocate memory for to_file");
+         free(from_file);
+         goto error;
+      }
+
+      to_file = strcpy(to_file, to);
+      to_file = strcat(to_file, restore_last_files_names[i]);
+
+      number_of_workers = pgmoneta_get_number_of_workers(server);
+      if (number_of_workers > 0)
+      {
+         pgmoneta_workers_initialize(number_of_workers, &workers);
+      }
+
+      if (pgmoneta_copy_file(from_file, to_file, workers))
+      {
+         pgmoneta_log_error("Restore: Could not copy file %s to %s", from_file, to_file);
+         free(from_file);
+         free(to_file);
+         goto error;
+      }
+      free(from_file);
+      free(to_file);
+   }
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   {
+      free(restore_last_files_names[i]);
+   }
+   free(backups);
+   free(restore_last_files_names);
+   free(from);
+   free(to);
+   free(d);
+
+   return 0;
+
+error:
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   {
+      free(restore_last_files_names[i]);
+   }
+   free(backups);
+   free(restore_last_files_names);
+   free(from);
+   free(to);
+   free(d);
+
+   return 1;
+}
+
+static int
+restore_excluded_files_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    return 0;
 }

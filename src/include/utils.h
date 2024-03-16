@@ -440,11 +440,12 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
  * Copy a directory
  * @param from The from directory
  * @param to The to directory
+ * @param restore_last_paths The string array of file names that should be excluded from being copied in this round
  * @param workers The workers
  * @return The result
  */
 int
-pgmoneta_copy_directory(char* from, char* to, struct workers* workers);
+pgmoneta_copy_directory(char* from, char* to, char** restore_last_paths, struct workers* workers);
 
 /**
  * Copy a file
