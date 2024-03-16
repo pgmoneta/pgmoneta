@@ -36,11 +36,9 @@
 #include <unistd.h>
 
 static volatile int worker_keepalive;
-static volatile int worker_on_hold;
 
 static int worker_init(struct workers* workers, struct worker** worker);
 static void* worker_do(struct worker* worker);
-static void worker_hold(int sig_id);
 static void worker_destroy(struct worker* worker);
 
 static int queue_init(struct queue* queue);
@@ -63,7 +61,6 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
    *workers = NULL;
 
    worker_keepalive = 1;
-   worker_on_hold = 0;
 
    if (num < 1)
    {
@@ -280,36 +277,13 @@ error:
    return 1;
 }
 
-static void
-worker_hold(int sig_id)
-{
-   (void)sig_id;
-
-   worker_on_hold = 1;
-
-   while (worker_on_hold)
-   {
-      SLEEP(1000000000L);
-   }
-}
-
 static void*
 worker_do(struct worker* worker)
 {
    void (*func_ref)(void*);
    void* arg_ref;
    struct task* t;
-   struct sigaction sact;
    struct workers* workers = worker->workers;
-
-   sigemptyset(&sact.sa_mask);
-   sact.sa_flags = SA_ONSTACK;
-   sact.sa_handler = worker_hold;
-
-   if (sigaction(SIGUSR1, &sact, NULL) == -1)
-   {
-      pgmoneta_log_error("Cannot handle SIGUSR1");
-   }
 
    pthread_mutex_lock(&workers->worker_lock);
    workers->number_of_alive += 1;
