@@ -432,6 +432,21 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_throughput</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the backup for a server (bytes/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_backup_elapsed_time</h2>\n");
    data = pgmoneta_append(data, "  The backup in seconds for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -2213,6 +2228,72 @@ size_information(int client_fd)
       else
       {
          data = pgmoneta_append(data, "pgmoneta_backup_compression_ratio{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_throughput The throughput of the backup for a server (bytes/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_throughput gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_throughput{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->elapsed_time)
+               {
+                  data = pgmoneta_append_double(data, 1.0 * backups[j]->backup_size / backups[j]->elapsed_time);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_throughput{");
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->servers[i].name);
