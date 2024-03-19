@@ -181,7 +181,6 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 static int
 decryption_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
-   char* root = NULL;
    char* d = NULL;
    char* to = NULL;
    char* id = NULL;
@@ -244,7 +243,6 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       id = identifier;
    }
 
-   root = pgmoneta_get_node_string(*o_nodes, "root");
    to = pgmoneta_get_node_string(*o_nodes, "to");
 
    if (to != NULL)
@@ -264,7 +262,7 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_decrypt_directory(root, workers);
+   pgmoneta_decrypt_directory(d, workers);
 
    if (number_of_workers > 0)
    {
@@ -280,7 +278,7 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
 
    for (int i = 0; i < number_of_backups; i++)
    {
