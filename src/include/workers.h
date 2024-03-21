@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
-   
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,7 +104,7 @@ pgmoneta_workers_initialize(int num, struct workers** workers);
  * @return 0 upon success, otherwise 1.
  */
 int
-pgmoneta_workers_add(struct workers* workers, void(*function)(void*), void* ap);
+pgmoneta_workers_add(struct workers* workers, void (*function)(void*), void* ap);
 
 /**
  * Wait for all queued work units to finish
@@ -126,7 +126,6 @@ pgmoneta_workers_destroy(struct workers* workers);
  */
 int
 pgmoneta_get_number_of_workers(int server);
-
 
 /**
  * Create worker input
