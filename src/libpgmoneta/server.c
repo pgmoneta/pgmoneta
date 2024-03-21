@@ -282,7 +282,9 @@ pgmoneta_server_get_version(SSL* ssl, int socket, int server)
 
    config = (struct configuration*)shmem;
 
-   ret = pgmoneta_create_query_message("SELECT split_part(split_part(version(), ' ', 2), '.', 1);", &query_msg);
+   ret = pgmoneta_create_query_message("SELECT split_part(split_part(version(), ' ', 2), '.', 1) AS major, "
+                                       "split_part(split_part(version(), ' ', 2), '.', 2) AS minor;",
+                                       &query_msg);
    if (ret != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -294,6 +296,7 @@ pgmoneta_server_get_version(SSL* ssl, int socket, int server)
    }
 
    config->servers[server].version = atoi(response->tuples->data[0]);
+   config->servers[server].minor_version = atoi(response->tuples->data[1]);
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_copy_message(query_msg);

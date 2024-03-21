@@ -88,6 +88,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    int number_of_tablespaces = 0;
    char* label = NULL;
    char version[10];
+   char minor_version[10];
    char* wal = NULL;
    char* startpos = NULL;
    char* chkptpos = NULL;
@@ -135,6 +136,8 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    memset(version, 0, sizeof(version));
    snprintf(version, sizeof(version), "%d", config->servers[server].version);
+   memset(minor_version, 0, sizeof(minor_version));
+   snprintf(minor_version, sizeof(version), "%d", config->servers[server].minor_version);
 
    pgmoneta_create_query_message("SELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &tablespace_msg);
    if (pgmoneta_query_execute(ssl, socket, tablespace_msg, &response) || response == NULL)
@@ -275,6 +278,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_update_info_string(root, INFO_WAL, wal);
    pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
    pgmoneta_update_info_string(root, INFO_VERSION, version);
+   pgmoneta_update_info_string(root, INFO_MINOR_VERSION, minor_version);
    pgmoneta_update_info_bool(root, INFO_KEEP, false);
    // in case of parsing error
    if (startpos != NULL)

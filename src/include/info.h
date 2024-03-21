@@ -44,6 +44,7 @@ extern "C" {
 #define INFO_WAL            "WAL"
 #define INFO_ELAPSED        "ELAPSED"
 #define INFO_VERSION        "VERSION"
+#define INFO_MINOR_VERSION  "MINOR_VERSION"
 #define INFO_KEEP           "KEEP"
 #define INFO_BACKUP         "BACKUP"
 #define INFO_RESTORE        "RESTORE"
@@ -67,6 +68,7 @@ struct backup
    unsigned long restore_size;                               /**< The restore size */
    int elapsed_time;                                         /**< The elapsed time in seconds */
    int version;                                              /**< The version */
+   int minor_version;                                        /**< The minor version */
    bool keep;                                                /**< Keep the backup */
    char valid;                                               /**< Is the backup valid */
    unsigned long number_of_tablespaces;                      /**< The number of tablespaces */
