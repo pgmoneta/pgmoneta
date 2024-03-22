@@ -212,6 +212,7 @@ struct server
    bool wal_streaming;                 /**< Is WAL streaming active */
    bool valid;                         /**< Is the server valid */
    int version;                        /**< The major version of the server*/
+   int minor_version;                  /**< The minor version of the server*/
    int operation_count;                /**< Operation count of the server */
    int failed_operation_count;         /**< Failed operation count of the server */
    uint32_t cur_timeline;              /**< Current timeline the server is on*/
