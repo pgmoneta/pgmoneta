@@ -129,6 +129,7 @@ pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, 
       case MANAGEMENT_DETAILS:
       case MANAGEMENT_RESET:
       case MANAGEMENT_RELOAD:
+      case MANAGEMENT_ISALIVE:
          break;
       default:
          goto error;
