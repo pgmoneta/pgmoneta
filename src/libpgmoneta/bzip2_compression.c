@@ -156,7 +156,6 @@ do_bzip2_compress(void* arg)
    free(wi);
 }
 
-
 void
 pgmoneta_bzip2_tablespaces(char* root, struct workers* workers)
 {

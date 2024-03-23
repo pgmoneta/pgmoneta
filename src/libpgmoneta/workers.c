@@ -119,7 +119,7 @@ error:
 }
 
 int
-pgmoneta_workers_add(struct workers* workers, void(*function)(void*), void* ap)
+pgmoneta_workers_add(struct workers* workers, void (*function)(void*), void* ap)
 {
    struct task* t = NULL;
 
@@ -265,7 +265,7 @@ worker_init(struct workers* workers, struct worker** worker)
 
    w->workers = workers;
 
-   pthread_create(&w->pthread, NULL, (void* (*)(void*))worker_do, w);
+   pthread_create(&w->pthread, NULL, (void* (*)(void*)) worker_do, w);
    pthread_detach(w->pthread);
 
    *worker = w;
