@@ -2150,8 +2150,23 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct tuple* tup = NULL;
+   struct configuration* config;
+   struct token_bucket* bucket;
    char null_buffer[2 * 512]; // 2 tar block size of terminator null bytes
    FILE* file = NULL;
+
+   config = (struct configuration*)shmem;
+   bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+   if (bucket == NULL)
+   {
+      pgmoneta_log_error("failed to allocate memory for token bucket.\n");
+      goto error;
+   }
+   if (pgmoneta_token_bucket_init(bucket, config->burst, config->max_rate, config->every))
+   {
+      pgmoneta_log_error("failed to initialize the token bucket.\n");
+      goto error;
+   }
 
    memset(msg, 0, sizeof (struct message));
 
@@ -2240,6 +2255,28 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
 
          if (msg->kind == 'd' && msg->length > 0)
          {
+
+            if (bucket->burst)
+            {
+               if (msg->length > bucket->burst)
+               {
+                  pgmoneta_log_error("the file size(%zd) exceeds the burst capacity of the bucket(%ld).", msg->length, bucket->burst);
+                  goto error;
+               }
+
+               while (1)
+               {
+                  if (!pgmoneta_token_bucket_consume(bucket, msg->length))
+                  {
+                     break;
+                  }
+                  else
+                  {
+                     SLEEP(5000000L)
+                  }
+               }
+            }
+
             // copy data
             if (fwrite(msg->data, msg->length, 1, file) != 1)
             {
@@ -2326,6 +2363,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_copy_message(msg);
+   pgmoneta_token_bucket_destroy(bucket);
    return 0;
 
 error:
@@ -2346,6 +2384,8 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct tuple* tup = NULL;
    struct tablespace* tblspc = NULL;
+   struct configuration* config;
+   struct token_bucket* bucket;
    char null_buffer[2 * 512];
    char file_path[MAX_PATH];
    char directory[MAX_PATH];
@@ -2378,6 +2418,19 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
          goto error;
       }
       pgmoneta_consume_copy_stream_end(buffer, msg);
+   }
+
+   config = (struct configuration*)shmem;
+   bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+   if (bucket == NULL)
+   {
+      pgmoneta_log_error("failed to allocate memory for token bucket.\n");
+      goto error;
+   }
+   if (pgmoneta_token_bucket_init(bucket, config->burst, config->max_rate, config->every))
+   {
+      pgmoneta_log_error("failed to initialize the token bucket.\n");
+      goto error;
    }
 
    while (msg->kind != 'c')
@@ -2515,6 +2568,28 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                {
                   break;
                }
+
+               if (bucket->burst)
+               {
+                  if (msg->length > bucket->burst)
+                  {
+                     pgmoneta_log_error("the file size(%ld) exceeds the burst capacity of the bucket(%ld).", msg->length, bucket->burst);
+                     goto error;
+                  }
+
+                  while (1)
+                  {
+                     if (!pgmoneta_token_bucket_consume(bucket, msg->length))
+                     {
+                        break;
+                     }
+                     else
+                     {
+                        SLEEP(5000000L)
+                     }
+                  }
+               }
+
                if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)
                {
                   pgmoneta_log_error("could not write to file %s", file_path);
@@ -2537,6 +2612,9 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
       }
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
+
+   // Clean up resources
+   pgmoneta_token_bucket_destroy(bucket);
 
    if (file != NULL)
    {
@@ -2616,6 +2694,8 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
    char file_path[MAX_PATH];
    FILE* file = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct configuration* config;
+   struct token_bucket* bucket;
    memset(msg, 0, sizeof (struct message));
 
    memset(tmp_file_path, 0, sizeof(tmp_file_path));
@@ -2644,6 +2724,20 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       }
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
+
+   config = (struct configuration*)shmem;
+   bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+   if (bucket == NULL)
+   {
+      pgmoneta_log_error("failed to allocate memory for token bucket.\n");
+      goto error;
+   }
+   if (pgmoneta_token_bucket_init(bucket, config->burst, config->max_rate, config->every))
+   {
+      pgmoneta_log_error("failed to initialize the token bucket.\n");
+      goto error;
+   }
+
    while (msg->kind != 'c')
    {
       pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
@@ -2655,6 +2749,28 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       }
       if (msg->kind == 'd' && msg->length > 0)
       {
+
+         if (bucket->burst)
+         {
+            if (msg->length > bucket->burst)
+            {
+               pgmoneta_log_error("the file size(%ld) exceeds the burst capacity of the bucket(%ld).", msg->length, bucket->burst);
+               goto error;
+            }
+
+            while (1)
+            {
+               if (!pgmoneta_token_bucket_consume(bucket, msg->length))
+               {
+                  break;
+               }
+               else
+               {
+                  SLEEP(5000000L)
+               }
+            }
+         }
+
          // copy data
          if (fwrite(msg->data, msg->length, 1, file) != 1)
          {
@@ -2673,6 +2789,7 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
    fflush(file);
    fclose(file);
    pgmoneta_free_copy_message(msg);
+   pgmoneta_token_bucket_destroy(bucket);
    return 0;
 
 error:

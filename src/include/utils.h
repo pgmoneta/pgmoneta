@@ -805,6 +805,109 @@ pgmoneta_get_file_size(char* file_path);
 bool
 pgmoneta_is_file_archive(char* file_path);
 
+/** @struct
+ * Defines token bucket structure
+ */
+struct token_bucket
+{
+   unsigned long burst; /**< default value is 0, no limit */
+   atomic_ulong cur_tokens;
+   unsigned long max_rate;
+   int every;
+   atomic_ulong last_time;
+};
+
+/**
+ * Init a token bucket
+ * @param tb The token bucket
+ * @param burst The max burst of the bucket
+ * @param max_rate The number of tokens added each time
+ * @param every Add tokens every specified number of seconds
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_init(struct token_bucket* tb, unsigned long burst, unsigned long max_rate, int every);
+
+/**
+ * Free the memory of the token bucket
+ * @param tb The token bucket
+ */
+void
+pgmoneta_token_bucket_destroy(struct token_bucket* tb);
+
+/**
+ * Add new token into the bucket
+ * @param tb The token bucket
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_add(struct token_bucket* tb);
+
+/**
+ * Get tokens from token bucket
+ * @param tb The token bucket
+ * @param tokens Needed tokens
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens);
+
+// ************************************** nanoseconds version **************************************************
+
+/** @struct
+ * Defines token bucket structure
+ */
+struct token_bucket_ns
+{
+   unsigned long burst;
+   atomic_ulong cur_tokens;
+   unsigned long max_rate;
+   int every;
+   atomic_ulong last_time;
+};
+
+/**
+ * Init a token bucket
+ * @param tb The pointer of the token bucket
+ * @param burst The max burst of the bucket
+ * @param max_rate The number of tokens added each time
+ * @param every Add tokens every specified number of seconds
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_init_ns(struct token_bucket_ns* tb, unsigned long burst, unsigned long max_rate, int every);
+
+/**
+ * Free the memory of the token bucket
+ * @param tb The token bucket
+ */
+void
+pgmoneta_token_bucket_destroy_ns(struct token_bucket_ns* tb);
+
+/**
+ * Add new token into the bucket
+ * @param tb The token bucket
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_add_ns(struct token_bucket_ns* tb);
+
+/**
+ * Get tokens from token bucket
+ * @param tb The token bucket
+ * @param tokens Needed tokens
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_consume_ns(struct token_bucket_ns* tb, unsigned long tokens);
+
+/**
+ * Get the current time in nanoseconds
+ * @return unsigned long type
+ */
+unsigned long
+pgmoneta_get_current_time_ns(void);
+
 #ifdef DEBUG
 
 /**
