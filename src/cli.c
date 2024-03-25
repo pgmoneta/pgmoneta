@@ -49,25 +49,38 @@
 
 #include <openssl/ssl.h>
 
-#define ACTION_UNKNOWN      0
-#define ACTION_BACKUP       1
-#define ACTION_LIST_BACKUP  2
-#define ACTION_RESTORE      3
-#define ACTION_ARCHIVE      4
-#define ACTION_DELETE       5
-#define ACTION_STOP         6
-#define ACTION_STATUS       7
-#define ACTION_DETAILS      8
-#define ACTION_ISALIVE      9
-#define ACTION_RESET       10
-#define ACTION_RELOAD      11
-#define ACTION_RETAIN      12
-#define ACTION_EXPUNGE     13
-#define ACTION_DECRYPT     14
-#define ACTION_ENCRYPT     15
-#define ACTION_HELP        99
+#define ACTION_UNKNOWN         0
+#define ACTION_BACKUP          1
+#define ACTION_LIST_BACKUP     2
+#define ACTION_RESTORE         3
+#define ACTION_ARCHIVE         4
+#define ACTION_DELETE          5
+#define ACTION_STOP            6
+#define ACTION_STATUS          7
+#define ACTION_STATUS_DETAILS  8
+#define ACTION_ISALIVE         9
+#define ACTION_RESET          10
+#define ACTION_RELOAD         11
+#define ACTION_RETAIN         12
+#define ACTION_EXPUNGE        13
+#define ACTION_DECRYPT        14
+#define ACTION_ENCRYPT        15
+#define ACTION_HELP           99
 
-static int find_action(int argc, char** argv, int* place);
+#define COMMAND_BACKUP "backup"
+#define COMMAND_LIST_BACKUP "list-backup"
+#define COMMAND_RESTORE "restore"
+#define COMMAND_ARCHIVE "archive"
+#define COMMAND_DELETE "delete"
+#define COMMAND_RETAIN "retain"
+#define COMMAND_EXPUNGE "expunge"
+#define COMMAND_ENCRYPT "encrypt"
+#define COMMAND_DECRYPT "decrypt"
+#define COMMAND_PING "ping"
+#define COMMAND_STOP "stop"
+#define COMMAND_STATUS "status"
+#define COMMAND_CONF "conf"
+#define COMMAND_CLEAR "clear"
 
 static void help_backup(void);
 static void help_list_backup(void);
@@ -78,6 +91,12 @@ static void help_retain(void);
 static void help_expunge(void);
 static void help_decrypt(void);
 static void help_encrypt(void);
+static void help_stop(void);
+static void help_ping(void);
+static void help_status_details(void);
+static void help_conf(void);
+static void help_clear(void);
+static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server, char output_format);
@@ -134,16 +153,184 @@ usage(void)
    printf("  expunge                  Expunge a backup from a server\n");
    printf("  encrypt                  Encrypt a file using master-key\n");
    printf("  decrypt                  Decrypt a file using master-key\n");
-   printf("  is-alive                 Is pgmoneta alive\n");
+   printf("  ping                     Check if pgmoneta is alive\n");
    printf("  stop                     Stop pgmoneta\n");
-   printf("  status                   Status of pgmoneta\n");
-   printf("  details                  Detailed status of pgmoneta\n");
-   printf("  reload                   Reload the configuration\n");
-   printf("  reset                    Reset the Prometheus statistics\n");
+   printf("  status [details]         Status of pgmoneta, with optional details\n");
+   printf("  conf <action>            Manage the configuration, with one of subcommands:\n");
+   printf("                           - 'reload' to reload the configuration\n");
+   printf("  clear <what>             Clear data, with:\n");
+   printf("                           - 'prometheus' to reset the Prometheus statistics\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
 }
+
+const struct pgmoneta_command command_table[] = {
+   {
+      .command = "backup",
+      .subcommand = "",
+      .accepted_argument_count = {1},
+      .action = ACTION_BACKUP,
+      .deprecated = false,
+      .log_message = "<backup> [%s]",
+   },
+   {
+      .command = "list-backup",
+      .subcommand = "",
+      .accepted_argument_count = {1},
+      .action = ACTION_LIST_BACKUP,
+      .deprecated = false,
+      .log_message = "<list-backup> [%s]",
+   },
+   {
+      .command = "restore",
+      .subcommand = "",
+      .accepted_argument_count = {3, 4},
+      .action = ACTION_RESTORE,
+      .deprecated = false,
+      .log_message = "<restore> [%s]",
+   },
+   {
+      .command = "archive",
+      .subcommand = "",
+      .accepted_argument_count = {3, 4},
+      .action = ACTION_ARCHIVE,
+      .deprecated = false,
+      .log_message = "<archive> [%s]"
+   },
+   {
+      .command = "delete",
+      .subcommand = "",
+      .accepted_argument_count = {2},
+      .action = ACTION_DELETE,
+      .deprecated = false,
+      .log_message = "<delete> [%s]"
+   },
+   {
+      .command = "retain",
+      .subcommand = "",
+      .accepted_argument_count = {2},
+      .action = ACTION_RETAIN,
+      .deprecated = false,
+      .log_message = "<retain> [%s]"
+   },
+   {
+      .command = "expunge",
+      .subcommand = "",
+      .accepted_argument_count = {2},
+      .action = ACTION_EXPUNGE,
+      .deprecated = false,
+      .log_message = "<expunge [%s]>",
+   },
+   {
+      .command = "decrypt",
+      .subcommand = "",
+      .accepted_argument_count = {1},
+      .action = ACTION_DECRYPT,
+      .deprecated = false,
+      .log_message = "<decrypt> [%s]"
+   },
+   {
+      .command = "encrypt",
+      .subcommand = "",
+      .accepted_argument_count = {1},
+      .action = ACTION_ENCRYPT,
+      .deprecated = false,
+      .log_message = "<encrypt> [%s]"
+   },
+   {
+      .command = "ping",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_ISALIVE,
+      .deprecated = false,
+      .log_message = "<ping>"
+   },
+   {
+      .command = "stop",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_STOP,
+      .deprecated = false,
+      .log_message = "<stop>"
+   },
+   {
+      .command = "status",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_STATUS,
+      .deprecated = false,
+      .log_message = "<status>"
+   },
+   {
+      .command = "status",
+      .subcommand = "details",
+      .accepted_argument_count = {0},
+      .action = ACTION_STATUS_DETAILS,
+      .deprecated = false,
+      .log_message = "<status details>"
+   },
+   {
+      .command = "conf",
+      .subcommand = "reload",
+      .accepted_argument_count = {0},
+      .action = ACTION_RELOAD,
+      .deprecated = false,
+      .log_message = "<conf reload>"
+   },
+   {
+      .command = "clear",
+      .subcommand = "prometheus",
+      .accepted_argument_count = {0},
+      .action = ACTION_RESET,
+      .deprecated = false,
+      .log_message = "<clear prometheus>"
+   },
+   {
+      .command = "details",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_STATUS_DETAILS,
+      .deprecated = true,
+      .deprecated_by = "status details",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .log_message = "<status details>",
+   },
+   {
+      .command = "is-alive",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_ISALIVE,
+      .deprecated = true,
+      .deprecated_by = "ping",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .log_message = "<ping>",
+   },
+   {
+      .command = "reload",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_RELOAD,
+      .deprecated = true,
+      .deprecated_by = "conf reload",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .log_message = "<conf reload>",
+   },
+   {
+      .command = "reset",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .action = ACTION_RESET,
+      .deprecated = true,
+      .deprecated_by = "clear prometheus",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .log_message = "<clear prometheus>"
+   }
+};
 
 int
 main(int argc, char** argv)
@@ -159,19 +346,17 @@ main(int argc, char** argv)
    char* password = NULL;
    bool verbose = false;
    char* logfile = NULL;
-   char* server = NULL;
-   char* id = NULL;
-   char* pos = NULL;
-   char* dir = NULL;
    bool do_free = true;
    int c;
    int option_index = 0;
+   /* Store the result from command parser*/
+   bool matched = false;
    size_t size;
-   int position;
-   int32_t action = ACTION_UNKNOWN;
    char un[MAX_USERNAME_LENGTH];
    struct configuration* config = NULL;
    char output_format = COMMAND_OUTPUT_FORMAT_TEXT;
+   size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
+   struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
 
    while (1)
    {
@@ -325,305 +510,170 @@ main(int argc, char** argv)
          config = (struct configuration*)shmem;
       }
    }
-
-   if (argc > 0)
+   if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
    {
-      action = find_action(argc, argv, &position);
+      if (argc > optind)
+      {
+         char* command = argv[optind];
+         display_helper(command);
+      }
+      else
+      {
+         usage();
+      }
+      exit_code = 1;
+      goto done;
+   }
 
-      if (action == ACTION_BACKUP)
-      {
-         if (argc == position + 2)
-         {
-            server = argv[argc - 1];
-         }
-         else
-         {
-            help_backup();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_LIST_BACKUP)
-      {
-         if (argc == position + 2)
-         {
-            server = argv[argc - 1];
-         }
-         else
-         {
-            help_list_backup();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_RESTORE)
-      {
-         if (argc == position + 5)
-         {
-            server = argv[argc - 4];
-            id = argv[argc - 3];
-            pos = argv[argc - 2];
-            dir = argv[argc - 1];
-         }
-         else if (argc == position + 4)
-         {
-            server = argv[argc - 3];
-            id = argv[argc - 2];
-            dir = argv[argc - 1];
-         }
-         else
-         {
-            help_restore();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_ARCHIVE)
-      {
-         if (argc == position + 5)
-         {
-            server = argv[argc - 4];
-            id = argv[argc - 3];
-            pos = argv[argc - 2];
-            dir = argv[argc - 1];
-         }
-         else if (argc == position + 4)
-         {
-            server = argv[argc - 3];
-            id = argv[argc - 2];
-            dir = argv[argc - 1];
-         }
-         else
-         {
-            help_archive();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_DELETE)
-      {
-         if (argc == position + 3)
-         {
-            server = argv[argc - 2];
-            id = argv[argc - 1];
-         }
-         else
-         {
-            help_delete();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_STOP)
-      {
-         /* Ok */
-      }
-      else if (action == ACTION_STATUS)
-      {
-         /* Ok */
-      }
-      else if (action == ACTION_DETAILS)
-      {
-         /* Ok */
-      }
-      else if (action == ACTION_ISALIVE)
-      {
-         /* Ok */
-      }
-      else if (action == ACTION_RESET)
-      {
-         /* Ok */
-      }
-      else if (action == ACTION_RELOAD)
-      {
-         /* Local connection only */
-         if (configuration_path == NULL)
-         {
-            action = ACTION_UNKNOWN;
-         }
-      }
-      else if (action == ACTION_RETAIN)
-      {
-         if (argc == position + 3)
-         {
-            server = argv[argc - 2];
-            id = argv[argc - 1];
-         }
-         else
-         {
-            help_retain();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_EXPUNGE)
-      {
-         if (argc == position + 3)
-         {
-            server = argv[argc - 2];
-            id = argv[argc - 1];
-         }
-         else
-         {
-            help_expunge();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_DECRYPT)
-      {
-         if (argc == position + 2)
-         {
-            dir = argv[argc - 1];
-         }
-         else
-         {
-            help_decrypt();
-            action = ACTION_HELP;
-         }
-      }
-      else if (action == ACTION_ENCRYPT)
-      {
-         if (argc == position + 2)
-         {
-            dir = argv[argc - 1];
-         }
-         else
-         {
-            help_encrypt();
-            action = ACTION_HELP;
-         }
-      }
-      if (action != ACTION_UNKNOWN)
-      {
-         if (configuration_path != NULL)
-         {
-            /* Local connection */
-            if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
-            {
-               exit_code = 1;
-               goto done;
-            }
-         }
-         else
-         {
-            /* Remote connection */
-            if (pgmoneta_connect(host, atoi(port), &socket))
-            {
-               warnx("pgmoneta-cli: No route to host: %s:%s", host, port);
-               goto done;
-            }
+   matched = true;
 
-            /* User name */
-            if (username == NULL)
-            {
+   if (configuration_path != NULL)
+   {
+      /* Local connection */
+      if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
+      {
+         exit_code = 1;
+         goto done;
+      }
+   }
+   else
+   {
+      /* Remote connection */
+      if (pgmoneta_connect(host, atoi(port), &socket))
+      {
+         warnx("pgmoneta-cli: No route to host: %s:%s", host, port);
+         goto done;
+      }
+
+      /* User name */
+      if (username == NULL)
+      {
 username:
-               printf("User name: ");
+         printf("User name: ");
 
-               memset(&un, 0, sizeof(un));
-               if (fgets(&un[0], sizeof(un), stdin) == NULL)
-               {
-                  exit_code = 1;
-                  goto done;
-               }
-               un[strlen(un) - 1] = 0;
-               username = &un[0];
-            }
+         memset(&un, 0, sizeof(un));
+         if (fgets(&un[0], sizeof(un), stdin) == NULL)
+         {
+            exit_code = 1;
+            goto done;
+         }
+         un[strlen(un) - 1] = 0;
+         username = &un[0];
+      }
 
-            if (username == NULL || strlen(username) == 0)
-            {
-               goto username;
-            }
+      if (username == NULL || strlen(username) == 0)
+      {
+         goto username;
+      }
 
-            /* Password */
-            if (password == NULL)
-            {
+      /* Password */
+      if (password == NULL)
+      {
 password:
-               if (password != NULL)
-               {
-                  free(password);
-                  password = NULL;
-               }
+         if (password != NULL)
+         {
+            free(password);
+            password = NULL;
+         }
 
-               printf("Password : ");
-               password = pgmoneta_get_password();
-               printf("\n");
-            }
-            else
-            {
-               do_free = false;
-            }
+         printf("Password : ");
+         password = pgmoneta_get_password();
+         printf("\n");
+      }
+      else
+      {
+         do_free = false;
+      }
 
-            for (int i = 0; i < strlen(password); i++)
-            {
-               if ((unsigned char)(*(password + i)) & 0x80)
-               {
-                  goto password;
-               }
-            }
-
-            /* Authenticate */
-            if (pgmoneta_remote_management_scram_sha256(username, password, socket, &s_ssl) != AUTH_SUCCESS)
-            {
-               warnx("pgmoneta-cli: Bad credentials for %s", username);
-               goto done;
-            }
+      for (int i = 0; i < strlen(password); i++)
+      {
+         if ((unsigned char)(*(password + i)) & 0x80)
+         {
+            goto password;
          }
       }
 
-      if (action == ACTION_BACKUP)
+      /* Authenticate */
+      if (pgmoneta_remote_management_scram_sha256(username, password, socket, &s_ssl) != AUTH_SUCCESS)
       {
-         exit_code = backup(s_ssl, socket, server);
+         warnx("pgmoneta-cli: Bad credentials for %s", username);
+         goto done;
       }
-      else if (action == ACTION_LIST_BACKUP)
+   }
+
+   if (parsed.cmd->action == ACTION_BACKUP)
+   {
+      exit_code = backup(s_ssl, socket, parsed.args[0]);
+   }
+   else if (parsed.cmd->action == ACTION_LIST_BACKUP)
+   {
+      exit_code = list_backup(s_ssl, socket, parsed.args[0], output_format);
+   }
+   else if (parsed.cmd->action == ACTION_RESTORE)
+   {
+      if (parsed.args[3])
       {
-         exit_code = list_backup(s_ssl, socket, server, output_format);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3]);
       }
-      else if (action == ACTION_RESTORE)
+      else
       {
-         exit_code = restore(s_ssl, socket, server, id, pos, dir);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
       }
-      else if (action == ACTION_ARCHIVE)
+   }
+   else if (parsed.cmd->action == ACTION_ARCHIVE)
+   {
+      if (parsed.args[3])
       {
-         exit_code = archive(s_ssl, socket, server, id, pos, dir);
+         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3]);
       }
-      else if (action == ACTION_DELETE)
+      else
       {
-         exit_code = delete(s_ssl, socket, server, id, output_format);
+         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
       }
-      else if (action == ACTION_STOP)
-      {
-         exit_code = stop(s_ssl, socket);
-      }
-      else if (action == ACTION_STATUS)
-      {
-         exit_code = status(s_ssl, socket, output_format);
-      }
-      else if (action == ACTION_DETAILS)
-      {
-         exit_code = details(s_ssl, socket, output_format);
-      }
-      else if (action == ACTION_ISALIVE)
-      {
-         exit_code = isalive(s_ssl, socket, output_format);
-      }
-      else if (action == ACTION_RESET)
-      {
-         exit_code = reset(s_ssl, socket);
-      }
-      else if (action == ACTION_RELOAD)
-      {
-         exit_code = reload(s_ssl, socket);
-      }
-      else if (action == ACTION_RETAIN)
-      {
-         exit_code = retain(s_ssl, socket, server, id);
-      }
-      else if (action == ACTION_EXPUNGE)
-      {
-         exit_code = expunge(s_ssl, socket, server, id);
-      }
-      else if (action == ACTION_DECRYPT)
-      {
-         exit_code = decrypt(s_ssl, socket, dir);
-      }
-      else if (action == ACTION_ENCRYPT)
-      {
-         exit_code = encrypt(s_ssl, socket, dir);
-      }
+   }
+   else if (parsed.cmd->action == ACTION_DELETE)
+   {
+      exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
+   }
+   else if (parsed.cmd->action == ACTION_STOP)
+   {
+      exit_code = stop(s_ssl, socket);
+   }
+   else if (parsed.cmd->action == ACTION_STATUS)
+   {
+      exit_code = status(s_ssl, socket, output_format);
+   }
+   else if (parsed.cmd->action == ACTION_STATUS_DETAILS)
+   {
+      exit_code = details(s_ssl, socket, output_format);
+   }
+   else if (parsed.cmd->action == ACTION_ISALIVE)
+   {
+      exit_code = isalive(s_ssl, socket, output_format);
+   }
+   else if (parsed.cmd->action == ACTION_RESET)
+   {
+      exit_code = reset(s_ssl, socket);
+   }
+   else if (parsed.cmd->action == ACTION_RELOAD)
+   {
+      exit_code = reload(s_ssl, socket);
+   }
+   else if (parsed.cmd->action == ACTION_RETAIN)
+   {
+      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1]);
+   }
+   else if (parsed.cmd->action == ACTION_EXPUNGE)
+   {
+      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1]);
+   }
+   else if (parsed.cmd->action == ACTION_DECRYPT)
+   {
+      exit_code = decrypt(s_ssl, socket, parsed.args[0]);
+   }
+   else if (parsed.cmd->action == ACTION_ENCRYPT)
+   {
+      exit_code = encrypt(s_ssl, socket, parsed.args[0]);
    }
 
 done:
@@ -643,19 +693,9 @@ done:
 
    pgmoneta_disconnect(socket);
 
-   if (action == ACTION_UNKNOWN)
-   {
-      usage();
-      exit_code = 1;
-   }
-
    if (configuration_path != NULL)
    {
-      if (action == ACTION_HELP)
-      {
-         /* Ok */
-      }
-      else if (action != ACTION_UNKNOWN && exit_code != 0)
+      if (matched && exit_code != 0)
       {
          warnx("No connection to pgmoneta on %s", config->unix_socket_dir);
       }
@@ -682,93 +722,6 @@ done:
    }
 
    return exit_code;
-}
-
-static int
-find_action(int argc, char** argv, int* place)
-{
-   *place = -1;
-
-   for (int i = 1; i < argc; i++)
-   {
-      if (!strcmp("backup", argv[i]))
-      {
-         *place = i;
-         return ACTION_BACKUP;
-      }
-      else if (!strcmp("list-backup", argv[i]))
-      {
-         *place = i;
-         return ACTION_LIST_BACKUP;
-      }
-      else if (!strcmp("restore", argv[i]))
-      {
-         *place = i;
-         return ACTION_RESTORE;
-      }
-      else if (!strcmp("archive", argv[i]))
-      {
-         *place = i;
-         return ACTION_ARCHIVE;
-      }
-      else if (!strcmp("delete", argv[i]))
-      {
-         *place = i;
-         return ACTION_DELETE;
-      }
-      else if (!strcmp("stop", argv[i]))
-      {
-         *place = i;
-         return ACTION_STOP;
-      }
-      else if (!strcmp("status", argv[i]))
-      {
-         *place = i;
-         return ACTION_STATUS;
-      }
-      else if (!strcmp("details", argv[i]))
-      {
-         *place = i;
-         return ACTION_DETAILS;
-      }
-      else if (!strcmp("is-alive", argv[i]))
-      {
-         *place = i;
-         return ACTION_ISALIVE;
-      }
-      else if (!strcmp("reset", argv[i]))
-      {
-         *place = i;
-         return ACTION_RESET;
-      }
-      else if (!strcmp("reload", argv[i]))
-      {
-         *place = i;
-         return ACTION_RELOAD;
-      }
-      else if (!strcmp("retain", argv[i]))
-      {
-         *place = i;
-         return ACTION_RETAIN;
-      }
-      else if (!strcmp("expunge", argv[i]))
-      {
-         *place = i;
-         return ACTION_EXPUNGE;
-      }
-      else if (!strcmp("decrypt", argv[i]))
-      {
-         *place = i;
-         return ACTION_DECRYPT;
-      }
-      else if (!strcmp("encrypt", argv[i]))
-      {
-         *place = i;
-         return ACTION_ENCRYPT;
-      }
-   }
-
-   return ACTION_UNKNOWN;
 }
 
 static void
@@ -830,8 +783,107 @@ help_decrypt(void)
 static void
 help_encrypt(void)
 {
-   printf("Encrypt a single file in place.\n");
+   printf("Encrypt a single file in place\n");
    printf("  pgmoneta-cli encrypt <file>\n");
+}
+
+static void
+help_stop(void)
+{
+   printf("Stop pgmoneta\n");
+   printf("  pgmoneta-cli stop\n");
+}
+
+static void
+help_ping(void)
+{
+   printf("Check if pgmoneta is alive\n");
+   printf("  pgmoneta-cli ping\n");
+}
+
+static void
+help_status_details(void)
+{
+   printf("Status of pgmoneta\n");
+   printf("  pgmoneta-cli status [details]\n");
+}
+
+static void
+help_conf(void)
+{
+   printf("Manage the configuration\n");
+   printf("  pgmoneta-cli conf [reload]\n");
+}
+
+static void
+help_clear(void)
+{
+   printf("Reset data\n");
+   printf("  pgmoneta-cli clear [prometheus]\n");
+}
+static void
+display_helper(char* command)
+{
+   if (!strcmp(command, COMMAND_BACKUP))
+   {
+      help_backup();
+   }
+   else if (!strcmp(command, COMMAND_LIST_BACKUP))
+   {
+      help_list_backup();
+   }
+   else if (!strcmp(command, COMMAND_RESTORE))
+   {
+      help_restore();
+   }
+   else if (!strcmp(command, COMMAND_ARCHIVE))
+   {
+      help_archive();
+   }
+   else if (!strcmp(command, COMMAND_DELETE))
+   {
+      help_delete();
+   }
+   else if (!strcmp(command, COMMAND_RETAIN))
+   {
+      help_retain();
+   }
+   else if (!strcmp(command, COMMAND_EXPUNGE))
+   {
+      help_expunge();
+   }
+   else if (!strcmp(command, COMMAND_DECRYPT))
+   {
+      help_decrypt();
+   }
+   else if (!strcmp(command, COMMAND_ENCRYPT))
+   {
+      help_encrypt();
+   }
+   else if (!strcmp(command, COMMAND_PING))
+   {
+      help_ping();
+   }
+   else if (!strcmp(command, COMMAND_STOP))
+   {
+      help_stop();
+   }
+   else if (!strcmp(command, COMMAND_STATUS))
+   {
+      help_status_details();
+   }
+   else if (!strcmp(command, COMMAND_CONF))
+   {
+      help_conf();
+   }
+   else if (!strcmp(command, COMMAND_CLEAR))
+   {
+      help_clear();
+   }
+   else
+   {
+      usage();
+   }
 }
 
 static int

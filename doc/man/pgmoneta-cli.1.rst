@@ -72,22 +72,19 @@ retain
 expunge
   Expunge a backup from a server - include in deletion by retention policy
 
-is-alive
-  Is pgmoneta alive
+ping
+  Check if pgmoneta is alive
 
 stop
   Stop pgmoneta
 
-status
+status [details]
   Status of pgmoneta
 
-details
-  Detailed status of pgmoneta
-
-reload
+conf [reload]
   Reload the configuration
 
-reset
+clear [prometheus]
   Reset the Prometheus statistics
 
 decrypt
