@@ -147,7 +147,7 @@ Add the master key and create vault
 
 ```
 pgmoneta-admin master-key
-pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword add-user
+pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword user add
 ```
 You have to choose a password for the master key - remember it !
 
@@ -218,7 +218,7 @@ pgmoneta-cli -c pgmoneta.conf backup primary
 In another terminal
 
 ```
-pgmoneta-cli -c pgmoneta.conf details
+pgmoneta-cli -c pgmoneta.conf status details
 ```
 
 (`pgmoneta` user)

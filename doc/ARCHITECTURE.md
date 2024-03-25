@@ -107,7 +107,7 @@ However, some configuration settings requires a full restart of `pgmoneta` in or
 * `unix_socket_dir`
 * `pidfile`
 
-The configuration can also be reloaded using `pgmoneta-cli -c pgmoneta.conf reload`. The command is only supported
+The configuration can also be reloaded using `pgmoneta-cli -c pgmoneta.conf conf reload`. The command is only supported
 over the local interface, and hence doesn't work remotely.
 
 ## Prometheus

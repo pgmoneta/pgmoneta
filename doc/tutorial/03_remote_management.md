@@ -30,7 +30,7 @@ management = 5002
 ## Add pgmoneta admin
 
 ```
-pgmoneta-admin -f pgmoneta_admins.conf -U admin -P admin1234 add-user
+pgmoneta-admin -f pgmoneta_admins.conf -U admin -P admin1234 user add
 ```
 
 (`pgmoneta` user)
@@ -49,7 +49,7 @@ pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf -A pgmoneta_admins.conf
 ## Connect via remote administration interface
 
 ```
-pgmoneta-cli -h localhost -p 5002 -U admin details
+pgmoneta-cli -h localhost -p 5002 -U admin status details
 ```
 
 and use `admin1234` as the password

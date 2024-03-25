@@ -48,16 +48,16 @@ COMMANDS
 master-key
   Create or update the master key. The master key will be created in the pgmoneta user home directory under ~/.pgmoneta
 
-add-user
+user add
   Add a user
 
-update-user
+user edit
   Update a user
 
-remove-user
+user del
   Remove a user
 
-list-users
+user ls
   List all users
 
 REPORTING BUGS
