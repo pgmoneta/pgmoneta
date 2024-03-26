@@ -329,6 +329,12 @@ master_key(char* password, bool generate_pwd, int pwd_length)
    memset(&buf, 0, sizeof(buf));
    snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", pgmoneta_get_home_directory());
 
+   if (pgmoneta_exists(&buf[0]))
+   {
+      warnx("The file ~/.pgmoneta/master.key already exists");
+      goto error;
+   }
+
    if (stat(&buf[0], &st) == -1)
    {
       /* Ok */
