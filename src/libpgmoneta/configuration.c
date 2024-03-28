@@ -80,6 +80,8 @@ static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
 
 static bool is_empty_string(char* s);
+static void remove_leading_whitespace(char* s);
+static void remove_comments(char* s);
 
 /**
  *
@@ -162,6 +164,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
    {
       if (!is_empty_string(line))
       {
+         remove_leading_whitespace(line); // Remove leading whitespace
          if (line[0] == '[')
          {
             ptr = strchr(line, ']');
@@ -207,6 +210,8 @@ pgmoneta_read_configuration(void* shm, char* filename)
          }
          else
          {
+            remove_comments(line); // remove inline comment
+
             extract_key_value(line, &key, &value);
 
             if (key && value)
@@ -865,7 +870,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      config->compression_type = as_compression(value);
-
                   }
                   else
                   {
@@ -1477,12 +1481,15 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    {
       if (!is_empty_string(line))
       {
+         remove_leading_whitespace(line); // Remove leading whitespace
          if (line[0] == '#' || line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
+            remove_comments(line); // remove inline comment
+
             ptr = strtok(line, ":");
 
             username = ptr;
@@ -1654,12 +1661,15 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
    {
       if (!is_empty_string(line))
       {
+         remove_leading_whitespace(line); // Remove leading whitespace
          if (line[0] == '#' || line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
+            remove_comments(line); // remove inline comment
+
             ptr = strtok(line, ":");
 
             username = ptr;
@@ -3020,4 +3030,37 @@ is_empty_string(char* s)
    }
 
    return true;
+}
+
+static void
+remove_leading_whitespace(char* s)
+{
+   int i = 0;
+   while (s[i] != '\0' && isspace(s[i]))
+   {
+      i++;
+   }
+   if (i > 0)
+   {
+      memmove(s, s + i, strlen(s) - i + 1);
+   }
+}
+
+static void
+remove_comments(char* s)
+{
+   char* comment_pos;
+   // Remove comments starting with ';'
+   comment_pos = strchr(s, ';');
+   if (comment_pos)
+   {
+      *comment_pos = '\0';   // Null terminate at comment
+
+   }
+   // Remove comments starting with '#'
+   comment_pos = strchr(s, '#');
+   if (comment_pos)
+   {
+      *comment_pos = '\0';   // Null terminate at comment
+   }
 }

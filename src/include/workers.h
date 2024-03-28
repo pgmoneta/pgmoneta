@@ -49,7 +49,7 @@ struct semaphore
 struct task
 {
    struct task* previous;
-   void (*function)(void* arg);
+   void (* function)(void* arg);
    void* arg;
 };
 
@@ -104,7 +104,7 @@ pgmoneta_workers_initialize(int num, struct workers** workers);
  * @return 0 upon success, otherwise 1.
  */
 int
-pgmoneta_workers_add(struct workers* workers, void (*function)(void*), void* ap);
+pgmoneta_workers_add(struct workers* workers, void (* function)(void*), void* ap);
 
 /**
  * Wait for all queued work units to finish
