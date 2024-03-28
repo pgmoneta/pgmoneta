@@ -6,14 +6,59 @@ function _pgmoneta_cli()
 {
     local line
     _arguments -C \
-               "1: :(backup list-backup restore archive delete retain expunge encrypt decrypt is-alive stop status details reload reset)" \
+               "1: :(backup list-backup restore archive delete retain expunge encrypt decrypt ping stop status conf clear)" \
+               "*::arg:->args"
+    case $line[1] in
+        status)
+            _pgmoneta_cli_status
+            ;;
+        conf)
+            _pgmoneta_cli_conf
+            ;;
+        clear)
+            _pgmoneta_cli_clear
+            ;;
+    esac
+}
+
+function _pgmoneta_cli_status()
+{
+    _arguments -C \
+               "1: :(details)" \
+               "*::arg:->args"
+}
+
+function _pgmoneta_cli_conf()
+{
+    _arguments -C \
+               "1: :(reload)" \
+               "*::arg:->args"
+}
+
+function _pgmoneta_cli_clear()
+{
+    _arguments -C \
+               "1: :(prometheus)" \
                "*::arg:->args"
 }
 
 function _pgmoneta_admin()
 {
-    local line
+   local line
     _arguments -C \
-               "1: :(master-key add-user update-user remove-user list-users)" \
+               "1: :(master-key user)" \
+               "*::arg:->args"
+
+    case $line[1] in
+        user)
+            _pgmoneta_admin_user
+            ;;
+    esac
+}
+
+function _pgmoneta_admin_user()
+{
+    _arguments -C \
+               "1: :(add del edit ls)" \
                "*::arg:->args"
 }

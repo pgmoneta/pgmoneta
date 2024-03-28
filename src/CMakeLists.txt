@@ -113,6 +113,14 @@ add_compile_options(-D_GNU_SOURCE)
 add_compile_options(-Wno-deprecated)
 add_compile_options(-Wno-deprecated-declarations)
 
+#
+# version number and string management
+#
+add_compile_options(-DPGMONETA_MAJOR_VERSION=${VERSION_MAJOR})
+add_compile_options(-DPGMONETA_MINOR_VERSION=${VERSION_MINOR})
+add_compile_options(-DPGMONETA_PATCH_VERSION=${VERSION_PATCH})
+add_compile_options(-DPGMONETA_VERSION="${VERSION_STRING}")
+
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
   add_compile_options(-Wstrict-prototypes)
 endif()
