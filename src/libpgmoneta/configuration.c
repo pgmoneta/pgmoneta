@@ -80,8 +80,8 @@ static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
 
 static bool is_empty_string(char* s);
-static void remove_leading_whitespace(char* s);
-static void remove_comments(char* s);
+static char*  remove_leading_whitespace(const char* s);
+void remove_comments(char* s);
 
 /**
  *
@@ -162,21 +162,21 @@ pgmoneta_read_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      if (!is_empty_string(line))
+      char* trimmed_line = remove_leading_whitespace(line); // Remove leading whitespace
+      if (!is_empty_string(trimmed_line))
       {
-         remove_leading_whitespace(line); // Remove leading whitespace
-         if (line[0] == '[')
+         if (trimmed_line[0] == '[')
          {
-            ptr = strchr(line, ']');
+            ptr = strchr(trimmed_line, ']');
             if (ptr)
             {
                memset(&section, 0, LINE_LENGTH);
-               max = ptr - line - 1;
+               max = ptr - trimmed_line - 1;
                if (max > MISC_LENGTH - 1)
                {
                   max = MISC_LENGTH - 1;
                }
-               memcpy(&section, line + 1, max);
+               memcpy(&section, trimmed_line + 1, max);
                if (strcmp(section, "pgmoneta"))
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
@@ -204,15 +204,15 @@ pgmoneta_read_configuration(void* shm, char* filename)
                }
             }
          }
-         else if (line[0] == '#' || line[0] == ';')
+         else if (trimmed_line[0] == '#' || trimmed_line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
-            remove_comments(line); // remove inline comment
+            remove_comments(trimmed_line);
 
-            extract_key_value(line, &key, &value);
+            extract_key_value(trimmed_line, &key, &value);
 
             if (key && value)
             {
@@ -858,7 +858,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      config->hugepage = as_hugepage(value);
-
                   }
                   else
                   {
@@ -1468,7 +1467,6 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    {
       goto error;
    }
-
    if (pgmoneta_get_master_key(&master_key))
    {
       goto masterkey;
@@ -1479,18 +1477,18 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      if (!is_empty_string(line))
+      char* trimmed_line = remove_leading_whitespace(line); // Remove leading whitespace
+      if (!is_empty_string(trimmed_line))
       {
-         remove_leading_whitespace(line); // Remove leading whitespace
-         if (line[0] == '#' || line[0] == ';')
+         if (trimmed_line[0] == '#' || trimmed_line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
-            remove_comments(line); // remove inline comment
+            remove_comments(trimmed_line);
 
-            ptr = strtok(line, ":");
+            ptr = strtok(trimmed_line, ":");
 
             username = ptr;
 
@@ -1659,18 +1657,18 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-      if (!is_empty_string(line))
+      char* trimmed_line = remove_leading_whitespace(line); // Remove leading whitespace
+      if (!is_empty_string(trimmed_line))
       {
-         remove_leading_whitespace(line); // Remove leading whitespace
-         if (line[0] == '#' || line[0] == ';')
+         if (trimmed_line[0] == '#' || trimmed_line[0] == ';')
          {
             /* Comment, so ignore */
          }
          else
          {
-            remove_comments(line); // remove inline comment
+            remove_comments(trimmed_line);
 
-            ptr = strtok(line, ":");
+            ptr = strtok(trimmed_line, ":");
 
             username = ptr;
 
@@ -2716,8 +2714,7 @@ as_bytes(char* str, int* bytes, int default_bytes)
          // allow a 'B' suffix on a multiplier
          // like for instance 'MB', but don't allow it
          // for bytes themselves ('BB')
-         if (multiplier == 1
-             || (str[i] != 'b' && str[i] != 'B'))
+         if (multiplier == 1 || (str[i] != 'b' && str[i] != 'B'))
          {
             // another non-digit char not allowed
             goto error;
@@ -2873,10 +2870,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->log_level = reload->log_level;
    // if the log main parameters have changed, we need
    // to restart the logging system
-   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH)
-       || config->log_rotation_size != reload->log_rotation_size
-       || config->log_rotation_age != reload->log_rotation_age
-       || config->log_mode != reload->log_mode)
+   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH) || config->log_rotation_size != reload->log_rotation_size || config->log_rotation_age != reload->log_rotation_age || config->log_mode != reload->log_mode)
    {
       pgmoneta_log_debug("Log restart triggered!");
       pgmoneta_stop_logging();
@@ -3032,24 +3026,36 @@ is_empty_string(char* s)
    return true;
 }
 
-static void
-remove_leading_whitespace(char* s)
+static char* 
+remove_leading_whitespace(const char* s)
 {
-   int i = 0;
-   while (s[i] != '\0' && isspace(s[i]))
-   {
-      i++;
-   }
-   if (i > 0)
-   {
-      memmove(s, s + i, strlen(s) - i + 1);
-   }
+    // Find the index of the first non-whitespace character
+    int i = 0;
+    while (s[i] != '\0' && isspace(s[i]))
+    {
+        i++;
+    }
+
+    // Allocate memory for the new string
+    size_t length = strlen(s) - i + 1;
+    char* result = (char*)malloc(length * sizeof(char));
+    if (result == NULL)
+    {
+        // Memory allocation failed
+        return NULL;
+    }
+
+    // Copy the substring without leading whitespace
+    strcpy(result, s + i);
+
+    return result;
 }
 
-static void
+void
 remove_comments(char* s)
 {
    char* comment_pos;
+
    // Remove comments starting with ';'
    comment_pos = strchr(s, ';');
    if (comment_pos)
