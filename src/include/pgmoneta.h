@@ -350,6 +350,10 @@ struct configuration
    int number_of_users;          /**< The number of users */
    int number_of_admins;         /**< The number of admins */
 
+   unsigned long burst;    /**< Maximum burst capacity of the rate limit token bucket. */
+   unsigned long max_rate; /**< Number of tokens added to the bucket with each replenishment. */
+   int every;    /**< Tokens are added at regular intervals specified in seconds. */
+
    struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
    struct user users[NUMBER_OF_USERS];             /**< The users */
    struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
