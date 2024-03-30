@@ -59,6 +59,9 @@ extern "C" {
 #define MAX_BUFFER_SIZE      65535
 #define DEFAULT_BUFFER_SIZE  65535
 
+#define DEFAULT_BURST 65535
+#define DEFAULT_EVERY 1
+
 #define MAX_USERNAME_LENGTH  128
 #define MAX_PASSWORD_LENGTH 1024
 
@@ -351,6 +354,8 @@ struct configuration
    int number_of_servers;        /**< The number of servers */
    int number_of_users;          /**< The number of users */
    int number_of_admins;         /**< The number of admins */
+
+   unsigned long backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
 
    struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
    struct user users[NUMBER_OF_USERS];             /**< The users */

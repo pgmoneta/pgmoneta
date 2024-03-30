@@ -2145,7 +2145,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version)
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket)
 {
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
@@ -2240,6 +2240,22 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
 
          if (msg->kind == 'd' && msg->length > 0)
          {
+
+            if (bucket)
+            {
+               while (1)
+               {
+                  if (!pgmoneta_token_bucket_consume(bucket, msg->length))
+                  {
+                     break;
+                  }
+                  else
+                  {
+                     SLEEP(500000000L)
+                  }
+               }
+            }
+
             // copy data
             if (fwrite(msg->data, msg->length, 1, file) != 1)
             {
@@ -2274,7 +2290,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
    // If server version >= 13, receive manifest as well
    if (version >= 13)
    {
-      if (pgmoneta_receive_manifest_file(ssl, socket, buffer, basedir))
+      if (pgmoneta_receive_manifest_file(ssl, socket, buffer, basedir, bucket))
       {
          goto error;
       }
@@ -2340,7 +2356,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces)
+pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket)
 {
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
@@ -2515,6 +2531,22 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                {
                   break;
                }
+
+               if (bucket)
+               {
+                  while (1)
+                  {
+                     if (!pgmoneta_token_bucket_consume(bucket, msg->length))
+                     {
+                        break;
+                     }
+                     else
+                     {
+                        SLEEP(500000000L)
+                     }
+                  }
+               }
+
                if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)
                {
                   pgmoneta_log_error("could not write to file %s", file_path);
@@ -2610,7 +2642,7 @@ error:
 }
 
 int
-pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir)
+pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket)
 {
    char tmp_file_path[MAX_PATH];
    char file_path[MAX_PATH];
@@ -2620,6 +2652,7 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
 
    memset(tmp_file_path, 0, sizeof(tmp_file_path));
    memset(file_path, 0, sizeof(file_path));
+
    // Name the manifest with .tmp suffix so that we know backup is invalid if replication is interrupted
    if (pgmoneta_ends_with(basedir, "/"))
    {
@@ -2644,6 +2677,7 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       }
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
+
    while (msg->kind != 'c')
    {
       pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
@@ -2655,6 +2689,22 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       }
       if (msg->kind == 'd' && msg->length > 0)
       {
+
+         if (bucket)
+         {
+            while (1)
+            {
+               if (!pgmoneta_token_bucket_consume(bucket, msg->length))
+               {
+                  break;
+               }
+               else
+               {
+                  SLEEP(500000000L)
+               }
+            }
+         }
+
          // copy data
          if (fwrite(msg->data, msg->length, 1, file) != 1)
          {

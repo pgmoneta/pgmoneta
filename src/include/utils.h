@@ -919,6 +919,60 @@ pgmoneta_get_file_size(char* file_path);
 bool
 pgmoneta_is_file_archive(char* file_path);
 
+/** @struct
+ * Defines token bucket structure
+ */
+struct token_bucket
+{
+   unsigned long burst; /**< default value is 0, no limit */
+   atomic_ulong cur_tokens;
+   unsigned long max_rate;
+   int every;
+   atomic_ulong last_time;
+};
+
+/**
+ * Init a token bucket
+ * @param tb The token bucket
+ * @param max_rate The number of bytes of tokens added every one second
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_init(struct token_bucket* tb, unsigned long max_rate);
+
+/**
+ * Free the memory of the token bucket
+ * @param tb The token bucket
+ */
+void
+pgmoneta_token_bucket_destroy(struct token_bucket* tb);
+
+/**
+ * Add new token into the bucket
+ * @param tb The token bucket
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_add(struct token_bucket* tb);
+
+/**
+ * Get tokens from token bucket wrapper
+ * @param tb The token bucket
+ * @param tokens Needed tokens
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens);
+
+/**
+ * Get tokens from token bucket once
+ * @param tb The token bucket
+ * @param tokens Needed tokens
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
+
 #ifdef DEBUG
 
 /**

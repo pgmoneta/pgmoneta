@@ -46,6 +46,8 @@ extern "C" {
 #define MESSAGE_STATUS_OK    1
 #define MESSAGE_STATUS_ERROR 2
 
+extern struct token_bucket bucket;
+
 /** @struct
  * Defines a message
  */
@@ -516,10 +518,11 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
  * @param basedir The base directory for the backup data
  * @param tablespaces The user level tablespaces
  * @param version The server version
+ * @param bucket The rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version);
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket);
 
 /**
  * Receive backup tar files from the copy stream and write to disk
@@ -529,10 +532,11 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
  * @param buffer The stream buffer
  * @param basedir The base directory for the backup data
  * @param tablespaces The user level tablespaces
+ * @param bucket The rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces);
+pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket);
 
 /**
  * Receive mainfest file from the copy stream and write to disk
@@ -541,10 +545,11 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
  * @param socket The socket
  * @param buffer The stream buffer
  * @param basedir The base directory for the manifest
+ * @param bucket The rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir);
+pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket);
 
 #ifdef __cplusplus
 }

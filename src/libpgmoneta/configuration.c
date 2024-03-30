@@ -56,6 +56,7 @@
 
 static void extract_key_value(char* str, char** key, char** value);
 static int as_int(char* str, int* i);
+static int as_ulong(char* str, unsigned long* ul);
 static int as_bool(char* str, bool* b);
 static int as_logging_type(char* str);
 static int as_logging_level(char* str);
@@ -127,6 +128,8 @@ pgmoneta_init_configuration(void* shm)
    config->log_level = PGMONETA_LOGGING_LEVEL_INFO;
    config->log_mode = PGMONETA_LOGGING_MODE_APPEND;
    atomic_init(&config->log_lock, STATE_FREE);
+
+   config->backup_max_rate = 0;
 
    return 0;
 }
@@ -1169,6 +1172,20 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "backup_max_rate"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_ulong(value, &config->backup_max_rate))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else
                {
                   unknown = true;
@@ -2008,6 +2025,46 @@ as_int(char* str, int* i)
    }
 
    *i = (int)val;
+
+   return 0;
+
+error:
+
+   errno = 0;
+
+   return 1;
+}
+
+static int
+as_ulong(char* str, unsigned long* ul)
+{
+   char* endptr;
+   long val;
+
+   errno = 0;
+   val = strtol(str, &endptr, 10);
+
+   if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) || (errno != 0 && val == 0))
+   {
+      goto error;
+   }
+
+   if (str == endptr)
+   {
+      goto error;
+   }
+
+   if (*endptr != '\0')
+   {
+      goto error;
+   }
+
+   if (val < 0)
+   {
+      goto error;
+   }
+
+   *ul = (unsigned long)val;
 
    return 0;
 

@@ -104,12 +104,24 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    struct tablespace* tablespaces = NULL;
    struct tablespace* current_tablespace = NULL;
    struct tuple* tup = NULL;
+   struct token_bucket* bucket = NULL;
 
    start_time = time(NULL);
 
    pgmoneta_memory_init();
 
    config = (struct configuration*)shmem;
+
+   // default is 0
+   if (config->backup_max_rate)
+   {
+      bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+      if (pgmoneta_token_bucket_init(bucket, config->backup_max_rate))
+      {
+         pgmoneta_log_error("failed to initialize the token bucket for backup.\n");
+         goto error;
+      }
+   }
 
    usr = -1;
    // find the corresponding user's index of the given server
@@ -206,7 +218,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_mkdir(root);
    if (config->servers[server].version < 15)
    {
-      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, config->servers[server].version))
+      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, config->servers[server].version, bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -217,7 +229,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    else
    {
-      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, root, tablespaces))
+      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, root, tablespaces, bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -318,6 +330,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_free_copy_message(basebackup_msg);
    pgmoneta_free_copy_message(tablespace_msg);
    pgmoneta_free_query_response(response);
+   pgmoneta_token_bucket_destroy(bucket);
    free(root);
    free(label);
    free(d);
@@ -336,6 +349,7 @@ error:
    pgmoneta_free_tablespaces(tablespaces);
    pgmoneta_free_copy_message(basebackup_msg);
    pgmoneta_free_query_response(response);
+   pgmoneta_token_bucket_destroy(bucket);
    free(root);
    free(label);
    free(d);

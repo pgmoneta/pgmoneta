@@ -43,6 +43,7 @@
 #include <inttypes.h>
 #include <libgen.h>
 #include <pwd.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2018,7 +2019,6 @@ pgmoneta_basename_file(char* s, char** basename)
    return 0;
 
 error:
-
    return 1;
 }
 
@@ -3163,6 +3163,140 @@ parse_command(int argc,
    }
 
    return true;
+}
+
+int
+pgmoneta_token_bucket_init(struct token_bucket* tb, unsigned long max_rate)
+{
+   if (tb != NULL)
+   {
+      if (max_rate > DEFAULT_BURST)
+      {
+         tb->burst = max_rate;
+      }
+      else
+      {
+         tb->burst = DEFAULT_BURST;
+      }
+      atomic_init(&tb->cur_tokens, tb->burst);
+      tb->max_rate = max_rate;
+      tb->every = DEFAULT_EVERY;
+      atomic_init(&tb->last_time, (unsigned long)time(NULL));
+      return 0;
+   }
+   return 1;
+}
+
+void
+pgmoneta_token_bucket_destroy(struct token_bucket* tb)
+{
+   if (tb)
+   {
+      free(tb);
+   }
+}
+
+int
+pgmoneta_token_bucket_add(struct token_bucket* tb)
+{
+   unsigned long diff;
+   unsigned long expected_tokens;
+   unsigned long new_tokens;
+   unsigned long expected_time;
+   unsigned long cur_time;
+
+   expected_time = atomic_load(&tb->last_time);
+   cur_time = (unsigned long) time(NULL);
+   diff = cur_time - expected_time;
+
+   if (diff < tb->every)
+   {
+      return 0;
+   }
+
+   // update time
+   while (!atomic_compare_exchange_weak(&tb->last_time, &expected_time, cur_time))
+   {
+      expected_time = atomic_load(&tb->last_time);
+      cur_time = (unsigned long) time(NULL);
+      diff = cur_time - expected_time;
+      if (diff < tb->every)
+      {
+         return 0;
+      }
+   }
+
+   // update token
+   expected_tokens = atomic_load(&tb->cur_tokens);
+   new_tokens = expected_tokens + tb->max_rate * (diff / tb->every);
+
+   if (new_tokens > tb->burst)
+   {
+      new_tokens = tb->burst;
+   }
+
+   while (!atomic_compare_exchange_weak(&tb->cur_tokens, &expected_tokens, new_tokens))
+   {
+      expected_tokens = atomic_load(&tb->cur_tokens);
+      new_tokens = expected_tokens + tb->max_rate * (diff / tb->every);
+
+      if (new_tokens > tb->burst)
+      {
+         new_tokens = tb->burst;
+      }
+   }
+
+   return 0;
+}
+
+int
+pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens)
+{
+   if (tokens < tb->burst)
+   {
+      return pgmoneta_token_bucket_once(tb, tokens);
+   }
+   else
+   {
+      unsigned long accum = 0;
+      unsigned long cur_tokens;
+      while (accum < tokens)
+      {
+
+         cur_tokens = atomic_load(&tb->cur_tokens);
+         if (!pgmoneta_token_bucket_once(tb, cur_tokens))
+         {
+            accum += cur_tokens;
+         }
+         else
+         {
+            SLEEP(500000000L);
+         }
+      }
+      return 0;
+
+   }
+}
+
+int
+pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens)
+{
+   unsigned long expected;
+
+   if (!pgmoneta_token_bucket_add(tb))
+   {
+      expected = atomic_load(&tb->cur_tokens);
+
+      while (expected >= tokens)
+      {
+         if (atomic_compare_exchange_weak(&tb->cur_tokens, &expected, expected - tokens))
+         {
+            return 0;
+         }
+      }
+   }
+
+   return 1;
 }
 
 #ifdef DEBUG
