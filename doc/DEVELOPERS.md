@@ -112,7 +112,7 @@ If the postgres user already exists, don't forget to set its password for conven
 Open a new window, switch to the `postgres` user. This section will always operate within this user space.
 
     sudo su -
-    su - pgmoneta
+    su - postgres
 
 #### Initialize cluster
 
