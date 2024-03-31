@@ -50,7 +50,7 @@ pgmoneta_create_info(char* directory, char* label, int status)
    sfile = fopen(s, "w");
    
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "VERSION=%s\n", VERSION);
+   snprintf(&buffer[0], sizeof(buffer), "PGMONETA_VERSION=%s\n", VERSION);
    fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
