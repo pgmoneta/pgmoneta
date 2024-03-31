@@ -119,19 +119,19 @@ Example
 pgmoneta-cli expunge primary oldest
 ```
 
-## is-alive
-Is pgmoneta alive
+## ping
+Verify if pgmoneta is alive
 
 Command
 
 ```
-pgmoneta-cli is-alive
+pgmoneta-cli ping
 ```
 
 Example
 
 ```
-pgmoneta-cli is-alive
+pgmoneta-cli ping
 ```
 
 ## stop
@@ -150,62 +150,56 @@ pgmoneta-cli stop
 ```
 
 ## status
-Status of pgmoneta
+Status of pgmoneta, with a `details` option
 
 Command
 
 ```
-pgmoneta-cli status
+pgmoneta-cli status [details]
 ```
 
 Example
 
 ```
-pgmoneta-cli status
+pgmoneta-cli status details
 ```
 
-## details
-Detailed status of pgmoneta
+## conf
+Manage the configuration
 
 Command
 
 ```
-pgmoneta-cli details
+pgmoneta-cli conf [reload]
 ```
+
+Subcommand
+
+- `reload`: Reload configuration
 
 Example
 
 ```
-pgmoneta-cli details
+pgmoneta-cli conf reload
 ```
 
-## reload
-Reload the configuration
+## Clear
+Clear data/statistics
 
 Command
 
 ```
-pgmoneta-cli reload
+pgmoneta-cli clear [prometheus]
 ```
+
+Subcommand
+
+- `prometheus`: Reset the Prometheus statistics
 
 Example
 
 ```
-pgmoneta-cli reload
-```
-
-## reset
-Reset the Prometheus statistics
-Command
-
-```
-pgmoneta-cli reset
-```
-
-Example
-
-```
-pgmoneta-cli reset
+pgmoneta-cli clear prometheus
 ```
 
 ## decrypt

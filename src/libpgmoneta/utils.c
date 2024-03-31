@@ -35,6 +35,7 @@
 
 /* system */
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
 #include <ev.h>
 #include <execinfo.h>
@@ -905,6 +906,35 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
                 s2 != NULL ? s2 : "");
 
 #endif
+}
+
+unsigned int
+pgmoneta_version_as_number(unsigned int major, unsigned int minor, unsigned int patch)
+{
+   return (patch % 100)
+          + (minor % 100) * 100
+          + (major % 100) * 10000;
+}
+
+unsigned int
+pgmoneta_version_number(void)
+{
+   return pgmoneta_version_as_number(PGMONETA_MAJOR_VERSION,
+                                     PGMONETA_MINOR_VERSION,
+                                     PGMONETA_PATCH_VERSION);
+}
+
+bool
+pgmoneta_version_ge(unsigned int major, unsigned int minor, unsigned int patch)
+{
+   if (pgmoneta_version_number() >= pgmoneta_version_as_number(major, minor, patch))
+   {
+      return true;
+   }
+   else
+   {
+      return false;
+   }
 }
 
 int
@@ -3001,6 +3031,128 @@ pgmoneta_is_file_archive(char* file_path)
    }
 
    return false;
+}
+
+/* Parser for pgmoneta-cli amd pgmoneta-admin commands */
+bool
+parse_command(int argc,
+              char** argv,
+              int offset,
+              struct pgmoneta_parsed_command* parsed,
+              const struct pgmoneta_command command_table[],
+              size_t command_count)
+{
+   char* command = NULL;
+   char* subcommand = NULL;
+   bool command_match = false;
+   int default_command_match = -1;
+   int arg_count = -1;
+   int command_index = -1;
+   int j;
+
+   /* Parse command, and exit if there is no match */
+   if (offset < argc)
+   {
+      command = argv[offset++];
+   }
+   else
+   {
+      warnx("A command is required\n");
+      return false;
+   }
+
+   if (offset < argc)
+   {
+      subcommand = argv[offset];
+   }
+
+   for (int i = 0; i < command_count; i++)
+   {
+      if (strncmp(command, command_table[i].command, MISC_LENGTH) == 0)
+      {
+         command_match = true;
+         if (subcommand && strncmp(subcommand, command_table[i].subcommand, MISC_LENGTH) == 0)
+         {
+            offset++;
+            command_index = i;
+            break;
+         }
+         else if (EMPTY_STR(command_table[i].subcommand))
+         {
+            /* Default command does not require a subcommand, might be followed by an argument */
+            default_command_match = i;
+         }
+      }
+   }
+
+   if (command_match == false)
+   {
+      warnx("Unknown command '%s'\n", command);
+      return false;
+   }
+
+   if (command_index == -1 && default_command_match >= 0)
+   {
+      command_index = default_command_match;
+      subcommand = "";
+   }
+   else if (command_index == -1)  /* Command was matched, but subcommand was not */
+   {
+      if (subcommand)
+      {
+         warnx("Unknown subcommand '%s' for command '%s'\n", subcommand, command);
+      }
+      else  /* User did not type a subcommand */
+      {
+         warnx("Command '%s' requires a subcommand\n", command);
+      }
+      return false;
+   }
+
+   parsed->cmd = &command_table[command_index];
+
+   /* Iterate until find an accepted_arg_count that is equal or greater than the typed command arg_count */
+   arg_count = argc - offset;
+   for (j = 0; j < MISC_LENGTH; j++)
+   {
+      if (parsed->cmd->accepted_argument_count[j] >= arg_count)
+      {
+         break;
+      }
+   }
+   if (arg_count < parsed->cmd->accepted_argument_count[0])
+   {
+      warnx("Too few arguments provided for command '%s%s%s'\n", command,
+            (command && !EMPTY_STR(subcommand)) ? " " : "", subcommand);
+      return false;
+   }
+   if (j == MISC_LENGTH || arg_count > parsed->cmd->accepted_argument_count[j])
+   {
+      warnx("Too many arguments provided for command '%s%s%s'\n", command,
+            (command && !EMPTY_STR(subcommand)) ? " " : "", subcommand);
+      return false;
+   }
+
+   /* Copy argv + offset pointers into parsed->args */
+   for (int i = 0; i < arg_count; i++)
+   {
+      parsed->args[i] = argv[i + offset];
+   }
+   parsed->args[0] = parsed->args[0] ? parsed->args[0] : (char*) parsed->cmd->default_argument;
+
+   /* Warn the user if there is enough information about deprecation */
+   if (parsed->cmd->deprecated
+       && pgmoneta_version_ge(parsed->cmd->deprecated_since_major,
+                              parsed->cmd->deprecated_since_minor, 0))
+   {
+      warnx("command <%s> has been deprecated by <%s> since version %d.%d",
+            parsed->cmd->command,
+            parsed->cmd->deprecated_by,
+            parsed->cmd->deprecated_since_major,
+            parsed->cmd->deprecated_since_minor);
+   }
+
+   return true;
 }
 
 #ifdef DEBUG

@@ -69,6 +69,94 @@ static int remove_user(char* users_path, char* username);
 static int list_users(char* users_path);
 static char* generate_password(int pwd_length);
 
+const struct pgmoneta_command command_table[] =
+{
+   {
+      .command = "master-key",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .deprecated = false,
+      .action = ACTION_MASTER_KEY,
+      .log_message = "<master-key>",
+   },
+   {
+      .command = "user",
+      .subcommand = "add",
+      .accepted_argument_count = {0},
+      .deprecated = false,
+      .action = ACTION_ADD_USER,
+      .log_message = "<user add> [%s]",
+   },
+   {
+      .command = "user",
+      .subcommand = "edit",
+      .accepted_argument_count = {0},
+      .deprecated = false,
+      .action = ACTION_UPDATE_USER,
+      .log_message = "<user edit> [%s]",
+   },
+   {
+      .command = "user",
+      .subcommand = "del",
+      .accepted_argument_count = {0},
+      .deprecated = false,
+      .action = ACTION_REMOVE_USER,
+      .log_message = "<user del> [%s]",
+   },
+   {
+      .command = "user",
+      .subcommand = "ls",
+      .accepted_argument_count = {0},
+      .deprecated = false,
+      .action = ACTION_LIST_USERS,
+      .log_message = "<user ls>",
+   },
+   {
+      .command = "add-user",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .deprecated = true,
+      .action = ACTION_ADD_USER,
+      .log_message = "<deprecated: use 'user add'> [%s]",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .deprecated_by = "user add",
+   },
+   {
+      .command = "update-user",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .deprecated = true,
+      .action = ACTION_UPDATE_USER,
+      .log_message = "<deprecated: use 'user edit'> [%s]",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .deprecated_by = "user edit",
+   },
+   {
+      .command = "remove-user",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .deprecated = true,
+      .action = ACTION_REMOVE_USER,
+      .log_message = "<deprecated: use 'user del'>",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .deprecated_by = "user del",
+   },
+   {
+      .command = "list-users",
+      .subcommand = "",
+      .accepted_argument_count = {0},
+      .deprecated = true,
+      .action = ACTION_LIST_USERS,
+      .log_message = "<deprecated: use 'user ls'>",
+      .deprecated_since_major = 0,
+      .deprecated_since_minor = 11,
+      .deprecated_by = "user ls",
+   },
+};
+
 static void
 version(void)
 {
@@ -97,10 +185,11 @@ usage(void)
    printf("\n");
    printf("Commands:\n");
    printf("  master-key              Create or update the master key\n");
-   printf("  add-user                Add a user\n");
-   printf("  update-user             Update a user\n");
-   printf("  remove-user             Remove a user\n");
-   printf("  list-users              List all users\n");
+   printf("  user <subcommand>       Manage a specific user, where <subcommand> can be\n");
+   printf("                          - add  to add a new user\n");
+   printf("                          - del  to remove an existing user\n");
+   printf("                          - edit to change the password for an existing user\n");
+   printf("                          - ls   to list all available users\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
@@ -109,7 +198,6 @@ usage(void)
 int
 main(int argc, char** argv)
 {
-   int exit_code = 0;
    int c;
    char* username = NULL;
    char* password = NULL;
@@ -117,7 +205,8 @@ main(int argc, char** argv)
    bool generate_pwd = false;
    int pwd_length = DEFAULT_PASSWORD_LENGTH;
    int option_index = 0;
-   int32_t action = ACTION_UNKNOWN;
+   size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
+   struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
 
    while (1)
    {
@@ -171,114 +260,67 @@ main(int argc, char** argv)
 
    if (getuid() == 0)
    {
-      warnx("pgmoneta: Using the root account is not allowed");
-      exit(1);
+      errx(1, "pgmoneta: Using the root account is not allowed");
    }
 
-   if (argc > 0)
-   {
-      if (!strcmp("master-key", argv[argc - 1]))
-      {
-         action = ACTION_MASTER_KEY;
-      }
-      else if (!strcmp("add-user", argv[argc - 1]))
-      {
-         action = ACTION_ADD_USER;
-      }
-      else if (!strcmp("update-user", argv[argc - 1]))
-      {
-         action = ACTION_UPDATE_USER;
-      }
-      else if (!strcmp("remove-user", argv[argc - 1]))
-      {
-         action = ACTION_REMOVE_USER;
-      }
-      else if (!strcmp("list-users", argv[argc - 1]))
-      {
-         action = ACTION_LIST_USERS;
-      }
-
-      if (action == ACTION_MASTER_KEY)
-      {
-         if (master_key(password, generate_pwd, pwd_length))
-         {
-            warnx("Error for master key");
-            exit_code = 1;
-         }
-      }
-      else if (action == ACTION_ADD_USER)
-      {
-         if (file_path != NULL)
-         {
-            if (add_user(file_path, username, password, generate_pwd, pwd_length))
-            {
-               warnx("Error for add-user");
-               exit_code = 1;
-            }
-         }
-         else
-         {
-            warnx("Missing file argument");
-            exit_code = 1;
-         }
-      }
-      else if (action == ACTION_UPDATE_USER)
-      {
-         if (file_path != NULL)
-         {
-            if (update_user(file_path, username, password, generate_pwd, pwd_length))
-            {
-               warnx("Error for update-user");
-               exit_code = 1;
-            }
-         }
-         else
-         {
-            warnx("Missing file argument");
-            exit_code = 1;
-         }
-      }
-      else if (action == ACTION_REMOVE_USER)
-      {
-         if (file_path != NULL)
-         {
-            if (remove_user(file_path, username))
-            {
-               warnx("Error for remove-user");
-               exit_code = 1;
-            }
-         }
-         else
-         {
-            warnx("Missing file argument");
-            exit_code = 1;
-         }
-      }
-      else if (action == ACTION_LIST_USERS)
-      {
-         if (file_path != NULL)
-         {
-            if (list_users(file_path))
-            {
-               warnx("Error for list-users");
-               exit_code = 1;
-            }
-         }
-         else
-         {
-            warnx("Missing file argument");
-            exit_code = 1;
-         }
-      }
-   }
-
-   if (action == ACTION_UNKNOWN)
+   if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
    {
       usage();
-      exit_code = 1;
+      goto error;
    }
 
-   return exit_code;
+   if (parsed.cmd->action == ACTION_MASTER_KEY)
+   {
+      if (master_key(password, generate_pwd, pwd_length))
+      {
+         errx(1, "Cannot generate master key");
+      }
+   }
+   else
+   {
+      if (file_path == NULL)
+      {
+         errx(1, "Missing file argument");
+      }
+
+      if (parsed.cmd->action == ACTION_ADD_USER)
+      {
+         if (add_user(file_path, username, password, generate_pwd, pwd_length))
+         {
+            errx(1, "Error for <user add>");
+         }
+      }
+      else if (parsed.cmd->action == ACTION_UPDATE_USER)
+      {
+         if (update_user(file_path, username, password, generate_pwd, pwd_length))
+         {
+            errx(1, "Error for <user edit>");
+         }
+      }
+      else if (parsed.cmd->action == ACTION_REMOVE_USER)
+      {
+
+         if (remove_user(file_path, username))
+         {
+            errx(1, "Error for <user del>");
+         }
+      }
+      else if (parsed.cmd->action == ACTION_LIST_USERS)
+      {
+
+         if (list_users(file_path))
+         {
+            errx(1, "Error for <user ls>");
+         }
+
+      }
+   }
+
+   exit(0);
+
+error:
+
+   exit(1);
 }
 
 static int

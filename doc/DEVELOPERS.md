@@ -260,7 +260,7 @@ open a new terminal and log in with `pgmoneta`
 
 #### View backup
 
-    pgmoneta-cli -c pgmoneta.conf details
+    pgmoneta-cli -c pgmoneta.conf status details
 
 #### Stop pgmoneta
 
