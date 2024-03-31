@@ -9,12 +9,12 @@ on:
     - main
 
 jobs:
-  build:
+  build-linux:
 
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Update system
       run: sudo apt update -y
     - name: Install libev
@@ -58,3 +58,47 @@ jobs:
     - name: CLANG/make
       run: make
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+  
+
+
+  build-macos:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Homebrew
+      run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+    - name: Update system
+      run: brew update
+    - name: Install libev
+      run: brew install libev
+    - name: Install rst2man
+      run: brew install docutils
+    - name: Install libarchive
+      run: brew install --ignore-dependencies libarchive
+    - name: Install clang
+      run: brew install llvm
+    - name: Install cJSON
+      run: brew install cjson
+    - name: GCC/mkdir
+      run: mkdir build
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
+    - name: GCC/cmake
+      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+    - name: GCC/make
+      run: make
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+    - name: rm -Rf
+      run: rm -Rf build/
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
+    - name: CLANG/mkdir
+      run: mkdir build
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
+    - name: CLANG/cmake
+      run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+    - name: CLANG/make
+      run: make
+      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/

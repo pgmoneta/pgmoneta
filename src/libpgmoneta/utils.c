@@ -815,11 +815,7 @@ error:
 void
 pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 {
-#ifdef HAVE_LINUX
    char title[MAX_PROCESS_TITLE_LENGTH];
-   size_t size;
-   char** env = environ;
-   int es = 0;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -830,6 +826,10 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
    {
       return;
    }
+#ifdef HAVE_LINUX
+   size_t size;
+   char** env = environ;
+   int es = 0;
 
    if (!env_changed)
    {
@@ -898,7 +898,15 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 
    // keep track of how long the title is now
    max_process_title_size = size;
+#elif defined(HAVE_OSX)
+   // compose the new title
+   snprintf(title, sizeof(title), "pgmoneta: %s%s%s",
+            s1 != NULL ? s1 : "",
+            s1 != NULL && s2 != NULL ? "/" : "",
+            s2 != NULL ? s2 : "");
 
+   // set the program name using setprogname (macOS API)
+   setprogname(title);
 #else
    setproctitle("-pgmoneta: %s%s%s",
                 s1 != NULL ? s1 : "",
@@ -2157,7 +2165,9 @@ pgmoneta_symlink_at_file(char* from, char* to)
    char absolute_path[MAX_PATH];
 
    dir_path = dirname(strdup(from));
-#ifndef HAVE_OPENBSD
+#ifndef HAVE_OSX
+   dirfd = open(dir_path, O_DIRECTORY | O_NOFOLLOW);
+#elif defined(HAVE_OPENBSD)
    dirfd = open(dir_path, O_PATH | O_DIRECTORY | O_NOFOLLOW);
 #else
    dirfd = open(dir_path, O_DIRECTORY | O_NOFOLLOW);

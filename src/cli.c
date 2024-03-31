@@ -111,8 +111,8 @@ static int reset(SSL* ssl, int socket);
 static int reload(SSL* ssl, int socket);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
-static int decrypt(SSL* ssl, int socket, char* path);
-static int encrypt(SSL* ssl, int socket, char* path);
+static int decrypt_data(SSL* ssl, int socket, char* path);
+static int encrypt_data(SSL* ssl, int socket, char* path);
 
 static void
 version(void)
@@ -669,11 +669,11 @@ password:
    }
    else if (parsed.cmd->action == ACTION_DECRYPT)
    {
-      exit_code = decrypt(s_ssl, socket, parsed.args[0]);
+      exit_code = decrypt_data(s_ssl, socket, parsed.args[0]);
    }
    else if (parsed.cmd->action == ACTION_ENCRYPT)
    {
-      exit_code = encrypt(s_ssl, socket, parsed.args[0]);
+      exit_code = encrypt_data(s_ssl, socket, parsed.args[0]);
    }
 
 done:
@@ -1081,7 +1081,7 @@ expunge(SSL* ssl, int socket, char* server, char* backup_id)
 }
 
 static int
-decrypt(SSL* ssl, int socket, char* path)
+decrypt_data(SSL* ssl, int socket, char* path)
 {
    int ret;
 
@@ -1094,7 +1094,7 @@ decrypt(SSL* ssl, int socket, char* path)
 }
 
 static int
-encrypt(SSL* ssl, int socket, char* path)
+encrypt_data(SSL* ssl, int socket, char* path)
 {
    int ret;
 

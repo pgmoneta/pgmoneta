@@ -34,6 +34,7 @@ message(STATUS "pgmoneta ${VERSION_STRING}")
 
 include(CheckCCompilerFlag)
 include(CheckCSourceCompiles)
+include(CheckLinkerFlag)
 include(FindPackageHandleStandardArgs)
 include(GNUInstallDirs)
 
@@ -96,6 +97,17 @@ if (OPENSSL_FOUND)
   message(STATUS "OpenSSL found")
 else ()
   message(FATAL_ERROR "OpenSSL needed")
+endif()
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    # Homebrew ships libarchive keg only, include dirs have to be set manually
+    execute_process(
+        COMMAND brew --prefix libarchive
+        OUTPUT_VARIABLE LIBARCHIVE_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+    set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
 endif()
 
 find_package(LibArchive)

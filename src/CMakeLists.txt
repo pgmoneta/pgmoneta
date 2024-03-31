@@ -53,6 +53,58 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  find_program(HOMEBREW_EXECUTABLE brew)
+  if(EXISTS ${HOMEBREW_EXECUTABLE})
+    execute_process(
+      COMMAND ${HOMEBREW_EXECUTABLE} --prefix
+      OUTPUT_VARIABLE HOMEBREW_PREFIX
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    message(STATUS "Homebrew found at ${HOMEBREW_PREFIX}")
+  endif()
+
+  add_compile_options(-DHAVE_DARWIN)
+  add_compile_options(-D_POSIX_C_SOURCE=200809L)
+  add_compile_options(-D_DARWIN_C_SOURCE)
+  add_compile_options(-DHAVE_OSX)
+
+  #
+  # Include directories
+  #
+  include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${ZLIB_INCLUDE_DIRS}
+    ${BZIP2_INCLUDE_DIRS}
+    ${ZSTD_INCLUDE_DIRS}
+    ${LZ4_INCLUDE_DIRS}
+    ${LIBEV_INCLUDE_DIRS}
+    ${OPENSSL_INCLUDE_DIR}
+    ${SYSTEMD_INCLUDE_DIRS}
+    ${LIBSSH_INCLUDE_DIRS}
+    ${CURL_INCLUDE_DIRS}
+    ${LibArchive_INCLUDE_DIRS}
+    ${CJSON_INCLUDE_DIRS}
+  )
+
+  #
+  # Library directories
+  #
+  link_libraries(
+    ${ZLIB_LIBRARIES}
+    ${BZIP2_LIBRARIES}
+    ${ZSTD_LIBRARIES}
+    ${LZ4_LIBRARIES}
+    ${LIBEV_LIBRARIES}
+    ${OPENSSL_CRYPTO_LIBRARY}
+    ${OPENSSL_SSL_LIBRARY}
+    ${SYSTEMD_LIBRARIES}
+    ${LIBSSH_LIBRARIES}
+    ${CURL_LIBRARIES}
+    ${LIBATOMIC_LIBRARY}
+    ${LibArchive_LIBRARY}
+    ${CJSON_LIBRARY}
+  )
+
 else()
 
   add_compile_options(-D_XOPEN_SOURCE=700)
@@ -191,14 +243,15 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   check_pie_supported()
 endif()
 
-check_c_compiler_flag(-Wl,-z,relro HAS_RELRO)
-if (HAS_RELRO)
+check_c_compiler_flag(-Wl,arg HAS_LINKER)
+check_linker_flag(C "-z relro" LINKER_HAS_RELRO)
+if (HAS_LINKER AND LINKER_HAS_RELRO)
   set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,relro")
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,relro")
 endif()
 
-check_c_compiler_flag(-Wl,-z,now HAS_NOW)
-if (HAS_NOW)
+check_linker_flag(C "-z now" LINKER_HAS_NOW)
+if (HAS_LINKER AND LINKER_HAS_NOW)
   set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,now")
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,now")
 endif()
