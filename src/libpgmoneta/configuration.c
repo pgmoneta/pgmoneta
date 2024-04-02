@@ -80,6 +80,7 @@ static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
 
 static bool is_empty_string(char* s);
+static int remove_leading_whitespace_and_comments(char* s, char** trimmed_line);
 
 /**
  *
@@ -140,6 +141,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
    FILE* file;
    char section[LINE_LENGTH];
    char line[LINE_LENGTH];
+   char* trimmed_line = NULL;
    char* key = NULL;
    char* value = NULL;
    char* ptr = NULL;
@@ -162,18 +164,32 @@ pgmoneta_read_configuration(void* shm, char* filename)
    {
       if (!is_empty_string(line))
       {
-         if (line[0] == '[')
+         if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
          {
-            ptr = strchr(line, ']');
+            if (is_empty_string(trimmed_line))
+            {
+               free(trimmed_line);
+               trimmed_line = NULL;
+               continue;
+            }
+         }
+         else
+         {
+            goto error;
+         }
+
+         if (trimmed_line[0] == '[')
+         {
+            ptr = strchr(trimmed_line, ']');
             if (ptr)
             {
                memset(&section, 0, LINE_LENGTH);
-               max = ptr - line - 1;
+               max = ptr - trimmed_line - 1;
                if (max > MISC_LENGTH - 1)
                {
                   max = MISC_LENGTH - 1;
                }
-               memcpy(&section, line + 1, max);
+               memcpy(&section, trimmed_line + 1, max);
                if (strcmp(section, "pgmoneta"))
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
@@ -201,13 +217,9 @@ pgmoneta_read_configuration(void* shm, char* filename)
                }
             }
          }
-         else if (line[0] == '#' || line[0] == ';')
-         {
-            /* Comment, so ignore */
-         }
          else
          {
-            extract_key_value(line, &key, &value);
+            extract_key_value(trimmed_line, &key, &value);
 
             if (key && value)
             {
@@ -853,7 +865,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      config->hugepage = as_hugepage(value);
-
                   }
                   else
                   {
@@ -865,7 +876,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      config->compression_type = as_compression(value);
-
                   }
                   else
                   {
@@ -1190,6 +1200,8 @@ pgmoneta_read_configuration(void* shm, char* filename)
             }
          }
       }
+      free(trimmed_line);
+      trimmed_line = NULL;
    }
 
    if (strlen(srv.name) > 0)
@@ -1202,6 +1214,17 @@ pgmoneta_read_configuration(void* shm, char* filename)
    fclose(file);
 
    return 0;
+
+error:
+
+   free(trimmed_line);
+   trimmed_line = NULL;
+   if (file)
+   {
+      fclose(file);
+   }
+
+   return 1;
 }
 
 /**
@@ -1449,6 +1472,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 {
    FILE* file;
    char line[LINE_LENGTH];
+   char* trimmed_line = NULL;
    int index;
    char* master_key = NULL;
    char* username = NULL;
@@ -1464,7 +1488,6 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    {
       goto error;
    }
-
    if (pgmoneta_get_master_key(&master_key))
    {
       goto masterkey;
@@ -1475,56 +1498,67 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
+
       if (!is_empty_string(line))
       {
-         if (line[0] == '#' || line[0] == ';')
+         if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
          {
-            /* Comment, so ignore */
+            if (is_empty_string(trimmed_line))
+            {
+               free(trimmed_line);
+               trimmed_line = NULL;
+               continue;
+            }
          }
          else
          {
-            ptr = strtok(line, ":");
-
-            username = ptr;
-
-            ptr = strtok(NULL, ":");
-
-            if (ptr == NULL)
-            {
-               goto error;
-            }
-
-            if (pgmoneta_base64_decode(ptr, strlen(ptr), &decoded, &decoded_length))
-            {
-               goto error;
-            }
-
-            if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
-            {
-               goto error;
-            }
-
-            if (strlen(username) < MAX_USERNAME_LENGTH &&
-                strlen(password) < MAX_PASSWORD_LENGTH)
-            {
-               memcpy(&config->users[index].username, username, strlen(username));
-               memcpy(&config->users[index].password, password, strlen(password));
-            }
-            else
-            {
-               warnx("pgmoneta: Invalid USER entry");
-               warnx("%s", line);
-            }
-
-            free(password);
-            free(decoded);
-
-            password = NULL;
-            decoded = NULL;
-
-            index++;
+            goto error;
          }
+
+         ptr = strtok(trimmed_line, ":");
+
+         username = ptr;
+
+         ptr = strtok(NULL, ":");
+
+         if (ptr == NULL)
+         {
+            goto error;
+         }
+
+         if (pgmoneta_base64_decode(ptr, strlen(ptr), &decoded, &decoded_length))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
+         {
+            goto error;
+         }
+
+         if (strlen(username) < MAX_USERNAME_LENGTH &&
+             strlen(password) < MAX_PASSWORD_LENGTH)
+         {
+            memcpy(&config->users[index].username, username, strlen(username));
+            memcpy(&config->users[index].password, password, strlen(password));
+         }
+         else
+         {
+            warnx("pgmoneta: Invalid USER entry");
+            warnx("%s", line);
+         }
+
+         free(password);
+         free(decoded);
+
+         password = NULL;
+         decoded = NULL;
+
+         index++;
+
       }
+      free(trimmed_line);
+      trimmed_line = NULL;
    }
 
    config->number_of_users = index;
@@ -1542,6 +1576,8 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
 error:
 
+   free(trimmed_line);
+   trimmed_line = NULL;
    free(master_key);
    free(password);
    free(decoded);
@@ -1626,6 +1662,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 {
    FILE* file;
    char line[LINE_LENGTH];
+   char* trimmed_line = NULL;
    int index;
    char* master_key = NULL;
    char* username = NULL;
@@ -1652,56 +1689,67 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
+
       if (!is_empty_string(line))
       {
-         if (line[0] == '#' || line[0] == ';')
+         if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
          {
-            /* Comment, so ignore */
+            if (is_empty_string(trimmed_line))
+            {
+               free(trimmed_line);
+               trimmed_line = NULL;
+               continue;
+            }
          }
          else
          {
-            ptr = strtok(line, ":");
-
-            username = ptr;
-
-            ptr = strtok(NULL, ":");
-
-            if (ptr == NULL)
-            {
-               goto error;
-            }
-
-            if (pgmoneta_base64_decode(ptr, strlen(ptr), &decoded, &decoded_length))
-            {
-               goto error;
-            }
-
-            if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
-            {
-               goto error;
-            }
-
-            if (strlen(username) < MAX_USERNAME_LENGTH &&
-                strlen(password) < MAX_PASSWORD_LENGTH)
-            {
-               memcpy(&config->admins[index].username, username, strlen(username));
-               memcpy(&config->admins[index].password, password, strlen(password));
-            }
-            else
-            {
-               warnx("pgmoneta: Invalid ADMIN entry");
-               warnx("%s", line);
-            }
-
-            free(password);
-            free(decoded);
-
-            password = NULL;
-            decoded = NULL;
-
-            index++;
+            goto error;
          }
+
+         ptr = strtok(trimmed_line, ":");
+
+         username = ptr;
+
+         ptr = strtok(NULL, ":");
+
+         if (ptr == NULL)
+         {
+            goto error;
+         }
+
+         if (pgmoneta_base64_decode(ptr, strlen(ptr), &decoded, &decoded_length))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
+         {
+            goto error;
+         }
+
+         if (strlen(username) < MAX_USERNAME_LENGTH &&
+             strlen(password) < MAX_PASSWORD_LENGTH)
+         {
+            memcpy(&config->admins[index].username, username, strlen(username));
+            memcpy(&config->admins[index].password, password, strlen(password));
+         }
+         else
+         {
+            warnx("pgmoneta: Invalid ADMIN entry");
+            warnx("%s", line);
+         }
+
+         free(password);
+         free(decoded);
+
+         password = NULL;
+         decoded = NULL;
+
+         index++;
+
       }
+      free(trimmed_line);
+      trimmed_line = NULL;
    }
 
    config->number_of_admins = index;
@@ -1719,6 +1767,8 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 
 error:
 
+   free(trimmed_line);
+   trimmed_line = NULL;
    free(master_key);
    free(password);
    free(decoded);
@@ -2706,8 +2756,7 @@ as_bytes(char* str, int* bytes, int default_bytes)
          // allow a 'B' suffix on a multiplier
          // like for instance 'MB', but don't allow it
          // for bytes themselves ('BB')
-         if (multiplier == 1
-             || (str[i] != 'b' && str[i] != 'B'))
+         if (multiplier == 1 || (str[i] != 'b' && str[i] != 'B'))
          {
             // another non-digit char not allowed
             goto error;
@@ -2863,10 +2912,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->log_level = reload->log_level;
    // if the log main parameters have changed, we need
    // to restart the logging system
-   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH)
-       || config->log_rotation_size != reload->log_rotation_size
-       || config->log_rotation_age != reload->log_rotation_age
-       || config->log_mode != reload->log_mode)
+   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH) || config->log_rotation_size != reload->log_rotation_size || config->log_rotation_age != reload->log_rotation_age || config->log_mode != reload->log_mode)
    {
       pgmoneta_log_debug("Log restart triggered!");
       pgmoneta_stop_logging();
@@ -3020,4 +3066,49 @@ is_empty_string(char* s)
    }
 
    return true;
+}
+
+static int
+remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
+{
+   // Find the index of the first non-whitespace character
+   int i = 0;
+   int last_non_whitespace_index = -1;
+   char* result = NULL; // Temporary variable to hold the trimmed line
+   while (s[i] != '\0' && isspace(s[i]))
+   {
+      i++;
+   }
+
+   // Loop through the string starting from non-whitespace character
+   for (; s[i] != '\0'; i++)
+   {
+      if (s[i] == ';' || s[i] == '#')
+      {
+         result = pgmoneta_append_char(result, '\0');
+         break; // Break loop if a comment character is encountered
+      }
+      if (!isspace(s[i]))
+      {
+         last_non_whitespace_index = i; // Update the index of the last non-whitespace character
+      }
+      result = pgmoneta_append_char(result, s[i]); // Append the current character to result
+      if (result == NULL)
+      {
+         goto error;
+      }
+   }
+   if (last_non_whitespace_index != -1)
+   {
+      result[last_non_whitespace_index + 1] = '\0'; // Null-terminate the string at the last non-whitespace character
+   }
+
+   *trimmed_line = result; // Assign result to trimmed_line
+
+   return 0;
+
+error:
+   free(result); // Free memory in case of error
+   *trimmed_line = NULL;
+   return 1;
 }
