@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <hot_standby.h>
 #include <logging.h>
 #include <storage.h>
 #include <workflow.h>
@@ -104,6 +105,9 @@ wf_backup(void)
    current = head;
 
    current->next = pgmoneta_storage_create_local();
+   current = current->next;
+
+   current->next = pgmoneta_create_hot_standby();
    current = current->next;
 
    if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)

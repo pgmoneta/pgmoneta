@@ -85,6 +85,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | wal_shipping | | String | No | The WAL shipping directory |
+| hot_standby | | String | No | Hot standby directory |
 | workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting |
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. |
 | tls_key_file | | String | No | Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. |

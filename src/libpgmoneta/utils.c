@@ -1542,19 +1542,22 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
       goto error;
    }
 
-   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   if (restore_last_files_names != NULL)
    {
-      char* temp = NULL;
-      temp = (char*)malloc((strlen(restore_last_files_names[i]) + strlen(from)) * sizeof(char) + 1);
-
-      if (temp == NULL)
+      for (int i = 0; restore_last_files_names[i] != NULL; i++)
       {
-         goto error;
-      }
-      snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
-      free(restore_last_files_names[i]);
+         char* temp = NULL;
+         temp = (char*)malloc((strlen(restore_last_files_names[i]) + strlen(from)) * sizeof(char) + 1);
 
-      restore_last_files_names[i] = temp;
+         if (temp == NULL)
+         {
+            goto error;
+         }
+         snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
+         free(restore_last_files_names[i]);
+
+         restore_last_files_names[i] = temp;
+      }
    }
 
    pgmoneta_mkdir(to);
@@ -1592,13 +1595,16 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
             else
             {
                bool file_is_excluded = false;
-               for (int i = 0; restore_last_files_names[i] != NULL; i++)
+               if (restore_last_files_names != NULL)
                {
-                  file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
-               }
-               if (!file_is_excluded)
-               {
-                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  for (int i = 0; restore_last_files_names[i] != NULL; i++)
+                  {
+                     file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+                  }
+                  if (!file_is_excluded)
+                  {
+                     pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  }
                }
             }
          }
@@ -1815,11 +1821,18 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
             else
             {
                bool file_is_excluded = false;
-               for (int i = 0; restore_last_files_names[i] != NULL; i++)
+               if (restore_last_files_names != NULL)
                {
-                  file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+                  for (int i = 0; restore_last_files_names[i] != NULL; i++)
+                  {
+                     file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+                  }
+                  if (!file_is_excluded)
+                  {
+                     pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  }
                }
-               if (!file_is_excluded)
+               else
                {
                   pgmoneta_copy_file(from_buffer, to_buffer, workers);
                }
