@@ -822,6 +822,7 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+   memset(&title, 0, sizeof(title));
 
    // sanity check: if the user does not want to
    // update the process title, do nothing
@@ -871,7 +872,6 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
    }
 
    // compose the new title
-   memset(&title, 0, sizeof(title));
    snprintf(title, sizeof(title) - 1, "pgmoneta: %s%s%s",
             s1 != NULL ? s1 : "",
             s1 != NULL && s2 != NULL ? "/" : "",
