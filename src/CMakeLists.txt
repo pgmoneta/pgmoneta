@@ -30,6 +30,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${CURL_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
+    ${THREAD_INCLUDE_DIRS}
   )
 
   #
@@ -49,6 +50,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARY}
     ${CJSON_LIBRARY}
+    ${THREAD_LIBRARY}
   )
 
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
@@ -84,6 +86,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${CURL_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
+    ${THREAD_INCLUDE_DIRS}
   )
 
   #
@@ -103,6 +106,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARY}
     ${CJSON_LIBRARY}
+    ${THREAD_LIBRARY}
   )
 
 else()
@@ -127,6 +131,7 @@ else()
     ${CURL_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
+    ${THREAD_INCLUDE_DIRS}
   )
 
   #
@@ -144,6 +149,7 @@ else()
     ${CURL_LIBRARIES}
     ${LibArchive_LIBRARIES}
     ${CJSON_LIBRARIES}
+    ${THREAD_LIBRARIES}
   )
 
   if (${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")

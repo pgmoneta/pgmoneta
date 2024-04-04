@@ -145,6 +145,13 @@ else ()
   message(FATAL_ERROR "libcurl needed")
 endif()
 
+find_package(THREAD)
+if (THREAD_FOUND)
+  message(STATUS "pthread found")
+else ()
+  message(FATAL_ERROR "pthread needed")
+endif()
+
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   find_package(Libatomic)
   if (LIBATOMIC_FOUND)
