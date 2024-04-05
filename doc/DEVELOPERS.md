@@ -273,3 +273,74 @@ Now that we've attempted our first backup, take a moment to relax. There are a f
 1. Since we initialized the database in `/tmp`, the data in this directory might be removed after you go offline, depending on your OS configuration. If you want to make it permanent, choose a different directory.
 
 2. Always use uncrustify to format your code when you make modifications.
+
+## Basic git guide
+
+Here are some links that will help you
+
+* [How to Squash Commits in Git](https://www.git-tower.com/learn/git/faq/git-squash)
+* [ProGit book](https://github.com/progit/progit2/releases)
+
+### Start by forking the repository
+
+This is done by the "Fork" button on GitHub.
+
+### Clone your repository locally
+
+This is done by
+
+```sh
+git clone git@github.com:<username>/pgmoneta.git
+```
+
+### Add upstream
+
+Do
+
+```sh
+cd pgmoneta
+git remote add upstream https://github.com/pgmoneta/pgmoneta.git
+```
+
+### Do a work branch
+
+```
+git checkout -b mywork main
+```
+
+### Make the changes
+
+Remember to verify the compile and execution of the code
+
+### Multiple commits
+
+If you have multiple commits on your branch then squash them
+
+```
+git rebase -i HEAD~2
+```
+
+for example. It is `p` for the first one, then `s` for the rest
+
+### Rebase
+
+Always rebase
+
+```
+git fetch upstream
+git rebase -i upstream/main
+```
+
+### Force push
+
+When you are done with your changes force push your branch
+
+```
+git push -f origin mywork
+```
+
+and then create a pull requests for it
+
+### Repeat
+
+Based on feedback keep making changes, squashing, rebasing and force pushing
