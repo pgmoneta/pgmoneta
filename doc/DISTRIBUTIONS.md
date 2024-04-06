@@ -3,6 +3,7 @@ Currently, primarily supported platforms covered in this tutorial are:
 1. Fedora (37, 38)
 2. Rocky (8.x, 9.x)
 3. RHEL (8.x, 9.x)
+4. FreeBSD 14
 
 ## Requirements
 `pgmoneta` requires:
@@ -84,6 +85,13 @@ Also verify the repos using
 dnf repolist
 ```
 Install required packages after the previous steps.
+
+On FreeBSD, `pkg` is used instead of `dnf` or `yum`. 
+
+Use `pkg install <package name>` to install the following packages
+```
+git gcc cmake libev openssl libssh zlib-ng zstd liblz4 bzip2 curl py39-docutils libarchive libcjson
+```
 
 ## Compile
 Compiling pgmoneta on different platforms is the same.
