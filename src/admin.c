@@ -478,6 +478,7 @@ is_valid_key(char* key)
 
    if (strlen(key) < 8)
    {
+      warnx("Master key must be at least 8 characters long");
       return false;
    }
 
@@ -488,6 +489,7 @@ is_valid_key(char* key)
       /* Only support ASCII for now */
       if ((unsigned char)c & 0x80)
       {
+         warnx("Master key cannot contain non-ASCII characters");
          return false;
       }
    }
