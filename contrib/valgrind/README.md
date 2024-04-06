@@ -8,9 +8,14 @@
 valgrind --leak-check=full --show-leak-kinds=all --log-file=%p.log --trace-children=yes --track-origins=yes --read-var-info=yes ./pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
 ```
 
-# Generate suppressions rules
+# Use suppressions rules
 
 ``` bash
 valgrind --suppressions=../../contrib/valgrind/pgmoneta.supp --leak-check=full --show-leak-kinds=all --log-file=%p.log --trace-children=yes --track-origins=yes --read-var-info=yes ./pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
 ```
 
+# Generate suppressions rules
+
+``` bash
+valgrind --gen-suppressions=all --leak-check=full --show-leak-kinds=all --log-file=%p.log --trace-children=yes --track-origins=yes --read-var-info=yes ./pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
+```
