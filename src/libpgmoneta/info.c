@@ -378,6 +378,10 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          {
             bck->version = atoi(&value[0]);
          }
+         else if (!strcmp(INFO_MINOR_VERSION, &key[0]))
+         {
+            bck->minor_version = atoi(&value[0]);
+         }
          else if (!strcmp(INFO_KEEP, &key[0]))
          {
             bck->keep = atoi(&value[0]) == 1 ? true : false;
