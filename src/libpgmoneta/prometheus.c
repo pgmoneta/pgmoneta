@@ -272,6 +272,9 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    <li>1 = Running</li>\n");
    data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_version</h2>\n");
+   data = pgmoneta_append(data, "  The version of pgmoneta\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention_days</h2>\n");
    data = pgmoneta_append(data, "  The retention of pgmoneta in days\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention_weeks</h2>\n");
@@ -949,7 +952,12 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "pgmoneta_state ");
    data = pgmoneta_append(data, "1");
    data = pgmoneta_append(data, "\n\n");
-
+   data = pgmoneta_append(data, "#HELP pgmoneta_version The version of pgmoneta\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_version gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_version{version=\"");
+   data = pgmoneta_append(data, VERSION);
+   data = pgmoneta_append(data, "\"} 1");
+   data = pgmoneta_append(data, "\n\n");   
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_days The retention days of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_days gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_days ");

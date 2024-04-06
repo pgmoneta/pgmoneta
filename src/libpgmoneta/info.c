@@ -61,6 +61,10 @@ pgmoneta_create_info(char* directory, char* label, int status)
    snprintf(&buffer[0], sizeof(buffer), "TABLESPACES=0\n");
    fputs(&buffer[0], sfile);
 
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "PGMONETA_VERSION=%s\n", VERSION);
+   fputs(&buffer[0], sfile);
+
    pgmoneta_permission(s, 6, 0, 0);
 
    if (sfile != NULL)
