@@ -50,8 +50,10 @@ extern "C" {
 #define INFO_RESTORE        "RESTORE"
 #define INFO_TABLESPACES    "TABLESPACES"
 #define INFO_START_WALPOS   "START_WALPOS"
+#define INFO_END_WALPOS     "END_WALPOS"
 #define INFO_CHKPT_WALPOS   "CHKPT_WALPOS"
 #define INFO_START_TIMELINE "START_TIMELINE"
+#define INFO_END_TIMELINE   "END_TIMELINE"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -75,9 +77,12 @@ struct backup
    char tablespaces[MAX_NUMBER_OF_TABLESPACES][MISC_LENGTH]; /**< The names of the tablespaces */
    uint32_t start_lsn_hi32;                                  /**< The high 32 bits of WAL starting position of the backup */
    uint32_t start_lsn_lo32;                                  /**< The low 32 bits of WAL starting position of the backup */
+   uint32_t end_lsn_hi32;                                    /**< The high 32 bits of WAL ending position of the backup */
+   uint32_t end_lsn_lo32;                                    /**< The low 32 bits of WAL ending position of the backup */
    uint32_t checkpoint_lsn_hi32;                             /**< The high 32 bits of WAL checkpoint position of the backup */
    uint32_t checkpoint_lsn_lo32;                             /**< The low 32 bits of WAL checkpoint position of the backup */
    uint32_t start_timeline;                                  /**< The starting timeline of the backup */
+   uint32_t end_timeline;                                    /**< The ending timeline of the backup */
 } __attribute__ ((aligned (64)));
 
 /**

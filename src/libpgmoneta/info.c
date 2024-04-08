@@ -399,6 +399,10 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          {
             sscanf(&value[0], "%X/%X", &bck->start_lsn_hi32, &bck->start_lsn_lo32);
          }
+         else if (pgmoneta_starts_with(&key[0], INFO_END_WALPOS))
+         {
+            sscanf(&value[0], "%X/%X", &bck->end_lsn_hi32, &bck->end_lsn_lo32);
+         }
          else if (pgmoneta_starts_with(&key[0], INFO_CHKPT_WALPOS))
          {
             sscanf(&value[0], "%X/%X", &bck->checkpoint_lsn_hi32, &bck->checkpoint_lsn_lo32);
@@ -406,6 +410,10 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          else if (pgmoneta_starts_with(&key[0], INFO_START_TIMELINE))
          {
             bck->start_timeline = atoi(&value[0]);
+         }
+         else if (pgmoneta_starts_with(&key[0], INFO_END_TIMELINE))
+         {
+            bck->end_timeline = atoi(&value[0]);
          }
       }
    }

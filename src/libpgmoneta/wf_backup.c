@@ -90,9 +90,11 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    char version[10];
    char minor_version[10];
    char* wal = NULL;
-   char* startpos = NULL;
+   char startpos[20];
+   char endpos[20];
    char* chkptpos = NULL;
    uint32_t start_timeline = 0;
+   uint32_t end_timeline = 0;
    char old_label_path[MAX_PATH];
    struct node* o_root = NULL;
    struct node* o_to = NULL;
@@ -201,13 +203,16 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
 
    pgmoneta_memory_stream_buffer_init(&buffer);
-   // Receive and ignore the first result set, it is for receiving wal
+   // Receive the first result set, which contains the WAL starting point
    if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
    {
       goto error;
    }
    else
    {
+      memset(startpos, 0, sizeof(startpos));
+      memcpy(startpos, response->tuples[0].data[0], sizeof(startpos));
+      start_timeline = atoi(response->tuples[0].data[1]);
       pgmoneta_free_query_response(response);
       response = NULL;
    }
@@ -237,6 +242,20 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
          goto error;
       }
+   }
+
+   // Receive the final result set, which contains the WAL ending point
+   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+   {
+      goto error;
+   }
+   else
+   {
+      memset(endpos, 0, sizeof(endpos));
+      memcpy(endpos, response->tuples[0].data[0], sizeof(endpos));
+      end_timeline = atoi(response->tuples[0].data[1]);
+      pgmoneta_free_query_response(response);
+      response = NULL;
    }
 
    // remove backup_label.old if it exists
@@ -272,7 +291,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    size = pgmoneta_directory_size(d);
    pgmoneta_read_wal(d, &wal);
-   pgmoneta_read_wal_info(d, &startpos, &chkptpos, &start_timeline);
+   pgmoneta_read_checkpoint_info(d, &chkptpos);
 
    if (pgmoneta_create_node_string(root, "root", &o_root))
    {
@@ -292,18 +311,14 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_update_info_string(root, INFO_VERSION, version);
    pgmoneta_update_info_string(root, INFO_MINOR_VERSION, minor_version);
    pgmoneta_update_info_bool(root, INFO_KEEP, false);
+   pgmoneta_update_info_string(root, INFO_START_WALPOS, startpos);
+   pgmoneta_update_info_string(root, INFO_END_WALPOS, endpos);
+   pgmoneta_update_info_unsigned_long(root, INFO_START_TIMELINE, start_timeline);
+   pgmoneta_update_info_unsigned_long(root, INFO_END_TIMELINE, end_timeline);
    // in case of parsing error
-   if (startpos != NULL)
-   {
-      pgmoneta_update_info_string(root, INFO_START_WALPOS, startpos);
-   }
    if (chkptpos != NULL)
    {
       pgmoneta_update_info_string(root, INFO_CHKPT_WALPOS, chkptpos);
-   }
-   if (start_timeline != 0)
-   {
-      pgmoneta_update_info_unsigned_long(root, INFO_START_TIMELINE, start_timeline);
    }
 
    current_tablespace = tablespaces;
