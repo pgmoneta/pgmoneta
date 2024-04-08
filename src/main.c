@@ -1652,7 +1652,7 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
          {
             follow = -1;
 
-            for (int j = 0; j == -1 && j < config->number_of_servers; j++)
+            for (int j = 0; follow == -1 && j < config->number_of_servers; j++)
             {
                if (!strcmp(config->servers[j].follow, config->servers[i].name))
                {
