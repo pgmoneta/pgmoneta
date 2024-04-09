@@ -50,6 +50,7 @@ unix_socket_dir = /tmp/
 host = localhost
 port = 5432
 user = repl
+wal_slot = repl
 ```
 
 In our main section called `[pgmoneta]` we setup `pgmoneta` to listen on all
@@ -62,7 +63,8 @@ PostgreSQL command line tools.
 
 Next we create a section called `[primary]` which has the information about our
 [PostgreSQL](https://www.postgresql.org) instance. In this case it is running
-on `localhost` on port `5432` and we will use the `repl` user account to connect.
+on `localhost` on port `5432` and we will use the `repl` user account to connect, and the
+Write+Ahead slot will be named `repl` as well.
 
 The `repl` user must have the `REPLICATION` role and have access to the `postgres` database,
 so for example
@@ -83,17 +85,11 @@ host    replication     repl           ::1/128                 scram-sha-256
 
 The authentication type should be based on `postgresql.conf`'s `password_encryption` value.
 
-Then, create a physical replication slot that can be used for Write-Ahead Log streaming,
+Then, create a physical replication slot that will be used for Write-Ahead Log streaming,
 like
 
 ```
 SELECT pg_create_physical_replication_slot('repl', true, false);
-```
-
-and add that to the `pgmoneta.conf` configuration under `[primary]`, as
-
-```
-wal_slot = repl
 ```
 
 We will need a user vault for the `repl` account, so the following commands will add
