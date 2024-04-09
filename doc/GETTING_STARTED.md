@@ -87,7 +87,7 @@ Optionally, create a physical replication slot that can be used for Write-Ahead 
 like
 
 ```
-SELECT pg_create_physical_replication_slot('repl');
+SELECT pg_create_physical_replication_slot('repl', true, false);
 ```
 
 and add that to the `pgmoneta.conf` configuration under `[primary]`, as
