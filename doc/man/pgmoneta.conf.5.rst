@@ -83,9 +83,6 @@ encryption
 create_slot
   Create a replication slot for all server. Valid values are: yes, no. Default is no
 
-create_slot_name
-  The name of the slot. Required if create_slot is yes
-
 ssh_hostname
   Defines the hostname of the remote system for connection
 
@@ -232,13 +229,10 @@ user
   The user name for the replication role. Mandatory
 
 wal_slot
-  The WAL slot
+  The WAL slot. Mandatory
 
 create_slot
   Create a replication slot for all server. Valid values are: yes, no. Default is no
-
-create_slot_name
-  The name of the slot. Required if create_slot is yes
 
 follow
   Failover to this server if follow server fails

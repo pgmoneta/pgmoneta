@@ -83,7 +83,7 @@ host    replication     repl           ::1/128                 scram-sha-256
 
 The authentication type should be based on `postgresql.conf`'s `password_encryption` value.
 
-Optionally, create a physical replication slot that can be used for Write-Ahead Log streaming,
+Then, create a physical replication slot that can be used for Write-Ahead Log streaming,
 like
 
 ```

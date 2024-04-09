@@ -209,7 +209,6 @@ struct server
    int retention_months;               /**< The retention months for the server */
    int retention_years;                /**< The retention years for the server */
    int create_slot;                    /**< Create a slot */
-   char create_slot_name[MISC_LENGTH]; /**< Name of the slot */
    atomic_bool backup;                 /**< Is there an active backup */
    atomic_bool delete;                 /**< Is there an active delete */
    atomic_bool wal;                    /**< Is there an active wal */
@@ -291,7 +290,6 @@ struct configuration
    int compression_level; /**< The compression level */
 
    int create_slot;                    /**< Create a slot */
-   char create_slot_name[MISC_LENGTH]; /**< Name of the slot */
 
    int storage_engine;  /**< The storage engine */
 

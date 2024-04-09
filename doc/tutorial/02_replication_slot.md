@@ -1,6 +1,6 @@
 # Replication slot for pgmoneta
 
-This tutorial will show you how to do use a replication slot for pgmoneta.
+This tutorial will show you how to add a replication slot for pgmoneta.
 
 ## Preface
 

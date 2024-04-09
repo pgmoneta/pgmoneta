@@ -358,37 +358,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "create_slot_name"))
-               {
-                  if (!strcmp(section, "pgmoneta"))
-                  {
-                     max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
-                     {
-                        max = MISC_LENGTH - 1;
-                     }
-                     memcpy(config->create_slot_name, value, max);
-                  }
-                  else if (strlen(section) > 0)
-                  {
-                     max = strlen(section);
-                     if (max > MISC_LENGTH - 1)
-                     {
-                        max = MISC_LENGTH - 1;
-                     }
-                     memcpy(&srv.name, section, max);
-                     max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
-                     {
-                        max = MISC_LENGTH - 1;
-                     }
-                     memcpy(&srv.create_slot_name, value, max);
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
                else if (!strcmp(key, "follow"))
                {
                   if (strlen(section) > 0)
@@ -1349,15 +1318,6 @@ pgmoneta_validate_configuration(void* shm)
       return 1;
    }
 
-   if (config->create_slot == CREATE_SLOT_YES)
-   {
-      if (strlen(config->create_slot_name) == 0)
-      {
-         pgmoneta_log_fatal("No create_slot_name defined");
-         return 1;
-      }
-   }
-
    if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
       if (config->compression_level < 1)
@@ -1442,7 +1402,8 @@ pgmoneta_validate_configuration(void* shm)
 
       if (strlen(config->servers[i].wal_slot) == 0)
       {
-         pgmoneta_log_info("No WAL slot defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No WAL slot defined for %s", config->servers[i].name);
+         return 1;
       }
 
       if (strlen(config->servers[i].follow) > 0)
@@ -1459,15 +1420,6 @@ pgmoneta_validate_configuration(void* shm)
          if (!found)
          {
             pgmoneta_log_fatal("Invalid follow value for %s", config->servers[i].name);
-            return 1;
-         }
-      }
-
-      if (config->servers[i].create_slot == CREATE_SLOT_YES)
-      {
-         if (strlen(config->create_slot_name) == 0 && strlen(config->servers[i].create_slot_name) == 0)
-         {
-            pgmoneta_log_fatal("No create_slot_name defined for %s", config->servers[i].name);
             return 1;
          }
       }
@@ -2953,7 +2905,6 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    restart_string("base_dir", config->base_dir, reload->base_dir);
 
    config->create_slot = reload->create_slot;
-   memcpy(config->create_slot_name, reload->create_slot_name, MISC_LENGTH);
 
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
@@ -3048,7 +2999,6 @@ copy_server(struct server* dst, struct server* src)
    dst->port = src->port;
    memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
    dst->create_slot = src->create_slot;
-   memcpy(&dst->create_slot_name[0], &src->create_slot_name[0], MISC_LENGTH);
    memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
    memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);

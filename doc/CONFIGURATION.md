@@ -35,7 +35,6 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure) |
 | encryption | none | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes \| aes-256 \| aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192 \| aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128 \| aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length |
 | create_slot | no | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
-| create_slot_name | | String | No | The name of the slot. Required if `create_slot` is yes or physical |
 | ssh_hostname | | String | Yes | Defines the hostname of the remote system for connection |
 | ssh_username | | String | Yes | Defines the username of the remote system for connection |
 | ssh_base_dir | | String | Yes | The base directory for the remote backup |
@@ -81,9 +80,8 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
-| wal_slot | | String | No | The replication slot for WAL |
+| wal_slot | | String | Yes | The replication slot for WAL |
 | create_slot | no | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
-| create_slot_name | | String | No | The name of the slot. Required if `create_slot` is yes or physical |
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | wal_shipping | | String | No | The WAL shipping directory |

@@ -1849,7 +1849,6 @@ init_replication_slots(void)
    SSL* ssl = NULL;
    int socket;
    int ret = 0;
-   char* create_slot_name = NULL;
    struct message* slot_request_msg = NULL;
    struct message* slot_response_msg = NULL;
    struct configuration* config = NULL;
@@ -1903,61 +1902,50 @@ init_replication_slots(void)
                goto server_done;
             }
 
-            if (strlen(config->servers[srv].wal_slot) > 0)
+            /* Verify replication slot */
+            slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, ssl, socket);
+            if (slot_status == VALID_SLOT)
             {
-               /* Verify replication slot */
-               slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, ssl, socket);
-               if (slot_status == VALID_SLOT)
+               /* Ok */
+            }
+            else if (!create_slot)
+            {
+               if (slot_status == SLOT_NOT_FOUND)
                {
-                  /* Ok */
+                  pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
+                  ret = 1;
                }
-               else if (!create_slot)
+               else if (slot_status == INCORRECT_SLOT_TYPE)
                {
-                  if (slot_status == SLOT_NOT_FOUND)
-                  {
-                     pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
-                     ret = 1;
-                  }
-                  else if (slot_status == INCORRECT_SLOT_TYPE)
-                  {
-                     pgmoneta_log_fatal("Replication slot '%s' should be physical", config->servers[srv].wal_slot);
-                     ret = 1;
-                  }
+                  pgmoneta_log_fatal("Replication slot '%s' should be physical", config->servers[srv].wal_slot);
+                  ret = 1;
                }
             }
          }
          else
          {
             pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
+            ret = 1;
          }
 
          pgmoneta_close_ssl(ssl);
          pgmoneta_disconnect(socket);
          socket = 0;
 
-         if (create_slot && slot_status == SLOT_NOT_FOUND && strlen(config->servers[srv].wal_slot) > 0)
+         if (create_slot && slot_status == SLOT_NOT_FOUND)
          {
             auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
 
             if (auth == AUTH_SUCCESS)
             {
-               if (strlen(config->servers[srv].create_slot_name) > 0)
-               {
-                  create_slot_name = config->servers[srv].create_slot_name;
-               }
-               else
-               {
-                  create_slot_name = config->create_slot_name;
-               }
+               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, config->servers[srv].wal_slot);
 
-               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, create_slot_name);
-
-               pgmoneta_create_replication_slot_message(create_slot_name, &slot_request_msg, config->servers[srv].version);
+               pgmoneta_create_replication_slot_message(config->servers[srv].wal_slot, &slot_request_msg, config->servers[srv].version);
                if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
                {
                   if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                   {
-                     pgmoneta_log_info("Created replication slot %s on %s", create_slot_name, config->servers[srv].name);
+                     pgmoneta_log_info("Created replication slot %s on %s", config->servers[srv].wal_slot, config->servers[srv].name);
                   }
                   else
                   {

@@ -563,26 +563,15 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
       snprintf(&line[0], sizeof(line), "#\n");
       fputs(&line[0], tfile);
 
-      if (strlen(config->servers[server].wal_slot) == 0)
-      {
-         memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "primary_conninfo = \'host=%s port=%d user=%s password=%s\'\n",
-                  config->servers[server].host, config->servers[server].port, config->servers[server].username,
-                  get_user_password(config->servers[server].username));
-         fputs(&line[0], tfile);
-      }
-      else
-      {
-         memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "primary_conninfo = \'host=%s port=%d user=%s password=%s application_name=%s\'\n",
-                  config->servers[server].host, config->servers[server].port, config->servers[server].username,
-                  get_user_password(config->servers[server].username), config->servers[server].wal_slot);
-         fputs(&line[0], tfile);
+      memset(&line[0], 0, sizeof(line));
+      snprintf(&line[0], sizeof(line), "primary_conninfo = \'host=%s port=%d user=%s password=%s application_name=%s\'\n",
+               config->servers[server].host, config->servers[server].port, config->servers[server].username,
+               get_user_password(config->servers[server].username), config->servers[server].wal_slot);
+      fputs(&line[0], tfile);
 
-         memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->servers[server].wal_slot);
-         fputs(&line[0], tfile);
-      }
+      memset(&line[0], 0, sizeof(line));
+      snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->servers[server].wal_slot);
+      fputs(&line[0], tfile);
 
       ptr = strtok(&tokens[0], ",");
 
