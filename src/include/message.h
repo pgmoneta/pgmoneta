@@ -376,10 +376,11 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
  * Create a replication slot
  * @param create_slot_name The name of the slot
  * @param msg The resulting message
+ * @param version The server version
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_replication_slot_message(char* create_slot_name, struct message** msg);
+pgmoneta_create_replication_slot_message(char* create_slot_name, struct message** msg, int version);
 
 /**
  * Create a message to search if a replication slot exists

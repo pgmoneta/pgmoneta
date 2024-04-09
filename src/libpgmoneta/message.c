@@ -950,7 +950,7 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
 }
 
 int
-pgmoneta_create_replication_slot_message(char* create_slot_name, struct message** msg)
+pgmoneta_create_replication_slot_message(char* create_slot_name, struct message** msg, int version)
 {
    char cmd[1024];
    struct message* m = NULL;
@@ -958,7 +958,14 @@ pgmoneta_create_replication_slot_message(char* create_slot_name, struct message*
 
    memset(&cmd[0], 0, sizeof(cmd));
 
-   snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL RESERVE_WAL;", create_slot_name);
+   if (version >= 15)
+   {
+      snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL (RESERVE_WAL true);", create_slot_name);
+   }
+   else
+   {
+      snprintf(cmd, sizeof(cmd), "CREATE_REPLICATION_SLOT %s PHYSICAL RESERVE_WAL;", create_slot_name);
+   }
 
    size = 1 + 4 + strlen(cmd) + 1;
 

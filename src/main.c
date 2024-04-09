@@ -1952,7 +1952,7 @@ init_replication_slots(void)
 
                pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, create_slot_name);
 
-               pgmoneta_create_replication_slot_message(create_slot_name, &slot_request_msg);
+               pgmoneta_create_replication_slot_message(create_slot_name, &slot_request_msg, config->servers[srv].version);
                if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
                {
                   if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
