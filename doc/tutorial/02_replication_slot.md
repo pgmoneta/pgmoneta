@@ -13,9 +13,11 @@ for more detail.
 
 ```
 psql postgres
-SELECT pg_create_physical_replication_slot('repl');
+SELECT pg_create_physical_replication_slot('repl', true, false);
 \q
 ```
+Note, it is highly recommended to set `immediately_reserve` to true, 
+so that the replication slot keeps the WAL segments on creation.
 
 (`postgres` user)
 
