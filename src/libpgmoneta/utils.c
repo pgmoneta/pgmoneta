@@ -1606,6 +1606,10 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
                      pgmoneta_copy_file(from_buffer, to_buffer, workers);
                   }
                }
+               else
+               {
+                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+               }
             }
          }
 
@@ -1622,20 +1626,26 @@ pgmoneta_copy_postgresql(char* from, char* to, char* base, char* server, char* i
       goto error;
    }
 
-   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   if (restore_last_files_names != NULL)
    {
-      free(restore_last_files_names[i]);
+      for (int i = 0; restore_last_files_names[i] != NULL; i++)
+      {
+         free(restore_last_files_names[i]);
+      }
+      free(restore_last_files_names);
    }
-   free(restore_last_files_names);
 
    return 0;
 
 error:
-   for (int i = 0; restore_last_files_names[i] != NULL; i++)
+   if (restore_last_files_names != NULL)
    {
-      free(restore_last_files_names[i]);
+      for (int i = 0; restore_last_files_names[i] != NULL; i++)
+      {
+         free(restore_last_files_names[i]);
+      }
+      free(restore_last_files_names);
    }
-   free(restore_last_files_names);
 
    return 1;
 }
