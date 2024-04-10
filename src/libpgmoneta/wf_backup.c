@@ -211,7 +211,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    else
    {
       memset(startpos, 0, sizeof(startpos));
-      memcpy(startpos, response->tuples[0].data[0], sizeof(startpos));
+      memcpy(startpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
       start_timeline = atoi(response->tuples[0].data[1]);
       pgmoneta_free_query_response(response);
       response = NULL;
@@ -252,7 +252,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    else
    {
       memset(endpos, 0, sizeof(endpos));
-      memcpy(endpos, response->tuples[0].data[0], sizeof(endpos));
+      memcpy(endpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
       end_timeline = atoi(response->tuples[0].data[1]);
       pgmoneta_free_query_response(response);
       response = NULL;
