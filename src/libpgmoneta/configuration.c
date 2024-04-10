@@ -1259,8 +1259,19 @@ pgmoneta_validate_configuration(void* shm)
    }
    else
    {
-      pgmoneta_log_fatal("base_dir is not a directory (%s)", config->base_dir);
-      return 1;
+      if (!pgmoneta_exists(config->base_dir))
+      {
+         if (pgmoneta_mkdir(config->base_dir))
+         {
+            pgmoneta_log_fatal("Can not create %s", config->base_dir);
+            return 1;
+         }
+      }
+      else
+      {
+         pgmoneta_log_fatal("base_dir is not a directory (%s)", config->base_dir);
+         return 1;
+      }
    }
 
    if (config->retention_years != -1 && config->retention_years < 1)
