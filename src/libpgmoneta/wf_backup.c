@@ -346,6 +346,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_free_copy_message(tablespace_msg);
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
+   free(chkptpos);
    free(root);
    free(label);
    free(d);
@@ -365,6 +366,7 @@ error:
    pgmoneta_free_copy_message(basebackup_msg);
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
+   free(chkptpos);
    free(root);
    free(label);
    free(d);
