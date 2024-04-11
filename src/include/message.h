@@ -361,7 +361,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  * @param server_version The version of the PostgreSQL server to backup
  * @param label The label of the backup
  * @param include_wal The indication of whether to also include WAL
- * @param checksum_algorithm The checksum algorithm to be applied to backup manifest (only work for server version > 12)
+ * @param checksum_algorithm The checksum algorithm to be applied to backup manifest
  * @param compression The compression type
  * @param compression_level The compression level
  * @param msg The resulting message

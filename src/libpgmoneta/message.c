@@ -912,14 +912,11 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
          options = pgmoneta_append(options, "NOWAIT ");
       }
 
-      if (server_version > 12)
-      {
-         options = pgmoneta_append(options, "MANIFEST 'yes' ");
+      options = pgmoneta_append(options, "MANIFEST 'yes' ");
 
-         options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
-         options = pgmoneta_append(options, checksum_algorithm);
-         options = pgmoneta_append(options, "' ");
-      }
+      options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
+      options = pgmoneta_append(options, checksum_algorithm);
+      options = pgmoneta_append(options, "' ");
 
       snprintf(cmd, sizeof(cmd), "BASE_BACKUP %s;", options);
    }
