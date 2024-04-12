@@ -130,6 +130,7 @@ pgmoneta_init_configuration(void* shm)
    atomic_init(&config->log_lock, STATE_FREE);
 
    config->backup_max_rate = 0;
+   config->network_max_rate = 0;
 
    return 0;
 }
@@ -215,6 +216,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   memset(srv.wal_shipping, 0, MAX_PATH);
                   srv.workers = -1;
                   srv.backup_max_rate = -1;
+                  srv.network_max_rate = -1;
 
                   idx_server++;
                }
@@ -1196,6 +1198,33 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "network_max_rate"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->network_max_rate))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     if (as_int(value, &srv.network_max_rate))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else
                {
                   unknown = true;
@@ -1469,6 +1498,16 @@ pgmoneta_validate_configuration(void* shm)
       if (config->servers[i].workers < -1)
       {
          config->servers[i].workers = -1;
+      }
+
+      if (config->servers[i].backup_max_rate < -1)
+      {
+         config->servers[i].backup_max_rate = -1;
+      }
+
+      if (config->servers[i].network_max_rate < -1)
+      {
+         config->servers[i].network_max_rate = -1;
       }
    }
 
@@ -2984,6 +3023,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
 
    config->workers = reload->workers;
    config->backup_max_rate = reload->backup_max_rate;
+   config->network_max_rate = reload->network_max_rate;
 
    /* prometheus */
 
@@ -3019,6 +3059,7 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH);
    dst->workers = src->workers;
    dst->backup_max_rate = src->backup_max_rate;
+   dst->network_max_rate = src->network_max_rate;
 }
 
 static void

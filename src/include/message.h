@@ -486,10 +486,11 @@ pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer,
  * @param socket The socket
  * @param buffer The stream buffer
  * @param message The message buffer
+ * @param network_bucket The network rate limit bucket
  * @return 1 upon success, 0 if no data to consume, otherwise 2
  */
 int
-pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message);
+pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message, struct token_bucket* network_bucket);
 
 /**
  * Finish consuming the buffer, prepare for the next message to be consumed
@@ -520,10 +521,11 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
  * @param tablespaces The user level tablespaces
  * @param version The server version
  * @param bucket The rate limit bucket
+ * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket);
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 /**
  * Receive backup tar files from the copy stream and write to disk
@@ -534,10 +536,11 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
  * @param basedir The base directory for the backup data
  * @param tablespaces The user level tablespaces
  * @param bucket The rate limit bucket
+ * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket);
+pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 /**
  * Receive mainfest file from the copy stream and write to disk
@@ -547,10 +550,11 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
  * @param buffer The stream buffer
  * @param basedir The base directory for the manifest
  * @param bucket The rate limit bucket
+ * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket);
+pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 #ifdef __cplusplus
 }

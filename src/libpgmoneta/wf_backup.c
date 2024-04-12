@@ -98,6 +98,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    uint32_t end_timeline = 0;
    char old_label_path[MAX_PATH];
    int backup_max_rate;
+   int network_max_rate;
    struct node* o_root = NULL;
    struct node* o_to = NULL;
    struct configuration* config;
@@ -109,6 +110,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    struct tablespace* current_tablespace = NULL;
    struct tuple* tup = NULL;
    struct token_bucket* bucket = NULL;
+   struct token_bucket* network_bucket = NULL;
 
    start_time = time(NULL);
 
@@ -127,6 +129,16 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       }
    }
 
+   network_max_rate = pgmoneta_get_network_max_rate(server);
+   if (network_max_rate)
+   {
+      bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+      if (pgmoneta_token_bucket_init(bucket, network_max_rate))
+      {
+         pgmoneta_log_error("failed to initialize the network token bucket for backup.\n");
+         goto error;
+      }
+   }
    usr = -1;
    // find the corresponding user's index of the given server
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -225,7 +237,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_mkdir(root);
    if (config->servers[server].version < 15)
    {
-      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, config->servers[server].version, bucket))
+      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, config->servers[server].version, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -236,7 +248,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    else
    {
-      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, root, tablespaces, bucket))
+      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, root, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -348,6 +360,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_free_copy_message(tablespace_msg);
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
+   pgmoneta_token_bucket_destroy(network_bucket);
    free(chkptpos);
    free(root);
    free(label);
@@ -368,6 +381,7 @@ error:
    pgmoneta_free_copy_message(basebackup_msg);
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
+   pgmoneta_token_bucket_destroy(network_bucket);
    free(chkptpos);
    free(root);
    free(label);

@@ -672,3 +672,18 @@ bind_host(const char* hostname, int port, int** fds, int* length)
 
    return 0;
 }
+
+int
+pgmoneta_get_network_max_rate(int server)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (config->servers[server].network_max_rate != -1)
+   {
+      return config->servers[server].network_max_rate;
+   }
+
+   return config->network_max_rate;
+}

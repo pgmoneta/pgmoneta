@@ -211,7 +211,7 @@ pgmoneta_wal(int srv, char** argv)
 
       while (config->running && (msg == NULL || type != 'W'))
       {
-         ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
+         ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
          if (ret != 1)
          {
             pgmoneta_log_error("Error occurred when starting stream replication");
@@ -232,7 +232,7 @@ pgmoneta_wal(int srv, char** argv)
       // start streaming current timeline's WAL segments
       while (config->running)
       {
-         ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
+         ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
          if (ret == 0)
          {
             break;
@@ -436,7 +436,7 @@ pgmoneta_wal(int srv, char** argv)
       msg->kind = '\0';
       while (config->running && msg->kind != 'C')
       {
-         pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg);
+         pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
          pgmoneta_consume_copy_stream_end(buffer, msg);
       }
 
