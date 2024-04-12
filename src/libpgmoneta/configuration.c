@@ -56,7 +56,6 @@
 
 static void extract_key_value(char* str, char** key, char** value);
 static int as_int(char* str, int* i);
-static int as_ulong(char* str, unsigned long* ul);
 static int as_bool(char* str, bool* b);
 static int as_logging_type(char* str);
 static int as_logging_level(char* str);
@@ -215,6 +214,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   srv.cur_timeline = 1; // by default current timeline is 1
                   memset(srv.wal_shipping, 0, MAX_PATH);
                   srv.workers = -1;
+                  srv.backup_max_rate = -1;
 
                   idx_server++;
                }
@@ -1173,7 +1173,20 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_ulong(value, &config->backup_max_rate))
+                     if (as_int(value, &config->backup_max_rate))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     if (as_int(value, &srv.backup_max_rate))
                      {
                         unknown = true;
                      }
@@ -2056,46 +2069,6 @@ as_int(char* str, int* i)
    }
 
    *i = (int)val;
-
-   return 0;
-
-error:
-
-   errno = 0;
-
-   return 1;
-}
-
-static int
-as_ulong(char* str, unsigned long* ul)
-{
-   char* endptr;
-   long val;
-
-   errno = 0;
-   val = strtol(str, &endptr, 10);
-
-   if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) || (errno != 0 && val == 0))
-   {
-      goto error;
-   }
-
-   if (str == endptr)
-   {
-      goto error;
-   }
-
-   if (*endptr != '\0')
-   {
-      goto error;
-   }
-
-   if (val < 0)
-   {
-      goto error;
-   }
-
-   *ul = (unsigned long)val;
 
    return 0;
 
@@ -3010,6 +2983,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->number_of_admins = reload->number_of_admins;
 
    config->workers = reload->workers;
+   config->backup_max_rate = reload->backup_max_rate;
 
    /* prometheus */
 
@@ -3044,6 +3018,7 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH);
    memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH);
    dst->workers = src->workers;
+   dst->backup_max_rate = src->backup_max_rate;
 }
 
 static void

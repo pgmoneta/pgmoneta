@@ -228,6 +228,8 @@ struct server
    char tls_key_file[MISC_LENGTH];    /**< TLS key path */
    char tls_ca_file[MISC_LENGTH];     /**< TLS CA certificate path */
    int workers;                       /**< The number of workers */
+   int backup_max_rate;     /**< Number of tokens added to the bucket with each replenishment for backup. */
+
 } __attribute__ ((aligned (64)));
 
 /** @struct
@@ -354,7 +356,7 @@ struct configuration
    int number_of_users;          /**< The number of users */
    int number_of_admins;         /**< The number of admins */
 
-   unsigned long backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
+   int backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
 
    struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
    struct user users[NUMBER_OF_USERS];             /**< The users */

@@ -3164,9 +3164,9 @@ parse_command(int argc,
 }
 
 int
-pgmoneta_token_bucket_init(struct token_bucket* tb, unsigned long max_rate)
+pgmoneta_token_bucket_init(struct token_bucket* tb, long max_rate)
 {
-   if (tb != NULL)
+   if (tb != NULL && max_rate > 0)
    {
       if (max_rate > DEFAULT_BURST)
       {
@@ -3182,6 +3182,7 @@ pgmoneta_token_bucket_init(struct token_bucket* tb, unsigned long max_rate)
       atomic_init(&tb->last_time, (unsigned long)time(NULL));
       return 0;
    }
+
    return 1;
 }
 

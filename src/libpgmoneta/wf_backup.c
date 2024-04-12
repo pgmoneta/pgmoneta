@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <backup.h>
 #include <info.h>
 #include <logging.h>
 #include <memory.h>
@@ -96,6 +97,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    uint32_t start_timeline = 0;
    uint32_t end_timeline = 0;
    char old_label_path[MAX_PATH];
+   int backup_max_rate;
    struct node* o_root = NULL;
    struct node* o_to = NULL;
    struct configuration* config;
@@ -114,11 +116,11 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
    config = (struct configuration*)shmem;
 
-   // default is 0
-   if (config->backup_max_rate)
+   backup_max_rate = pgmoneta_get_backup_max_rate(server);
+   if (backup_max_rate)
    {
       bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
-      if (pgmoneta_token_bucket_init(bucket, config->backup_max_rate))
+      if (pgmoneta_token_bucket_init(bucket, backup_max_rate))
       {
          pgmoneta_log_error("failed to initialize the token bucket for backup.\n");
          goto error;

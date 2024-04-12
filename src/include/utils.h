@@ -924,7 +924,7 @@ struct token_bucket
 {
    unsigned long burst; /**< default value is 0, no limit */
    atomic_ulong cur_tokens;
-   unsigned long max_rate;
+   long max_rate;
    int every;
    atomic_ulong last_time;
 };
@@ -936,7 +936,7 @@ struct token_bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_token_bucket_init(struct token_bucket* tb, unsigned long max_rate);
+pgmoneta_token_bucket_init(struct token_bucket* tb, long max_rate);
 
 /**
  * Free the memory of the token bucket

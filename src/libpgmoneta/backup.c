@@ -179,3 +179,18 @@ error:
 
    exit(1);
 }
+
+int
+pgmoneta_get_backup_max_rate(int server)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (config->servers[server].backup_max_rate != -1)
+   {
+      return config->servers[server].backup_max_rate;
+   }
+
+   return config->backup_max_rate;
+}

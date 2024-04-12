@@ -45,6 +45,14 @@ extern "C" {
 void
 pgmoneta_backup(int client_fd, int server, char** argv);
 
+/**
+ * Get the backup max rate for a server
+ * @param server The server
+ * @return The backup max rate
+ */
+int
+pgmoneta_get_backup_max_rate(int server);
+
 #ifdef __cplusplus
 }
 #endif
