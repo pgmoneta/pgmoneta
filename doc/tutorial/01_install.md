@@ -162,6 +162,7 @@ cat > pgmoneta.conf
 [pgmoneta]
 host = *
 metrics = 5001
+create_slot = yes
 
 base_dir = /home/pgmoneta/backup
 
@@ -181,6 +182,7 @@ unix_socket_dir = /tmp/
 host = localhost
 port = 5432
 user = repl
+wal_slot = repl
 ```
 
 and press `Ctrl-D`

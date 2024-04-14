@@ -66,6 +66,7 @@ If you see an error saying `pgmoneta: pgmoneta: Configuration not found: /etc/pg
     [pgmoneta]
     host = *
     metrics = 5001
+    create_slot = yes
 
     base_dir = /home/pgmoneta
 
@@ -85,6 +86,7 @@ If you see an error saying `pgmoneta: pgmoneta: Configuration not found: /etc/pg
     host = localhost
     port = 5432
     user = repl
+    wal_slot = repl
 
 In our main section called `[pgmoneta]` we setup `pgmoneta` to listen on all network addresses. We will enable Prometheus metrics on port 5001 and have the backups live in the `/home/pgmoneta` directory. All backups are being compressed with zstd and kept for 7 days. Logging will be performed at `info` level and put in a file called `/tmp/pgmoneta.log`. Last we specify the location of the `unix_socket_dir` used for management operations and the path for the PostgreSQL command line tools.
 

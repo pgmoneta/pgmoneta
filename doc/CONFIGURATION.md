@@ -82,7 +82,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
 | wal_slot | | String | Yes | The replication slot for WAL |
-| create_slot | no | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
+| create_slot | no | Bool | No | Create a replication slot for this server. Valid values are: yes, no |
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | wal_shipping | | String | No | The WAL shipping directory |
