@@ -598,7 +598,15 @@ bool
 pgmoneta_exists(char* f);
 
 /**
- * Check for file
+ * Is the path a directory
+ * @param directory The directory
+ * @return The result
+ */
+bool
+pgmoneta_is_directory(char* directory);
+
+/**
+ * Is the path a file
  * @param file The file
  * @return The result
  */

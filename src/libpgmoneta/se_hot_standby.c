@@ -135,7 +135,9 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
          pgmoneta_workers_wait(workers);
       }
 
-      if (strlen(config->servers[server].hot_standby_overrides) > 0)
+      if (strlen(config->servers[server].hot_standby_overrides) > 0 &&
+          pgmoneta_exists(config->servers[server].hot_standby_overrides) &&
+          pgmoneta_is_directory(config->servers[server].hot_standby_overrides))
       {
          pgmoneta_log_trace("hot_standby_overrides source:      %s", config->servers[server].hot_standby_overrides);
          pgmoneta_log_trace("hot_standby_overrides destination: %s", destination);

@@ -2061,6 +2061,24 @@ pgmoneta_exists(char* f)
 }
 
 bool
+pgmoneta_is_directory(char* directory)
+{
+   struct stat statbuf;
+
+   memset(&statbuf, 0, sizeof(struct stat));
+
+   if (!lstat(directory, &statbuf))
+   {
+      if (S_ISDIR(statbuf.st_mode))
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
+bool
 pgmoneta_is_file(char* file)
 {
    struct stat statbuf;
