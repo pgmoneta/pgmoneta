@@ -106,7 +106,7 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
       source = pgmoneta_append(source, identifier);
       source = pgmoneta_append_char(source, '/');
       
-      source = pgmoneta_append(source, "data/");
+      source = pgmoneta_append(source, "data");
 
       root = pgmoneta_append(root, config->servers[server].hot_standby);
       if (!pgmoneta_ends_with(root, "/"))
@@ -116,10 +116,6 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
       destination = pgmoneta_append(destination, root);
       destination = pgmoneta_append(destination, config->servers[server].name);
-      if (!pgmoneta_ends_with(destination, "/"))
-      {
-         destination = pgmoneta_append_char(destination, '/');
-      }
 
       if (pgmoneta_exists(destination))
       {
@@ -133,6 +129,22 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
       pgmoneta_log_trace("hot_standby source:      %s", source);
       pgmoneta_log_trace("hot_standby destination: %s", destination);
+
+      if (number_of_workers > 0)
+      {
+         pgmoneta_workers_wait(workers);
+      }
+
+      if (strlen(config->servers[server].hot_standby_overrides) > 0)
+      {
+         pgmoneta_log_trace("hot_standby_overrides source:      %s", config->servers[server].hot_standby_overrides);
+         pgmoneta_log_trace("hot_standby_overrides destination: %s", destination);
+
+         pgmoneta_copy_directory(config->servers[server].hot_standby_overrides,
+                                 destination,
+                                 NULL,
+                                 workers);
+      }
 
       if (number_of_workers > 0)
       {

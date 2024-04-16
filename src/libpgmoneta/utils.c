@@ -1920,15 +1920,19 @@ copy_file(void* arg)
    fi = (struct worker_input*)arg;
 
    fd_from = open(fi->from, O_RDONLY);
+
    if (fd_from < 0)
    {
       goto error;
    }
+
    if (get_permissions(fi->from, &permissions))
    {
       goto error;
    }
-   fd_to = open(fi->to, O_WRONLY | O_CREAT | O_EXCL, permissions);
+
+   fd_to = open(fi->to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
+
    if (fd_to < 0)
    {
       goto error;

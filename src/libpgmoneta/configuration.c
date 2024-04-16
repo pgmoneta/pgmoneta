@@ -428,6 +428,24 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      memcpy(&srv.hot_standby, value, max);
                   }
                }
+               else if (!strcmp(key, "hot_standby_overrides"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(&srv.hot_standby_overrides, value, max);
+                  }
+               }
                else if (!strcmp(key, "metrics"))
                {
                   if (!strcmp(section, "pgmoneta"))
