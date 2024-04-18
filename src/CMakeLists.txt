@@ -3,8 +3,11 @@
 #
 FILE(GLOB SOURCE_FILES "libpgmoneta/*.c")
 FILE(GLOB HEADER_FILES "include/*.h")
+FILE(GLOB UMDS "../doc/manual/user-??-*.en.md")
+FILE(GLOB DMDS "../doc/manual/dev-??-*.en.md")
 
 set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
+set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
 
 #
 # OS
@@ -309,3 +312,37 @@ endif()
 target_link_libraries(pgmoneta-admin-bin pgmoneta)
 
 install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+#
+# Generate manual
+#
+add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf -s -f markdown-smart --toc ${UMDS}
+    DEPENDS ${UMDS}
+    COMMENT "Generating User Guide PDF documentation"
+)
+add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf -s -f markdown-smart --toc ${DMDS}
+    DEPENDS ${DMDS}
+    COMMENT "Generating Developer Guide PDF documentation"
+)
+
+add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html -s -f markdown-smart --toc -t html5 ${UMDS}
+    DEPENDS ${UMDS}
+    COMMENT "Generating User Guide HTML documentation"
+)
+add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html -s -f markdown-smart --toc -t html5 ${DMDS}
+    DEPENDS ${DMDS}
+    COMMENT "Generating Developer Guide HTML documentation"
+)
+
+add_custom_target(
+    all_docs ALL
+    DEPENDS ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html
+)

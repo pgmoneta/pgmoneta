@@ -57,6 +57,38 @@ if(NOT COMPILER_SUPPORTS_C17)
   message(FATAL_ERROR "The compiler ${CMAKE_C_COMPILER} has no C17 support. Please use a different C compiler.")
 endif()
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    # Homebrew ships libarchive keg only, include dirs have to be set manually
+    execute_process(
+      COMMAND brew --prefix libarchive
+      OUTPUT_VARIABLE LIBARCHIVE_PREFIX
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      COMMAND_ERROR_IS_FATAL ANY
+    )
+    set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
+
+    execute_process(
+        COMMAND brew --prefix pandoc
+        OUTPUT_VARIABLE PANDOC_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+endif()
+
+find_package(Pandoc)
+if (PANDOC_FOUND)
+  message(STATUS "pandoc found")
+else ()
+  message(FATAL_ERROR "pandoc needed")
+endif()
+
+find_package(Pdflatex)
+if (PDFLATEX_FOUND)
+  message(STATUS "pdflatex found")
+else ()
+  message(FATAL_ERROR "pdflatex needed")
+endif()
+
 find_package(ZLIB)
 if (ZLIB_FOUND)
   message(STATUS "zlib found")
@@ -97,17 +129,6 @@ if (OPENSSL_FOUND)
   message(STATUS "OpenSSL found")
 else ()
   message(FATAL_ERROR "OpenSSL needed")
-endif()
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    # Homebrew ships libarchive keg only, include dirs have to be set manually
-    execute_process(
-        COMMAND brew --prefix libarchive
-        OUTPUT_VARIABLE LIBARCHIVE_PREFIX
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        COMMAND_ERROR_IS_FATAL ANY
-    )
-    set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
 endif()
 
 find_package(LibArchive)

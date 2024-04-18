@@ -7,7 +7,7 @@ URL:           https://github.com/pgmoneta/pgmoneta
 Source0:       https://github.com/pgmoneta/pgmoneta/archive/%{version}.tar.gz
 
 BuildRequires: gcc cmake make python3-docutils zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel bzip2 bzip2-devel
-BuildRequires: libev libev-devel openssl openssl-devel systemd systemd-devel libssh libssh-devel libarchive libarchive-devel cjson cjson-devel
+BuildRequires: libev libev-devel openssl openssl-devel systemd systemd-devel libssh libssh-devel libarchive libarchive-devel cjson cjson-devel pandoc texlive-latex
 Requires:      libev openssl systemd zlib libzstd lz4 bzip2 libssh libarchive cjson
 
 %description
@@ -31,6 +31,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/etc
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/shell_comp
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/tutorial
+%{__mkdir} -p %{buildroot}%{_docdir}/%{name}/manual
 %{__mkdir} -p %{buildroot}%{_mandir}/man1
 %{__mkdir} -p %{buildroot}%{_mandir}/man5
 %{__mkdir} -p %{buildroot}%{_sysconfdir}/pgmoneta
@@ -69,6 +70,8 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/10_grafana.md %{buildroot}%{_docdir}/%{name}/tutorial/10_grafana.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/11_wal_shipping.md %{buildroot}%{_docdir}/%{name}/tutorial/11_wal_shipping.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/12_tls.md %{buildroot}%{_docdir}/%{name}/tutorial/12_tls.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-manual.en.pdf %{buildroot}%{_docdir}/%{name}/manual/pgmoneta-manual.en.pdf
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-manual.en.html %{buildroot}%{_docdir}/%{name}/manual/pgmoneta-manual.en.html
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
@@ -120,6 +123,8 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/tutorial/10_grafana.md
 %{_docdir}/%{name}/tutorial/11_wal_shipping.md
 %{_docdir}/%{name}/tutorial/12_tls.md
+%{_docdir}/%{name}/manual/pgmoneta-manual.en.pdf
+%{_docdir}/%{name}/manual/pgmoneta-manual.en.html
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
