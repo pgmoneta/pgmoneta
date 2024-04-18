@@ -294,7 +294,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "      <tr>\n");
    data = pgmoneta_append(data, "        <td>parameter</td>\n");
-   data = pgmoneta_append(data, "        <td>days|weeks|months|years/td>\n");
+   data = pgmoneta_append(data, "        <td>days|weeks|months|years</td>\n");
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
