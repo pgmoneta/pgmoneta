@@ -37,6 +37,10 @@ jobs:
       run: sudo apt install -y clang
     - name: Install cJSON
       run: sudo apt install -y libcjson-dev
+    - name: Install pandoc
+      run: sudo apt install pandoc
+    - name: Install pdflatex
+      run: sudo apt install texlive-latex-extra
     - name: GCC/mkdir
       run: mkdir build
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
@@ -148,6 +152,24 @@ jobs:
       run: brew install llvm
     - name: Install cJSON
       run: brew install cjson
+    - name: Install pandoc
+      run: brew install pandoc
+    - name: Install pdflatex
+      run: brew install --cask basictex
+    - name: Refresh env
+      run: eval "$(/usr/libexec/path_helper)"
+    - name: Locate pdflatex and update PATH
+      run: |
+        PDFLATEX_PATH=$(find /usr/local/texlive -name pdflatex -print -quit)
+        if [ -n "$PDFLATEX_PATH" ]; then
+          PDFLATEX_DIR=$(dirname "$PDFLATEX_PATH")
+          echo "PDFLATEX_DIR=$PDFLATEX_DIR" >> $GITHUB_ENV
+          echo "PATH=$PDFLATEX_DIR:$PATH" >> $GITHUB_ENV
+        else
+          echo "pdflatex could not be found"
+          exit 1
+        fi
+      shell: bash
     - name: Install PostgreSQL
       run: brew install postgresql
     - name: Install libssh
