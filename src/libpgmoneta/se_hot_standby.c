@@ -30,6 +30,8 @@
 #include <pgmoneta.h>
 #include <hot_standby.h>
 #include <logging.h>
+#include <manifest.h>
+#include <node.h>
 #include <utils.h>
 #include <workers.h>
 
@@ -67,6 +69,8 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    char* root = NULL;
    char* source = NULL;
    char* destination = NULL;
+   char* old_manifest = NULL;
+   char* new_manifest = NULL;
    time_t start_time;
    int total_seconds;
    int hours;
@@ -74,6 +78,13 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    int seconds;
    char elapsed[128];
    int number_of_workers = 0;
+   char* f = NULL;
+   char* from = NULL;
+   char* to = NULL;
+   struct node* deleted_files = NULL;
+   struct node* changed_files = NULL;
+   struct node* new_files = NULL;
+   struct node* n = NULL;
    struct workers* workers = NULL;
    struct configuration* config;
 
@@ -119,13 +130,111 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
       if (pgmoneta_exists(destination))
       {
-         pgmoneta_delete_directory(destination);
+         old_manifest = pgmoneta_append(old_manifest, destination);
+         if (!pgmoneta_ends_with(old_manifest, "/"))
+         {
+            old_manifest = pgmoneta_append_char(old_manifest, '/');
+         }
+         old_manifest = pgmoneta_append(old_manifest, "backup_manifest");
+
+         new_manifest = pgmoneta_append(new_manifest, source);
+         if (!pgmoneta_ends_with(new_manifest, "/"))
+         {
+            new_manifest = pgmoneta_append_char(new_manifest, '/');
+         }
+         new_manifest = pgmoneta_append(new_manifest, "backup_manifest");
+
+         pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &new_files);
+
+         n = deleted_files;
+         while (n != NULL)
+         {
+            f = pgmoneta_append(f, destination);
+            if (!pgmoneta_ends_with(f, "/"))
+            {
+               f = pgmoneta_append_char(f, '/');
+            }
+            f = pgmoneta_append(f, (char*)n->data);
+
+            if (pgmoneta_exists(f))
+            {
+               pgmoneta_log_trace("hot_standby delete: %s", f);
+               pgmoneta_delete_file(f);
+            }
+
+            free(f);
+            f = NULL;
+
+            n = n->next;
+         }
+
+         n = changed_files;
+         while (n != NULL)
+         {
+            from = pgmoneta_append(from, source);
+            if (!pgmoneta_ends_with(from, "/"))
+            {
+               from = pgmoneta_append_char(from, '/');
+            }
+            from = pgmoneta_append(from, (char*)n->data);
+
+            to = pgmoneta_append(to, destination);
+            if (!pgmoneta_ends_with(to, "/"))
+            {
+               to = pgmoneta_append_char(to, '/');
+            }
+            to = pgmoneta_append(to, (char*)n->data);
+
+            pgmoneta_log_trace("hot_standby changed: %s -> %s", from, to);
+
+            pgmoneta_copy_file(from, to, workers);
+
+            free(from);
+            from = NULL;
+
+            free(to);
+            to = NULL;
+
+            n = n->next;
+         }
+
+         n = new_files;
+         while (n != NULL)
+         {
+            from = pgmoneta_append(from, source);
+            if (!pgmoneta_ends_with(from, "/"))
+            {
+               from = pgmoneta_append_char(from, '/');
+            }
+            from = pgmoneta_append(from, (char*)n->data);
+
+            to = pgmoneta_append(to, destination);
+            if (!pgmoneta_ends_with(to, "/"))
+            {
+               to = pgmoneta_append_char(to, '/');
+            }
+            to = pgmoneta_append(to, (char*)n->data);
+
+            pgmoneta_log_trace("hot_standby new: %s -> %s", from, to);
+
+            pgmoneta_copy_file(from, to, workers);
+
+            free(from);
+            from = NULL;
+
+            free(to);
+            to = NULL;
+
+            n = n->next;
+         }
       }
+      else
+      {
+         pgmoneta_mkdir(root);
+         pgmoneta_mkdir(destination);
 
-      pgmoneta_mkdir(root);
-      pgmoneta_mkdir(destination);
-
-      pgmoneta_copy_directory(source, destination, NULL, workers);
+         pgmoneta_copy_directory(source, destination, NULL, workers);
+      }
 
       pgmoneta_log_trace("hot_standby source:      %s", source);
       pgmoneta_log_trace("hot_standby destination: %s", destination);
@@ -164,6 +273,13 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
       pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
    }
+
+   free(old_manifest);
+   free(new_manifest);
+
+   pgmoneta_free_nodes(deleted_files);
+   pgmoneta_free_nodes(changed_files);
+   pgmoneta_free_nodes(new_files);
 
    free(root);
    free(source);

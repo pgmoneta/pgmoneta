@@ -36,8 +36,13 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 
+#define NODE_TYPE_STRING 0
+#define NODE_TYPE_INT    1
+#define NODE_TYPE_BOOL   2
+
 struct node
 {
+   char type;
    void* data;
    char* tag;
    struct node* next;

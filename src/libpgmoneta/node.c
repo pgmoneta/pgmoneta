@@ -52,6 +52,8 @@ pgmoneta_create_node_string(char* s, char* t, struct node** result)
 
    memset(node, 0, sizeof(struct node));
 
+   node->type = NODE_TYPE_STRING;
+
    if (s != NULL)
    {
       node->data = malloc(strlen(s) + 1);
@@ -110,6 +112,8 @@ pgmoneta_create_node_int(int val, char* t, struct node** result)
 
    memset(node, 0, sizeof(struct node));
 
+   node->type = NODE_TYPE_INT;
+
    node->data = malloc(sizeof(int));
 
    if (node->data == NULL)
@@ -161,6 +165,8 @@ pgmoneta_create_node_bool(bool val, char* t, struct node** result)
 
    memset(node, 0, sizeof(struct node));
 
+   node->type = NODE_TYPE_BOOL;
+
    node->data = malloc(sizeof(bool));
 
    if (node->data == NULL)
@@ -205,7 +211,6 @@ pgmoneta_get_node_string(struct node* chain, char* t)
 
    while (current != NULL)
    {
-
       if (!strcmp(current->tag, t))
       {
          return (char*)current->data;
@@ -226,7 +231,6 @@ pgmoneta_get_node_int(struct node* chain, char* t)
 
    while (current != NULL)
    {
-
       if (!strcmp(current->tag, t))
       {
          return *(int*)current->data;
@@ -247,7 +251,6 @@ pgmoneta_get_node_bool(struct node* chain, char* t)
 
    while (current != NULL)
    {
-
       if (!strcmp(current->tag, t))
       {
          return *(bool*)current->data;
@@ -294,7 +297,23 @@ pgmoneta_list_nodes(struct node* chain)
 
    while (current != NULL)
    {
-      pgmoneta_log_trace("Node: %s -> %p", current->tag, current->data);
+      if (current->type == NODE_TYPE_STRING)
+      {
+         pgmoneta_log_trace("Node: %s -> %s (%p)", current->tag, (char*)current->data, current->data);
+      }
+      else if (current->type == NODE_TYPE_INT)
+      {
+         pgmoneta_log_trace("Node: %s -> %d (%p)", current->tag, *(int*)current->data, current->data);
+      }
+      else if (current->type == NODE_TYPE_BOOL)
+      {
+         pgmoneta_log_trace("Node: %s -> %s (%p)", current->tag, *(bool*)current->data ? "true" : "false", current->data);
+      }
+      else
+      {
+         pgmoneta_log_trace("Node: %s -> %p", current->tag, current->data);
+      }
+
       current = current->next;
    }
 }

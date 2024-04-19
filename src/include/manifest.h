@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <node.h>
 
 struct manifest_file
 {
@@ -67,6 +68,18 @@ pgmoneta_parse_manifest(char* manifest_path, struct manifest** manifest);
  */
 int
 pgmoneta_manifest_checksum_verify(char* root);
+
+/**
+ * Compare manifests
+ * @param manifest1 The path to the first manifest
+ * @param manifest2 The path to the second manifest
+ * @param deleted_files The deleted files
+ * @param changed_files The changed files
+ * @param new_files The new files
+ * @return 0 on parsing success, otherwise 1
+ */
+int
+pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node** deleted_files, struct node** changed_files, struct node** new_files);
 
 /**
  * Free a manifest

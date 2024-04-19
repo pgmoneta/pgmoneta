@@ -250,6 +250,124 @@ error:
    return 1;
 }
 
+int
+pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node** deleted_files, struct node** changed_files, struct node** new_files)
+{
+   struct manifest* m1 = NULL;
+   struct manifest* m2 = NULL;
+   struct manifest_file* mf1 = NULL;
+   struct manifest_file* mf2 = NULL;
+   struct node* deleted_files_head = NULL;
+   struct node* changed_files_head = NULL;
+   struct node* new_files_head = NULL;
+   struct node* n = NULL;
+
+   *deleted_files = NULL;
+   *changed_files = NULL;
+   *new_files = NULL;
+
+   if (pgmoneta_parse_manifest(old_manifest, &m1))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_parse_manifest(new_manifest, &m2))
+   {
+      goto error;
+   }
+
+   mf1 = m1->files;
+   while (mf1 != NULL)
+   {
+      bool deleted = true;
+
+      mf2 = m2->files;
+      while (mf2 != NULL && deleted)
+      {
+         if (!strcmp(mf1->path, mf2->path))
+         {
+            deleted = false;
+
+            if (strcmp(mf1->checksum, mf2->checksum))
+            {
+               pgmoneta_log_trace("%s: %s <-> %s", mf1->path, mf1->checksum, mf2->checksum);
+
+               if (pgmoneta_create_node_string(mf1->path, mf1->checksum, &n))
+               {
+                  goto error;
+               }
+
+               pgmoneta_append_node(&changed_files_head, n);
+               n = NULL;
+
+               break;
+            }
+         }
+
+         mf2 = mf2->next;
+      }
+
+      if (deleted)
+      {
+         if (pgmoneta_create_node_string(mf1->path, mf1->checksum, &n))
+         {
+            goto error;
+         }
+
+         pgmoneta_append_node(&deleted_files_head, n);
+         n = NULL;
+      }
+
+      mf1 = mf1->next;
+   }
+
+   mf2 = m2->files;
+   while (mf2 != NULL)
+   {
+      bool new = true;
+
+      mf1 = m1->files;
+      while (mf1 != NULL && new)
+      {
+         if (!strcmp(mf1->path, mf2->path))
+         {
+            new = false;
+         }
+
+         mf1 = mf1->next;
+      }
+
+      if (new)
+      {
+         if (pgmoneta_create_node_string(mf2->path, mf2->checksum, &n))
+         {
+            goto error;
+         }
+
+         pgmoneta_append_node(&new_files_head, n);
+         n = NULL;
+      }
+
+      mf2 = mf2->next;
+   }
+
+   *deleted_files = deleted_files_head;
+   *changed_files = changed_files_head;
+   *new_files = new_files_head;
+
+   pgmoneta_manifest_free(m1);
+   pgmoneta_manifest_free(m2);
+
+   return 0;
+
+error:
+
+   pgmoneta_manifest_free(m1);
+   pgmoneta_manifest_free(m2);
+
+   return 1;
+}
+
 void
 pgmoneta_manifest_free(struct manifest* manifest)
 {
