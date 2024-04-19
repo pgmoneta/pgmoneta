@@ -154,7 +154,7 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       d = pgmoneta_append(d, ".aes");
       if (pgmoneta_exists(d))
       {
-         pgmoneta_delete_file(d);
+         pgmoneta_delete_file(d, NULL);
       }
 
       enc_file = pgmoneta_append(enc_file, tarfile);

@@ -531,10 +531,11 @@ pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files);
 /**
  * Remove a file
  * @param file The file
+ * @param workers The optional workers
  * @return The result
  */
 int
-pgmoneta_delete_file(char* file);
+pgmoneta_delete_file(char* file, struct workers* workers);
 
 /**
  * Copy a PostgreSQL installation

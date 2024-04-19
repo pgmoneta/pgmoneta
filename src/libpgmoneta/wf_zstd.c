@@ -124,7 +124,7 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 
       if (pgmoneta_exists(d))
       {
-         pgmoneta_delete_file(d);
+         pgmoneta_delete_file(d, NULL);
       }
 
       pgmoneta_zstandardc_file(tarfile, d);

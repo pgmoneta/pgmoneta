@@ -147,7 +147,7 @@ do_gz_compress(void* arg)
       }
       else
       {
-         pgmoneta_delete_file(wi->from);
+         pgmoneta_delete_file(wi->from, NULL);
       }
    }
 
@@ -244,7 +244,7 @@ pgmoneta_gzip_wal(char* directory)
                break;
             }
 
-            pgmoneta_delete_file(from);
+            pgmoneta_delete_file(from, NULL);
             pgmoneta_permission(to, 6, 0, 0);
          }
 
@@ -267,7 +267,7 @@ pgmoneta_gunzip_file(char* from, char* to)
          goto error;
       }
 
-      pgmoneta_delete_file(from);
+      pgmoneta_delete_file(from, NULL);
    }
    else
    {
@@ -366,7 +366,7 @@ do_gz_decompress(void* arg)
    }
    else
    {
-      pgmoneta_delete_file(wi->from);
+      pgmoneta_delete_file(wi->from, NULL);
    }
 
    free(wi);
@@ -396,7 +396,7 @@ pgmoneta_gzip_file(char* from, char* to)
    }
    else
    {
-      pgmoneta_delete_file(from);
+      pgmoneta_delete_file(from, NULL);
    }
 
    return 0;

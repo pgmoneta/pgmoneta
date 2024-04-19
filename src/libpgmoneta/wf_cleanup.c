@@ -131,7 +131,7 @@ cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, stru
 
    if (pgmoneta_exists(path))
    {
-      pgmoneta_delete_file(path);
+      pgmoneta_delete_file(path, NULL);
    }
 
    for (int i = 0; i < number_of_backups; i++)

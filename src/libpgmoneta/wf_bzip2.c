@@ -125,7 +125,7 @@ bzip2_execute_compress(int server, char* identifier, struct node* i_nodes, struc
 
       if (pgmoneta_exists(d))
       {
-         pgmoneta_delete_file(d);
+         pgmoneta_delete_file(d, NULL);
       }
 
       pgmoneta_bzip2_file(tarfile, d);

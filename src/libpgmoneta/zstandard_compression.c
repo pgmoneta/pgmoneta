@@ -138,7 +138,7 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
                   break;
                }
 
-               pgmoneta_delete_file(from);
+               pgmoneta_delete_file(from, NULL);
 
                memset(zin, 0, zin_size);
                memset(zout, 0, zout_size);
@@ -283,7 +283,7 @@ pgmoneta_zstandardc_wal(char* directory)
                break;
             }
 
-            pgmoneta_delete_file(from);
+            pgmoneta_delete_file(from, NULL);
             pgmoneta_permission(to, 6, 0, 0);
 
             memset(zin, 0, zin_size);
@@ -343,7 +343,7 @@ pgmoneta_zstandardd_file(char* from, char* to)
          goto error;
       }
 
-      pgmoneta_delete_file(from);
+      pgmoneta_delete_file(from, NULL);
    }
    else
    {
@@ -452,7 +452,7 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
                break;
             }
 
-            pgmoneta_delete_file(from);
+            pgmoneta_delete_file(from, NULL);
 
             memset(zin, 0, zin_size);
             memset(zout, 0, zout_size);
@@ -531,7 +531,7 @@ pgmoneta_zstandardc_file(char* from, char* to)
    }
    else
    {
-      pgmoneta_delete_file(from);
+      pgmoneta_delete_file(from, NULL);
    }
 
    ZSTD_freeCCtx(cctx);

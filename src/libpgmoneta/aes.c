@@ -129,7 +129,7 @@ do_encrypt_file(void* arg)
    wi = (struct worker_input*)arg;
 
    encrypt_file(wi->from, wi->to, 1);
-   pgmoneta_delete_file(wi->from);
+   pgmoneta_delete_file(wi->from, NULL);
 
    free(wi);
 }
@@ -231,7 +231,7 @@ pgmoneta_encrypt_wal(char* d)
          if (pgmoneta_exists(from))
          {
             encrypt_file(from, to, 1);
-            pgmoneta_delete_file(from);
+            pgmoneta_delete_file(from, NULL);
             pgmoneta_permission(to, 6, 0, 0);
          }
 
@@ -262,7 +262,7 @@ pgmoneta_encrypt_file(char* from, char* to)
    }
 
    encrypt_file(from, to, 1);
-   pgmoneta_delete_file(from);
+   pgmoneta_delete_file(from, NULL);
    if (flag)
    {
       free(to);
@@ -353,7 +353,7 @@ do_decrypt_file(void* arg)
    wi = (struct worker_input*)arg;
 
    encrypt_file(wi->from, wi->to, 0);
-   pgmoneta_delete_file(wi->from);
+   pgmoneta_delete_file(wi->from, NULL);
 
    free(wi);
 }
@@ -380,7 +380,7 @@ pgmoneta_decrypt_archive(char* path)
       return 1;
    }
 
-   pgmoneta_delete_file(path);
+   pgmoneta_delete_file(path, NULL);
    free(to);
    return 0;
 }

@@ -146,7 +146,7 @@ do_link(void* arg)
 
       if (equal)
       {
-         pgmoneta_delete_file(wi->from);
+         pgmoneta_delete_file(wi->from, NULL);
          pgmoneta_symlink_file(wi->from, wi->to);
       }
    }
@@ -253,14 +253,14 @@ do_relink(void* arg)
    {
       if (pgmoneta_is_file(wi->from))
       {
-         pgmoneta_delete_file(wi->to);
+         pgmoneta_delete_file(wi->to, NULL);
          pgmoneta_copy_file(wi->from, wi->to, wi->workers);
       }
       else
       {
          link = pgmoneta_get_symlink(wi->from);
 
-         pgmoneta_delete_file(wi->to);
+         pgmoneta_delete_file(wi->to, NULL);
          pgmoneta_symlink_file(wi->to, link);
 
          free(link);
@@ -354,7 +354,7 @@ do_tablespace(void* arg)
 
    if (equal)
    {
-      pgmoneta_delete_file(wi->from);
+      pgmoneta_delete_file(wi->from, NULL);
       pgmoneta_symlink_file(wi->from, wi->to);
    }
 

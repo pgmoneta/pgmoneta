@@ -130,7 +130,7 @@ do_lz4_compress(void* arg)
       }
       else
       {
-         pgmoneta_delete_file(wi->from);
+         pgmoneta_delete_file(wi->from, NULL);
       }
    }
 
@@ -176,7 +176,7 @@ pgmoneta_lz4c_wal(char* directory)
 
          lz4_compress(from, to);
 
-         pgmoneta_delete_file(from);
+         pgmoneta_delete_file(from, NULL);
          pgmoneta_permission(to, 6, 0, 0);
 
          free(from);
@@ -300,7 +300,7 @@ do_lz4_decompress(void* arg)
    }
    else
    {
-      pgmoneta_delete_file(wi->from);
+      pgmoneta_delete_file(wi->from, NULL);
    }
 
    free(wi);
@@ -317,7 +317,7 @@ pgmoneta_lz4d_file(char* from, char* to)
          goto error;
       }
 
-      pgmoneta_delete_file(from);
+      pgmoneta_delete_file(from, NULL);
    }
    else
    {
@@ -336,7 +336,7 @@ pgmoneta_lz4c_file(char* from, char* to)
 {
    lz4_compress(from, to);
 
-   pgmoneta_delete_file(from);
+   pgmoneta_delete_file(from, NULL);
 
    return 0;
 }

@@ -149,7 +149,7 @@ do_bzip2_compress(void* arg)
       }
       else
       {
-         pgmoneta_delete_file(wi->from);
+         pgmoneta_delete_file(wi->from, NULL);
       }
    }
 
@@ -342,7 +342,7 @@ do_bzip2_decompress(void* arg)
    }
    else
    {
-      pgmoneta_delete_file(wi->from);
+      pgmoneta_delete_file(wi->from, NULL);
    }
 
    free(wi);
@@ -372,7 +372,7 @@ pgmoneta_bzip2_file(char* from, char* to)
    }
    else
    {
-      pgmoneta_delete_file(from);
+      pgmoneta_delete_file(from, NULL);
    }
 
    return 0;

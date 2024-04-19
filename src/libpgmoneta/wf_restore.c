@@ -757,7 +757,7 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
 
       if (pgmoneta_exists(path))
       {
-         pgmoneta_delete_file(path);
+         pgmoneta_delete_file(path, NULL);
       }
    }
 

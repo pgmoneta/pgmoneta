@@ -81,6 +81,7 @@ static int copy_tablespaces(char* from, char* to, char* base, char* server, char
 static int get_permissions(char* from, int* permissions);
 
 static void copy_file(void* arg);
+static void delete_file(void* arg);
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -1511,20 +1512,44 @@ error:
 }
 
 int
-pgmoneta_delete_file(char* file)
+pgmoneta_delete_file(char* file, struct workers* workers)
+{
+   struct worker_input* fi = NULL;
+
+   if (pgmoneta_create_worker_input(NULL, file, NULL, 0, workers, &fi))
+   {
+      return 1;
+   }
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_add(workers, delete_file, (void*)fi);
+   }
+   else
+   {
+      delete_file(fi);
+   }
+
+   return 0;
+}
+
+static void
+delete_file(void* arg)
 {
    int ret;
+   struct worker_input* fi = NULL;
 
-   ret = unlink(file);
+   fi = (struct worker_input*)arg;
+
+   ret = unlink(fi->from);
 
    if (ret != 0)
    {
-      pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", file, strerror(errno));
+      pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
       errno = 0;
-      ret = 1;
    }
 
-   return ret;
+   free(fi);
 }
 
 int
