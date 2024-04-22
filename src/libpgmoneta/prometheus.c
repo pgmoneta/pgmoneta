@@ -957,7 +957,7 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "pgmoneta_version{version=\"");
    data = pgmoneta_append(data, VERSION);
    data = pgmoneta_append(data, "\"} 1");
-   data = pgmoneta_append(data, "\n\n");   
+   data = pgmoneta_append(data, "\n\n");
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_days The retention days of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_days gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_days ");

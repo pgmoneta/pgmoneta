@@ -111,12 +111,12 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
       {
          source = pgmoneta_append_char(source, '/');
       }
-      
+
       source = pgmoneta_append(source, "backup/");
 
       source = pgmoneta_append(source, identifier);
       source = pgmoneta_append_char(source, '/');
-      
+
       source = pgmoneta_append(source, "data");
 
       root = pgmoneta_append(root, config->servers[server].hot_standby);
