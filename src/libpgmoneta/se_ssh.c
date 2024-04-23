@@ -46,18 +46,25 @@
 #include <libssh/sftp.h>
 
 static int ssh_storage_setup(int, char*, struct node*, struct node**);
-static int ssh_storage_execute(int, char*, struct node*, struct node**);
-static int ssh_storage_teardown(int, char*, struct node*, struct node**);
+static int ssh_storage_backup_execute(int, char*, struct node*, struct node**);
+static int ssh_storage_wal_shipping_execute(int, char*, struct node*, struct node**);
+static int ssh_storage_backup_teardown(int, char*, struct node*, struct node**);
+static int ssh_storage_wal_shipping_teardown(int, char*, struct node*, struct node**);
 
 static char* get_remote_server_basepath(int server);
 static char* get_remote_server_backup(int server);
 static char* get_remote_server_backup_identifier(int server, char* identifier);
+static char* get_remote_server_wal(int server);
 
 static int read_latest_backup_sha256(char* path);
 
 static int sftp_make_directory(char* local_dir, char* remote_dir);
 static int sftp_copy_directory(char* local_root, char* remote_root, char* relative_path);
 static int sftp_copy_file(char* local_root, char* remote_root, char* relative_path);
+static int sftp_wal_prepare(sftp_file* file, int segsize);
+static bool sftp_exists(char* path);
+static int sftp_get_file_size(char* file_path, size_t* file_size);
+static int sftp_permission(char* path, int user, int group, int all);
 
 static ssh_session session = NULL;
 static sftp_session sftp = NULL;
@@ -71,15 +78,27 @@ static char** hashes = NULL;
 static char* latest_remote_root = NULL;
 
 struct workflow*
-pgmoneta_storage_create_ssh(void)
+pgmoneta_storage_create_ssh(int workflow_type)
 {
    struct workflow* wf = NULL;
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
    wf->setup = &ssh_storage_setup;
-   wf->execute = &ssh_storage_execute;
-   wf->teardown = &ssh_storage_teardown;
+
+   switch (workflow_type)
+   {
+      case WORKFLOW_TYPE_BACKUP:
+         wf->execute = &ssh_storage_backup_execute;
+         wf->teardown = &ssh_storage_backup_teardown;
+         break;
+      case WORKFLOW_TYPE_WAL_SHIPPING:
+         wf->execute = &ssh_storage_wal_shipping_execute;
+         wf->teardown = &ssh_storage_wal_shipping_teardown;
+         break;
+      default:
+         break;
+   }
    wf->next = NULL;
 
    return wf;
@@ -254,8 +273,8 @@ error:
 }
 
 static int
-ssh_storage_execute(int server, char* identifier,
-                    struct node* i_nodes, struct node** o_nodes)
+ssh_storage_backup_execute(int server, char* identifier,
+                           struct node* i_nodes, struct node** o_nodes)
 {
    char* server_path = NULL;
    char* local_root = NULL;
@@ -365,8 +384,38 @@ error:
 }
 
 static int
-ssh_storage_teardown(int server, char* identifier,
-                     struct node* i_nodes, struct node** o_nodes)
+ssh_storage_wal_shipping_execute(int server, char* identifier,
+                                 struct node* i_nodes, struct node** o_nodes)
+{
+   char* local_root = NULL;
+   char* remote_root = NULL;
+
+   remote_root = get_remote_server_wal(server);
+   local_root = pgmoneta_get_server_wal(server);
+
+   if (sftp_make_directory(local_root, remote_root) == 1)
+   {
+      pgmoneta_log_error("could not create the wal-shipping directory: %s in the remote server: %s", remote_root, ssh_get_error(session));
+      goto error;
+   }
+   is_error = false;
+
+   free(remote_root);
+   free(local_root);
+
+   return 0;
+error:
+   is_error = true;
+
+   free(remote_root);
+   free(local_root);
+
+   return 1;
+}
+
+static int
+ssh_storage_backup_teardown(int server, char* identifier,
+                            struct node* i_nodes, struct node** o_nodes)
 {
    char* root = NULL;
 
@@ -395,6 +444,16 @@ ssh_storage_teardown(int server, char* identifier,
    return 0;
 }
 
+static int
+ssh_storage_wal_shipping_teardown(int server, char* identifier,
+                                  struct node* i_nodes, struct node** o_nodes)
+{
+   sftp_free(sftp);
+
+   ssh_free(session);
+
+   return 0;
+}
 static int
 sftp_make_directory(char* local_dir, char* remote_dir)
 {
@@ -642,6 +701,30 @@ error:
 }
 
 static int
+sftp_wal_prepare(sftp_file* file, int segsize)
+{
+   char buffer[8192] = {0};
+   size_t written = 0;
+
+   if (file == NULL || *file == NULL)
+   {
+      return 1;
+   }
+
+   while (written < segsize)
+   {
+      written += sftp_write(*file, buffer, sizeof(buffer));
+   }
+
+   if (sftp_seek(*file, 0) < 0)
+   {
+      pgmoneta_log_error("WAL error: %s", ssh_get_error(session));
+      return 1;
+   }
+   return 0;
+}
+
+static int
 read_latest_backup_sha256(char* path)
 {
    char buffer[4096];
@@ -745,4 +828,197 @@ get_remote_server_backup_identifier(int server, char* identifier)
    d = pgmoneta_append(d, identifier);
 
    return d;
+}
+
+static char*
+get_remote_server_wal(int server)
+{
+   char* d = NULL;
+
+   d = get_remote_server_basepath(server);
+   d = pgmoneta_append(d, "wal/");
+
+   return d;
+}
+
+int
+pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file)
+{
+
+   char* root = NULL;
+   char* path = NULL;
+
+   root = get_remote_server_wal(server);
+
+   if (root == NULL || strlen(root) == 0 || !sftp_exists(root))
+   {
+      goto error;
+   }
+
+   path = pgmoneta_append(path, root);
+   if (!pgmoneta_ends_with(path, "/"))
+   {
+      path = pgmoneta_append(path, "/");
+   }
+
+   path = pgmoneta_append(path, filename);
+   path = pgmoneta_append(path, ".partial");
+
+   if (sftp_exists(path))
+   {
+      // file alreay exists, check if it's padded already
+      size_t size;
+      sftp_get_file_size(path, &size);
+      if (size == segsize)
+      {
+         *file = sftp_open(sftp, path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+         if (*file == NULL)
+         {
+            pgmoneta_log_error("WAL error: %s", ssh_get_error(session));
+            goto error;
+         }
+         sftp_permission(path, 6, 0, 0);
+
+         free(path);
+         return 0;
+      }
+      if (size != 0)
+      {
+         // corrupted file
+         pgmoneta_log_error("WAL file corrupted: %s", path);
+         goto error;
+      }
+   }
+
+   *file = sftp_open(sftp, path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+
+   if (*file == NULL)
+   {
+      pgmoneta_log_error("WAL error: %s", ssh_get_error(session));
+      goto error;
+   }
+
+   if (sftp_wal_prepare(file, segsize))
+   {
+      goto error;
+   }
+
+   free(path);
+   return 0;
+
+error:
+   if (*file != NULL)
+   {
+      sftp_close(*file);
+   }
+   free(path);
+   return 1;
+}
+
+int
+pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* file)
+{
+
+   char* root = NULL;
+   char tmp_file_path[MAX_PATH] = {0};
+   char file_path[MAX_PATH] = {0};
+
+   root = get_remote_server_wal(server);
+
+   if (file == NULL || *file == NULL || root == NULL || filename == NULL || strlen(root) == 0 || strlen(filename) == 0)
+   {
+      return 1;
+   }
+
+   if (partial)
+   {
+      pgmoneta_log_warn("Not renaming %s.partial, this segment is incomplete", filename);
+      sftp_close(*file);
+      return 0;
+   }
+
+   if (pgmoneta_ends_with(root, "/"))
+   {
+      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s%s.partial", root, filename);
+      snprintf(file_path, sizeof(file_path), "%s%s", root, filename);
+   }
+   else
+   {
+      snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/%s.partial", root, filename);
+      snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
+   }
+   if (sftp_rename(sftp, tmp_file_path, file_path) != 0)
+   {
+      pgmoneta_log_error("could not rename file %s to %s", tmp_file_path, file_path);
+      goto error;
+   }
+
+   sftp_close(*file);
+
+   return 0;
+
+error:
+   sftp_close(*file);
+   return 1;
+}
+static bool
+sftp_exists(char* path)
+{
+   if (sftp_stat(sftp, path) != NULL)
+   {
+      return true;
+   }
+   return false;
+}
+
+static int
+sftp_get_file_size(char* file_path, size_t* file_size)
+{
+   sftp_file file = NULL;
+   sftp_attributes attributes = NULL;
+
+   if ((file = sftp_open(sftp, file_path, O_RDONLY, 0)) == NULL)
+   {
+      pgmoneta_log_error("Failed to open file: %s : %s", file_path, ssh_get_error(session));
+      goto error;
+   }
+
+   if ((attributes = sftp_fstat(file)) == NULL)
+   {
+      pgmoneta_log_error("Error retrieving file attributes: %s : %s", file_path, ssh_get_error(session));
+      goto error;
+   }
+
+   *file_size = attributes->size;
+
+   sftp_attributes_free(attributes);
+   sftp_close(file);
+
+   return 0;
+
+error:
+   if (file != NULL)
+   {
+      sftp_close(file);
+   }
+   if (attributes != NULL)
+   {
+      sftp_attributes_free(attributes);
+   }
+   return 1;
+}
+
+static int
+sftp_permission(char* path, int user, int group, int all)
+{
+   int ret;
+   mode_t mode;
+   pgmoneta_get_permission_mode(user, group, all, &mode);
+   ret = sftp_chmod(sftp, path, mode);
+   if (ret != 0)
+   {
+      return 1;
+   }
+
+   return 0;
 }

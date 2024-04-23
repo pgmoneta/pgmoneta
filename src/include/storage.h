@@ -33,7 +33,12 @@
 extern "C" {
 #endif
 
+/* pgmoneta */
 #include <workflow.h>
+
+/* system */
+#include <libssh/libssh.h>
+#include <libssh/sftp.h>
 
 /**
  * Create a workflow for the local storage engine
@@ -44,10 +49,11 @@ pgmoneta_storage_create_local(void);
 
 /**
  * Create a workflow for the SSH storage engine
+ * @param workflow_type The workflow type
  * @return The workflow
  */
 struct workflow*
-pgmoneta_storage_create_ssh(void);
+pgmoneta_storage_create_ssh(int workflow_type);
 
 /**
  * Create a workflow for the S3 storage engine
@@ -63,6 +69,27 @@ pgmoneta_storage_create_s3(void);
 struct workflow*
 pgmoneta_storage_create_azure(void);
 
+/**
+ * Open WAL shipping file in remote ssh server
+ * @param srv The server index
+ * @param filename WAL file name
+ * @param segsize WAL segment size
+ * @param sftp_file WAL streaming file
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file);
+
+/**
+ * Close WAL shipping file in remote ssh server
+ * @param srv The server index
+ * @param filename WAL file name
+ * @param partial Completed segment or not
+ * @param sftp_file WAL streaming file
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* file);
 #ifdef __cplusplus
 }
 #endif

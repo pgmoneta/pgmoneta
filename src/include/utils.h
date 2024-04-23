@@ -862,6 +862,16 @@ int
 pgmoneta_permission(char* e, int user, int group, int all);
 
 /**
+ * Calculate mode
+ * @param user The user (0; nothing, 4; read, 6; read/write)
+ * @param group The group (0; nothing, 4; read, 6; read/write)
+ * @param all All (0; nothing, 4; read, 6; read/write)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_get_permission_mode(int user, int group, int all, mode_t* mode);
+
+/**
  * Get file permission.
  * @param path The file path.
  * @return The mode of file.
