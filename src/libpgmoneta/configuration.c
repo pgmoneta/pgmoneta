@@ -2521,24 +2521,41 @@ error:
 static int
 as_storage_engine(char* str)
 {
-   if (!strcasecmp(str, "local"))
+   int STORAGE_ENGINE_TYPES = STORAGE_ENGINE_LOCAL;
+   char* token = NULL;
+   char* delimiter = ",";
+   int i = 0, j = 0;
+   while (str[i])
    {
-      return STORAGE_ENGINE_LOCAL;
+      if (str[i] != ' ' && str[i] != '\t')
+      {
+         str[j++] = str[i];
+      }
+      i++;
    }
-   else if (!strcasecmp(str, "ssh"))
+   str[j] = '\0';
+   token = strtok(str, delimiter);
+   while (token != NULL)
    {
-      return STORAGE_ENGINE_SSH;
+      if (!strcasecmp(token, "local"))
+      {
+         STORAGE_ENGINE_TYPES |= STORAGE_ENGINE_LOCAL;
+      }
+      else if (!strcasecmp(token, "ssh"))
+      {
+         STORAGE_ENGINE_TYPES |= STORAGE_ENGINE_SSH;
+      }
+      else if (!strcasecmp(token, "s3"))
+      {
+         STORAGE_ENGINE_TYPES |= STORAGE_ENGINE_S3;
+      }
+      else if (!strcasecmp(token, "azure"))
+      {
+         STORAGE_ENGINE_TYPES |= STORAGE_ENGINE_AZURE;
+      }
+      token = strtok(NULL, delimiter);
    }
-   else if (!strcasecmp(str, "s3"))
-   {
-      return STORAGE_ENGINE_S3;
-   }
-   else if (!strcasecmp(str, "azure"))
-   {
-      return STORAGE_ENGINE_AZURE;
-   }
-
-   return STORAGE_ENGINE_LOCAL;
+   return STORAGE_ENGINE_TYPES;
 }
 
 static char*

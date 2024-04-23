@@ -37,7 +37,9 @@
 #include <security.h>
 #include <server.h>
 #include <wal.h>
+#include <workflow.h>
 #include <utils.h>
+#include <storage.h>
 
 /* system */
 #include <ctype.h>
@@ -51,6 +53,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <openssl/ssl.h>
+#include <libssh/libssh.h>
+#include <libssh/sftp.h>
 
 static char* wal_file_name(uint32_t timeline, size_t segno, int segsize);
 static int wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket);
@@ -92,8 +96,12 @@ pgmoneta_wal(int srv, char** argv)
    char* filename = NULL;
    signed char type;
    int ret;
+   char date[128];
+   time_t current_time;
+   struct tm* time_info;
    FILE* wal_file = NULL;
    FILE* wal_shipping_file = NULL;
+   sftp_file sftp_wal_file = NULL;
    struct message* identify_system_msg = NULL;
    struct query_response* identify_system_response = NULL;
    struct query_response* end_of_timeline_response = NULL;
@@ -101,6 +109,10 @@ pgmoneta_wal(int srv, char** argv)
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct configuration* config;
    struct stream_buffer* buffer = NULL;
+   struct workflow* head = NULL;
+   struct workflow* current = NULL;
+   struct node* i_nodes = NULL;
+   struct node* o_nodes = NULL;
    memset(msg, 0, sizeof (struct message));
 
    pgmoneta_start_logging();
@@ -109,6 +121,11 @@ pgmoneta_wal(int srv, char** argv)
    config = (struct configuration*) shmem;
 
    pgmoneta_set_proc_title(1, argv, "wal", config->servers[srv].name);
+
+   memset(&date[0], 0, sizeof(date));
+   time(&current_time);
+   time_info = localtime(&current_time);
+   strftime(&date[0], sizeof(date), "%Y%m%d%H%M%S", time_info);
 
    usr = -1;
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -129,6 +146,32 @@ pgmoneta_wal(int srv, char** argv)
    segsize = config->servers[srv].wal_size;
    d = pgmoneta_get_server_wal(srv);
    pgmoneta_mkdir(d);
+
+   if (config->storage_engine & STORAGE_ENGINE_SSH)
+   {
+      head = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_WAL_SHIPPING);
+      current = head;
+   }
+
+   current = head;
+   while (current != NULL)
+   {
+      if (current->setup(srv, &date[0], i_nodes, &o_nodes))
+      {
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = head;
+   while (current != NULL)
+   {
+      if (current->execute(srv, &date[0], i_nodes, &o_nodes))
+      {
+         goto error;
+      }
+      current = current->next;
+   }
 
    // Setup WAL shipping directory
    if (wal_shipping_setup(srv, &wal_shipping))
@@ -298,10 +341,23 @@ pgmoneta_wal(int srv, char** argv)
                               pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
                            }
                         }
+                        if (config->storage_engine & STORAGE_ENGINE_SSH)
+                        {
+                           if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
+                           {
+                              pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
+                              goto error;
+                           }
+                        }
+
                         if (bytes_left > 0)
                         {
                            curr_xlogoff += bytes_left;
                            fwrite(remain_buffer, 1, bytes_left, wal_file);
+                           if (sftp_wal_file != NULL)
+                           {
+                              sftp_write(sftp_wal_file, remain_buffer, bytes_left);
+                           }
                            if (wal_shipping_file != NULL)
                            {
                               fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
@@ -335,6 +391,11 @@ pgmoneta_wal(int srv, char** argv)
                         pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
                      }
+                     if (sftp_wal_file != NULL)
+                     {
+                        sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_to_write);
+                     }
+
                      if (wal_shipping_file != NULL)
                      {
                         fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_shipping_file);
@@ -351,6 +412,12 @@ pgmoneta_wal(int srv, char** argv)
                         // the end of WAL segment
                         fflush(wal_file);
                         wal_close(d, filename, false, wal_file);
+                        if (sftp_wal_file != NULL)
+                        {
+                           pgmoneta_sftp_wal_close(srv, filename, false, &sftp_wal_file);
+                           sftp_wal_file = NULL;
+                        }
+
                         wal_file = NULL;
                         if (wal_shipping_file != NULL)
                         {
@@ -412,6 +479,11 @@ pgmoneta_wal(int srv, char** argv)
                wal_file = NULL;
                wal_close(wal_shipping, filename, false, wal_shipping_file);
                wal_shipping_file = NULL;
+               if (sftp_wal_file != NULL)
+               {
+                  pgmoneta_sftp_wal_close(srv, filename, false, &sftp_wal_file);
+                  sftp_wal_file = NULL;
+               }
             }
             pgmoneta_consume_copy_stream_end(buffer, msg);
             break;
@@ -457,6 +529,19 @@ pgmoneta_wal(int srv, char** argv)
       bool partial = (wal_xlog_offset(xlogptr, segsize) != 0);
       wal_close(d, filename, partial, wal_file);
       wal_close(wal_shipping, filename, partial, wal_shipping_file);
+      if (sftp_wal_file != NULL)
+      {
+         pgmoneta_sftp_wal_close(srv, filename, partial, &sftp_wal_file);
+         sftp_wal_file = NULL;
+      }
+   }
+
+   current = head;
+   while (current != NULL)
+   {
+      current->teardown(srv, &date[0], i_nodes, &o_nodes);
+
+      current = current->next;
    }
 
    pgmoneta_memory_destroy();
@@ -493,6 +578,11 @@ error:
       wal_close(d, filename, true, wal_file);
       wal_close(wal_shipping, filename, true, wal_shipping_file);
    }
+   if (sftp_wal_file != NULL)
+   {
+      pgmoneta_sftp_wal_close(srv, filename, true, &sftp_wal_file);
+      sftp_wal_file = NULL;
+   }
    pgmoneta_free_copy_message(identify_system_msg);
    pgmoneta_free_copy_message(start_replication_msg);
    if (msg != NULL)
@@ -503,6 +593,14 @@ error:
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_free_query_response(end_of_timeline_response);
    pgmoneta_memory_stream_buffer_free(buffer);
+
+   current = head;
+   while (current != NULL)
+   {
+      current->teardown(srv, &date[0], i_nodes, &o_nodes);
+
+      current = current->next;
+   }
 
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
