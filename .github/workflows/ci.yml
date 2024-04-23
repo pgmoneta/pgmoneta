@@ -150,8 +150,8 @@ jobs:
       run: brew install cjson
     - name: Install PostgreSQL
       run: brew install postgresql
-    - name: Install OpenSSH
-      run: brew install openssh
+    - name: Install libssh
+      run: brew install libssh
     - name: GCC/mkdir
       run: mkdir build
       working-directory: /Users/runner/work/pgmoneta/pgmoneta/
