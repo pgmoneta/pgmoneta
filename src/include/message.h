@@ -544,7 +544,6 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
 
 /**
  * Receive mainfest file from the copy stream and write to disk
- * This functionality is for server version >= 13,
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer

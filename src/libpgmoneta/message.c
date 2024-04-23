@@ -2166,11 +2166,13 @@ error:
 int
 pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket, struct token_bucket* network_bucket)
 {
+   char directory[MAX_PATH];
+   char link_path[MAX_PATH];
+   char null_buffer[2 * 512]; // 2 tar block size of terminator null bytes
+   FILE* file = NULL;
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct tuple* tup = NULL;
-   char null_buffer[2 * 512]; // 2 tar block size of terminator null bytes
-   FILE* file = NULL;
 
    memset(msg, 0, sizeof (struct message));
 
@@ -2306,24 +2308,19 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       msg = NULL;
       tup = tup->next;
    }
-   // If server version >= 13, receive manifest as well
-   if (version >= 13)
+
+   if (pgmoneta_receive_manifest_file(ssl, socket, buffer, basedir, bucket, network_bucket))
    {
-      if (pgmoneta_receive_manifest_file(ssl, socket, buffer, basedir, bucket, network_bucket))
-      {
-         goto error;
-      }
+      goto error;
    }
 
    // update symbolic link
    struct tablespace* tblspc = tablespaces;
    while (tblspc != NULL)
    {
-      // update symlink
-      char directory[MAX_PATH];
-      char link_path[MAX_PATH];
       memset(link_path, 0, sizeof(link_path));
       memset(directory, 0, sizeof(directory));
+
       if (pgmoneta_ends_with(basedir, "/"))
       {
          snprintf(link_path, sizeof(link_path), "%sdata/pg_tblspc/%d", basedir, tblspc->oid);
@@ -2334,29 +2331,27 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
          snprintf(link_path, sizeof(link_path), "%s/data/pg_tblspc/%d", basedir, tblspc->oid);
          snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
       }
+
       unlink(link_path);
       pgmoneta_symlink_file(link_path, directory);
       tblspc = tblspc->next;
    }
 
-   // verify manifest checksum if available
-   if (version >= 13)
+   memset(directory, 0, sizeof(directory));
+
+   if (pgmoneta_ends_with(basedir, "/"))
    {
-      char directory[MAX_PATH];
-      memset(directory, 0, sizeof(directory));
-      if (pgmoneta_ends_with(basedir, "/"))
-      {
-         snprintf(directory, sizeof(directory), "%sdata", basedir);
-      }
-      else
-      {
-         snprintf(directory, sizeof(directory), "%s/data", basedir);
-      }
-      if (pgmoneta_manifest_checksum_verify(directory))
-      {
-         pgmoneta_log_error("Manifest verification failed");
-         goto error;
-      }
+      snprintf(directory, sizeof(directory), "%sdata", basedir);
+   }
+   else
+   {
+      snprintf(directory, sizeof(directory), "%s/data", basedir);
+   }
+
+   if (pgmoneta_manifest_checksum_verify(directory))
+   {
+      pgmoneta_log_error("Manifest verification failed");
+      goto error;
    }
 
    pgmoneta_free_query_response(response);
