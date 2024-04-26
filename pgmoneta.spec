@@ -69,7 +69,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/10_grafana.md %{buildroot}%{_docdir}/%{name}/tutorial/10_grafana.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/11_wal_shipping.md %{buildroot}%{_docdir}/%{name}/tutorial/11_wal_shipping.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/12_tls.md %{buildroot}%{_docdir}/%{name}/tutorial/12_tls.md
-
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/13_hot_standby.md %{buildroot}%{_docdir}/%{name}/tutorial/13_hot_standby.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-cli.1 %{buildroot}%{_mandir}/man1/pgmoneta-cli.1
@@ -120,6 +120,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/tutorial/10_grafana.md
 %{_docdir}/%{name}/tutorial/11_wal_shipping.md
 %{_docdir}/%{name}/tutorial/12_tls.md
+%{_docdir}/%{name}/tutorial/13_hot_standby.md
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
