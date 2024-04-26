@@ -4,7 +4,7 @@ This tutorial will show you how to do setup [Prometheus](https://prometheus.io/)
 
 ## Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 12+ and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.

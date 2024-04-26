@@ -8,7 +8,7 @@ You do not need to make sure the directory is unique for each server, the WAL co
 
 ## Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 12+ and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.

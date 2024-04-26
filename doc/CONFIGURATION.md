@@ -98,7 +98,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 The `user` specified must have the `REPLICATION` option in order to stream the Write-Ahead Log (WAL), and must
 have access to the `postgres` database in order to get the necessary configuration parameters.
 
-Note, that PostgreSQL 12+ is required, as well as having `wal_level` at `replica` or `logical` level.
+Note, that PostgreSQL 13+ is required, as well as having `wal_level` at `replica` or `logical` level.
 
 Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will connect using a Unix Domain Socket.
 
