@@ -12,6 +12,7 @@
 * AES encryption support
 * Symlink support
 * WAL shipping support
+* Hot standby
 * Prometheus support
 * Remote management
 * Offline mode

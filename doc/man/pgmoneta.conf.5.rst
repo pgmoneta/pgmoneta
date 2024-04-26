@@ -33,6 +33,9 @@ host
 unix_socket_dir
   The Unix Domain Socket location. Mandatory
 
+base_dir
+  The base directory for the backup. Mandatory
+
 metrics
   The metrics port. Default is 0 (disabled)
 
@@ -57,6 +60,9 @@ compression
 
 compression_level
   The compression level. Default is 3
+
+workers
+  The number of workers that each process can use for its work. Use 0 to disable. Default is 0
 
 storage_engine
   The storage engine type (local, ssh, s3, azure). Default is local
@@ -121,6 +127,9 @@ s3_secret_access_key
 s3_bucket
   The IAM secret access key
 
+s3_base_dir
+  The base directory for the S3 bucket
+
 azure_storage_account
   The Azure storage account name
 
@@ -134,7 +143,7 @@ azure_base_dir
   The base directory for the Azure container
 
 retention
-  The retention for pgmoneta. Default is 7
+  The retention time in days, weeks, months, years. Default is 7, - , - , -
 
 link
   Use links to limit backup size. Default is true
@@ -169,6 +178,12 @@ log_mode
 
 blocking_timeout
   The number of seconds the process will be blocking for a connection (disable = 0). Default is 30
+
+backup_max_rate
+  The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable. Default is 0
+
+network_max_rate
+  The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable. Default is 0
 
 tls
   Enable Transport Layer Security (TLS). Default is false
@@ -242,6 +257,30 @@ retention
 
 wal_shipping
   The WAL shipping directory
+
+hot_standby
+  Hot standby directory
+
+hot_standby_overrides
+  Files to override in the hot standby directory
+
+workers
+  The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Default is -1
+
+backup_max_rate
+  The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
+
+network_max_rate
+  The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
+
+tls_cert_file
+  Certificate file for TLS. This file must be owned by either the user running pgmoneta or root.
+
+tls_key_file
+  Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least 0640 when owned by root or 0600 otherwise.
+
+tls_ca_file
+  Certificate Authority (CA) file for TLS. This file must be owned by either the user running pgmoneta or root.
 
 REPORTING BUGS
 ==============
