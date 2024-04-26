@@ -208,6 +208,9 @@ main(int argc, char** argv)
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
 
+   // Disable stdout buffering (i.e. write to stdout immediatelly).
+   setbuf(stdout, NULL);
+
    while (1)
    {
       static struct option long_options[] =
