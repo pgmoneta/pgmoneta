@@ -318,26 +318,26 @@ install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 #
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf -s -f markdown-smart --toc ${UMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf -s -f markdown-smart -N --toc ${UMDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide PDF documentation"
 )
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf -s -f markdown-smart --toc ${DMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf -s -f markdown-smart -N --toc ${DMDS}
     DEPENDS ${DMDS}
     COMMENT "Generating Developer Guide PDF documentation"
 )
 
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html -s -f markdown-smart --toc -t html5 ${UMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html -s -f markdown-smart -N --toc -t html5 ${UMDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide HTML documentation"
 )
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html -s -f markdown-smart --toc -t html5 ${DMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html -s -f markdown-smart -N --toc -t html5 ${DMDS}
     DEPENDS ${DMDS}
     COMMENT "Generating Developer Guide HTML documentation"
 )
