@@ -1,3 +1,5 @@
+% pgmoneta: User Guide
+
 \newpage
 
 # Introduction

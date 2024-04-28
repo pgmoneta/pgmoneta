@@ -3,6 +3,8 @@
 #
 FILE(GLOB SOURCE_FILES "libpgmoneta/*.c")
 FILE(GLOB HEADER_FILES "include/*.h")
+FILE(GLOB PREDS "../doc/manual/0?-*.en.md")
+FILE(GLOB POSTDS "../doc/manual/9?-*.en.md")
 FILE(GLOB UMDS "../doc/manual/user-??-*.en.md")
 FILE(GLOB DMDS "../doc/manual/dev-??-*.en.md")
 
@@ -318,26 +320,26 @@ install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 #
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf -s -f markdown-smart -N --toc ${UMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf -s -f markdown-smart -N --toc ${PREDS} ${UMDS} ${POSTDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide PDF documentation"
 )
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf -s -f markdown-smart -N --toc ${DMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf -s -f markdown-smart -N --toc ${PREDS} ${DMDS} ${POSTDS}
     DEPENDS ${DMDS}
     COMMENT "Generating Developer Guide PDF documentation"
 )
 
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html -s -f markdown-smart -N --toc -t html5 ${UMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${UMDS} ${POSTDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide HTML documentation"
 )
 add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html -s -f markdown-smart -N --toc -t html5 ${DMDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${DMDS} ${POSTDS}
     DEPENDS ${DMDS}
     COMMENT "Generating Developer Guide HTML documentation"
 )
