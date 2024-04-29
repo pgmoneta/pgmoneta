@@ -867,7 +867,7 @@ pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file)
    if (sftp_exists(path))
    {
       // file alreay exists, check if it's padded already
-      size_t size;
+      size_t size = 0;
       sftp_get_file_size(path, &size);
       if (size == segsize)
       {

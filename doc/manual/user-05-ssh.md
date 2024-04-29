@@ -8,7 +8,7 @@ First of all, you need to have a remote server where you can store your backups 
 
 Lets take an EC2 instance as an example, after launching an EC2 instance you need to add new user account with SSH access to the EC2 instance:
 
-1. [Connect to your Linux instance using SSH.](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AccessingInstancesLinux.html)
+1. [Connect to your Linux instance using SSH.][aws_access]
 
 2. Use the adduser command to add a new user account to an EC2 instance (replace new_user with the new account name).
 

@@ -1,4 +1,4 @@
-# Install pgmoneta
+## Install pgmoneta
 
 This tutorial will show you how to do a simple installation of pgmoneta.
 
@@ -8,7 +8,7 @@ and will be streaming Write-Ahead Log (WAL) to pgmoneta.
 Please note that inside the brackets at the end of each step it's the user account
 you should be using, switch the account when needed.
 
-## Preface
+### Preface
 
 This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
@@ -19,7 +19,7 @@ For RPM based distributions such as Fedora and RHEL you can add the
 dnf install -y postgresql10 postgresql10-server pgmoneta
 ```
 
-## Initialize cluster
+### Initialize cluster
 
 ```
 # If you use dnf to install your postgres, 
@@ -31,7 +31,7 @@ initdb /tmp/pgsql
 
 (`postgres` user)
 
-## Remove default access
+### Remove default access
 
 Remove
 
@@ -46,7 +46,7 @@ from `/tmp/pgsql/pg_hba.conf`
 
 (`postgres` user)
 
-## Add access for users and a database
+### Add access for users and a database
 
 Add
 
@@ -66,7 +66,7 @@ to setup the correct authentication type.
 
 (`postgres` user)
 
-## Make sure that replication level is set
+### Make sure that replication level is set
 
 Check that
 
@@ -78,7 +78,7 @@ is set in `/tmp/pgsql/postgresql.conf` - or `logical`
 
 (`postgres` user)
 
-## Start PostgreSQL
+### Start PostgreSQL
 
 ```
 pg_ctl  -D /tmp/pgsql/ start
@@ -86,7 +86,7 @@ pg_ctl  -D /tmp/pgsql/ start
 
 (`postgres` user)
 
-## Add users and a database
+### Add users and a database
 
 ```
 createuser -P myuser
@@ -105,7 +105,7 @@ CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';
 
 (`postgres` user)
 
-## Verify access
+### Verify access
 
 For the user (standard) (using `mypass`)
 
@@ -123,7 +123,7 @@ psql -h localhost -p 5432 -U repl postgres
 
 (`postgres` user)
 
-## Add pgmoneta user
+### Add pgmoneta user
 
 ```
 sudo su -
@@ -134,7 +134,7 @@ exit
 
 (`postgres` user)
 
-## Create pgmoneta configuration
+### Create pgmoneta configuration
 
 Switch to the pgmoneta user
 
@@ -189,7 +189,7 @@ and press `Ctrl-D`
 
 (`postgres` user)
 
-## Create base directory
+### Create base directory
 
 ```
 mkdir backup
@@ -197,7 +197,7 @@ mkdir backup
 
 (`pgmoneta` user)
 
-## Start pgmoneta
+### Start pgmoneta
 
 ```
 pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
@@ -205,7 +205,7 @@ pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
 
 (`pgmoneta` user)
 
-## Create a backup
+### Create a backup
 
 In another terminal
 
@@ -215,7 +215,7 @@ pgmoneta-cli -c pgmoneta.conf backup primary
 
 (`pgmoneta` user)
 
-## View backup
+### View backup
 
 In another terminal
 
@@ -224,12 +224,12 @@ pgmoneta-cli -c pgmoneta.conf status details
 ```
 
 (`pgmoneta` user)
-## Shell completion
+### Shell completion
 
 There is a minimal shell completion support for `pgmoneta-cli` and `pgmoneta-admin`. If you are running such commands from a Bash or Zsh, you can take some advantage of command completion.
 
 
-### Installing command completions in Bash
+#### Installing command completions in Bash
 
 There is a completion script into `contrib/shell_comp/pgmoneta_comp.bash` that can be used
 to help you complete the command line while you are typing.
@@ -243,7 +243,7 @@ source contrib/shell_comp/pgmoneta_comp.bash
 
 At this point, the completions should be active, so you can type the name of one the commands between `pgmoneta-cli` and `pgmoneta-admin` and hit `<TAB>` to help the command line completion.
 
-### Installing the command completions on Zsh
+#### Installing the command completions on Zsh
 
 In order to enable completion into `zsh` you first need to have `compinit` loaded;
 ensure your `.zshrc` file contains the following lines:

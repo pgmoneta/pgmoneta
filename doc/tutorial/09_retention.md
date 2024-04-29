@@ -1,15 +1,15 @@
-# Retention Policy
+## Retention Policy
 
 This tutorial will show you how to configure retention to retain backups.
 
-## Preface
+### Preface
 
 This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
 
-## Retention Setup
+### Retention Setup
 
 In `pgmoneta.conf`, you can use `retention = 7, 4, 12, 5` to configure pgmoneta to retain backups
 within the nearest 7 days, 4 weeks, 12 months and 5 years. Specifically, pgmoneta will retain
@@ -26,8 +26,10 @@ If you don't configure retention, by default pgmoneta keeps backups within the n
 (weeks, months, years) are unspecified. 
 Additionally, if you are using prometheus, unspecified values will be shown as `0`.
 
-## Retention Validation Rule
+### Retention Validation Rule
+
 Current validation rule is:
+
 1. Retention days >= 1
 2. If retention months is specified, then 1 <= weeks <= 4, otherwise weeks >= 1
 3. If retention years is specified, then 1 <= months <= 12, otherwise months >= 1

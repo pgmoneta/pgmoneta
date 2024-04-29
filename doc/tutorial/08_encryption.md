@@ -1,15 +1,15 @@
-# Encryption and Decryption
+## Encryption and Decryption
 
 This tutorial will show you how to use encryption and decryption features in pgmoneta.
 
-## Preface
+### Preface
 
 This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
 
-## Enable Encryption and Decryption in pgmoneta workflow
+### Enable Encryption and Decryption in pgmoneta workflow
 
 By default, the encryption is disabled. To enable this feature, modify `pgmoneta.conf`:
 
@@ -20,7 +20,7 @@ encryption = aes-256-cbc
 
 Many encryption modes are supported, see [Configuration](../CONFIGURATION.md) for details.
 
-## Encryption and Decryption Commands
+### Encryption and Decryption Commands
 
 pgmoneta use the same key created by `pgmoneta-admin master-key` to encrypt and decrypt files.
 

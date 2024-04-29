@@ -15,23 +15,23 @@ Currently, primarily supported platforms covered in this tutorial are:
 
 `pgmoneta` requires:
 
-* [gcc 8+](https://gcc.gnu.org) (C17)
-* [cmake](https://cmake.org)
-* [make](https://www.gnu.org/software/make/)
-* [libev](http://software.schmorp.de/pkg/libev.html)
-* [OpenSSL](http://www.openssl.org/)
-* [zlib](https://zlib.net)
-* [zstd](http://www.zstd.net)
-* [lz4](https://lz4.github.io/lz4/)
-* [bzip2](http://sourceware.org/bzip2/)
-* [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
-* [rst2man](https://docutils.sourceforge.io/)
-* [libssh](https://www.libssh.org/)
-* [libcurl](https://curl.se/libcurl/)
-* [libarchive](http://www.libarchive.org/)
-* [cJSON](https://github.com/DaveGamble/cJSON)
-* [pandoc](https://pandoc.org/)
-* [texlive](https://www.tug.org/texlive/)
+* [gcc 8+][gcc](C17)
+* [cmake][cmake]
+* [make][make]
+* [libev][libev]
+* [OpenSSL][openssl]
+* [zlib][zlib]
+* [zstd][zstd]
+* [lz4][lz4]
+* [bzip2][bzip2]
+* [systemd][systemd]
+* [rst2man][rst2man]
+* [libssh][libssh]
+* [libcurl][libcurl]
+* [libarchive][libarchive]
+* [cJSON][cjson]
+* [pandoc][pandoc]
+* [texlive][texlive]
 
 On Fedora, these can be installed using `dnf` or `yum`:
 
@@ -158,4 +158,4 @@ Remember to set the `log_level` configuration option to `debug5`.
 
 ## Install
 
-The installation process of `pgmoneta` is the same on all platforms. Please follow the instructions in the [tutorial](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md).
+The installation process of `pgmoneta` is the same on all platforms. Please follow the instructions in the [tutorial][t_install].

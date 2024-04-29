@@ -10,7 +10,7 @@ A container organizes a set of blobs, similar to a directory in a file system. A
 
 To create an Azure storage account with the Azure portal:
 
-1. Sign in to the [Azure portal](https://portal.azure.com/#home).
+1. Sign in to the [Azure portal][azure].
 
 2. From the left portal menu, select Storage accounts to display a list of your storage accounts. If the portal menu isn't visible, click the menu button to toggle it on.
 

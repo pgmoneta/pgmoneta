@@ -14,11 +14,13 @@ for Fedora 38, this will install PostgreSQL 15
 
 ### Pre-install
 
+#### Basic dependencies
+
 ``` sh
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel pandoc texlive-scheme-basic 'tex(footnote.sty)'
+dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel
 ```
 
-### Choose what suits you, if above didn't work
+Choose what suits you, if above didn't work
 
 ``` sh
 dnf install cmake
@@ -32,6 +34,38 @@ dnf install libssh-devel
 dnf install libcurl-devel
 dnf install systemd-devel
 ```
+
+#### Generate user and developer guide
+
+This process is optional. If you choose not to generate the PDF and HTML files, you can opt out of downloading these dependencies, and the process will automatically skip the generation.
+
+1. Download dependencies
+
+    ``` sh
+    dnf install pandoc texlive-scheme-basic
+    ```
+
+2. Download Eisvogel
+
+    Use the command `pandoc --version` to locate the user data directory. On Fedora systems, this directory is typically located at `/root/.local/share/pandoc`.
+
+    Download the `Eisvogel` template for `pandoc`, please visit the [pandoc-latex-template](https://github.com/Wandmalfarbe/pandoc-latex-template) repository. For a standard installation, you can follow the steps outlined below.
+
+    ```sh
+    wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/2.4.2/Eisvogel-2.4.2.tar.gz
+    tar -xzf Eisvogel-2.4.2.tar.gz
+    mkdir /root/.local/share/pandoc # user data directory
+    mkdir /root/.local/share/pandoc/templates
+    mv eisvogel.latex /root/.local/share/pandoc/templates/
+    ```
+
+3. Add package for latex
+
+    Download the additional packages required for generating PDF and HTML files.
+
+    ```sh
+    dnf install 'tex(footnote.sty)' 'tex(footnotebackref.sty)' 'tex(pagecolor.sty)' 'tex(hardwrap.sty)' 'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' 'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' 'tex(titling.sty)' 'tex(csquotes.sty)' 'tex(zref-abspage.sty)' 'tex(needspace.sty)'
+    ```
 
 ### Build
 

@@ -4,8 +4,8 @@
 
 Here are some links that will help you
 
-* [How to Squash Commits in Git](https://www.git-tower.com/learn/git/faq/git-squash)
-* [ProGit book](https://github.com/progit/progit2/releases)
+* [How to Squash Commits in Git][git_squash]
+* [ProGit book][progit]
 
 ## Basic steps
 

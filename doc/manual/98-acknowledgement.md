@@ -30,22 +30,22 @@ Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 
 ## Contributing
 
-Contributions to `pgmoneta` are managed on [GitHub.com](https://github.com/pgmoneta/pgmoneta/)
+Contributions to `pgmoneta` are managed on [GitHub.com][pgmoneta]
 
-* [Ask a question](https://github.com/pgmoneta/pgmoneta/discussions)
-* [Raise an issue](https://github.com/pgmoneta/pgmoneta/issues)
-* [Feature request](https://github.com/pgmoneta/pgmoneta/issues)
-* [Code submission](https://github.com/pgmoneta/pgmoneta/pulls)
+* [Ask a question][ask]
+* [Raise an issue][issue]
+* [Feature request][request]
+* [Code submission][submission]
 
 Contributions are most welcome!
 
-Please, consult our [Code of Conduct](https://github.com/pgmoneta/pgmoneta/blob/main/CODE_OF_CONDUCT.md) policies for interacting in our
+Please, consult our [Code of Conduct][conduct] policies for interacting in our
 community.
 
-Consider giving the project a [star](https://github.com/pgmoneta/pgmoneta/stargazers) on
-[GitHub](https://github.com/pgmoneta/pgmoneta/) if you find it useful. And, feel free to follow
-the project on [Twitter](https://twitter.com/pgmoneta/) as well.
+Consider giving the project a [star][star] on
+[GitHub][pagmoneta] if you find it useful. And, feel free to follow
+the project on [Twitter][twitter] as well.
 
 ## License
 
-[BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause)
+[BSD-3-Clause][license]
