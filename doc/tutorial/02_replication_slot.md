@@ -1,15 +1,15 @@
-# Replication slot for pgmoneta
+## Replication slot for pgmoneta
 
 This tutorial will show you how to add a replication slot for pgmoneta.
 
-## Preface
+### Preface
 
 This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
 
-## Add replication slot
+### Add replication slot
 
 ```
 psql postgres
@@ -41,7 +41,7 @@ Replication slot(s) named according to `wal_slot` will be created automatically 
 
 (`postgres` user)
 
-## Change the pgmoneta configuration
+### Change the pgmoneta configuration
 
 Change `pgmoneta.conf` to add
 
@@ -61,7 +61,7 @@ wal_slot = repl
 
 (`pgmoneta` user)
 
-## Restart pgmoneta
+### Restart pgmoneta
 
 Stop pgmoneta and start it again with
 

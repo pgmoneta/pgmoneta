@@ -8,29 +8,29 @@ We recommend using `Fedora` to test and run pgmoneta, but other Linux systems an
 
 `pgmoneta` requires
 
-* [gcc 8+](https://gcc.gnu.org) (C17)
-* [cmake](https://cmake.org)
-* [make](https://www.gnu.org/software/make/)
-* [libev](http://software.schmorp.de/pkg/libev.html)
-* [OpenSSL](http://www.openssl.org/)
-* [zlib](https://zlib.net)
-* [zstd](http://www.zstd.net)
-* [lz4](https://lz4.github.io/lz4/)
-* [bzip2](http://sourceware.org/bzip2/)
-* [systemd](https://www.freedesktop.org/wiki/Software/systemd/)
-* [rst2man](https://docutils.sourceforge.io/)
-* [libssh](https://www.libssh.org/)
-* [libcurl](https://curl.se/libcurl/)
-* [libarchive](http://www.libarchive.org/)
-* [cJSON](https://github.com/DaveGamble/cJSON)
-* [pandoc](https://pandoc.org/)
-* [texlive](https://www.tug.org/texlive/)
+* [gcc 8+][gcc](C17)
+* [cmake][cmake]
+* [make][make]
+* [libev][libev]
+* [OpenSSL][openssl]
+* [zlib][zlib]
+* [zstd][zstd]
+* [lz4][lz4]
+* [bzip2][bzip2]
+* [systemd][systemd]
+* [rst2man][rst2man]
+* [libssh][libssh]
+* [libcurl][libcurl]
+* [libarchive][libarchive]
+* [cJSON][cjson]
+* [pandoc][pandoc]
+* [texlive][texlive]
 
 ```sh
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel pandoc texlive-scheme-basic 'tex(footnote.sty)'
+dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel pandoc texlive-scheme-basic 'tex(footnote.sty)' 'tex(footnotebackref.sty)' 'tex(pagecolor.sty)' 'tex(hardwrap.sty)' 'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' 'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' 'tex(titling.sty)'
 ```
 
-Alternative [clang 8+](https://clang.llvm.org/) can be used.
+Alternative [clang 8+][clang] can be used.
 
 ## Build
 
@@ -48,7 +48,7 @@ make
 sudo make install
 ```
 
-See [RPM](https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md) for how to build a RPM of `pgmoneta`.
+See [RPM][rpm] for how to build a RPM of `pgmoneta`.
 
 ### Debug build
 
@@ -118,7 +118,7 @@ wal_slot = repl
 
 In our main section called `[pgmoneta]` we setup `pgmoneta` to listen on all network addresses. We will enable Prometheus metrics on port 5001 and have the backups live in the `/home/pgmoneta` directory. All backups are being compressed with zstd and kept for 7 days. Logging will be performed at `info` level and put in a file called `/tmp/pgmoneta.log`. Last we specify the location of the `unix_socket_dir` used for management operations and the path for the PostgreSQL command line tools.
 
-Next we create a section called `[primary]` which has the information about our [PostgreSQL](https://www.postgresql.org) instance. In this case it is running on `localhost` on port `5432` and we will use the `repl` user account to connect, and the Write+Ahead slot will be named `repl` as well.
+Next we create a section called `[primary]` which has the information about our [PostgreSQL][postgresql] instance. In this case it is running on `localhost` on port `5432` and we will use the `repl` user account to connect, and the Write+Ahead slot will be named `repl` as well.
 
 The `repl` user must have the `REPLICATION` role and have access to the `postgres` database,
 so for example
@@ -294,22 +294,22 @@ Next steps in improving pgmoneta's configuration could be
 * Update `pgmoneta.conf` with the required settings for your system
 * Enable Transport Layer Security v1.2+ (TLS) for administrator access
 
-See [Configuration](https://github.com/pgmoneta/pgmoneta/blob/main/doc/CONFIGURATION.md) for more information on these subjects.
+See [Configuration][configuration] for more information on these subjects.
 
 ## Tutorials
 
 There are a few short tutorials available to help you better understand and configure `pgmoneta`:
 
-* [Installing pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
-* [Using a replication slot](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_replication_slot.md)
-* [Enabling remote management](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/03_remote_management.md)
-* [Enabling Prometheus metrics](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/04_prometheus.md)
-* [Doing backup and restore](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_backup_restore.md)
-* [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_archive.md)
-* [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md)
-* [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
-* [Retention](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_retention.md)
-* [Enabling Grafana dashboard](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_grafana.md)
-* [Add WAL shipping](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/11_wal_shipping.md)
-* [Working with Transport Level Security](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_tls.md)
-* [Hot standby](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/13_hot_standby.md)
+* [Installing pgmoneta][t_install]
+* [Using a replication slot][t_replication_slot]
+* [Enabling remote management][t_remote_management]
+* [Enabling Prometheus metrics][t_prometheus]
+* [Doing backup and restore][t_backup_restore]
+* [Creating an archive][t_archive]
+* [Deleting a backup][t_delete]
+* [Encryption and decryption][t_encryption]
+* [Retention][t_retention]
+* [Enabling Grafana dashboard][t_grafana]
+* [Add WAL shipping][t_wal_shipping]
+* [Working with Transport Level Security][t_tls]
+* [Hot standby][t_hot_standby]

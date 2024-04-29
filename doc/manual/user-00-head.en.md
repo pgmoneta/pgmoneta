@@ -1,2 +1,0 @@
-% pgmoneta
-% User Guide

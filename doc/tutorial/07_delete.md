@@ -1,15 +1,15 @@
-# Delete a backup
+## Delete a backup
 
 This tutorial will show you how to delete a backup from pgmoneta.
 
-## Preface
+### Preface
 
 This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
 
-## Delete the oldest backup
+### Delete the oldest backup
 
 ```
 pgmoneta-cli -c pgmoneta.conf delete primary oldest

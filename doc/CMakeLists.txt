@@ -1,9 +1,3 @@
-# Files
-FILE(GLOB PREDS "manual/0?-*.en.md")
-FILE(GLOB POSTDS "manual/9?-*.en.md")
-FILE(GLOB UMDS "manual/user-??-*.en.md")
-FILE(GLOB DMDS "manual/dev-??-*.en.md")
-
 # man target
 add_custom_target(man ALL)
 
@@ -16,9 +10,6 @@ set(PGMONETA_ADMIN_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/man/pgmoneta-admin.1.rs
 set(PGMONETA_ADMIN_DST_FILE "${CMAKE_CURRENT_BINARY_DIR}/pgmoneta-admin.1")
 set(PGMONETA_CONF_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/man/pgmoneta.conf.5.rst")
 set(PGMONETA_CONF_DST_FILE "${CMAKE_CURRENT_BINARY_DIR}/pgmoneta.conf.5")
-
-# Manuals
-set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
 
 # pgmoneta.1
 add_custom_command(
@@ -69,33 +60,53 @@ install(FILES ${PGMONETA_CONF_DST_FILE} DESTINATION share/man/man5)
 #
 # Generate manual
 #
-add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf -s -f markdown-smart -N --toc ${PREDS} ${UMDS} ${POSTDS}
+if(generation)
+  # Files
+  FILE(GLOB PREDS "manual/0?-*.md")
+  FILE(GLOB POSTDS "manual/9?-*.md")
+  FILE(GLOB TDS "tutorial/??_*.md")
+  FILE(GLOB UMDS "manual/user-??-*.md")
+  FILE(GLOB DMDS "manual/dev-??-*.md")
+
+  # Manuals definitions
+  set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
+  get_filename_component(PARENT_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
+  set(IMAGE_DIR "${PARENT_DIR}/doc/images")
+
+  add_custom_target(
+    copy_images
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${IMAGE_DIR} ${CMAKE_BINARY_DIR}/images
+    COMMENT "Copy images"
+  )
+
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf --from markdown --template eisvogel --listings -N --toc ${PREDS} ${UMDS} ${TDS} ${POSTDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide PDF documentation"
-)
-add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf -s -f markdown-smart -N --toc ${PREDS} ${DMDS} ${POSTDS}
+  )
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf --from markdown --template eisvogel --listings -N --toc ${PREDS} ${DMDS} ${POSTDS}
     DEPENDS ${DMDS}
     COMMENT "Generating Developer Guide PDF documentation"
-)
+  )
 
-add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${UMDS} ${POSTDS}
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${UMDS} ${TDS} ${POSTDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide HTML documentation"
-)
-add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${DMDS} ${POSTDS}
+  )
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${DMDS} ${POSTDS}
     DEPENDS ${DMDS}
     COMMENT "Generating Developer Guide HTML documentation"
-)
+  )
 
-add_custom_target(
+  add_custom_target(
     all_docs ALL
-    DEPENDS ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.en.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.en.html
-)
+    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html
+  )
+endif()

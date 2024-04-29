@@ -8,7 +8,7 @@ First of all, you need to have an AWS account, an IAM user and S3 bucket.
 
 To create an IAM user:
 
-1. Sign in to the AWS Management Console and open the [IAM console](https://console.aws.amazon.com/iam/).
+1. Sign in to the AWS Management Console and open the [IAM console][aws_iam].
 
 2. In the navigation pane, choose Users and then choose Add users.
 
@@ -28,13 +28,13 @@ To create an IAM user:
 
 You are now ready to create a S3 bucket, To create a S3 bucket:
 
-1. Sign in to the AWS Management Console using your IAM user credentials and open the [Amazon S3 console](https://console.aws.amazon.com/s3/).
+1. Sign in to the AWS Management Console using your IAM user credentials and open the [Amazon S3 console][aws_s3].
 
 2. Choose Create bucket.
 
 3. In Bucket name, enter a name for your bucket.
 
-4. In Region, choose the AWS Region where you want the bucket to reside. 
+4. In Region, choose the AWS Region where you want the bucket to reside.
 
 5. Keep the default values as it is and Choose Create bucket.
 

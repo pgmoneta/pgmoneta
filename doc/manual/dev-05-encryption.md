@@ -52,7 +52,7 @@ pgmoneta-cli encrypt <file>
 
 ## Benchmark
 
-Check if your CPU have [AES-NI](https://en.wikipedia.org/wiki/AES_instruction_set)
+Check if your CPU have [AES-NI][aes_ni]
 
 ```sh
 cat /proc/cpuinfo | grep aes

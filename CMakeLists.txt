@@ -32,6 +32,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 message(STATUS "pgmoneta ${VERSION_STRING}")
 
+set(generation TRUE)
+
 include(CheckCCompilerFlag)
 include(CheckCSourceCompiles)
 include(CheckLinkerFlag)
@@ -79,14 +81,16 @@ find_package(Pandoc)
 if (PANDOC_FOUND)
   message(STATUS "pandoc found")
 else ()
-  message(FATAL_ERROR "pandoc needed")
+  set(generation FALSE)
+  message(STATUS "pandoc needed. The generation process will be skipped.")
 endif()
 
 find_package(Pdflatex)
 if (PDFLATEX_FOUND)
   message(STATUS "pdflatex found")
 else ()
-  message(FATAL_ERROR "pdflatex needed")
+  set(generation FALSE)
+  message(STATUS "pdflatex needed. The generation process will be skipped.")
 endif()
 
 find_package(ZLIB)

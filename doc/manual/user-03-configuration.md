@@ -8,7 +8,7 @@ The configuration of `pgmoneta` is split into sections using the `[` and `]` cha
 
 The main section, called `[pgmoneta]`, is where you configure the overall properties of `pgmoneta`.
 
-Other sections doesn't have any requirements to their naming so you can give them meaningful names like `[primary]` for the primary [PostgreSQL](https://www.postgresql.org) instance.
+Other sections doesn't have any requirements to their naming so you can give them meaningful names like `[primary]` for the primary [PostgreSQL][postgresql] instance.
 
 All properties are in the format `key = value`.
 
@@ -16,29 +16,29 @@ The characters `#` and `;` can be used for comments; must be the first character
 
 The `Bool` data type supports the following values: `on`, `yes`, `1`, `true`, `off`, `no`, `0` and `false`.
 
-See a [sample](https://github.com/pgmoneta/pgmoneta/blob/main/doc/etc/pgmoneta.conf) configuration for running `pgmoneta` on `localhost`.
+See a [sample][sample] configuration for running `pgmoneta` on `localhost`.
 
 ## [pgmoneta]
 
-| Property | Default | Unit | Required | Description |
-|----------|---------|------|----------|-------------|
-| host | | String | Yes | The bind address for pgmoneta |
-| unix_socket_dir | | String | Yes | The Unix Domain Socket location |
-| base_dir | | String | Yes | The base directory for the backup |
-| metrics | 0 | Int | No | The metrics port (disable = 0) |
-| metrics_cache_max_age | 0 | String | No | The number of seconds to keep in cache a Prometheus (metrics) response. If set to zero, the caching will be disabled. Can be a string with a suffix, like `2m` to indicate 2 minutes |
-| metrics_cache_max_size | 256k | String | No | The maximum amount of data to keep in cache when serving Prometheus responses. Changes require restart. This parameter determines the size of memory allocated for the cache even if `metrics_cache_max_age` or `metrics` are disabled. Its value, however, is taken into account only if `metrics_cache_max_age` is set to a non-zero value. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes).|
-| management | 0 | Int | No | The remote management port (disable = 0) |
-| compression | zstd | String | No | The compression type (none, gzip, client-gzip, server-gzip, zstd, client-zstd, server-zstd, lz4, client-lz4, server-lz4, bzip2, client-bzip2) |
-| compression_level | 3 | Int | No | The compression level |
-| workers | 0 | Int | No | The number of workers that each process can use for its work. Use 0 to disable |
-| storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure) |
-| encryption | none | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes` or `aes-256` or `aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192` or `aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128` or `aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length |
-| create_slot | no | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
-| ssh_hostname | | String | Yes | Defines the hostname of the remote system for connection |
-| ssh_username | | String | Yes | Defines the username of the remote system for connection |
-| ssh_base_dir | | String | Yes | The base directory for the remote backup |
-| ssh_ciphers | aes-256-ctr, aes-192-ctr, aes-128-ctr | String | No | The supported ciphers for communication. `aes` or `aes-256` or `aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192` or `aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128` or `aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length. Otherwise verbatim |
+| Property              |Default|Unit  |Required| Description |
+|-----------------------|-------|------|--------|-------------|
+| host                  |       |String|  Yes   | The bind address for pgmoneta |
+| unix_socket_dir       |       |String|  Yes   | The Unix Domain Socket location |
+| base_dir              |       |String|  Yes   | The base directory for the backup |
+| metrics               |   0   | Int  |   No   | The metrics port (disable = 0) |
+| metrics_cache_max_age |   0   |String|   No   | The number of seconds to keep in cache a Prometheus (metrics) response. If set to zero, the caching will be disabled. Can be a string with a suffix, like `2m` to indicate 2 minutes |
+| metrics_cache_max_size| 256k  |String|  No    | The maximum amount of data to keep in cache when serving Prometheus responses. Changes require restart. This parameter determines the size of memory allocated for the cache even if `metrics_cache_max_age` or `metrics` are disabled. Its value, however, is taken into account only if `metrics_cache_max_age` is set to a non-zero value. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes).|
+| management            |   0   | Int  |   No   | The remote management port (disable = 0) |
+| compression           | zstd  |String|   No   | The compression type (none, gzip, client-gzip, server-gzip, zstd, client-zstd, server-zstd, lz4, client-lz4, server-lz4, bzip2, client-bzip2) |
+| compression_level     |   3   | Int  |   No   | The compression level |
+| workers               |   0   | Int  |   No   | The number of workers that each process can use for its work. Use 0 to disable |
+| storage_engine        | local |String|   No   | The storage engine type (local, ssh, s3, azure) |
+| encryption            | none  |String|   No   | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes` or `aes-256` or `aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192` or `aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128` or `aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length |
+| create_slot           |   no  | Bool |   No   | Create a replication slot for all server. Valid values are: yes, no |
+| ssh_hostname          |       |String|  Yes   | Defines the hostname of the remote system for connection |
+| ssh_username          |       |String|  Yes   | Defines the username of the remote system for connection |
+| ssh_base_dir          |       |String|  Yes   | The base directory for the remote backup |
+| ssh_ciphers           | aes-256-ctr, aes-192-ctr, aes-128-ctr | String | No | The supported ciphers for communication. `aes` or `aes-256` or `aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192` or `aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128` or `aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length. Otherwise verbatim |
 | s3_aws_region | | String | Yes | The AWS region |
 | s3_access_key_id | | String | Yes | The IAM access key ID |
 | s3_secret_access_key | | String | Yes | The IAM secret access key |
@@ -62,7 +62,7 @@ See a [sample](https://github.com/pgmoneta/pgmoneta/blob/main/doc/etc/pgmoneta.c
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. |
 | tls_key_file | | String | No | Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. |
 | tls_ca_file | | String | No | Certificate Authority (CA) file for TLS. This file must be owned by either the user running pgmoneta or root.  |
-| libev | `auto` | String | No | Select the [libev](http://software.schmorp.de/pkg/libev.html) backend to use. Valid options: `auto`, `select`, `poll`, `epoll`, `iouring`, `devpoll` and `port` |
+| libev | `auto` | String | No | Select the [libev][libev] backend to use. Valid options: `auto`, `select`, `poll`, `epoll`, `iouring`, `devpoll` and `port` |
 | buffer_size | 65535 | Int | No | The network buffer size (`SO_RCVBUF` and `SO_SNDBUF`) |
 | backup_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the backup rate|
 | network_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate|
@@ -76,8 +76,8 @@ See a [sample](https://github.com/pgmoneta/pgmoneta/blob/main/doc/etc/pgmoneta.c
 
 ## Server section
 
-| Property | Default | Unit | Required | Description |
-|----------|---------|------|----------|-------------|
+| Property       | Default | Unit | Required | Description |
+|----------------|---------|------|----------|-------------|
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
