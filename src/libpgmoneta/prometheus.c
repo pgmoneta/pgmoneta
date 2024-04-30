@@ -1118,7 +1118,7 @@ general_information(int client_fd)
    d = NULL;
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping The disk space used for WAL shipping for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping{");
@@ -1147,7 +1147,7 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_used_space The disk space used for WAL shipping of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_used_space\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_used_space gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_used_space{");
@@ -1175,7 +1175,7 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_free_space The free disk space for WAL shipping of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_free_space\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_free_space gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_free_space{");
@@ -1204,7 +1204,7 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_total_space The total disk space for WAL shipping of a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_total_space\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_total_space gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_total_space{");
