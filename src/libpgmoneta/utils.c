@@ -2753,6 +2753,31 @@ pgmoneta_get_server_wal_shipping_wal(int server)
 }
 
 char*
+pgmoneta_get_server_hot_standby(int server)
+{
+   struct configuration* config;
+   char* hs = NULL;
+
+   config = (struct configuration*)shmem;
+
+   if (strlen(config->servers[server].hot_standby) > 0)
+   {
+      hs = pgmoneta_append(hs, config->servers[server].hot_standby);
+
+      if (!pgmoneta_ends_with(hs, "/"))
+      {
+         hs = pgmoneta_append(hs, "/");
+      }
+
+      hs = pgmoneta_append(hs, config->servers[server].name);
+
+      return hs;
+   }
+
+   return NULL;
+}
+
+char*
 pgmoneta_get_server_backup_identifier(int server, char* identifier)
 {
    char* d = NULL;

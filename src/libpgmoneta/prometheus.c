@@ -355,6 +355,15 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_wal_shipping_total_space</h2>\n");
    data = pgmoneta_append(data, "  The total disk space for the WAL shipping directory of a server\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_hot_standby</h2>\n");
+   data = pgmoneta_append(data, "  The disk space used for hot standby for a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_hot_standby_free_space</h2>\n");
+   data = pgmoneta_append(data, "  The free disk space for the hot standby directory of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_hot_standby_total_space</h2>\n");
+   data = pgmoneta_append(data, "  The total disk space for the hot standby directory of a server\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_server_timeline</h2>\n");
    data = pgmoneta_append(data, "  The current timeline a server is on\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -1205,6 +1214,97 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_wal_shipping(i);
+
+      if (d != NULL)
+      {
+         size = pgmoneta_total_space(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   free(d);
+
+   d = NULL;
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby The disk space used for hot standby for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_hot_standby{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_hot_standby(i);
+
+      if (d != NULL)
+      {
+         size = pgmoneta_directory_size(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_free_space The free disk space for hot standby of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_free_space gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_hot_standby_free_space{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_hot_standby(i);
+
+      if (d != NULL)
+      {
+         size = pgmoneta_free_space(d);
+         data = pgmoneta_append_ulong(data, size);
+      }
+      else
+      {
+         data = pgmoneta_append_ulong(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+
+      free(d);
+      d = NULL;
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_total_space The total disk space for hot standby of a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_total_space gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_hot_standby_total_space{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      d = pgmoneta_get_server_hot_standby(i);
 
       if (d != NULL)
       {

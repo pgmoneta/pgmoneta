@@ -806,6 +806,14 @@ char*
 pgmoneta_get_server_wal_shipping_wal(int server);
 
 /**
+ * Get the hot standby directory for a server
+ * @param server The server
+ * @return The hot standby directory
+ */
+char*
+pgmoneta_get_server_hot_standby(int server);
+
+/**
  * Get the backup directory for a server with an identifier
  * @param server The server
  * @param identifier The identifier
