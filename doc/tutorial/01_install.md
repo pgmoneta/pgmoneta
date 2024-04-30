@@ -16,15 +16,12 @@ For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
 
 ```
+dnf -qy module disable postgresql
 dnf install -y postgresql13 postgresql13-server pgmoneta
 ```
 
 ### Initialize cluster
-
 ```
-# If you use dnf to install your postgres, 
-# chances are the binary file is in /usr/bin/,
-# so use that instead of /usr/pgsql-13/bin
 export PATH=/usr/pgsql-13/bin:$PATH
 initdb /tmp/pgsql
 ```

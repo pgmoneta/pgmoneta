@@ -2,73 +2,10 @@
 
 # Quick start
 
-## Compiling the source
-
-We recommend using `Fedora` to test and run pgmoneta, but other Linux systems and macOS are also supported.
-
-`pgmoneta` requires
-
-* [gcc 8+][gcc](C17)
-* [cmake][cmake]
-* [make][make]
-* [libev][libev]
-* [OpenSSL][openssl]
-* [zlib][zlib]
-* [zstd][zstd]
-* [lz4][lz4]
-* [bzip2][bzip2]
-* [systemd][systemd]
-* [rst2man][rst2man]
-* [libssh][libssh]
-* [libcurl][libcurl]
-* [libarchive][libarchive]
-* [cJSON][cjson]
-* [pandoc][pandoc]
-* [texlive][texlive]
-
-```sh
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel pandoc texlive-scheme-basic 'tex(footnote.sty)' 'tex(footnotebackref.sty)' 'tex(pagecolor.sty)' 'tex(hardwrap.sty)' 'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' 'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' 'tex(titling.sty)'
-```
-
-Alternative [clang 8+][clang] can be used.
-
-## Build
-
-### Release build
-
-The following commands will install `pgmoneta` in the `/usr/local` hierarchy.
-
-```sh
-git clone https://github.com/pgmoneta/pgmoneta.git
-cd pgmoneta
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
-make
-sudo make install
-```
-
-See [RPM][rpm] for how to build a RPM of `pgmoneta`.
-
-### Debug build
-
-The following commands will create a `DEBUG` version of `pgmoneta`.
-
-```sh
-git clone https://github.com/pgmoneta/pgmoneta.git
-cd pgmoneta
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
-make
-```
-
-## Check
-
 Make sure that `pgmoneta` is installed and in your path by using `pgmoneta -?`. You should see
 
 ``` console
-pgmoneta 0.11.0
+pgmoneta 0.12.0
   Backup / restore solution for PostgreSQL
 
 Usage:
@@ -295,21 +232,3 @@ Next steps in improving pgmoneta's configuration could be
 * Enable Transport Layer Security v1.2+ (TLS) for administrator access
 
 See [Configuration][configuration] for more information on these subjects.
-
-## Tutorials
-
-There are a few short tutorials available to help you better understand and configure `pgmoneta`:
-
-* [Installing pgmoneta][t_install]
-* [Using a replication slot][t_replication_slot]
-* [Enabling remote management][t_remote_management]
-* [Enabling Prometheus metrics][t_prometheus]
-* [Doing backup and restore][t_backup_restore]
-* [Creating an archive][t_archive]
-* [Deleting a backup][t_delete]
-* [Encryption and decryption][t_encryption]
-* [Retention][t_retention]
-* [Enabling Grafana dashboard][t_grafana]
-* [Add WAL shipping][t_wal_shipping]
-* [Working with Transport Level Security][t_tls]
-* [Hot standby][t_hot_standby]
