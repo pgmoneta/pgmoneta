@@ -16,7 +16,7 @@ For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
 
 ```
-dnf install -y postgresql10 postgresql10-server pgmoneta
+dnf install -y postgresql13 postgresql13-server pgmoneta
 ```
 
 ## Initialize cluster
@@ -24,8 +24,8 @@ dnf install -y postgresql10 postgresql10-server pgmoneta
 ```
 # If you use dnf to install your postgres, 
 # chances are the binary file is in /usr/bin/,
-# so use that instead of /usr/pgsql-10/bin
-export PATH=/usr/pgsql-10/bin:$PATH
+# so use that instead of /usr/pgsql-13/bin
+export PATH=/usr/pgsql-13/bin:$PATH
 initdb /tmp/pgsql
 ```
 
