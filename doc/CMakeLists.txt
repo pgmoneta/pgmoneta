@@ -65,7 +65,8 @@ if(generation)
   FILE(GLOB PREDS "manual/0?-*.md")
   FILE(GLOB POSTDS "manual/9?-*.md")
   FILE(GLOB TDS "tutorial/??_*.md")
-  FILE(GLOB UMDS "manual/user-??-*.md")
+  FILE(GLOB UMDS_PRE "manual/user-0?-*.md")
+  FILE(GLOB UMDS_POST "manual/user-1?-*.md")
   FILE(GLOB DMDS "manual/dev-??-*.md")
 
   # Manuals definitions
@@ -81,7 +82,7 @@ if(generation)
 
   add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf --from markdown --template eisvogel --listings -N --toc ${PREDS} ${UMDS} ${TDS} ${POSTDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf --from markdown --template eisvogel --listings -N --toc ${PREDS} ${UMDS_PRE} ${TDS} ${UMDS_POST} ${POSTDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide PDF documentation"
   )
@@ -94,7 +95,7 @@ if(generation)
 
   add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${UMDS} ${TDS} ${POSTDS}
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${UMDS_PRE} ${TDS} ${UMDS_POST} ${POSTDS}
     DEPENDS ${UMDS}
     COMMENT "Generating User Guide HTML documentation"
   )
