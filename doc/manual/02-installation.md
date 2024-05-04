@@ -44,9 +44,9 @@ dnf install -y pgmoneta
 
 ## Compiling the source
 
-We recommend using Fedora to test and run pgmoneta, but other Linux systems, FreeBSD and MacOS are also supported.
+We recommend using Fedora to test and run [**pgmoneta**][pgmoneta], but other Linux systems, FreeBSD and MacOS are also supported.
 
-pgmoneta requires
+[**pgmoneta**][pgmoneta] requires
 
 * [gcc 8+](https://gcc.gnu.org) (C17)
 * [cmake](https://cmake.org)
@@ -118,7 +118,7 @@ dnf config-manager --set-enabled crb
 dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 ```
 
-Then use the `dnf` command for `pgmoneta` to install the required packages.
+Then use the `dnf` command for [**pgmoneta**][pgmoneta] to install the required packages.
 
 
 ### FreeBSD
@@ -136,7 +136,7 @@ git gcc cmake libev openssl libssh zlib-ng zstd liblz4 bzip2 curl \
 
 #### Release build
 
-The following commands will install `pgmoneta` in the `/usr/local` hierarchy.
+The following commands will install [**pgmoneta**][pgmoneta] in the `/usr/local` hierarchy.
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
@@ -148,11 +148,11 @@ make
 sudo make install
 ```
 
-See [RPM](https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md) for how to build a RPM of `pgmoneta`.
+See [RPM](https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md) for how to build a RPM of [**pgmoneta**][pgmoneta].
 
 #### Debug build
 
-The following commands will create a `DEBUG` version of `pgmoneta`.
+The following commands will create a `DEBUG` version of [**pgmoneta**][pgmoneta].
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
@@ -165,7 +165,7 @@ make
 
 ## Compiling the documentation
 
-pgmoneta's documentation requires
+[**pgmoneta**][pgmoneta]'s documentation requires
 
 * [pandoc](https://pandoc.org/)
 * [texlive](https://www.tug.org/texlive/)

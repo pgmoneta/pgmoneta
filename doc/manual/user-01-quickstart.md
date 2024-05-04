@@ -2,7 +2,7 @@
 
 # Quick start
 
-Make sure that `pgmoneta` is installed and in your path by using `pgmoneta -?`. You should see
+Make sure that [**pgmoneta**][pgmoneta] is installed and in your path by using `pgmoneta -?`. You should see
 
 ``` console
 pgmoneta 0.12.0
@@ -21,7 +21,7 @@ Options:
   -?, --help               Display help
 ```
 
-If you encounter any issues following the above steps, you can refer to the **Developer Guide** under **Install pgmoneta** to see how to compile and install pgmoneta on your system.
+If you encounter any issues following the above steps, you can refer to the **Installation** chapter to see how to install or compile pgmoneta on your system.
 
 ## Configuration
 
@@ -53,7 +53,7 @@ user = repl
 wal_slot = repl
 ```
 
-In our main section called `[pgmoneta]` we setup `pgmoneta` to listen on all network addresses. We will enable Prometheus metrics on port 5001 and have the backups live in the `/home/pgmoneta` directory. All backups are being compressed with zstd and kept for 7 days. Logging will be performed at `info` level and put in a file called `/tmp/pgmoneta.log`. Last we specify the location of the `unix_socket_dir` used for management operations and the path for the PostgreSQL command line tools.
+In our main section called `[pgmoneta]` we setup [**pgmoneta**][pgmoneta] to listen on all network addresses. We will enable Prometheus metrics on port 5001 and have the backups live in the `/home/pgmoneta` directory. All backups are being compressed with zstd and kept for 7 days. Logging will be performed at `info` level and put in a file called `/tmp/pgmoneta.log`. Last we specify the location of the `unix_socket_dir` used for management operations and the path for the PostgreSQL command line tools.
 
 Next we create a section called `[primary]` which has the information about our [PostgreSQL][postgresql] instance. In this case it is running on `localhost` on port `5432` and we will use the `repl` user account to connect, and the Write+Ahead slot will be named `repl` as well.
 
@@ -67,11 +67,11 @@ CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';
 and in `pg_hba.conf`
 
 ``` ini
-local   postgres        repl                                   scram-sha-256
-host    postgres        repl           127.0.0.1/32            scram-sha-256
-host    postgres        repl           ::1/128                 scram-sha-256
-host    replication     repl           127.0.0.1/32            scram-sha-256
-host    replication     repl           ::1/128                 scram-sha-256
+local   postgres       repl                     scram-sha-256
+host    postgres       repl    127.0.0.1/32     scram-sha-256
+host    postgres       repl    ::1/128          scram-sha-256
+host    replication    repl    127.0.0.1/32     scram-sha-256
+host    replication    repl    ::1/128          scram-sha-256
 ```
 
 The authentication type should be based on `postgresql.conf`'s `password_encryption` value.
@@ -91,13 +91,13 @@ pgmoneta-admin master-key
 pgmoneta-admin -f pgmoneta_users.conf user add
 ```
 
-We are now ready to run `pgmoneta`.
+We are now ready to run [**pgmoneta**][pgmoneta].
 
-See charpter **Configuration** for all configuration options.
+See the **Configuration** charpter for all configuration options.
 
 ## Running
 
-We will run `pgmoneta` using the command
+We will run [**pgmoneta**][pgmoneta] using the command
 
 ``` sh
 pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
@@ -105,16 +105,16 @@ pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
 
 If this doesn't give an error, then we are ready to do backups.
 
-`pgmoneta` is stopped by pressing Ctrl-C (`^C`) in the console where you started it, or by sending the `SIGTERM` signal to the process using `kill <pid>`.
+[**pgmoneta**][pgmoneta] is stopped by pressing Ctrl-C (`^C`) in the console where you started it, or by sending the `SIGTERM` signal to the process using `kill <pid>`.
 
 ## Run-time administration
 
-`pgmoneta` has a run-time administration tool called `pgmoneta-cli`.
+[**pgmoneta**][pgmoneta] has a run-time administration tool called `pgmoneta-cli`.
 
 You can see the commands it supports by using `pgmoneta-cli -?` which will give
 
 ``` console
-pgmoneta-cli 0.11.0
+pgmoneta-cli 0.12.0
   Command line utility for pgmoneta
 
 Usage:
@@ -150,7 +150,7 @@ Commands:
                            - 'prometheus' to reset the Prometheus statistics
 ```
 
-This tool can be used on the machine running `pgmoneta` to do a backup like
+This tool can be used on the machine running [**pgmoneta**][pgmoneta] to do a backup like
 
 ``` sh
 pgmoneta-cli -c pgmoneta.conf backup primary
@@ -180,12 +180,12 @@ If pgmoneta has both Transport Layer Security (TLS) and `management` enabled the
 
 ## Administration
 
-`pgmoneta` has an administration tool called `pgmoneta-admin`, which is used to control user registration with `pgmoneta`.
+[**pgmoneta**][pgmoneta] has an administration tool called `pgmoneta-admin`, which is used to control user registration with [**pgmoneta**][pgmoneta].
 
 You can see the commands it supports by using `pgmoneta-admin -?` which will give
 
 ``` console
-pgmoneta-admin 0.11.0
+pgmoneta-admin 0.12.0
   Administration utility for pgmoneta
 
 Usage:
