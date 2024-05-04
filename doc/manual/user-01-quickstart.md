@@ -36,8 +36,6 @@ base_dir = /home/pgmoneta
 
 compression = zstd
 
-storage_engine = local
-
 retention = 7
 
 log_type = file

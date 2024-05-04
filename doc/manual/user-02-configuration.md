@@ -4,9 +4,9 @@
 
 The configuration is loaded from either the path specified by the `-c` flag or `/etc/pgmoneta/pgmoneta.conf`.
 
-The configuration of `pgmoneta` is split into sections using the `[` and `]` characters.
+The configuration of [**pgmoneta**][pgmoneta] is split into sections using the `[` and `]` characters.
 
-The main section, called `[pgmoneta]`, is where you configure the overall properties of `pgmoneta`.
+The main section, called `[pgmoneta]`, is where you configure the overall properties of [**pgmoneta**][pgmoneta].
 
 Other sections doesn't have any requirements to their naming so you can give them meaningful names like `[primary]` for the primary [PostgreSQL][postgresql] instance.
 
@@ -16,7 +16,7 @@ The characters `#` and `;` can be used for comments; must be the first character
 
 The `Bool` data type supports the following values: `on`, `yes`, `1`, `true`, `off`, `no`, `0` and `false`.
 
-See a [sample][sample] configuration for running `pgmoneta` on `localhost`.
+See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `localhost`.
 
 ## [pgmoneta]
 
@@ -99,7 +99,7 @@ The `user` specified must have the `REPLICATION` option in order to stream the W
 
 Note, that PostgreSQL 13+ is required, as well as having `wal_level` at `replica` or `logical` level.
 
-Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will connect using a Unix Domain Socket.
+Note, that if `host` starts with a `/` it represents a path and [**pgmoneta**][pgmoneta] will connect using a Unix Domain Socket.
 
 ## pgmoneta_users configuration
 
