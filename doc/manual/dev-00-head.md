@@ -8,4 +8,5 @@ titlepage-color: "0064A5"
 titlepage-text-color: "000000"
 titlepage-rule-color: "360049"
 titlepage-rule-height: 0
+toc-own-page: true
 ...
