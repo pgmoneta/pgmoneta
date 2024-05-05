@@ -42,18 +42,17 @@
   [configuration]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/CONFIGURATION.md
 <!-- doc/tutorial -->
   [t_install]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md
-  [t_replication_slot]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_replication_slot.md
-  [t_remote_management]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/03_remote_management.md
-  [t_prometheus]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/04_prometheus.md
-  [t_backup_restore]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_backup_restore.md
-  [t_archive]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_archive.md
-  [t_delete]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md
-  [t_encryption]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md
-  [t_retention]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_retention.md
-  [t_grafana]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_grafana.md
-  [t_wal_shipping]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/11_wal_shipping.md
-  [t_tls]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_tls.md
-  [t_hot_standby]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/13_hot_standby.md
+  [t_remote_management]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_remote_management.md
+  [t_prometheus]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/03_prometheus.md
+  [t_backup_restore]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/04_backup_restore.md
+  [t_archive]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_archive.md
+  [t_delete]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_delete.md
+  [t_encryption]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_encryption.md
+  [t_retention]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_retention.md
+  [t_grafana]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_grafana.md
+  [t_wal_shipping]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_wal_shipping.md
+  [t_tls]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/11_tls.md
+  [t_hot_standby]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_hot_standby.md
 <!-- doc/etc -->
   [sample]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/etc/pgmoneta.conf
 

@@ -1,10 +1,10 @@
 ## Encryption and Decryption
 
-This tutorial will show you how to use encryption and decryption features in pgmoneta.
+This tutorial will show you how to use encryption and decryption features in [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 ### Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 13+ and [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
@@ -22,7 +22,7 @@ Many encryption modes are supported, see [Configuration](../CONFIGURATION.md) fo
 
 ### Encryption and Decryption Commands
 
-pgmoneta use the same key created by `pgmoneta-admin master-key` to encrypt and decrypt files.
+[**pgmoneta**](https://github.com/pgmoneta/pgmoneta) use the same key created by `pgmoneta-admin master-key` to encrypt and decrypt files.
 
 Encrypt a file with `pgmoneta-cli encrypt`, the file will be encrypted in place and remove unencrypted file on success.
 ```sh

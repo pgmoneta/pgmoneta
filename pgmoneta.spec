@@ -59,18 +59,17 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/contrib/shell_comp/pgmoneta_comp.zsh %{buildroot}%{_docdir}/%{name}/shell_comp/pgmoneta_comp.zsh
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/01_install.md %{buildroot}%{_docdir}/%{name}/tutorial/01_install.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/02_replication_slot.md %{buildroot}%{_docdir}/%{name}/tutorial/02_replication_slot.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/03_remote_management.md %{buildroot}%{_docdir}/%{name}/tutorial/03_remote_management.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/04_prometheus.md %{buildroot}%{_docdir}/%{name}/tutorial/04_prometheus.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/05_backup_restore.md %{buildroot}%{_docdir}/%{name}/tutorial/05_backup_restore.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/06_archive.md %{buildroot}%{_docdir}/%{name}/tutorial/06_archive.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/07_delete.md %{buildroot}%{_docdir}/%{name}/tutorial/07_delete.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/08_encryption.md %{buildroot}%{_docdir}/%{name}/tutorial/08_encryption.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/09_retention.md %{buildroot}%{_docdir}/%{name}/tutorial/09_retention.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/10_grafana.md %{buildroot}%{_docdir}/%{name}/tutorial/10_grafana.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/11_wal_shipping.md %{buildroot}%{_docdir}/%{name}/tutorial/11_wal_shipping.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/12_tls.md %{buildroot}%{_docdir}/%{name}/tutorial/12_tls.md
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/13_hot_standby.md %{buildroot}%{_docdir}/%{name}/tutorial/13_hot_standby.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/02_remote_management.md %{buildroot}%{_docdir}/%{name}/tutorial/02_remote_management.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/03_prometheus.md %{buildroot}%{_docdir}/%{name}/tutorial/03_prometheus.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/04_backup_restore.md %{buildroot}%{_docdir}/%{name}/tutorial/04_backup_restore.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/05_archive.md %{buildroot}%{_docdir}/%{name}/tutorial/05_archive.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/06_delete.md %{buildroot}%{_docdir}/%{name}/tutorial/06_delete.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/07_encryption.md %{buildroot}%{_docdir}/%{name}/tutorial/07_encryption.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/08_retention.md %{buildroot}%{_docdir}/%{name}/tutorial/08_retention.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/09_grafana.md %{buildroot}%{_docdir}/%{name}/tutorial/09_grafana.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/10_wal_shipping.md %{buildroot}%{_docdir}/%{name}/tutorial/10_wal_shipping.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/11_tls.md %{buildroot}%{_docdir}/%{name}/tutorial/11_tls.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/12_hot_standby.md %{buildroot}%{_docdir}/%{name}/tutorial/12_hot_standby.md
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
@@ -111,18 +110,17 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/shell_comp/pgmoneta_comp.bash
 %{_docdir}/%{name}/shell_comp/pgmoneta_comp.zsh
 %{_docdir}/%{name}/tutorial/01_install.md
-%{_docdir}/%{name}/tutorial/02_replication_slot.md
-%{_docdir}/%{name}/tutorial/03_remote_management.md
-%{_docdir}/%{name}/tutorial/04_prometheus.md
-%{_docdir}/%{name}/tutorial/05_backup_restore.md
-%{_docdir}/%{name}/tutorial/06_archive.md
-%{_docdir}/%{name}/tutorial/07_delete.md
-%{_docdir}/%{name}/tutorial/08_encryption.md
-%{_docdir}/%{name}/tutorial/09_retention.md
-%{_docdir}/%{name}/tutorial/10_grafana.md
-%{_docdir}/%{name}/tutorial/11_wal_shipping.md
-%{_docdir}/%{name}/tutorial/12_tls.md
-%{_docdir}/%{name}/tutorial/13_hot_standby.md
+%{_docdir}/%{name}/tutorial/02_remote_management.md
+%{_docdir}/%{name}/tutorial/03_prometheus.md
+%{_docdir}/%{name}/tutorial/04_backup_restore.md
+%{_docdir}/%{name}/tutorial/05_archive.md
+%{_docdir}/%{name}/tutorial/06_delete.md
+%{_docdir}/%{name}/tutorial/07_encryption.md
+%{_docdir}/%{name}/tutorial/08_retention.md
+%{_docdir}/%{name}/tutorial/09_grafana.md
+%{_docdir}/%{name}/tutorial/10_wal_shipping.md
+%{_docdir}/%{name}/tutorial/11_tls.md
+%{_docdir}/%{name}/tutorial/12_hot_standby.md
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*

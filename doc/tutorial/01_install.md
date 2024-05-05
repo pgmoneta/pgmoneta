@@ -1,16 +1,16 @@
 ## Install pgmoneta
 
-This tutorial will show you how to do a simple installation of pgmoneta.
+This tutorial will show you how to do a simple installation of [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 At the end of this tutorial you will have a backup of a PostgreSQL cluster,
-and will be streaming Write-Ahead Log (WAL) to pgmoneta. 
+and will be streaming Write-Ahead Log (WAL) to [**pgmoneta**](https://github.com/pgmoneta/pgmoneta). 
 
 Please note that inside the brackets at the end of each step it's the user account
 you should be using, switch the account when needed.
 
 ### Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 13+ and [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
@@ -97,6 +97,16 @@ Then
 ```
 psql postgres
 CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';
+\q
+```
+
+(`postgres` user)
+
+### Add Write-Ahead Log (WAL) replication slot
+
+```
+psql postgres
+SELECT pg_create_physical_replication_slot('repl', true, false);
 \q
 ```
 

@@ -1,12 +1,12 @@
 ## Use of Transport Level Security (TLS)
 
-This tutorial is about using Transport Level Security (TLS) in PostgreSQL, and how it affects pgmoneta.
+This tutorial is about using Transport Level Security (TLS) in PostgreSQL, and how it affects [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 **Note, that this tutorial is an example on how to setup a PostgreSQL TLS environment for development use only !**
 
 ### Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 13+, OpenSSL and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 13+, OpenSSL and [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.

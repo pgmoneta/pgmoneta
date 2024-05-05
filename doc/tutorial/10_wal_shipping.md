@@ -8,7 +8,7 @@ You do not need to make sure the directory is unique for each server, the WAL co
 
 ### Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 13+ and pgmoneta.
+This tutorial assumes that you have an installation of PostgreSQL 13+ and [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
@@ -21,7 +21,7 @@ In order to use WAL shipping, simply add
 wal_shipping = your/local/wal/shipping/directory
 ```
 
-to the corresponding server section of `pgmoneta.conf`, pgmoneta will create the directory if it doesn't exist, 
+to the corresponding server section of `pgmoneta.conf`, [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will create the directory if it doesn't exist, 
 and ship a copy of WAL segments under the subdirectory `your/local/wal/shipping/directory/server_name/wal`.
 
 ### Prometheus
