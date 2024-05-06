@@ -2,7 +2,7 @@
 
 # RPM
 
-`pgmoneta` can be built into a RPM for [Fedora][fedora] systems.
+[**pgmoneta**][pgmoneta] can be built into a RPM for [Fedora][fedora] systems.
 
 ## Requirements
 

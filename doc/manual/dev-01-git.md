@@ -38,7 +38,16 @@ git checkout -b mywork main
 
 ### Make the changes
 
-Remember to verify the compile and execution of the code
+Remember to verify the compile and execution of the code.
+
+Use
+
+```
+[#xyz] Description
+```
+
+as the commit message where `[#xyz]` is the issue number for the work, and
+`Description` is a short description of the issue in the first line
 
 ### Multiple commits
 
@@ -67,7 +76,17 @@ When you are done with your changes force push your branch
 git push -f origin mywork
 ```
 
-and then create a pull requests for it
+and then create a pull request for it
+
+### Format source code
+
+Use
+
+``` sh
+./uncrustify.sh
+```
+
+to format the source code
 
 ### Repeat
 

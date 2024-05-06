@@ -4,7 +4,7 @@
 
 ## Overview
 
-`pgmoneta` use a process model (`fork()`), where each process handles one Write-Ahead Log (WAL) receiver to [PostgreSQL][postgresql].
+[**pgmoneta**][pgmoneta] use a process model (`fork()`), where each process handles one Write-Ahead Log (WAL) receiver to [PostgreSQL][postgresql].
 
 The main process is defined in [main.c][main_c].
 
@@ -24,9 +24,9 @@ Compression is handled in [gzip.h][gzip_h] ([gzip.c][gzip_c]) and [zstandard.h][
 
 ## Shared memory
 
-A memory segment ([shmem.h][shmem_h]) is shared among all processes which contains the `pgmoneta` state containing the configuration and the list of servers.
+A memory segment ([shmem.h][shmem_h]) is shared among all processes which contains the [**pgmoneta**][pgmoneta] state containing the configuration and the list of servers.
 
-The configuration of `pgmoneta` (`struct configuration`) and the configuration of the servers (`struct server`) is initialized in this shared memory segment. These structs are all defined in [pgmoneta.h][pgmoneta_h].
+The configuration of [**pgmoneta**][pgmoneta] (`struct configuration`) and the configuration of the servers (`struct server`) is initialized in this shared memory segment. These structs are all defined in [pgmoneta.h][pgmoneta_h].
 
 The shared memory segment is created using the `mmap()` call.
 
@@ -48,7 +48,7 @@ The memory interface is defined in [memory.h][memory_h] ([memory.c][memory_c]).
 
 ## Management
 
-`pgmoneta` has a management interface which defines the administrator abilities that can be performed when it is running. This include for example taking a backup. The `pgmoneta-cli` program is used for these operations ([cli.c][cli_c]).
+[**pgmoneta**][pgmoneta] has a management interface which defines the administrator abilities that can be performed when it is running. This include for example taking a backup. The `pgmoneta-cli` program is used for these operations ([cli.c][cli_c]).
 
 The management interface use Unix Domain Socket for communication.
 
@@ -76,17 +76,17 @@ Each process has its own event loop, such that the process only gets notified wh
 
 ## Signals
 
-The main process of `pgmoneta` supports the following signals `SIGTERM`, `SIGINT` and `SIGALRM` as a mechanism for shutting down. The `SIGABRT` is used to request a core dump (`abort()`).
+The main process of [**pgmoneta**][pgmoneta] supports the following signals `SIGTERM`, `SIGINT` and `SIGALRM` as a mechanism for shutting down. The `SIGABRT` is used to request a core dump (`abort()`).
 
 The `SIGHUP` signal will trigger a reload of the configuration.
 
-It should not be needed to use `SIGKILL` for `pgmoneta`. Please, consider using `SIGABRT` instead, and share the core dump and debug logs with the `pgmoneta` community.
+It should not be needed to use `SIGKILL` for [**pgmoneta**][pgmoneta]. Please, consider using `SIGABRT` instead, and share the core dump and debug logs with the [**pgmoneta**][pgmoneta] community.
 
 ## Reload
 
 The `SIGHUP` signal will trigger a reload of the configuration.
 
-However, some configuration settings requires a full restart of `pgmoneta` in order to take effect. These are
+However, some configuration settings requires a full restart of [**pgmoneta**][pgmoneta] in order to take effect. These are
 
 * `hugepage`
 * `libev`

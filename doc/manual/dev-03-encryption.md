@@ -4,7 +4,7 @@
 
 ## Overview
 
-AES Cipher block chaining (CBC) mode and AES Counter (CTR) mode are supported in pgmoneta. The default setup is no encryption.
+AES Cipher block chaining (CBC) mode and AES Counter (CTR) mode are supported in [**pgmoneta**][pgmoneta]. The default setup is no encryption.
 
 CBC is the most commonly used and considered save mode. Its main drawbacks are that encryption is sequential (decryption can be parallelized).
 
