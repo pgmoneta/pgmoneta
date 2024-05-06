@@ -130,7 +130,7 @@ pgmoneta-cli expunge primary oldest
 
 ## ping
 
-Verify if pgmoneta is alive
+Verify if [**pgmoneta**][pgmoneta] is alive
 
 Command
 
@@ -146,7 +146,7 @@ pgmoneta-cli ping
 
 ## stop
 
-Stop pgmoneta
+Stop [**pgmoneta**][pgmoneta]
 
 Command
 
@@ -162,7 +162,7 @@ pgmoneta-cli stop
 
 ## status
 
-Status of pgmoneta, with a `details` option
+Status of [**pgmoneta**][pgmoneta], with a `details` option
 
 Command
 

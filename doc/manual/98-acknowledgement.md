@@ -4,7 +4,7 @@
 
 ## Authors
 
-pgmoneta was created by the following authors:
+[**pgmoneta**][pgmoneta] was created by the following authors:
 
 ```
 Jesper Pedersen <jesper.pedersen@comcast.net>
@@ -30,7 +30,7 @@ Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 
 ## Contributing
 
-Contributions to `pgmoneta` are managed on [GitHub.com][pgmoneta]
+Contributions to [**pgmoneta**][pgmoneta] are managed on [GitHub][pgmoneta]
 
 * [Ask a question][ask]
 * [Raise an issue][issue]
