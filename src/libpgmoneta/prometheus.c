@@ -310,7 +310,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_link</h2>\n");
-   data = pgmoneta_append(data, "  Use links to limit backup size\n");
+   data = pgmoneta_append(data, "  Use symbolic links for backups\n");
    data = pgmoneta_append(data, "  <ul>\n");
    data = pgmoneta_append(data, "    <li>1 = Yes</li>\n");
    data = pgmoneta_append(data, "    <li>0 = No</li>\n");
@@ -754,7 +754,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
-   data = pgmoneta_append(data, "        <td>server</td>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
    data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -769,7 +769,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
-   data = pgmoneta_append(data, "        <td>server</td>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
    data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
    data = pgmoneta_append(data, "      </tr>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -1064,7 +1064,7 @@ general_information(int client_fd)
    data = pgmoneta_append_int(data, config->compression_type);
    data = pgmoneta_append(data, "\n\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_link Use links to limit backup size\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_link Use symbolic links for backups\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_link gauge\n");
    data = pgmoneta_append(data, "pgmoneta_link ");
    data = pgmoneta_append_bool(data, config->link);
@@ -2821,7 +2821,7 @@ size_information(int client_fd)
    {
       data = pgmoneta_append(data, "pgmoneta_current_wal_file{");
 
-      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, "name=\"");
       data = pgmoneta_append(data, config->servers[i].name);
       data = pgmoneta_append(data, "\", ");
 
@@ -2842,7 +2842,7 @@ size_information(int client_fd)
    {
       data = pgmoneta_append(data, "pgmoneta_current_wal_lsn{");
 
-      data = pgmoneta_append(data, "server=\"");
+      data = pgmoneta_append(data, "name=\"");
       data = pgmoneta_append(data, config->servers[i].name);
       data = pgmoneta_append(data, "\", ");
 

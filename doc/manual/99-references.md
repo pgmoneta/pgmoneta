@@ -40,6 +40,7 @@
 <!-- doc/ -->
   [rpm]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md
   [configuration]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/CONFIGURATION.md
+  [prometheus]: https://prometheus.io/
 <!-- doc/tutorial -->
   [t_install]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md
   [t_remote_management]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_remote_management.md
