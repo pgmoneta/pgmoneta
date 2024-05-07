@@ -31,7 +31,6 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/etc
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/shell_comp
 %{__mkdir} -p %{buildroot}%{_docdir}/%{name}/tutorial
-%{__mkdir} -p %{buildroot}%{_docdir}/%{name}/manual
 %{__mkdir} -p %{buildroot}%{_mandir}/man1
 %{__mkdir} -p %{buildroot}%{_mandir}/man5
 %{__mkdir} -p %{buildroot}%{_sysconfdir}/pgmoneta
