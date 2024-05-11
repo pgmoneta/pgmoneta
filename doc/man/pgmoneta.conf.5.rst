@@ -145,9 +145,6 @@ azure_base_dir
 retention
   The retention time in days, weeks, months, years. Default is 7, - , - , -
 
-link
-  Use links to limit backup size. Default is true
-
 log_type
   The logging type (console, file, syslog). Default is console
 

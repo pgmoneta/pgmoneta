@@ -137,11 +137,8 @@ wf_backup(void)
       current = current->next;
    }
 
-   if (config->link)
-   {
-      current->next = pgmoneta_workflow_create_link();
-      current = current->next;
-   }
+   current->next = pgmoneta_workflow_create_link();
+   current = current->next;
 
    current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_BACKUP);
    current = current->next;

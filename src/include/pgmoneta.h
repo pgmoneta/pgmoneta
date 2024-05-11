@@ -319,7 +319,6 @@ struct configuration
    int retention_weeks;                 /**< The retention weeks for the server */
    int retention_months;                /**< The retention months for the server */
    int retention_years;                 /**< The retention years for the server */
-   bool link;     /**< Use link */
 
    int log_type;                      /**< The logging type */
    int log_level;                     /**< The logging level */

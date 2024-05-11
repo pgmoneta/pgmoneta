@@ -668,11 +668,6 @@ pgmoneta_management_write_status(int socket, bool offline)
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_status", socket, config->link ? 1 : 0))
-   {
-      goto error;
-   }
-
    if (write_int32("pgmoneta_management_write_status", socket, config->workers))
    {
       goto error;
@@ -883,11 +878,6 @@ pgmoneta_management_write_details(int socket, bool offline)
    }
 
    if (write_int64("pgmoneta_management_write_details", socket, total_size))
-   {
-      goto error;
-   }
-
-   if (write_int32("pgmoneta_management_write_details", socket, config->link ? 1 : 0))
    {
       goto error;
    }
@@ -1740,7 +1730,6 @@ read_status_json(SSL* ssl, int socket)
    int retention_weeks;
    int retention_months;
    int retention_years;
-   int link;
    int num_servers;
    int number_of_directories;
    int workers;
@@ -1787,12 +1776,6 @@ read_status_json(SSL* ssl, int socket)
    size_string = pgmoneta_bytes_to_string(total_size);
    cJSON_AddStringToObject(status, "Total space", size_string);
    free(size_string);
-
-   if (read_int32("pgmoneta_management_read_status", socket, &link))
-   {
-      goto error;
-   }
-   cJSON_AddStringToObject(status, "Link", link == 1 ? "Yes" : "No");
 
    if (read_int32("pgmoneta_management_read_status", socket, &workers))
    {
@@ -1909,7 +1892,6 @@ read_details_json(SSL* ssl, int socket)
    int retention_weeks;
    int retention_months;
    int retention_years;
-   int link;
    int num_servers;
    int number_of_backups;
    unsigned long backup_size;
@@ -1966,12 +1948,6 @@ read_details_json(SSL* ssl, int socket)
    size_string = pgmoneta_bytes_to_string(total_size);
    cJSON_AddStringToObject(status, "Total space", size_string);
    free(size_string);
-
-   if (read_int32("pgmoneta_management_read_details", socket, &link))
-   {
-      goto error;
-   }
-   cJSON_AddStringToObject(status, "Link", link == 1 ? "Yes" : "No");
 
    if (read_int32("pgmoneta_management_read_status", socket, &workers))
    {
@@ -2430,12 +2406,6 @@ print_status_json(cJSON* json)
       printf("Free space       : %s\n", total_space->valuestring);
    }
 
-   cJSON* link = cJSON_GetObjectItemCaseSensitive(status, "Link");
-   if (link != NULL)
-   {
-      printf("Link             : %s\n", link->valuestring);
-   }
-
    cJSON* workers = cJSON_GetObjectItemCaseSensitive(status, "Workers");
    if (workers != NULL)
    {
@@ -2523,12 +2493,6 @@ print_details_json(cJSON* json)
    if (total_space != NULL)
    {
       printf("Free space       : %s\n", total_space->valuestring);
-   }
-
-   cJSON* link = cJSON_GetObjectItemCaseSensitive(status, "Link");
-   if (link != NULL)
-   {
-      printf("Link             : %s\n", link->valuestring);
    }
 
    cJSON* workers = cJSON_GetObjectItemCaseSensitive(status, "Workers");

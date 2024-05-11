@@ -108,8 +108,6 @@ pgmoneta_init_configuration(void* shm)
    config->retention_months = -1;
    config->retention_years = -1;
 
-   config->link = true;
-
    config->tls = false;
 
    config->blocking_timeout = 30;
@@ -1155,20 +1153,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                                       &srv.retention_weeks,
                                       &srv.retention_months,
                                       &srv.retention_years))
-                     {
-                        unknown = true;
-                     }
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
-               else if (!strcmp(key, "link"))
-               {
-                  if (!strcmp(section, "pgmoneta"))
-                  {
-                     if (as_bool(value, &config->link))
                      {
                         unknown = true;
                      }
@@ -2989,7 +2973,6 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->retention_weeks = reload->retention_weeks;
    config->retention_months = reload->retention_months;
    config->retention_years = reload->retention_years;
-   config->link = reload->link;
 
    /* log_type */
    restart_int("log_type", config->log_type, reload->log_type);

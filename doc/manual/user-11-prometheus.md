@@ -53,14 +53,6 @@ The compression used
 
 4 = BZIP2
 
-## pgmoneta_link
-
-Use symbolic links for backups
-
-1 = Yes
-
-0 = No
-
 ## pgmoneta_used_space
 
 The disk space used for pgmoneta

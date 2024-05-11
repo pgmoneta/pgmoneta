@@ -309,13 +309,6 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    <li>4 = BZIP2</li>\n");
    data = pgmoneta_append(data, "  </ul>\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_link</h2>\n");
-   data = pgmoneta_append(data, "  Use symbolic links for backups\n");
-   data = pgmoneta_append(data, "  <ul>\n");
-   data = pgmoneta_append(data, "    <li>1 = Yes</li>\n");
-   data = pgmoneta_append(data, "    <li>0 = No</li>\n");
-   data = pgmoneta_append(data, "  </ul>\n");
-   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_used_space</h2>\n");
    data = pgmoneta_append(data, "  The disk space used for pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
@@ -1062,12 +1055,6 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "#TYPE pgmoneta_compression gauge\n");
    data = pgmoneta_append(data, "pgmoneta_compression ");
    data = pgmoneta_append_int(data, config->compression_type);
-   data = pgmoneta_append(data, "\n\n");
-
-   data = pgmoneta_append(data, "#HELP pgmoneta_link Use symbolic links for backups\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_link gauge\n");
-   data = pgmoneta_append(data, "pgmoneta_link ");
-   data = pgmoneta_append_bool(data, config->link);
    data = pgmoneta_append(data, "\n\n");
 
    d = NULL;
