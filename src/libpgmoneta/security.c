@@ -109,6 +109,8 @@ static int  create_ssl_ctx(bool client, SSL_CTX** ctx);
 static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
 static int  create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl);
 
+static int create_hash_file(char* filename, const char* algorithm, char** hash);
+
 int
 pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
 {
@@ -2810,53 +2812,109 @@ error:
    return 1;
 }
 
-int
-pgmoneta_generate_file_sha256_hash(char* filename, char** sha256)
+static int
+create_hash_file(char* filename, const char* algorithm, char** hash)
 {
+   EVP_MD_CTX* md_ctx;
+   const EVP_MD* md;
+   unsigned char md_value[EVP_MAX_MD_SIZE];
+   unsigned int md_len;
+   FILE* file = NULL;
    char read_buf[16384];
    unsigned long read_bytes = 0;
    int i = 0;
-   FILE* file = NULL;
-   SHA256_CTX sha256_ctx;
-   unsigned char hash[SHA256_DIGEST_LENGTH];
-   char* sha256_buf;
+   char* hash_buf;
+   unsigned int hash_len;
 
-   *sha256 = NULL;
+   md = EVP_get_digestbyname(algorithm);
+   if (md == NULL)
+   {
+      pgmoneta_log_error("Invalid message digest: %s", algorithm);
+      return 1;
+   }
+
+   if (strcmp("SHA256", algorithm) == 0)
+   {
+      hash_len = 65;
+   }
+   else if (strcmp("SHA384", algorithm) == 0)
+   {
+      hash_len = 97;
+   }
+   else
+   {
+      hash_len = 129;
+   }
+
+   hash_buf = malloc(hash_len);
+
+   memset(hash_buf, 0, hash_len);
+
+   md_ctx = EVP_MD_CTX_new();
+
+   if (!EVP_DigestInit_ex2(md_ctx, md, NULL))
+   {
+      pgmoneta_log_error("Message digest initialization failed");
+      EVP_MD_CTX_free(md_ctx);
+      return 1;
+   }
 
    file = fopen(filename, "rb");
-
    if (file == NULL)
    {
       return 1;
    }
 
-   sha256_buf = malloc(65);
-
-   memset(sha256_buf, 0, 65);
-
    memset(read_buf, 0, sizeof(read_buf));
-
-   SHA256_Init(&sha256_ctx);
 
    while ((read_bytes = fread(read_buf, 1, sizeof(read_buf), file)) > 0)
    {
-      SHA256_Update(&sha256_ctx, read_buf, read_bytes);
+      if (!EVP_DigestUpdate(md_ctx, read_buf, read_bytes))
+      {
+         pgmoneta_log_error("Message digest update failed");
+         EVP_MD_CTX_free(md_ctx);
+         return 1;
+      }
    }
 
-   SHA256_Final(hash, &sha256_ctx);
-
-   for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+   if (!EVP_DigestFinal_ex(md_ctx, md_value, &md_len))
    {
-      sprintf(&sha256_buf[i * 2], "%02x", hash[i]);
+      pgmoneta_log_error("Message digest finalization failed");
+      EVP_MD_CTX_free(md_ctx);
+      return 1;
    }
 
-   sha256_buf[64] = 0;
+   EVP_MD_CTX_free(md_ctx);
 
-   *sha256 = sha256_buf;
+   for (i = 0; i < md_len; i++)
+   {
+      sprintf(&hash_buf[i * 2], "%02x", md_value[i]);
+   }
+
+   hash_buf[hash_len - 1] = 0;
+   *hash = hash_buf;
 
    fclose(file);
 
    return 0;
+}
+
+int
+pgmoneta_create_sha256_file(char* filename, char** sha256)
+{
+   return create_hash_file(filename, "SHA256", sha256);
+}
+
+int
+pgmoneta_create_sha384_file(char* filename, char** sha384)
+{
+   return create_hash_file(filename, "SHA384", sha384);
+}
+
+int
+pgmoneta_create_sha512_file(char* filename, char** sha512)
+{
+   return create_hash_file(filename, "SHA512", sha512);
 }
 
 int

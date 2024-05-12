@@ -96,7 +96,25 @@ pgmoneta_tls_valid(void);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_generate_file_sha256_hash(char* filename, char** sha256);
+pgmoneta_create_sha256_file(char* filename, char** sha256);
+
+/**
+ * Generate SHA384 for a file
+ * @param filename The file path
+ * @param sha384 The hash value
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_sha384_file(char* filename, char** sha384);
+
+/**
+ * Generate SHA512 for a file
+ * @param filename The file path
+ * @param sha512 The hash value
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_sha512_file(char* filename, char** sha512);
 
 /**
  * Generate SHA256 for a string.

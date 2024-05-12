@@ -442,7 +442,7 @@ manifest_file_hash(char* algorithm, char* file_path, char** hash)
    int stat = 0;
    if (pgmoneta_compare_string(algorithm, "SHA256"))
    {
-      stat = pgmoneta_generate_file_sha256_hash(file_path, hash);
+      stat = pgmoneta_create_sha256_file(file_path, hash);
    }
    else if (pgmoneta_compare_string(algorithm, "CRC32C") || pgmoneta_compare_string(algorithm, "SHA224") ||
             pgmoneta_compare_string(algorithm, "SHA384") || pgmoneta_compare_string(algorithm, "SHA512"))

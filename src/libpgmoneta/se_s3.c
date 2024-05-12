@@ -234,7 +234,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
       goto error;
    }
 
-   pgmoneta_generate_file_sha256_hash(local_path, &file_sha256);
+   pgmoneta_create_sha256_file(local_path, &file_sha256);
 
    s3_host = s3_get_host();
 
