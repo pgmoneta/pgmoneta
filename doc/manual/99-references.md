@@ -21,7 +21,6 @@
   [libssh]: https://www.libssh.org/
   [libcurl]: https://curl.se/libcurl/
   [libarchive]: http://www.libarchive.org/
-  [cjson]: https://github.com/DaveGamble/cJSON
   [pandoc]: https://pandoc.org/
   [pandoc_latex_template]: https://github.com/Wandmalfarbe/pandoc-latex-template
   [texlive]: https://www.tug.org/texlive/

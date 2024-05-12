@@ -28,28 +28,25 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <json.h>
 #include <logging.h>
 #include <manifest.h>
 #include <security.h>
 #include <utils.h>
 
 /* system */
-#include <cjson/cJSON.h>
 #include <stdio.h>
 #include <string.h>
 
-static void manifest_init(struct manifest** manifest);
-static void manifest_file_init(struct manifest_file** file, char* path, char* checksum, char* algorithm, size_t size);
-static void manifest_file_free(struct manifest_file* file);
 static int manifest_file_hash(char* algorithm, char* file_path, char** hash);
 
 int
 pgmoneta_manifest_checksum_verify(char* root)
 {
    char manifest_path[MAX_PATH];
-   char* manifest_sha256 = NULL;
-   struct manifest* manifest = NULL;
-   struct manifest_file* file = NULL;
+   char* key_path[1] = {"Files"};
+   struct json_reader* reader = NULL;
+   struct json* file = NULL;
 
    memset(manifest_path, 0, MAX_PATH);
    if (pgmoneta_ends_with(root, "/"))
@@ -60,239 +57,114 @@ pgmoneta_manifest_checksum_verify(char* root)
    {
       snprintf(manifest_path, MAX_PATH, "%s/%s", root, "backup_manifest");
    }
-
-   if (pgmoneta_parse_manifest(manifest_path, &manifest))
+   if (pgmoneta_json_reader_init(manifest_path, &reader))
    {
       goto error;
    }
-   // first check manifest checksum, it's always a SHA256 hash
-   pgmoneta_generate_string_sha256_hash(manifest->content, &manifest_sha256);
-   if (!pgmoneta_compare_string(manifest_sha256, manifest->checksum))
+   if (pgmoneta_json_locate(reader, key_path, 1))
    {
-      pgmoneta_log_error("Manifest checksum mismatch. Getting %s, should be %s", manifest_sha256, manifest->checksum);
+      pgmoneta_log_error("cannot locate files array in manifest %s", manifest_path);
       goto error;
    }
-   file = manifest->files;
-   while (file != NULL)
+   while (pgmoneta_json_next_array_item(reader, &file))
    {
       char file_path[MAX_PATH];
       size_t file_size = 0;
+      size_t file_size_manifest = 0;
       char* hash = NULL;
+      char* algorithm = NULL;
+      char* checksum = NULL;
 
       memset(file_path, 0, MAX_PATH);
       if (pgmoneta_ends_with(root, "/"))
       {
-         snprintf(file_path, MAX_PATH, "%s%s", root, file->path);
+         snprintf(file_path, MAX_PATH, "%s%s", root, pgmoneta_json_get_string_value(file, "Path"));
       }
       else
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", root, file->path);
-      }
-      file_size = pgmoneta_get_file_size(file_path);
-      if (file_size != file->size)
-      {
-         pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file->size);
+         snprintf(file_path, MAX_PATH, "%s/%s", root, pgmoneta_json_get_string_value(file, "Path"));
       }
 
-      if (manifest_file_hash(file->algorithm, file_path, &hash))
+      file_size = pgmoneta_get_file_size(file_path);
+      file_size_manifest = pgmoneta_json_get_int64_value(file, "Size");
+      if (file_size != file_size_manifest)
       {
-         pgmoneta_log_error("Unable to generate hash for file %s with algorithm %s", file_path, file->algorithm);
+         pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file_size_manifest);
+      }
+
+      algorithm = pgmoneta_json_get_string_value(file, "Checksum-Algorithm");
+      if (manifest_file_hash(algorithm, file_path, &hash))
+      {
+         pgmoneta_log_error("Unable to generate hash for file %s with algorithm %s", file_path, algorithm);
          goto error;
       }
-      if (!pgmoneta_compare_string(hash, file->checksum))
+
+      checksum = pgmoneta_json_get_string_value(file, "Checksum");
+      if (!pgmoneta_compare_string(hash, checksum))
       {
-         pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, manifest_sha256, manifest->checksum);
+         pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, hash, checksum);
       }
       free(hash);
-      file = file->next;
+      pgmoneta_json_free(file);
+      file = NULL;
    }
-   pgmoneta_manifest_free(manifest);
-   free(manifest_sha256);
+   pgmoneta_json_close_reader(reader);
+   pgmoneta_json_free(file);
    return 0;
 
 error:
-   pgmoneta_manifest_free(manifest);
-   free(manifest_sha256);
-   return 1;
-}
-
-int
-pgmoneta_parse_manifest(char* manifest_path, struct manifest** manifest)
-{
-   struct manifest* m = NULL;
-   FILE* f = NULL;
-   size_t checksum_size = 0;
-   size_t content_size = 0;
-   size_t size = 0;
-   char* json = NULL;
-   char* ptr = NULL;
-   struct cJSON* manifest_json = NULL;
-   struct cJSON* manifest_checksum = NULL;
-   struct cJSON* files = NULL;
-   struct cJSON* file = NULL;
-
-   *manifest = NULL;
-   manifest_init(&m);
-
-   if (!pgmoneta_exists(manifest_path))
-   {
-      pgmoneta_log_error("Could not find backup manifest: %s", manifest_path);
-      goto error;
-   }
-   size = pgmoneta_get_file_size(manifest_path);
-   json = (char*) malloc(size + 1);
-   memset(json, 0, size + 1);
-
-   f = fopen(manifest_path, "r");
-   if (f == NULL)
-   {
-      pgmoneta_log_error("Could not open backup manifest: %s", manifest_path);
-      goto error;
-   }
-
-   size = fread(json, 1, size, f);
-
-   manifest_json = cJSON_Parse(json);
-   if (manifest_json == NULL)
-   {
-      const char* error_ptr = cJSON_GetErrorPtr();
-      if (error_ptr != NULL)
-      {
-         pgmoneta_log_error("Unable to parse manifest: %s", error_ptr);
-      }
-      goto error;
-   }
-
-   files = cJSON_GetObjectItemCaseSensitive(manifest_json, "Files");
-   manifest_checksum = cJSON_GetObjectItemCaseSensitive(manifest_json, "Manifest-Checksum");
-   if (!cJSON_IsString(manifest_checksum))
-   {
-      pgmoneta_log_error("Unable to parse manifest %s", manifest_path);
-      goto error;
-   }
-   checksum_size = strlen(manifest_checksum->valuestring);
-   m->checksum = (char*)malloc(checksum_size + 1);
-   memset(m->checksum, 0, checksum_size + 1);
-   memcpy(m->checksum, manifest_checksum->valuestring, checksum_size);
-
-   struct manifest_file* tmp = NULL;
-   cJSON_ArrayForEach(file, files)
-   {
-      struct manifest_file* manifest_file = NULL;
-      struct cJSON* file_path = cJSON_GetObjectItemCaseSensitive(file, "Path");
-      struct cJSON* file_size = cJSON_GetObjectItemCaseSensitive(file, "Size");
-      struct cJSON* file_checksum = cJSON_GetObjectItemCaseSensitive(file, "Checksum");
-      struct cJSON* file_algorithm = cJSON_GetObjectItemCaseSensitive(file, "Checksum-Algorithm");
-
-      if (!cJSON_IsNumber(file_size) || !cJSON_IsString(file_path) || !cJSON_IsString(file_checksum) || !cJSON_IsString(file_algorithm))
-      {
-         pgmoneta_log_error("Unable to parse manifest %s", manifest_path);
-         goto error;
-      }
-      manifest_file_init(&manifest_file, file_path->valuestring, file_checksum->valuestring, file_algorithm->valuestring, file_size->valuedouble);
-      if (manifest_file == NULL)
-      {
-         pgmoneta_log_error("Unable to allocated space for manifest file info");
-         goto error;
-      }
-      if (tmp == NULL)
-      {
-         tmp = manifest_file;
-         m->files = tmp;
-      }
-      else
-      {
-         tmp->next = manifest_file;
-         tmp = tmp->next;
-      }
-   }
-
-   ptr = strstr(json, "\"Manifest-Checksum\"");
-
-   if (ptr == NULL)
-   {
-      pgmoneta_log_error("Incomplete manifest, missing manifest checksum");
-      goto error;
-   }
-
-   // save preceding lines before the manifest checksum field,
-   // in order to verify the checksum of the manifest itself
-   content_size = ptr - json;
-   m->content = (char*)malloc(content_size + 1);
-   memset(m->content, 0, content_size + 1);
-   memcpy(m->content, json, content_size);
-
-   if (manifest_json != NULL)
-   {
-      cJSON_Delete(manifest_json);
-   }
-   if (f != NULL)
-   {
-      fclose(f);
-   }
-   free(json);
-   *manifest = m;
-   return 0;
-error:
-   if (manifest_json != NULL)
-   {
-      cJSON_Delete(manifest_json);
-   }
-   if (m != NULL)
-   {
-      pgmoneta_manifest_free(m);
-   }
-   if (f != NULL)
-   {
-      fclose(f);
-   }
-   free(json);
+   pgmoneta_json_close_reader(reader);
+   pgmoneta_json_free(file);
    return 1;
 }
 
 int
 pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node** deleted_files, struct node** changed_files, struct node** new_files)
 {
-   struct manifest* m1 = NULL;
-   struct manifest* m2 = NULL;
-   struct manifest_file* mf1 = NULL;
-   struct manifest_file* mf2 = NULL;
+   char* key_path[1] = {"Files"};
+   struct json_reader* r1 = NULL;
+   struct json* f1 = NULL;
+   struct json_reader* r2 = NULL;
+   struct json* f2 = NULL;
    struct node* deleted_files_head = NULL;
    struct node* changed_files_head = NULL;
    struct node* new_files_head = NULL;
    struct node* n = NULL;
+   char* checksum1 = NULL;
+   char* checksum2 = NULL;
+   char* path = NULL;
+   bool manifest_changed = false;
 
    *deleted_files = NULL;
    *changed_files = NULL;
    *new_files = NULL;
 
-   if (pgmoneta_parse_manifest(old_manifest, &m1))
+   if (pgmoneta_json_reader_init(old_manifest, &r1) || pgmoneta_json_locate(r1, key_path, 1))
    {
       goto error;
    }
 
-   if (pgmoneta_parse_manifest(new_manifest, &m2))
+   if (pgmoneta_json_reader_init(new_manifest, &r2) || pgmoneta_json_locate(r2, key_path, 1))
    {
       goto error;
    }
-
-   mf1 = m1->files;
-   while (mf1 != NULL)
+   while (pgmoneta_json_next_array_item(r1, &f1))
    {
       bool deleted = true;
-
-      mf2 = m2->files;
-      while (mf2 != NULL && deleted)
+      path = pgmoneta_json_get_string_value(f1, "Path");
+      checksum1 = pgmoneta_json_get_string_value(f1, "Checksum");
+      while (pgmoneta_json_next_array_item(r2, &f2) && deleted)
       {
-         if (!strcmp(mf1->path, mf2->path))
+         if (pgmoneta_compare_string(path, pgmoneta_json_get_string_value(f2, "Path")))
          {
             deleted = false;
-
-            if (strcmp(mf1->checksum, mf2->checksum))
+            checksum2 = pgmoneta_json_get_string_value(f2, "Checksum");
+            if (!pgmoneta_compare_string(checksum1, checksum2))
             {
-               pgmoneta_log_trace("%s: %s <-> %s", mf1->path, mf1->checksum, mf2->checksum);
+               manifest_changed = true;
+               pgmoneta_log_trace("%s: %s <-> %s", path, checksum1, checksum2);
 
-               if (pgmoneta_create_node_string(mf1->path, mf1->checksum, &n))
+               if (pgmoneta_create_node_string(path, checksum1, &n))
                {
                   goto error;
                }
@@ -304,12 +176,14 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node**
             }
          }
 
-         mf2 = mf2->next;
+         pgmoneta_json_free(f2);
+         f2 = NULL;
       }
 
       if (deleted)
       {
-         if (pgmoneta_create_node_string(mf1->path, mf1->checksum, &n))
+         manifest_changed = true;
+         if (pgmoneta_create_node_string(path, checksum1, &n))
          {
             goto error;
          }
@@ -318,122 +192,77 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node**
          n = NULL;
       }
 
-      mf1 = mf1->next;
+      pgmoneta_json_free(f1);
+      f1 = NULL;
+      if (pgmoneta_json_reader_reset(r2) || pgmoneta_json_locate(r2, key_path, 1))
+      {
+         goto error;
+      }
    }
 
-   mf2 = m2->files;
-   while (mf2 != NULL)
+   while (pgmoneta_json_next_array_item(r2, &f2))
    {
       bool new = true;
 
-      mf1 = m1->files;
-      while (mf1 != NULL && new)
+      path = pgmoneta_json_get_string_value(f2, "Path");
+      checksum2 = pgmoneta_json_get_string_value(f2, "Checksum");
+      while (pgmoneta_json_next_array_item(r1, &f1) && new)
       {
-         if (!strcmp(mf1->path, mf2->path))
+         if (pgmoneta_compare_string(pgmoneta_json_get_string_value(f1, "Path"), path))
          {
             new = false;
          }
 
-         mf1 = mf1->next;
+         pgmoneta_json_free(f1);
+         f1 = NULL;
       }
 
       if (new)
       {
-         if (pgmoneta_create_node_string(mf2->path, mf2->checksum, &n))
+         if (pgmoneta_create_node_string(path, checksum2, &n))
          {
             goto error;
          }
+         manifest_changed = true;
 
          pgmoneta_append_node(&new_files_head, n);
          n = NULL;
       }
 
-      mf2 = mf2->next;
+      pgmoneta_json_free(f2);
+      f2 = NULL;
+      if (pgmoneta_json_reader_reset(r1) || pgmoneta_json_locate(r1, key_path, 1))
+      {
+         goto error;
+      }
+   }
+   if (manifest_changed)
+   {
+      if (pgmoneta_create_node_string("backup_manifest", "manifest", &n))
+      {
+         goto error;
+      }
+      pgmoneta_append_node(&changed_files_head, n);
    }
 
    *deleted_files = deleted_files_head;
    *changed_files = changed_files_head;
    *new_files = new_files_head;
 
-   pgmoneta_manifest_free(m1);
-   pgmoneta_manifest_free(m2);
+   pgmoneta_json_close_reader(r1);
+   pgmoneta_json_close_reader(r2);
+   pgmoneta_json_free(f1);
+   pgmoneta_json_free(f2);
 
    return 0;
 
 error:
-
-   pgmoneta_manifest_free(m1);
-   pgmoneta_manifest_free(m2);
+   pgmoneta_json_close_reader(r1);
+   pgmoneta_json_close_reader(r2);
+   pgmoneta_json_free(f1);
+   pgmoneta_json_free(f2);
 
    return 1;
-}
-
-void
-pgmoneta_manifest_free(struct manifest* manifest)
-{
-   if (manifest == NULL)
-   {
-      return;
-   }
-   struct manifest_file* file = manifest->files;
-   while (file != NULL)
-   {
-      struct manifest_file* f = file;
-      file = file->next;
-      manifest_file_free(f);
-   }
-   free(manifest->checksum);
-   free(manifest->content);
-   free(manifest);
-}
-
-static void
-manifest_init(struct manifest** manifest)
-{
-   struct manifest* m = NULL;
-   m = (struct manifest*) malloc(sizeof(struct manifest));
-   m->checksum = NULL;
-   m->content = NULL;
-   m->files = NULL;
-   *manifest = m;
-}
-
-static void
-manifest_file_init(struct manifest_file** file, char* path, char* checksum, char* algorithm, size_t size)
-{
-   struct manifest_file* f = NULL;
-   int checksum_len = strlen(checksum);
-   int path_len = strlen(path);
-   int algorithm_len = strlen(algorithm);
-
-   f = (struct manifest_file*) malloc(sizeof(struct manifest_file));
-   f->next = NULL;
-   f->checksum = (char*)malloc(checksum_len + 1);
-   f->path = (char*)malloc(path_len + 1);
-   f->algorithm = (char*)malloc(algorithm_len + 1);
-   f->size = size;
-
-   memset(f->checksum, 0, checksum_len + 1);
-   memset(f->path, 0, path_len + 1);
-   memset(f->algorithm, 0, algorithm_len + 1);
-
-   memcpy(f->checksum, checksum, checksum_len);
-   memcpy(f->path, path, path_len);
-   memcpy(f->algorithm, algorithm, algorithm_len);
-   *file = f;
-}
-
-static void
-manifest_file_free(struct manifest_file* file)
-{
-   if (file == NULL)
-   {
-      return;
-   }
-   free(file->path);
-   free(file->checksum);
-   free(file->algorithm);
-   free(file);
 }
 
 static int

@@ -22,13 +22,12 @@ Currently, primarily supported platforms covered in this tutorial are:
 * [libssh](https://www.libssh.org/)
 * [libcurl](https://curl.se/libcurl/)
 * [libarchive](http://www.libarchive.org/)
-* [cJSON](https://github.com/DaveGamble/cJSON)
 * [pandoc](https://pandoc.org/)
 * [texlive](https://www.tug.org/texlive/)
 
 On Fedora, these can be installed using `dnf` or `yum`:
 ```
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel cjson cjson-devel pandoc texlive-scheme-basic 'tex(footnote.sty)'
+dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel pandoc texlive-scheme-basic 'tex(footnote.sty)'
 ```
 On Rocky, before you install the required packages, some additional repositories, PowerTools and EPEL in this case, need to be enabled or installed first.
 ```
@@ -92,7 +91,7 @@ On FreeBSD, `pkg` is used instead of `dnf` or `yum`.
 
 Use `pkg install <package name>` to install the following packages
 ```
-git gcc cmake libev openssl libssh zlib-ng zstd liblz4 bzip2 curl py39-docutils libarchive libcjson
+git gcc cmake libev openssl libssh zlib-ng zstd liblz4 bzip2 curl py39-docutils libarchive
 ```
 
 ## Compile

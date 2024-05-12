@@ -65,7 +65,6 @@ We recommend using Fedora to test and run [**pgmoneta**][pgmoneta], but other Li
 * [libssh](https://www.libssh.org/)
 * [libcurl](https://curl.se/libcurl/)
 * [libarchive](http://www.libarchive.org/)
-* [cJSON](https://github.com/DaveGamble/cJSON)
 
 ```sh
 dnf install git gcc cmake make libev libev-devel \
@@ -76,8 +75,7 @@ dnf install git gcc cmake make libev libev-devel \
             libcurl libcurl-devel \
             python3-docutils libatomic \
             bzip2 bzip2-devel \
-            libarchive libarchive-devel \
-            cjson cjson-devel
+            libarchive libarchive-devel 
 ```
 
 Alternative [clang 8+](https://clang.llvm.org/) can be used.
@@ -132,7 +130,7 @@ Use `pkg install <package name>` to install the following packages
 
 ``` sh
 git gcc cmake libev openssl libssh zlib-ng zstd liblz4 bzip2 curl \
-    py39-docutils libarchive libcjson
+    py39-docutils libarchive
 ```
 
 ### Build

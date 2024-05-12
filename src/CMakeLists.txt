@@ -29,7 +29,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBSSH_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
   )
 
@@ -49,7 +48,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${CURL_LIBRARIES}
     ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARY}
-    ${CJSON_LIBRARY}
     ${THREAD_LIBRARY}
   )
 
@@ -85,7 +83,6 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${LIBSSH_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
   )
 
@@ -105,7 +102,6 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${CURL_LIBRARIES}
     ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARY}
-    ${CJSON_LIBRARY}
     ${THREAD_LIBRARY}
   )
 
@@ -130,7 +126,6 @@ else()
     ${LIBSSH_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
   )
 
@@ -148,7 +143,6 @@ else()
     ${LIBSSH_LIBRARIES}
     ${CURL_LIBRARIES}
     ${LibArchive_LIBRARIES}
-    ${CJSON_LIBRARIES}
     ${THREAD_LIBRARIES}
   )
 

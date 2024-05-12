@@ -35,10 +35,6 @@ extern "C" {
 
 /* pgmoneta */
 #include <pgmoneta.h>
-
-/* system */
-#include <cjson/cJSON.h>
-
 /**
  * JSON related command tags, used to build and retrieve
  * a JSON piece of information related to a single command
@@ -66,6 +62,460 @@ extern "C" {
 #define JSON_BOOL_SUCCESS   0
 #define JSON_BOOL_ERROR     1
 
+enum json_value_type {
+   ValueInt64,
+   ValueString,
+   ValueFloat,
+   ValueObject,
+   ValueInt64Array,
+   ValueStringArray,
+   ValueFloatArray,
+   ValueItemArray,
+   ValueArrayArray,
+};
+
+enum json_type {
+   JSONItem,
+   JSONArray
+};
+
+// This is just a subset of all possible state during parsing,
+// since we basically only look into the item array in json,
+// some state transition will be fast-forwarded
+enum json_reader_state {
+   KeyStart,
+   KeyEnd,
+   ValueStart,
+   ValueEnd,
+   ArrayStart,
+   ArrayEnd,
+   ItemStart,
+   ItemEnd,
+   InvalidReaderState,
+};
+
+struct json_value
+{
+   enum json_value_type type; /**< The json value type */
+   unsigned short length;     /**< (optional) The json array length */
+   // Payload can hold a 64bit value such as an integer, or be a pointer to a string, float or an array
+   // Based on value type, payload could be converted to the following:
+   // int64 (ValueInt), int64*(ValueInt64Array), char*(ValueString),
+   // char**(ValueStringArray), float*(ValueFloat/ValueFloatArray),
+   // json*(ValueObject), json**(ValueItemArray/ValueArrayArray)
+   void* payload;             /**< The json value payload */
+};
+
+struct json
+{
+   // a json object can only be item or array
+   enum json_type type;          /**< The json object type */
+   // if the object is an array, it can have at most one json element
+   struct json_element* element;   /**< The kv element start */
+};
+
+struct json_element
+{
+   // if the element holds an array value,
+   // if it belongs to a json array object, then the key is NULL, and it will not have next element,
+   // if it belongs to a json item object, then the key is not NULL, and it probably has next element
+   char* key;                    /**< The json element key */
+   struct json_value* value;     /**< The json element value */
+   struct json_element* next;    /**< The next element */
+};
+
+struct json_reader
+{
+   struct stream_buffer* buffer;
+   int fd;
+   enum json_reader_state state;
+};
+
+/**
+ * Read a new chunk of json file into memory
+ * @param reader The reader
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_read(struct json_reader* reader);
+
+/**
+ * Get the next char from json file
+ * @param reader The reader
+ * @param next [out] The next char
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_json_next_char(struct json_reader* reader, char* next);
+
+/**
+ * Get the next char without forwarding the cursor
+ * @param reader The reader
+ * @param next [out] The next char
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_json_peek_next_char(struct json_reader* reader, char* next);
+
+/**
+ * Initialize the json reader
+ * @param path The json file path
+ * @param reader The reader
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_reader_init(char* path, struct json_reader** reader);
+
+/**
+ * Close and free the json reader
+ * @param reader The reader
+ */
+void
+pgmoneta_json_close_reader(struct json_reader* reader);
+
+/**
+ * Navigate the reader to the target json object(array or item) according to the key prefix array,
+ * it currently does not handle escape character
+ * @param reader The json reader
+ * @param key_path The key path as an array leading to the key to the array
+ * @param key_path_length The length of the prefix
+ * @return 0 if found, 1 if otherwise
+ */
+int
+pgmoneta_json_locate(struct json_reader* reader, char** key_path, int key_path_length);
+
+/**
+ * Fast-forward until current value ends
+ * @param reader The reader
+ * @param ch Current character reader is at
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_fast_forward_value(struct json_reader* reader, char ch);
+
+/**
+ * Return the next item in the found array
+ * @param reader The json reader
+ * @param item The item in the array, parsed into json structure, all array and nested items will be ignored currently
+ * @return true if has next item, false if no next item, or the array hasn't been found
+ */
+bool
+pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item);
+
+/**
+ * Parse input to a json item as the reader progresses through the input stream,
+ * reader should be in ItemStart state.
+ * The function is the non-recursive version - it will ignore array and nested item,
+ * since we don't need that for now.
+ * @param reader The reader
+ * @param item [out]The item
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_json_stream_parse_item(struct json_reader* reader, struct json** item);
+
+/**
+ * Given the key and the json item, find the value
+ * @param item The json item
+ * @param key The key
+ * @return the json value, null if not found
+ */
+struct json_value*
+pgmoneta_json_get_value(struct json* item, char* key);
+
+/**
+ * Get int64 value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+int64_t
+pgmoneta_json_get_int64_value(struct json* item, char* key);
+
+/**
+ * Get int64 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+int64_t*
+pgmoneta_json_get_int64_array_value(struct json* item, char* key);
+
+/**
+ * Get string value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+char*
+pgmoneta_json_get_string_value(struct json* item, char* key);
+
+/**
+ * Get string array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+char**
+pgmoneta_json_get_string_array_value(struct json* item, char* key);
+
+/**
+ * Get float value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+float
+pgmoneta_json_get_float_value(struct json* item, char* key);
+
+/**
+ * Get float array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+float*
+pgmoneta_json_get_float_array_value(struct json* item, char* key);
+
+/**
+ * Get json object value from json.
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+struct json*
+pgmoneta_json_get_json_object_value(struct json* item, char* key);
+
+/**
+ * Get json object array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+struct json**
+pgmoneta_json_get_json_object_array_value(struct json* item, char* key);
+
+/**
+ * Init a json object
+ * @param item [out] The json item
+ * @param type The type
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_init(struct json** object, enum json_type type);
+
+/**
+ * Free the json object
+ * @param item The json object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_free(struct json* object);
+
+/**
+ * Init the json element
+ * @param value [out] The value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_element_init(struct json_element** element);
+
+/**
+ * Free the json element
+ * @param value The value
+ * @return The next json element
+ */
+struct json_element*
+pgmoneta_json_element_free(struct json_element* element);
+
+/**
+ * Init the json value
+ * @param value [out] The value
+ * @param type The type
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_value_init(struct json_value** value, enum json_value_type type);
+
+/**
+ * Free the json value
+ * @param value The value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_value_free(struct json_value* value);
+
+/**
+ * Append value to array typed json value
+ * If array is int/float/string array, value will be read, copied and appended to the array payload points to.
+ * If array is array/item array, payload points to an array of json pointer,
+ * ptr will be treated as a json pointer and appended to this array.
+ * This function does not provide type check
+ * @param value The json value
+ * @param ptr The pointer
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_value_append(struct json_value* value, void* ptr);
+
+/**
+ * Wrapper of pgmoneta_json_value_append, it does not run type check
+ * @param array The json array
+ * @param ptr The payload
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_array_append(struct json* array, void* ptr);
+
+/**
+ * Add an element to the json object, either array or item.
+ * Does not check for duplication
+ * Returns error when the object is json array and already has an element
+ * @param object The json object
+ * @param element The element
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_add(struct json* object, struct json_element* element);
+
+/**
+ * Put a key value pair to a json object, the key will be copied, while the payload will not
+ * @param object The json object
+ * @param key The key
+ * @param type The value type
+ * @param payload The value payload
+ * @param length The array typed value length, unused if value is not array
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_object_put(struct json* object, char* key, enum json_value_type type, void* payload, unsigned short length);
+
+/**
+ * Put a string kv pair to json item, the key and string will be copied.
+ * This function frees the old string value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The string value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_string(struct json* item, char* key, char* val);
+
+/**
+ * Put an int64 kv pair to json item, the key will not be copied.
+ * This function frees the old int64 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The int64 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_int64(struct json* item, char* key, int64_t val);
+
+/**
+ * Put a float kv pair to json item, the key will not be copied
+ * @param item The item
+ * @param key The key
+ * @param val The float value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_float(struct json* item, char* key, float val);
+
+/**
+ * Put an json object kv pair to json item, the key will be copied but the object is not.
+ * The object could be an array or an item.
+ * @param item The item
+ * @param key The key
+ * @param val The item value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_object(struct json* item, char* key, struct json* val);
+
+/**
+ * Put an int64 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The int64 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_int64_array(struct json* item, char* key, int64_t* vals, unsigned short length);
+
+/**
+ * Put a json item array to json item, it does not make copies of items or key
+ * @param item The item
+ * @param key The key
+ * @param items The json item array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_item_array(struct json* item, char* key, struct json* items, unsigned short length);
+
+/**
+ * Add an int64 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_int64(struct json* array, int64_t val);
+
+/**
+ * Put a string to the json array, the string will be copied,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The string
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_string(struct json* array, char* str);
+
+/**
+ * Put an object to the json array, the item is not copied
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param object The json object
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_object(struct json* array, struct json* object);
+
+/**
+ * Print a json object
+ * @param object The object
+ * @param indent_per_level The indent per level
+ */
+void
+pgmoneta_json_print(struct json* object, int indent_per_level);
+
+/**
+ * Get the json element from json array
+ * @param index The index
+ * @return The element, NULL if error or index out of bound;
+ */
+struct json*
+pgmoneta_json_array_get(struct json* array, int index);
+
+/**
+ * Get json array length
+ * @param array The json array
+ * @return The length
+ */
+unsigned short
+pgmoneta_json_array_length(struct json* array);
+
+/**
+ * Reset the json reader to where json file starts
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_reader_reset(struct json_reader* reader);
+
 /**
  * Utility method to create a new JSON object that wraps a
  * single command. This method should be called to initialize the
@@ -83,7 +533,7 @@ extern "C" {
  * @param executable_name the name of the executable that is creating this
  * response object
  */
-cJSON*
+struct json*
 pgmoneta_json_create_new_command_object(char* command_name, bool success, char* executable_name);
 
 /**
@@ -97,8 +547,8 @@ pgmoneta_json_create_new_command_object(char* command_name, bool success, char* 
  * @param json the command object that wraps the command
  * @returns the pointer to the output object of NULL in case of an error
  */
-cJSON*
-pgmoneta_json_extract_command_output_object(cJSON* json);
+struct json*
+pgmoneta_json_extract_command_output_object(struct json* json);
 
 /**
  * Utility function to set a command JSON object as faulty, that
@@ -117,7 +567,7 @@ pgmoneta_json_extract_command_output_object(cJSON* json);
  * json_set_command_object_faulty( json, strerror( errno ) );
  */
 int
-pgmoneta_json_set_command_object_faulty(cJSON* json, char* message);
+pgmoneta_json_set_command_object_faulty(struct json* json, char* message);
 
 /**
  * Utility method to inspect if a JSON object that wraps a command
@@ -128,7 +578,7 @@ pgmoneta_json_set_command_object_faulty(cJSON* json, char* message);
  * the object is not valid
  */
 bool
-pgmoneta_json_is_command_object_faulty(cJSON* json);
+pgmoneta_json_is_command_object_faulty(struct json* json);
 
 /**
  * Utility method to extract the message related to the status
@@ -138,7 +588,7 @@ pgmoneta_json_is_command_object_faulty(cJSON* json);
  * #returns the status message or NULL in case the JSON object is not valid
  */
 const char*
-pgmoneta_json_get_command_object_status(cJSON* json);
+pgmoneta_json_get_command_object_status(struct json* json);
 
 /**
  * Utility method to check if a JSON object wraps a specific command name.
@@ -149,7 +599,7 @@ pgmoneta_json_get_command_object_status(cJSON* json);
  * the JSON object is not valid or the command name is not valid
  */
 bool
-pgmoneta_json_command_name_equals_to(cJSON* json, char* command_name);
+pgmoneta_json_command_name_equals_to(struct json* json, char* command_name);
 
 /**
  * Utility method to print out the JSON object
@@ -166,7 +616,7 @@ pgmoneta_json_command_name_equals_to(cJSON* json, char* command_name);
  * @param json the json object to print
  */
 void
-pgmoneta_json_print_and_free_json_object(cJSON* json);
+pgmoneta_json_print_and_free_json_object(struct json* json);
 
 #ifdef __cplusplus
 }

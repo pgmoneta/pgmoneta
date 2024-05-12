@@ -36,31 +36,6 @@ extern "C" {
 #include <pgmoneta.h>
 #include <node.h>
 
-struct manifest_file
-{
-   char* path;
-   char* checksum;
-   char* algorithm;
-   size_t size;
-   struct manifest_file* next;
-} __attribute__ ((aligned (64)));
-
-struct manifest
-{
-   char* checksum;
-   char* content;
-   struct manifest_file* files;
-} __attribute__ ((aligned (64)));
-
-/**
- * Parse the manifest json into manifest struct
- * @param manifest_path The path to manifest
- * @param manifest The manifest
- * @return 0 on parsing success, otherwise 1
- */
-int
-pgmoneta_parse_manifest(char* manifest_path, struct manifest** manifest);
-
 /**
  * Verify checksum of the manifest and the checksum
  * @param root The root directory holding the manifest
@@ -80,13 +55,6 @@ pgmoneta_manifest_checksum_verify(char* root);
  */
 int
 pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node** deleted_files, struct node** changed_files, struct node** new_files);
-
-/**
- * Free a manifest
- * @param manifest The manifest to be freed
- */
-void
-pgmoneta_manifest_free(struct manifest* manifest);
 
 #ifdef __cplusplus
 }
