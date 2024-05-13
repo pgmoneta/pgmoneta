@@ -58,47 +58,70 @@ __attribute__((used))
 int
 pgmoneta_hashmap_create(unsigned int initial_size, struct hashmap** new_hashmap)
 {
-   struct hashmap* m = NULL;
+   void* m = NULL;
+   struct hashmap* hm = NULL;
 
    if (0 == initial_size || 0 != (initial_size & (initial_size - 1)))
    {
-      return 1;
+      goto error;
    }
 
-   m = HASHMAP_CAST(struct hashmap*, calloc(1, sizeof(struct hashmap)));
+   m = calloc(1, sizeof(struct hashmap));
 
-   if (!m)
+   if (m == NULL)
    {
-      return 1;
+      goto error;
    }
 
-   m->table_size = initial_size;
-   m->size = 0;
+   hm = HASHMAP_CAST(struct hashmap*, m);
 
-   m->data = HASHMAP_CAST(struct hashmap_element*,
-                          calloc(initial_size, sizeof(struct hashmap_element)));
-   if (!m->data)
+   hm->table_size = initial_size;
+   hm->size = 0;
+
+   m = calloc(initial_size, sizeof(struct hashmap_element));
+
+   if (m == NULL)
    {
-      free(m);
-      return 1;
+      goto error;
    }
 
-   *new_hashmap = m;
+   hm->data = HASHMAP_CAST(struct hashmap_element*, m);
+   if (!hm->data)
+   {
+      goto error;
+   }
+
+   *new_hashmap = hm;
 
    return 0;
+
+error:
+
+   free(m);
+
+   if (hm != NULL)
+   {
+      free(hm->data);
+      free(hm);
+   }
+
+   return 1;
 }
 
 __attribute__((used))
 int
 pgmoneta_hashmap_put(struct hashmap* hashmap, char* key, void* value)
 {
-   unsigned int index = 0;
-   unsigned int len = strlen(key);
+   unsigned int index;
+   unsigned int len;
 
    if (hashmap == NULL || key == NULL)
    {
       return 1;
    }
+
+   index = 0;
+   len = strlen(key);
 
    /* Find a place to put our value. */
    while (!hashmap_hash_helper(hashmap, key, len, &index))
@@ -490,24 +513,24 @@ hashmap_rehash_iterator(void* new_hash, struct hashmap_element* e)
 static int
 hashmap_rehash_helper(struct hashmap* m)
 {
-   /* If this multiplication overflows hashmap_create will fail. */
+   int flag;
    unsigned int new_size = 2 * m->table_size;
    struct hashmap* new_hash = NULL;
 
-   int flag = pgmoneta_hashmap_create(new_size, &new_hash);
+   flag = pgmoneta_hashmap_create(new_size, &new_hash);
 
-   if (0 != flag)
+   if (flag != 0)
    {
-      return flag;
+      goto error;
    }
 
    /* copy the old elements to the new table */
    flag = hashmap_iterate(m, hashmap_rehash_iterator,
                           HASHMAP_PTR_CAST(void*, new_hash));
 
-   if (0 != flag)
+   if (flag != 0)
    {
-      return flag;
+      goto error;
    }
 
    pgmoneta_hashmap_destroy(m);
@@ -517,4 +540,14 @@ hashmap_rehash_helper(struct hashmap* m)
    free(new_hash);
 
    return 0;
+
+error:
+
+   if (new_hash != NULL)
+   {
+      free(new_hash->data);
+      free(new_hash);
+   }
+
+   return 1;
 }

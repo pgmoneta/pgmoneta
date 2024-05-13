@@ -276,13 +276,13 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
 
    if (!(dir = opendir(d)))
    {
       pgmoneta_log_error("pgmoneta_decrypt_directory: Could not open directory %s", d);
-      return 1;
+      goto error;
    }
 
    while ((entry = readdir(dir)) != NULL)
@@ -313,6 +313,12 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             from = pgmoneta_append(from, entry->d_name);
 
             name = malloc(strlen(entry->d_name) - 3);
+
+            if (name == NULL)
+            {
+               goto error;
+            }
+
             memset(name, 0, strlen(entry->d_name) - 3);
             memcpy(name, entry->d_name, strlen(entry->d_name) - 4);
 
@@ -343,6 +349,15 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
 
    closedir(dir);
    return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   return 1;
 }
 
 static void
@@ -371,18 +386,33 @@ pgmoneta_decrypt_archive(char* path)
    }
 
    to = malloc(strlen(path) - 3);
+
+   if (to == NULL)
+   {
+      goto error;
+   }
+
    memset(to, 0, strlen(path) - 3);
    memcpy(to, path, strlen(path) - 4);
 
    if (encrypt_file(path, to, 0))
    {
-      pgmoneta_log_error("pgmoneta_decrypt_archive: error on decrypt file");
-      return 1;
+      goto error;
    }
 
    pgmoneta_delete_file(path, NULL);
+
    free(to);
+
    return 0;
+
+error:
+   
+   pgmoneta_log_error("pgmoneta_decrypt_archive: error on decrypt file");
+
+   free(to);
+
+   return 1;
 }
 
 int
@@ -460,6 +490,12 @@ aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphe
 
    size = strlen(plaintext) + EVP_CIPHER_block_size(cipher_fp());
    ct = malloc(size);
+
+   if (ct == NULL)
+   {
+      goto error;
+   }
+
    memset(ct, 0, size);
 
    if (EVP_EncryptUpdate(ctx,
@@ -519,6 +555,12 @@ aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigne
 
    size = ciphertext_length + EVP_CIPHER_block_size(cipher_fp());
    pt = malloc(size);
+
+   if (pt == NULL)
+   {
+      goto error;
+   }
+
    memset(pt, 0, size);
 
    if (EVP_DecryptUpdate(ctx,
@@ -638,7 +680,7 @@ encrypt_file(char* from, char* to, int enc)
    }
 
    out = fopen(to, "w");
-   if (in == NULL)
+   if (out == NULL)
    {
       pgmoneta_log_error("fopen: Could not open %s", to);
       goto error;
@@ -699,8 +741,18 @@ error:
    {
       EVP_CIPHER_CTX_free(ctx);
    }
+
    free(master_key);
-   fclose(in);
-   fclose(out);
+
+   if (in != NULL)
+   {
+      fclose(in);
+   }
+
+   if (out != NULL)
+   {
+      fclose(out);
+   }
+
    return 1;
 }

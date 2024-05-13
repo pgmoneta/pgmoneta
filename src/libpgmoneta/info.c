@@ -267,7 +267,7 @@ error:
 int
 pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** backups)
 {
-   char* d;
+   char* d = NULL;
    struct backup** bcks = NULL;
    int number_of_directories;
    char** dirs;
@@ -282,15 +282,24 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
 
    bcks = (struct backup**)malloc(number_of_directories * sizeof(struct backup*));
 
+   if (bcks == NULL)
+   {
+      goto error;
+   }
+
+   memset(bcks, 0, number_of_directories * sizeof(struct backup*));
+
    for (int i = 0; i < number_of_directories; i++)
    {
-      d = NULL;
-
       d = pgmoneta_append(d, directory);
 
-      pgmoneta_get_backup(d, dirs[i], &bcks[i]);
+      if (pgmoneta_get_backup(d, dirs[i], &bcks[i]))
+      {
+         goto error;
+      }
 
       free(d);
+      d = NULL;
    }
 
    for (int i = 0; i < number_of_directories; i++)
@@ -303,6 +312,21 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
    *backups = bcks;
 
    return 0;
+
+error:
+
+   free(d);
+
+   if (dirs != NULL)
+   {
+      for (int i = 0; i < number_of_directories; i++)
+      {
+         free(dirs[i]);
+      }
+      free(dirs);
+   }
+
+   return 1;
 }
 
 int
@@ -325,6 +349,12 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    file = fopen(fn, "r");
 
    bck = (struct backup*)malloc(sizeof(struct backup));
+
+   if (bck == NULL)
+   {
+      goto error;
+   }
+
    memset(bck, 0, sizeof(struct backup));
 
    memcpy(&bck->label[0], label, strlen(label));
@@ -342,9 +372,21 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          memset(&value[0], 0, sizeof(value));
 
          ptr = strtok(&buffer[0], "=");
+
+         if (ptr == NULL)
+         {
+            goto error;
+         }
+
          memcpy(&key[0], ptr, strlen(ptr));
 
          ptr = strtok(NULL, "=");
+
+         if (ptr == NULL)
+         {
+            goto error;
+         }
+
          memcpy(&value[0], ptr, strlen(ptr) - 1);
 
          if (!strcmp(INFO_STATUS, &key[0]))
@@ -432,6 +474,19 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    free(fn);
 
    return 0;
+
+error:
+
+   free(bck);
+
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+
+   free(fn);
+
+   return 1;
 }
 
 int
@@ -443,23 +498,35 @@ pgmoneta_get_number_of_valid_backups(int server)
    int result = 0;
 
    server_path = pgmoneta_get_server_backup(server);
+   if (server_path == NULL)
+   {
+      goto error;
+   }
 
-   pgmoneta_get_backups(server_path, &number_of_backups, &backups);
+   if (pgmoneta_get_backups(server_path, &number_of_backups, &backups))
+   {
+      goto error;
+   }
 
    for (int i = 0; i < number_of_backups; i++)
    {
-      if (backups[i]->valid)
+      if (backups[i] != NULL && backups[i]->valid)
       {
          result++;
       }
    }
 
-   free(server_path);
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
    }
    free(backups);
 
+   free(server_path);
+
    return result;
+
+error:
+
+   return 0;
 }

@@ -298,6 +298,12 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
             from = pgmoneta_append(from, entry->d_name);
 
             name = malloc(strlen(entry->d_name) - 2);
+
+            if (name == NULL)
+            {
+               goto error;
+            }
+
             memset(name, 0, strlen(entry->d_name) - 2);
             memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
 
@@ -327,6 +333,14 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
    }
 
    closedir(dir);
+   return;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
 }
 
 static void

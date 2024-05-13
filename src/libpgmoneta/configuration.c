@@ -149,7 +149,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
    size_t max;
    struct configuration* config;
    int idx_server = 0;
-   struct server srv;
+   struct server srv = {0};
 
    file = fopen(filename, "r");
 
@@ -1977,13 +1977,13 @@ extract_key_value(char* str, char** key, char** value)
    *key = NULL;
    *value = NULL;
 
+   memset(left, 0, sizeof(left));
+   memset(right, 0, sizeof(right));
+
    equal = strchr(str, '=');
 
    if (equal != NULL)
    {
-      memset(&left[0], 0, sizeof(left));
-      memset(&right[0], 0, sizeof(right));
-
       i = 0;
       while (true)
       {
@@ -2075,7 +2075,18 @@ extract_key_value(char* str, char** key, char** value)
       }
 
       k = calloc(1, strlen(left) + 1);
+
+      if (k == NULL)
+      {
+         goto error;
+      }
+
       v = calloc(1, strlen(right) + 1);
+
+      if (v == NULL)
+      {
+         goto error;
+      }
 
       memcpy(k, left, strlen(left));
       memcpy(v, right, strlen(right));
@@ -2083,6 +2094,13 @@ extract_key_value(char* str, char** key, char** value)
       *key = k;
       *value = v;
    }
+
+   return;
+
+error:
+
+   free(k);
+   free(v);
 }
 
 static int
@@ -2172,6 +2190,12 @@ as_logging_level(char* str)
       {
          size = strlen(str) - strlen("debug");
          debug_value = (char*)malloc(size + 1);
+
+         if (debug_value == NULL)
+         {
+            goto done;
+         }
+
          memset(debug_value, 0, size + 1);
          memcpy(debug_value, str + 5, size);
          if (as_int(debug_value, &debug_level))
@@ -2223,6 +2247,8 @@ as_logging_level(char* str)
    {
       return PGMONETA_LOGGING_LEVEL_FATAL;
    }
+
+done:
 
    return PGMONETA_LOGGING_LEVEL_INFO;
 }
@@ -2315,6 +2341,11 @@ as_retention(char* str, int* days, int* weeks, int* months, int* years)
 {
    // make a deep copy because the parsing break the input string
    char* copied_str = (char*)malloc(strlen(str) + 1);
+
+   if (copied_str == NULL)
+   {
+      goto error;
+   }
 
    memset(copied_str, 0, strlen(str) + 1);
    memcpy(copied_str, str, strlen(str));
