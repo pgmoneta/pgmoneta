@@ -50,7 +50,7 @@ add_custom_command(
 #
 install(FILES etc/pgmoneta.conf DESTINATION share/doc/pgmoneta/etc)
 
-install(DIRECTORY . DESTINATION share/doc/pgmoneta FILES_MATCHING PATTERN "*.md" PATTERN "etc" EXCLUDE PATTERN "man" EXCLUDE)
+install(DIRECTORY . DESTINATION share/doc/pgmoneta FILES_MATCHING PATTERN "*.md" PATTERN "etc" EXCLUDE PATTERN "man" EXCLUDE PATTERN "manual" EXCLUDE)
 
 install(FILES ${PGMONETA_DST_FILE} DESTINATION share/man/man1)
 install(FILES ${PGMONETA_CLI_DST_FILE} DESTINATION share/man/man1)
@@ -110,4 +110,10 @@ if(generation)
     all_docs ALL
     DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html
   )
+
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html DESTINATION share/doc/pgmoneta/manual)
+
 endif()
