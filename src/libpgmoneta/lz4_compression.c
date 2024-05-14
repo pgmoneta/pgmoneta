@@ -257,6 +257,12 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
          from = pgmoneta_append(from, entry->d_name);
 
          name = malloc(strlen(entry->d_name) - 3);
+
+         if (name == NULL)
+         {
+            goto error;
+         }
+
          memset(name, 0, strlen(entry->d_name) - 3);
          memcpy(name, entry->d_name, strlen(entry->d_name) - 4);
 
@@ -285,6 +291,14 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
    }
 
    closedir(dir);
+   return;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
 }
 
 static void
@@ -353,7 +367,18 @@ lz4_compress(char* from, char* to)
 
    lz4Stream = LZ4_createStream();
    fin = fopen(from, "rb");
+
+   if (fin == NULL)
+   {
+      goto error;
+   }
+
    fout = fopen(to, "wb");
+
+   if (fout == NULL)
+   {
+      goto error;
+   }
 
    for (;;)
    {
@@ -380,6 +405,20 @@ lz4_compress(char* from, char* to)
    LZ4_freeStream(lz4Stream);
 
    return 0;
+
+error:
+
+   if (fin != NULL)
+   {
+      fclose(fin);
+   }
+
+   if (fout != NULL)
+   {
+      fclose(fout);
+   }
+
+   return 1;
 }
 
 static int
@@ -396,7 +435,18 @@ lz4_decompress(char* from, char* to)
 
    lz4StreamDecode = &lz4StreamDecodeBody;
    fin = fopen(from, "rb");
+
+   if (fin == NULL)
+   {
+      goto error;
+   }
+
    fout = fopen(to, "wb");
+
+   if (fout == NULL)
+   {
+      goto error;
+   }
 
    LZ4_setStreamDecode(lz4StreamDecode, NULL, 0);
 
