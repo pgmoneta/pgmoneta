@@ -114,6 +114,8 @@ pgmoneta_wal(int srv, char** argv)
    struct node* i_nodes = NULL;
    struct node* o_nodes = NULL;
 
+   config = (struct configuration*) shmem;
+
    if (msg == NULL)
    {
       goto error;
@@ -123,8 +125,6 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
-
-   config = (struct configuration*) shmem;
 
    pgmoneta_set_proc_title(1, argv, "wal", config->servers[srv].name);
 
