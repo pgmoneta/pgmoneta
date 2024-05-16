@@ -1344,7 +1344,7 @@ pgmoneta_get_files(char* base, int* number_of_files, char*** files)
    char** array = NULL;
    int nof = 0;
    int n;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
 
    *number_of_files = 0;
@@ -1374,6 +1374,11 @@ pgmoneta_get_files(char* base, int* number_of_files, char*** files)
    dir = NULL;
 
    dir = opendir(base);
+
+   if (dir == NULL)
+   {
+      goto error;
+   }
 
    array = (char**)malloc(sizeof(char*) * nof);
 
