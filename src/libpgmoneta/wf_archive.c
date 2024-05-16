@@ -62,6 +62,11 @@ pgmoneta_workflow_create_archive(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &archive_setup;
    wf->execute = &archive_execute;
    wf->teardown = &archive_teardown;

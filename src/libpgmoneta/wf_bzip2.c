@@ -51,6 +51,11 @@ pgmoneta_workflow_create_bzip2(bool compress)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &bzip2_setup;
 
    if (compress == true)

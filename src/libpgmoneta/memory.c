@@ -63,7 +63,18 @@ pgmoneta_memory_size(size_t size)
    pgmoneta_memory_destroy();
 
    message = (struct message*)malloc(sizeof(struct message));
+
+   if (message == NULL)
+   {
+      return;
+   }
+
    data = malloc(size);
+
+   if (data == NULL)
+   {
+      return;
+   }
 
    memset(message, 0, sizeof(struct message));
    memset(data, 0, size);
@@ -164,6 +175,13 @@ void
 pgmoneta_memory_stream_buffer_init(struct stream_buffer** buffer)
 {
    struct stream_buffer* b = malloc(sizeof(struct stream_buffer));
+
+   if (b == NULL)
+   {
+      *buffer = NULL;
+      return;
+   }
+
    b->size = DEFAULT_BUFFER_SIZE;
    b->start = b->end = b->cursor = 0;
    b->buffer = malloc(DEFAULT_BUFFER_SIZE);

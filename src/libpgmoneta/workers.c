@@ -224,6 +224,12 @@ pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, s
    *wi = NULL;
 
    w = (struct worker_input*)malloc(sizeof(struct worker_input));
+
+   if (w == NULL)
+   {
+      goto error;
+   }
+
    memset(w, 0, sizeof(struct worker_input));
 
    if (directory != NULL && strlen(directory) > 0)
@@ -247,6 +253,10 @@ pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, s
    *wi = w;
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 static int
@@ -436,7 +446,7 @@ queue_destroy(struct queue* queue)
 static int
 semaphore_init(struct semaphore* semaphore, int value)
 {
-   if (value < 0 || value > 1)
+   if (value < 0 || value > 1 || semaphore == NULL)
    {
       pgmoneta_log_error("Invalid semaphore value: %d", value);
       goto error;

@@ -84,6 +84,11 @@ pgmoneta_storage_create_ssh(int workflow_type)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &ssh_storage_setup;
 
    switch (workflow_type)
@@ -748,7 +753,18 @@ read_latest_backup_sha256(char* path)
    file = fopen(path, "r");
 
    file_paths = (char**)malloc(sizeof(char*) * lines);
+
+   if (file_paths == NULL)
+   {
+      goto error;
+   }
+
    hashes = (char**)malloc(sizeof(char*) * lines);
+
+   if (hashes == NULL)
+   {
+      goto error;
+   }
 
    memset(&buffer[0], 0, sizeof(buffer));
 
@@ -757,13 +773,30 @@ read_latest_backup_sha256(char* path)
       char* ptr = NULL;
       ptr = strtok(&buffer[0], ":");
 
+      if (ptr == NULL)
+      {
+         goto error;
+      }
+
       file_paths[n] = (char*)malloc(strlen(ptr) + 1);
+
+      if (file_paths[n] == NULL)
+      {
+         goto error;
+      }
+
       memset(file_paths[n], 0, strlen(ptr) + 1);
       memcpy(file_paths[n], ptr, strlen(ptr));
 
       ptr = strtok(NULL, ":");
 
       hashes[n] = (char*)malloc(strlen(ptr));
+
+      if (hashes[n] == NULL)
+      {
+         goto error;
+      }
+
       memset(hashes[n], 0, strlen(ptr));
       memcpy(hashes[n], ptr, strlen(ptr) - 1);
 

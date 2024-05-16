@@ -113,6 +113,12 @@ pgmoneta_wal(int srv, char** argv)
    struct workflow* current = NULL;
    struct node* i_nodes = NULL;
    struct node* o_nodes = NULL;
+
+   if (msg == NULL)
+   {
+      goto error;
+   }
+
    memset(msg, 0, sizeof (struct message));
 
    pgmoneta_start_logging();
@@ -212,6 +218,12 @@ pgmoneta_wal(int srv, char** argv)
       timeline = cur_timeline;
       xlogpos_size = strlen(pgmoneta_query_response_get_data(identify_system_response, 2)) + 1;
       xlogpos = (char*)malloc(xlogpos_size);
+
+      if (xlogpos == NULL)
+      {
+         goto error;
+      }
+
       memset(xlogpos, 0, xlogpos_size);
       memcpy(xlogpos, pgmoneta_query_response_get_data(identify_system_response, 2), xlogpos_size);
       if (wal_convert_xlogpos(xlogpos, &high32, &low32, segsize))
@@ -664,6 +676,12 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
          continue;
       }
       nexth = (struct timeline_history*) malloc(sizeof(struct timeline_history));
+
+      if (nexth == NULL)
+      {
+         goto error;
+      }
+
       memset(nexth, 0, sizeof(struct timeline_history));
       if (h == NULL)
       {

@@ -47,6 +47,11 @@ pgmoneta_workflow_create_cleanup(int type)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &cleanup_setup;
    switch (type)
    {

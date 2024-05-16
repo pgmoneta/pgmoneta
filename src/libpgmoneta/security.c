@@ -757,6 +757,12 @@ get_salt(void* data, char** salt)
    char* result;
 
    result = malloc(4);
+
+   if (result == NULL)
+   {
+      goto error;
+   }
+
    memset(result, 0, 4);
 
    memcpy(result, data + 9, 4);
@@ -764,6 +770,10 @@ get_salt(void* data, char** salt)
    *salt = result;
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 static int
@@ -775,6 +785,11 @@ generate_md5(char* str, int length, char** md5)
    char* out;
 
    out = malloc(33);
+
+   if (out == NULL)
+   {
+      goto error;
+   }
 
    memset(out, 0, 33);
 
@@ -790,6 +805,10 @@ generate_md5(char* str, int length, char** md5)
    *md5 = out;
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 static int
@@ -861,6 +880,12 @@ retry:
    }
 
    client_first_message_bare = malloc(msg->length - 25);
+
+   if (client_first_message_bare == NULL)
+   {
+      goto error;
+   }
+
    memset(client_first_message_bare, 0, msg->length - 25);
    memcpy(client_first_message_bare, msg->data + 26, msg->length - 26);
 
@@ -870,6 +895,12 @@ retry:
    pgmoneta_base64_encode(salt, salt_length, &base64_salt);
 
    server_first_message = malloc(89);
+
+   if (server_first_message == NULL)
+   {
+      goto error;
+   }
+
    memset(server_first_message, 0, 89);
    snprintf(server_first_message, 89, "r=%s%s,s=%s,i=4096", client_nounce, server_nounce, base64_salt);
 

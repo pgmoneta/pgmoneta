@@ -49,6 +49,11 @@ pgmoneta_workflow_create_zstd(bool compress)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &zstd_setup;
 
    if (compress == true)

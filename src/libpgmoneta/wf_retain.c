@@ -55,6 +55,11 @@ pgmoneta_workflow_create_retention(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &retain_setup;
    wf->execute = &retain_execute;
    wf->teardown = &retain_teardown;
@@ -168,6 +173,12 @@ mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int re
    struct tm* time_info;
 
    flags = (bool*) malloc(sizeof (bool*) * number_of_backups);
+
+   if (flags == NULL)
+   {
+      return;
+   }
+
    for (int i = 0; i < number_of_backups; i++)
    {
       flags[i] = false;

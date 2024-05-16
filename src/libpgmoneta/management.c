@@ -1408,6 +1408,12 @@ read_string(char* prefix, int socket, char** str)
    if (size > 0)
    {
       s = malloc(size + 1);
+
+      if (s == NULL)
+      {
+         goto error;
+      }
+
       memset(s, 0, size + 1);
 
       if (read_complete(NULL, socket, s, size))
@@ -1423,6 +1429,8 @@ read_string(char* prefix, int socket, char** str)
    return 0;
 
 error:
+
+   free(s);
 
    return 1;
 }
@@ -2201,6 +2209,8 @@ read_delete_json(SSL* ssl, int socket, char* server)
    return json;
 
 error:
+   free(name);
+
    // return json anyway with error code set
    if (json != NULL)
    {

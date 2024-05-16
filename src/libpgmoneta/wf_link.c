@@ -50,6 +50,11 @@ pgmoneta_workflow_create_link(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &link_setup;
    wf->execute = &link_execute;
    wf->teardown = &link_teardown;

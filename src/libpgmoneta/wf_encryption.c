@@ -53,6 +53,11 @@ pgmoneta_workflow_encryption(bool encrypt)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &encryption_setup;
 
    if (encrypt)

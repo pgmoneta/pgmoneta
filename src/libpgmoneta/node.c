@@ -94,6 +94,8 @@ pgmoneta_create_node_string(char* s, char* t, struct node** result)
 
 error:
 
+   pgmoneta_free_nodes(node);
+
    return 1;
 }
 
@@ -147,6 +149,9 @@ pgmoneta_create_node_int(int val, char* t, struct node** result)
    return 0;
 
 error:
+
+   pgmoneta_free_nodes(node);
+
    return 1;
 }
 
@@ -199,6 +204,9 @@ pgmoneta_create_node_bool(bool val, char* t, struct node** result)
 
    return 0;
 error:
+
+   pgmoneta_free_nodes(node);
+
    return 1;
 }
 

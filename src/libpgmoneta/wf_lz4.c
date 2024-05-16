@@ -49,6 +49,11 @@ pgmoneta_workflow_create_lz4(bool compress)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &lz4_setup;
 
    if (compress == true)

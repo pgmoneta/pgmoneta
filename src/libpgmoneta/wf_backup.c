@@ -56,6 +56,11 @@ pgmoneta_workflow_create_basebackup(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &basebackup_setup;
    wf->execute = &basebackup_execute;
    wf->teardown = &basebackup_teardown;

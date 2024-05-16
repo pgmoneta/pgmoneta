@@ -578,6 +578,12 @@ bind_host(const char* hostname, int port, int** fds, int* length)
    size = 0;
 
    sport = malloc(5);
+
+   if (sport == NULL)
+   {
+      goto error;
+   }
+
    memset(sport, 0, 5);
    sprintf(sport, "%d", port);
 
@@ -602,6 +608,12 @@ bind_host(const char* hostname, int port, int** fds, int* length)
    }
 
    result = malloc(size * sizeof(int));
+
+   if (result == NULL)
+   {
+      goto error;
+   }
+
    memset(result, 0, size * sizeof(int));
 
    /* Loop through all the results and bind to the first we can */
@@ -671,6 +683,10 @@ bind_host(const char* hostname, int port, int** fds, int* length)
    *length = index;
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 int

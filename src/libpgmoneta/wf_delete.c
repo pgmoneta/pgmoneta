@@ -51,6 +51,11 @@ pgmoneta_workflow_delete_backup(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &delete_backup_setup;
    wf->execute = &delete_backup_execute;
    wf->teardown = &delete_backup_teardown;

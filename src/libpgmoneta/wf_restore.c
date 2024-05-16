@@ -64,6 +64,11 @@ pgmoneta_workflow_create_restore(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &restore_setup;
    wf->execute = &restore_execute;
    wf->teardown = &restore_teardown;
@@ -79,6 +84,11 @@ pgmoneta_workflow_create_recovery_info(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &recovery_info_setup;
    wf->execute = &recovery_info_execute;
    wf->teardown = &recovery_info_teardown;
@@ -93,6 +103,11 @@ pgmoneta_restore_excluded_files(void)
    struct workflow* wf = NULL;
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
+
+   if (wf == NULL)
+   {
+      return NULL;
+   }
 
    wf->setup = &restore_excluded_files_setup;
    wf->execute = &restore_excluded_files_execute;
@@ -528,6 +543,12 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
 
       tfile = fopen(t, "w");
 
+      if (tfile == NULL)
+      {
+         pgmoneta_log_error("Could not create %s", t);
+         goto error;
+      }
+
       if (ffile != NULL)
       {
          while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
@@ -720,6 +741,12 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
 
       tfile = fopen(t, "w");
 
+      if (tfile == NULL)
+      {
+         pgmoneta_log_error("Could not create %s", t);
+         goto error;
+      }
+
       if (ffile != NULL)
       {
          while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
@@ -770,6 +797,15 @@ done:
    return 0;
 
 error:
+
+   if (ffile != NULL)
+   {
+      fclose(ffile);
+   }
+   if (tfile != NULL)
+   {
+      fclose(tfile);
+   }
 
    free(f);
    free(t);

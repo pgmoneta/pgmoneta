@@ -78,6 +78,13 @@ pgmoneta_create_tablespace(char* name, char* path, struct tablespace** result)
 
 error:
 
+   if (tablespace != NULL)
+   {
+      free(tablespace->name);
+      free(tablespace->path);
+      free(tablespace);
+   }
+
    return 1;
 }
 

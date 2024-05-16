@@ -49,6 +49,11 @@ pgmoneta_create_hot_standby(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &hot_standby_setup;
    wf->execute = &hot_standby_execute;
    wf->teardown = &hot_standby_teardown;

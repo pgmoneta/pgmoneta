@@ -51,6 +51,11 @@ pgmoneta_workflow_create_gzip(bool compress)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &gzip_setup;
 
    if (compress == true)

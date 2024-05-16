@@ -2086,6 +2086,11 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
 
    config = (struct configuration*)shmem;
 
+   if (msg == NULL)
+   {
+      goto error;
+   }
+
    memset(msg, 0, sizeof (struct message));
 
    // consume DataRow messages from stream buffer until CommandComplete
@@ -2109,6 +2114,12 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
       {
          cols = get_number_of_columns(msg);
          r = (struct query_response*)malloc(sizeof(struct query_response));
+
+         if (r == NULL)
+         {
+            goto error;
+         }
+
          memset(r, 0, sizeof(struct query_response));
 
          r->number_of_columns = cols;
@@ -2391,6 +2402,11 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
    char type;
    FILE* file = NULL;
 
+   if (msg == NULL)
+   {
+      goto error;
+   }
+
    memset(msg, 0, sizeof(struct message));
 
    // Receive the second result set
@@ -2662,6 +2678,12 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
    char file_path[MAX_PATH];
    FILE* file = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
+
+   if (msg == NULL)
+   {
+      goto error;
+   }
+
    memset(msg, 0, sizeof (struct message));
 
    memset(tmp_file_path, 0, sizeof(tmp_file_path));
@@ -2679,6 +2701,12 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
    }
    file = fopen(tmp_file_path, "wb");
+
+   if (file == NULL)
+   {
+      goto error;
+   }
+
    // get the copy out response
    while (msg == NULL || msg->kind != 'H')
    {

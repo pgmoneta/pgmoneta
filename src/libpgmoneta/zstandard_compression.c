@@ -396,8 +396,19 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 
    zin_size = ZSTD_DStreamInSize();
    zin = malloc(zin_size);
+
+   if (zin == NULL)
+   {
+      goto error;
+   }
+
    zout_size = ZSTD_DStreamOutSize();
    zout = malloc(zout_size);
+
+   if (zout == NULL)
+   {
+      goto error;
+   }
 
    dctx = ZSTD_createDCtx();
    if (dctx == NULL)
@@ -434,6 +445,12 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
             from = pgmoneta_append(from, entry->d_name);
 
             name = malloc(strlen(entry->d_name) - 4);
+
+            if (name == NULL)
+            {
+               goto error;
+            }
+
             memset(name, 0, strlen(entry->d_name) - 4);
             memcpy(name, entry->d_name, strlen(entry->d_name) - 5);
 
@@ -562,7 +579,18 @@ zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size,
    size_t toRead;
 
    fin = fopen(from, "rb");
+
+   if (fin == NULL)
+   {
+      goto error;
+   }
+
    fout = fopen(to, "wb");
+
+   if (fout == NULL)
+   {
+      goto error;
+   }
 
    toRead = zin_size;
    for (;;)
@@ -591,6 +619,20 @@ zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size,
    fclose(fin);
 
    return 0;
+
+error:
+
+   if (fout != NULL)
+   {
+      fclose(fout);
+   }
+
+   if (fin != NULL)
+   {
+      fclose(fin);
+   }
+
+   return 1;
 }
 
 static int
@@ -603,7 +645,18 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    size_t lastRet = 0;
 
    fin = fopen(from, "rb");
+
+   if (fin == NULL)
+   {
+      goto error;
+   }
+
    fout = fopen(to, "wb");;
+
+   if (fout == NULL)
+   {
+      goto error;
+   }
 
    toRead = zin_size;
    while ((read = fread(zin, sizeof(char), toRead, fin)))

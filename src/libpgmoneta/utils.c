@@ -1010,6 +1010,11 @@ pgmoneta_append(char* orig, char* s)
 
    n = (char*)realloc(orig, orig_length + s_length + 1);
 
+   if (n == NULL)
+   {
+      return orig;
+   }
+
    memcpy(n + orig_length, s, s_length);
 
    n[orig_length + s_length] = '\0';
@@ -1347,6 +1352,11 @@ pgmoneta_get_files(char* base, int* number_of_files, char*** files)
 
    nof = 0;
 
+   if (base == NULL)
+   {
+      goto error;
+   }
+
    if (!(dir = opendir(base)))
    {
       goto error;
@@ -1366,6 +1376,12 @@ pgmoneta_get_files(char* base, int* number_of_files, char*** files)
    dir = opendir(base);
 
    array = (char**)malloc(sizeof(char*) * nof);
+
+   if (array == NULL)
+   {
+      goto error;
+   }
+
    n = 0;
 
    while ((entry = readdir(dir)) != NULL)
@@ -1373,6 +1389,12 @@ pgmoneta_get_files(char* base, int* number_of_files, char*** files)
       if (entry->d_type == DT_REG)
       {
          array[n] = (char*)malloc(strlen(entry->d_name) + 1);
+
+         if (array[n] == NULL)
+         {
+            goto error;
+         }
+
          memset(array[n], 0, strlen(entry->d_name) + 1);
          memcpy(array[n], entry->d_name, strlen(entry->d_name));
          n++;
@@ -1823,8 +1845,8 @@ int
 pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, struct workers* workers)
 {
    DIR* d = opendir(from);
-   char* from_buffer = NULL;
-   char* to_buffer = NULL;
+   char* from_buffer;
+   char* to_buffer;
    struct dirent* entry;
    struct stat statbuf;
 
@@ -1838,6 +1860,9 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
          {
             continue;
          }
+
+         from_buffer = NULL;
+         to_buffer = NULL;
 
          from_buffer = pgmoneta_append(from_buffer, from);
          from_buffer = pgmoneta_append(from_buffer, "/");
@@ -1876,9 +1901,6 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
 
          free(from_buffer);
          free(to_buffer);
-
-         from_buffer = NULL;
-         to_buffer = NULL;
       }
       closedir(d);
    }
@@ -2310,10 +2332,20 @@ pgmoneta_get_symlink(char* symlink)
 
    alloc = strlen(&link[0]) + 1;
    result = malloc(alloc);
+
+   if (result == NULL)
+   {
+      goto error;
+   }
+
    memset(result, 0, alloc);
    memcpy(result, &link[0], strlen(&link[0]));
 
    return result;
+
+error:
+
+   return NULL;
 }
 
 int
@@ -2461,10 +2493,18 @@ pgmoneta_starts_with(char* str, char* prefix)
 bool
 pgmoneta_ends_with(char* str, char* suffix)
 {
-   int str_len = strlen(str);
-   int suffix_len = strlen(suffix);
+   int str_len;
+   int suffix_len;
 
-   return (str_len >= suffix_len) && (strcmp(str + (str_len - suffix_len), suffix) == 0);
+   if (str != NULL && suffix != NULL)
+   {
+      str_len = strlen(str);
+      suffix_len = strlen(suffix);
+
+      return (str_len >= suffix_len) && (strcmp(str + (str_len - suffix_len), suffix) == 0);
+   }
+
+   return false;
 }
 
 bool
@@ -2476,7 +2516,10 @@ pgmoneta_contains(char* str, char* s)
 void
 pgmoneta_sort(size_t size, char** array)
 {
-   qsort(array, size, sizeof(const char*), string_compare);
+   if (array != NULL)
+   {
+      qsort(array, size, sizeof(const char*), string_compare);
+   }
 }
 
 char*
@@ -2488,6 +2531,11 @@ pgmoneta_bytes_to_string(uint64_t bytes)
    char* result;
 
    result = (char*)malloc(sizeof(char) * 20);
+
+   if (result == NULL)
+   {
+      goto error;
+   }
 
    for (int i = 0; i < sizeof(sizes) / sizeof(*(sizes)); i++, multiplier /= 1024)
    {
@@ -2510,6 +2558,10 @@ pgmoneta_bytes_to_string(uint64_t bytes)
 
    strcpy(result, "0");
    return result;
+
+error:
+
+   return NULL;
 }
 
 int
@@ -2538,6 +2590,12 @@ pgmoneta_read_version(char* directory, char** version)
    }
 
    result = malloc(strlen(&buf[0]) + 1);
+
+   if (result == NULL)
+   {
+      goto error;
+   }
+
    memset(result, 0, strlen(&buf[0]) + 1);
    memcpy(result, &buf[0], strlen(&buf[0]));
 
@@ -2631,6 +2689,11 @@ pgmoneta_read_checkpoint_info(char* directory, char** chkptpos)
 
    chkpt = (char*)malloc(MISC_LENGTH);
 
+   if (chkpt == NULL)
+   {
+      goto error;
+   }
+
    memset(chkpt, 0, MISC_LENGTH);
    memset(buffer, 0, sizeof(buffer));
    memset(label, 0, MAX_PATH);
@@ -2652,11 +2715,13 @@ pgmoneta_read_checkpoint_info(char* directory, char** chkptpos)
             pgmoneta_log_error("Error parsing checkpoint wal location");
             goto error;
          }
-         *chkptpos = chkpt;
+
          break;
       }
       memset(buffer, 0, sizeof(buffer));
    }
+
+   *chkptpos = chkpt;
 
    fclose(file);
    return 0;
@@ -2847,6 +2912,11 @@ pgmoneta_permission_recursive(char* d)
          }
          f = pgmoneta_append(f, entry->d_name);
 
+         if (f == NULL)
+         {
+            goto error;
+         }
+
          if (!stat(f, &statbuf))
          {
             if (S_ISDIR(statbuf.st_mode))
@@ -2868,6 +2938,17 @@ pgmoneta_permission_recursive(char* d)
    }
 
    return 0;
+
+error:
+
+   free(f);
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   return 1;
 }
 
 int
@@ -3078,6 +3159,12 @@ pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length,
    *hex = NULL;
 
    hex_buf = malloc(base32_length * 2 + 1);
+
+   if (hex_buf == NULL)
+   {
+      goto error;
+   }
+
    memset(hex_buf, 0, base32_length * 2 + 1);
 
    for (i = 0; i < base32_length; i++)
@@ -3089,6 +3176,12 @@ pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length,
    *hex = (unsigned char*)hex_buf;
 
    return 0;
+
+error:
+
+   free(hex_buf);
+
+   return 1;
 }
 
 size_t

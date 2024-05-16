@@ -49,6 +49,11 @@ pgmoneta_workflow_create_permissions(int type)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &permissions_setup;
    switch (type)
    {

@@ -197,10 +197,22 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    }
 
    *output = malloc(strlen(o) + 1);
+
+   if (*output == NULL)
+   {
+      goto error;
+   }
+
    memset(*output, 0, strlen(o) + 1);
    memcpy(*output, o, strlen(o));
 
    *identifier = malloc(strlen(ident) + 1);
+
+   if (*identifier == NULL)
+   {
+      goto error;
+   }
+
    memset(*identifier, 0, strlen(ident) + 1);
    memcpy(*identifier, ident, strlen(ident));
 

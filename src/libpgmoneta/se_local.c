@@ -46,6 +46,11 @@ pgmoneta_storage_create_local(void)
 
    wf = (struct workflow*)malloc(sizeof(struct workflow));
 
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
    wf->setup = &local_storage_setup;
    wf->execute = &local_storage_execute;
    wf->teardown = &local_storage_teardown;
