@@ -407,7 +407,7 @@ pgmoneta_decrypt_archive(char* path)
    return 0;
 
 error:
-   
+
    pgmoneta_log_error("pgmoneta_decrypt_archive: error on decrypt file");
 
    free(to);

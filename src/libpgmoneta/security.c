@@ -2864,7 +2864,11 @@ create_hash_file(char* filename, const char* algorithm, char** hash)
       return 1;
    }
 
-   if (strcmp("SHA256", algorithm) == 0)
+   if (strcmp("SHA224", algorithm) == 0)
+   {
+      hash_len = 57;
+   }
+   else if (strcmp("SHA256", algorithm) == 0)
    {
       hash_len = 65;
    }
@@ -2928,6 +2932,12 @@ create_hash_file(char* filename, const char* algorithm, char** hash)
    fclose(file);
 
    return 0;
+}
+
+int
+pgmoneta_create_sha224_file(char* filename, char** sha224)
+{
+   return create_hash_file(filename, "SHA224", sha224);
 }
 
 int

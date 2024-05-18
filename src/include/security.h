@@ -90,6 +90,15 @@ int
 pgmoneta_tls_valid(void);
 
 /**
+ * Generate SHA224 for a file
+ * @param filename The file path
+ * @param sha224 The hash value
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_sha224_file(char* filename, char** sha224);
+
+/**
  * Generate SHA256 for a file
  * @param filename The file path
  * @param sha256 The hash value
