@@ -149,6 +149,22 @@ int pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* v
                                               int* hmac_length);
 
 /**
+ * Generate CRC32C for a buffer
+ * @param buffer The buffer
+ * @param size The size of the buffer
+ * @param crc_buff The hash value
+ * @return 0 upon success, otherwise 1
+ */
+int pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc_buf);
+
+/**
+ * @param path The file path.
+ * @param crc The hash value.
+ * @return 0 upon success, otherwise 1.
+ */
+int pgmoneta_create_crc32c_file(char* path, char** crc);
+
+/**
  * Close a SSL structure
  * @param ssl The SSL structure
  */
