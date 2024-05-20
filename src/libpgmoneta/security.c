@@ -3184,6 +3184,7 @@ pgmoneta_create_crc32c_file(char* path, char** crc)
    uint32_t crc_buf = 0;
 
    file = fopen(path, "rb");
+
    if (file == NULL)
    {
       goto error;
@@ -3196,9 +3197,13 @@ pgmoneta_create_crc32c_file(char* path, char** crc)
       pgmoneta_create_crc32c_buffer(read_buf, read_bytes, &crc_buf);
    }
 
-   fclose(file);
-
    crc_string = malloc(9);
+
+   if (crc_string == NULL)
+   {
+      goto error;
+   }
+
    memset(crc_string, 0, 9);
 
    for (int i = 0; i < 8; i++)
@@ -3206,16 +3211,19 @@ pgmoneta_create_crc32c_file(char* path, char** crc)
       sprintf(crc_string, "%08x", crc_buf);
    }
 
-   if (crc_string == NULL)
-   {
-      goto error;
-   }
-
    *crc = crc_string;
+
+   fclose(file);
 
    return 0;
 
 error:
+
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+
    return 1;
 }
 
