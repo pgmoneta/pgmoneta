@@ -114,14 +114,14 @@ SELECT pg_create_physical_replication_slot('repl', true, false);
 
 ### Verify access
 
-For the user (standard) (using `mypass`)
+For the user `myuser` using `mypass` as the password
 
 ```
 psql -h localhost -p 5432 -U myuser mydb
 \q
 ```
 
-For the user (pgmoneta) (using `secretpassword`)
+For the user `repl` using `secretpassword` as the password
 
 ```
 psql -h localhost -p 5432 -U repl postgres
@@ -194,7 +194,7 @@ wal_slot = repl
 
 and press `Ctrl-D`
 
-(`postgres` user)
+(`pgmoneta` user)
 
 ### Create base directory
 
@@ -231,6 +231,7 @@ pgmoneta-cli -c pgmoneta.conf status details
 ```
 
 (`pgmoneta` user)
+
 ### Shell completion
 
 There is a minimal shell completion support for `pgmoneta-cli` and `pgmoneta-admin`. If you are running such commands from a Bash or Zsh, you can take some advantage of command completion.

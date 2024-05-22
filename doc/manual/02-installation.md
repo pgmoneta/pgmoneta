@@ -4,10 +4,10 @@
 
 ## Fedora
 
-You need to add the [PostgreSQL YUM repository](https://yum.postgresql.org/), for example for Fedora 39
+You need to add the [PostgreSQL YUM repository](https://yum.postgresql.org/), for example for Fedora 40
 
 ```
-dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-39-x86_64/pgdg-fedora-repo-latest.noarch.rpm
+dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-40-x86_64/pgdg-fedora-repo-latest.noarch.rpm
 ```
 
 and do the install via
@@ -15,6 +15,8 @@ and do the install via
 ```
 dnf install -y pgmoneta
 ```
+
+Additional information
 
 * [PostgreSQL YUM](https://yum.postgresql.org/howto/)
 * [Linux downloads](https://www.postgresql.org/download/linux/redhat/)
@@ -83,7 +85,7 @@ Alternative [clang 8+](https://clang.llvm.org/) can be used.
 
 ### RHEL / RockyLinux
 
-On RHEL / Rocky, before you install the required packages some additional repositoriesneed to be enabled or installed first.
+On RHEL / Rocky, before you install the required packages some additional repositories need to be enabled or installed first.
 
 First you need to install the subscription-manager
 
