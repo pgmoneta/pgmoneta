@@ -303,6 +303,8 @@ pgmoneta_server_get_version(SSL* ssl, int socket, int server)
 
    return 0;
 error:
+
+   pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
    return 1;
 }

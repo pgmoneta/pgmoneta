@@ -1123,6 +1123,15 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       reply = NULL;
    }
 
+   if (data == NULL)
+   {
+      pgmoneta_log_debug("Data is NULL");
+   }
+   else
+   {
+      pgmoneta_log_mem(data, data_size);
+   }
+
    if (pgmoneta_has_message('E', data, data_size))
    {
       goto error;
@@ -1283,7 +1292,7 @@ pgmoneta_query_response_debug(struct query_response* response)
 
    if (response == NULL)
    {
-      pgmoneta_log_info("Query is NULL");
+      pgmoneta_log_debug("Query is NULL");
       return;
    }
 
