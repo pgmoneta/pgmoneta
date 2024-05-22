@@ -183,7 +183,7 @@ Example
 pgmoneta-cli conf reload
 ```
 
-## Clear
+## clear
 Clear data/statistics
 
 Command
