@@ -65,6 +65,7 @@ static int wal_send_status_report(SSL* ssl, int socket, int64_t received, int64_
 static int wal_xlog_offset(size_t xlogptr, int segsize);
 static int wal_convert_xlogpos(char* xlogpos, uint32_t* high32, uint32_t* low32, int segsize);
 static int wal_find_streaming_start(char* basedir, uint32_t* timeline, uint32_t* high32, uint32_t* low32, int segsize);
+static int wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, uint32_t* high32, uint32_t* low32, uint32_t* timeline, int segsize);
 static int wal_shipping_setup(int srv, char** wal_shipping);
 static void update_wal_lsn(int srv, size_t xlogptr);
 
@@ -93,6 +94,7 @@ pgmoneta_wal(int srv, char** argv)
    int xlogoff;
    int curr_xlogoff = 0;
    int segsize;
+   int read_replication = 1;
    char* filename = NULL;
    signed char type;
    int ret;
@@ -214,25 +216,39 @@ pgmoneta_wal(int srv, char** argv)
    wal_find_streaming_start(d, &timeline, &high32, &low32, segsize);
    if (timeline == 0)
    {
+      read_replication = (config->servers[srv].version >= 15) ? 1 : 0;
+
+      // query the replication slot to gey the starting LSN and timeline ID
+      if (read_replication)
+      {
+         if (wal_read_replication_slot(ssl, socket, config->servers[srv].wal_slot, config->servers[srv].name, &high32, &low32, &timeline, segsize))
+         {
+            read_replication = 0;   // Fallback if not PostgreSQL 15+
+         }
+      }
+
       // use current xlogpos as last resort
-      timeline = cur_timeline;
-      xlogpos_size = strlen(pgmoneta_query_response_get_data(identify_system_response, 2)) + 1;
-      xlogpos = (char*)malloc(xlogpos_size);
-
-      if (xlogpos == NULL)
+      if (!read_replication)
       {
-         goto error;
-      }
+         timeline = cur_timeline;
+         xlogpos_size = strlen(pgmoneta_query_response_get_data(identify_system_response, 2)) + 1;
+         xlogpos = (char*)malloc(xlogpos_size);
 
-      memset(xlogpos, 0, xlogpos_size);
-      memcpy(xlogpos, pgmoneta_query_response_get_data(identify_system_response, 2), xlogpos_size);
-      if (wal_convert_xlogpos(xlogpos, &high32, &low32, segsize))
-      {
-         goto error;
+         if (xlogpos == NULL)
+         {
+            goto error;
+         }
+         memset(xlogpos, 0, xlogpos_size);
+         memcpy(xlogpos, pgmoneta_query_response_get_data(identify_system_response, 2), xlogpos_size);
+         if (wal_convert_xlogpos(xlogpos, &high32, &low32, segsize))
+         {
+            goto error;
+         }
+         free(xlogpos);
+         xlogpos = NULL;
       }
-      free(xlogpos);
-      xlogpos = NULL;
    }
+
    pgmoneta_free_query_response(identify_system_response);
    identify_system_response = NULL;
 
@@ -623,6 +639,57 @@ error:
    free(filename);
    free(xlogpos);
    exit(1);
+}
+
+static int
+wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, uint32_t* high32, uint32_t* low32, uint32_t* timeline, int segsize)
+{
+   struct message* read_slot_msg = NULL;
+   struct query_response* read_slot_response = NULL;
+   char* lsn = NULL;
+   int status = 0;
+   uint32_t local_timeline = 0;
+
+   pgmoneta_create_read_replication_slot_message(slot, &read_slot_msg);
+   status = pgmoneta_query_execute(ssl, socket, read_slot_msg, &read_slot_response);
+
+   if (status != 0)
+   {
+      pgmoneta_log_error("Error occurred when executing READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
+      goto error;
+   }
+
+   if (read_slot_response->number_of_columns < 3)
+   {
+      pgmoneta_log_error("Invalid response from READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
+      goto error;
+   }
+
+   local_timeline = atoi(pgmoneta_query_response_get_data(read_slot_response, 2));
+   if (local_timeline < 1)
+   {
+      pgmoneta_log_error("Error occurred when reading replication slot on server %s: timeline should at least be 1, but getting %d", name, local_timeline);
+      goto error;
+   }
+
+   lsn = pgmoneta_query_response_get_data(read_slot_response, 1);
+   if (wal_convert_xlogpos(lsn, high32, low32, segsize))
+   {
+      pgmoneta_log_error("Failed to convert LSN from replication slot %s on server %s", slot, name);
+      goto error;
+   }
+
+   *timeline = local_timeline;
+
+   pgmoneta_free_query_response(read_slot_response);
+   pgmoneta_free_copy_message(read_slot_msg);
+
+   return 0;
+
+error:
+   pgmoneta_free_query_response(read_slot_response);
+   pgmoneta_free_copy_message(read_slot_msg);
+   return 1;
 }
 
 static void
