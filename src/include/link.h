@@ -33,6 +33,7 @@
 extern "C" {
 #endif
 
+#include <art.h>
 #include <workers.h>
 
 #include <stdlib.h>
@@ -45,6 +46,19 @@ extern "C" {
  */
 void
 pgmoneta_link(char* from, char* to, struct workers* workers);
+
+/**
+ * Create link between two directories with processed manifest info
+ * @param base_from The base from directory (newer)
+ * @param base_to The base to directory
+ * @param from The current from directory
+ * @param to The current to directory
+ * @param changed The changed files
+ * @param added The added files
+ * @param workers The optional workers
+ */
+void
+pgmoneta_link_with_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
 
 /**
  * Relink link two directories

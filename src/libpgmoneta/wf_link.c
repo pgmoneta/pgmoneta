@@ -28,16 +28,19 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <backup.h>
 #include <info.h>
 #include <link.h>
 #include <logging.h>
+#include <manifest.h>
 #include <utils.h>
 #include <workers.h>
 #include <workflow.h>
 
 /* system */
 #include <stdlib.h>
+#include <string.h>
 
 static int link_setup(int, char*, struct node*, struct node**);
 static int link_execute(int, char*, struct node*, struct node**);
@@ -75,6 +78,8 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    char* server_path = NULL;
    char* from = NULL;
    char* to = NULL;
+   char* from_manifest = NULL;
+   char* to_manifest = NULL;
    char* from_tablespaces = NULL;
    char* to_tablespaces = NULL;
    int next_newest = -1;
@@ -89,6 +94,11 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    int number_of_workers = 0;
    struct workers* workers = NULL;
    struct configuration* config;
+   struct art* deleted_files = NULL;
+   struct art* changed_files = NULL;
+   struct art* added_files = NULL;
+   char base_from[MAX_PATH];
+   char base_to[MAX_PATH];
 
    config = (struct configuration*)shmem;
 
@@ -121,11 +131,20 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
 
          from = pgmoneta_get_server_backup_identifier_data(server, identifier);
          to = pgmoneta_get_server_backup_identifier_data(server, backups[next_newest]->label);
+         from_manifest = pgmoneta_append(from_manifest, from);
+         from_manifest = pgmoneta_append(from_manifest, "backup_manifest");
+         to_manifest = pgmoneta_append(to_manifest, to);
+         to_manifest = pgmoneta_append(to_manifest, "backup_manifest");
 
          from_tablespaces = pgmoneta_get_server_backup_identifier(server, identifier);
          to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
+         pgmoneta_compare_manifests(to_manifest, from_manifest, &deleted_files, &changed_files, &added_files);
 
-         pgmoneta_link(from, to, workers);
+         memset(base_from, 0, MAX_PATH);
+         memset(base_to, 0, MAX_PATH);
+         memcpy(base_from, from, strlen(from) + 1);
+         memcpy(base_to, to, strlen(to) + 1);
+         pgmoneta_link_with_manifest(base_from, base_to, from, changed_files, added_files, workers);
          pgmoneta_link_tablespaces(from_tablespaces, to_tablespaces, workers);
 
          if (number_of_workers > 0)
@@ -155,9 +174,13 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    free(server_path);
    free(from);
    free(to);
+   free(from_manifest);
+   free(to_manifest);
    free(from_tablespaces);
    free(to_tablespaces);
-
+   pgmoneta_art_destroy(changed_files);
+   pgmoneta_art_destroy(added_files);
+   pgmoneta_art_destroy(deleted_files);
    return 0;
 }
 

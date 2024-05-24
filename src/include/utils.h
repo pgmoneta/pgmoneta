@@ -483,6 +483,15 @@ char*
 pgmoneta_remove_whitespace(char* orig);
 
 /**
+ * Remove the common prefix from orig
+ * @param orig The original string
+ * @param prefix The prefix string
+ * @return The resulting string
+ */
+char*
+pgmoneta_remove_prefix(char* orig, char* prefix);
+
+/**
  * Calculate the directory size
  * @param directory The directory
  * @return The size in bytes

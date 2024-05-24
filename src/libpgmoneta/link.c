@@ -133,6 +133,89 @@ done:
    }
 }
 
+void
+pgmoneta_link_with_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
+{
+   DIR* from_dir = opendir(from);
+   char* from_entry = NULL;
+   char* from_file = NULL;
+   char* to_entry = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   if (from_dir == NULL)
+   {
+      goto done;
+   }
+
+   while ((entry = readdir(from_dir)))
+   {
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, "pg_tblspc"))
+      {
+         continue;
+      }
+
+      from_entry = pgmoneta_append(from_entry, from);
+      if (!pgmoneta_ends_with(from, "/"))
+      {
+         from_entry = pgmoneta_append(from_entry, "/");
+      }
+      from_entry = pgmoneta_append(from_entry, entry->d_name);
+
+      if (!stat(from_entry, &statbuf))
+      {
+         if (S_ISDIR(statbuf.st_mode))
+         {
+            pgmoneta_link_with_manifest(base_from, base_to, from_entry, changed, added, workers);
+         }
+         else
+         {
+            struct worker_input* wi = NULL;
+            from_file = pgmoneta_remove_prefix(from_entry, base_from);
+            // file in newer dir is not added nor changed
+            if (pgmoneta_art_search(added, (unsigned char*)from_file, strlen(from_file) + 1) == NULL &&
+                pgmoneta_art_search(changed, (unsigned char*)from_file, strlen(from_file) + 1) == NULL)
+            {
+               to_entry = pgmoneta_append(to_entry, base_to);
+               if (!pgmoneta_ends_with(to_entry, "/"))
+               {
+                  to_entry = pgmoneta_append(to_entry, "/");
+               }
+               to_entry = pgmoneta_append(to_entry, from_file);
+               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
+               {
+                  goto done;
+               }
+            }
+
+            if (workers != NULL)
+            {
+               pgmoneta_workers_add(workers, do_link, (void*)wi);
+            }
+            else
+            {
+               do_link(wi);
+            }
+         }
+      }
+
+      free(from_entry);
+      free(from_file);
+      free(to_entry);
+
+      from_entry = NULL;
+      to_entry = NULL;
+      from_file = NULL;
+   }
+
+done:
+
+   if (from_dir != NULL)
+   {
+      closedir(from_dir);
+   }
+}
+
 static void
 do_link(void* arg)
 {
@@ -142,13 +225,8 @@ do_link(void* arg)
 
    if (pgmoneta_exists(wi->to))
    {
-      bool equal = pgmoneta_compare_files(wi->from, wi->to);
-
-      if (equal)
-      {
-         pgmoneta_delete_file(wi->from, NULL);
-         pgmoneta_symlink_file(wi->from, wi->to);
-      }
+      pgmoneta_delete_file(wi->from, NULL);
+      pgmoneta_symlink_file(wi->from, wi->to);
    }
 
    free(wi);
@@ -353,7 +431,6 @@ do_tablespace(void* arg)
    struct worker_input* wi = NULL;
 
    wi = (struct worker_input*)arg;
-
    equal = pgmoneta_compare_files(wi->from, wi->to);
 
    if (equal)

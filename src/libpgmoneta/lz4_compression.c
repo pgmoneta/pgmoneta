@@ -83,6 +83,11 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
       else if (entry->d_type == DT_REG)
       {
          from = NULL;
+         if (pgmoneta_ends_with(entry->d_name, "backup_label") ||
+             pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+         {
+            continue;
+         }
 
          from = pgmoneta_append(from, directory);
          from = pgmoneta_append(from, "/");

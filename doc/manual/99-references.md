@@ -35,6 +35,8 @@
   [wireshark]: https://www.wireshark.org/
   [pgprtdbg]: https://github.com/jesperpedersen/pgprtdbg
   [aes_ni]: https://en.wikipedia.org/wiki/AES_instruction_set
+  [ART_paper]: http://www-db.in.tum.de/~leis/papers/ART.pdf
+  [libart]: https://github.com/armon/libart
 
 <!-- doc/ -->
   [rpm]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md

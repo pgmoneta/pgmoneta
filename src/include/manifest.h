@@ -34,7 +34,21 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
-#include <node.h>
+#include <art.h>
+
+#define MANIFEST_CHUNK_SIZE 8192
+
+struct manifest_file
+{
+   char* path;
+   char* checksum;
+};
+
+struct manifest_chunk
+{
+   struct manifest_file files[MANIFEST_CHUNK_SIZE];
+   int size;
+};
 
 /**
  * Verify checksum of the manifest and the checksum
@@ -50,11 +64,11 @@ pgmoneta_manifest_checksum_verify(char* root);
  * @param manifest2 The path to the second manifest
  * @param deleted_files The deleted files
  * @param changed_files The changed files
- * @param new_files The new files
+ * @param added_files The added files
  * @return 0 on parsing success, otherwise 1
  */
 int
-pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node** deleted_files, struct node** changed_files, struct node** new_files);
+pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** deleted_files, struct art** changed_files, struct art** added_files);
 
 #ifdef __cplusplus
 }

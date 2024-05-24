@@ -115,6 +115,11 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
       }
       else if (entry->d_type == DT_REG)
       {
+         if (pgmoneta_ends_with(entry->d_name, "backup_label") ||
+             pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+         {
+            continue;
+         }
          if (!pgmoneta_is_file_archive(entry->d_name))
          {
             from = NULL;

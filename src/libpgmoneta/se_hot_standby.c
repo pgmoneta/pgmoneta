@@ -31,12 +31,12 @@
 #include <hot_standby.h>
 #include <logging.h>
 #include <manifest.h>
-#include <node.h>
 #include <utils.h>
 #include <workers.h>
 
 /* system */
 #include <stdlib.h>
+#include <string.h>
 
 static int hot_standby_setup(int, char*, struct node*, struct node**);
 static int hot_standby_execute(int, char*, struct node*, struct node**);
@@ -86,10 +86,13 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    char* f = NULL;
    char* from = NULL;
    char* to = NULL;
-   struct node* deleted_files = NULL;
-   struct node* changed_files = NULL;
-   struct node* new_files = NULL;
-   struct node* n = NULL;
+   struct art* deleted_files = NULL;
+   struct art_iterator* deleted_iter = NULL;
+   struct art* changed_files = NULL;
+   struct art_iterator* changed_iter = NULL;
+   struct art* added_files = NULL;
+   struct art_iterator* added_iter = NULL;
+   struct art_leaf* l = NULL;
    struct workers* workers = NULL;
    struct configuration* config;
 
@@ -149,17 +152,20 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
          }
          new_manifest = pgmoneta_append(new_manifest, "backup_manifest");
 
-         pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &new_files);
+         pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files);
 
-         n = deleted_files;
-         while (n != NULL)
+         pgmoneta_art_iterator_init(&deleted_iter, deleted_files);
+         pgmoneta_art_iterator_init(&changed_iter, changed_files);
+         pgmoneta_art_iterator_init(&added_iter, added_files);
+         while (pgmoneta_art_iterator_has_next(deleted_iter))
          {
+            l = pgmoneta_art_iterator_next(deleted_iter);
             f = pgmoneta_append(f, destination);
             if (!pgmoneta_ends_with(f, "/"))
             {
                f = pgmoneta_append_char(f, '/');
             }
-            f = pgmoneta_append(f, (char*)n->data);
+            f = pgmoneta_append(f, (char*)l->key);
 
             if (pgmoneta_exists(f))
             {
@@ -169,26 +175,24 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
             free(f);
             f = NULL;
-
-            n = n->next;
          }
 
-         n = changed_files;
-         while (n != NULL)
+         while (pgmoneta_art_iterator_has_next(changed_iter))
          {
+            l = pgmoneta_art_iterator_next(changed_iter);
             from = pgmoneta_append(from, source);
             if (!pgmoneta_ends_with(from, "/"))
             {
                from = pgmoneta_append_char(from, '/');
             }
-            from = pgmoneta_append(from, (char*)n->data);
+            from = pgmoneta_append(from, (char*)l->key);
 
             to = pgmoneta_append(to, destination);
             if (!pgmoneta_ends_with(to, "/"))
             {
                to = pgmoneta_append_char(to, '/');
             }
-            to = pgmoneta_append(to, (char*)n->data);
+            to = pgmoneta_append(to, (char*)l->key);
 
             pgmoneta_log_trace("hot_standby changed: %s -> %s", from, to);
 
@@ -199,26 +203,24 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
             free(to);
             to = NULL;
-
-            n = n->next;
          }
 
-         n = new_files;
-         while (n != NULL)
+         while (pgmoneta_art_iterator_has_next(added_iter))
          {
+            l = pgmoneta_art_iterator_next(added_iter);
             from = pgmoneta_append(from, source);
             if (!pgmoneta_ends_with(from, "/"))
             {
                from = pgmoneta_append_char(from, '/');
             }
-            from = pgmoneta_append(from, (char*)n->data);
+            from = pgmoneta_append(from, (char*)l->key);
 
             to = pgmoneta_append(to, destination);
             if (!pgmoneta_ends_with(to, "/"))
             {
                to = pgmoneta_append_char(to, '/');
             }
-            to = pgmoneta_append(to, (char*)n->data);
+            to = pgmoneta_append(to, (char*)l->key);
 
             pgmoneta_log_trace("hot_standby new: %s -> %s", from, to);
 
@@ -229,8 +231,6 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
             free(to);
             to = NULL;
-
-            n = n->next;
          }
       }
       else
@@ -282,9 +282,13 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    free(old_manifest);
    free(new_manifest);
 
-   pgmoneta_free_nodes(deleted_files);
-   pgmoneta_free_nodes(changed_files);
-   pgmoneta_free_nodes(new_files);
+   pgmoneta_art_iterator_destroy(deleted_iter);
+   pgmoneta_art_iterator_destroy(changed_iter);
+   pgmoneta_art_iterator_destroy(added_iter);
+
+   pgmoneta_art_destroy(deleted_files);
+   pgmoneta_art_destroy(changed_files);
+   pgmoneta_art_destroy(added_files);
 
    free(root);
    free(source);

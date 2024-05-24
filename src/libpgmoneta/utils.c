@@ -1115,6 +1115,41 @@ pgmoneta_remove_whitespace(char* orig)
    return result;
 }
 
+char*
+pgmoneta_remove_prefix(char* orig, char* prefix)
+{
+   char* res = NULL;
+   int idx = 0;
+   int len1 = strlen(orig);
+   int len2 = strlen(prefix);
+   int len = 0;
+   if (orig == NULL)
+   {
+      return NULL;
+   }
+   // make a copy of the original one
+   if (prefix == NULL)
+   {
+      res = pgmoneta_append(res, orig);
+      return res;
+   }
+   while (idx < len1 && idx < len2)
+   {
+      if (orig[idx] == prefix[idx])
+      {
+         idx++;
+      }
+   }
+   len = len1 - idx + 1;
+   res = malloc(len);
+   res[len - 1] = 0;
+   if (len > 1)
+   {
+      strcpy(res, orig + idx);
+   }
+   return res;
+}
+
 unsigned long
 pgmoneta_directory_size(char* directory)
 {

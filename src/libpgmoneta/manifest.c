@@ -31,6 +31,7 @@
 #include <json.h>
 #include <logging.h>
 #include <manifest.h>
+#include <deque.h>
 #include <security.h>
 #include <utils.h>
 
@@ -39,6 +40,12 @@
 #include <string.h>
 
 static int manifest_file_hash(char* algorithm, char* file_path, char** hash);
+
+static void
+build_deque(struct deque* deque, struct json_reader* reader, struct json* f);
+
+static void
+build_tree(struct art* tree, struct json_reader* reader, struct json* f);
 
 int
 pgmoneta_manifest_checksum_verify(char* root)
@@ -119,25 +126,33 @@ error:
 }
 
 int
-pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node** deleted_files, struct node** changed_files, struct node** new_files)
+pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** deleted_files, struct art** changed_files, struct art** added_files)
 {
    char* key_path[1] = {"Files"};
    struct json_reader* r1 = NULL;
    struct json* f1 = NULL;
    struct json_reader* r2 = NULL;
    struct json* f2 = NULL;
-   struct node* deleted_files_head = NULL;
-   struct node* changed_files_head = NULL;
-   struct node* new_files_head = NULL;
-   struct node* n = NULL;
-   char* checksum1 = NULL;
-   char* checksum2 = NULL;
-   char* path = NULL;
+   struct art* deleted = NULL;
+   struct art* changed = NULL;
+   struct art* added = NULL;
+   char* checksum = NULL;
    bool manifest_changed = false;
+   struct art* tree = NULL;
+   struct deque* que = NULL;
+   struct deque_node* entry = NULL;
+   char* key = NULL;
+   char* val = NULL;
 
    *deleted_files = NULL;
    *changed_files = NULL;
-   *new_files = NULL;
+   *added_files = NULL;
+
+   pgmoneta_deque_create(&que);
+
+   pgmoneta_art_init(&deleted, NULL);
+   pgmoneta_art_init(&added, NULL);
+   pgmoneta_art_init(&changed, NULL);
 
    if (pgmoneta_json_reader_init(old_manifest, &r1) || pgmoneta_json_locate(r1, key_path, 1))
    {
@@ -148,120 +163,127 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct node**
    {
       goto error;
    }
+
    while (pgmoneta_json_next_array_item(r1, &f1))
    {
-      bool deleted = true;
-      path = pgmoneta_json_get_string_value(f1, "Path");
-      checksum1 = pgmoneta_json_get_string_value(f1, "Checksum");
-      while (pgmoneta_json_next_array_item(r2, &f2) && deleted)
+      // build left chunk into a deque
+      build_deque(que, r1, f1);
+      while (pgmoneta_json_next_array_item(r2, &f2))
       {
-         if (pgmoneta_compare_string(path, pgmoneta_json_get_string_value(f2, "Path")))
+         // build every right chunk into an ART
+         pgmoneta_art_init(&tree, NULL);
+         build_tree(tree, r2, f2);
+         entry = pgmoneta_deque_peek(que);
+         while (entry != NULL && entry != que->end)
          {
-            deleted = false;
-            checksum2 = pgmoneta_json_get_string_value(f2, "Checksum");
-            if (!pgmoneta_compare_string(checksum1, checksum2))
+            checksum = pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
+            if (checksum != NULL)
             {
-               manifest_changed = true;
-               pgmoneta_log_trace("%s: %s <-> %s", path, checksum1, checksum2);
-
-               if (pgmoneta_create_node_string(path, checksum1, &n))
+               if (!strcmp(entry->data, checksum))
                {
-                  goto error;
+                  // not changed but not deleted, remove the entry
+                  entry = pgmoneta_deque_node_remove(que, entry);
                }
-
-               pgmoneta_append_node(&changed_files_head, n);
-               n = NULL;
-
-               break;
+               else
+               {
+                  // file is changed
+                  manifest_changed = true;
+                  val = pgmoneta_append(NULL, entry->data);
+                  pgmoneta_art_insert(changed, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
+                  // changed but not deleted, remove the entry
+                  entry = pgmoneta_deque_node_remove(que, entry);
+               }
+            }
+            else
+            {
+               entry = entry->next;
             }
          }
-
-         pgmoneta_json_free(f2);
-         f2 = NULL;
+         pgmoneta_art_destroy(tree);
+         tree = NULL;
       }
-
-      if (deleted)
+      entry = pgmoneta_deque_peek(que);
+      // traverse
+      while (!pgmoneta_deque_empty(que))
       {
          manifest_changed = true;
-         if (pgmoneta_create_node_string(path, checksum1, &n))
-         {
-            goto error;
-         }
-
-         pgmoneta_append_node(&deleted_files_head, n);
-         n = NULL;
+         // make a copy since tree insert doesn't do that
+         val = pgmoneta_append(NULL, entry->data);
+         pgmoneta_art_insert(deleted, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
+         entry = pgmoneta_deque_node_remove(que, entry);
       }
-
-      pgmoneta_json_free(f1);
-      f1 = NULL;
+      // reset right reader for the next left chunk
       if (pgmoneta_json_reader_reset(r2) || pgmoneta_json_locate(r2, key_path, 1))
       {
          goto error;
       }
    }
+   if (pgmoneta_json_reader_reset(r1) || pgmoneta_json_locate(r1, key_path, 1))
+   {
+      goto error;
+   }
 
    while (pgmoneta_json_next_array_item(r2, &f2))
    {
-      bool new = true;
-
-      path = pgmoneta_json_get_string_value(f2, "Path");
-      checksum2 = pgmoneta_json_get_string_value(f2, "Checksum");
-      while (pgmoneta_json_next_array_item(r1, &f1) && new)
+      build_deque(que, r2, f2);
+      while (pgmoneta_json_next_array_item(r1, &f1))
       {
-         if (pgmoneta_compare_string(pgmoneta_json_get_string_value(f1, "Path"), path))
+         pgmoneta_art_init(&tree, NULL);
+         build_tree(tree, r1, f1);
+         entry = pgmoneta_deque_peek(que);
+         while (entry != NULL && entry != que->end)
          {
-            new = false;
+            checksum = pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
+            if (checksum != NULL)
+            {
+               // the entry is not new, remove it
+               entry = pgmoneta_deque_node_remove(que, entry);
+            }
+            else
+            {
+               entry = entry->next;
+            }
          }
-
-         pgmoneta_json_free(f1);
-         f1 = NULL;
+         pgmoneta_art_destroy(tree);
+         tree = NULL;
       }
-
-      if (new)
+      entry = pgmoneta_deque_peek(que);
+      while (!pgmoneta_deque_empty(que))
       {
-         if (pgmoneta_create_node_string(path, checksum2, &n))
-         {
-            goto error;
-         }
          manifest_changed = true;
-
-         pgmoneta_append_node(&new_files_head, n);
-         n = NULL;
+         val = pgmoneta_append(NULL, entry->data);
+         pgmoneta_art_insert(added, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
+         entry = pgmoneta_deque_node_remove(que, entry);;
       }
-
-      pgmoneta_json_free(f2);
-      f2 = NULL;
       if (pgmoneta_json_reader_reset(r1) || pgmoneta_json_locate(r1, key_path, 1))
       {
          goto error;
       }
    }
+
    if (manifest_changed)
    {
-      if (pgmoneta_create_node_string("backup_manifest", "manifest", &n))
-      {
-         goto error;
-      }
-      pgmoneta_append_node(&changed_files_head, n);
+      key = pgmoneta_append(NULL, "backup_manifest");
+      val = pgmoneta_append(NULL, "manifest");
+      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
+      free(key);
    }
 
-   *deleted_files = deleted_files_head;
-   *changed_files = changed_files_head;
-   *new_files = new_files_head;
+   *deleted_files = deleted;
+   *changed_files = changed;
+   *added_files = added;
 
    pgmoneta_json_close_reader(r1);
    pgmoneta_json_close_reader(r2);
-   pgmoneta_json_free(f1);
-   pgmoneta_json_free(f2);
+   pgmoneta_art_destroy(tree);
+   pgmoneta_deque_destroy(que);
 
    return 0;
-
 error:
    pgmoneta_json_close_reader(r1);
    pgmoneta_json_close_reader(r2);
-   pgmoneta_json_free(f1);
-   pgmoneta_json_free(f2);
-
+   pgmoneta_art_destroy(tree);
+   pgmoneta_deque_destroy(que);
    return 1;
 }
 
@@ -285,4 +307,59 @@ manifest_file_hash(char* algorithm, char* file_path, char** hash)
       stat = 1;
    }
    return stat;
+}
+
+static void
+build_deque(struct deque* deque, struct json_reader* reader, struct json* f)
+{
+   struct json* entry = NULL;
+   char* path = NULL;
+   char* checksum = NULL;
+   if (deque == NULL)
+   {
+      return;
+   }
+   path = pgmoneta_json_get_string_value(f, "Path");
+   checksum = pgmoneta_json_get_string_value(f, "Checksum");
+   pgmoneta_deque_offer_string(deque, checksum, path);
+   pgmoneta_json_free(f);
+   while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_json_next_array_item(reader, &entry))
+   {
+      path = pgmoneta_json_get_string_value(entry, "Path");
+      checksum = pgmoneta_json_get_string_value(entry, "Checksum");
+      pgmoneta_deque_offer_string(deque, checksum, path);
+      pgmoneta_json_free(entry);
+   }
+}
+
+static void
+build_tree(struct art* tree, struct json_reader* reader, struct json* f)
+{
+   struct json* entry = NULL;
+   char* path = NULL;
+   char* checksum = NULL;
+   if (tree == NULL)
+   {
+      return;
+   }
+   path = pgmoneta_json_get_string_value(f, "Path");
+   // make a copy of checksum since ART doesn't do that for us
+   checksum = pgmoneta_append(checksum, pgmoneta_json_get_string_value(f, "Checksum"));
+   if (tree != NULL)
+   {
+      pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
+   }
+   checksum = NULL;
+   pgmoneta_json_free(f);
+   while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_json_next_array_item(reader, &entry))
+   {
+      path = pgmoneta_json_get_string_value(entry, "Path");
+      checksum = pgmoneta_append(checksum, pgmoneta_json_get_string_value(entry, "Checksum"));
+      if (tree != NULL)
+      {
+         pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
+      }
+      pgmoneta_json_free(entry);
+      checksum = NULL;
+   }
 }
