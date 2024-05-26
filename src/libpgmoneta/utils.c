@@ -3947,6 +3947,31 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens)
    return 1;
 }
 
+char*
+pgmoneta_format_and_append(char* buf, const char* format, ...)
+{
+   va_list args;
+   va_start(args, format);
+
+   // Determine the required buffer size
+   int size_needed = vsnprintf(NULL, 0, format, args) + 1;
+   va_end(args);
+
+   // Allocate buffer to hold the formatted string
+   char* formatted_str = malloc(size_needed);
+
+   va_start(args, format);
+   vsnprintf(formatted_str, size_needed, format, args);
+   va_end(args);
+
+   buf = pgmoneta_append(buf, formatted_str);
+
+   free(formatted_str);
+
+   return buf;
+
+}
+
 int
 pgmoneta_atoi(const char* input)
 {

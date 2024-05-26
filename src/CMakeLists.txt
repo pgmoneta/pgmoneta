@@ -1,8 +1,8 @@
 #
 # Add files for libpgmoneta
 #
-FILE(GLOB SOURCE_FILES "libpgmoneta/*.c")
-FILE(GLOB HEADER_FILES "include/*.h")
+FILE(GLOB_RECURSE SOURCE_FILES "libpgmoneta/*.c")
+FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
 
 set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
 

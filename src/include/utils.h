@@ -1154,6 +1154,16 @@ int
 pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
 
 /**
+ * Format a string and append it to the original string
+ * @param buf original string
+ * @param format The string to be formatted and appended to buf
+ * @param ... The arguments to be formatted
+ * @return The resulting string
+ */
+char*
+pgmoneta_format_and_append(char* buf, const char* format, ...);
+
+/**
  * Wrapper for the atoi() function, which provides NULL input check
  * @param input The string input
  * @return 0 if input is NULL, otherwise what atoi() returns
