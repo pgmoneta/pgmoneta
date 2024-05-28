@@ -2416,7 +2416,7 @@ print_status_json(struct json* json)
    char* total_space = pgmoneta_json_get_string_value(status, "Total space");
    if (total_space != NULL)
    {
-      printf("Free space       : %s\n", total_space);
+      printf("Total space      : %s\n", total_space);
    }
 
    int64_t workers = pgmoneta_json_get_int64_value(status, "Workers");
@@ -2503,7 +2503,7 @@ print_details_json(struct json* json)
    char* total_space = pgmoneta_json_get_string_value(status, "Total space");
    if (total_space != NULL)
    {
-      printf("Free space       : %s\n", total_space);
+      printf("Total space      : %s\n", total_space);
    }
 
    int64_t workers = pgmoneta_json_get_int64_value(status, "Workers");
