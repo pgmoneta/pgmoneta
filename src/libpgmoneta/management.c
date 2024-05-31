@@ -630,6 +630,7 @@ pgmoneta_management_write_status(int socket, bool offline)
    unsigned long used_size;
    unsigned long free_size;
    unsigned long total_size;
+   unsigned long hot_standby_size;
    int number_of_directories = 0;
    char** array = NULL;
    unsigned long server_size;
@@ -729,6 +730,20 @@ pgmoneta_management_write_status(int socket, bool offline)
 
       free(d);
       d = NULL;
+
+      if (strlen(config->servers[i].hot_standby) > 0)
+      {
+         hot_standby_size = pgmoneta_directory_size(config->servers[i].hot_standby);;
+      }
+      else
+      {
+         hot_standby_size = 0;
+      }
+
+      if (write_int64("pgmoneta_management_write_status", socket, hot_standby_size))
+      {
+         goto error;
+      }
 
       d = pgmoneta_get_server_backup(i);
 
@@ -842,6 +857,7 @@ pgmoneta_management_write_details(int socket, bool offline)
    unsigned long used_size;
    unsigned long free_size;
    unsigned long total_size;
+   unsigned long hot_standby_size;
    int number_of_backups = 0;
    struct backup** backups = NULL;
    unsigned long server_size;
@@ -966,6 +982,20 @@ pgmoneta_management_write_details(int socket, bool offline)
 
       free(d);
       d = NULL;
+
+      if (strlen(config->servers[i].hot_standby) > 0)
+      {
+         hot_standby_size = pgmoneta_directory_size(config->servers[i].hot_standby);;
+      }
+      else
+      {
+         hot_standby_size = 0;
+      }
+
+      if (write_int64("pgmoneta_management_write_details", socket, hot_standby_size))
+      {
+         goto error;
+      }
 
       d = pgmoneta_get_server_backup(i);
 
@@ -1734,7 +1764,9 @@ read_status_json(SSL* ssl, int socket)
    unsigned long free_size;
    unsigned long total_size;
    unsigned long server_size;
+   unsigned long hot_standby_size;
    char* size_string;
+   char* hot_standby_size_string;
    int retention_days;
    int retention_weeks;
    int retention_months;
@@ -1828,7 +1860,13 @@ read_status_json(SSL* ssl, int socket)
          goto error;
       }
 
+      if (read_int64("pgmoneta_management_read_status", socket, &hot_standby_size))
+      {
+         goto error;
+      }
+
       size_string = pgmoneta_bytes_to_string(server_size);
+      hot_standby_size_string = pgmoneta_bytes_to_string(hot_standby_size);
 
       if (read_int32("pgmoneta_management_read_status", socket, &number_of_directories))
       {
@@ -1862,12 +1900,16 @@ read_status_json(SSL* ssl, int socket)
       }
       pgmoneta_json_item_put_int64(server, "Backups", number_of_directories);
       pgmoneta_json_item_put_string(server, "Space", size_string);
+      pgmoneta_json_item_put_string(server, "Hot standby", hot_standby_size_string);
       pgmoneta_json_item_put_int64(server, "Workers", workers);
 
       pgmoneta_json_array_append_object(servers_array, server);
 
       free(size_string);
       size_string = NULL;
+
+      free(hot_standby_size_string);
+      hot_standby_size_string = NULL;
 
       free(name);
       name = NULL;
@@ -1897,7 +1939,9 @@ read_details_json(SSL* ssl, int socket)
    unsigned long free_size;
    unsigned long total_size;
    unsigned long server_size;
+   unsigned long hot_standby_size;
    char* size_string;
+   char* hot_standby_size_string;
    int retention_days;
    int retention_weeks;
    int retention_months;
@@ -2009,7 +2053,13 @@ read_details_json(SSL* ssl, int socket)
          goto error;
       }
 
+      if (read_int64("pgmoneta_management_read_details", socket, &hot_standby_size))
+      {
+         goto error;
+      }
+
       size_string = pgmoneta_bytes_to_string(server_size);
+      hot_standby_size_string = pgmoneta_bytes_to_string(hot_standby_size);
 
       if (read_int32("pgmoneta_management_read_details", socket, &number_of_backups))
       {
@@ -2034,8 +2084,12 @@ read_details_json(SSL* ssl, int socket)
       pgmoneta_json_item_put_int64(server, "Backups", number_of_backups);
       pgmoneta_json_item_put_string(server, "Space", size_string);
       pgmoneta_json_item_put_int64(server, "Workers", workers);
+      pgmoneta_json_item_put_string(server, "Hot standby", hot_standby_size_string);
       free(size_string);
       size_string = NULL;
+
+      free(hot_standby_size_string);
+      hot_standby_size_string = NULL;
 
       free(name);
       name = NULL;
@@ -2450,9 +2504,10 @@ print_status_json(struct json* json)
             printf("%" PRId64 " year(s) ", pgmoneta_json_get_int64_value(server, "Retention years"));
          }
          printf("\n");
+         printf("  Workers        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Workers"));
          printf("  Backups        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Backups"));
          printf("  Space          : %s\n", pgmoneta_json_get_string_value(server, "Space"));
-         printf("  Workers        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Workers"));
+         printf("  Hot standby    : %s\n", pgmoneta_json_get_string_value(server, "Hot standby"));
       }
    }
    return 0;
@@ -2564,6 +2619,7 @@ print_details_json(struct json* json)
                }
             }
             printf("  Space          : %s\n", pgmoneta_json_get_string_value(server, "Space"));
+            printf("  Hot standby    : %s\n", pgmoneta_json_get_string_value(server, "Hot standby"));
          }
       }
    }
