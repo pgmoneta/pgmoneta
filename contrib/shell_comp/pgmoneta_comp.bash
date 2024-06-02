@@ -10,7 +10,7 @@ pgmoneta_cli_completions()
     if [ "${#COMP_WORDS[@]}" == "2" ]; then
         # main completion: the user has specified nothing at all
         # or a single word, that is a command
-        COMPREPLY=($(compgen -W "backup list-backup restore archive delete retain expunge encrypt decrypt ping stop status conf clear" "${COMP_WORDS[1]}"))
+        COMPREPLY=($(compgen -W "backup list-backup restore archive delete retain expunge encrypt decrypt info ping stop status conf clear" "${COMP_WORDS[1]}"))
     else
         # the user has specified something else
         # subcommand required?

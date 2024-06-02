@@ -40,21 +40,22 @@ extern "C" {
 
 #include <openssl/ssl.h>
 
-#define MANAGEMENT_BACKUP      0
-#define MANAGEMENT_LIST_BACKUP 1
-#define MANAGEMENT_RESTORE     2
-#define MANAGEMENT_ARCHIVE     3
-#define MANAGEMENT_DELETE      4
-#define MANAGEMENT_STOP        5
-#define MANAGEMENT_STATUS      6
-#define MANAGEMENT_DETAILS     7
-#define MANAGEMENT_ISALIVE     8
-#define MANAGEMENT_RESET       9
-#define MANAGEMENT_RELOAD     10
-#define MANAGEMENT_RETAIN     11
-#define MANAGEMENT_EXPUNGE    12
-#define MANAGEMENT_DECRYPT    13
-#define MANAGEMENT_ENCRYPT    14
+#define MANAGEMENT_BACKUP          1
+#define MANAGEMENT_LIST_BACKUP     2
+#define MANAGEMENT_RESTORE         3
+#define MANAGEMENT_ARCHIVE         4
+#define MANAGEMENT_DELETE          5
+#define MANAGEMENT_STOP            6
+#define MANAGEMENT_STATUS          7
+#define MANAGEMENT_STATUS_DETAILS  8
+#define MANAGEMENT_ISALIVE         9
+#define MANAGEMENT_RESET          10
+#define MANAGEMENT_RELOAD         11
+#define MANAGEMENT_RETAIN         12
+#define MANAGEMENT_EXPUNGE        13
+#define MANAGEMENT_DECRYPT        14
+#define MANAGEMENT_ENCRYPT        15
+#define MANAGEMENT_INFO           16
 
 /**
  * Available command output formats
@@ -331,6 +332,37 @@ pgmoneta_management_decrypt(SSL* ssl, int socket, char* path);
  */
 int
 pgmoneta_management_encrypt(SSL* ssl, int socket, char* path);
+
+/**
+ * Management operation: Information about a back
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup The backup
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_info(SSL* ssl, int socket, char* server, char* backup);
+
+/**
+ * Management operation: Read information for a backup
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_read_info(SSL* ssl, int socket, char* server, char* backup, char output_format);
+
+/**
+ * Management: Write info
+ * @param socket The socket
+ * @param server The server name
+ * @param backup The backup
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_write_info(int socket, char* server, char* backup);
 
 /**
  * Management: Read int32

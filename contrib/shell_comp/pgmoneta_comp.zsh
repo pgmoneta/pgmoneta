@@ -6,7 +6,7 @@ function _pgmoneta_cli()
 {
     local line
     _arguments -C \
-               "1: :(backup list-backup restore archive delete retain expunge encrypt decrypt ping stop status conf clear)" \
+               "1: :(backup list-backup restore archive delete retain expunge encrypt decrypt info ping stop status conf clear)" \
                "*::arg:->args"
     case $line[1] in
         status)

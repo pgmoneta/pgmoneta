@@ -49,23 +49,7 @@
 
 #include <openssl/ssl.h>
 
-#define ACTION_UNKNOWN         0
-#define ACTION_BACKUP          1
-#define ACTION_LIST_BACKUP     2
-#define ACTION_RESTORE         3
-#define ACTION_ARCHIVE         4
-#define ACTION_DELETE          5
-#define ACTION_STOP            6
-#define ACTION_STATUS          7
-#define ACTION_STATUS_DETAILS  8
-#define ACTION_ISALIVE         9
-#define ACTION_RESET          10
-#define ACTION_RELOAD         11
-#define ACTION_RETAIN         12
-#define ACTION_EXPUNGE        13
-#define ACTION_DECRYPT        14
-#define ACTION_ENCRYPT        15
-#define ACTION_HELP           99
+#define HELP 99
 
 #define COMMAND_BACKUP "backup"
 #define COMMAND_LIST_BACKUP "list-backup"
@@ -81,6 +65,7 @@
 #define COMMAND_STATUS "status"
 #define COMMAND_CONF "conf"
 #define COMMAND_CLEAR "clear"
+#define COMMAND_INFO "info"
 
 static void help_backup(void);
 static void help_list_backup(void);
@@ -96,6 +81,7 @@ static void help_ping(void);
 static void help_status_details(void);
 static void help_conf(void);
 static void help_clear(void);
+static void help_info(void);
 static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server);
@@ -113,6 +99,7 @@ static int retain(SSL* ssl, int socket, char* server, char* backup_id);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
 static int decrypt_data(SSL* ssl, int socket, char* path);
 static int encrypt_data(SSL* ssl, int socket, char* path);
+static int info(SSL* ssl, int socket, char* server, char* backup, char output_format);
 
 static void
 version(void)
@@ -153,6 +140,7 @@ usage(void)
    printf("  expunge                  Expunge a backup from a server\n");
    printf("  encrypt                  Encrypt a file using master-key\n");
    printf("  decrypt                  Decrypt a file using master-key\n");
+   printf("  info                     Information about a backup\n");
    printf("  ping                     Check if pgmoneta is alive\n");
    printf("  stop                     Stop pgmoneta\n");
    printf("  status [details]         Status of pgmoneta, with optional details\n");
@@ -170,7 +158,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "backup",
       .subcommand = "",
       .accepted_argument_count = {1},
-      .action = ACTION_BACKUP,
+      .action = MANAGEMENT_BACKUP,
       .deprecated = false,
       .log_message = "<backup> [%s]",
    },
@@ -178,7 +166,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "list-backup",
       .subcommand = "",
       .accepted_argument_count = {1},
-      .action = ACTION_LIST_BACKUP,
+      .action = MANAGEMENT_LIST_BACKUP,
       .deprecated = false,
       .log_message = "<list-backup> [%s]",
    },
@@ -186,7 +174,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "restore",
       .subcommand = "",
       .accepted_argument_count = {3, 4},
-      .action = ACTION_RESTORE,
+      .action = MANAGEMENT_RESTORE,
       .deprecated = false,
       .log_message = "<restore> [%s]",
    },
@@ -194,7 +182,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "archive",
       .subcommand = "",
       .accepted_argument_count = {3, 4},
-      .action = ACTION_ARCHIVE,
+      .action = MANAGEMENT_ARCHIVE,
       .deprecated = false,
       .log_message = "<archive> [%s]"
    },
@@ -202,7 +190,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "delete",
       .subcommand = "",
       .accepted_argument_count = {2},
-      .action = ACTION_DELETE,
+      .action = MANAGEMENT_DELETE,
       .deprecated = false,
       .log_message = "<delete> [%s]"
    },
@@ -210,7 +198,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "retain",
       .subcommand = "",
       .accepted_argument_count = {2},
-      .action = ACTION_RETAIN,
+      .action = MANAGEMENT_RETAIN,
       .deprecated = false,
       .log_message = "<retain> [%s]"
    },
@@ -218,7 +206,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "expunge",
       .subcommand = "",
       .accepted_argument_count = {2},
-      .action = ACTION_EXPUNGE,
+      .action = MANAGEMENT_EXPUNGE,
       .deprecated = false,
       .log_message = "<expunge [%s]>",
    },
@@ -226,7 +214,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "decrypt",
       .subcommand = "",
       .accepted_argument_count = {1},
-      .action = ACTION_DECRYPT,
+      .action = MANAGEMENT_DECRYPT,
       .deprecated = false,
       .log_message = "<decrypt> [%s]"
    },
@@ -234,7 +222,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "encrypt",
       .subcommand = "",
       .accepted_argument_count = {1},
-      .action = ACTION_ENCRYPT,
+      .action = MANAGEMENT_ENCRYPT,
       .deprecated = false,
       .log_message = "<encrypt> [%s]"
    },
@@ -242,7 +230,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "ping",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_ISALIVE,
+      .action = MANAGEMENT_ISALIVE,
       .deprecated = false,
       .log_message = "<ping>"
    },
@@ -250,7 +238,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "stop",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_STOP,
+      .action = MANAGEMENT_STOP,
       .deprecated = false,
       .log_message = "<stop>"
    },
@@ -258,7 +246,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "status",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_STATUS,
+      .action = MANAGEMENT_STATUS,
       .deprecated = false,
       .log_message = "<status>"
    },
@@ -266,7 +254,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "status",
       .subcommand = "details",
       .accepted_argument_count = {0},
-      .action = ACTION_STATUS_DETAILS,
+      .action = MANAGEMENT_STATUS_DETAILS,
       .deprecated = false,
       .log_message = "<status details>"
    },
@@ -274,7 +262,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "conf",
       .subcommand = "reload",
       .accepted_argument_count = {0},
-      .action = ACTION_RELOAD,
+      .action = MANAGEMENT_RELOAD,
       .deprecated = false,
       .log_message = "<conf reload>"
    },
@@ -282,15 +270,23 @@ const struct pgmoneta_command command_table[] = {
       .command = "clear",
       .subcommand = "prometheus",
       .accepted_argument_count = {0},
-      .action = ACTION_RESET,
+      .action = MANAGEMENT_RESET,
       .deprecated = false,
       .log_message = "<clear prometheus>"
+   },
+   {
+      .command = "info",
+      .subcommand = "",
+      .accepted_argument_count = {2},
+      .action = MANAGEMENT_INFO,
+      .deprecated = false,
+      .log_message = "<info> [%s]"
    },
    {
       .command = "details",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_STATUS_DETAILS,
+      .action = MANAGEMENT_STATUS_DETAILS,
       .deprecated = true,
       .deprecated_by = "status details",
       .deprecated_since_major = 0,
@@ -301,7 +297,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "is-alive",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_ISALIVE,
+      .action = MANAGEMENT_ISALIVE,
       .deprecated = true,
       .deprecated_by = "ping",
       .deprecated_since_major = 0,
@@ -312,7 +308,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "reload",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_RELOAD,
+      .action = MANAGEMENT_RELOAD,
       .deprecated = true,
       .deprecated_by = "conf reload",
       .deprecated_since_major = 0,
@@ -323,7 +319,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "reset",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = ACTION_RESET,
+      .action = MANAGEMENT_RESET,
       .deprecated = true,
       .deprecated_by = "clear prometheus",
       .deprecated_since_major = 0,
@@ -604,15 +600,15 @@ password:
       }
    }
 
-   if (parsed.cmd->action == ACTION_BACKUP)
+   if (parsed.cmd->action == MANAGEMENT_BACKUP)
    {
       exit_code = backup(s_ssl, socket, parsed.args[0]);
    }
-   else if (parsed.cmd->action == ACTION_LIST_BACKUP)
+   else if (parsed.cmd->action == MANAGEMENT_LIST_BACKUP)
    {
       exit_code = list_backup(s_ssl, socket, parsed.args[0], output_format);
    }
-   else if (parsed.cmd->action == ACTION_RESTORE)
+   else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
       {
@@ -623,7 +619,7 @@ password:
          exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
       }
    }
-   else if (parsed.cmd->action == ACTION_ARCHIVE)
+   else if (parsed.cmd->action == MANAGEMENT_ARCHIVE)
    {
       if (parsed.args[3])
       {
@@ -634,49 +630,53 @@ password:
          exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
       }
    }
-   else if (parsed.cmd->action == ACTION_DELETE)
+   else if (parsed.cmd->action == MANAGEMENT_DELETE)
    {
       exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
    }
-   else if (parsed.cmd->action == ACTION_STOP)
+   else if (parsed.cmd->action == MANAGEMENT_STOP)
    {
       exit_code = stop(s_ssl, socket);
    }
-   else if (parsed.cmd->action == ACTION_STATUS)
+   else if (parsed.cmd->action == MANAGEMENT_STATUS)
    {
       exit_code = status(s_ssl, socket, output_format);
    }
-   else if (parsed.cmd->action == ACTION_STATUS_DETAILS)
+   else if (parsed.cmd->action == MANAGEMENT_STATUS_DETAILS)
    {
       exit_code = details(s_ssl, socket, output_format);
    }
-   else if (parsed.cmd->action == ACTION_ISALIVE)
+   else if (parsed.cmd->action == MANAGEMENT_ISALIVE)
    {
       exit_code = isalive(s_ssl, socket, output_format);
    }
-   else if (parsed.cmd->action == ACTION_RESET)
+   else if (parsed.cmd->action == MANAGEMENT_RESET)
    {
       exit_code = reset(s_ssl, socket);
    }
-   else if (parsed.cmd->action == ACTION_RELOAD)
+   else if (parsed.cmd->action == MANAGEMENT_RELOAD)
    {
       exit_code = reload(s_ssl, socket);
    }
-   else if (parsed.cmd->action == ACTION_RETAIN)
+   else if (parsed.cmd->action == MANAGEMENT_RETAIN)
    {
       exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1]);
    }
-   else if (parsed.cmd->action == ACTION_EXPUNGE)
+   else if (parsed.cmd->action == MANAGEMENT_EXPUNGE)
    {
       exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1]);
    }
-   else if (parsed.cmd->action == ACTION_DECRYPT)
+   else if (parsed.cmd->action == MANAGEMENT_DECRYPT)
    {
       exit_code = decrypt_data(s_ssl, socket, parsed.args[0]);
    }
-   else if (parsed.cmd->action == ACTION_ENCRYPT)
+   else if (parsed.cmd->action == MANAGEMENT_ENCRYPT)
    {
       exit_code = encrypt_data(s_ssl, socket, parsed.args[0]);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_INFO)
+   {
+      exit_code = info(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
    }
 
 done:
@@ -824,6 +824,14 @@ help_clear(void)
    printf("Reset data\n");
    printf("  pgmoneta-cli clear [prometheus]\n");
 }
+
+static void
+help_info(void)
+{
+   printf("Information about a backup\n");
+   printf("  pgmoneta-cli info <server> <backup>\n");
+}
+
 static void
 display_helper(char* command)
 {
@@ -882,6 +890,10 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_CLEAR))
    {
       help_clear();
+   }
+   else if (!strcmp(command, COMMAND_INFO))
+   {
+      help_info();
    }
    else
    {
@@ -1107,4 +1119,19 @@ encrypt_data(SSL* ssl, int socket, char* path)
    }
    pgmoneta_management_read_int32(ssl, socket, &ret);
    return ret;
+}
+
+static int
+info(SSL* ssl, int socket, char* server, char* backup, char output_format)
+{
+   if (pgmoneta_management_info(ssl, socket, server, backup) == 0)
+   {
+      pgmoneta_management_read_info(ssl, socket, server, backup, output_format);
+   }
+   else
+   {
+      return 1;
+   }
+
+   return 0;
 }

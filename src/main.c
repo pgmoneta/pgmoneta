@@ -1206,7 +1206,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
 
          break;
-      case MANAGEMENT_DETAILS:
+      case MANAGEMENT_STATUS_DETAILS:
          pgmoneta_log_debug("Management details");
 
          pid = fork();
@@ -1328,6 +1328,27 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          ret = pgmoneta_encrypt_file(payload_s1, NULL);
          pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
+         break;
+      case MANAGEMENT_INFO:
+         pgmoneta_log_debug("Management info: %s/%s", payload_s1, payload_s2);
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("Cannot create process");
+            free(payload_s1);
+            free(payload_s2);
+         }
+         else if (pid == 0)
+         {
+            shutdown_ports();
+            pgmoneta_management_write_info(client_fd, payload_s1, payload_s2);
+            free(payload_s1);
+            free(payload_s2);
+            exit(0);
+         }
+
          break;
       default:
          pgmoneta_log_debug("Unknown management id: %d", id);
