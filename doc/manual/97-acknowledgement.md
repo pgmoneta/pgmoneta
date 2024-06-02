@@ -46,7 +46,3 @@ community.
 Consider giving the project a [star][star] on
 [GitHub][pgmoneta] if you find it useful. And, feel free to follow
 the project on [Twitter][twitter] as well.
-
-## License
-
-[BSD-3-Clause][license]
