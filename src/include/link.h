@@ -57,11 +57,12 @@ pgmoneta_relink(char* from, char* to, struct workers* workers);
 
 /**
  * Create link between two tablespaces
- * @param from The root directory
+ * @param from The from directory
+ * @param to The to directory
  * @param workers The optional workers
  */
 void
-pgmoneta_link_tablespaces(char* root, struct workers* workers);
+pgmoneta_link_tablespaces(char* from, char* to, struct workers* workers);
 
 #ifdef __cplusplus
 }

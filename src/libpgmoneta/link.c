@@ -271,9 +271,9 @@ do_relink(void* arg)
 }
 
 void
-pgmoneta_link_tablespaces(char* root, struct workers* workers)
+pgmoneta_link_tablespaces(char* from, char* to, struct workers* workers)
 {
-   DIR* from_dir = opendir(root);
+   DIR* from_dir = opendir(from);
    char* from_entry = NULL;
    char* to_entry = NULL;
    struct dirent* entry;
@@ -291,21 +291,25 @@ pgmoneta_link_tablespaces(char* root, struct workers* workers)
          continue;
       }
 
-      from_entry = pgmoneta_append(from_entry, root);
+      from_entry = pgmoneta_append(from_entry, from);
       if (!pgmoneta_ends_with(from_entry, "/"))
       {
          from_entry = pgmoneta_append(from_entry, "/");
       }
       from_entry = pgmoneta_append(from_entry, entry->d_name);
 
-      to_entry = pgmoneta_append(to_entry, "../../");
+      to_entry = pgmoneta_append(to_entry, to);
+      if (!pgmoneta_ends_with(to_entry, "/"))
+      {
+         to_entry = pgmoneta_append(to_entry, "/");
+      }
       to_entry = pgmoneta_append(to_entry, entry->d_name);
 
       if (!stat(from_entry, &statbuf))
       {
          if (S_ISDIR(statbuf.st_mode))
          {
-            pgmoneta_link(from_entry, to_entry, workers);
+            pgmoneta_link_tablespaces(from_entry, to_entry, workers);
          }
          else
          {
