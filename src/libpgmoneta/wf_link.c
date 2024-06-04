@@ -126,7 +126,7 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
          to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
 
          pgmoneta_link(from, to, workers);
-         pgmoneta_link_tablespaces(from_tablespaces, workers);
+         pgmoneta_link_tablespaces(from_tablespaces, to_tablespaces, workers);
 
          if (number_of_workers > 0)
          {
