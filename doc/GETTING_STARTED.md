@@ -4,7 +4,7 @@ First of all, make sure that `pgmoneta` is installed and in your path by
 using `pgmoneta -?`. You should see
 
 ```
-pgmoneta 0.12.0
+pgmoneta 0.12.1
   Backup / restore solution for PostgreSQL
 
 Usage:
@@ -127,7 +127,7 @@ the `SIGTERM` signal to the process using `kill <pid>`.
 You can see the commands it supports by using `pgmoneta-cli -?` which will give
 
 ```
-pgmoneta-cli 0.12.0
+pgmoneta-cli 0.12.1
   Command line utility for pgmoneta
 
 Usage:
@@ -201,7 +201,7 @@ registration with `pgmoneta`.
 You can see the commands it supports by using `pgmoneta-admin -?` which will give
 
 ```
-pgmoneta-admin 0.12.0
+pgmoneta-admin 0.12.1
   Administration utility for pgmoneta
 
 Usage:
