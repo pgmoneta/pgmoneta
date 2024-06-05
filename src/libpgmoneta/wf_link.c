@@ -97,8 +97,6 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    struct art* deleted_files = NULL;
    struct art* changed_files = NULL;
    struct art* added_files = NULL;
-   char base_from[MAX_PATH];
-   char base_to[MAX_PATH];
 
    config = (struct configuration*)shmem;
 
@@ -124,6 +122,7 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
       if (next_newest != -1)
       {
          number_of_workers = pgmoneta_get_number_of_workers(server);
+
          if (number_of_workers > 0)
          {
             pgmoneta_workers_initialize(number_of_workers, &workers);
@@ -131,21 +130,32 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
 
          from = pgmoneta_get_server_backup_identifier_data(server, identifier);
          to = pgmoneta_get_server_backup_identifier_data(server, backups[next_newest]->label);
+
          from_manifest = pgmoneta_append(from_manifest, from);
          from_manifest = pgmoneta_append(from_manifest, "backup_manifest");
+
          to_manifest = pgmoneta_append(to_manifest, to);
          to_manifest = pgmoneta_append(to_manifest, "backup_manifest");
 
-         from_tablespaces = pgmoneta_get_server_backup_identifier(server, identifier);
-         to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
          pgmoneta_compare_manifests(to_manifest, from_manifest, &deleted_files, &changed_files, &added_files);
+         pgmoneta_link_manifest(from, to, from, changed_files, added_files, workers);
 
-         memset(base_from, 0, MAX_PATH);
-         memset(base_to, 0, MAX_PATH);
-         memcpy(base_from, from, strlen(from) + 1);
-         memcpy(base_to, to, strlen(to) + 1);
-         pgmoneta_link_with_manifest(base_from, base_to, from, changed_files, added_files, workers);
-         pgmoneta_link_tablespaces(from_tablespaces, to_tablespaces, workers);
+         for (int j = 0; j < backups[next_newest]->number_of_tablespaces; j++)
+         {
+            from_tablespaces = pgmoneta_get_server_backup_identifier(server, identifier);
+            to_tablespaces = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
+
+            from_tablespaces = pgmoneta_append(from_tablespaces, backups[next_newest]->tablespaces[j]);
+            to_tablespaces = pgmoneta_append(to_tablespaces, backups[next_newest]->tablespaces[j]);
+
+            pgmoneta_link_comparefiles(from_tablespaces, to_tablespaces, workers);
+
+            free(from_tablespaces);
+            from_tablespaces = NULL;
+
+            free(to_tablespaces);
+            to_tablespaces = NULL;
+         }
 
          if (number_of_workers > 0)
          {

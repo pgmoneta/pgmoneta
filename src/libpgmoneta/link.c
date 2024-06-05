@@ -44,97 +44,10 @@
 
 static void do_link(void* arg);
 static void do_relink(void* arg);
-static void do_tablespace(void* arg);
+static void do_comparefiles(void* arg);
 
 void
-pgmoneta_link(char* from, char* to, struct workers* workers)
-{
-   DIR* from_dir = opendir(from);
-   DIR* to_dir = opendir(to);
-   char* from_entry = NULL;
-   char* to_entry = NULL;
-   struct dirent* entry;
-   struct stat statbuf;
-
-   if (from_dir == NULL)
-   {
-      goto done;
-   }
-
-   if (to_dir == NULL)
-   {
-      goto done;
-   }
-
-   while ((entry = readdir(from_dir)))
-   {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, "pg_tblspc"))
-      {
-         continue;
-      }
-
-      from_entry = pgmoneta_append(from_entry, from);
-      if (!pgmoneta_ends_with(from, "/"))
-      {
-         from_entry = pgmoneta_append(from_entry, "/");
-      }
-      from_entry = pgmoneta_append(from_entry, entry->d_name);
-
-      to_entry = pgmoneta_append(to_entry, to);
-      if (!pgmoneta_ends_with(to, "/"))
-      {
-         to_entry = pgmoneta_append(to_entry, "/");
-      }
-      to_entry = pgmoneta_append(to_entry, entry->d_name);
-
-      if (!stat(from_entry, &statbuf))
-      {
-         if (S_ISDIR(statbuf.st_mode))
-         {
-            pgmoneta_link(from_entry, to_entry, workers);
-         }
-         else
-         {
-            struct worker_input* wi = NULL;
-
-            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
-            {
-               goto done;
-            }
-
-            if (workers != NULL)
-            {
-               pgmoneta_workers_add(workers, do_link, (void*)wi);
-            }
-            else
-            {
-               do_link(wi);
-            }
-         }
-      }
-
-      free(from_entry);
-      free(to_entry);
-
-      from_entry = NULL;
-      to_entry = NULL;
-   }
-
-done:
-
-   if (from_dir != NULL)
-   {
-      closedir(from_dir);
-   }
-
-   if (to_dir != NULL)
-   {
-      closedir(to_dir);
-   }
-}
-
-void
-pgmoneta_link_with_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
+pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
    char* from_entry = NULL;
@@ -166,7 +79,7 @@ pgmoneta_link_with_manifest(char* base_from, char* base_to, char* from, struct a
       {
          if (S_ISDIR(statbuf.st_mode))
          {
-            pgmoneta_link_with_manifest(base_from, base_to, from_entry, changed, added, workers);
+            pgmoneta_link_manifest(base_from, base_to, from_entry, changed, added, workers);
          }
          else
          {
@@ -349,7 +262,7 @@ do_relink(void* arg)
 }
 
 void
-pgmoneta_link_tablespaces(char* from, char* to, struct workers* workers)
+pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
    char* from_entry = NULL;
@@ -383,11 +296,13 @@ pgmoneta_link_tablespaces(char* from, char* to, struct workers* workers)
       }
       to_entry = pgmoneta_append(to_entry, entry->d_name);
 
+      pgmoneta_log_trace("pgmoneta_link_tablespaces: %s -> %s", from_entry, to_entry);
+
       if (!stat(from_entry, &statbuf))
       {
          if (S_ISDIR(statbuf.st_mode))
          {
-            pgmoneta_link_tablespaces(from_entry, to_entry, workers);
+            pgmoneta_link_comparefiles(from_entry, to_entry, workers);
          }
          else
          {
@@ -400,11 +315,11 @@ pgmoneta_link_tablespaces(char* from, char* to, struct workers* workers)
 
             if (workers != NULL)
             {
-               pgmoneta_workers_add(workers, do_tablespace, (void*)wi);
+               pgmoneta_workers_add(workers, do_comparefiles, (void*)wi);
             }
             else
             {
-               do_tablespace(wi);
+               do_comparefiles(wi);
             }
          }
       }
@@ -425,7 +340,7 @@ done:
 }
 
 static void
-do_tablespace(void* arg)
+do_comparefiles(void* arg)
 {
    bool equal;
    struct worker_input* wi = NULL;

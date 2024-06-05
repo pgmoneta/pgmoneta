@@ -39,15 +39,6 @@ extern "C" {
 #include <stdlib.h>
 
 /**
- * Create link two directories
- * @param from The from directory
- * @param to The to directory
- * @param workers The optional workers
- */
-void
-pgmoneta_link(char* from, char* to, struct workers* workers);
-
-/**
  * Create link between two directories with processed manifest info
  * @param base_from The base from directory (newer)
  * @param base_to The base to directory
@@ -58,7 +49,7 @@ pgmoneta_link(char* from, char* to, struct workers* workers);
  * @param workers The optional workers
  */
 void
-pgmoneta_link_with_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
+pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
 
 /**
  * Relink link two directories
@@ -70,13 +61,13 @@ void
 pgmoneta_relink(char* from, char* to, struct workers* workers);
 
 /**
- * Create link between two tablespaces
+ * Create link between two equal files
  * @param from The from directory
  * @param to The to directory
  * @param workers The optional workers
  */
 void
-pgmoneta_link_tablespaces(char* from, char* to, struct workers* workers);
+pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers);
 
 #ifdef __cplusplus
 }
