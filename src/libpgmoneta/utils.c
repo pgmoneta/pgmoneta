@@ -32,6 +32,7 @@
 #include <restore.h>
 #include <utils.h>
 #include <workers.h>
+#include <io.h>
 
 /* system */
 #include <dirent.h>
@@ -2197,14 +2198,14 @@ pgmoneta_compare_files(char* f1, char* f2)
    size_t cs;
    size_t bs;
 
-   fp1 = fopen(f1, "r");
+   fp1 = pgmoneta_open_file(f1, "r");
 
    if (fp1 == NULL)
    {
       goto error;
    }
 
-   fp2 = fopen(f2, "r");
+   fp2 = pgmoneta_open_file(f2, "r");
 
    if (fp2 == NULL)
    {
@@ -2617,7 +2618,7 @@ pgmoneta_read_version(char* directory, char** version)
    filename = pgmoneta_append(filename, directory);
    filename = pgmoneta_append(filename, "/PG_VERSION");
 
-   file = fopen(filename, "r");
+   file = pgmoneta_open_file(filename, "r");
    if (file == NULL)
    {
       goto error;
@@ -2739,7 +2740,7 @@ pgmoneta_read_checkpoint_info(char* directory, char** chkptpos)
    memset(label, 0, MAX_PATH);
    snprintf(label, MAX_PATH, "%s/backup_label", directory);
 
-   file = fopen(label, "r");
+   file = pgmoneta_open_file(label, "r");
    if (file == NULL)
    {
       pgmoneta_log_error("Unable to open backup_label file: %s", strerror(errno));

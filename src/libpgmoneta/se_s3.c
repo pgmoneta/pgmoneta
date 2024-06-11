@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <storage.h>
 #include <utils.h>
+#include <io.h>
 
 /* system */
 #include <stdlib.h>
@@ -321,7 +322,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    s3_url = pgmoneta_append(s3_url, "/");
    s3_url = pgmoneta_append(s3_url, s3_path);
 
-   file = fopen(local_path, "rb");
+   file = pgmoneta_open_file(local_path, "rb");
    if (file == NULL)
    {
       goto error;

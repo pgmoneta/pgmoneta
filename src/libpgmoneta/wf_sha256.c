@@ -33,6 +33,7 @@
 #include <node.h>
 #include <utils.h>
 #include <workflow.h>
+#include <io.h>
 
 /* system */
 #include <dirent.h>
@@ -78,7 +79,7 @@ sha256_execute(int server, char* identifier, struct node* i_nodes, struct node**
    sha256_path = pgmoneta_append(sha256_path, root);
    sha256_path = pgmoneta_append(sha256_path, "backup.sha256");
 
-   sha256_file = fopen(sha256_path, "w");
+   sha256_file = pgmoneta_open_file(sha256_path, "w");
    if (sha256_file == NULL)
    {
       goto error;

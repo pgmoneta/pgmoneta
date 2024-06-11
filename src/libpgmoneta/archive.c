@@ -39,6 +39,7 @@
 #include <utils.h>
 #include <workflow.h>
 #include <zstandard_compression.h>
+#include <io.h>
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -438,7 +439,7 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
             return;
          }
 
-         file = fopen(real_path, "rb");
+         file = pgmoneta_open_file(real_path, "rb");
 
          if (file != NULL)
          {

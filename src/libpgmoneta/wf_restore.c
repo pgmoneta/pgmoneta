@@ -36,6 +36,7 @@
 #include <utils.h>
 #include <workers.h>
 #include <workflow.h>
+#include <io.h>
 
 /* system */
 #include <fcntl.h>
@@ -533,7 +534,7 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
 
       if (pgmoneta_exists(f))
       {
-         ffile = fopen(f, "r");
+         ffile = pgmoneta_open_file(f, "r");
       }
       else
       {
@@ -541,7 +542,7 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
          goto error;
       }
 
-      tfile = fopen(t, "w");
+      tfile = pgmoneta_open_file(t, "w");
 
       if (tfile == NULL)
       {
@@ -731,7 +732,7 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
 
       if (pgmoneta_exists(f))
       {
-         ffile = fopen(f, "r");
+         ffile = pgmoneta_open_file(f, "r");
       }
       else
       {
@@ -739,7 +740,7 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
          goto error;
       }
 
-      tfile = fopen(t, "w");
+      tfile = pgmoneta_open_file(t, "w");
 
       if (tfile == NULL)
       {

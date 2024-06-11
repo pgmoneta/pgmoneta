@@ -32,6 +32,7 @@
 #include <utils.h>
 #include <workers.h>
 #include <zstandard_compression.h>
+#include <io.h>
 
 /* system */
 #include <dirent.h>
@@ -583,14 +584,14 @@ zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size,
    FILE* fout = NULL;
    size_t toRead;
 
-   fin = fopen(from, "rb");
+   fin = pgmoneta_open_file(from, "rb");
 
    if (fin == NULL)
    {
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   fout = pgmoneta_open_file(to, "wb");
 
    if (fout == NULL)
    {
@@ -609,7 +610,7 @@ zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size,
       {
          ZSTD_outBuffer output = {zout, zout_size, 0};
          size_t remaining = ZSTD_compressStream2(cctx, &output, &input, mode);
-         fwrite(zout, sizeof(char), output.pos, fout);
+         pgmoneta_write_file(zout, sizeof(char), output.pos, fout);
          finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
       }
       while (!finished);
@@ -649,14 +650,14 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    size_t read;
    size_t lastRet = 0;
 
-   fin = fopen(from, "rb");
+   fin = pgmoneta_open_file(from, "rb");
 
    if (fin == NULL)
    {
       goto error;
    }
 
-   fout = fopen(to, "wb");;
+   fout = pgmoneta_open_file(to, "wb");;
 
    if (fout == NULL)
    {
@@ -671,7 +672,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       {
          ZSTD_outBuffer output = {zout, zout_size, 0};
          size_t ret = ZSTD_decompressStream(dctx, &output, &input);
-         fwrite(zout, sizeof(char), output.pos, fout);
+         pgmoneta_write_file(zout, sizeof(char), output.pos, fout);
          lastRet = ret;
       }
    }

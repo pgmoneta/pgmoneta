@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <io.h>
 
 /* system */
 #include <errno.h>
@@ -245,7 +246,7 @@ log_file_open(void)
          log_rotation_disable();
       }
 
-      log_file = fopen(current_log_path, config->log_mode == PGMONETA_LOGGING_MODE_APPEND ? "a" : "w");
+      log_file = pgmoneta_open_file(current_log_path, config->log_mode == PGMONETA_LOGGING_MODE_APPEND ? "a" : "w");
 
       if (!log_file)
       {

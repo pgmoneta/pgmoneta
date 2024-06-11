@@ -33,6 +33,7 @@
 #include <stddef.h>
 #include <utils.h>
 #include <workers.h>
+#include <io.h>
 
 /* system */
 #include <bzlib.h>
@@ -411,13 +412,13 @@ bzip2_compress(char* from, int level, char* to)
    size_t length;
    int bzip2_err;
 
-   from_ptr = fopen(from, "r");
+   from_ptr = pgmoneta_open_file(from, "r");
    if (!from_ptr)
    {
       goto error;
    }
 
-   to_ptr = fopen(to, "wb+");
+   to_ptr = pgmoneta_open_file(to, "wb+");
    if (!to_ptr)
    {
       goto error;
@@ -471,13 +472,13 @@ bzip2_decompress(char* from, char* to)
    int bzip2_err;
    BZFILE* zip_file = NULL;
 
-   from_ptr = fopen(from, "r");
+   from_ptr = pgmoneta_open_file(from, "r");
    if (!from_ptr)
    {
       goto error;
    }
 
-   to_ptr = fopen(to, "wb+");
+   to_ptr = pgmoneta_open_file(to, "wb+");
    if (!to_ptr)
    {
       goto error;
@@ -499,7 +500,7 @@ bzip2_decompress(char* from, char* to)
 
       if (length > 0)
       {
-         if (fwrite(buf, 1, length, to_ptr) != length)
+         if (pgmoneta_write_file(buf, 1, length, to_ptr) != length)
          {
             goto error_unzip;
          }

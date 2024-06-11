@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <storage.h>
 #include <utils.h>
+#include <io.h>
 
 /* system */
 #include <stdlib.h>
@@ -193,7 +194,7 @@ azure_upload_files(char* local_root, char* azure_root, char* relative_path)
       new_file = pgmoneta_append(new_file, local_root);
       new_file = pgmoneta_append(new_file, relative_file);
 
-      FILE* file = fopen(new_file, "w");
+      FILE* file = pgmoneta_open_file(new_file, "w");
 
       pgmoneta_permission(new_file, 6, 4, 4);
 
@@ -260,7 +261,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   file = fopen(local_path, "rb");
+   file = pgmoneta_open_file(local_path, "rb");
    if (file == NULL)
    {
       goto error;

@@ -32,6 +32,7 @@
 #include <security.h>
 #include <aes.h>
 #include <utils.h>
+#include <io.h>
 
 /* system */
 #include <ctype.h>
@@ -397,7 +398,7 @@ master_key(char* password, bool generate_pwd, int pwd_length)
       }
    }
 
-   file = fopen(&buf[0], "w+");
+   file = pgmoneta_open_file(&buf[0], "w+");
    if (file == NULL)
    {
       warn("Could not write to master key file '%s'", &buf[0]);
@@ -529,7 +530,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
       do_free = false;
    }
 
-   users_file = fopen(users_path, "a+");
+   users_file = pgmoneta_open_file(users_path, "a+");
    if (users_file == NULL)
    {
       warn("Could not append to users file '%s'", users_path);
@@ -705,7 +706,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
       do_free = false;
    }
 
-   users_file = fopen(users_path, "r");
+   users_file = pgmoneta_open_file(users_path, "r");
    if (!users_file)
    {
       warnx("%s not found\n", users_path);
@@ -713,7 +714,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    }
 
    snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
-   users_file_tmp = fopen(tmpfilename, "w+");
+   users_file_tmp = pgmoneta_open_file(tmpfilename, "w+");
    if (users_file_tmp == NULL)
    {
       warn("Could not write to temporary user file '%s'", tmpfilename);
@@ -885,7 +886,7 @@ remove_user(char* users_path, char* username)
    char un[MAX_USERNAME_LENGTH];
    bool found = false;
 
-   users_file = fopen(users_path, "r");
+   users_file = pgmoneta_open_file(users_path, "r");
    if (!users_file)
    {
       warnx("%s not found", users_path);
@@ -894,7 +895,7 @@ remove_user(char* users_path, char* username)
 
    memset(&tmpfilename, 0, sizeof(tmpfilename));
    snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
-   users_file_tmp = fopen(tmpfilename, "w+");
+   users_file_tmp = pgmoneta_open_file(tmpfilename, "w+");
    if (users_file_tmp == NULL)
    {
       warn("Could not write to temporary user file '%s'", tmpfilename);
@@ -978,7 +979,7 @@ list_users(char* users_path)
    char line[MISC_LENGTH];
    char* ptr = NULL;
 
-   users_file = fopen(users_path, "r");
+   users_file = pgmoneta_open_file(users_path, "r");
    if (!users_file)
    {
       goto error;

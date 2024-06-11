@@ -34,6 +34,7 @@
 #include <shmem.h>
 #include <utils.h>
 #include <aes.h>
+#include <io.h>
 
 /* system */
 #include <ctype.h>
@@ -151,7 +152,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
    int idx_server = 0;
    struct server srv = {0};
 
-   file = fopen(filename, "r");
+   file = pgmoneta_open_file(filename, "r");
 
    if (!file)
    {
@@ -1534,7 +1535,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    char* ptr = NULL;
    struct configuration* config;
 
-   file = fopen(filename, "r");
+   file = pgmoneta_open_file(filename, "r");
 
    if (!file)
    {
@@ -1724,7 +1725,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
    char* ptr = NULL;
    struct configuration* config;
 
-   file = fopen(filename, "r");
+   file = pgmoneta_open_file(filename, "r");
 
    if (!file)
    {

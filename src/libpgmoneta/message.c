@@ -36,6 +36,7 @@
 #include <network.h>
 #include <security.h>
 #include <utils.h>
+#include <io.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -2247,7 +2248,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
          }
       }
       pgmoneta_mkdir(directory);
-      file = fopen(file_path, "wb");
+      file = pgmoneta_open_file(file_path, "wb");
       if (file == NULL)
       {
          pgmoneta_log_error("Could not create archive tar file");
@@ -2298,7 +2299,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
             }
 
             // copy data
-            if (fwrite(msg->data, msg->length, 1, file) != 1)
+            if (pgmoneta_write_file(msg->data, msg->length, 1, file) != 1)
             {
                pgmoneta_log_error("could not write to file %s", file_path);
                fflush(file);
@@ -2310,7 +2311,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       }
       //append two blocks of null bytes to the end of the tar file
       memset(null_buffer, 0, 2 * 512);
-      if (fwrite(null_buffer, 2 * 512, 1, file) != 1)
+      if (pgmoneta_write_file(null_buffer, 2 * 512, 1, file) != 1)
       {
          pgmoneta_log_error("could not write to file %s", file_path);
          fflush(file);
@@ -2454,7 +2455,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                // append two blocks of null buffer and extract the tar file
                if (file != NULL)
                {
-                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  if ((!is_server_side_compression()) && pgmoneta_write_file(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
                      fflush(file);
@@ -2523,7 +2524,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   }
                }
                pgmoneta_mkdir(directory);
-               file = fopen(file_path, "wb");
+               file = pgmoneta_open_file(file_path, "wb");
                if (file == NULL)
                {
                   pgmoneta_log_error("Could not create archive tar file");
@@ -2536,7 +2537,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                // start of manifest, finish off previous data archive receiving
                if (file != NULL)
                {
-                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  if ((!is_server_side_compression()) && pgmoneta_write_file(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
                      fflush(file);
@@ -2560,7 +2561,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   snprintf(tmp_manifest_file_path, sizeof(tmp_manifest_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
                   snprintf(manifest_file_path, sizeof(manifest_file_path), "%s/data/%s", basedir, "backup_manifest");
                }
-               file = fopen(tmp_manifest_file_path, "wb");
+               file = pgmoneta_open_file(tmp_manifest_file_path, "wb");
                break;
             }
             case 'd':
@@ -2586,7 +2587,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   }
                }
 
-               if (fwrite(msg->data + 1, msg->length - 1, 1, file) != 1)
+               if (pgmoneta_write_file(msg->data + 1, msg->length - 1, 1, file) != 1)
                {
                   pgmoneta_log_error("could not write to file %s", file_path);
                   goto error;
@@ -2709,7 +2710,7 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
       snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
    }
-   file = fopen(tmp_file_path, "wb");
+   file = pgmoneta_open_file(tmp_file_path, "wb");
 
    if (file == NULL)
    {
@@ -2757,7 +2758,7 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
          }
 
          // copy data
-         if (fwrite(msg->data, msg->length, 1, file) != 1)
+         if (pgmoneta_write_file(msg->data, msg->length, 1, file) != 1)
          {
             pgmoneta_log_error("could not write to file %s", file_path);
             goto error;

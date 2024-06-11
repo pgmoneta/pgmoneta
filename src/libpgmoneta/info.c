@@ -31,6 +31,7 @@
 #include <info.h>
 #include <logging.h>
 #include <utils.h>
+#include <io.h>
 
 /* system */
 #include <stdio.h>
@@ -47,7 +48,7 @@ pgmoneta_create_info(char* directory, char* label, int status)
    s = pgmoneta_append(s, directory);
    s = pgmoneta_append(s, "/backup.info");
 
-   sfile = fopen(s, "w");
+   sfile = pgmoneta_open_file(s, "w");
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "STATUS=%d\n", status);
@@ -92,8 +93,8 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
    d = pgmoneta_append(d, directory);
    d = pgmoneta_append(d, "/backup.info.tmp");
 
-   sfile = fopen(s, "r");
-   dfile = fopen(d, "w");
+   sfile = pgmoneta_open_file(s, "r");
+   dfile = pgmoneta_open_file(d, "w");
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
@@ -167,8 +168,8 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
    d = pgmoneta_append(d, directory);
    d = pgmoneta_append(d, "/backup.info.tmp");
 
-   sfile = fopen(s, "r");
-   dfile = fopen(d, "w");
+   sfile = pgmoneta_open_file(s, "r");
+   dfile = pgmoneta_open_file(d, "w");
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
@@ -346,7 +347,7 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    fn = pgmoneta_append(fn, label);
    fn = pgmoneta_append(fn, "/backup.info");
 
-   file = fopen(fn, "r");
+   file = pgmoneta_open_file(fn, "r");
 
    bck = (struct backup*)malloc(sizeof(struct backup));
 

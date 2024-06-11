@@ -32,6 +32,7 @@
 #include <logging.h>
 #include <utils.h>
 #include <workers.h>
+#include <io.h>
 
 /* system */
 #include <dirent.h>
@@ -434,7 +435,7 @@ gz_compress(char* from, int level, char* to)
    gzFile out = NULL;
    size_t length;
 
-   in = fopen(from, "rb");
+   in = pgmoneta_open_file(from, "rb");
    if (in == NULL)
    {
       goto error;
@@ -515,7 +516,7 @@ gz_decompress(char* from, char* to)
       goto error;
    }
 
-   out = fopen(to, "wb");
+   out = pgmoneta_open_file(to, "wb");
    if (out == NULL)
    {
       goto error;
@@ -527,7 +528,7 @@ gz_decompress(char* from, char* to)
 
       if (length > 0)
       {
-         if (fwrite(buf, 1, length, out) != length)
+         if (pgmoneta_write_file(buf, 1, length, out) != length)
          {
             goto error;
          }

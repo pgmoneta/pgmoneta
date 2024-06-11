@@ -40,6 +40,7 @@
 #include <workflow.h>
 #include <utils.h>
 #include <storage.h>
+#include <io.h>
 
 /* system */
 #include <ctype.h>
@@ -381,14 +382,14 @@ pgmoneta_wal(int srv, char** argv)
                         if (bytes_left > 0)
                         {
                            curr_xlogoff += bytes_left;
-                           fwrite(remain_buffer, 1, bytes_left, wal_file);
+                           pgmoneta_write_file(remain_buffer, 1, bytes_left, wal_file);
                            if (sftp_wal_file != NULL)
                            {
                               sftp_write(sftp_wal_file, remain_buffer, bytes_left);
                            }
                            if (wal_shipping_file != NULL)
                            {
-                              fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
+                              pgmoneta_write_file(remain_buffer, 1, bytes_left, wal_shipping_file);
                            }
                            bytes_left = 0;
                         }
@@ -414,7 +415,7 @@ pgmoneta_wal(int srv, char** argv)
                      {
                         bytes_to_write = bytes_left;
                      }
-                     if (bytes_to_write != fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_file))
+                     if (bytes_to_write != pgmoneta_write_file(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_file))
                      {
                         pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
@@ -426,7 +427,7 @@ pgmoneta_wal(int srv, char** argv)
 
                      if (wal_shipping_file != NULL)
                      {
-                        fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_shipping_file);
+                        pgmoneta_write_file(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_shipping_file);
                      }
 
                      bytes_written += bytes_to_write;
@@ -722,7 +723,7 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
    snprintf(filename, sizeof(filename), "%08X.history", tli);
    path = pgmoneta_get_server_wal(srv);
    path = pgmoneta_append(path, filename);
-   file = fopen(path, "r");
+   file = pgmoneta_open_file(path, "r");
    if (file == NULL)
    {
       pgmoneta_log_error("Unable to open history file: %s", strerror(errno));
@@ -852,12 +853,12 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
 
    history_content = pgmoneta_query_response_get_data(timeline_history_response, 1);
 
-   history_file = fopen(path, "wb");
+   history_file = pgmoneta_open_file(path, "wb");
    if (history_file == NULL)
    {
       goto error;
    }
-   fwrite(history_content, 1, strlen(history_content) + 1, history_file);
+   pgmoneta_write_file(history_content, 1, strlen(history_content) + 1, history_file);
    fflush(history_file);
 
    pgmoneta_free_copy_message(timeline_history_msg);
@@ -902,7 +903,7 @@ wal_open(char* root, char* filename, int segsize)
       size_t size = pgmoneta_get_file_size(path);
       if (size == segsize)
       {
-         file = fopen(path, "r+b");
+         file = pgmoneta_open_file(path, "r+b");
          if (file == NULL)
          {
             pgmoneta_log_error("WAL error: %s", strerror(errno));
@@ -922,7 +923,7 @@ wal_open(char* root, char* filename, int segsize)
       }
    }
 
-   file = fopen(path, "wb");
+   file = pgmoneta_open_file(path, "wb");
 
    if (file == NULL)
    {
@@ -1005,7 +1006,7 @@ wal_prepare(FILE* file, int segsize)
 
    while (written < segsize)
    {
-      written += fwrite(buffer, 1, sizeof(buffer), file);
+      written += pgmoneta_write_file(buffer, 1, sizeof(buffer), file);
    }
 
    fflush(file);

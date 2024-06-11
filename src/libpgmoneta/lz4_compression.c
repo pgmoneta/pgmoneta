@@ -34,6 +34,7 @@
 #include <lz4_compression.h>
 #include <utils.h>
 #include <workers.h>
+#include <io.h>
 
 /* system */
 #include <dirent.h>
@@ -371,14 +372,14 @@ lz4_compress(char* from, char* to)
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
 
    lz4Stream = LZ4_createStream();
-   fin = fopen(from, "rb");
+   fin = pgmoneta_open_file(from, "rb");
 
    if (fin == NULL)
    {
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   fout = pgmoneta_open_file(to, "wb");
 
    if (fout == NULL)
    {
@@ -399,8 +400,8 @@ lz4_compress(char* from, char* to)
          break;
       }
 
-      fwrite(&compression, sizeof(compression), 1, fout);
-      fwrite(buffOut, sizeof(char), (size_t)compression, fout);
+      pgmoneta_write_file(&compression, sizeof(compression), 1, fout);
+      pgmoneta_write_file(buffOut, sizeof(char), (size_t)compression, fout);
 
       buffInIndex = (buffInIndex + 1) % 2;
    }
@@ -439,14 +440,14 @@ lz4_decompress(char* from, char* to)
    size_t read = 0;
 
    lz4StreamDecode = &lz4StreamDecodeBody;
-   fin = fopen(from, "rb");
+   fin = pgmoneta_open_file(from, "rb");
 
    if (fin == NULL)
    {
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   fout = pgmoneta_open_file(to, "wb");
 
    if (fout == NULL)
    {
@@ -479,7 +480,7 @@ lz4_decompress(char* from, char* to)
          break;
       }
 
-      fwrite(buffIn[buffInIndex], sizeof(char), decompression, fout);
+      pgmoneta_write_file(buffIn[buffInIndex], sizeof(char), decompression, fout);
 
       buffInIndex = (buffInIndex + 1) % 2;
    }

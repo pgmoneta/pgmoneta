@@ -37,6 +37,7 @@
 #include <utils.h>
 #include <security.h>
 #include <storage.h>
+#include <io.h>
 
 /* system */
 #include <dirent.h>
@@ -638,7 +639,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
    {
       mode = pgmoneta_get_permission(s);
 
-      sfile = fopen(s, "rb");
+      sfile = pgmoneta_open_file(s, "rb");
 
       if (sfile == NULL)
       {
@@ -737,7 +738,7 @@ read_latest_backup_sha256(char* path)
    int lines = 0;
    FILE* file = NULL;
 
-   file = fopen(path, "r");
+   file = pgmoneta_open_file(path, "r");
    if (file == NULL)
    {
       goto error;
@@ -750,7 +751,7 @@ read_latest_backup_sha256(char* path)
 
    fclose(file);
 
-   file = fopen(path, "r");
+   file = pgmoneta_open_file(path, "r");
 
    file_paths = (char**)malloc(sizeof(char*) * lines);
 

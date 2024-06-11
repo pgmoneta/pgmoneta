@@ -35,6 +35,7 @@
 #include <prometheus.h>
 #include <security.h>
 #include <utils.h>
+#include <io.h>
 
 /* system */
 #include <stdatomic.h>
@@ -1788,7 +1789,7 @@ pgmoneta_get_master_key(char** masterkey)
       }
    }
 
-   master_key_file = fopen(&buf[0], "r");
+   master_key_file = pgmoneta_open_file(&buf[0], "r");
    if (master_key_file == NULL)
    {
       goto error;
@@ -2898,7 +2899,7 @@ create_hash_file(char* filename, const char* algorithm, char** hash)
       return 1;
    }
 
-   file = fopen(filename, "rb");
+   file = pgmoneta_open_file(filename, "rb");
    if (file == NULL)
    {
       return 1;
@@ -3183,7 +3184,7 @@ pgmoneta_create_crc32c_file(char* path, char** crc)
    char* crc_string;
    uint32_t crc_buf = 0;
 
-   file = fopen(path, "rb");
+   file = pgmoneta_open_file(path, "rb");
 
    if (file == NULL)
    {
