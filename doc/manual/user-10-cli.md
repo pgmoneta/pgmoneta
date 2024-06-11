@@ -128,6 +128,35 @@ Example
 pgmoneta-cli expunge primary oldest
 ```
 
+## encrypt
+
+Encrypt the file in place, remove unencrypted file after successful encryption.
+
+Command
+
+``` sh
+pgmoneta-cli encrypt <file>
+```
+## decrypt
+
+Decrypt the file in place, remove encrypted file after successful decryption.
+
+Command
+
+``` sh
+pgmoneta-cli decrypt <file>
+```
+
+## info
+
+Information about a backup.
+
+Command
+
+``` sh
+pgmoneta-cli info <server> <backup>
+```
+
 ## ping
 
 Verify if [**pgmoneta**][pgmoneta] is alive
@@ -214,26 +243,6 @@ Example
 
 ``` sh
 pgmoneta-cli clear prometheus
-```
-
-## decrypt
-
-Decrypt the file in place, remove encrypted file after successful decryption.
-
-Command
-
-``` sh
-pgmoneta-cli decrypt <file>
-```
-
-## encrypt
-
-Encrypt the file in place, remove unencrypted file after successful encryption.
-
-Command
-
-``` sh
-pgmoneta-cli encrypt <file>
 ```
 
 ## Shell completions
