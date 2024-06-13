@@ -60,6 +60,16 @@ struct art_node
 } __attribute__ ((aligned (64)));
 
 /**
+ * The ART leaf with key buffer of arbitrary size
+ */
+struct art_leaf
+{
+   void* value;
+   uint32_t key_len;
+   unsigned char key[];
+} __attribute__ ((aligned (64)));
+
+/**
  * The ART node with only 4 children,
  * the key character and the children pointer are stored
  * in the same position of the corresponding array.
@@ -1288,12 +1298,14 @@ pgmoneta_art_iterator_init(struct art_iterator** iter, struct art* t)
    }
    i->count = 0;
    i->tree = t;
+   i->key = NULL;
+   i->value = NULL;
    pgmoneta_deque_create(&i->que);
    *iter = i;
    return 0;
 }
 
-struct art_leaf*
+bool
 pgmoneta_art_iterator_next(struct art_iterator* iter)
 {
    struct deque* que = NULL;
@@ -1303,7 +1315,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
    int idx = 0;
    if (iter == NULL || iter->que == NULL || iter->tree == NULL || iter->count == iter->tree->size)
    {
-      return NULL;
+      return false;
    }
    que = iter->que;
    tree = iter->tree;
@@ -1317,7 +1329,9 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
       if (IS_LEAF(node))
       {
          iter->count++;
-         return GET_LEAF(node);
+         iter->key = GET_LEAF(node)->key;
+         iter->value = GET_LEAF(node)->value;
+         return true;
       }
       switch (node->type)
       {
@@ -1372,7 +1386,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
          }
       }
    }
-   return NULL;
+   return false;
 }
 
 void

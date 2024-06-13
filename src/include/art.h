@@ -53,22 +53,13 @@ struct art
    value_destroy_callback val_destroy_cb;
 };
 
-/**
- * The ART leaf with key buffer of arbitrary size
- */
-struct art_leaf
-{
-   void* value;
-   uint32_t key_len;
-   unsigned char key[];
-} __attribute__ ((aligned (64)));
-
-
 struct art_iterator
 {
    struct deque* que;
    struct art* tree;
    uint32_t count;
+   unsigned char* key;
+   void* value;
 };
 
 /**
@@ -153,11 +144,11 @@ void
 pgmoneta_art_iterator_destroy(struct art_iterator* iter);
 
 /**
- * Return the next leaf in the ART
+ * Get the next key value pair into iterator
  * @param iter The iterator
- * @return The next leaf, or NULL if all leaves have been visited
+ * @return true if iterator has next, otherwise false
  */
-struct art_leaf*
+bool
 pgmoneta_art_iterator_next(struct art_iterator* iter);
 
 /**
