@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <prometheus.h>
 
 /* system */
 #include <errno.h>
@@ -314,6 +315,24 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
 
    if (level >= config->log_level)
    {
+      switch (level)
+      {
+         case PGMONETA_LOGGING_LEVEL_INFO:
+            pgmoneta_prometheus_logging(PGMONETA_LOGGING_LEVEL_INFO);
+            break;
+         case PGMONETA_LOGGING_LEVEL_WARN:
+            pgmoneta_prometheus_logging(PGMONETA_LOGGING_LEVEL_WARN);
+            break;
+         case PGMONETA_LOGGING_LEVEL_ERROR:
+            pgmoneta_prometheus_logging(PGMONETA_LOGGING_LEVEL_ERROR);
+            break;
+         case PGMONETA_LOGGING_LEVEL_FATAL:
+            pgmoneta_prometheus_logging(PGMONETA_LOGGING_LEVEL_FATAL);
+            break;
+         default:
+            break;
+      }
+
 retry:
       isfree = STATE_FREE;
 

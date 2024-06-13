@@ -3075,6 +3075,10 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->network_max_rate = reload->network_max_rate;
 
    /* prometheus */
+   atomic_init(&config->prometheus.logging_info, 0);
+   atomic_init(&config->prometheus.logging_warn, 0);
+   atomic_init(&config->prometheus.logging_error, 0);
+   atomic_init(&config->prometheus.logging_fatal, 0);
 
 #ifdef HAVE_LINUX
    sd_notify(0, "READY=1");

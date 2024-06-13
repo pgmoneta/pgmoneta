@@ -269,6 +269,10 @@ struct prometheus_cache
  */
 struct prometheus
 {
+   atomic_ulong logging_info;  /**< Logging: INFO */
+   atomic_ulong logging_warn;  /**< Logging: WARN */
+   atomic_ulong logging_error; /**< Logging: ERROR */
+   atomic_ulong logging_fatal; /**< Logging: FATAL */
 } __attribute__ ((aligned (64)));
 
 /** @struct

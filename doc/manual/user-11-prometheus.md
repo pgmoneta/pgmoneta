@@ -14,6 +14,22 @@ The state of pgmoneta
 
 The version of pgmoneta
 
+## pgmoneta_logging_info
+
+The number of INFO statements
+
+## pgmoneta_logging_warn
+
+The number of WARN statements
+
+## pgmoneta_logging_error
+
+The number of ERROR statements
+
+## pgmoneta_logging_fatal
+
+The number of FATAL statements
+
 ## pgmoneta_retention_days
 
 The retention of pgmoneta in days

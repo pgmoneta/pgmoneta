@@ -94,6 +94,13 @@ pgmoneta_prometheus_reset(void);
 int
 pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem);
 
+/**
+ * Add a logging count
+ * @param logging The logging type
+ */
+void
+pgmoneta_prometheus_logging(int logging);
+
 #ifdef __cplusplus
 }
 #endif

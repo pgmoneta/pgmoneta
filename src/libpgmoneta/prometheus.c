@@ -131,8 +131,10 @@ void
 pgmoneta_prometheus_reset(void)
 {
    signed char cache_is_free;
+   struct configuration* config;
    struct prometheus_cache* cache;
 
+   config = (struct configuration*)shmem;
    cache = (struct prometheus_cache*)prometheus_cache_shmem;
 
 retry_cache_locking:
@@ -141,12 +143,43 @@ retry_cache_locking:
    {
       metrics_cache_invalidate();
 
+      atomic_store(&config->prometheus.logging_info, 0);
+      atomic_store(&config->prometheus.logging_warn, 0);
+      atomic_store(&config->prometheus.logging_error, 0);
+      atomic_store(&config->prometheus.logging_fatal, 0);
+
       atomic_store(&cache->lock, STATE_FREE);
    }
    else
    {
       /* Sleep for 1ms */
       SLEEP_AND_GOTO(1000000L, retry_cache_locking);
+   }
+}
+
+void
+pgmoneta_prometheus_logging(int type)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   switch (type)
+   {
+      case PGMONETA_LOGGING_LEVEL_INFO:
+         atomic_fetch_add(&config->prometheus.logging_info, 1);
+         break;
+      case PGMONETA_LOGGING_LEVEL_WARN:
+         atomic_fetch_add(&config->prometheus.logging_warn, 1);
+         break;
+      case PGMONETA_LOGGING_LEVEL_ERROR:
+         atomic_fetch_add(&config->prometheus.logging_error, 1);
+         break;
+      case PGMONETA_LOGGING_LEVEL_FATAL:
+         atomic_fetch_add(&config->prometheus.logging_fatal, 1);
+         break;
+      default:
+         break;
    }
 }
 
@@ -274,6 +307,18 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_version</h2>\n");
    data = pgmoneta_append(data, "  The version of pgmoneta\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_logging_info</h2>\n");
+   data = pgmoneta_append(data, "  The number of INFO logging statements\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_logging_warn</h2>\n");
+   data = pgmoneta_append(data, "  The number of WARN logging statements\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_logging_error</h2>\n");
+   data = pgmoneta_append(data, "  The number of ERROR logging statements\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_logging_fatal</h2>\n");
+   data = pgmoneta_append(data, "  The number of FATAL logging statements\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_retention_days</h2>\n");
    data = pgmoneta_append(data, "  The retention of pgmoneta in days\n");
@@ -959,6 +1004,26 @@ general_information(int client_fd)
    data = pgmoneta_append(data, "pgmoneta_version{version=\"");
    data = pgmoneta_append(data, VERSION);
    data = pgmoneta_append(data, "\"} 1");
+   data = pgmoneta_append(data, "\n\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_logging_info The number of INFO logging statements\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_info gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_logging_info ");
+   data = pgmoneta_append_ulong(data, atomic_load(&config->prometheus.logging_info));
+   data = pgmoneta_append(data, "\n\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_logging_warn The number of WARN logging statements\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_warn gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_logging_warn ");
+   data = pgmoneta_append_ulong(data, atomic_load(&config->prometheus.logging_warn));
+   data = pgmoneta_append(data, "\n\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_logging_error The number of ERROR logging statements\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_error gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_logging_error ");
+   data = pgmoneta_append_ulong(data, atomic_load(&config->prometheus.logging_error));
+   data = pgmoneta_append(data, "\n\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_logging_fatal The number of FATAL logging statements\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_logging_fatal gauge\n");
+   data = pgmoneta_append(data, "pgmoneta_logging_fatal ");
+   data = pgmoneta_append_ulong(data, atomic_load(&config->prometheus.logging_fatal));
    data = pgmoneta_append(data, "\n\n");
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_days The retention days of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_days gauge\n");
