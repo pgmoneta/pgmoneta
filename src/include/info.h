@@ -54,6 +54,7 @@ extern "C" {
 #define INFO_CHKPT_WALPOS   "CHKPT_WALPOS"
 #define INFO_START_TIMELINE "START_TIMELINE"
 #define INFO_END_TIMELINE   "END_TIMELINE"
+#define INFO_HASH_ALGORITHM "HASH_ALGORITM"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -83,6 +84,7 @@ struct backup
    uint32_t checkpoint_lsn_lo32;                             /**< The low 32 bits of WAL checkpoint position of the backup */
    uint32_t start_timeline;                                  /**< The starting timeline of the backup */
    uint32_t end_timeline;                                    /**< The ending timeline of the backup */
+   int hash_algoritm;                                        /**< The hash algoritm for the manifest */
 } __attribute__ ((aligned (64)));
 
 /**

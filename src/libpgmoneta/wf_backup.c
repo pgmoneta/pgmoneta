@@ -342,6 +342,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_update_info_string(root, INFO_END_WALPOS, endpos);
    pgmoneta_update_info_unsigned_long(root, INFO_START_TIMELINE, start_timeline);
    pgmoneta_update_info_unsigned_long(root, INFO_END_TIMELINE, end_timeline);
+   pgmoneta_update_info_unsigned_long(root, INFO_HASH_ALGORITHM, hash);
    // in case of parsing error
    if (chkptpos != NULL)
    {
