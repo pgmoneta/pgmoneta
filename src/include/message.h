@@ -368,7 +368,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, char* checksum_algorithm,
+pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, int checksum_algorithm,
                                     int compression, int compression_level,
                                     struct message** msg);
 

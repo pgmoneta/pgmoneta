@@ -104,6 +104,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    char old_label_path[MAX_PATH];
    int backup_max_rate;
    int network_max_rate;
+   int hash;
    struct node* o_root = NULL;
    struct node* o_to = NULL;
    struct configuration* config;
@@ -211,7 +212,14 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    }
    label = pgmoneta_append(label, "pgmoneta_base_backup_");
    label = pgmoneta_append(label, identifier);
-   pgmoneta_create_base_backup_message(config->servers[server].version, label, true, "SHA256",
+
+   hash = config->servers[server].manifest;
+   if (hash == HASH_ALGORITHM_DEFAULT)
+   {
+      hash = config->manifest;
+   }
+
+   pgmoneta_create_base_backup_message(config->servers[server].version, label, true, hash,
                                        config->compression_type, config->compression_level,
                                        &basebackup_msg);
 

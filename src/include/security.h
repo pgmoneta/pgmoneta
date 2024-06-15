@@ -39,6 +39,13 @@ extern "C" {
 
 #include <openssl/ssl.h>
 
+#define HASH_ALGORITHM_DEFAULT 0
+#define HASH_ALGORITHM_CRC32C  1
+#define HASH_ALGORITHM_SHA224  2
+#define HASH_ALGORITHM_SHA256  3
+#define HASH_ALGORITHM_SHA384  4
+#define HASH_ALGORITHM_SHA512  5
+
 /**
  * Authenticate a user
  * @param server The server

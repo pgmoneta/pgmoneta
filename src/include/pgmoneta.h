@@ -231,6 +231,7 @@ struct server
    int workers;                       /**< The number of workers */
    int backup_max_rate;     /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
+   int manifest;  /**< The manifest hash algorithm */
 } __attribute__ ((aligned (64)));
 
 /** @struct
@@ -362,6 +363,8 @@ struct configuration
 
    int backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
+
+   int manifest;  /**< The manifest hash algorithm */
 
    struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
    struct user users[NUMBER_OF_USERS];             /**< The users */
