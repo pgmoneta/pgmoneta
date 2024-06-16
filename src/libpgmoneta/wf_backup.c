@@ -184,6 +184,10 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    {
       char* tablespace_name = tup->data[0];
       char* tablespace_path = tup->data[1];
+
+      pgmoneta_log_info("tablespace_name: %s", tablespace_name);
+      pgmoneta_log_info("tablespace_path: %s", tablespace_path);
+
       if (tablespace_name != NULL && tablespace_path != NULL)
       {
          if (tablespaces == NULL)
@@ -210,7 +214,8 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       pgmoneta_log_info("Invalid credentials for %s", config->users[usr].username);
       goto error;
    }
-   label = pgmoneta_append(label, "pgmoneta_base_backup_");
+
+   label = pgmoneta_append(label, "pgmoneta_");
    label = pgmoneta_append(label, identifier);
 
    hash = config->servers[server].manifest;
@@ -353,12 +358,15 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    while (current_tablespace != NULL)
    {
       char key[MISC_LENGTH];
+      char tblname[MAX_PATH];
+
+      snprintf(&tblname[0], MAX_PATH, "tblspc_%s", current_tablespace->name);
 
       number_of_tablespaces++;
       pgmoneta_update_info_unsigned_long(root, INFO_TABLESPACES, number_of_tablespaces);
 
       snprintf(key, sizeof(key) - 1, "TABLESPACE%d", number_of_tablespaces);
-      pgmoneta_update_info_string(root, key, current_tablespace->name);
+      pgmoneta_update_info_string(root, key, tblname);
 
       current_tablespace = current_tablespace->next;
    }

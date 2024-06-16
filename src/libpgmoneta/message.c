@@ -2283,13 +2283,13 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
          }
          if (pgmoneta_ends_with(basedir, "/"))
          {
-            snprintf(file_path, sizeof(file_path), "%s%s/%s.tar", basedir, tblspc->name, tblspc->name);
-            snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+            snprintf(file_path, sizeof(file_path), "%stblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+            snprintf(directory, sizeof(directory), "%stblspc_%s/", basedir, tblspc->name);
          }
          else
          {
-            snprintf(file_path, sizeof(file_path), "%s/%s/%s.tar", basedir, tblspc->name, tblspc->name);
-            snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+            snprintf(file_path, sizeof(file_path), "%s/tblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+            snprintf(directory, sizeof(directory), "%s/tblspc_%s/", basedir, tblspc->name);
          }
       }
       pgmoneta_mkdir(directory);
@@ -2390,12 +2390,12 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       if (pgmoneta_ends_with(basedir, "/"))
       {
          snprintf(link_path, sizeof(link_path), "%sdata/pg_tblspc/%d", basedir, tblspc->oid);
-         snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+         snprintf(directory, sizeof(directory), "%stblspc_%s/", basedir, tblspc->name);
       }
       else
       {
          snprintf(link_path, sizeof(link_path), "%s/data/pg_tblspc/%d", basedir, tblspc->oid);
-         snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+         snprintf(directory, sizeof(directory), "%s/tblspc_%s/", basedir, tblspc->name);
       }
 
       unlink(link_path);
@@ -2559,13 +2559,13 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   }
                   if (pgmoneta_ends_with(basedir, "/"))
                   {
-                     snprintf(file_path, sizeof(file_path), "%s%s/%s.tar", basedir, tblspc->name, tblspc->name);
-                     snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+                     snprintf(file_path, sizeof(file_path), "%stblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+                     snprintf(directory, sizeof(directory), "%stblspc_%s/", basedir, tblspc->name);
                   }
                   else
                   {
-                     snprintf(file_path, sizeof(file_path), "%s/%s/%s.tar", basedir, tblspc->name, tblspc->name);
-                     snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+                     snprintf(file_path, sizeof(file_path), "%s/tblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+                     snprintf(directory, sizeof(directory), "%s/tblspc_%s/", basedir, tblspc->name);
                   }
                }
                pgmoneta_mkdir(directory);
@@ -2677,12 +2677,12 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
       if (pgmoneta_ends_with(basedir, "/"))
       {
          snprintf(link_path, sizeof(link_path), "%sdata/pg_tblspc/%d", basedir, tblspc->oid);
-         snprintf(directory, sizeof(directory), "%s%s/", basedir, tblspc->name);
+         snprintf(directory, sizeof(directory), "%stblspc_%s/", basedir, tblspc->name);
       }
       else
       {
          snprintf(link_path, sizeof(link_path), "%s/data/pg_tblspc/%d", basedir, tblspc->oid);
-         snprintf(directory, sizeof(directory), "%s/%s/", basedir, tblspc->name);
+         snprintf(directory, sizeof(directory), "%s/tblspc_%s/", basedir, tblspc->name);
       }
       unlink(link_path);
       pgmoneta_symlink_file(link_path, directory);
