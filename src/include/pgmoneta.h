@@ -122,6 +122,11 @@ extern "C" {
 #define SLOT_NOT_FOUND        1
 #define INCORRECT_SLOT_TYPE       2
 
+// simple manifest csv structure definition in case we want to change later
+#define MANIFEST_COLUMN_COUNT 2
+#define MANIFEST_PATH_INDEX 0
+#define MANIFEST_CHECKSUM_INDEX 1
+
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 

@@ -72,7 +72,6 @@ static int as_seconds(char* str, int* age, int default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
 static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
 static int as_create_slot(char* str, int* create_slot);
-static int as_manifest(char* str);
 
 static int transfer_configuration(struct configuration* config, struct configuration* reload);
 static void copy_server(struct server* dst, struct server* src);
@@ -1235,11 +1234,11 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->manifest = as_manifest(value);
+                     config->manifest = pgmoneta_get_hash_algorithm(value);
                   }
                   else if (strlen(section) > 0)
                   {
-                     srv.manifest = as_manifest(value);
+                     srv.manifest = pgmoneta_get_hash_algorithm(value);
                   }
                   else
                   {
@@ -2996,34 +2995,6 @@ as_create_slot(char* str, int* create_slot)
    *create_slot = CREATE_SLOT_UNDEFINED;
 
    return 1;
-}
-
-static int
-as_manifest(char* str)
-{
-
-   if (!strcasecmp(str, "crc32c"))
-   {
-      return HASH_ALGORITHM_CRC32C;
-   }
-   else if (!strcasecmp(str, "sha224"))
-   {
-      return HASH_ALGORITHM_SHA224;
-   }
-   else if (!strcasecmp(str, "sha256"))
-   {
-      return HASH_ALGORITHM_SHA256;
-   }
-   else if (!strcasecmp(str, "sha384"))
-   {
-      return HASH_ALGORITHM_SHA384;
-   }
-   else if (!strcasecmp(str, "sha512"))
-   {
-      return HASH_ALGORITHM_SHA512;
-   }
-
-   return HASH_ALGORITHM_SHA256;
 }
 
 static int

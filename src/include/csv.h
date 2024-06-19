@@ -26,48 +26,89 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_LINK_H
-#define PGMONETA_LINK_H
+#ifndef PGMONETA_CSV_H
+#define PGMONETA_CSV_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <art.h>
-#include <workers.h>
-
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-/**
- * Create link between two directories with processed manifest info
- * @param base_from The base from directory (newer)
- * @param base_from_data The base from data directory
- * @param base_to The base to directory
- * @param from The current from directory
- * @param changed The changed files
- * @param added The added files
- * @param workers The optional workers
- */
-void
-pgmoneta_link_manifest(char* base_from, char* base_from_data, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
+struct csv_reader
+{
+   FILE* file;
+   char line[512];
+};
+
+struct csv_writer
+{
+   FILE* file;
+};
 
 /**
- * Relink link two directories
- * @param from The from directory
- * @param to The to directory
- * @param workers The optional workers
+ * Initialize a csv reader
+ * @param path The path to the csv file
+ * @param reader The reader
+ * @return 0 on success, 1 if otherwise
  */
-void
-pgmoneta_relink(char* from, char* to, struct workers* workers);
+int
+pgmoneta_csv_reader_init(char* path, struct csv_reader** reader);
 
 /**
- * Create link between two equal files
- * @param from The from directory
- * @param to The to directory
- * @param workers The optional workers
+ * Reset the reader pointer to the head of the file
+ * @param reader The reader
+ * @return 0 on success, 1 if otherwise
  */
-void
-pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers);
+int
+pgmoneta_csv_reader_reset(struct csv_reader* reader);
+
+/**
+ * Initialize a csv writer
+ * @param path The path to the csv file
+ * @param writer The writer
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_csv_writer_init(char* path, struct csv_writer** writer);
+
+/**
+ * Write a row to csv file
+ * @param num_col The number of columns
+ * @param cols The columns of the row
+ * @param writer The csv writer
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_csv_write(int num_col, char** cols, struct csv_writer* writer);
+
+/**
+ * Get the next row in csv file
+ * @param num_col [out] The number of columns in the row
+ * @param cols [out] The columns in the row
+ * @param reader The reader
+ * @return true if has next row, false if otherwise
+ */
+bool
+pgmoneta_csv_next_row(int* num_col, char*** cols, struct csv_reader* reader);
+
+/**
+ * Destroy a csv reader
+ * @param reader The reader
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_csv_reader_destroy(struct csv_reader* reader);
+
+/**
+ * Destroy a csv writer
+ * @param writer The writer
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_csv_writer_destroy(struct csv_writer* writer);
 
 #ifdef __cplusplus
 }

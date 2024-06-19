@@ -198,6 +198,13 @@ pgmoneta_workflow_create_cleanup(int type);
  */
 struct workflow*
 pgmoneta_workflow_encryption(bool encrypt);
+
+/**
+ * Create a workflow for manifest building
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_manifest(void);
 #ifdef __cplusplus
 }
 #endif

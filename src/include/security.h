@@ -151,9 +151,10 @@ pgmoneta_generate_string_sha256_hash(char* string, char** sha256);
  * @param hmac_length The length of the digest.
  * @return 0 upon success, otherwise 1.
  */
-int pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* value,
-                                              int value_length, unsigned char** hmac,
-                                              int* hmac_length);
+int
+pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* value,
+                                          int value_length, unsigned char** hmac,
+                                          int* hmac_length);
 
 /**
  * Generate CRC32C for a buffer
@@ -162,14 +163,26 @@ int pgmoneta_generate_string_hmac_sha256_hash(char* key, int key_length, char* v
  * @param crc_buff The hash value
  * @return 0 upon success, otherwise 1
  */
-int pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc_buf);
+int
+pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc_buf);
 
 /**
  * @param path The file path.
  * @param crc The hash value.
  * @return 0 upon success, otherwise 1.
  */
-int pgmoneta_create_crc32c_file(char* path, char** crc);
+int
+pgmoneta_create_crc32c_file(char* path, char** crc);
+
+/**
+ * Create file hash with given algorithm
+ * @param algorithm The algorithm represented by index
+ * @param file_path The file path
+ * @param hash [out] The hash value
+ * @return 0 upon success, otherwise 1.
+ */
+int
+pgmoneta_create_file_hash(int algorithm, char* file_path, char** hash);
 
 /**
  * Close a SSL structure
@@ -177,6 +190,14 @@ int pgmoneta_create_crc32c_file(char* path, char** crc);
  */
 void
 pgmoneta_close_ssl(SSL* ssl);
+
+/**
+ * Convert an algorithm string into algorithm enum index
+ * @param algorithm The algorithm, case insensitive
+ * @return The algorithm index
+ */
+int
+pgmoneta_get_hash_algorithm(char* algorithm);
 
 #ifdef __cplusplus
 }

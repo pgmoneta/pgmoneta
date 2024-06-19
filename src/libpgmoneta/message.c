@@ -894,27 +894,27 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
       options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
       switch (checksum_algorithm)
       {
-          case HASH_ALGORITHM_DEFAULT:
-             options = pgmoneta_append(options, "SHA256");
-             break;
-          case HASH_ALGORITHM_CRC32C:
-             options = pgmoneta_append(options, "CRC32C");
-             break;
-          case HASH_ALGORITHM_SHA224:
-             options = pgmoneta_append(options, "SHA224");
-             break;
-          case HASH_ALGORITHM_SHA256:
-             options = pgmoneta_append(options, "SHA256");
-             break;
-          case HASH_ALGORITHM_SHA384:
-             options = pgmoneta_append(options, "SHA384");
-             break;
-          case HASH_ALGORITHM_SHA512:
-             options = pgmoneta_append(options, "SHA512");
-             break;
-          default:
-             options = pgmoneta_append(options, "SHA256");
-             break;
+         case HASH_ALGORITHM_DEFAULT:
+            options = pgmoneta_append(options, "SHA256");
+            break;
+         case HASH_ALGORITHM_CRC32C:
+            options = pgmoneta_append(options, "CRC32C");
+            break;
+         case HASH_ALGORITHM_SHA224:
+            options = pgmoneta_append(options, "SHA224");
+            break;
+         case HASH_ALGORITHM_SHA256:
+            options = pgmoneta_append(options, "SHA256");
+            break;
+         case HASH_ALGORITHM_SHA384:
+            options = pgmoneta_append(options, "SHA384");
+            break;
+         case HASH_ALGORITHM_SHA512:
+            options = pgmoneta_append(options, "SHA512");
+            break;
+         default:
+            options = pgmoneta_append(options, "SHA256");
+            break;
       }
       options = pgmoneta_append(options, "'");
 
@@ -940,27 +940,27 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
       options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
       switch (checksum_algorithm)
       {
-          case HASH_ALGORITHM_DEFAULT:
-             options = pgmoneta_append(options, "SHA256");
-             break;
-          case HASH_ALGORITHM_CRC32C:
-             options = pgmoneta_append(options, "CRC32C");
-             break;
-          case HASH_ALGORITHM_SHA224:
-             options = pgmoneta_append(options, "SHA224");
-             break;
-          case HASH_ALGORITHM_SHA256:
-             options = pgmoneta_append(options, "SHA256");
-             break;
-          case HASH_ALGORITHM_SHA384:
-             options = pgmoneta_append(options, "SHA384");
-             break;
-          case HASH_ALGORITHM_SHA512:
-             options = pgmoneta_append(options, "SHA512");
-             break;
-          default:
-             options = pgmoneta_append(options, "SHA256");
-             break;
+         case HASH_ALGORITHM_DEFAULT:
+            options = pgmoneta_append(options, "SHA256");
+            break;
+         case HASH_ALGORITHM_CRC32C:
+            options = pgmoneta_append(options, "CRC32C");
+            break;
+         case HASH_ALGORITHM_SHA224:
+            options = pgmoneta_append(options, "SHA224");
+            break;
+         case HASH_ALGORITHM_SHA256:
+            options = pgmoneta_append(options, "SHA256");
+            break;
+         case HASH_ALGORITHM_SHA384:
+            options = pgmoneta_append(options, "SHA384");
+            break;
+         case HASH_ALGORITHM_SHA512:
+            options = pgmoneta_append(options, "SHA512");
+            break;
+         default:
+            options = pgmoneta_append(options, "SHA256");
+            break;
       }
       options = pgmoneta_append(options, "' ");
 

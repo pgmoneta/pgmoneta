@@ -28,10 +28,11 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <csv.h>
+#include <deque.h>
 #include <json.h>
 #include <logging.h>
 #include <manifest.h>
-#include <deque.h>
 #include <security.h>
 #include <utils.h>
 
@@ -39,13 +40,11 @@
 #include <stdio.h>
 #include <string.h>
 
-static int manifest_file_hash(char* algorithm, char* file_path, char** hash);
+static void
+build_deque(struct deque* deque, struct csv_reader* reader, char** f);
 
 static void
-build_deque(struct deque* deque, struct json_reader* reader, struct json* f);
-
-static void
-build_tree(struct art* tree, struct json_reader* reader, struct json* f);
+build_tree(struct art* tree, struct csv_reader* reader, char** f);
 
 int
 pgmoneta_manifest_checksum_verify(char* root)
@@ -100,7 +99,7 @@ pgmoneta_manifest_checksum_verify(char* root)
       }
 
       algorithm = pgmoneta_json_get_string_value(file, "Checksum-Algorithm");
-      if (manifest_file_hash(algorithm, file_path, &hash))
+      if (pgmoneta_create_file_hash(pgmoneta_get_hash_algorithm(algorithm), file_path, &hash))
       {
          pgmoneta_log_error("Unable to generate hash for file %s with algorithm %s", file_path, algorithm);
          goto error;
@@ -128,15 +127,15 @@ error:
 int
 pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** deleted_files, struct art** changed_files, struct art** added_files)
 {
-   char* key_path[1] = {"Files"};
-   struct json_reader* r1 = NULL;
-   struct json* f1 = NULL;
-   struct json_reader* r2 = NULL;
-   struct json* f2 = NULL;
+   struct csv_reader* r1 = NULL;
+   char** f1 = NULL;
+   struct csv_reader* r2 = NULL;
+   char** f2 = NULL;
    struct art* deleted = NULL;
    struct art* changed = NULL;
    struct art* added = NULL;
    char* checksum = NULL;
+   int cols = 0;
    bool manifest_changed = false;
    struct art* tree = NULL;
    struct deque* que = NULL;
@@ -154,22 +153,34 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
    pgmoneta_art_init(&added, NULL);
    pgmoneta_art_init(&changed, NULL);
 
-   if (pgmoneta_json_reader_init(old_manifest, &r1) || pgmoneta_json_locate(r1, key_path, 1))
+   if (pgmoneta_csv_reader_init(old_manifest, &r1))
    {
       goto error;
    }
 
-   if (pgmoneta_json_reader_init(new_manifest, &r2) || pgmoneta_json_locate(r2, key_path, 1))
+   if (pgmoneta_csv_reader_init(new_manifest, &r2))
    {
       goto error;
    }
 
-   while (pgmoneta_json_next_array_item(r1, &f1))
+   while (pgmoneta_csv_next_row(&cols, &f1, r1))
    {
+      if (cols != MANIFEST_COLUMN_COUNT)
+      {
+         pgmoneta_log_error("Incorrect number of columns in manifest file");
+         free(f1);
+         continue;
+      }
       // build left chunk into a deque
       build_deque(que, r1, f1);
-      while (pgmoneta_json_next_array_item(r2, &f2))
+      while (pgmoneta_csv_next_row(&cols, &f2, r2))
       {
+         if (cols != MANIFEST_COLUMN_COUNT)
+         {
+            pgmoneta_log_error("Incorrect number of columns in manifest file");
+            free(f2);
+            continue;
+         }
          // build every right chunk into an ART
          pgmoneta_art_init(&tree, NULL);
          build_tree(tree, r2, f2);
@@ -213,21 +224,33 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          entry = pgmoneta_deque_node_remove(que, entry);
       }
       // reset right reader for the next left chunk
-      if (pgmoneta_json_reader_reset(r2) || pgmoneta_json_locate(r2, key_path, 1))
+      if (pgmoneta_csv_reader_reset(r2))
       {
          goto error;
       }
    }
-   if (pgmoneta_json_reader_reset(r1) || pgmoneta_json_locate(r1, key_path, 1))
+   if (pgmoneta_csv_reader_reset(r1))
    {
       goto error;
    }
 
-   while (pgmoneta_json_next_array_item(r2, &f2))
+   while (pgmoneta_csv_next_row(&cols, &f2, r2))
    {
-      build_deque(que, r2, f2);
-      while (pgmoneta_json_next_array_item(r1, &f1))
+      if (cols != MANIFEST_COLUMN_COUNT)
       {
+         pgmoneta_log_error("Incorrect number of columns in manifest file");
+         free(f2);
+         continue;
+      }
+      build_deque(que, r2, f2);
+      while (pgmoneta_csv_next_row(&cols, &f1, r1))
+      {
+         if (cols != MANIFEST_COLUMN_COUNT)
+         {
+            pgmoneta_log_error("Incorrect number of columns in manifest file");
+            free(f1);
+            continue;
+         }
          pgmoneta_art_init(&tree, NULL);
          build_tree(tree, r1, f1);
          entry = pgmoneta_deque_peek(que);
@@ -255,7 +278,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          pgmoneta_art_insert(added, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
          entry = pgmoneta_deque_node_remove(que, entry);;
       }
-      if (pgmoneta_json_reader_reset(r1) || pgmoneta_json_locate(r1, key_path, 1))
+      if (pgmoneta_csv_reader_reset(r1))
       {
          goto error;
       }
@@ -263,8 +286,18 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    if (manifest_changed)
    {
-      key = pgmoneta_append(NULL, "backup_manifest");
-      val = pgmoneta_append(NULL, "manifest");
+      key = pgmoneta_append(NULL, "backup.manifest");
+      val = pgmoneta_append(NULL, "backup manifest");
+      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
+      free(key);
+
+      key = pgmoneta_append(NULL, "data/backup_manifest");
+      val = pgmoneta_append(NULL, "backup manifest");
+      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
+      free(key);
+
+      key = pgmoneta_append(NULL, "backup.info");
+      val = pgmoneta_append(NULL, "backup info");
       pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
       free(key);
    }
@@ -273,105 +306,80 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
    *changed_files = changed;
    *added_files = added;
 
-   pgmoneta_json_close_reader(r1);
-   pgmoneta_json_close_reader(r2);
+   pgmoneta_csv_reader_destroy(r1);
+   pgmoneta_csv_reader_destroy(r2);
    pgmoneta_art_destroy(tree);
    pgmoneta_deque_destroy(que);
 
    return 0;
 error:
-   pgmoneta_json_close_reader(r1);
-   pgmoneta_json_close_reader(r2);
+   pgmoneta_csv_reader_destroy(r1);
+   pgmoneta_csv_reader_destroy(r2);
    pgmoneta_art_destroy(tree);
    pgmoneta_deque_destroy(que);
    return 1;
 }
 
-static int
-manifest_file_hash(char* algorithm, char* file_path, char** hash)
-{
-   int stat = 0;
-
-   if (pgmoneta_compare_string(algorithm, "SHA256"))
-   {
-      stat = pgmoneta_create_sha256_file(file_path, hash);
-   }
-   else if (pgmoneta_compare_string(algorithm, "SHA224"))
-   {
-      stat = pgmoneta_create_sha224_file(file_path, hash);
-   }
-   else if (pgmoneta_compare_string(algorithm, "SHA384"))
-   {
-      stat = pgmoneta_create_sha384_file(file_path, hash);
-   }
-   else if (pgmoneta_compare_string(algorithm, "SHA512"))
-   {
-      stat = pgmoneta_create_sha512_file(file_path, hash);
-   }
-   else if (pgmoneta_compare_string(algorithm, "CRC32C"))
-   {
-      stat = pgmoneta_create_crc32c_file(file_path, hash);
-   }
-   else
-   {
-      pgmoneta_log_error("Unrecognized hash algorithm: %s", algorithm);
-      stat = 1;
-   }
-
-   return stat;
-}
-
 static void
-build_deque(struct deque* deque, struct json_reader* reader, struct json* f)
+build_deque(struct deque* deque, struct csv_reader* reader, char** f)
 {
-   struct json* entry = NULL;
+   char** entry = NULL;
    char* path = NULL;
    char* checksum = NULL;
+   int cols = 0;
    if (deque == NULL)
    {
       return;
    }
-   path = pgmoneta_json_get_string_value(f, "Path");
-   checksum = pgmoneta_json_get_string_value(f, "Checksum");
+   path = f[MANIFEST_PATH_INDEX];
+   checksum = f[MANIFEST_CHECKSUM_INDEX];
    pgmoneta_deque_offer_string(deque, checksum, path);
-   pgmoneta_json_free(f);
-   while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_json_next_array_item(reader, &entry))
+   free(f);
+   while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(&cols, &entry, reader))
    {
-      path = pgmoneta_json_get_string_value(entry, "Path");
-      checksum = pgmoneta_json_get_string_value(entry, "Checksum");
+      if (cols != MANIFEST_COLUMN_COUNT)
+      {
+         pgmoneta_log_error("Incorrect number of columns in manifest file");
+         free(entry);
+         continue;
+      }
+      path = entry[MANIFEST_PATH_INDEX];
+      checksum = entry[MANIFEST_CHECKSUM_INDEX];
       pgmoneta_deque_offer_string(deque, checksum, path);
-      pgmoneta_json_free(entry);
+      free(entry);
+      entry = NULL;
    }
 }
 
 static void
-build_tree(struct art* tree, struct json_reader* reader, struct json* f)
+build_tree(struct art* tree, struct csv_reader* reader, char** f)
 {
-   struct json* entry = NULL;
+   char** entry = NULL;
    char* path = NULL;
    char* checksum = NULL;
+   int cols = 0;
    if (tree == NULL)
    {
       return;
    }
-   path = pgmoneta_json_get_string_value(f, "Path");
+   path = f[MANIFEST_PATH_INDEX];
    // make a copy of checksum since ART doesn't do that for us
-   checksum = pgmoneta_append(checksum, pgmoneta_json_get_string_value(f, "Checksum"));
-   if (tree != NULL)
-   {
-      pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
-   }
+   checksum = pgmoneta_append(checksum, f[MANIFEST_CHECKSUM_INDEX]);
+   pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
    checksum = NULL;
-   pgmoneta_json_free(f);
-   while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_json_next_array_item(reader, &entry))
+   free(f);
+   while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(&cols, &entry, reader))
    {
-      path = pgmoneta_json_get_string_value(entry, "Path");
-      checksum = pgmoneta_append(checksum, pgmoneta_json_get_string_value(entry, "Checksum"));
-      if (tree != NULL)
+      if (cols != MANIFEST_COLUMN_COUNT)
       {
-         pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
+         pgmoneta_log_error("Incorrect number of columns in manifest file");
+         free(entry);
+         continue;
       }
-      pgmoneta_json_free(entry);
+      path = entry[MANIFEST_PATH_INDEX];
+      checksum = pgmoneta_append(checksum, entry[MANIFEST_CHECKSUM_INDEX]);
+      pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
+      free(entry);
       checksum = NULL;
    }
 }

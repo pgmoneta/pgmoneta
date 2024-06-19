@@ -104,6 +104,9 @@ wf_backup(void)
    head = pgmoneta_workflow_create_basebackup();
    current = head;
 
+   current->next = pgmoneta_workflow_create_manifest();
+   current = current->next;
+
    current->next = pgmoneta_storage_create_local();
    current = current->next;
 

@@ -45,13 +45,16 @@
 static void do_link(void* arg);
 static void do_relink(void* arg);
 static void do_comparefiles(void* arg);
+static char* trim_suffix(char* str);
 
 void
-pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
+pgmoneta_link_manifest(char* base_from, char* base_from_data, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
    char* from_entry = NULL;
+   char* file = NULL;
    char* from_file = NULL;
+   char* from_file_trimmed = NULL;
    char* to_entry = NULL;
    struct dirent* entry;
    struct stat statbuf;
@@ -60,10 +63,9 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
    {
       goto done;
    }
-
    while ((entry = readdir(from_dir)))
    {
-      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") || !strcmp(entry->d_name, "pg_tblspc"))
+      if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
       {
          continue;
       }
@@ -79,15 +81,28 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
       {
          if (S_ISDIR(statbuf.st_mode))
          {
-            pgmoneta_link_manifest(base_from, base_to, from_entry, changed, added, workers);
+            // only consider data directory, table spaces will be accessed through symlinks in pg_tblspc
+            if (pgmoneta_starts_with(from_entry, base_from_data))
+            {
+               pgmoneta_link_manifest(base_from, base_from_data, base_to, from_entry, changed, added, workers);
+            }
          }
          else
          {
             struct worker_input* wi = NULL;
             from_file = pgmoneta_remove_prefix(from_entry, base_from);
+            from_file_trimmed = trim_suffix(from_file);
+            if (from_file_trimmed != NULL)
+            {
+               file = from_file_trimmed;
+            }
+            else
+            {
+               file = from_file;
+            }
             // file in newer dir is not added nor changed
-            if (pgmoneta_art_search(added, (unsigned char*)from_file, strlen(from_file) + 1) == NULL &&
-                pgmoneta_art_search(changed, (unsigned char*)from_file, strlen(from_file) + 1) == NULL)
+            if (pgmoneta_art_search(added, (unsigned char*)file, strlen(file) + 1) == NULL &&
+                pgmoneta_art_search(changed, (unsigned char*)file, strlen(file) + 1) == NULL)
             {
                to_entry = pgmoneta_append(to_entry, base_to);
                if (!pgmoneta_ends_with(to_entry, "/"))
@@ -113,12 +128,14 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
       }
 
       free(from_entry);
+      free(from_file_trimmed);
       free(from_file);
       free(to_entry);
 
       from_entry = NULL;
       to_entry = NULL;
       from_file = NULL;
+      from_file_trimmed = NULL;
    }
 
 done:
@@ -296,8 +313,6 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
       }
       to_entry = pgmoneta_append(to_entry, entry->d_name);
 
-      pgmoneta_log_trace("pgmoneta_link_tablespaces: %s -> %s", from_entry, to_entry);
-
       if (!stat(from_entry, &statbuf))
       {
          if (S_ISDIR(statbuf.st_mode))
@@ -355,4 +370,44 @@ do_comparefiles(void* arg)
    }
 
    free(wi);
+}
+
+static char*
+trim_suffix(char* str)
+{
+   char* res = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*) shmem;
+   int len = 0;
+   if (str == NULL)
+   {
+      return NULL;
+   }
+   len = strlen(str) + 1;
+   switch (config->compression_type)
+   {
+      case COMPRESSION_CLIENT_GZIP:
+      case COMPRESSION_SERVER_GZIP:
+         len -= 3;
+         break;
+      case COMPRESSION_CLIENT_ZSTD:
+      case COMPRESSION_SERVER_ZSTD:
+         len -= 5;
+         break;
+      case COMPRESSION_CLIENT_LZ4:
+      case COMPRESSION_SERVER_LZ4:
+      case COMPRESSION_CLIENT_BZIP2:
+         len -= 4;
+         break;
+   }
+   if (config->encryption != ENCRYPTION_NONE)
+   {
+      len -= 4;
+   }
+
+   res = malloc(len);
+   memset(res, 0, len);
+   memcpy(res, str, len - 1);
+   return res;
 }
