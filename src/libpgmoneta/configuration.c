@@ -447,6 +447,24 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      memcpy(&srv.hot_standby_overrides, value, max);
                   }
                }
+               else if (!strcmp(key, "hot_standby_tablespaces"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(&srv.hot_standby_tablespaces, value, max);
+                  }
+               }
                else if (!strcmp(key, "metrics"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -3118,6 +3136,8 @@ copy_server(struct server* dst, struct server* src)
    memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
    memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);
    memcpy(&dst->hot_standby[0], &src->hot_standby[0], MAX_PATH);
+   memcpy(&dst->hot_standby_overrides[0], &src->hot_standby_overrides[0], MAX_PATH);
+   memcpy(&dst->hot_standby_tablespaces[0], &src->hot_standby_tablespaces[0], MAX_PATH);
    dst->cur_timeline = src->cur_timeline;
    dst->retention_days = src->retention_days;
    dst->retention_weeks = src->retention_weeks;

@@ -185,11 +185,11 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
       char* tablespace_name = tup->data[0];
       char* tablespace_path = tup->data[1];
 
-      pgmoneta_log_info("tablespace_name: %s", tablespace_name);
-      pgmoneta_log_info("tablespace_path: %s", tablespace_path);
-
       if (tablespace_name != NULL && tablespace_path != NULL)
       {
+         pgmoneta_log_debug("tablespace_name: %s", tablespace_name);
+         pgmoneta_log_debug("tablespace_path: %s", tablespace_path);
+
          if (tablespaces == NULL)
          {
             pgmoneta_create_tablespace(tablespace_name, tablespace_path, &tablespaces);
@@ -367,6 +367,12 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
 
       snprintf(key, sizeof(key) - 1, "TABLESPACE%d", number_of_tablespaces);
       pgmoneta_update_info_string(root, key, tblname);
+
+      snprintf(key, sizeof(key) - 1, "TABLESPACE_OID%d", number_of_tablespaces);
+      pgmoneta_update_info_unsigned_long(root, key, current_tablespace->oid);
+
+      snprintf(key, sizeof(key) - 1, "TABLESPACE_PATH%d", number_of_tablespaces);
+      pgmoneta_update_info_string(root, key, current_tablespace->path);
 
       current_tablespace = current_tablespace->next;
    }

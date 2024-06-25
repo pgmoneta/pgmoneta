@@ -274,7 +274,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_copy_postgresql(from, to, directory, config->servers[server].name, id, verify, workers))
+   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->servers[server].name, id, verify, workers))
    {
       pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, id);
       goto error;

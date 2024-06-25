@@ -229,7 +229,8 @@ struct server
    char last_failed_operation_time[MISC_LENGTH];  /**< Last failed operation time of the server */
    char wal_shipping[MAX_PATH];                   /**< The WAL shipping directory */
    char hot_standby[MAX_PATH];                    /**< The hot standby directory */
-   char hot_standby_overrides[MAX_PATH];          /**< The hot standby directory */
+   char hot_standby_overrides[MAX_PATH];          /**< The hot standby overrides directory */
+   char hot_standby_tablespaces[MAX_PATH];        /**< The hot standby tablespaces mappings */
    char tls_cert_file[MISC_LENGTH];   /**< TLS certificate path */
    char tls_key_file[MISC_LENGTH];    /**< TLS key path */
    char tls_ca_file[MISC_LENGTH];     /**< TLS CA certificate path */

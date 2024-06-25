@@ -261,6 +261,9 @@ hot_standby
 hot_standby_overrides
   Files to override in the hot standby directory
 
+hot_standby_tablespaces
+  Tablespace mappings for the hot standby. Syntax is [from -> to,?]+
+
 workers
   The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Default is -1
 

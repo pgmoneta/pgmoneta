@@ -65,6 +65,11 @@ pgmoneta_create_info(char* directory, char* label, int status)
    snprintf(&buffer[0], sizeof(buffer), "PGMONETA_VERSION=%s\n", VERSION);
    fputs(&buffer[0], sfile);
 
+   pgmoneta_log_trace("STATUS=%d", status);
+   pgmoneta_log_trace("LABEL=%s", label);
+   pgmoneta_log_trace("TABLESPACES=0");
+   pgmoneta_log_trace("PGMONETA_VERSION=%s", VERSION);
+
    pgmoneta_permission(s, 6, 0, 0);
 
    if (sfile != NULL)
@@ -129,6 +134,7 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
    if (!found)
    {
       memset(&line[0], 0, sizeof(line));
+      pgmoneta_log_trace("%s=%lu", key, value);
       snprintf(&line[0], sizeof(line), "%s=%lu\n", key, value);
       fputs(&line[0], dfile);
    }
@@ -204,6 +210,7 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
    if (!found)
    {
       memset(&line[0], 0, sizeof(line));
+      pgmoneta_log_trace("%s=%s", key, value);
       snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
       fputs(&line[0], dfile);
    }
@@ -228,6 +235,7 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
 void
 pgmoneta_update_info_bool(char* directory, char* key, bool value)
 {
+   pgmoneta_log_trace("%s=%d", key, value ? 1 : 0);
    pgmoneta_update_info_unsigned_long(directory, key, value ? 1 : 0);
 }
 
@@ -243,6 +251,18 @@ pgmoneta_get_info_string(struct backup* backup, char* key, char** value)
    else if (!strcmp(INFO_WAL, key))
    {
       result = pgmoneta_append(result, backup->wal);
+   }
+   else if (pgmoneta_starts_with(key, "TABLESPACE_OID"))
+   {
+      unsigned long number = strtoul(key + 14, NULL, 10);
+
+      result = pgmoneta_append(result, backup->tablespaces_oids[number - 1]);
+   }
+   else if (pgmoneta_starts_with(key, "TABLESPACE_PATH"))
+   {
+      unsigned long number = strtoul(key + 15, NULL, 10);
+
+      result = pgmoneta_append(result, backup->tablespaces_paths[number - 1]);
    }
    else if (pgmoneta_starts_with(key, "TABLESPACE"))
    {
@@ -436,10 +456,19 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
          {
             bck->number_of_tablespaces = strtoul(&value[0], &ptr, 10);
          }
+         else if (pgmoneta_starts_with(&key[0], "TABLESPACE_OID"))
+         {
+            memcpy(&bck->tablespaces_oids[tbl_idx], &value[0], strlen(&value[0]));
+         }
+         else if (pgmoneta_starts_with(&key[0], "TABLESPACE_PATH"))
+         {
+            memcpy(&bck->tablespaces_paths[tbl_idx], &value[0], strlen(&value[0]));
+            /* This one is last */
+            tbl_idx++;
+         }
          else if (pgmoneta_starts_with(&key[0], "TABLESPACE"))
          {
             memcpy(&bck->tablespaces[tbl_idx], &value[0], strlen(&value[0]));
-            tbl_idx++;
          }
          else if (pgmoneta_starts_with(&key[0], INFO_START_WALPOS))
          {
