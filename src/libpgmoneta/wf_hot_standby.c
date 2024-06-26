@@ -93,7 +93,8 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    struct art_iterator* changed_iter = NULL;
    struct art* added_files = NULL;
    struct art_iterator* added_iter = NULL;
-   struct backup* backup = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
    struct workers* workers = NULL;
    struct configuration* config;
 
@@ -109,24 +110,9 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 
       start_time = time(NULL);
 
-      base = pgmoneta_append(base, config->base_dir);
-      if (!pgmoneta_ends_with(base, "/"))
-      {
-         base = pgmoneta_append_char(base, '/');
-      }
+      base = pgmoneta_get_server_backup(server);
 
-      base = pgmoneta_append(base, config->servers[server].name);
-      if (!pgmoneta_ends_with(base, "/"))
-      {
-         base = pgmoneta_append_char(base, '/');
-      }
-
-      base = pgmoneta_append(base, "backup/");
-
-      source = pgmoneta_append(source, base);
-      source = pgmoneta_append(source, identifier);
-      source = pgmoneta_append_char(source, '/');
-      source = pgmoneta_append(source, "data");
+      pgmoneta_get_backups(base, &number_of_backups, &backups);
 
       root = pgmoneta_append(root, config->servers[server].hot_standby);
       if (!pgmoneta_ends_with(root, "/"))
@@ -137,29 +123,43 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
       destination = pgmoneta_append(destination, root);
       destination = pgmoneta_append(destination, config->servers[server].name);
 
-      pgmoneta_get_backup(base, identifier, &backup);
-
       if (pgmoneta_exists(destination))
       {
-         old_manifest = pgmoneta_append(old_manifest, destination);
+         source = pgmoneta_append(source, base);
+         if (!pgmoneta_ends_with(source, "/"))
+         {
+            source = pgmoneta_append_char(source, '/');
+         }
+         source = pgmoneta_append(source, backups[number_of_backups - 1]->label);
+         if (!pgmoneta_ends_with(source, "/"))
+         {
+            source = pgmoneta_append_char(source, '/');
+         }
+
+         old_manifest = pgmoneta_append(old_manifest, base);
          if (!pgmoneta_ends_with(old_manifest, "/"))
          {
             old_manifest = pgmoneta_append_char(old_manifest, '/');
          }
-         old_manifest = pgmoneta_append(old_manifest, "backup_manifest");
+         old_manifest = pgmoneta_append(old_manifest, backups[number_of_backups - 2]->label);
+         if (!pgmoneta_ends_with(old_manifest, "/"))
+         {
+            old_manifest = pgmoneta_append_char(old_manifest, '/');
+         }
+         old_manifest = pgmoneta_append(old_manifest, "backup.manifest");
 
          new_manifest = pgmoneta_append(new_manifest, source);
-         if (!pgmoneta_ends_with(new_manifest, "/"))
-         {
-            new_manifest = pgmoneta_append_char(new_manifest, '/');
-         }
-         new_manifest = pgmoneta_append(new_manifest, "backup_manifest");
+         new_manifest = pgmoneta_append(new_manifest, "backup.manifest");
+
+         pgmoneta_log_trace("old_manifest: %s", old_manifest);
+         pgmoneta_log_trace("new_manifest: %s", new_manifest);
 
          pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files);
 
          pgmoneta_art_iterator_init(&deleted_iter, deleted_files);
          pgmoneta_art_iterator_init(&changed_iter, changed_files);
          pgmoneta_art_iterator_init(&added_iter, added_files);
+
          while (pgmoneta_art_iterator_next(deleted_iter))
          {
             f = pgmoneta_append(f, destination);
@@ -235,14 +235,19 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
       }
       else
       {
+         source = pgmoneta_append(source, base);
+         source = pgmoneta_append(source, identifier);
+         source = pgmoneta_append_char(source, '/');
+         source = pgmoneta_append(source, "data");
+
          pgmoneta_mkdir(root);
          pgmoneta_mkdir(destination);
 
-         pgmoneta_copy_postgresql_hotstandby(source, destination, config->servers[server].hot_standby_tablespaces, backup, workers);
+         pgmoneta_copy_postgresql_hotstandby(source, destination, config->servers[server].hot_standby_tablespaces, backups[number_of_backups - 1], workers);
       }
 
-      pgmoneta_log_trace("hot_standby source:      %s", source);
-      pgmoneta_log_trace("hot_standby destination: %s", destination);
+      pgmoneta_log_debug("hot_standby source:      %s", source);
+      pgmoneta_log_debug("hot_standby destination: %s", destination);
 
       if (number_of_workers > 0)
       {
@@ -253,8 +258,8 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
           pgmoneta_exists(config->servers[server].hot_standby_overrides) &&
           pgmoneta_is_directory(config->servers[server].hot_standby_overrides))
       {
-         pgmoneta_log_trace("hot_standby_overrides source:      %s", config->servers[server].hot_standby_overrides);
-         pgmoneta_log_trace("hot_standby_overrides destination: %s", destination);
+         pgmoneta_log_debug("hot_standby_overrides source:      %s", config->servers[server].hot_standby_overrides);
+         pgmoneta_log_debug("hot_standby_overrides destination: %s", destination);
 
          pgmoneta_copy_directory(config->servers[server].hot_standby_overrides,
                                  destination,
@@ -282,7 +287,11 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    free(old_manifest);
    free(new_manifest);
 
-   free(backup);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
 
    pgmoneta_art_iterator_destroy(deleted_iter);
    pgmoneta_art_iterator_destroy(changed_iter);
