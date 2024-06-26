@@ -2890,7 +2890,11 @@ create_hash_file(char* filename, const char* algorithm, char** hash)
 
    md_ctx = EVP_MD_CTX_new();
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
    if (!EVP_DigestInit_ex2(md_ctx, md, NULL))
+#else
+   if (!EVP_DigestInit_ex(md_ctx, md, NULL))
+#endif
    {
       pgmoneta_log_error("Message digest initialization failed");
       EVP_MD_CTX_free(md_ctx);
