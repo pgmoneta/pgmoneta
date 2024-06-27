@@ -31,13 +31,16 @@ to override files in the `hot_standby` directory.
 
 By default tablespaces will be mapped to a similar path than the original one, for example `/tmp/mytblspc` becomes `/tmp/mytblspchs`.
 
-However, you can use
+However, you can use the directory name to map it to another directory, like
 
 ```
-hot_standby_tablespaces = /tmp/mytblspc->/tmp/mytblspchs
+hot_standby_tablespaces = /tmp/mytblspc->/tmp/mybcktblspc
 ```
 
-to map it to another directory. You can either use the `OID` or the directory name for the key part.
+You can also use the `OID` for the key part, like
+
+```
+hot_standby_tablespaces = 16392->/tmp/mybcktblspc
+```
 
 Multiple tablespaces can be specified using a `,` between them.
-

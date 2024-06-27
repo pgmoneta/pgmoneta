@@ -1748,30 +1748,6 @@ pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings,
    char* to_buffer = NULL;
    struct dirent* entry;
    struct stat statbuf;
-   char** restore_last_files_names = NULL;
-
-   if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
-   {
-      goto error;
-   }
-
-   if (restore_last_files_names != NULL)
-   {
-      for (int i = 0; restore_last_files_names[i] != NULL; i++)
-      {
-         char* temp = NULL;
-         temp = (char*)malloc((strlen(restore_last_files_names[i]) + strlen(from)) * sizeof(char) + 1);
-
-         if (temp == NULL)
-         {
-            goto error;
-         }
-         snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
-         free(restore_last_files_names[i]);
-
-         restore_last_files_names[i] = temp;
-      }
-   }
 
    pgmoneta_mkdir(to);
 
@@ -1802,27 +1778,12 @@ pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings,
                }
                else
                {
-                  pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
+                  pgmoneta_copy_directory(from_buffer, to_buffer, NULL, workers);
                }
             }
             else
             {
-               bool file_is_excluded = false;
-               if (restore_last_files_names != NULL)
-               {
-                  for (int i = 0; restore_last_files_names[i] != NULL; i++)
-                  {
-                     file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
-                  }
-                  if (!file_is_excluded)
-                  {
-                     pgmoneta_copy_file(from_buffer, to_buffer, workers);
-                  }
-               }
-               else
-               {
-                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
-               }
+               pgmoneta_copy_file(from_buffer, to_buffer, workers);
             }
          }
 
@@ -1839,26 +1800,9 @@ pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings,
       goto error;
    }
 
-   if (restore_last_files_names != NULL)
-   {
-      for (int i = 0; restore_last_files_names[i] != NULL; i++)
-      {
-         free(restore_last_files_names[i]);
-      }
-      free(restore_last_files_names);
-   }
-
    return 0;
 
 error:
-   if (restore_last_files_names != NULL)
-   {
-      for (int i = 0; restore_last_files_names[i] != NULL; i++)
-      {
-         free(restore_last_files_names[i]);
-      }
-      free(restore_last_files_names);
-   }
 
    return 1;
 }
