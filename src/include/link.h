@@ -41,7 +41,6 @@ extern "C" {
 /**
  * Create link between two directories with processed manifest info
  * @param base_from The base from directory (newer)
- * @param base_from_data The base from data directory
  * @param base_to The base to directory
  * @param from The current from directory
  * @param changed The changed files
@@ -49,7 +48,7 @@ extern "C" {
  * @param workers The optional workers
  */
 void
-pgmoneta_link_manifest(char* base_from, char* base_from_data, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
+pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
 
 /**
  * Relink link two directories

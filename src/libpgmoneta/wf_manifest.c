@@ -112,7 +112,7 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
    while (pgmoneta_json_next_array_item(reader, &entry))
    {
       memset(file_path, 0, MAX_PATH);
-      snprintf(file_path, MAX_PATH, "data/%s", pgmoneta_json_get_string_value(entry, "Path"));
+      snprintf(file_path, MAX_PATH, "%s", pgmoneta_json_get_string_value(entry, "Path"));
       info[MANIFEST_PATH_INDEX] = file_path;
       info[MANIFEST_CHECKSUM_INDEX] = pgmoneta_json_get_string_value(entry, "Checksum");
       pgmoneta_csv_write(MANIFEST_COLUMN_COUNT, info, writer);

@@ -48,11 +48,10 @@ static void do_comparefiles(void* arg);
 static char* trim_suffix(char* str);
 
 void
-pgmoneta_link_manifest(char* base_from, char* base_from_data, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
+pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
    char* from_entry = NULL;
-   char* file = NULL;
    char* from_file = NULL;
    char* from_file_trimmed = NULL;
    char* to_entry = NULL;
@@ -81,28 +80,16 @@ pgmoneta_link_manifest(char* base_from, char* base_from_data, char* base_to, cha
       {
          if (S_ISDIR(statbuf.st_mode))
          {
-            // only consider data directory, table spaces will be accessed through symlinks in pg_tblspc
-            if (pgmoneta_starts_with(from_entry, base_from_data))
-            {
-               pgmoneta_link_manifest(base_from, base_from_data, base_to, from_entry, changed, added, workers);
-            }
+            pgmoneta_link_manifest(base_from, base_to, from_entry, changed, added, workers);
          }
          else
          {
             struct worker_input* wi = NULL;
             from_file = pgmoneta_remove_prefix(from_entry, base_from);
             from_file_trimmed = trim_suffix(from_file);
-            if (from_file_trimmed != NULL)
-            {
-               file = from_file_trimmed;
-            }
-            else
-            {
-               file = from_file;
-            }
             // file in newer dir is not added nor changed
-            if (pgmoneta_art_search(added, (unsigned char*)file, strlen(file) + 1) == NULL &&
-                pgmoneta_art_search(changed, (unsigned char*)file, strlen(file) + 1) == NULL)
+            if (pgmoneta_art_search(added, (unsigned char*)from_file_trimmed, strlen(from_file_trimmed) + 1) == NULL &&
+                pgmoneta_art_search(changed, (unsigned char*)from_file_trimmed, strlen(from_file_trimmed) + 1) == NULL)
             {
                to_entry = pgmoneta_append(to_entry, base_to);
                if (!pgmoneta_ends_with(to_entry, "/"))

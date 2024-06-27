@@ -286,18 +286,8 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    if (manifest_changed)
    {
-      key = pgmoneta_append(NULL, "backup.manifest");
+      key = pgmoneta_append(NULL, "backup_manifest");
       val = pgmoneta_append(NULL, "backup manifest");
-      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
-      free(key);
-
-      key = pgmoneta_append(NULL, "data/backup_manifest");
-      val = pgmoneta_append(NULL, "backup manifest");
-      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
-      free(key);
-
-      key = pgmoneta_append(NULL, "backup.info");
-      val = pgmoneta_append(NULL, "backup info");
       pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
       free(key);
    }

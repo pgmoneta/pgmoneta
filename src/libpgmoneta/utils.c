@@ -2072,7 +2072,9 @@ copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappings, struct 
                char* v = NULL;
 
                k = strtok(token, "->");
+               k = pgmoneta_remove_whitespace(k);
                v = strtok(NULL, "->");
+               v = pgmoneta_remove_whitespace(v);
 
                if (!strcmp(k, backup->tablespaces_oids[i]) || !strcmp(k, backup->tablespaces_paths[i]))
                {
@@ -2081,6 +2083,8 @@ copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappings, struct 
                }
 
                token = strtok(NULL, ",");
+               free(k);
+               free(v);
             }
 
             free(copied_tblspc_mappings);

@@ -77,7 +77,6 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
 {
    char* server_path = NULL;
    char* from = NULL;
-   char* from_data = NULL;
    char* to = NULL;
    char* from_manifest = NULL;
    char* to_manifest = NULL;
@@ -130,17 +129,6 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
          }
 
          from = pgmoneta_get_server_backup_identifier(server, identifier);
-         from_data = pgmoneta_append(from_data, from);
-         // from_data cannot be built through pgmoneta_get_server_backup_identifier_data
-         // since the trailing '/' will exclude the data directory when comparing prefix
-         if (pgmoneta_ends_with(from_data, "/"))
-         {
-            from_data = pgmoneta_append(from_data, "data");
-         }
-         else
-         {
-            from_data = pgmoneta_append(from_data, "/data");
-         }
 
          to = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
 
@@ -150,8 +138,11 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
          to_manifest = pgmoneta_append(to_manifest, to);
          to_manifest = pgmoneta_append(to_manifest, "backup.manifest");
 
+         from = pgmoneta_append(from, "data/");
+         to = pgmoneta_append(to, "data/");
+
          pgmoneta_compare_manifests(to_manifest, from_manifest, &deleted_files, &changed_files, &added_files);
-         pgmoneta_link_manifest(from, from_data, to, from, changed_files, added_files, workers);
+         pgmoneta_link_manifest(from, to, from, changed_files, added_files, workers);
 
          if (number_of_workers > 0)
          {
@@ -179,7 +170,6 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
 
    free(server_path);
    free(from);
-   free(from_data);
    free(to);
    free(from_manifest);
    free(to_manifest);
