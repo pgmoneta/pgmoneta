@@ -1,6 +1,6 @@
 # Developer guide
 
-## Install PostgreSql
+## Install PostgreSQL
 
 For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
