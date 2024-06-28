@@ -29,6 +29,13 @@ Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 Jakub Jirutka <jakub@jirutka.cz>
 ```
 
+## Committers
+
+```
+Jesper Pedersen <jesper.pedersen@comcast.net>
+Haoran Zhang <andrewzhr9911@gmail.com>
+```
+
 ## Contributing
 
 Contributions to [**pgmoneta**][pgmoneta] are managed on [GitHub][pgmoneta]
