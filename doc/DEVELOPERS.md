@@ -1,14 +1,16 @@
 # Developer guide
 
-For Fedora 40
-
 ## Install PostgreSql
 
+For RPM based distributions such as Fedora and RHEL you can add the
+[PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
+
 ``` sh
-dnf install postgresql-server
+dnf -qy module disable postgresql
+dnf install -y postgresql13 postgresql13-server
 ```
 
-, this will install PostgreSQL 15.
+This will install PostgreSQL 13.
 
 ## Install pgmoneta
 
@@ -183,6 +185,7 @@ to test
 #### Add users and a database
 
 ``` sh
+export PATH=/usr/pgsql-13/bin:$PATH
 createuser -P myuser
 createdb -E UTF8 -O myuser mydb
 ```
