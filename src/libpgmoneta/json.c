@@ -36,9 +36,6 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 /**
@@ -613,14 +610,111 @@ pgmoneta_json_get_value(struct json* item, char* key)
    return NULL;
 }
 
-int64_t
-pgmoneta_json_get_int64_value(struct json* item, char* key)
+int8_t
+pgmoneta_json_get_int8_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return 0;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueInt8)
+   {
+      return 0;
+   }
+   return pgmoneta_read_byte(val->payload);
+}
+
+uint8_t
+pgmoneta_json_get_uint8_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt8)
+   {
+      return 0;
+   }
+   return pgmoneta_read_uint8(val->payload);
+}
+
+int16_t
+pgmoneta_json_get_int16_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueInt16)
+   {
+      return 0;
+   }
+   return pgmoneta_read_int16(val->payload);
+}
+
+uint16_t
+pgmoneta_json_get_uint16_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt16)
+   {
+      return 0;
+   }
+   return pgmoneta_read_uint16(val->payload);
+}
+
+int32_t
+pgmoneta_json_get_int32_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueInt32)
+   {
+      return 0;
+   }
+   return pgmoneta_read_int32(val->payload);
+}
+
+uint32_t
+pgmoneta_json_get_uint32_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt32)
+   {
+      return 0;
+   }
+   return pgmoneta_read_uint32(val->payload);
+}
+
+int64_t
+pgmoneta_json_get_int64_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueInt64)
    {
       return 0;
@@ -628,14 +722,47 @@ pgmoneta_json_get_int64_value(struct json* item, char* key)
    return pgmoneta_read_int64(val->payload);
 }
 
+uint64_t
+pgmoneta_json_get_uint64_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt64)
+   {
+      return 0;
+   }
+   return pgmoneta_read_uint64(val->payload);
+}
+
+bool
+pgmoneta_json_get_bool_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return 0;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueBool)
+   {
+      return 0;
+   }
+   return pgmoneta_read_bool(val->payload);
+}
+
 int64_t*
 pgmoneta_json_get_int64_array_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return NULL;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueInt64Array)
    {
       return NULL;
@@ -646,11 +773,12 @@ pgmoneta_json_get_int64_array_value(struct json* item, char* key)
 char*
 pgmoneta_json_get_string_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return NULL;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueString)
    {
       return NULL;
@@ -661,11 +789,12 @@ pgmoneta_json_get_string_value(struct json* item, char* key)
 char**
 pgmoneta_json_get_string_array_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return NULL;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueStringArray)
    {
       return NULL;
@@ -676,11 +805,12 @@ pgmoneta_json_get_string_array_value(struct json* item, char* key)
 float
 pgmoneta_json_get_float_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return 0;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueFloat)
    {
       return 0;
@@ -691,11 +821,12 @@ pgmoneta_json_get_float_value(struct json* item, char* key)
 float*
 pgmoneta_json_get_float_array_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return NULL;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueFloatArray)
    {
       return NULL;
@@ -706,11 +837,12 @@ pgmoneta_json_get_float_array_value(struct json* item, char* key)
 struct json*
 pgmoneta_json_get_json_object_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return NULL;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || val->type != ValueObject)
    {
       return NULL;
@@ -721,11 +853,12 @@ pgmoneta_json_get_json_object_value(struct json* item, char* key)
 struct json**
 pgmoneta_json_get_json_object_array_value(struct json* item, char* key)
 {
+   struct json_value* val = NULL;
    if (item == NULL)
    {
       return NULL;
    }
-   struct json_value* val = pgmoneta_json_get_value(item, key);
+   val = pgmoneta_json_get_value(item, key);
    if (val == NULL || (val->type != ValueItemArray && val->type != ValueArrayArray))
    {
       return NULL;
@@ -889,11 +1022,26 @@ pgmoneta_json_value_free(struct json_value* value)
    }
    switch (value->type)
    {
+      case ValueInt8:
+      case ValueUInt8:
+      case ValueInt16:
+      case ValueUInt16:
+      case ValueInt32:
+      case ValueUInt32:
       case ValueInt64:
+      case ValueUInt64:
+      case ValueBool:
       case ValueString:
       case ValueFloat:
       case ValueFloatArray:
+      case ValueInt8Array:
+      case ValueUInt8Array:
+      case ValueInt16Array:
+      case ValueUInt16Array:
+      case ValueInt32Array:
+      case ValueUInt32Array:
       case ValueInt64Array:
+      case ValueUInt64Array:
          // payload points to actual memory
          free(value->payload);
          value->payload = NULL;
@@ -1070,6 +1218,156 @@ pgmoneta_json_item_put_string(struct json* item, char* key, char* val)
 }
 
 int
+pgmoneta_json_item_put_int8(struct json* item, char* key, int8_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueInt8)
+   {
+      pgmoneta_log_error("json key exists but not the int8 type");
+      return 1;
+   }
+   payload = malloc(sizeof(int8_t));
+   // int value is stored in place
+   pgmoneta_write_byte(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueInt8, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_uint8(struct json* item, char* key, uint8_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueUInt8)
+   {
+      pgmoneta_log_error("json key exists but not the uint8 type");
+      return 1;
+   }
+   payload = malloc(sizeof(uint8_t));
+   // int value is stored in place
+   pgmoneta_write_uint8(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueUInt8, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_int16(struct json* item, char* key, int16_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueInt16)
+   {
+      pgmoneta_log_error("json key exists but not the int16 type");
+      return 1;
+   }
+   payload = malloc(sizeof(int16_t));
+   // int value is stored in place
+   pgmoneta_write_int16(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueInt16, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_uint16(struct json* item, char* key, uint16_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueUInt16)
+   {
+      pgmoneta_log_error("json key exists but not the uint16 type");
+      return 1;
+   }
+   payload = malloc(sizeof(uint16_t));
+   // int value is stored in place
+   pgmoneta_write_uint16(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueUInt16, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_int32(struct json* item, char* key, int32_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueInt32)
+   {
+      pgmoneta_log_error("json key exists but not the int32 type");
+      return 1;
+   }
+   payload = malloc(sizeof(int32_t));
+   // int value is stored in place
+   pgmoneta_write_int32(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueInt32, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_uint32(struct json* item, char* key, uint32_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueUInt32)
+   {
+      pgmoneta_log_error("json key exists but not the uint32 type");
+      return 1;
+   }
+   payload = malloc(sizeof(uint32_t));
+   // int value is stored in place
+   pgmoneta_write_uint32(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueUInt32, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
 pgmoneta_json_item_put_int64(struct json* item, char* key, int64_t val)
 {
    void* payload = NULL;
@@ -1085,6 +1383,56 @@ pgmoneta_json_item_put_int64(struct json* item, char* key, int64_t val)
    if (intval == NULL)
    {
       return pgmoneta_json_object_put(item, key, ValueInt64, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_uint64(struct json* item, char* key, uint64_t val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueUInt64)
+   {
+      pgmoneta_log_error("json key exists but not the uint64 type");
+      return 1;
+   }
+   payload = malloc(sizeof(uint64_t));
+   // int value is stored in place
+   pgmoneta_write_uint64(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueUInt64, payload, 0);
+   }
+   else
+   {
+      free(intval->payload);
+      intval->payload = payload;
+   }
+   return 0;
+}
+
+int
+pgmoneta_json_item_put_bool(struct json* item, char* key, bool val)
+{
+   void* payload = NULL;
+   struct json_value* intval = pgmoneta_json_get_value(item, key);
+   if (intval != NULL && intval->type != ValueBool)
+   {
+      pgmoneta_log_error("json key exists but not the bool type");
+      return 1;
+   }
+   payload = malloc(sizeof(bool));
+   // int value is stored in place
+   pgmoneta_write_byte(payload, val);
+   if (intval == NULL)
+   {
+      return pgmoneta_json_object_put(item, key, ValueBool, payload, 0);
    }
    else
    {
@@ -1570,12 +1918,27 @@ is_array_typed_value(enum json_value_type type)
    switch (type)
    {
 
+      case ValueInt8:
+      case ValueUInt8:
+      case ValueInt16:
+      case ValueUInt16:
+      case ValueInt32:
+      case ValueUInt32:
       case ValueInt64:
+      case ValueUInt64:
+      case ValueBool:
       case ValueString:
       case ValueFloat:
       case ValueObject:
          return false;
+      case ValueInt8Array:
+      case ValueUInt8Array:
+      case ValueInt16Array:
+      case ValueUInt16Array:
+      case ValueInt32Array:
+      case ValueUInt32Array:
       case ValueInt64Array:
+      case ValueUInt64Array:
       case ValueStringArray:
       case ValueFloatArray:
       case ValueItemArray:
@@ -1604,8 +1967,32 @@ print_json_item(struct json* item, int indent, int indent_per_level)
       printf("\"%s\": ", element->key);
       switch (val->type)
       {
+         case ValueInt8:
+            printf("%" PRId8 "%s\n", pgmoneta_read_byte(val->payload), has_next?",":"");
+            break;
+         case ValueUInt8:
+            printf("%" PRIu8 "%s\n", pgmoneta_read_uint8(val->payload), has_next?",":"");
+            break;
+         case ValueInt16:
+            printf("%" PRId16 "%s\n", pgmoneta_read_int16(val->payload), has_next?",":"");
+            break;
+         case ValueUInt16:
+            printf("%" PRIu16 "%s\n", pgmoneta_read_uint16(val->payload), has_next?",":"");
+            break;
+         case ValueInt32:
+            printf("%" PRId32 "%s\n", pgmoneta_read_int32(val->payload), has_next?",":"");
+            break;
+         case ValueUInt32:
+            printf("%" PRIu32 "%s\n", pgmoneta_read_uint32(val->payload), has_next?",":"");
+            break;
          case ValueInt64:
             printf("%" PRId64 "%s\n", pgmoneta_read_int64(val->payload), has_next?",":"");
+            break;
+         case ValueUInt64:
+            printf("%" PRIu64 "%s\n", pgmoneta_read_uint64(val->payload), has_next?",":"");
+            break;
+         case ValueBool:
+            printf("%s%s\n", pgmoneta_read_bool(val->payload)? "true": "false", has_next?",":"");
             break;
          case ValueFloat:
             printf("%.4f%s\n", *((float*)val->payload), has_next?",":"");
@@ -1628,7 +2015,14 @@ print_json_item(struct json* item, int indent, int indent_per_level)
          }
          break;
          case ValueStringArray:
+         case ValueInt8Array:
+         case ValueUInt8Array:
+         case ValueInt16Array:
+         case ValueUInt16Array:
+         case ValueInt32Array:
+         case ValueUInt32Array:
          case ValueInt64Array:
+         case ValueUInt64Array:
          case ValueFloatArray:
          case ValueItemArray:
          case ValueArrayArray:

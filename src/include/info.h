@@ -67,14 +67,14 @@ struct backup
 {
    char label[MISC_LENGTH];                                       /**< The label of the backup */
    char wal[MISC_LENGTH];                                         /**< The name of the WAL file */
-   unsigned long backup_size;                                     /**< The backup size */
-   unsigned long restore_size;                                    /**< The restore size */
-   int elapsed_time;                                              /**< The elapsed time in seconds */
-   int version;                                                   /**< The version */
-   int minor_version;                                             /**< The minor version */
+   uint64_t backup_size;                                          /**< The backup size */
+   uint64_t restore_size;                                         /**< The restore size */
+   int32_t elapsed_time;                                          /**< The elapsed time in seconds */
+   int32_t version;                                               /**< The version */
+   int32_t minor_version;                                         /**< The minor version */
    bool keep;                                                     /**< Keep the backup */
    char valid;                                                    /**< Is the backup valid */
-   unsigned long number_of_tablespaces;                           /**< The number of tablespaces */
+   uint64_t number_of_tablespaces;                                /**< The number of tablespaces */
    char tablespaces[MAX_NUMBER_OF_TABLESPACES][MISC_LENGTH];      /**< The names of the tablespaces */
    char tablespaces_oids[MAX_NUMBER_OF_TABLESPACES][MISC_LENGTH]; /**< The OIDs of the tablespaces */
    char tablespaces_paths[MAX_NUMBER_OF_TABLESPACES][MAX_PATH];   /**< The paths of the tablespaces */

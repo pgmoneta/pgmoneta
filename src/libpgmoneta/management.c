@@ -33,6 +33,7 @@
 #include <logging.h>
 #include <network.h>
 #include <management.h>
+#include <stdint.h>
 #include <utils.h>
 
 /* system */
@@ -55,11 +56,15 @@
 #define MANAGEMENT_HEADER_SIZE 1
 
 static int read_byte(char* prefix, int socket, signed char* c);
-static int read_int32(char* prefix, int socket, int* i);
-static int read_int64(char* prefix, int socket, unsigned long* l);
+static int read_int32(char* prefix, int socket, int32_t* i);
+static int read_uint32(char* prefix, int socket, uint32_t* i);
+static int read_uint64(char* prefix, int socket, uint64_t* l);
+static int read_bool(char* prefix, int socket, bool* b);
 static int read_string(char* prefix, int socket, char** str);
 static int write_int32(char* prefix, int socket, int32_t i);
-static int write_int64(char* prefix, int socket, int64_t l);
+static int write_uint32(char* prefix, int socket, uint32_t i);
+static int write_uint64(char* prefix, int socket, uint64_t l);
+static int write_bool(char* prefix, int socket, bool b);
 static int write_string(char* prefix, int socket, char* str);
 static int write_byte(char* prefix, int socket, signed char c);
 static int read_complete(SSL* ssl, int socket, void* buf, size_t size);
@@ -236,11 +241,11 @@ pgmoneta_management_write_list_backup(int socket, int server)
 {
    char* d = NULL;
    char* wal_dir = NULL;
-   int number_of_backups;
+   int32_t number_of_backups;
    struct backup** backups = NULL;
-   int nob;
-   unsigned long wal;
-   unsigned long delta;
+   int32_t nob;
+   uint64_t wal;
+   uint64_t delta;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -284,22 +289,21 @@ pgmoneta_management_write_list_backup(int socket, int server)
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_list_backup", socket, backups[i]->keep ? 1 : 0))
+            if (write_byte("pgmoneta_management_write_list_backup", socket, backups[i]->keep ? 1 : 0))
             {
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_list_backup", socket, backups[i]->valid))
+            if (write_byte("pgmoneta_management_write_list_backup", socket, backups[i]->valid))
+            {
+               goto error;
+            }
+            if (write_uint64("pgmoneta_management_write_list_backup", socket, backups[i]->backup_size))
             {
                goto error;
             }
 
-            if (write_int64("pgmoneta_management_write_list_backup", socket, backups[i]->backup_size))
-            {
-               goto error;
-            }
-
-            if (write_int64("pgmoneta_management_write_list_backup", socket, backups[i]->restore_size))
+            if (write_uint64("pgmoneta_management_write_list_backup", socket, backups[i]->restore_size))
             {
                goto error;
             }
@@ -307,7 +311,7 @@ pgmoneta_management_write_list_backup(int socket, int server)
             wal = pgmoneta_number_of_wal_files(wal_dir, &backups[i]->wal[0], NULL);
             wal *= config->servers[server].wal_size;
 
-            if (write_int64("pgmoneta_management_write_list_backup", socket, wal))
+            if (write_uint64("pgmoneta_management_write_list_backup", socket, wal))
             {
                goto error;
             }
@@ -319,7 +323,7 @@ pgmoneta_management_write_list_backup(int socket, int server)
                delta *= config->servers[server].wal_size;
             }
 
-            if (write_int64("pgmoneta_management_write_list_backup", socket, delta))
+            if (write_uint64("pgmoneta_management_write_list_backup", socket, delta))
             {
                goto error;
             }
@@ -493,7 +497,7 @@ int
 pgmoneta_management_write_delete(int socket, int server, int result)
 {
    char* d = NULL;
-   int number_of_backups = 0;
+   int32_t number_of_backups = 0;
    char** array = NULL;
 
    if (write_int32("pgmoneta_management_write_delete", socket, server))
@@ -628,17 +632,17 @@ int
 pgmoneta_management_write_status(int socket, bool offline)
 {
    char* d = NULL;
-   int retention_days;
-   int retention_weeks;
-   int retention_months;
-   int retention_years;
-   unsigned long used_size;
-   unsigned long free_size;
-   unsigned long total_size;
-   unsigned long hot_standby_size;
-   int number_of_directories = 0;
+   int32_t retention_days;
+   int32_t retention_weeks;
+   int32_t retention_months;
+   int32_t retention_years;
+   uint64_t used_size;
+   uint64_t free_size;
+   uint64_t total_size;
+   uint64_t hot_standby_size;
+   int32_t number_of_directories = 0;
    char** array = NULL;
-   unsigned long server_size;
+   uint64_t server_size;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -660,17 +664,17 @@ pgmoneta_management_write_status(int socket, bool offline)
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_status", socket, used_size))
+   if (write_uint64("pgmoneta_management_write_status", socket, used_size))
    {
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_status", socket, free_size))
+   if (write_uint64("pgmoneta_management_write_status", socket, free_size))
    {
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_status", socket, total_size))
+   if (write_uint64("pgmoneta_management_write_status", socket, total_size))
    {
       goto error;
    }
@@ -728,7 +732,7 @@ pgmoneta_management_write_status(int socket, bool offline)
 
       server_size = pgmoneta_directory_size(d);
 
-      if (write_int64("pgmoneta_management_write_status", socket, server_size))
+      if (write_uint64("pgmoneta_management_write_status", socket, server_size))
       {
          goto error;
       }
@@ -745,7 +749,7 @@ pgmoneta_management_write_status(int socket, bool offline)
          hot_standby_size = 0;
       }
 
-      if (write_int64("pgmoneta_management_write_status", socket, hot_standby_size))
+      if (write_uint64("pgmoneta_management_write_status", socket, hot_standby_size))
       {
          goto error;
       }
@@ -855,19 +859,19 @@ pgmoneta_management_write_details(int socket, bool offline)
 {
    char* d = NULL;
    char* wal_dir = NULL;
-   int retention_days;
-   int retention_weeks;
-   int retention_months;
-   int retention_years;
-   unsigned long used_size;
-   unsigned long free_size;
-   unsigned long total_size;
-   unsigned long hot_standby_size;
-   int number_of_backups = 0;
+   int32_t retention_days;
+   int32_t retention_weeks;
+   int32_t retention_months;
+   int32_t retention_years;
+   uint64_t used_size;
+   uint64_t free_size;
+   uint64_t total_size;
+   uint64_t hot_standby_size;
+   int32_t number_of_backups = 0;
    struct backup** backups = NULL;
-   unsigned long server_size;
-   unsigned long wal;
-   unsigned long delta;
+   uint64_t server_size;
+   uint64_t wal;
+   uint64_t delta;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -884,22 +888,22 @@ pgmoneta_management_write_details(int socket, bool offline)
    free_size = pgmoneta_free_space(config->base_dir);
    total_size = pgmoneta_total_space(config->base_dir);
 
-   if (write_int32("pgmoneta_management_write_details", socket, offline))
+   if (write_bool("pgmoneta_management_write_details", socket, offline))
    {
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_details", socket, used_size))
+   if (write_uint64("pgmoneta_management_write_details", socket, used_size))
    {
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_details", socket, free_size))
+   if (write_uint64("pgmoneta_management_write_details", socket, free_size))
    {
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_details", socket, total_size))
+   if (write_uint64("pgmoneta_management_write_details", socket, total_size))
    {
       goto error;
    }
@@ -980,7 +984,7 @@ pgmoneta_management_write_details(int socket, bool offline)
 
       server_size = pgmoneta_directory_size(d);
 
-      if (write_int64("pgmoneta_management_write_details", socket, server_size))
+      if (write_uint64("pgmoneta_management_write_details", socket, server_size))
       {
          goto error;
       }
@@ -997,7 +1001,7 @@ pgmoneta_management_write_details(int socket, bool offline)
          hot_standby_size = 0;
       }
 
-      if (write_int64("pgmoneta_management_write_details", socket, hot_standby_size))
+      if (write_uint64("pgmoneta_management_write_details", socket, hot_standby_size))
       {
          goto error;
       }
@@ -1020,22 +1024,22 @@ pgmoneta_management_write_details(int socket, bool offline)
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_details", socket, backups[j]->keep ? 1 : 0))
+            if (write_bool("pgmoneta_management_write_details", socket, backups[j]->keep))
             {
                goto error;
             }
 
-            if (write_int32("pgmoneta_management_write_details", socket, backups[j]->valid))
+            if (write_bool("pgmoneta_management_write_details", socket, backups[j]->valid))
             {
                goto error;
             }
 
-            if (write_int64("pgmoneta_management_write_details", socket, backups[j]->backup_size))
+            if (write_uint64("pgmoneta_management_write_details", socket, backups[j]->backup_size))
             {
                goto error;
             }
 
-            if (write_int64("pgmoneta_management_write_details", socket, backups[j]->restore_size))
+            if (write_uint64("pgmoneta_management_write_details", socket, backups[j]->restore_size))
             {
                goto error;
             }
@@ -1043,7 +1047,7 @@ pgmoneta_management_write_details(int socket, bool offline)
             wal = pgmoneta_number_of_wal_files(wal_dir, &backups[j]->wal[0], NULL);
             wal *= config->servers[i].wal_size;
 
-            if (write_int64("pgmoneta_management_write_details", socket, wal))
+            if (write_uint64("pgmoneta_management_write_details", socket, wal))
             {
                goto error;
             }
@@ -1055,7 +1059,7 @@ pgmoneta_management_write_details(int socket, bool offline)
                delta *= config->servers[i].wal_size;
             }
 
-            if (write_int64("pgmoneta_management_write_details", socket, delta))
+            if (write_uint64("pgmoneta_management_write_details", socket, delta))
             {
                goto error;
             }
@@ -1361,7 +1365,7 @@ pgmoneta_management_write_info(int socket, char* server, char* backup)
 {
    int srv = -1;
    char* d = NULL;
-   int number_of_backups = 0;
+   int32_t number_of_backups = 0;
    struct backup** backups = NULL;
    struct backup* bck = NULL;
    struct configuration* config = NULL;
@@ -1411,12 +1415,12 @@ pgmoneta_management_write_info(int socket, char* server, char* backup)
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_info", socket, bck->backup_size))
+   if (write_uint64("pgmoneta_management_write_info", socket, bck->backup_size))
    {
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_info", socket, bck->restore_size))
+   if (write_uint64("pgmoneta_management_write_info", socket, bck->restore_size))
    {
       goto error;
    }
@@ -1446,7 +1450,7 @@ pgmoneta_management_write_info(int socket, char* server, char* backup)
       goto error;
    }
 
-   if (write_int64("pgmoneta_management_write_info", socket, bck->number_of_tablespaces))
+   if (write_uint64("pgmoneta_management_write_info", socket, bck->number_of_tablespaces))
    {
       goto error;
    }
@@ -1458,43 +1462,43 @@ pgmoneta_management_write_info(int socket, char* server, char* backup)
          goto error;
       }
    }
-   
-   if (write_int32("pgmoneta_management_write_info", socket, bck->start_lsn_hi32))
+
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->start_lsn_hi32))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->start_lsn_lo32))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->start_lsn_lo32))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->end_lsn_hi32))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->end_lsn_hi32))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->end_lsn_lo32))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->end_lsn_lo32))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->checkpoint_lsn_hi32))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->checkpoint_lsn_hi32))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->checkpoint_lsn_lo32))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->checkpoint_lsn_lo32))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->start_timeline))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->start_timeline))
    {
       goto error;
    }
 
-   if (write_int32("pgmoneta_management_write_info", socket, bck->end_timeline))
+   if (write_uint32("pgmoneta_management_write_info", socket, bck->end_timeline))
    {
       goto error;
    }
@@ -1660,7 +1664,30 @@ error:
 }
 
 static int
-read_int64(char* prefix, int socket, unsigned long* l)
+read_uint32(char* prefix, int socket, uint32_t* i)
+{
+   char buf4[4] = {0};
+
+   *i = 0;
+
+   if (read_complete(NULL, socket, &buf4[0], sizeof(buf4)))
+   {
+      pgmoneta_log_warn("%s: read: %d %s", prefix, socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   *i = pgmoneta_read_uint32(&buf4);
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+read_uint64(char* prefix, int socket, uint64_t* l)
 {
    char buf8[8] = {0};
 
@@ -1673,7 +1700,30 @@ read_int64(char* prefix, int socket, unsigned long* l)
       goto error;
    }
 
-   *l = pgmoneta_read_int64(&buf8);
+   *l = pgmoneta_read_uint64(&buf8);
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+read_bool(char* prefix, int socket, bool* b)
+{
+   char buf1[1] = {0};
+
+   *b = 0;
+
+   if (read_complete(NULL, socket, &buf1[0], sizeof(buf1)))
+   {
+      pgmoneta_log_warn("%s: read: %d %s", prefix, socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   *b = pgmoneta_read_bool(&buf1);
 
    return 0;
 
@@ -1750,12 +1800,52 @@ error:
 }
 
 static int
-write_int64(char* prefix, int socket, int64_t l)
+write_uint32(char* prefix, int socket, uint32_t i)
+{
+   char buf4[4] = {0};
+
+   pgmoneta_write_uint32(&buf4, i);
+   if (write_complete(NULL, socket, &buf4, sizeof(buf4)))
+   {
+      pgmoneta_log_warn("%s: write: %d %s", prefix, socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+write_uint64(char* prefix, int socket, uint64_t l)
 {
    char buf8[8] = {0};
 
-   pgmoneta_write_int64(&buf8, l);
+   pgmoneta_write_uint64(&buf8, l);
    if (write_complete(NULL, socket, &buf8, sizeof(buf8)))
+   {
+      pgmoneta_log_warn("%s: write: %d %s", prefix, socket, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+write_bool(char* prefix, int socket, bool b)
+{
+   char buf1[1] = {0};
+
+   pgmoneta_write_bool(&buf1, b);
+   if (write_complete(NULL, socket, &buf1, sizeof(buf1)))
    {
       pgmoneta_log_warn("%s: write: %d %s", prefix, socket, strerror(errno));
       errno = 0;
@@ -2043,21 +2133,21 @@ static struct json*
 read_status_json(SSL* ssl, int socket)
 {
    char* name = NULL;
-   int offline;
-   unsigned long used_size;
-   unsigned long free_size;
-   unsigned long total_size;
-   unsigned long server_size;
-   unsigned long hot_standby_size;
+   bool offline;
+   uint64_t used_size;
+   uint64_t free_size;
+   uint64_t total_size;
+   uint64_t server_size;
+   uint64_t hot_standby_size;
    char* size_string;
    char* hot_standby_size_string;
-   int retention_days;
-   int retention_weeks;
-   int retention_months;
-   int retention_years;
-   int num_servers;
-   int number_of_directories;
-   int workers;
+   int32_t retention_days;
+   int32_t retention_weeks;
+   int32_t retention_months;
+   int32_t retention_years;
+   int32_t num_servers;
+   int32_t number_of_directories;
+   int32_t workers;
    struct json* json = NULL;
    struct json* output = NULL;
    struct json* status = NULL;
@@ -2072,13 +2162,13 @@ read_status_json(SSL* ssl, int socket)
 
    output = pgmoneta_json_extract_command_output_object(json);
 
-   if (read_int32("pgmoneta_management_read_status", socket, &offline))
+   if (read_bool("pgmoneta_management_read_status", socket, &offline))
    {
       goto error;
    }
    pgmoneta_json_item_put_string(status, "Mode", (offline == 0 ? "Running" : "Offline"));
 
-   if (read_int64("pgmoneta_management_read_status", socket, &used_size))
+   if (read_uint64("pgmoneta_management_read_status", socket, &used_size))
    {
       goto error;
    }
@@ -2086,7 +2176,7 @@ read_status_json(SSL* ssl, int socket)
    pgmoneta_json_item_put_string(status, "Used space", size_string);
    free(size_string);
 
-   if (read_int64("pgmoneta_management_read_status", socket, &free_size))
+   if (read_uint64("pgmoneta_management_read_status", socket, &free_size))
    {
       goto error;
    }
@@ -2094,7 +2184,7 @@ read_status_json(SSL* ssl, int socket)
    pgmoneta_json_item_put_string(status, "Free space", size_string);
    free(size_string);
 
-   if (read_int64("pgmoneta_management_read_status", socket, &total_size))
+   if (read_uint64("pgmoneta_management_read_status", socket, &total_size))
    {
       goto error;
    }
@@ -2106,13 +2196,13 @@ read_status_json(SSL* ssl, int socket)
    {
       goto error;
    }
-   pgmoneta_json_item_put_int64(status, "Workers", workers);
+   pgmoneta_json_item_put_int32(status, "Workers", workers);
 
    if (read_int32("pgmoneta_management_read_status", socket, &num_servers))
    {
       goto error;
    }
-   pgmoneta_json_item_put_int64(status, "Number of servers", num_servers);
+   pgmoneta_json_item_put_int32(status, "Number of servers", num_servers);
 
    pgmoneta_json_init(&servers_array, JSONArray);
    if (servers_array == NULL)
@@ -2139,12 +2229,12 @@ read_status_json(SSL* ssl, int socket)
          goto error;
       }
 
-      if (read_int64("pgmoneta_management_read_status", socket, &server_size))
+      if (read_uint64("pgmoneta_management_read_status", socket, &server_size))
       {
          goto error;
       }
 
-      if (read_int64("pgmoneta_management_read_status", socket, &hot_standby_size))
+      if (read_uint64("pgmoneta_management_read_status", socket, &hot_standby_size))
       {
          goto error;
       }
@@ -2169,23 +2259,23 @@ read_status_json(SSL* ssl, int socket)
       struct json* server = NULL;
       pgmoneta_json_init(&server, JSONItem);
       pgmoneta_json_item_put_string(server, "Server", &name[0]);
-      pgmoneta_json_item_put_int64(server, "Retention days", retention_days);
+      pgmoneta_json_item_put_int32(server, "Retention days", retention_days);
       if (retention_weeks != -1)
       {
-         pgmoneta_json_item_put_int64(server, "Retention weeks", retention_weeks);
+         pgmoneta_json_item_put_int32(server, "Retention weeks", retention_weeks);
       }
       if (retention_months != -1)
       {
-         pgmoneta_json_item_put_int64(server, "Retention months", retention_months);
+         pgmoneta_json_item_put_int32(server, "Retention months", retention_months);
       }
       if (retention_years != -1)
       {
-         pgmoneta_json_item_put_int64(server, "Retention years", retention_years);
+         pgmoneta_json_item_put_int32(server, "Retention years", retention_years);
       }
-      pgmoneta_json_item_put_int64(server, "Backups", number_of_directories);
+      pgmoneta_json_item_put_int32(server, "Backups", number_of_directories);
       pgmoneta_json_item_put_string(server, "Space", size_string);
       pgmoneta_json_item_put_string(server, "Hot standby", hot_standby_size_string);
-      pgmoneta_json_item_put_int64(server, "Workers", workers);
+      pgmoneta_json_item_put_int32(server, "Workers", workers);
 
       pgmoneta_json_array_append_object(servers_array, server);
 
@@ -2218,31 +2308,31 @@ static struct json*
 read_details_json(SSL* ssl, int socket)
 {
    char* name = NULL;
-   int offline;
-   unsigned long used_size;
-   unsigned long free_size;
-   unsigned long total_size;
-   unsigned long server_size;
-   unsigned long hot_standby_size;
+   bool offline;
+   uint64_t used_size;
+   uint64_t free_size;
+   uint64_t total_size;
+   uint64_t server_size;
+   uint64_t hot_standby_size;
    char* size_string;
    char* hot_standby_size_string;
-   int retention_days;
-   int retention_weeks;
-   int retention_months;
-   int retention_years;
-   int num_servers;
-   int number_of_backups;
-   unsigned long backup_size;
-   unsigned long restore_size;
-   unsigned long wal_size;
-   unsigned long delta_size;
-   int keep;
-   int valid;
+   int32_t retention_days;
+   int32_t retention_weeks;
+   int32_t retention_months;
+   int32_t retention_years;
+   int32_t num_servers;
+   int32_t number_of_backups;
+   uint64_t backup_size;
+   uint64_t restore_size;
+   uint64_t wal_size;
+   uint64_t delta_size;
+   bool keep;
+   int8_t valid;
    char* bck = NULL;
    char* res = NULL;
    char* ws = NULL;
    char* ds = NULL;
-   int workers;
+   int32_t workers;
    struct json* json = NULL;
    struct json* output = NULL;
    struct json* status = NULL;
@@ -2257,13 +2347,13 @@ read_details_json(SSL* ssl, int socket)
 
    output = pgmoneta_json_extract_command_output_object(json);
 
-   if (read_int32("pgmoneta_management_read_details", socket, &offline))
+   if (read_bool("pgmoneta_management_read_details", socket, &offline))
    {
       goto error;
    }
    pgmoneta_json_item_put_string(status, "Mode", (offline == 0 ? "Running" : "Offline"));
 
-   if (read_int64("pgmoneta_management_read_details", socket, &used_size))
+   if (read_uint64("pgmoneta_management_read_details", socket, &used_size))
    {
       goto error;
    }
@@ -2271,7 +2361,7 @@ read_details_json(SSL* ssl, int socket)
    pgmoneta_json_item_put_string(status, "Used space", size_string);
    free(size_string);
 
-   if (read_int64("pgmoneta_management_read_details", socket, &free_size))
+   if (read_uint64("pgmoneta_management_read_details", socket, &free_size))
    {
       goto error;
    }
@@ -2279,7 +2369,7 @@ read_details_json(SSL* ssl, int socket)
    pgmoneta_json_item_put_string(status, "Free space", size_string);
    free(size_string);
 
-   if (read_int64("pgmoneta_management_read_details", socket, &total_size))
+   if (read_uint64("pgmoneta_management_read_details", socket, &total_size))
    {
       goto error;
    }
@@ -2291,13 +2381,13 @@ read_details_json(SSL* ssl, int socket)
    {
       goto error;
    }
-   pgmoneta_json_item_put_int64(status, "Workers", workers);
+   pgmoneta_json_item_put_int32(status, "Workers", workers);
 
    if (read_int32("pgmoneta_management_read_details", socket, &num_servers))
    {
       goto error;
    }
-   pgmoneta_json_item_put_int64(status, "Number of servers", num_servers);
+   pgmoneta_json_item_put_int32(status, "Number of servers", num_servers);
    pgmoneta_json_init(&servers_array, JSONArray);
    if (servers_array == NULL)
    {
@@ -2332,12 +2422,12 @@ read_details_json(SSL* ssl, int socket)
          goto error;
       }
 
-      if (read_int64("pgmoneta_management_read_details", socket, &server_size))
+      if (read_uint64("pgmoneta_management_read_details", socket, &server_size))
       {
          goto error;
       }
 
-      if (read_int64("pgmoneta_management_read_details", socket, &hot_standby_size))
+      if (read_uint64("pgmoneta_management_read_details", socket, &hot_standby_size))
       {
          goto error;
       }
@@ -2352,22 +2442,22 @@ read_details_json(SSL* ssl, int socket)
       struct json* server = NULL;
       pgmoneta_json_init(&server, JSONItem);
       pgmoneta_json_item_put_string(server, "Server", &name[0]);
-      pgmoneta_json_item_put_int64(server, "Retention days", retention_days);
+      pgmoneta_json_item_put_int32(server, "Retention days", retention_days);
       if (retention_weeks != -1)
       {
-         pgmoneta_json_item_put_int64(server, "Retention weeks", retention_weeks);
+         pgmoneta_json_item_put_int32(server, "Retention weeks", retention_weeks);
       }
       if (retention_months != -1)
       {
-         pgmoneta_json_item_put_int64(server, "Retention months", retention_months);
+         pgmoneta_json_item_put_int32(server, "Retention months", retention_months);
       }
       if (retention_years != -1)
       {
-         pgmoneta_json_item_put_int64(server, "Retention years", retention_years);
+         pgmoneta_json_item_put_int32(server, "Retention years", retention_years);
       }
-      pgmoneta_json_item_put_int64(server, "Backups", number_of_backups);
+      pgmoneta_json_item_put_int32(server, "Backups", number_of_backups);
       pgmoneta_json_item_put_string(server, "Space", size_string);
-      pgmoneta_json_item_put_int64(server, "Workers", workers);
+      pgmoneta_json_item_put_int32(server, "Workers", workers);
       pgmoneta_json_item_put_string(server, "Hot standby", hot_standby_size_string);
       free(size_string);
       size_string = NULL;
@@ -2391,43 +2481,45 @@ read_details_json(SSL* ssl, int socket)
             goto error;
          }
 
-         if (read_int32("pgmoneta_management_read_details", socket, &keep))
+         if (read_bool("pgmoneta_management_read_details", socket, &keep))
          {
             goto error;
          }
 
-         if (read_int32("pgmoneta_management_read_details", socket, &valid))
+         if (read_byte("pgmoneta_management_read_details", socket, &valid))
          {
             goto error;
          }
 
-         if (read_int64("pgmoneta_management_read_details", socket, &backup_size))
+         if (read_uint64("pgmoneta_management_read_details", socket, &backup_size))
          {
             goto error;
          }
 
          bck = pgmoneta_bytes_to_string(backup_size);
+         pgmoneta_log_info("backup_size = %s", bck);
 
-         if (read_int64("pgmoneta_management_read_details", socket, &restore_size))
+         if (read_uint64("pgmoneta_management_read_details", socket, &restore_size))
          {
             goto error;
          }
 
          res = pgmoneta_bytes_to_string(restore_size);
 
-         if (read_int64("pgmoneta_management_read_details", socket, &wal_size))
+         if (read_uint64("pgmoneta_management_read_details", socket, &wal_size))
          {
             goto error;
          }
 
          ws = pgmoneta_bytes_to_string(wal_size);
 
-         if (read_int64("pgmoneta_management_read_details", socket, &delta_size))
+         if (read_uint64("pgmoneta_management_read_details", socket, &delta_size))
          {
             goto error;
          }
 
          ds = pgmoneta_bytes_to_string(delta_size);
+         pgmoneta_log_info(">>%s", ds);
          struct json* backup = NULL;
          pgmoneta_json_init(&backup, JSONItem);
          pgmoneta_json_item_put_string(backup, "Backup name", name);
@@ -2493,7 +2585,7 @@ read_delete_json(SSL* ssl, int socket, char* server)
 {
    char* name = NULL;
    int srv;
-   int number_of_backups;
+   int32_t number_of_backups;
    struct json* json = NULL;
    struct json* output = NULL;
    struct json* status = NULL;
@@ -2517,7 +2609,7 @@ read_delete_json(SSL* ssl, int socket, char* server)
       {
          goto error;
       }
-      pgmoneta_json_item_put_int64(status, "Number of backups", number_of_backups);
+      pgmoneta_json_item_put_int32(status, "Number of backups", number_of_backups);
       pgmoneta_json_init(&backups_array, JSONArray);
       if (backups_array == NULL)
       {
@@ -2563,10 +2655,11 @@ read_info_json(SSL* ssl, int socket)
 {
    char* label = NULL;
    char* wal = NULL;
-   signed char sc;
+   bool sc;
    int32_t i32;
+   uint32_t u32;
    uint64_t u64;
-   unsigned long number_of_tablespaces;
+   uint64_t number_of_tablespaces;
    char* tablespace = NULL;
    struct json* tbl_array = NULL;
    struct json* json = NULL;
@@ -2597,14 +2690,14 @@ read_info_json(SSL* ssl, int socket)
 
    pgmoneta_json_item_put_string(info, "WAL", wal);
 
-   if (read_int64("pgmoneta_management_read_info", socket, &u64))
+   if (read_uint64("pgmoneta_management_read_info", socket, &u64))
    {
       goto error;
    }
 
    pgmoneta_json_item_put_int64(info, "Backup size", u64);
 
-   if (read_int64("pgmoneta_management_read_info", socket, &u64))
+   if (read_uint64("pgmoneta_management_read_info", socket, &u64))
    {
       goto error;
    }
@@ -2616,43 +2709,43 @@ read_info_json(SSL* ssl, int socket)
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Elapsed time", i32);
+   pgmoneta_json_item_put_int32(info, "Elapsed time", i32);
 
    if (read_int32("pgmoneta_management_read_info", socket, &i32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Version", i32);
+   pgmoneta_json_item_put_int32(info, "Version", i32);
 
    if (read_int32("pgmoneta_management_read_info", socket, &i32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Minor version", i32);
+   pgmoneta_json_item_put_int32(info, "Minor version", i32);
 
-   if (read_byte("pgmoneta_management_read_info", socket, &sc))
+   if (read_bool("pgmoneta_management_read_info", socket, &sc))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Keep", sc);
+   pgmoneta_json_item_put_bool(info, "Keep", sc);
 
-   if (read_byte("pgmoneta_management_read_info", socket, &sc))
+   if (read_bool("pgmoneta_management_read_info", socket, &sc))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Valid", sc);
+   pgmoneta_json_item_put_bool(info, "Valid", sc);
 
-   if (read_int64("pgmoneta_management_read_info", socket, &u64))
+   if (read_uint64("pgmoneta_management_read_info", socket, &u64))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Number of tablespaces", u64);
-   number_of_tablespaces = (unsigned long)u64;
+   pgmoneta_json_item_put_uint64(info, "Number of tablespaces", u64);
+   number_of_tablespaces = (uint64_t)u64;
 
    pgmoneta_json_init(&tbl_array, JSONArray);
 
@@ -2686,61 +2779,61 @@ read_info_json(SSL* ssl, int socket)
 
    pgmoneta_json_item_put_object(info, "Table spaces", tbl_array);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Start LSN Hi32", i32);
+   pgmoneta_json_item_put_uint32(info, "Start LSN Hi32", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Start LSN Lo32", i32);
+   pgmoneta_json_item_put_uint32(info, "Start LSN Lo32", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "End LSN Hi32", i32);
+   pgmoneta_json_item_put_uint32(info, "End LSN Hi32", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "End LSN Lo32", i32);
+   pgmoneta_json_item_put_uint32(info, "End LSN Lo32", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Checkpoint LSN Hi32", i32);
+   pgmoneta_json_item_put_uint32(info, "Checkpoint LSN Hi32", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Checkpoint LSN Lo32", i32);
+   pgmoneta_json_item_put_uint32(info, "Checkpoint LSN Lo32", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Start timeline", i32);
+   pgmoneta_json_item_put_uint32(info, "Start timeline", u32);
 
-   if (read_int32("pgmoneta_management_read_info", socket, &i32))
+   if (read_uint32("pgmoneta_management_read_info", socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "End timeline", i32);
+   pgmoneta_json_item_put_uint32(info, "End timeline", u32);
 
    pgmoneta_json_item_put_object(output, "info", info);
 
@@ -2769,13 +2862,13 @@ read_list_backup_json(SSL* ssl, int socket, char* server)
 {
    char* name = NULL;
    int srv;
-   int number_of_backups;
-   int keep;
-   int valid;
-   unsigned long backup_size;
-   unsigned long restore_size;
-   unsigned long wal_size;
-   unsigned long delta_size;
+   int32_t number_of_backups;
+   bool keep;
+   int8_t valid;
+   uint64_t backup_size;
+   uint64_t restore_size;
+   uint64_t wal_size;
+   uint64_t delta_size;
    char* bck = NULL;
    char* res = NULL;
    char* ws = NULL;
@@ -2808,47 +2901,52 @@ read_list_backup_json(SSL* ssl, int socket, char* server)
       {
          goto error;
       }
-      pgmoneta_json_item_put_int64(status, "Number of backups", number_of_backups);
+      pgmoneta_json_item_put_int32(status, "Number of backups", number_of_backups);
       for (int i = 0; i < number_of_backups; i++)
       {
          if (read_string("pgmoneta_management_read_list_backup", socket, &name))
          {
+            pgmoneta_log_error("read error in name");
             goto error;
          }
 
-         if (read_int32("pgmoneta_management_read_list_backup", socket, &keep))
+         if (read_bool("pgmoneta_management_read_list_backup", socket, &keep))
          {
             goto error;
          }
 
-         if (read_int32("pgmoneta_management_read_list_backup", socket, &valid))
+         if (read_byte("pgmoneta_management_read_list_backup", socket, &valid))
          {
             goto error;
          }
 
-         if (read_int64("pgmoneta_management_read_list_backup", socket, &backup_size))
+         if (read_uint64("pgmoneta_management_read_list_backup", socket, &backup_size))
          {
+            pgmoneta_log_error("read error in backup_size");
             goto error;
          }
 
          bck = pgmoneta_bytes_to_string(backup_size);
 
-         if (read_int64("pgmoneta_management_read_list_backup", socket, &restore_size))
+         if (read_uint64("pgmoneta_management_read_list_backup", socket, &restore_size))
          {
+            pgmoneta_log_error("read error in restore_size");
             goto error;
          }
 
          res = pgmoneta_bytes_to_string(restore_size);
 
-         if (read_int64("pgmoneta_management_read_list_backup", socket, &wal_size))
+         if (read_uint64("pgmoneta_management_read_list_backup", socket, &wal_size))
          {
+            pgmoneta_log_error("read error in wal_size");
             goto error;
          }
 
          ws = pgmoneta_bytes_to_string(wal_size);
 
-         if (read_int64("pgmoneta_management_read_list_backup", socket, &delta_size))
+         if (read_uint64("pgmoneta_management_read_list_backup", socket, &delta_size))
          {
+            pgmoneta_log_error("read error in delta_size");
             goto error;
          }
 
@@ -2895,7 +2993,7 @@ read_list_backup_json(SSL* ssl, int socket, char* server)
    }
    else
    {
-      pgmoneta_json_item_put_int64(status, "Number of backups", 0);
+      pgmoneta_json_item_put_int32(status, "Number of backups", 0);
    }
 
    pgmoneta_json_item_put_object(status, "backups", backups_array);
@@ -2963,11 +3061,11 @@ print_status_json(struct json* json)
       printf("Total space      : %s\n", total_space);
    }
 
-   int64_t workers = pgmoneta_json_get_int64_value(status, "Workers");
-   printf("Workers          : %" PRId64 "\n", workers);
+   int32_t workers = pgmoneta_json_get_int32_value(status, "Workers");
+   printf("Workers          : %" PRId32 "\n", workers);
 
-   int64_t num_servers = pgmoneta_json_get_int64_value(status, "Number of servers");
-   printf("Number of servers: %" PRId64 "\n", num_servers);
+   int32_t num_servers = pgmoneta_json_get_int32_value(status, "Number of servers");
+   printf("Number of servers: %" PRId32 "\n", num_servers);
 
    struct json* servers = pgmoneta_json_get_json_object_value(status, "servers");
    if (servers != NULL)
@@ -2977,25 +3075,25 @@ print_status_json(struct json* json)
          server = pgmoneta_json_array_get(servers, i);
          printf("Server           : %s\n", pgmoneta_json_get_string_value(server, "Server"));
          printf("  Retention      : ");
-         printf("%" PRId64 " day(s) ", pgmoneta_json_get_int64_value(server, "Retention days"));
-         int64_t weeks = pgmoneta_json_get_int64_value(server, "Retention weeks");
+         printf("%" PRId32 " day(s) ", pgmoneta_json_get_int32_value(server, "Retention days"));
+         int32_t weeks = pgmoneta_json_get_int32_value(server, "Retention weeks");
          if (weeks != 0)
          {
-            printf("%" PRId64 " week(s) ", weeks);
+            printf("%" PRId32 " week(s) ", weeks);
          }
-         int64_t months = pgmoneta_json_get_int64_value(server, "Retention months");
+         int32_t months = pgmoneta_json_get_int32_value(server, "Retention months");
          if (months != 0)
          {
-            printf("%" PRId64 " month(s) ", months);
+            printf("%" PRId32 " month(s) ", months);
          }
-         int64_t years = pgmoneta_json_get_int64_value(server, "Retention years");
+         int32_t years = pgmoneta_json_get_int32_value(server, "Retention years");
          if (years != 0)
          {
-            printf("%" PRId64 " year(s) ", pgmoneta_json_get_int64_value(server, "Retention years"));
+            printf("%" PRId32 " year(s) ", pgmoneta_json_get_int32_value(server, "Retention years"));
          }
          printf("\n");
-         printf("  Workers        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Workers"));
-         printf("  Backups        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Backups"));
+         printf("  Workers        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Workers"));
+         printf("  Backups        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Backups"));
          printf("  Space          : %s\n", pgmoneta_json_get_string_value(server, "Space"));
          printf("  Hot standby    : %s\n", pgmoneta_json_get_string_value(server, "Hot standby"));
       }
@@ -3051,11 +3149,11 @@ print_details_json(struct json* json)
       printf("Total space      : %s\n", total_space);
    }
 
-   int64_t workers = pgmoneta_json_get_int64_value(status, "Workers");
-   printf("Workers          : %" PRId64 "\n", workers);
+   int32_t workers = pgmoneta_json_get_int32_value(status, "Workers");
+   printf("Workers          : %" PRId32 "\n", workers);
 
-   int64_t num_servers = pgmoneta_json_get_int64_value(status, "Number of servers");
-   printf("Number of servers: %" PRId64 "\n", num_servers);
+   int32_t num_servers = pgmoneta_json_get_int32_value(status, "Number of servers");
+   printf("Number of servers: %" PRId32 "\n", num_servers);
 
    struct json* servers = pgmoneta_json_get_json_object_value(status, "servers");
    if (servers != NULL)
@@ -3065,25 +3163,25 @@ print_details_json(struct json* json)
          server = pgmoneta_json_array_get(servers, i);
          printf("Server           : %s\n", pgmoneta_json_get_string_value(server, "Server"));
          printf("  Retention      : ");
-         printf("%" PRId64 " day(s) ", pgmoneta_json_get_int64_value(server, "Retention days"));
-         int64_t weeks = pgmoneta_json_get_int64_value(server, "Retention weeks");
+         printf("%" PRId32 " day(s) ", pgmoneta_json_get_int32_value(server, "Retention days"));
+         int32_t weeks = pgmoneta_json_get_int32_value(server, "Retention weeks");
          if (weeks != 0)
          {
-            printf("%" PRId64 " week(s) ", weeks);
+            printf("%" PRId32 " week(s) ", weeks);
          }
-         int64_t months = pgmoneta_json_get_int64_value(server, "Retention months");
+         int32_t months = pgmoneta_json_get_int32_value(server, "Retention months");
          if (months != 0)
          {
-            printf("%" PRId64 " month(s) ", months);
+            printf("%" PRId32 " month(s) ", months);
          }
-         int64_t years = pgmoneta_json_get_int64_value(server, "Retention years");
+         int32_t years = pgmoneta_json_get_int32_value(server, "Retention years");
          if (years != 0)
          {
-            printf("%" PRId64 " year(s) ", pgmoneta_json_get_int64_value(server, "Retention years"));
+            printf("%" PRId32 " year(s) ", pgmoneta_json_get_int32_value(server, "Retention years"));
          }
          printf("\n");
-         printf("  Workers        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Workers"));
-         printf("  Backups        : %" PRId64 "\n", pgmoneta_json_get_int64_value(server, "Backups"));
+         printf("  Workers        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Workers"));
+         printf("  Backups        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Backups"));
 
          struct json* backups = pgmoneta_json_get_json_object_value(server, "backups");
          if (backups != NULL)
@@ -3121,7 +3219,7 @@ print_delete_json(struct json* json)
 {
    struct json* backup = NULL;
    char* srv = NULL;
-   int64_t number_of_backups = 0;
+   int32_t number_of_backups = 0;
    if (!json || pgmoneta_json_is_command_object_faulty(json))
    {
       return 1;
@@ -3147,8 +3245,8 @@ print_delete_json(struct json* json)
    printf("Server           : %s\n", srv);
    if (!pgmoneta_compare_string(srv, "Unknown"))
    {
-      number_of_backups = pgmoneta_json_get_int64_value(status, "Number of backups");
-      printf("Number of backups: %" PRId64 "\n", number_of_backups);
+      number_of_backups = pgmoneta_json_get_int32_value(status, "Number of backups");
+      printf("Number of backups: %" PRId32 "\n", number_of_backups);
 
       if (number_of_backups > 0)
       {
@@ -3197,7 +3295,7 @@ print_list_backup_json(struct json* json)
       return 1;
    }
 
-   number_of_backups = pgmoneta_json_get_int64_value(status, "Number of backups");
+   number_of_backups = pgmoneta_json_get_int32_value(status, "Number of backups");
 
    printf("Server           : %s\n", srv);
    if (!pgmoneta_compare_string(srv, "Unknown"))
@@ -3243,7 +3341,7 @@ print_info_json(struct json* json)
    struct json* tablespace = NULL;
    char* label = NULL;
    char* wal = NULL;
-   unsigned long number_of_tablespaces;
+   uint64_t number_of_tablespaces;
 
    if (!json)
    {
@@ -3278,13 +3376,13 @@ print_info_json(struct json* json)
 
    printf("Backup size          : %" PRId64 "\n", pgmoneta_json_get_int64_value(info, "Backup size"));
    printf("Restore size         : %" PRId64 "\n", pgmoneta_json_get_int64_value(info, "Restore size"));
-   printf("Elapsed time         : %d\n" , (int)pgmoneta_json_get_int64_value(info, "Elapsed time"));
-   printf("Version              : %d\n" , (int)pgmoneta_json_get_int64_value(info, "Version"));
-   printf("Minor version        : %d\n" , (int)pgmoneta_json_get_int64_value(info, "Minor version"));
-   printf("Keep                 : %d\n" , (bool)pgmoneta_json_get_int64_value(info, "Keep"));
-   printf("Valid                : %d\n" , (char)pgmoneta_json_get_int64_value(info, "Valid"));
+   printf("Elapsed time         : %d\n", (int)pgmoneta_json_get_int32_value(info, "Elapsed time"));
+   printf("Version              : %d\n", (int)pgmoneta_json_get_int32_value(info, "Version"));
+   printf("Minor version        : %d\n", (int)pgmoneta_json_get_int32_value(info, "Minor version"));
+   printf("Keep                 : %d\n", (bool)pgmoneta_json_get_bool_value(info, "Keep"));
+   printf("Valid                : %d\n", (char)pgmoneta_json_get_bool_value(info, "Valid"));
 
-   number_of_tablespaces = (unsigned long)pgmoneta_json_get_int64_value(info, "Number of tablespaces");
+   number_of_tablespaces = (uint64_t)pgmoneta_json_get_int64_value(info, "Number of tablespaces");
    printf("Number of tablespaces: %" PRId64 "\n", number_of_tablespaces);
 
    tablespaces = pgmoneta_json_get_json_object_value(info, "Table spaces");
@@ -3297,17 +3395,17 @@ print_info_json(struct json* json)
       }
    }
 
-   printf("Start LSN Hi32       : %X\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "Start LSN Hi32"));
-   printf("Start LSN Lo32       : %X\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "Start LSN Lo32"));
+   printf("Start LSN Hi32       : %X\n", pgmoneta_json_get_uint32_value(info, "Start LSN Hi32"));
+   printf("Start LSN Lo32       : %X\n", pgmoneta_json_get_uint32_value(info, "Start LSN Lo32"));
 
-   printf("End LSN Hi32         : %X\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "End LSN Hi32"));
-   printf("End LSN Lo32         : %X\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "End LSN Lo32"));
+   printf("End LSN Hi32         : %X\n", pgmoneta_json_get_uint32_value(info, "End LSN Hi32"));
+   printf("End LSN Lo32         : %X\n", pgmoneta_json_get_uint32_value(info, "End LSN Lo32"));
 
-   printf("Checkpoint LSN Hi32  : %X\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "Checkpoint LSN Hi32"));
-   printf("Checkpoint LSN Lo32  : %X\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "Checkpoint LSN Lo32"));
+   printf("Checkpoint LSN Hi32  : %X\n", pgmoneta_json_get_uint32_value(info, "Checkpoint LSN Hi32"));
+   printf("Checkpoint LSN Lo32  : %X\n", pgmoneta_json_get_uint32_value(info, "Checkpoint LSN Lo32"));
 
-   printf("Start timeline       : %d\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "Start timeline"));
-   printf("End timeline         : %d\n" , (uint32_t)pgmoneta_json_get_int64_value(info, "End timeline"));
+   printf("Start timeline       : %u\n", pgmoneta_json_get_uint32_value(info, "Start timeline"));
+   printf("End timeline         : %u\n", pgmoneta_json_get_uint32_value(info, "End timeline"));
 
    return 0;
 }

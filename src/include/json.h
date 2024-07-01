@@ -63,11 +63,26 @@ extern "C" {
 #define JSON_BOOL_ERROR     1
 
 enum json_value_type {
+   ValueInt8,
+   ValueUInt8,
+   ValueInt16,
+   ValueUInt16,
+   ValueInt32,
+   ValueUInt32,
    ValueInt64,
+   ValueUInt64,
+   ValueBool,
    ValueString,
    ValueFloat,
    ValueObject,
+   ValueInt8Array,
+   ValueUInt8Array,
+   ValueInt16Array,
+   ValueUInt16Array,
+   ValueInt32Array,
+   ValueUInt32Array,
    ValueInt64Array,
+   ValueUInt64Array,
    ValueStringArray,
    ValueFloatArray,
    ValueItemArray,
@@ -224,13 +239,139 @@ struct json_value*
 pgmoneta_json_get_value(struct json* item, char* key);
 
 /**
- * Get int64 value from json
+ * Get int8_t value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+int8_t
+pgmoneta_json_get_int8_value(struct json* item, char* key);
+
+/**
+ * Get uint8_t value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+uint8_t
+pgmoneta_json_get_uint8_value(struct json* item, char* key);
+
+/**
+ * Get int16_t value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+int16_t
+pgmoneta_json_get_int16_value(struct json* item, char* key);
+
+/**
+ * Get uint16_t value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+uint16_t
+pgmoneta_json_get_uint16_value(struct json* item, char* key);
+
+/**
+ * Get int32_t value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+int32_t
+pgmoneta_json_get_int32_value(struct json* item, char* key);
+
+/**
+ * Get uint32_t value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+uint32_t
+pgmoneta_json_get_uint32_value(struct json* item, char* key);
+
+/**
+ * Get int64_t value from json
  * @param item The item
  * @param key The key
  * @return The value, 0 if not found
  */
 int64_t
 pgmoneta_json_get_int64_value(struct json* item, char* key);
+
+/**
+ * Get uint64 value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+uint64_t
+pgmoneta_json_get_uint64_value(struct json* item, char* key);
+
+/**
+ * Get bool value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, 0 if not found
+ */
+bool
+pgmoneta_json_get_bool_value(struct json* item, char* key);
+
+/**
+ * Get int8 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+int8_t*
+pgmoneta_json_get_int8_array_value(struct json* item, char* key);
+
+/**
+ * Get uint8 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+uint8_t*
+pgmoneta_json_get_uint8_array_value(struct json* item, char* key);
+
+/**
+ * Get int16 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+int16_t*
+pgmoneta_json_get_int16_array_value(struct json* item, char* key);
+
+/**
+ * Get uint16 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+uint16_t*
+pgmoneta_json_get_uint16_array_value(struct json* item, char* key);
+
+/**
+ * Get int32 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+int32_t*
+pgmoneta_json_get_int32_array_value(struct json* item, char* key);
+
+/**
+ * Get uint32 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+uint32_t*
+pgmoneta_json_get_uint32_array_value(struct json* item, char* key);
 
 /**
  * Get int64 array value from json
@@ -240,6 +381,15 @@ pgmoneta_json_get_int64_value(struct json* item, char* key);
  */
 int64_t*
 pgmoneta_json_get_int64_array_value(struct json* item, char* key);
+
+/**
+ * Get uint64 array value from json
+ * @param item The item
+ * @param key The key
+ * @return The value, NULL if not found
+ */
+uint64_t*
+pgmoneta_json_get_uint64_array_value(struct json* item, char* key);
 
 /**
  * Get string value from json
@@ -402,6 +552,72 @@ int
 pgmoneta_json_item_put_string(struct json* item, char* key, char* val);
 
 /**
+ * Put an int8 kv pair to json item, the key will not be copied.
+ * This function frees the old int8 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The int8 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_int8(struct json* item, char* key, int8_t val);
+
+/**
+ * Put an uint8 kv pair to json item, the key will not be copied.
+ * This function frees the old uint8 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The uint8 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_uint8(struct json* item, char* key, uint8_t val);
+
+/**
+ * Put an int16 kv pair to json item, the key will not be copied.
+ * This function frees the old int16 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The int16 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_int16(struct json* item, char* key, int16_t val);
+
+/**
+ * Put an uint16 kv pair to json item, the key will not be copied.
+ * This function frees the old uint16 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The uint16 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_uint16(struct json* item, char* key, uint16_t val);
+
+/**
+ * Put an int32 kv pair to json item, the key will not be copied.
+ * This function frees the old int32 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The int32 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_int32(struct json* item, char* key, int32_t val);
+
+/**
+ * Put an uint32 kv pair to json item, the key will not be copied.
+ * This function frees the old uint32 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The uint32 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_uint32(struct json* item, char* key, uint32_t val);
+
+/**
  * Put an int64 kv pair to json item, the key will not be copied.
  * This function frees the old int64 value and replace with new one, if the key exists.
  * @param item The item
@@ -411,6 +627,28 @@ pgmoneta_json_item_put_string(struct json* item, char* key, char* val);
  */
 int
 pgmoneta_json_item_put_int64(struct json* item, char* key, int64_t val);
+
+/**
+ * Put an uint64 kv pair to json item, the key will not be copied.
+ * This function frees the old uint64 value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The uint64 value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_uint64(struct json* item, char* key, uint64_t val);
+
+/**
+ * Put an bool kv pair to json item, the key will not be copied.
+ * This function frees the old bool value and replace with new one, if the key exists.
+ * @param item The item
+ * @param key The key
+ * @param val The bool value
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_item_put_bool(struct json* item, char* key, bool val);
 
 /**
  * Put a float kv pair to json item, the key will not be copied
@@ -434,6 +672,72 @@ int
 pgmoneta_json_item_put_object(struct json* item, char* key, struct json* val);
 
 /**
+ * Put an int8 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The int8 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_int8_array(struct json* item, char* key, int8_t* vals, unsigned short length);
+
+/**
+ * Put an uint8 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The uint8 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+
+int
+pgmoneta_json_item_put_uint8_array(struct json* item, char* key, uint8_t* vals, unsigned short length);
+/**
+ * Put an int16 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The int16 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_int16_array(struct json* item, char* key, int16_t* vals, unsigned short length);
+
+/**
+ * Put an uint16 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The uint16 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_uint16_array(struct json* item, char* key, uint16_t* vals, unsigned short length);
+
+/**
+ * Put an int32 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The int32 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_int32_array(struct json* item, char* key, int32_t* vals, unsigned short length);
+
+/**
+ * Put an uint32 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The uint32 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_uint32_array(struct json* item, char* key, uint32_t* vals, unsigned short length);
+
+/**
  * Put an int64 array to json item, it does not make copies of array or key
  * @param item The item
  * @param key The key
@@ -443,6 +747,17 @@ pgmoneta_json_item_put_object(struct json* item, char* key, struct json* val);
  */
 int
 pgmoneta_json_item_put_int64_array(struct json* item, char* key, int64_t* vals, unsigned short length);
+
+/**
+ * Put an uint64 array to json item, it does not make copies of array or key
+ * @param item The item
+ * @param key The key
+ * @param vals The uint64 array
+ * @param length The array length
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_item_put_uint64_array(struct json* item, char* key, uint64_t* vals, unsigned short length);
 
 /**
  * Put a json item array to json item, it does not make copies of items or key
@@ -456,6 +771,66 @@ int
 pgmoneta_json_item_put_item_array(struct json* item, char* key, struct json* items, unsigned short length);
 
 /**
+ * Add an int8 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_int8(struct json* array, int8_t val);
+
+/**
+ * Add an int16 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_int16(struct json* array, int16_t val);
+
+/**
+ * Add an int16 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_int16(struct json* array, int16_t val);
+
+/**
+ * Add an uint8 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_uint8(struct json* array, uint8_t val);
+
+/**
+ * Add an int32 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_int32(struct json* array, int32_t val);
+
+/**
+ * Add an uint32 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_uint32(struct json* array, uint32_t val);
+
+/**
  * Add an int64 value to the json array,
  * method will be denied if the type does not match
  * @param array The array
@@ -464,6 +839,16 @@ pgmoneta_json_item_put_item_array(struct json* item, char* key, struct json* ite
  */
 int
 pgmoneta_json_array_append_int64(struct json* array, int64_t val);
+
+/**
+ * Add an uint64 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_uint64(struct json* array, uint64_t val);
 
 /**
  * Put a string to the json array, the string will be copied,

@@ -29,6 +29,8 @@
 #ifndef PGMONETA_UTILS_H
 #define PGMONETA_UTILS_H
 
+#include <stdbool.h>
+#include <sys/types.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -199,12 +201,28 @@ signed char
 pgmoneta_read_byte(void* data);
 
 /**
+ * Read an uint8
+ * @param data Pointer to the data
+ * @return The uint8
+ */
+uint8_t
+pgmoneta_read_uint8(void* data);
+
+/**
  * Read an int16
  * @param data Pointer to the data
  * @return The int16
  */
 int16_t
 pgmoneta_read_int16(void* data);
+
+/**
+ * Read an uint16
+ * @param data Pointer to the data
+ * @return The uint16
+ */
+uint16_t
+pgmoneta_read_uint16(void* data);
 
 /**
  * Read an int32
@@ -215,12 +233,36 @@ int32_t
 pgmoneta_read_int32(void* data);
 
 /**
+ * Read an uint32
+ * @param data Pointer to the data
+ * @return The uint32
+ */
+uint32_t
+pgmoneta_read_uint32(void* data);
+
+/**
  * Read an int64
  * @param data Pointer to the data
  * @return The int64
  */
 int64_t
 pgmoneta_read_int64(void* data);
+
+/**
+ * Read an uint64
+ * @param data Pointer to the data
+ * @return The uint64
+ */
+uint64_t
+pgmoneta_read_uint64(void* data);
+
+/**
+ * Read a bool
+ * @param data Pointer to the data
+ * @return The bool
+ */
+bool
+pgmoneta_read_bool(void* data);
 
 /**
  * Write a byte
@@ -231,6 +273,30 @@ void
 pgmoneta_write_byte(void* data, signed char b);
 
 /**
+ * Write a uint8
+ * @param data Pointer to the data
+ * @param b The uint8
+ */
+void
+pgmoneta_write_uint8(void* data, uint8_t b);
+
+/**
+ * Write an int16
+ * @param data Pointer to the data
+ * @param i The int16
+ */
+void
+pgmoneta_write_int16(void* data, int16_t i);
+
+/**
+ * Write an uint16
+ * @param data Pointer to the data
+ * @param i The uint16
+ */
+void
+pgmoneta_write_uint16(void* data, uint16_t i);
+
+/**
  * Write an int32
  * @param data Pointer to the data
  * @param i The int32
@@ -239,12 +305,36 @@ void
 pgmoneta_write_int32(void* data, int32_t i);
 
 /**
+ * Write an uint32
+ * @param data Pointer to the data
+ * @param i The uint32
+ */
+void
+pgmoneta_write_uint32(void* data, uint32_t i);
+
+/**
  * Write an int64
  * @param data Pointer to the data
  * @param i The int64
  */
 void
 pgmoneta_write_int64(void* data, int64_t i);
+
+/**
+ * Write an uint64
+ * @param data Pointer to the data
+ * @param i The uint64
+ */
+void
+pgmoneta_write_uint64(void* data, uint64_t i);
+
+/**
+ * Write an bool
+ * @param data Pointer to the data
+ * @param i The bool
+ */
+void
+pgmoneta_write_bool(void* data, bool b);
 
 /**
  * Read a string

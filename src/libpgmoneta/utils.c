@@ -372,6 +372,12 @@ pgmoneta_read_byte(void* data)
    return (signed char) *((char*)data);
 }
 
+uint8_t
+pgmoneta_read_uint8(void* data)
+{
+   return (uint8_t) *((char*)data);
+}
+
 int16_t
 pgmoneta_read_int16(void* data)
 {
@@ -380,6 +386,18 @@ pgmoneta_read_int16(void* data)
 
    int16_t res = (int16_t)((bytes[0] << 8)) |
                  ((bytes[1]));
+
+   return res;
+}
+
+uint16_t
+pgmoneta_read_uint16(void* data)
+{
+   unsigned char bytes[] = {*((unsigned char*)data),
+                            *((unsigned char*)(data + 1))};
+
+   uint16_t res = (uint16_t)((bytes[0] << 8)) |
+                  ((bytes[1]));
 
    return res;
 }
@@ -396,6 +414,22 @@ pgmoneta_read_int32(void* data)
                  ((bytes[1] << 16)) |
                  ((bytes[2] << 8)) |
                  ((bytes[3]));
+
+   return res;
+}
+
+uint32_t
+pgmoneta_read_uint32(void* data)
+{
+   uint8_t bytes[] = {*((uint8_t*)data),
+                      *((uint8_t*)(data + 1)),
+                      *((uint8_t*)(data + 2)),
+                      *((uint8_t*)(data + 3))};
+
+   uint32_t res = (uint32_t)(((uint32_t)bytes[0] << 24)) |
+                  (((uint32_t)bytes[1] << 16)) |
+                  (((uint32_t)bytes[2] << 8)) |
+                  (((uint32_t)bytes[3]));
 
    return res;
 }
@@ -424,10 +458,66 @@ pgmoneta_read_int64(void* data)
    return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
 }
 
+uint64_t
+pgmoneta_read_uint64(void* data)
+{
+   uint64_t i0 = *((uint8_t*)data);
+   uint64_t i1 = *((uint8_t*)data + 1);
+   uint64_t i2 = *((uint8_t*)data + 2);
+   uint64_t i3 = *((uint8_t*)data + 3);
+   uint64_t i4 = *((uint8_t*)data + 4);
+   uint64_t i5 = *((uint8_t*)data + 5);
+   uint64_t i6 = *((uint8_t*)data + 6);
+   uint64_t i7 = *((uint8_t*)data + 7);
+
+   i0 = i0 << 56;
+   i1 = i1 << 48;
+   i2 = i2 << 40;
+   i3 = i3 << 32;
+   i4 = i4 << 24;
+   i5 = i5 << 16;
+   i6 = i6 << 8;
+   /* i7 = i7; */
+
+   return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
+}
+
+bool
+pgmoneta_read_bool(void* data)
+{
+   return (bool) *((bool*)data);
+}
+
 void
 pgmoneta_write_byte(void* data, signed char b)
 {
    *((char*)(data)) = b;
+}
+
+void
+pgmoneta_write_uint8(void* data, uint8_t b)
+{
+   *((uint8_t*)(data)) = b;
+}
+
+void
+pgmoneta_write_int16(void* data, int16_t i)
+{
+   char* ptr = (char*)&i;
+
+   *((char*)(data + 1)) = *ptr;
+   ptr++;
+   *((char*)(data)) = *ptr;
+}
+
+void
+pgmoneta_write_uint16(void* data, uint16_t i)
+{
+   char* ptr = (char*)&i;
+
+   *((char*)(data + 1)) = *ptr;
+   ptr++;
+   *((char*)(data)) = *ptr;
 }
 
 void
@@ -442,6 +532,20 @@ pgmoneta_write_int32(void* data, int32_t i)
    *((char*)(data + 1)) = *ptr;
    ptr++;
    *((char*)(data)) = *ptr;
+}
+
+void
+pgmoneta_write_uint32(void* data, uint32_t i)
+{
+   uint8_t* ptr = (uint8_t*)&i;
+
+   *((uint8_t*)(data + 3)) = *ptr;
+   ptr++;
+   *((uint8_t*)(data + 2)) = *ptr;
+   ptr++;
+   *((uint8_t*)(data + 1)) = *ptr;
+   ptr++;
+   *((uint8_t*)(data)) = *ptr;
 }
 
 void
@@ -464,6 +568,34 @@ pgmoneta_write_int64(void* data, int64_t i)
    *((char*)(data + 1)) = *ptr;
    ptr++;
    *((char*)(data)) = *ptr;
+}
+
+void
+pgmoneta_write_uint64(void* data, uint64_t i)
+{
+   char* ptr = (char*)&i;
+
+   *((char*)(data + 7)) = *ptr;
+   ptr++;
+   *((char*)(data + 6)) = *ptr;
+   ptr++;
+   *((char*)(data + 5)) = *ptr;
+   ptr++;
+   *((char*)(data + 4)) = *ptr;
+   ptr++;
+   *((char*)(data + 3)) = *ptr;
+   ptr++;
+   *((char*)(data + 2)) = *ptr;
+   ptr++;
+   *((char*)(data + 1)) = *ptr;
+   ptr++;
+   *((char*)(data)) = *ptr;
+}
+
+void
+pgmoneta_write_bool(void* data, bool b)
+{
+   *((bool*)(data)) = b;
 }
 
 char*
@@ -1738,7 +1870,6 @@ error:
 
    return 1;
 }
-
 
 int
 pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
