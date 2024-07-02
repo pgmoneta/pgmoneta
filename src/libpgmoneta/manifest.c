@@ -373,3 +373,74 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
       checksum = NULL;
    }
 }
+
+int
+pgmoneta_verify_data(struct json_reader* reader, char** output, int srv, char* backup_label, bool report_all)
+{
+	struct json* manifest_item = NULL;
+	char* path = NULL;
+	char* reported_checksum = NULL;
+	char* fresh_checksum = NULL;
+
+	pgmoneta_log_debug("Verify: inside pgmoneta_verify_data");
+
+	//cleaning manifest_item from previous run. no problem if first run
+	pgmoneta_json_free(manifest_item);
+	if(pgmoneta_json_next_array_item(reader, &manifest_item) != 0)
+	{
+		char* absolute_file_path = NULL;
+		pgmoneta_log_debug("Verify: looping through backup_manifest files array");
+
+		//get file path reported in backup_manifest
+		path = pgmoneta_json_get_string_value(manifest_item, "Path");
+		pgmoneta_log_debug("Verify: path is %s", path);
+
+		//construct absolute path for data files
+		absolute_file_path = pgmoneta_get_server_backup_identifier_data(srv, backup_label);
+		pgmoneta_log_debug("Verify: absolute path before append is %s", absolute_file_path);
+		pgmoneta_append(absolute_file_path, path);
+		pgmoneta_log_debug("Verify: absolute path is %s", absolute_file_path);
+
+		//get checksum reported in backup_manifest and store it
+		reported_checksum = pgmoneta_json_get_string_value(manifest_item, "Checksum");
+		pgmoneta_log_debug("Verify: reported_checksum is %s", reported_checksum);
+
+		//generate checksum for file on disk
+		if (pgmoneta_create_sha256_file(absolute_file_path, &fresh_checksum) != 0)
+		{
+			pgmoneta_log_error("Could not calculate checksum for file %s", absolute_file_path);
+			free(absolute_file_path);
+			goto error;
+		}
+
+		pgmoneta_log_debug("Verify: fresh checksum is %s", fresh_checksum);
+
+		//only report files with sucessfull checks if report_all is true
+		if (strcmp(reported_checksum, fresh_checksum) == 0)
+		{
+			if (report_all == true)
+			{
+				*output = "Sucess";
+				*(output + 1)  = path;
+				*(output + 2)= reported_checksum;
+				*(output + 3)= fresh_checksum;
+			}
+		}
+		else 
+		{
+				*output = "Fail";
+				*(output + 1)  = path;
+				*(output + 2)= reported_checksum;
+				*(output + 3)= fresh_checksum;
+		}
+	}
+
+	return 0;
+
+error:
+	free(path);
+	free(reported_checksum);
+	free(fresh_checksum);
+
+	return 1;
+}

@@ -56,6 +56,7 @@ extern "C" {
 #define MANAGEMENT_DECRYPT        14
 #define MANAGEMENT_ENCRYPT        15
 #define MANAGEMENT_INFO           16
+#define MANAGEMENT_VERIFY         17 
 
 /**
  * Available command output formats
@@ -363,6 +364,33 @@ pgmoneta_management_read_info(SSL* ssl, int socket, char* server, char* backup, 
  */
 int
 pgmoneta_management_write_info(int socket, char* server, char* backup);
+
+/**
+ * Management operation: Verify checksums of backup files against backup_manifest
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup_id The backup id
+ * @param option Which files to report: all or only the ones whose calculated checksum does not match the checksum reported in manifest file (default)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_verify_data(SSL* ssl, int socket, char* server, char *backup_id, char* option);
+
+
+/**
+ * Management operation: Read checksum verification info for a backup 
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param option Which files to report: all or only the ones whose calculated checksum does not match the checksum reported in manifest file (default)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_read_verify_data(SSL* ssl, int socket, char* server, char* backup_id, char* option);
+
+//TODO documentation
+int
+pgmoneta_management_write_verify_data(int socket, int srv, char* backup_id, char* option) ;
 
 /**
  * Management: Read int32

@@ -35,6 +35,7 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <art.h>
+#include <json.h>
 
 #define MANIFEST_CHUNK_SIZE 8192
 
@@ -69,6 +70,18 @@ pgmoneta_manifest_checksum_verify(char* root);
  */
 int
 pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** deleted_files, struct art** changed_files, struct art** added_files);
+
+/**
+ * Verify files' checksum against backup_manifest
+ * @param reader The json reader
+ * @param output Array of strings to store output
+ * @param srv The number of the server
+ * @param backup_label The backup label 
+ * @param bool Report_all. True if all checksums should be reported. False if only failed checks.
+ * @return 0 upon success, otherwise 1.
+ */
+int
+pgmoneta_verify_data(struct json_reader* reader, char** output, int srv, char* backup_label, bool report_all);
 
 #ifdef __cplusplus
 }

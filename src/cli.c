@@ -50,6 +50,23 @@
 #include <openssl/ssl.h>
 
 #define HELP 99
+#define ACTION_UNKNOWN         0
+#define ACTION_BACKUP          1
+#define ACTION_LIST_BACKUP     2
+#define ACTION_RESTORE         3
+#define ACTION_ARCHIVE         4
+#define ACTION_DELETE          5
+#define ACTION_STOP            6
+#define ACTION_STATUS          7
+#define ACTION_STATUS_DETAILS  8
+#define ACTION_ISALIVE         9
+#define ACTION_RESET          10
+#define ACTION_RELOAD         11
+#define ACTION_RETAIN         12
+#define ACTION_EXPUNGE        13
+#define ACTION_DECRYPT        14
+#define ACTION_ENCRYPT        15
+#define ACTION_VERIFY         16
 
 #define COMMAND_BACKUP "backup"
 #define COMMAND_LIST_BACKUP "list-backup"
@@ -66,6 +83,7 @@
 #define COMMAND_CONF "conf"
 #define COMMAND_CLEAR "clear"
 #define COMMAND_INFO "info"
+#define COMMAND_VERIFY "verify"
 
 static void help_backup(void);
 static void help_list_backup(void);
@@ -100,6 +118,7 @@ static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
 static int decrypt_data(SSL* ssl, int socket, char* path);
 static int encrypt_data(SSL* ssl, int socket, char* path);
 static int info(SSL* ssl, int socket, char* server, char* backup, char output_format);
+static int verify_data(SSL* ssl, int socket, char* server, char* backup_id, char* option);
 
 static void
 version(void)
@@ -281,6 +300,14 @@ const struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_INFO,
       .deprecated = false,
       .log_message = "<info> [%s]"
+   },
+   {
+      .command = "verify",
+      .subcommand = "",
+      .accepted_argument_count = {2, 3},
+      .action = MANAGEMENT_VERIFY,
+      .deprecated = false,
+      .log_message = "<verify>"
    },
    {
       .command = "details",
@@ -678,6 +705,17 @@ password:
    {
       exit_code = info(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_VERIFY)
+   {
+		if (parsed.args[2])
+		{
+			exit_code = verify_data(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2]);
+		}
+		else
+		{
+			exit_code = verify_data(s_ssl, socket, parsed.args[0], parsed.args[1], NULL);
+		}
+   }
 
 done:
 
@@ -833,6 +871,13 @@ help_info(void)
 }
 
 static void
+help_verify(void)
+{
+   printf("Verify backup files' checksums against checksums reported on backup_manifest\n");
+   printf("  pgmoneta-cli verify <server> <backup> [FAIL|all]\n");
+}
+
+static void
 display_helper(char* command)
 {
    if (!strcmp(command, COMMAND_BACKUP))
@@ -894,6 +939,10 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_INFO))
    {
       help_info();
+	}
+   else if (!strcmp(command, COMMAND_VERIFY))
+   {
+	  help_verify();
    }
    else
    {
@@ -1132,6 +1181,19 @@ info(SSL* ssl, int socket, char* server, char* backup, char output_format)
    {
       return 1;
    }
-
    return 0;
+}
+
+static int
+verify_data(SSL* ssl, int socket, char* server, char* backup_id, char* option)
+{
+	if (pgmoneta_management_verify_data(ssl, socket, server, backup_id, option) == 0)
+    {
+		pgmoneta_management_read_verify_data(ssl, socket, server, backup_id, option);
+        return 1;
+    }
+	else
+	{
+		return 0;
+	}
 }
