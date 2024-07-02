@@ -34,6 +34,7 @@
 #include <network.h>
 #include <management.h>
 #include <stdint.h>
+#include <manifest.h>
 #include <utils.h>
 
 /* system */
@@ -82,6 +83,7 @@ static struct json* read_details_json(SSL* ssl, int socket);
 static struct json* read_list_backup_json(SSL* ssl, int socket, char* server);
 static struct json* read_delete_json(SSL* ssl, int socket, char* server);
 static struct json* read_info_json(SSL* ssl, int socket);
+static struct json* read_verify_json(SSL* ssl, int socket);
 
 int
 pgmoneta_management_read_header(int socket, signed char* id)
@@ -134,6 +136,11 @@ pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, 
       case MANAGEMENT_INFO:
          read_string("pgmoneta_management_read_payload", socket, payload_s1);
          read_string("pgmoneta_management_read_payload", socket, payload_s2);
+         break;
+      case MANAGEMENT_VERIFY:
+         read_string("pgmoneta_management_read_payload", socket, payload_s1);
+         read_string("pgmoneta_management_read_payload", socket, payload_s2);
+         read_string("pgmoneta_management_read_payload", socket, payload_s3);
          break;
       case MANAGEMENT_STOP:
       case MANAGEMENT_STATUS:
@@ -1282,6 +1289,35 @@ pgmoneta_management_encrypt(SSL* ssl, int socket, char* path)
    {
       goto error;
    }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_verify_data(SSL* ssl, int socket, char* server, char *backup_id, char* option)
+{
+   if (write_header(ssl, socket, MANAGEMENT_VERIFY))
+   {
+      pgmoneta_log_warn("pgmoneta_management_verify_data: write: %d", socket);
+      errno = 0;
+      goto error;
+   }
+	if (write_string("pgmoneta_management_verify_data", socket, server))
+	{
+		goto error;
+	}
+	if (write_string("pgmoneta_management_verify_data", socket, backup_id))
+	{
+		goto error;
+	}
+	if (write_string("pgmoneta_management_verify_data", socket, option))
+	{
+		goto error;
+	}
 
    return 0;
 
@@ -3408,4 +3444,302 @@ print_info_json(struct json* json)
    printf("End timeline         : %u\n", pgmoneta_json_get_uint32_value(info, "End timeline"));
 
    return 0;
+}
+
+int
+pgmoneta_management_read_verify_data(SSL* ssl, int socket, char* server, char* backup_id, char* option)
+{
+
+	int check_option;
+	struct json* json = NULL;
+
+	pgmoneta_log_debug("Verify: inside pgmoneta_management_read_verify_data");
+	pgmoneta_management_read_int32(ssl, socket, &check_option);
+	pgmoneta_log_debug("Verify: inside pgmoneta_management_read_verify_data. Just read check_option");
+
+	if (check_option == 1)
+	{
+		pgmoneta_log_error("Verify: unknown option");
+		goto error;
+	}
+
+	json = read_verify_json(ssl, socket);
+
+	if (json == NULL)
+	{
+		goto error;
+	}
+	
+	//print - temporary
+	pgmoneta_json_print_and_free_json_object(json);
+	json = NULL;
+
+	return 0;
+
+error:
+	if (json != NULL)
+	{
+		pgmoneta_json_free(json);
+	}
+	return 1;
+}
+
+static struct json*
+read_verify_json(SSL* ssl, int socket)
+{
+	char* path = NULL;
+	char* manifest_checksum = NULL;
+	char* actual_checksum = NULL;
+	char* check = NULL;
+	struct json* json = NULL;
+	struct json* verify_output = NULL;
+	struct json* output_array = NULL;
+	struct json* output_item = NULL;
+
+	pgmoneta_log_debug("Verify: inside read_verify_json");
+
+	json = pgmoneta_json_create_new_command_object("verify", true, "pgmoneta-cli");
+	pgmoneta_json_init(&output_array, JSONArray);
+	pgmoneta_json_init(&output_item, JSONItem);
+
+	if (json == NULL || output_array == NULL || output_item)
+	{
+		goto error;
+	}
+
+	verify_output = pgmoneta_json_extract_command_output_object(json);
+
+	//wait for warning that messages will begin to be sent
+	int should_read;
+	read_int32("pgmoneta_management_read_verify_data", socket, &should_read);
+	pgmoneta_log_debug("Verify: should_begin = %d", should_read);
+	
+	while (should_read == 1)
+	{
+		pgmoneta_log_debug("Reading");
+		//read from pgmoneta-verify
+		if (read_string("pgmoneta_management_read_verify_data", socket, &check))
+		{
+			goto error;
+		}
+	
+		pgmoneta_json_item_put_string(output_item, "Check", check);
+	
+		if (read_string("pgmoneta_management_read_verify_data", socket, &manifest_checksum))
+		{
+			goto error;
+		}
+	
+		pgmoneta_json_item_put_string(output_item, "Actual_Checksum", manifest_checksum);
+	
+		if (read_string("pgmoneta_management_read_verify_data", socket, &actual_checksum))
+		{
+			goto error;
+		}
+	
+		pgmoneta_json_item_put_string(output_item, "Actual_Checksum", actual_checksum);
+	
+		if (read_string("pgmoneta_management_read_verify_data", socket, &path))
+		{
+			goto error;
+		}
+	
+		pgmoneta_json_item_put_string(output_item, "Actual_Checksum", path);
+	
+		//put to array
+		pgmoneta_json_array_append_object(output_array, output_item);
+	
+		//end
+		pgmoneta_json_item_put_object(verify_output, "verify_output", output_array);
+
+		read_int32("pgmoneta_management_read_verify_data", socket, &should_read);
+	}
+
+	// free(path);
+	// free(manifest_checksum);
+	// free(actual_checksum);
+	// free(check);
+
+	return json;
+
+
+error:
+
+	free(path);
+	free(manifest_checksum);
+	free(actual_checksum);
+	free(check);
+
+	if (json != NULL)
+	{
+		pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+	}
+	
+	errno = 0;
+
+	return json;
+}
+
+int
+pgmoneta_management_write_verify_data(int socket, int srv, char* backup_id, char* option) 
+{
+	char* d = NULL;
+	char* backup_manifest = NULL;
+	char* backup_label = NULL;
+	int backup_index = -1;
+	int number_of_backups = 0;
+	bool report_all;
+	struct configuration* config;
+	struct backup** backups = NULL;
+
+	if (option == NULL || strcmp(option, "fail") == 0)
+	{
+		report_all = false;
+		pgmoneta_log_debug("Verify: report only failed checksums check");
+	}
+	else
+	{
+		report_all = true;
+		pgmoneta_log_debug("Verify: report all checksums check");
+	}
+
+	config = (struct configuration*)shmem;
+
+	//backup dir for server;
+	d = pgmoneta_get_server_backup(srv);
+
+	//get all backups for the server;
+	if (pgmoneta_get_backups(d, &number_of_backups, &backups) != 0)
+	{
+		goto error;
+	}
+	free(d);
+	d = NULL;
+
+	//select proper backup
+	if (!strcmp(backup_id, "oldest"))
+	{
+		for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
+		{
+			if (backups[i] != NULL)
+			{
+				backup_index = i;
+			}
+		}
+	}
+	else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
+	{
+		for (int i = number_of_backups - 1; backup_index == -1 && i >= 0; i--)
+		{
+			if (backups[i] != NULL)
+			{
+				backup_index = i;
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
+		{
+			if (backups[i] != NULL && !strcmp(backups[i]->label, backup_id))
+			{
+				backup_index = i;
+			}
+		}
+	}
+
+	//backup not found
+	if (backup_index == -1)
+	{
+		pgmoneta_log_error("Verify: No identifier for %s/%s", config->servers[srv].name, backup_id);
+		goto error;
+	}
+
+	//backup not valid
+	if (backups[backup_index]->valid == VALID_FALSE)
+	{
+		pgmoneta_log_error("Verify: Backup is not valid");
+		goto error;
+	}
+
+
+	//check if backup_manifest exists and is a regular file
+	backup_manifest = pgmoneta_get_server_backup_identifier_data(srv, backups[backup_index]->label);
+	backup_manifest = pgmoneta_append(backup_manifest, "backup_manifest");
+
+	if (pgmoneta_exists(backup_manifest) == false)
+	{
+		pgmoneta_log_error("Verify: backup_manifest does not exist.");
+		free(backup_manifest);
+		goto error;
+	}
+
+	if (pgmoneta_is_file(backup_manifest) == false)
+	{
+		pgmoneta_log_error("Verify: backup_manifest is not a file.");
+		free(backup_manifest);
+		goto error;
+	}
+
+	pgmoneta_log_debug("Verify: backup_manifest file found - OK");
+
+	//reading the backup_manifest
+	struct json_reader* reader = NULL;
+
+	if (pgmoneta_json_reader_init(backup_manifest, &reader) == 1)
+	{
+		pgmoneta_log_error("Verify: could not initialize JSON reader");
+		free(reader);
+		free(backup_manifest);
+		goto error;
+	}
+	//we don't need backup_manifest string anymore. all relevant info will be accessed through the reader
+	free(backup_manifest);
+	backup_manifest = NULL;
+
+	//go to to first array element, which is called Files
+	char* key_path[1] = {"Files"};
+
+	if (pgmoneta_json_locate(reader, key_path, 1) != 0)
+	{
+		pgmoneta_log_error("Verify: could not locate array Files in backup_manifest");
+		free(reader);
+		goto error;
+	}
+
+	//loop
+	backup_label = backups[backup_index]->label;
+	char **output = NULL;
+
+	output = (char **) malloc(sizeof(char**) * 4);
+
+	//main write loop
+	while(pgmoneta_verify_data(reader, output, srv, backup_label, report_all) == 0)
+	{
+		pgmoneta_log_debug("Verify: inside pgmoneta_management_write_verify_data loop");
+		pgmoneta_log_debug("Output[0] is %s", output[0]);
+		pgmoneta_log_debug("Output[1] is %s", output[1]);
+		pgmoneta_log_debug("Output[2] is %s", output[2]);
+		pgmoneta_log_debug("Output[3] is %s", output[3]);
+		pgmoneta_management_write_int32(socket, 1);
+		write_string("pgmoneta_management_write_verify_data", socket,  output[0]);
+		write_string("pgmoneta_management_write_verify_data", socket,  output[1]);
+		write_string("pgmoneta_management_write_verify_data", socket,  output[2]);
+		write_string("pgmoneta_management_write_verify_data", socket,  output[3]);
+	}
+	//stop waiting
+	pgmoneta_management_write_int32(socket, 0);
+
+	return 0;
+
+error:
+	for (int i = 0; i < number_of_backups; i++)
+	{
+		free(backups[i]);
+	}
+	free(backups);
+
+	free(d);
+
+	return 1;
 }

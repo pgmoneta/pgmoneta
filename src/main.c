@@ -40,6 +40,7 @@
 #include <logging.h>
 #include <lz4_compression.h>
 #include <management.h>
+#include <manifest.h>
 #include <memory.h>
 #include <message.h>
 #include <network.h>
@@ -1348,7 +1349,72 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             free(payload_s2);
             exit(0);
          }
+         break;
+      case MANAGEMENT_VERIFY:
+        pgmoneta_log_debug("Management verify: %s/%s/%s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none");
 
+		if (payload_s3 != NULL && strcmp(payload_s3, "all") && strcmp(payload_s3, "fail"))
+		{
+			pgmoneta_log_error("Verify: invalid option");
+			pgmoneta_management_write_int32(client_fd, 1);
+			free(payload_s1);
+        	free(payload_s2);
+        	free(payload_s3);
+		}
+		else
+		{
+			srv = -1;
+			for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+			{
+				if (!strcmp(config->servers[i].name, payload_s1))
+				{
+					srv = i;
+				}
+			}
+			
+			//select backup
+			if (srv != -1)
+			{
+				pgmoneta_log_debug("Verify: Server found.");
+				pid = fork();
+				if (pid == -1)
+				{
+					//maybe change line below to pgmoneta_management_write_int32 ?
+					pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
+					pgmoneta_log_error("Cannot create process");
+				}
+				else if (pid == 0)
+				{
+					pgmoneta_log_error("Verify: Fork sucessfull");
+					pgmoneta_set_proc_title(1, argv_ptr, "verify", config->servers[srv].name);
+					pgmoneta_management_write_int32(client_fd, 0);
+	
+					//shutdown_ports(); //I'm not sure if I have to call this function
+					// ret = pgmoneta_verify_data(client_fd, srv, payload_s2, payload_s3);
+					ret = pgmoneta_management_write_verify_data(client_fd, srv, payload_s2, payload_s3);
+					//maybe change line below to pgmoneta_management_write_int32 ?
+					// pgmoneta_management_process_result(client_fd, srv, payload_s1, ret, true);
+					if (ret == 0)
+					{
+						exit(0);
+					}
+					else 
+					{
+						exit(1);
+					}
+				}
+			}
+	
+			if (srv == -1)
+			{
+				pgmoneta_log_error("Verify - Unknown server %s", payload_s1);
+				pgmoneta_management_write_int32(client_fd, 1);
+			}
+		
+	        free(payload_s1);
+	        free(payload_s2);
+	        free(payload_s3);
+		}
          break;
       default:
          pgmoneta_log_debug("Unknown management id: %d", id);
