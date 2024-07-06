@@ -552,7 +552,7 @@ int
 pgmoneta_json_item_put_string(struct json* item, char* key, char* val);
 
 /**
- * Put an int8 kv pair to json item, the key will not be copied.
+ * Put an int8 kv pair to json item, the key will be copied.
  * This function frees the old int8 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -563,7 +563,7 @@ int
 pgmoneta_json_item_put_int8(struct json* item, char* key, int8_t val);
 
 /**
- * Put an uint8 kv pair to json item, the key will not be copied.
+ * Put an uint8 kv pair to json item, the key will be copied.
  * This function frees the old uint8 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -574,7 +574,7 @@ int
 pgmoneta_json_item_put_uint8(struct json* item, char* key, uint8_t val);
 
 /**
- * Put an int16 kv pair to json item, the key will not be copied.
+ * Put an int16 kv pair to json item, the key will be copied.
  * This function frees the old int16 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -585,7 +585,7 @@ int
 pgmoneta_json_item_put_int16(struct json* item, char* key, int16_t val);
 
 /**
- * Put an uint16 kv pair to json item, the key will not be copied.
+ * Put an uint16 kv pair to json item, the key will be copied.
  * This function frees the old uint16 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -596,7 +596,7 @@ int
 pgmoneta_json_item_put_uint16(struct json* item, char* key, uint16_t val);
 
 /**
- * Put an int32 kv pair to json item, the key will not be copied.
+ * Put an int32 kv pair to json item, the key will be copied.
  * This function frees the old int32 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -607,7 +607,7 @@ int
 pgmoneta_json_item_put_int32(struct json* item, char* key, int32_t val);
 
 /**
- * Put an uint32 kv pair to json item, the key will not be copied.
+ * Put an uint32 kv pair to json item, the key will be copied.
  * This function frees the old uint32 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -618,7 +618,7 @@ int
 pgmoneta_json_item_put_uint32(struct json* item, char* key, uint32_t val);
 
 /**
- * Put an int64 kv pair to json item, the key will not be copied.
+ * Put an int64 kv pair to json item, the key will be copied.
  * This function frees the old int64 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -629,7 +629,7 @@ int
 pgmoneta_json_item_put_int64(struct json* item, char* key, int64_t val);
 
 /**
- * Put an uint64 kv pair to json item, the key will not be copied.
+ * Put an uint64 kv pair to json item, the key will be copied.
  * This function frees the old uint64 value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -640,7 +640,7 @@ int
 pgmoneta_json_item_put_uint64(struct json* item, char* key, uint64_t val);
 
 /**
- * Put an bool kv pair to json item, the key will not be copied.
+ * Put an bool kv pair to json item, the key will be copied.
  * This function frees the old bool value and replace with new one, if the key exists.
  * @param item The item
  * @param key The key
@@ -651,7 +651,7 @@ int
 pgmoneta_json_item_put_bool(struct json* item, char* key, bool val);
 
 /**
- * Put a float kv pair to json item, the key will not be copied
+ * Put a float kv pair to json item, the key will be copied
  * @param item The item
  * @param key The key
  * @param val The float value
@@ -672,7 +672,7 @@ int
 pgmoneta_json_item_put_object(struct json* item, char* key, struct json* val);
 
 /**
- * Put an int8 array to json item, it does not make copies of array or key
+ * Put an int8 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The int8 array
@@ -683,7 +683,7 @@ int
 pgmoneta_json_item_put_int8_array(struct json* item, char* key, int8_t* vals, unsigned short length);
 
 /**
- * Put an uint8 array to json item, it does not make copies of array or key
+ * Put an uint8 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The uint8 array
@@ -694,7 +694,7 @@ pgmoneta_json_item_put_int8_array(struct json* item, char* key, int8_t* vals, un
 int
 pgmoneta_json_item_put_uint8_array(struct json* item, char* key, uint8_t* vals, unsigned short length);
 /**
- * Put an int16 array to json item, it does not make copies of array or key
+ * Put an int16 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The int16 array
@@ -705,7 +705,7 @@ int
 pgmoneta_json_item_put_int16_array(struct json* item, char* key, int16_t* vals, unsigned short length);
 
 /**
- * Put an uint16 array to json item, it does not make copies of array or key
+ * Put an uint16 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The uint16 array
@@ -716,7 +716,7 @@ int
 pgmoneta_json_item_put_uint16_array(struct json* item, char* key, uint16_t* vals, unsigned short length);
 
 /**
- * Put an int32 array to json item, it does not make copies of array or key
+ * Put an int32 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The int32 array
@@ -727,7 +727,7 @@ int
 pgmoneta_json_item_put_int32_array(struct json* item, char* key, int32_t* vals, unsigned short length);
 
 /**
- * Put an uint32 array to json item, it does not make copies of array or key
+ * Put an uint32 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The uint32 array
@@ -738,7 +738,7 @@ int
 pgmoneta_json_item_put_uint32_array(struct json* item, char* key, uint32_t* vals, unsigned short length);
 
 /**
- * Put an int64 array to json item, it does not make copies of array or key
+ * Put an int64 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The int64 array
@@ -749,7 +749,7 @@ int
 pgmoneta_json_item_put_int64_array(struct json* item, char* key, int64_t* vals, unsigned short length);
 
 /**
- * Put an uint64 array to json item, it does not make copies of array or key
+ * Put an uint64 array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param vals The uint64 array
@@ -760,7 +760,7 @@ int
 pgmoneta_json_item_put_uint64_array(struct json* item, char* key, uint64_t* vals, unsigned short length);
 
 /**
- * Put a json item array to json item, it does not make copies of items or key
+ * Put a json item array to json item, it copies the key, but not the array
  * @param item The item
  * @param key The key
  * @param items The json item array
