@@ -38,6 +38,7 @@ extern "C" {
 
 /**
  * Create an archive
+ * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
  * @param backup_id The backup identifier
@@ -46,7 +47,7 @@ extern "C" {
  * @param argv The argv
  */
 void
-pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
+pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
 
 /**
  * Extract from a tar file to a given directory

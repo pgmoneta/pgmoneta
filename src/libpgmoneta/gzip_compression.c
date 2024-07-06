@@ -461,7 +461,7 @@ gz_compress(char* from, int level, char* to)
 
       if (length > 0)
       {
-         if (gzwrite(out, buf, (unsigned)length) != length)
+         if (gzwrite(out, buf, (unsigned)length) != (int)length)
          {
             goto error;
          }

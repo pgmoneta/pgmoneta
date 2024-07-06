@@ -498,7 +498,7 @@ bzip2_decompress(char* from, char* to)
 
       if (length > 0)
       {
-         if (fwrite(buf, 1, length, to_ptr) != length)
+         if (fwrite(buf, 1, length, to_ptr) != (size_t)length)
          {
             goto error_unzip;
          }

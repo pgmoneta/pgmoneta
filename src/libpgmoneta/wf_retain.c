@@ -71,6 +71,14 @@ pgmoneta_workflow_create_retention(void)
 static int
 retain_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Retain (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -84,6 +92,10 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Retain (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
@@ -160,6 +172,14 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
 static int
 retain_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Retain (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 

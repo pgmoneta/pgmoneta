@@ -112,10 +112,9 @@ pgmoneta_write_message(SSL* ssl, int socket, struct message* msg);
 
 /**
  * Free a message
- * @param msg The resulting message
  */
 void
-pgmoneta_free_message(struct message* msg);
+pgmoneta_free_message(void);
 
 /**
  * Copy a message
@@ -519,13 +518,12 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
  * @param buffer The stream buffer
  * @param basedir The base directory for the backup data
  * @param tablespaces The user level tablespaces
- * @param version The server version
  * @param bucket The rate limit bucket
  * @param network_bucket The network rate limit bucket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 /**
  * Receive backup tar files from the copy stream and write to disk

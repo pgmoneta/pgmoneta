@@ -246,7 +246,7 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
 int
 pgmoneta_extract_error_fields(char type, struct message* msg, char** extracted)
 {
-   size_t offset = 1 + 4;
+   ssize_t offset = 1 + 4;
    char* result = NULL;
    *extracted = NULL;
 
@@ -317,7 +317,7 @@ pgmoneta_extract_message_offset(size_t offset, void* data, struct message** extr
 int
 pgmoneta_extract_message_from_data(char type, void* data, size_t data_size, struct message** extracted)
 {
-   int offset;
+   size_t offset;
    void* m_data = NULL;
    int m_length;
    struct message* result = NULL;
@@ -1233,7 +1233,7 @@ pgmoneta_remove_whitespace(char* orig)
 
    length = strlen(orig);
 
-   for (int i = 0; i < length; i++)
+   for (size_t i = 0; i < length; i++)
    {
       c = *(orig + i);
       if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
@@ -2008,7 +2008,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
             tblspc_name = strrchr(&path[0], '/') + 1;
          }
 
-         for (int i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
+         for (uint64_t i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
          {
             if (!strcmp(tblspc_name, backup->tablespaces[i]))
             {
@@ -2904,7 +2904,7 @@ pgmoneta_bytes_to_string(uint64_t bytes)
       goto error;
    }
 
-   for (int i = 0; i < sizeof(sizes) / sizeof(*(sizes)); i++, multiplier /= 1024)
+   for (size_t i = 0; i < sizeof(sizes) / sizeof(*(sizes)); i++, multiplier /= 1024)
    {
       if (bytes < multiplier)
       {
@@ -3614,7 +3614,7 @@ parse_command(int argc,
       subcommand = argv[offset];
    }
 
-   for (int i = 0; i < command_count; i++)
+   for (size_t i = 0; i < command_count; i++)
    {
       if (strncmp(command, command_table[i].command, MISC_LENGTH) == 0)
       {
@@ -3748,7 +3748,7 @@ pgmoneta_token_bucket_add(struct token_bucket* tb)
    cur_time = (unsigned long) time(NULL);
    diff = cur_time - expected_time;
 
-   if (diff < tb->every)
+   if (diff < (unsigned long)tb->every)
    {
       return 0;
    }
@@ -3759,7 +3759,7 @@ pgmoneta_token_bucket_add(struct token_bucket* tb)
       expected_time = atomic_load(&tb->last_time);
       cur_time = (unsigned long) time(NULL);
       diff = cur_time - expected_time;
-      if (diff < tb->every)
+      if (diff < (unsigned long)tb->every)
       {
          return 0;
       }

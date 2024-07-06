@@ -184,7 +184,7 @@ pgmoneta_server_get_wal_size(SSL* ssl, int socket, int* ws)
    }
 
    pgmoneta_free_copy_message(dmsg);
-   pgmoneta_free_message(tmsg);
+   pgmoneta_free_message();
    free(value);
    free(number);
 
@@ -194,7 +194,7 @@ error:
    pgmoneta_log_trace("pgmoneta_server_get_wal_size: socket %d status %d", socket, status);
 
    pgmoneta_free_copy_message(dmsg);
-   pgmoneta_free_message(tmsg);
+   pgmoneta_free_message();
    free(value);
    free(number);
 
@@ -257,7 +257,7 @@ get_wal_level(SSL* ssl, int socket, bool* replica)
    }
 
    pgmoneta_free_copy_message(dmsg);
-   pgmoneta_free_message(tmsg);
+   pgmoneta_free_message();
    free(value);
 
    return 0;
@@ -266,7 +266,7 @@ error:
    pgmoneta_log_trace("get_wal_level: socket %d status %d", socket, status);
 
    pgmoneta_free_copy_message(dmsg);
-   pgmoneta_free_message(tmsg);
+   pgmoneta_free_message();
    free(value);
 
    return 1;

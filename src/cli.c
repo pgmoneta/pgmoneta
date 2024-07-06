@@ -92,7 +92,7 @@ static int delete(SSL* ssl, int socket, char* server, char* backup_id, char outp
 static int stop(SSL* ssl, int socket);
 static int status(SSL* ssl, int socket, char output_format);
 static int details(SSL* ssl, int socket, char output_format);
-static int isalive(SSL* ssl, int socket, char output_format);
+static int isalive(SSL* ssl, int socket);
 static int reset(SSL* ssl, int socket);
 static int reload(SSL* ssl, int socket);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id);
@@ -584,7 +584,7 @@ password:
          do_free = false;
       }
 
-      for (int i = 0; i < strlen(password); i++)
+      for (size_t i = 0; i < strlen(password); i++)
       {
          if ((unsigned char)(*(password + i)) & 0x80)
          {
@@ -648,7 +648,7 @@ password:
    }
    else if (parsed.cmd->action == MANAGEMENT_ISALIVE)
    {
-      exit_code = isalive(s_ssl, socket, output_format);
+      exit_code = isalive(s_ssl, socket);
    }
    else if (parsed.cmd->action == MANAGEMENT_RESET)
    {
@@ -1027,13 +1027,13 @@ details(SSL* ssl, int socket, char output_format)
 }
 
 static int
-isalive(SSL* ssl, int socket, char output_format)
+isalive(SSL* ssl, int socket)
 {
    int status = -1;
 
    if (pgmoneta_management_isalive(ssl, socket) == 0)
    {
-      if (pgmoneta_management_read_isalive(ssl, socket, &status, output_format))
+      if (pgmoneta_management_read_isalive(ssl, socket, &status))
       {
          return 1;
       }
@@ -1126,7 +1126,7 @@ info(SSL* ssl, int socket, char* server, char* backup, char output_format)
 {
    if (pgmoneta_management_info(ssl, socket, server, backup) == 0)
    {
-      pgmoneta_management_read_info(ssl, socket, server, backup, output_format);
+      pgmoneta_management_read_info(ssl, socket, output_format);
    }
    else
    {

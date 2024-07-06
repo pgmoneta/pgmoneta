@@ -63,6 +63,14 @@ pgmoneta_workflow_create_sha256(void)
 static int
 sha256_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SHA256 (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -72,6 +80,13 @@ sha256_execute(int server, char* identifier, struct node* i_nodes, struct node**
    char* root = NULL;
    char* d = NULL;
    char* sha256_path = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SHA256 (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    root = pgmoneta_get_server_backup_identifier(server, identifier);
 
@@ -118,6 +133,14 @@ error:
 static int
 sha256_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SHA256 (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 

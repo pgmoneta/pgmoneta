@@ -71,11 +71,19 @@ pgmoneta_storage_create_azure(void)
 static int
 azure_storage_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
    curl = curl_easy_init();
    if (curl == NULL)
    {
       goto error;
    }
+
+   pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    return 0;
 
@@ -88,9 +96,16 @@ azure_storage_execute(int server, char* identifier, struct node* i_nodes, struct
 {
    char* local_root = NULL;
    char* azure_root = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    local_root = pgmoneta_get_server_backup_identifier(server, identifier);
    azure_root = azure_get_basepath(server, identifier);
+
+   pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    if (azure_upload_files(local_root, azure_root, ""))
    {
@@ -114,12 +129,19 @@ static int
 azure_storage_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* root = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    root = pgmoneta_get_server_backup_identifier_data(server, identifier);
 
    pgmoneta_delete_directory(root);
 
    curl_easy_cleanup(curl);
+
+   pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    free(root);
 

@@ -69,6 +69,14 @@ pgmoneta_workflow_create_link(void)
 static int
 link_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Link (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -99,6 +107,10 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
    struct art* added_files = NULL;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Link (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    link_time = time(NULL);
 
@@ -184,5 +196,13 @@ link_execute(int server, char* identifier, struct node* i_nodes, struct node** o
 static int
 link_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Link (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }

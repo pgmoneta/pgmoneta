@@ -49,7 +49,7 @@
 static void write_tar_file(struct archive* a, char* current_real_path, char* current_save_path);
 
 void
-pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
+pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
 {
    char elapsed[128];
    char real_directory[MAX_PATH];
@@ -213,7 +213,7 @@ pgmoneta_archive(int client_fd, int server, char* backup_id, char* position, cha
    }
    free(backups);
 
-   pgmoneta_management_process_result(client_fd, server, NULL, result, true);
+   pgmoneta_management_process_result(ssl, client_fd, server, NULL, result, true);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();

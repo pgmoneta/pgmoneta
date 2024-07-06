@@ -92,7 +92,7 @@ pgmoneta_write_message(SSL* ssl, int socket, struct message* msg)
 }
 
 void
-pgmoneta_free_message(struct message* msg)
+pgmoneta_free_message(void)
 {
    pgmoneta_memory_free();
 }
@@ -165,7 +165,7 @@ pgmoneta_log_copyfail_message(struct message* msg)
 void
 pgmoneta_log_error_response_message(struct message* msg)
 {
-   size_t offset = 1 + 4;
+   ssize_t offset = 1 + 4;
    signed char field_type = 0;
    char* error = NULL;
    char* error_code = NULL;
@@ -206,7 +206,7 @@ pgmoneta_log_error_response_message(struct message* msg)
 void
 pgmoneta_log_notice_response_message(struct message* msg)
 {
-   size_t offset = 1 + 4;
+   ssize_t offset = 1 + 4;
    signed char field_type = 0;
    char* error = NULL;
    char* error_code = NULL;
@@ -1165,7 +1165,7 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
          goto error;
       }
 
-      pgmoneta_free_message(reply);
+      pgmoneta_free_message();
       reply = NULL;
    }
 
@@ -1247,7 +1247,7 @@ error:
 
    pgmoneta_disconnect(fd);
 
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
    pgmoneta_free_copy_message(tmsg);
    pgmoneta_memory_dynamic_destroy(data);
 
@@ -1259,7 +1259,7 @@ error:
 bool
 pgmoneta_has_message(char type, void* data, size_t data_size)
 {
-   int offset;
+   size_t offset;
 
    offset = 0;
 
@@ -1655,22 +1655,36 @@ ssl_read_message(SSL* ssl, int timeout, struct message** msg)
                   /* Sleep for 100ms */
                   SLEEP(100000000L);
                }
+               keep_read = true;
+               break;
             case SSL_ERROR_WANT_READ:
+               keep_read = true;
+               break;
             case SSL_ERROR_WANT_WRITE:
+               keep_read = true;
+               break;
             case SSL_ERROR_WANT_CONNECT:
+               keep_read = true;
+               break;
             case SSL_ERROR_WANT_ACCEPT:
+               keep_read = true;
+               break;
             case SSL_ERROR_WANT_X509_LOOKUP:
+               keep_read = true;
+               break;
 #ifndef HAVE_OPENBSD
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
             case SSL_ERROR_WANT_ASYNC:
+               keep_read = true;
+               break;
             case SSL_ERROR_WANT_ASYNC_JOB:
 #if (OPENSSL_VERSION_NUMBER >= 0x10101000L)
             case SSL_ERROR_WANT_CLIENT_HELLO_CB:
-#endif
-#endif
-#endif
                keep_read = true;
                break;
+#endif
+#endif
+#endif
             case SSL_ERROR_SYSCALL:
                pgmoneta_log_error("SSL_ERROR_SYSCALL: %s (%d)", strerror(errno), SSL_get_fd(ssl));
                errno = 0;
@@ -1854,22 +1868,36 @@ ssl_error:
                case SSL_ERROR_ZERO_RETURN:
                   /* Sleep for 100ms */
                   SLEEP(100000000L);
+                  keep_read = true;
+                  break;
                case SSL_ERROR_WANT_READ:
+                  keep_read = true;
+                  break;
                case SSL_ERROR_WANT_WRITE:
+                  keep_read = true;
+                  break;
                case SSL_ERROR_WANT_CONNECT:
+                  keep_read = true;
+                  break;
                case SSL_ERROR_WANT_ACCEPT:
+                  keep_read = true;
+                  break;
                case SSL_ERROR_WANT_X509_LOOKUP:
+                  keep_read = true;
+                  break;
 #ifndef HAVE_OPENBSD
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
                case SSL_ERROR_WANT_ASYNC:
+                  keep_read = true;
+                  break;
                case SSL_ERROR_WANT_ASYNC_JOB:
 #if (OPENSSL_VERSION_NUMBER >= 0x10101000L)
                case SSL_ERROR_WANT_CLIENT_HELLO_CB:
-#endif
-#endif
-#endif
                   keep_read = true;
                   break;
+#endif
+#endif
+#endif
                case SSL_ERROR_SYSCALL:
                   pgmoneta_log_error("SSL_ERROR_SYSCALL: %s (%d)", strerror(errno), SSL_get_fd(ssl));
                   errno = 0;
@@ -2230,7 +2258,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, int version, struct token_bucket* bucket, struct token_bucket* network_bucket)
+pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
 {
    char directory[MAX_PATH];
    char link_path[MAX_PATH];

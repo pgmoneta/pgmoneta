@@ -62,6 +62,14 @@ pgmoneta_workflow_create_manifest(void)
 static int
 manifest_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Manifest (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -81,6 +89,13 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
    char* tblspc = NULL;
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    backup_dir = pgmoneta_get_server_backup(server);
    root = pgmoneta_get_server_backup_identifier(server, identifier);
@@ -149,5 +164,13 @@ error:
 static int
 manifest_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Manifest (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }

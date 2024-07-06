@@ -72,6 +72,14 @@ pgmoneta_workflow_create_basebackup(void)
 static int
 basebackup_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Basebackup (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -118,11 +126,15 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    struct token_bucket* bucket = NULL;
    struct token_bucket* network_bucket = NULL;
 
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Basebackup (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    start_time = time(NULL);
 
    pgmoneta_memory_init();
-
-   config = (struct configuration*)shmem;
 
    backup_max_rate = pgmoneta_get_backup_max_rate(server);
    if (backup_max_rate)
@@ -255,7 +267,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_mkdir(root);
    if (config->servers[server].version < 15)
    {
-      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, config->servers[server].version, bucket, network_bucket))
+      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
@@ -422,5 +434,13 @@ error:
 static int
 basebackup_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Basebackup (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }

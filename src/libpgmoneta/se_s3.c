@@ -71,6 +71,14 @@ pgmoneta_storage_create_s3(void)
 static int
 s3_storage_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("S3 storage engine (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    curl = curl_easy_init();
    if (curl == NULL)
    {
@@ -88,6 +96,13 @@ s3_storage_execute(int server, char* identifier, struct node* i_nodes, struct no
 {
    char* local_root = NULL;
    char* s3_root = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("S3 storage engine (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    local_root = pgmoneta_get_server_backup_identifier(server, identifier);
    s3_root = s3_get_basepath(server, identifier);
@@ -114,6 +129,13 @@ static int
 s3_storage_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* root = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("S3 storage engine (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    root = pgmoneta_get_server_backup_identifier_data(server, identifier);
 

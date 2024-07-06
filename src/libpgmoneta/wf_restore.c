@@ -120,6 +120,14 @@ pgmoneta_restore_excluded_files(void)
 static int
 restore_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Restore (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -155,6 +163,10 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Restore (execure): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    position = pgmoneta_get_node_string(i_nodes, "position");
 
@@ -466,12 +478,28 @@ error:
 static int
 restore_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Restore (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
 static int
 recovery_info_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Recovery (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -495,6 +523,10 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    is_recovery_info = pgmoneta_get_node_bool(*o_nodes, "recovery info");
 
@@ -817,12 +849,28 @@ error:
 static int
 recovery_info_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Recovery (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
 static int
 restore_excluded_files_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Excluded (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -840,6 +888,10 @@ restore_excluded_files_execute(int server, char* identifier, struct node* i_node
    char** restore_last_files_names = NULL;
    char* directory = NULL;
    struct configuration* config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Excluded (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
    {
@@ -978,6 +1030,14 @@ error:
 static int
 restore_excluded_files_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Excluded (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 

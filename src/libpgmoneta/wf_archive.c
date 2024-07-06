@@ -86,6 +86,10 @@ archive_setup(int server, char* identifier, struct node* i_nodes, struct node** 
 
    config = (struct configuration*)shmem;
 
+   pgmoneta_log_debug("Archive (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    destination = pgmoneta_get_node_string(i_nodes, "destination");
    id = pgmoneta_get_node_string(i_nodes, "id");
 
@@ -125,6 +129,10 @@ archive_execute(int server, char* identifier, struct node* i_nodes, struct node*
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    output = pgmoneta_get_node_string(i_nodes, "output");
 
@@ -166,6 +174,13 @@ static int
 archive_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* output = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    output = pgmoneta_get_node_string(i_nodes, "output");
 

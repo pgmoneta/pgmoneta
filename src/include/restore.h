@@ -46,6 +46,7 @@ pgmoneta_get_restore_last_files_names(char*** output);
 
 /**
  * Create a restore
+ * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
  * @param backup_id The backup identifier
@@ -54,7 +55,7 @@ pgmoneta_get_restore_last_files_names(char*** output);
  * @param argv The argv
  */
 void
-pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
+pgmoneta_restore(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
 
 /**
  * Restore to a directory

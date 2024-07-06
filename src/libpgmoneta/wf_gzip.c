@@ -76,6 +76,14 @@ pgmoneta_workflow_create_gzip(bool compress)
 static int
 gzip_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("GZip (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }
 
@@ -97,6 +105,10 @@ gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("GZip (compress): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    compression_time = time(NULL);
 
@@ -168,6 +180,10 @@ gzip_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
 
    config = (struct configuration*)shmem;
 
+   pgmoneta_log_debug("GZip (uncompress): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    to = pgmoneta_get_node_string(*o_nodes, "to");
 
    if (to != NULL)
@@ -213,5 +229,13 @@ gzip_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
 static int
 gzip_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("GZip (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    return 0;
 }

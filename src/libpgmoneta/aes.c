@@ -701,7 +701,7 @@ encrypt_file(char* from, char* to, int enc)
          pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
          goto error;
       }
-      if (fwrite(outbuf, sizeof(char), outl, out) != outl)
+      if (fwrite(outbuf, sizeof(char), outl, out) != (size_t)outl)
       {
          pgmoneta_log_error("fwrite: failed to write cipher");
          goto error;
@@ -722,7 +722,7 @@ encrypt_file(char* from, char* to, int enc)
 
    if (f_len)
    {
-      if (fwrite(outbuf, sizeof(char), f_len, out) != f_len)
+      if (fwrite(outbuf, sizeof(char), f_len, out) != (size_t)f_len)
       {
          pgmoneta_log_error("fwrite: failed to write final block");
          goto error;

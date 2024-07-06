@@ -2052,7 +2052,7 @@ extract_key_value(char* str, char** key, char** value)
       end = strchr(str, '\n');
       idx = 0;
 
-      for (int i = 0; i < strlen(equal); i++)
+      for (size_t i = 0; i < strlen(equal); i++)
       {
          ptr = equal + i;
          if (ptr != end)
@@ -2776,7 +2776,7 @@ as_seconds(char* str, int* age, int default_age)
    }
 
    index = 0;
-   for (int i = 0; i < strlen(str); i++)
+   for (size_t i = 0; i < strlen(str); i++)
    {
       if (isdigit(str[i]))
       {
@@ -2881,7 +2881,7 @@ as_bytes(char* str, int* bytes, int default_bytes)
    }
 
    index = 0;
-   for (int i = 0; i < strlen(str); i++)
+   for (size_t i = 0; i < strlen(str); i++)
    {
       if (isdigit(str[i]))
       {
@@ -3199,7 +3199,7 @@ is_empty_string(char* s)
       return true;
    }
 
-   for (int i = 0; i < strlen(s); i++)
+   for (size_t i = 0; i < strlen(s); i++)
    {
       if (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n')
       {

@@ -45,7 +45,7 @@
 
 #define ZSTD_DEFAULT_NUMBER_OF_WORKERS 4
 
-static int zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
+static int zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 static int zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 
 void
@@ -136,7 +136,7 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 
             if (pgmoneta_exists(from))
             {
-               if (zstd_compress(from, level, to, cctx, zin_size, zin, zout_size, zout))
+               if (zstd_compress(from, to, cctx, zin_size, zin, zout_size, zout))
                {
                   pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, entry->d_name);
                   break;
@@ -281,7 +281,7 @@ pgmoneta_zstandardc_wal(char* directory)
 
          if (pgmoneta_exists(from))
          {
-            if (zstd_compress(from, level, to, cctx, zin_size, zin, zout_size, zout))
+            if (zstd_compress(from, to, cctx, zin_size, zin, zout_size, zout))
             {
                pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, entry->d_name);
                break;
@@ -546,7 +546,7 @@ pgmoneta_zstandardc_file(char* from, char* to)
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
    ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
 
-   if (zstd_compress(from, level, to, cctx, zin_size, zin, zout_size, zout))
+   if (zstd_compress(from, to, cctx, zin_size, zin, zout_size, zout))
    {
       goto error;
    }
@@ -576,7 +576,7 @@ error:
 }
 
 static int
-zstd_compress(char* from, int level, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout)
+zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout)
 {
    FILE* fin = NULL;
    FILE* fout = NULL;

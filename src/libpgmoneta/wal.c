@@ -83,7 +83,7 @@ pgmoneta_wal(int srv, char** argv)
    uint32_t timeline = 0;
    uint32_t cur_timeline = 0;
    int hdrlen = 1 + 8 + 8 + 8;
-   int bytes_left = 0;
+   size_t bytes_left = 0;
    char* xlogpos = NULL;
    char* remain_buffer = NULL;
    size_t remain_buffer_alloc_size = 0;
@@ -91,9 +91,9 @@ pgmoneta_wal(int srv, char** argv)
    size_t xlogpos_size = 0;
    size_t xlogptr = 0;
    size_t segno;
-   int xlogoff;
-   int curr_xlogoff = 0;
-   int segsize;
+   size_t xlogoff;
+   size_t curr_xlogoff = 0;
+   size_t segsize;
    int read_replication = 1;
    char* filename = NULL;
    signed char type;
@@ -400,11 +400,11 @@ pgmoneta_wal(int srv, char** argv)
                      goto error;
                   }
                   bytes_left = msg->length - hdrlen;
-                  int bytes_written = 0;
+                  size_t bytes_written = 0;
                   // write to the wal file
                   while (bytes_left > 0)
                   {
-                     int bytes_to_write = 0;
+                     size_t bytes_to_write = 0;
                      if (xlogoff + bytes_left > segsize)
                      {
                         // do not write across the segment boundary
@@ -900,7 +900,7 @@ wal_open(char* root, char* filename, int segsize)
    {
       // file alreay exists, check if it's padded already
       size_t size = pgmoneta_get_file_size(path);
-      if (size == segsize)
+      if (size == (size_t)segsize)
       {
          file = fopen(path, "r+b");
          if (file == NULL)
@@ -1003,7 +1003,7 @@ wal_prepare(FILE* file, int segsize)
       return 1;
    }
 
-   while (written < segsize)
+   while (written < (size_t)segsize)
    {
       written += fwrite(buffer, 1, sizeof(buffer), file);
    }
@@ -1126,7 +1126,7 @@ wal_find_streaming_start(char* basedir, uint32_t* timeline, uint32_t* high32, ui
    if (!high_is_partial)
    {
       // handle possible overflow
-      if (*low32 == segments_per_id)
+      if (*low32 == (uint32_t)segments_per_id)
       {
          *low32 = 0;
          *high32 = *high32 + 1;

@@ -80,7 +80,7 @@ static int get_auth_type(struct message* msg, int* auth_type);
 static int get_salt(void* data, char** salt);
 static int generate_md5(char* str, int length, char** md5);
 
-static int client_scram256(SSL* c_ssl, int client_fd, char* username, char* password, int slot);
+static int client_scram256(SSL* c_ssl, int client_fd, char* password, int slot);
 
 static int server_trust(void);
 static int server_password(char* username, char* password, SSL* ssl, int server_fd);
@@ -170,7 +170,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          {
             goto error;
          }
-         pgmoneta_free_message(msg);
+         pgmoneta_free_message();
 
          status = SSL_accept(c_ssl);
          if (status != 1)
@@ -196,7 +196,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          {
             goto error;
          }
-         pgmoneta_free_message(msg);
+         pgmoneta_free_message();
 
          status = pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg);
          if (status != MESSAGE_STATUS_OK)
@@ -234,7 +234,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          goto bad_password;
       }
 
-      status = client_scram256(c_ssl, client_fd, username, password, -1);
+      status = client_scram256(c_ssl, client_fd, password, -1);
       if (status == AUTH_BAD_PASSWORD)
       {
          pgmoneta_write_connection_refused(c_ssl, client_fd);
@@ -275,7 +275,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
    }
 
 bad_password:
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
    pgmoneta_free_copy_message(request_msg);
 
    free(username);
@@ -286,7 +286,7 @@ bad_password:
    return AUTH_BAD_PASSWORD;
 
 error:
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
    pgmoneta_free_copy_message(request_msg);
 
    free(username);
@@ -595,7 +595,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
    pgmoneta_free_copy_message(sslrequest_msg);
    pgmoneta_free_copy_message(startup_msg);
    pgmoneta_free_copy_message(sasl_response);
@@ -621,7 +621,7 @@ bad_password:
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
    pgmoneta_free_copy_message(sslrequest_msg);
    pgmoneta_free_copy_message(startup_msg);
    pgmoneta_free_copy_message(sasl_response);
@@ -647,7 +647,7 @@ error:
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
    pgmoneta_free_copy_message(sslrequest_msg);
    pgmoneta_free_copy_message(startup_msg);
    pgmoneta_free_copy_message(sasl_response);
@@ -816,7 +816,7 @@ error:
 }
 
 static int
-client_scram256(SSL* c_ssl, int client_fd, char* username, char* password, int slot)
+client_scram256(SSL* c_ssl, int client_fd, char* password, int slot)
 {
    int status;
    time_t start_time;
@@ -1236,7 +1236,7 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
 
    pgmoneta_free_copy_message(ssl_msg);
    pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
 
    return AUTH_SUCCESS;
 
@@ -1244,7 +1244,7 @@ bad_password:
 
    pgmoneta_free_copy_message(ssl_msg);
    pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
 
    pgmoneta_close_ssl(c_ssl);
    if (server_fd != -1)
@@ -1258,7 +1258,7 @@ error:
 
    pgmoneta_free_copy_message(ssl_msg);
    pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_message(msg);
+   pgmoneta_free_message();
 
    pgmoneta_close_ssl(c_ssl);
    if (server_fd != -1)
@@ -1337,7 +1337,7 @@ server_password(char* username, char* password, SSL* ssl, int server_fd)
    }
 
    pgmoneta_free_copy_message(password_msg);
-   pgmoneta_free_message(auth_msg);
+   pgmoneta_free_message();
 
    return AUTH_SUCCESS;
 
@@ -1346,14 +1346,14 @@ bad_password:
    pgmoneta_log_warn("Wrong password for user: %s", username);
 
    pgmoneta_free_copy_message(password_msg);
-   pgmoneta_free_message(auth_msg);
+   pgmoneta_free_message();
 
    return AUTH_BAD_PASSWORD;
 
 error:
 
    pgmoneta_free_copy_message(password_msg);
-   pgmoneta_free_message(auth_msg);
+   pgmoneta_free_message();
 
    return AUTH_ERROR;
 }
@@ -1458,7 +1458,7 @@ server_md5(char* username, char* password, SSL* ssl, int server_fd)
    free(salt);
 
    pgmoneta_free_copy_message(md5_msg);
-   pgmoneta_free_message(auth_msg);
+   pgmoneta_free_message();
 
    return AUTH_SUCCESS;
 
@@ -1473,7 +1473,7 @@ bad_password:
    free(salt);
 
    pgmoneta_free_copy_message(md5_msg);
-   pgmoneta_free_message(auth_msg);
+   pgmoneta_free_message();
 
    return AUTH_BAD_PASSWORD;
 
@@ -1486,7 +1486,7 @@ error:
    free(salt);
 
    pgmoneta_free_copy_message(md5_msg);
-   pgmoneta_free_message(auth_msg);
+   pgmoneta_free_message();
 
    return AUTH_ERROR;
 }
@@ -1938,7 +1938,7 @@ sasl_prep(char* password, char** password_prep)
    char* p = NULL;
 
    /* Only support ASCII for now */
-   for (int i = 0; i < strlen(password); i++)
+   for (size_t i = 0; i < strlen(password); i++)
    {
       if ((unsigned char)(*(password + i)) & 0x80)
       {
@@ -2133,7 +2133,7 @@ client_proof(char* password, char* salt, int salt_length, int iterations,
    }
 
    /* ClientProof: ClientKey XOR ClientSignature */
-   for (int i = 0; i < size; i++)
+   for (size_t i = 0; i < size; i++)
    {
       *(r + i) = *(c_k + i) ^ *(c_s + i);
    }
@@ -2260,7 +2260,7 @@ salted_password(char* password, char* salt, int salt_length, int iterations, uns
          goto error;
       }
 
-      for (int j = 0; j < size; j++)
+      for (size_t j = 0; j < size; j++)
       {
          *(r + j) ^= *(Ui + j);
       }
@@ -2857,7 +2857,6 @@ create_hash_file(char* filename, const char* algorithm, char** hash)
    FILE* file = NULL;
    char read_buf[16384];
    unsigned long read_bytes = 0;
-   int i = 0;
    char* hash_buf;
    unsigned int hash_len;
 
@@ -2925,7 +2924,7 @@ create_hash_file(char* filename, const char* algorithm, char** hash)
 
    EVP_MD_CTX_free(md_ctx);
 
-   for (i = 0; i < md_len; i++)
+   for (size_t i = 0; i < md_len; i++)
    {
       sprintf(&hash_buf[i * 2], "%02x", md_value[i]);
    }
@@ -3162,7 +3161,7 @@ pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc)
       0xBE2DA0A5L, 0x4C4623A6L, 0x5F16D052L, 0xAD7D5351L
    };
 
-   for (int i = 0; i < size; i++)
+   for (size_t i = 0; i < size; i++)
    {
       crc_int = crc32_tab[(((unsigned char)crc_int) ^ ((unsigned char*)buffer)[i])] ^ (crc_int >> 8);
    }

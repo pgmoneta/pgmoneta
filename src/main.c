@@ -850,7 +850,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                   }
                }
 
-               pgmoneta_management_write_int32(client_fd, number_of_results);
+               pgmoneta_management_write_int32(NULL, client_fd, number_of_results);
 
                for (int i = 0; i < config->number_of_servers; i++)
                {
@@ -859,7 +859,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                      pid = fork();
                      if (pid == -1)
                      {
-                        pgmoneta_management_process_result(client_fd, i, NULL, 1, true);
+                        pgmoneta_management_process_result(NULL, client_fd, i, NULL, 1, true);
 
                         /* No process */
                         pgmoneta_log_error("Cannot create process");
@@ -885,12 +885,12 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
                if (srv != -1)
                {
-                  pgmoneta_management_write_int32(client_fd, 1);
+                  pgmoneta_management_write_int32(NULL, client_fd, 1);
 
                   pid = fork();
                   if (pid == -1)
                   {
-                     pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
+                     pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
 
                      /* No process */
                      pgmoneta_log_error("Cannot create process");
@@ -903,7 +903,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                }
                else
                {
-                  pgmoneta_management_write_int32(client_fd, 0);
+                  pgmoneta_management_write_int32(NULL, client_fd, 0);
 
                   pgmoneta_log_error("Backup - Unknown server %s", payload_s1);
                }
@@ -911,7 +911,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_write_int32(client_fd, 0);
+            pgmoneta_management_write_int32(NULL, client_fd, 0);
             pgmoneta_log_warn("Can not create backups in offline mode");
          }
 
@@ -932,7 +932,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_process_result(client_fd, srv, NULL, 1, false);
+            pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, false);
 
             /* No process */
             pgmoneta_log_error("Cannot create process");
@@ -940,7 +940,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_management_write_list_backup(client_fd, srv);
+            pgmoneta_management_write_list_backup(NULL, client_fd, srv);
             exit(0);
          }
 
@@ -966,7 +966,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_process_result(client_fd, srv, NULL, 1, false);
+            pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, false);
 
             /* No process */
             pgmoneta_log_error("Cannot create process");
@@ -982,8 +982,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             memcpy(backup_id, payload_s2, strlen(payload_s2));
 
             result = pgmoneta_delete(srv, backup_id);
+            pgmoneta_log_trace("Delete: %d", result);
             pgmoneta_delete_wal(srv);
-            pgmoneta_management_write_delete(client_fd, srv, result);
+            pgmoneta_management_write_delete(NULL, client_fd, srv /*, result */);
 
             free(backup_id);
             exit(0);
@@ -1009,14 +1010,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             }
          }
 
-         pgmoneta_management_write_int32(client_fd, 1);
+         pgmoneta_management_write_int32(NULL, client_fd, 1);
 
          if (srv != -1)
          {
             pid = fork();
             if (pid == -1)
             {
-               pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
+               pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
 
                /* No process */
                pgmoneta_log_error("Cannot create process");
@@ -1043,12 +1044,12 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                memset(directory, 0, strlen(payload_s4) + 1);
                memcpy(directory, payload_s4, strlen(payload_s4));
 
-               pgmoneta_restore(client_fd, srv, backup_id, position, directory, ai->argv);
+               pgmoneta_restore(NULL, client_fd, srv, backup_id, position, directory, ai->argv);
             }
          }
          else
          {
-            pgmoneta_management_write_int32(client_fd, 1);
+            pgmoneta_management_write_int32(NULL, client_fd, 1);
 
             pgmoneta_log_error("Restore - Unknown server %s", payload_s1);
          }
@@ -1073,14 +1074,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                }
             }
 
-            pgmoneta_management_write_int32(client_fd, number_of_results);
+            pgmoneta_management_write_int32(NULL, client_fd, number_of_results);
 
             for (int i = 0; i < config->number_of_servers; i++)
             {
                pid = fork();
                if (pid == -1)
                {
-                  pgmoneta_management_process_result(client_fd, i, NULL, 1, true);
+                  pgmoneta_management_process_result(NULL, client_fd, i, NULL, 1, true);
 
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
@@ -1111,7 +1112,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                      memset(directory, 0, strlen(payload_s4) + 1);
                      memcpy(directory, payload_s4, strlen(payload_s4));
 
-                     pgmoneta_archive(client_fd, i, backup_id, position, directory, ai->argv);
+                     pgmoneta_archive(NULL, client_fd, i, backup_id, position, directory, ai->argv);
                   }
                }
             }
@@ -1132,14 +1133,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                }
             }
 
-            pgmoneta_management_write_int32(client_fd, 1);
+            pgmoneta_management_write_int32(NULL, client_fd, 1);
 
             if (srv != -1)
             {
                pid = fork();
                if (pid == -1)
                {
-                  pgmoneta_management_process_result(client_fd, srv, NULL, 1, true);
+                  pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
 
                   /* No process */
                   pgmoneta_log_error("Cannot create process");
@@ -1166,12 +1167,12 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                   memset(directory, 0, strlen(payload_s4) + 1);
                   memcpy(directory, payload_s4, strlen(payload_s4));
 
-                  pgmoneta_archive(client_fd, srv, backup_id, position, directory, ai->argv);
+                  pgmoneta_archive(NULL, client_fd, srv, backup_id, position, directory, ai->argv);
                }
             }
             else
             {
-               pgmoneta_management_write_int32(client_fd, 1);
+               pgmoneta_management_write_int32(NULL, client_fd, 1);
 
                pgmoneta_log_error("Archive - Unknown server %s", payload_s1);
             }
@@ -1201,7 +1202,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_management_write_status(client_fd, offline);
+            pgmoneta_management_write_status(NULL, client_fd, offline);
             exit(0);
          }
 
@@ -1218,14 +1219,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_management_write_details(client_fd, offline);
+            pgmoneta_management_write_details(NULL, client_fd, offline);
             exit(0);
          }
 
          break;
       case MANAGEMENT_ISALIVE:
          pgmoneta_log_debug("Management isalive");
-         pgmoneta_management_write_isalive(client_fd);
+         pgmoneta_management_write_isalive(NULL, client_fd);
          break;
       case MANAGEMENT_RESET:
          pgmoneta_log_debug("Management reset");
@@ -1320,13 +1321,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       case MANAGEMENT_DECRYPT:
          pgmoneta_log_debug("Management decrypt: %s", payload_s1);
          ret = pgmoneta_decrypt_archive(payload_s1);
-         pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
+         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
          break;
       case MANAGEMENT_ENCRYPT:
          pgmoneta_log_debug("Management encrypt: %s", payload_s1);
          ret = pgmoneta_encrypt_file(payload_s1, NULL);
-         pgmoneta_management_process_result(client_fd, -1, payload_s1, ret, true);
+         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
          free(payload_s1);
          break;
       case MANAGEMENT_INFO:
@@ -1343,7 +1344,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_management_write_info(client_fd, payload_s1, payload_s2);
+            pgmoneta_management_write_info(NULL, client_fd, payload_s1, payload_s2);
             free(payload_s1);
             free(payload_s2);
             exit(0);
@@ -1514,7 +1515,7 @@ shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("shutdown requested");
+   pgmoneta_log_debug("shutdown requested (%p, %p, %d)", loop, w, revents);
    ev_break(loop, EVBREAK_ALL);
    keep_running = 0;
    config->running = false;
@@ -1523,14 +1524,14 @@ shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 static void
 reload_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
-   pgmoneta_log_debug("reload requested");
+   pgmoneta_log_debug("reload requested (%p, %p, %d)", loop, w, revents);
    reload_configuration();
 }
 
 static void
 coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
-   pgmoneta_log_info("core dump requested");
+   pgmoneta_log_info("core dump requested (%p, %p, %d)", loop, w, revents);
    abort();
 }
 
@@ -1540,6 +1541,8 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("wal (%p, %p, %d)", loop, w, revents);
 
    if (EV_ERROR & revents)
    {
@@ -1598,6 +1601,8 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 static void
 retention_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
+   pgmoneta_log_debug("retention (%p, %p, %d)", loop, w, revents);
+
    if (EV_ERROR & revents)
    {
       pgmoneta_log_trace("retention_cb: got invalid event: %s", strerror(errno));
@@ -1617,6 +1622,8 @@ valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("valid (%p, %p, %d)", loop, w, revents);
 
    if (EV_ERROR & revents)
    {
@@ -1654,6 +1661,8 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("wal streaming (%p, %p, %d)", loop, w, revents);
 
    if (EV_ERROR & revents)
    {
@@ -1981,7 +1990,7 @@ init_replication_slots(void)
                pgmoneta_free_copy_message(slot_request_msg);
                slot_request_msg = NULL;
 
-               pgmoneta_free_message(slot_response_msg);
+               pgmoneta_free_message();
                slot_response_msg = NULL;
             }
             else

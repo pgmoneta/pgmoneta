@@ -118,12 +118,13 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server, char ou
 
 /**
  * Management operation: List backups for a server (Write)
+ * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server index
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_list_backup(int socket, int server);
+pgmoneta_management_write_list_backup(SSL* ssl, int socket, int server);
 
 /**
  * Management operation: Restore a server
@@ -176,13 +177,13 @@ pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup
 
 /**
  * Management operation: Delete a backup for a server (Write)
+ * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server index
- * @param result The result
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_delete(int socket, int server, int result);
+pgmoneta_management_write_delete(SSL* ssl, int socket, int server);
 
 /**
  * Management operation: Stop
@@ -204,6 +205,7 @@ pgmoneta_management_status(SSL* ssl, int socket);
 
 /**
  * Management: Read status
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
@@ -213,12 +215,13 @@ pgmoneta_management_read_status(SSL* ssl, int socket, char output_format);
 
 /**
  * Management: Write status
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param offline Offline status
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_status(int socket, bool offline);
+pgmoneta_management_write_status(SSL* ssl, int socket, bool offline);
 
 /**
  * Management operation: Details
@@ -240,12 +243,13 @@ pgmoneta_management_read_details(SSL* ssl, int socket, char output_format);
 
 /**
  * Management: Write details
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param offline Offline status
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_details(int socket, bool offline);
+pgmoneta_management_write_details(SSL* ssl, int socket, bool offline);
 
 /**
  * Management operation: isalive
@@ -259,19 +263,19 @@ pgmoneta_management_isalive(SSL* ssl, int socket);
  * Management: Read isalive
  * @param socket The socket
  * @param status The resulting status
- * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status, char output_format);
+pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status);
 
 /**
  * Management: Write isalive
+ * @param ssl The SSL connection
  * @param socket The socket
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_isalive(int socket);
+pgmoneta_management_write_isalive(SSL* ssl, int socket);
 
 /**
  * Management operation: Reset
@@ -352,20 +356,22 @@ pgmoneta_management_info(SSL* ssl, int socket, char* server, char* backup);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_info(SSL* ssl, int socket, char* server, char* backup, char output_format);
+pgmoneta_management_read_info(SSL* ssl, int socket, char output_format);
 
 /**
  * Management: Write info
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param server The server name
  * @param backup The backup
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_info(int socket, char* server, char* backup);
+pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup);
 
 /**
  * Management: Read int32
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param status The resulting status
  * @return 0 upon success, otherwise 1
@@ -375,15 +381,17 @@ pgmoneta_management_read_int32(SSL* ssl, int socket, int* status);
 
 /**
  * Management: Write int32
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param code The code
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_int32(int socket, int code);
+pgmoneta_management_write_int32(SSL* ssl, int socket, int code);
 
 /**
  * Management: Write result
+ * @param ssl The SSL connection
  * @param socket The socket
  * @param srv The server index
  * @param server The server
@@ -392,7 +400,7 @@ pgmoneta_management_write_int32(int socket, int code);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_process_result(int socket, int srv, char* server, int code, bool send);
+pgmoneta_management_process_result(SSL* ssl, int socket, int srv, char* server, int code, bool send);
 
 #ifdef __cplusplus
 }

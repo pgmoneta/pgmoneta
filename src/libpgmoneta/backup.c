@@ -154,7 +154,7 @@ done:
    free(root);
    free(d);
 
-   pgmoneta_management_process_result(client_fd, server, NULL, 0, true);
+   pgmoneta_management_process_result(NULL, client_fd, server, NULL, 0, true);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
@@ -172,7 +172,7 @@ error:
    free(root);
    free(d);
 
-   pgmoneta_management_process_result(client_fd, server, NULL, 1, true);
+   pgmoneta_management_process_result(NULL, client_fd, server, NULL, 1, true);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();

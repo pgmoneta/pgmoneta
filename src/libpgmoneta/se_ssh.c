@@ -130,6 +130,10 @@ ssh_storage_setup(int server, char* identifier, struct node* i_nodes,
 
    config = (struct configuration*)shmem;
 
+   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    homedir = getenv("HOME");
    pubkey_path = "/.ssh/id_rsa.pub";
    privkey_path = "/.ssh/id_rsa";
@@ -288,6 +292,13 @@ ssh_storage_backup_execute(int server, char* identifier,
    int next_newest = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    remote_root = get_remote_server_backup_identifier(server, identifier);
 
@@ -389,11 +400,17 @@ error:
 }
 
 static int
-ssh_storage_wal_shipping_execute(int server, char* identifier,
-                                 struct node* i_nodes, struct node** o_nodes)
+ssh_storage_wal_shipping_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
 {
    char* local_root = NULL;
    char* remote_root = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    remote_root = get_remote_server_wal(server);
    local_root = pgmoneta_get_server_wal(server);
@@ -423,6 +440,13 @@ ssh_storage_backup_teardown(int server, char* identifier,
                             struct node* i_nodes, struct node** o_nodes)
 {
    char* root = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
 
    if (!is_error)
    {
@@ -453,6 +477,14 @@ static int
 ssh_storage_wal_shipping_teardown(int server, char* identifier,
                                   struct node* i_nodes, struct node** o_nodes)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes);
+   pgmoneta_list_nodes(*o_nodes);
+
    sftp_free(sftp);
 
    ssh_free(session);
@@ -716,7 +748,7 @@ sftp_wal_prepare(sftp_file* file, int segsize)
       return 1;
    }
 
-   while (written < segsize)
+   while (written < (size_t)segsize)
    {
       written += sftp_write(*file, buffer, sizeof(buffer));
    }
@@ -902,7 +934,7 @@ pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file)
       // file alreay exists, check if it's padded already
       size_t size = 0;
       sftp_get_file_size(path, &size);
-      if (size == segsize)
+      if (size == (size_t)segsize)
       {
          *file = sftp_open(sftp, path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
          if (*file == NULL)

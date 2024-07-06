@@ -70,7 +70,7 @@ pgmoneta_get_restore_last_files_names(char*** output)
 }
 
 void
-pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
+pgmoneta_restore(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
 {
    char elapsed[128];
    time_t start_time;
@@ -106,7 +106,7 @@ pgmoneta_restore(int client_fd, int server, char* backup_id, char* position, cha
       pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
    }
 
-   pgmoneta_management_process_result(client_fd, server, NULL, result, true);
+   pgmoneta_management_process_result(ssl, client_fd, server, NULL, result, true);
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();

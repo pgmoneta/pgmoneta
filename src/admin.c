@@ -490,7 +490,7 @@ is_valid_key(char* key)
       return false;
    }
 
-   for (int i = 0; i < strlen(key); i++)
+   for (size_t i = 0; i < strlen(key); i++)
    {
       c = *(key + i);
 
@@ -605,7 +605,7 @@ password:
       printf("\n");
    }
 
-   for (int i = 0; i < strlen(password); i++)
+   for (size_t i = 0; i < strlen(password); i++)
    {
       if ((unsigned char)(*(password + i)) & 0x80)
       {
@@ -779,7 +779,7 @@ password:
             printf("\n");
          }
 
-         for (int i = 0; i < strlen(password); i++)
+         for (size_t i = 0; i < strlen(password); i++)
          {
             if ((unsigned char)(*(password + i)) & 0x80)
             {
@@ -1024,7 +1024,7 @@ generate_password(int pwd_length)
 
    srand((unsigned)time(&t));
 
-   for (int i = 0; i < s; i++)
+   for (size_t i = 0; i < s; i++)
    {
       *((char*)(pwd + i)) = CHARS[rand() % sizeof(CHARS)];
    }
