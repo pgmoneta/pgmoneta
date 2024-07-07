@@ -5,9 +5,29 @@
 For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
 
+**Fedora 40**
+
+```sh
+rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/F-40-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
+**RHEL 8.x / Rocky Linux 8.x**
+
+```sh
+rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
+**RHEL 9.x / Rocky Linux 9.x**
+
+```sh
+rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
+**PostgreSQL 13**
+
 ``` sh
 dnf -qy module disable postgresql
-dnf install -y postgresql13 postgresql13-server
+dnf install -y postgresql13 postgresql13-server postgresql13-contrib postgresql13-libs
 ```
 
 This will install PostgreSQL 13.
