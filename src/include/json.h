@@ -781,26 +781,6 @@ int
 pgmoneta_json_array_append_int8(struct json* array, int8_t val);
 
 /**
- * Add an int16 value to the json array,
- * method will be denied if the type does not match
- * @param array The array
- * @param val The value
- * @return 1 if success, otherwise 0
- */
-int
-pgmoneta_json_array_append_int16(struct json* array, int16_t val);
-
-/**
- * Add an int16 value to the json array,
- * method will be denied if the type does not match
- * @param array The array
- * @param val The value
- * @return 1 if success, otherwise 0
- */
-int
-pgmoneta_json_array_append_int16(struct json* array, int16_t val);
-
-/**
  * Add an uint8 value to the json array,
  * method will be denied if the type does not match
  * @param array The array
@@ -809,6 +789,26 @@ pgmoneta_json_array_append_int16(struct json* array, int16_t val);
  */
 int
 pgmoneta_json_array_append_uint8(struct json* array, uint8_t val);
+
+/**
+ * Add an int16 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_int16(struct json* array, int16_t val);
+
+/**
+ * Add an uint16 value to the json array,
+ * method will be denied if the type does not match
+ * @param array The array
+ * @param val The value
+ * @return 1 if success, otherwise 0
+ */
+int
+pgmoneta_json_array_append_uint16(struct json* array, uint16_t val);
 
 /**
  * Add an int32 value to the json array,

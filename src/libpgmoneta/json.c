@@ -754,6 +754,102 @@ pgmoneta_json_get_bool_value(struct json* item, char* key)
    return pgmoneta_read_bool(val->payload);
 }
 
+int8_t*
+pgmoneta_json_get_int8_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueInt8Array)
+   {
+      return NULL;
+   }
+   return (int8_t*)val->payload;
+}
+
+uint8_t*
+pgmoneta_json_get_uint8_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt8Array)
+   {
+      return NULL;
+   }
+   return (uint8_t*)val->payload;
+}
+
+int16_t*
+pgmoneta_json_get_int16_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueInt16Array)
+   {
+      return NULL;
+   }
+   return (int16_t*)val->payload;
+}
+
+uint16_t*
+pgmoneta_json_get_uint16_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt16Array)
+   {
+      return NULL;
+   }
+   return (uint16_t*)val->payload;
+}
+
+int32_t*
+pgmoneta_json_get_int32_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueInt32Array)
+   {
+      return NULL;
+   }
+   return (int32_t*)val->payload;
+}
+
+uint32_t*
+pgmoneta_json_get_uint32_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt32Array)
+   {
+      return NULL;
+   }
+   return (uint32_t*)val->payload;
+}
+
 int64_t*
 pgmoneta_json_get_int64_array_value(struct json* item, char* key)
 {
@@ -768,6 +864,22 @@ pgmoneta_json_get_int64_array_value(struct json* item, char* key)
       return NULL;
    }
    return (int64_t*)val->payload;
+}
+
+uint64_t*
+pgmoneta_json_get_uint64_array_value(struct json* item, char* key)
+{
+   struct json_value* val = NULL;
+   if (item == NULL)
+   {
+      return NULL;
+   }
+   val = pgmoneta_json_get_value(item, key);
+   if (val == NULL || val->type != ValueUInt64Array)
+   {
+      return NULL;
+   }
+   return (uint64_t*)val->payload;
 }
 
 char*
@@ -1457,15 +1569,187 @@ pgmoneta_json_item_put_object(struct json* item, char* key, struct json* val)
 }
 
 int
+pgmoneta_json_item_put_int8_array(struct json* item, char* key, int8_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueInt8Array, vals, length);
+}
+
+int
+pgmoneta_json_item_put_uint8_array(struct json* item, char* key, uint8_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueUInt8Array, vals, length);
+}
+
+int
+pgmoneta_json_item_put_int16_array(struct json* item, char* key, int16_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueInt16Array, vals, length);
+}
+
+int
+pgmoneta_json_item_put_uint16_array(struct json* item, char* key, uint16_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueUInt16Array, vals, length);
+}
+int
+pgmoneta_json_item_put_int32_array(struct json* item, char* key, int32_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueInt32Array, vals, length);
+}
+
+int
+pgmoneta_json_item_put_uint32_array(struct json* item, char* key, uint32_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueUInt32Array, vals, length);
+}
+int
 pgmoneta_json_item_put_int64_array(struct json* item, char* key, int64_t* vals, unsigned short length)
 {
    return pgmoneta_json_object_put(item, key, ValueInt64Array, vals, length);
 }
 
 int
+pgmoneta_json_item_put_uint64_array(struct json* item, char* key, uint64_t* vals, unsigned short length)
+{
+   return pgmoneta_json_object_put(item, key, ValueUInt64Array, vals, length);
+}
+
+int
 pgmoneta_json_item_put_item_array(struct json* item, char* key, struct json* items, unsigned short length)
 {
    return pgmoneta_json_object_put(item, key, ValueItemArray, items, length);
+}
+
+int
+pgmoneta_json_array_append_int8(struct json* array, int8_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueInt8Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueInt8Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
+}
+
+int
+pgmoneta_json_array_append_uint8(struct json* array, uint8_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueUInt8Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueUInt8Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
+}
+
+int
+pgmoneta_json_array_append_int16(struct json* array, int16_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueInt16Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueInt16Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
+}
+
+int
+pgmoneta_json_array_append_uint16(struct json* array, uint16_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueUInt16Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueUInt16Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
+}
+
+int
+pgmoneta_json_array_append_int32(struct json* array, int32_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueInt32Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueInt32Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
+}
+
+int
+pgmoneta_json_array_append_uint32(struct json* array, uint32_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueUInt32Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueUInt32Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
 }
 
 int
@@ -1482,6 +1766,28 @@ pgmoneta_json_array_append_int64(struct json* array, int64_t val)
    struct json_value* value = array->element->value;
    // type check
    if (array->type != JSONArray || value->type != ValueInt64Array)
+   {
+      goto error;
+   }
+   return pgmoneta_json_value_append(value, &val);
+error:
+   return 1;
+}
+
+int
+pgmoneta_json_array_append_uint64(struct json* array, uint64_t val)
+{
+   if (array == NULL)
+   {
+      goto error;
+   }
+   if (array->element == NULL)
+   {
+      pgmoneta_json_object_put(array, NULL, ValueUInt64Array, NULL, 0);
+   }
+   struct json_value* value = array->element->value;
+   // type check
+   if (array->type != JSONArray || value->type != ValueUInt64Array)
    {
       goto error;
    }
