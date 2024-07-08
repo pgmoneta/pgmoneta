@@ -129,12 +129,12 @@ pgmoneta_art_iterate(struct art* t, art_callback cb, void* data);
 
 /**
  * Create an art iterator
- * @param iter [out] The iterator
  * @param t The tree
+ * @param iter [out] The iterator
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_art_iterator_init(struct art_iterator** iter, struct art* t);
+pgmoneta_art_iterator_init(struct art* t, struct art_iterator** iter);
 
 /**
  * Destroy the iterator

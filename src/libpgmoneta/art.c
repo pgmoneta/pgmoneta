@@ -1288,7 +1288,7 @@ node256_remove_child(struct art_node256* node, struct art_node** node_ref, unsig
 }
 
 int
-pgmoneta_art_iterator_init(struct art_iterator** iter, struct art* t)
+pgmoneta_art_iterator_init(struct art* t, struct art_iterator** iter)
 {
    struct art_iterator* i = NULL;
    i = malloc(sizeof(struct art_iterator));
