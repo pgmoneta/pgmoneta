@@ -215,6 +215,13 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   endif()
 endif()
 
+find_package(Doxygen
+             REQUIRED dot)
+
+if (DOXYGEN_FOUND)
+  message(status "Doxygen found: ${DOXYGEN_EXECUTABLE}")
+endif()
+
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/src/")
 
 add_subdirectory(doc)

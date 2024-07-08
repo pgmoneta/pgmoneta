@@ -117,3 +117,23 @@ if(generation)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html DESTINATION share/doc/pgmoneta/manual)
 
 endif()
+
+#
+# Generate API docs
+#
+if (DOXYGEN_FOUND)
+  add_custom_target(api ALL)
+
+  set(DOXYGEN_GENERATE_HTML YES)
+  set(DOXYGEN_GENERATE_MAN NO)
+  set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.doxygen)
+
+  doxygen_add_docs(doxygen ${PROJECT_SOURCE_DIR}/src/include/)
+
+  add_custom_command(
+    TARGET api
+    COMMAND ${DOXYGEN_EXECUTABLE} -q ${DOXYFILE_OUT}
+    COMMENT "Generating API documentation"
+  )
+
+endif()
