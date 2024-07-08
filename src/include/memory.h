@@ -37,7 +37,7 @@ extern "C" {
 
 #include <stdlib.h>
 
-/** @struct
+/** @struct stream_buffer
  * Defines a streaming buffer
  */
 struct stream_buffer

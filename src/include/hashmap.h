@@ -41,10 +41,10 @@ extern "C" {
  */
 struct hashmap_element
 {
-   char* key;
-   unsigned int key_len;
-   int in_use;
-   void* data;
+   char* key;            /**< The key */
+   unsigned int key_len; /**< The length of the key */
+   int in_use;           /**< Is the element in use  */
+   void* data;           /**< The data  */
 };
 
 /**
@@ -53,9 +53,9 @@ struct hashmap_element
  */
 struct hashmap
 {
-   unsigned int table_size;
-   unsigned int size;
-   struct hashmap_element* data;
+   unsigned int table_size;      /**< The table size  */
+   unsigned int size;            /**< The size  */
+   struct hashmap_element* data; /**< The first data element */
 };
 
 /**

@@ -39,52 +39,70 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
+/** @struct semaphore
+ * Defines a semaphore
+ */
 struct semaphore
 {
-   pthread_mutex_t mutex;
-   pthread_cond_t cond;
-   int value;
+   pthread_mutex_t mutex; /**< The mutex of the semaphore */
+   pthread_cond_t cond;   /**< The condition of the semaphore */
+   int value;             /**< The current value */
 };
 
+/** @struct task
+ * Defines a task
+ */
 struct task
 {
-   struct task* previous;
-   void (*function)(void* arg);
-   void* arg;
+   struct task* previous;       /**< The previous task */
+   void (*function)(void* arg); /**< The task */
+   void* arg;                   /**< The arguments */
 };
 
+/** @struct queue
+ * Defines a queue
+ */
 struct queue
 {
-   pthread_mutex_t rwmutex;
-   struct task* front;
-   struct task* rear;
-   struct semaphore* has_tasks;
-   int number_of_tasks;
+   pthread_mutex_t rwmutex;     /**< The read/write mutex */
+   struct task* front;          /**< The first task */
+   struct task* rear;           /**< The last task */
+   struct semaphore* has_tasks; /**< Are there any tasks ? */
+   int number_of_tasks;         /**< The number of tasks */
 };
 
+/** @struct worker
+ * Defines a worker
+ */
 struct worker
 {
-   pthread_t pthread;
-   struct workers* workers;
+   pthread_t pthread;       /**< The worker thread */
+   struct workers* workers; /**< Pointer to the root structure */
 };
 
+/** @struct workers
+ * Defines the workers
+ */
 struct workers
 {
-   struct worker** worker;
-   volatile int number_of_alive;
-   volatile int number_of_working;
-   pthread_mutex_t worker_lock;
-   pthread_cond_t worker_all_idle;
-   struct queue queue;
+   struct worker** worker;         /**< The list of workers */
+   volatile int number_of_alive;   /**< The number of alive workers */
+   volatile int number_of_working; /**< The number of workers */
+   pthread_mutex_t worker_lock;    /**< The worker lock */
+   pthread_cond_t worker_all_idle; /**< Are workers idle */
+   struct queue queue;             /**< The queue */
 };
 
+/** @struct worker_input
+ * Defines the worker input
+ */
 struct worker_input
 {
-   char directory[MAX_PATH];
-   char from[MAX_PATH];
-   char to[MAX_PATH];
-   int level;
-   struct workers* workers;
+   char directory[MAX_PATH]; /**< The directory */
+   char from[MAX_PATH];      /**< The from directory */
+   char to[MAX_PATH];        /**< The to directory */
+   int level;                /**< The compression level */
+   struct workers* workers;  /**< The root structure */
 };
 
 /**

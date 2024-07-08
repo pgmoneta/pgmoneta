@@ -43,23 +43,26 @@ typedef int (*art_callback)(void* data, const unsigned char* key, uint32_t key_l
 
 typedef void (*value_destroy_callback)(void* value);
 
-/**
+/** @struct art
  * The ART tree
  */
 struct art
 {
-   struct art_node* root;
-   uint64_t size;
-   value_destroy_callback val_destroy_cb;
+   struct art_node* root;                 /**< The root node of ART */
+   uint64_t size;                         /**< The size of the ART */
+   value_destroy_callback val_destroy_cb; /**< The callback for the value destroy */
 };
 
+/** @struct art_iterator
+ * Defines an art_iterator
+ */
 struct art_iterator
 {
-   struct deque* que;
-   struct art* tree;
-   uint32_t count;
-   unsigned char* key;
-   void* value;
+   struct deque* que;  /**< The deque */
+   struct art* tree;   /**< The ART */
+   uint32_t count;     /**< The count of the iterator */
+   unsigned char* key; /**< The key */
+   void* value;        /**< The value */
 };
 
 /**

@@ -48,7 +48,7 @@ extern "C" {
 
 extern struct token_bucket bucket;
 
-/** @struct
+/** @struct message
  * Defines a message
  */
 struct message
@@ -59,7 +59,7 @@ struct message
    void* data;        /**< The message data */
 } __attribute__ ((aligned (64)));
 
-/** @struct
+/** @struct tuple
  * Defines a tuple
  */
 struct tuple
@@ -68,7 +68,7 @@ struct tuple
    struct tuple* next;            /**< The next tuple */
 } __attribute__ ((aligned (64)));
 
-/** @struct
+/** @struct query_response
  * Defines the response to a query
  */
 struct query_response
@@ -76,7 +76,7 @@ struct query_response
    char names[MAX_NUMBER_OF_COLUMNS][MISC_LENGTH]; /**< The column names */
    int number_of_columns;                          /**< The number of columns */
 
-   struct tuple* tuples;
+   struct tuple* tuples;                           /**< The resulting tuples */
 } __attribute__ ((aligned (64)));
 
 /**

@@ -37,6 +37,9 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 
+/** @struct timeline_history
+ * Defines a timeline history
+ */
 struct timeline_history
 {
    uint32_t parent_tli;           /**< the previous timeline current timeline switched off from */

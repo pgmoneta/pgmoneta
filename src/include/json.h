@@ -109,6 +109,9 @@ enum json_reader_state {
    InvalidReaderState,
 };
 
+/** @struct json_value
+ * Defines a JSON value
+ */
 struct json_value
 {
    enum json_value_type type; /**< The json value type */
@@ -121,6 +124,9 @@ struct json_value
    void* payload;             /**< The json value payload */
 };
 
+/** @struct json
+ * Defines a JSON structure
+ */
 struct json
 {
    // a json object can only be item or array
@@ -129,6 +135,9 @@ struct json
    struct json_element* element;   /**< The kv element start */
 };
 
+/** @struct json_element
+ * Defines a JSON element
+ */
 struct json_element
 {
    // if the element holds an array value,
@@ -139,11 +148,14 @@ struct json_element
    struct json_element* next;    /**< The next element */
 };
 
+/** @struct json_reader
+ * Defines a JSON reader
+ */
 struct json_reader
 {
-   struct stream_buffer* buffer;
-   int fd;
-   enum json_reader_state state;
+   struct stream_buffer* buffer; /**< The buffer */
+   int fd;                       /**< The file descriptor */
+   enum json_reader_state state; /**< The current reader state of the JSON reader */
 };
 
 /**

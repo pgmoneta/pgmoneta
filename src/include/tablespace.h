@@ -36,6 +36,9 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 
+/** @struct tablespace
+ * Defines a tablespace
+ */
 struct tablespace
 {
    char* name;              /**< The name of the table space */

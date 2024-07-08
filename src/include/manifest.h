@@ -38,16 +38,22 @@ extern "C" {
 
 #define MANIFEST_CHUNK_SIZE 8192
 
+/** @struct manifest_file
+ * Defines a manifest file
+ */
 struct manifest_file
 {
-   char* path;
-   char* checksum;
+   char* path;     /**< The path of the manifest */
+   char* checksum; /**< The checksum of the manifest */
 };
 
+/** @struct manifest_chunk
+ * Defines a manifest chunk
+ */
 struct manifest_chunk
 {
-   struct manifest_file files[MANIFEST_CHUNK_SIZE];
-   int size;
+   struct manifest_file files[MANIFEST_CHUNK_SIZE]; /**< The chunk of the manifest */
+   int size;                                        /**< The size of the chunk */
 };
 
 /**

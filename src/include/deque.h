@@ -43,20 +43,26 @@ enum node_type {
    NodeRef,
 };
 
+/** @struct deque_node
+ * Defines a deque node
+ */
 struct deque_node
 {
-   enum node_type type;
-   char* data;
-   char* tag;
-   struct deque_node* next;
-   struct deque_node* prev;
+   enum node_type type;     /**< The type */
+   char* data;              /**< The data */
+   char* tag;               /**< The tag */
+   struct deque_node* next; /**< The next pointer */
+   struct deque_node* prev; /**< The previous pointer */
 };
 
+/** @struct deque
+ * Defines a deque
+ */
 struct deque
 {
-   uint32_t size;
-   struct deque_node* start;
-   struct deque_node* end;
+   uint32_t size;            /**< The size of the deque */
+   struct deque_node* start; /**< The start node */
+   struct deque_node* end;   /**< The end node */
 };
 
 /**

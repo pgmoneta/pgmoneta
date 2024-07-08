@@ -60,7 +60,7 @@ extern "C" {
 #define VALID_FALSE    0
 #define VALID_TRUE     1
 
-/** @struct
+/** @struct backup
  * Defines a backup
  */
 struct backup

@@ -46,7 +46,7 @@ extern "C" {
 #define LONG_TIME_LENGHT  16 + 1
 #define UTC_TIME_LENGTH   29 + 1
 
-/** @struct
+/** @struct signal_info
  * Defines the signal structure
  */
 struct signal_info
@@ -55,7 +55,7 @@ struct signal_info
    int slot;                /**< The slot */
 };
 
-/** @struct
+/** @struct pgmoneta_command
  * Defines pgmoneta commands.
  * The necessary fields are marked with an ">".
  *
@@ -76,22 +76,22 @@ struct signal_info
  */
 struct pgmoneta_command
 {
-   const char* command;
-   const char* subcommand;
-   const int accepted_argument_count[MISC_LENGTH];
+   const char* command;                            /**< The command */
+   const char* subcommand;                         /**< The subcommand if there is one */
+   const int accepted_argument_count[MISC_LENGTH]; /**< The argument count */
 
-   const int action;
-   const char* default_argument;
-   const char* log_message;
+   const int action;                               /**< The specific action */
+   const char* default_argument;                   /**< The default argument */
+   const char* log_message;                        /**< The log message used */
 
    /* Deprecation information */
-   bool deprecated;
-   unsigned int deprecated_since_major;
-   unsigned int deprecated_since_minor;
-   const char* deprecated_by;
+   bool deprecated;                                /**< Is the command deprecated */
+   unsigned int deprecated_since_major;            /**< Deprecated since major version */
+   unsigned int deprecated_since_minor;            /**< Deprecated since minor version */
+   const char* deprecated_by;                      /**< Deprecated by this command */
 };
 
-/** @struct
+/** @struct pgmoneta_parsed_command
  * Holds parsed command data.
  *
  * Fields:
@@ -100,8 +100,20 @@ struct pgmoneta_command
  */
 struct pgmoneta_parsed_command
 {
-   const struct pgmoneta_command* cmd;
-   char* args[MISC_LENGTH];
+   const struct pgmoneta_command* cmd; /**< The command */
+   char* args[MISC_LENGTH];            /**< The arguments */
+};
+
+/** @struct token_bucket
+ * Defines token bucket structure
+ */
+struct token_bucket
+{
+   unsigned long burst;     /**< Default value is 0, no limit */
+   atomic_ulong cur_tokens; /**< The current tokens */
+   long max_rate;           /**< The maximum rate */
+   int every;               /**< The every rate */
+   atomic_ulong last_time;  /**< The last time updated */
 };
 
 /**
@@ -1054,18 +1066,6 @@ pgmoneta_get_file_size(char* file_path);
  */
 bool
 pgmoneta_is_file_archive(char* file_path);
-
-/** @struct
- * Defines token bucket structure
- */
-struct token_bucket
-{
-   unsigned long burst; /**< default value is 0, no limit */
-   atomic_ulong cur_tokens;
-   long max_rate;
-   int every;
-   atomic_ulong last_time;
-};
 
 /**
  * Init a token bucket

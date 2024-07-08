@@ -37,15 +37,21 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
+/** @struct csv_reader
+ * Defines a CSV reader
+ */
 struct csv_reader
 {
-   FILE* file;
-   char line[512];
+   FILE* file;     /**< The file */
+   char line[512]; /**< The line */
 };
 
+/** @struct csv_writer
+ * Defines a CSV writer
+ */
 struct csv_writer
 {
-   FILE* file;
+   FILE* file; /**< The file */
 };
 
 /**

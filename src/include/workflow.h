@@ -55,13 +55,16 @@ typedef int (* setup)(int, char*, struct node*, struct node**);
 typedef int (* execute)(int, char*, struct node*, struct node**);
 typedef int (* teardown)(int, char*, struct node*, struct node**);
 
+/** @struct workflow
+ * Defines a workflow
+ */
 struct workflow
 {
-   setup setup;
-   execute execute;
-   teardown teardown;
+   setup setup;           /**< The setup  function pointer */
+   execute execute;       /**< The execute function pointer */
+   teardown teardown;     /**< The taerdown function pointer */
 
-   struct workflow* next;
+   struct workflow* next; /**< The next workflow */
 };
 
 /**

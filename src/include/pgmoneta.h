@@ -196,7 +196,7 @@ extern void* shmem;
  */
 extern void* prometheus_cache_shmem;
 
-/** @struct
+/** @struct server
  * Defines a server
  */
 struct server
@@ -240,7 +240,7 @@ struct server
    int manifest;  /**< The manifest hash algorithm */
 } __attribute__ ((aligned (64)));
 
-/** @struct
+/** @struct user
  * Defines a user
  */
 struct user
@@ -249,7 +249,7 @@ struct user
    char password[MAX_PASSWORD_LENGTH]; /**< The password */
 } __attribute__ ((aligned (64)));
 
-/**
+/** @struct prometheus_cache
  * A structure to handle the Prometheus response
  * so that it is possible to serve the very same
  * response over and over depending on the cache
@@ -271,7 +271,7 @@ struct prometheus_cache
    char data[];          /**< the payload */
 } __attribute__ ((aligned (64)));
 
-/** @struct
+/** @struct prometheus
  * Defines the Prometheus metrics
  */
 struct prometheus
@@ -282,7 +282,7 @@ struct prometheus
    atomic_ulong logging_fatal; /**< Logging: FATAL */
 } __attribute__ ((aligned (64)));
 
-/** @struct
+/** @struct configuration
  * Defines the configuration and state of pgmoneta
  */
 struct configuration

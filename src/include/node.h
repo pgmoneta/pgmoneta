@@ -40,12 +40,15 @@ extern "C" {
 #define NODE_TYPE_INT    1
 #define NODE_TYPE_BOOL   2
 
+/** @struct node
+ * Defines a node
+ */
 struct node
 {
-   char type;
-   void* data;
-   char* tag;
-   struct node* next;
+   char type;         /**< The node type */
+   void* data;        /**< The node data */
+   char* tag;         /**< The node tag */
+   struct node* next; /**< The next node pointer */
 };
 
 /**
