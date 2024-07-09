@@ -38,6 +38,7 @@
 
 static struct workflow* wf_backup(void);
 static struct workflow* wf_restore(void);
+static struct workflow* wf_verify(void);
 static struct workflow* wf_archive(void);
 static struct workflow* wf_delete_backup(void);
 static struct workflow* wf_retain(void);
@@ -52,6 +53,9 @@ pgmoneta_workflow_create(int workflow_type)
          break;
       case WORKFLOW_TYPE_RESTORE:
          return wf_restore();
+         break;
+      case WORKFLOW_TYPE_VERIFY:
+         return wf_verify();
          break;
       case WORKFLOW_TYPE_ARCHIVE:
          return wf_archive();
@@ -219,6 +223,57 @@ wf_restore(void)
    current = current->next;
 
    current->next = pgmoneta_workflow_create_cleanup(CLEANUP_TYPE_RESTORE);
+   current = current->next;
+
+   return head;
+}
+
+static struct workflow*
+wf_verify(void)
+{
+   struct workflow* head = NULL;
+   struct workflow* current = NULL;
+   struct configuration* config = NULL;
+
+   config = (struct configuration*)shmem;
+
+   head = pgmoneta_workflow_create_restore();
+   current = head;
+
+   if (config->encryption != ENCRYPTION_NONE)
+   {
+      current->next = pgmoneta_workflow_encryption(false);
+      current = current->next;
+   }
+
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   {
+      current->next = pgmoneta_workflow_create_gzip(false);
+      current = current->next;
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   {
+      current->next = pgmoneta_workflow_create_zstd(false);
+      current = current->next;
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   {
+      current->next = pgmoneta_workflow_create_lz4(false);
+      current = current->next;
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+   {
+      current->next = pgmoneta_workflow_create_bzip2(false);
+      current = current->next;
+   }
+
+   current->next = pgmoneta_restore_excluded_files();
+   current = current->next;
+
+   current->next = pgmoneta_workflow_create_permissions(PERMISSION_TYPE_RESTORE);
+   current = current->next;
+
+   current->next = pgmoneta_workflow_create_verify();
    current = current->next;
 
    return head;

@@ -38,12 +38,13 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define WORKFLOW_TYPE_BACKUP 0
-#define WORKFLOW_TYPE_RESTORE 1
-#define WORKFLOW_TYPE_ARCHIVE 2
+#define WORKFLOW_TYPE_BACKUP        0
+#define WORKFLOW_TYPE_RESTORE       1
+#define WORKFLOW_TYPE_ARCHIVE       2
 #define WORKFLOW_TYPE_DELETE_BACKUP 3
-#define WORKFLOW_TYPE_RETAIN 4
-#define WORKFLOW_TYPE_WAL_SHIPPING 5
+#define WORKFLOW_TYPE_RETAIN        4
+#define WORKFLOW_TYPE_WAL_SHIPPING  5
+#define WORKFLOW_TYPE_VERIFY        6
 
 #define PERMISSION_TYPE_BACKUP  0
 #define PERMISSION_TYPE_RESTORE 1
@@ -96,6 +97,13 @@ pgmoneta_workflow_create_basebackup(void);
  */
 struct workflow*
 pgmoneta_workflow_create_restore(void);
+
+/**
+ * Create a workflow for the verify
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_verify(void);
 
 /**
  * Create a workflow for the archive

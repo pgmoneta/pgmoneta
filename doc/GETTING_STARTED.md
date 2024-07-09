@@ -147,7 +147,8 @@ Options:
 Commands:
   backup                   Backup a server
   list-backup              List the backups for a server
-  restore                  Restore a backup from a server
+  restore                  Restore a backup from a server 
+  verify                   Verify a backup from a server
   archive                  Archive a backup from a server
   delete                   Delete a backup from a server
   retain                   Retain a backup from a server

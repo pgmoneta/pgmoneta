@@ -7,18 +7,43 @@ The **pgmoneta-cli** command line interface controls your interaction with **pgm
 Using other commands on the backup directory could cause problems.
 
 ```
-pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
+pgmoneta-cli
+  Command line utility for pgmoneta
 
--c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
--h, --host HOST          Set the host name
--p, --port PORT          Set the port number
--U, --user USERNAME      Set the user name
--P, --password PASSWORD  Set the password
--L, --logfile FILE       Set the log file
--v, --verbose            Output text string of result
--V, --version            Display version information
--F, --format text|json   Set the output format
--?, --help               Display help
+Usage:
+  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ] 
+
+Options:
+  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
+  -h, --host HOST          Set the host name
+  -p, --port PORT          Set the port number
+  -U, --user USERNAME      Set the user name
+  -P, --password PASSWORD  Set the password
+  -L, --logfile FILE       Set the log file
+  -v, --verbose            Output text string of result
+  -V, --version            Display version information
+  -F, --format text|json   Set the output format
+  -?, --help               Display help
+
+Commands:
+  backup                   Backup a server
+  list-backup              List the backups for a server
+  restore                  Restore a backup from a server
+  verify                   Verify a backup from a server
+  archive                  Archive a backup from a server
+  delete                   Delete a backup from a server
+  retain                   Retain a backup from a server
+  expunge                  Expunge a backup from a server
+  encrypt                  Encrypt a file using master-key
+  decrypt                  Decrypt a file using master-key
+  info                     Information about a backup
+  ping                     Check if pgmoneta is alive
+  stop                     Stop pgmoneta
+  status [details]         Status of pgmoneta, with optional details
+  conf <action>            Manage the configuration, with one of subcommands:
+                           - 'reload' to reload the configuration
+  clear <what>             Clear data, with:
+                           - 'prometheus' to reset the Prometheus statistics
 ```
 
 ## backup
@@ -67,6 +92,22 @@ Example
 
 ``` sh
 pgmoneta-cli restore primary newest name=MyLabel,primary /tmp
+```
+
+## verify
+
+Verify a backup from a server
+
+Command
+
+``` sh
+pgmoneta-cli verify <server> [<timestamp>|oldest|newest] <directory> [failed|all]
+```
+
+Example
+
+``` sh
+pgmoneta-cli verify primary oldest /tmp
 ```
 
 ## archive

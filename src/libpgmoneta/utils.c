@@ -2376,6 +2376,8 @@ copy_file(void* arg)
 
    if (nread == 0)
    {
+      fsync(fd_to);
+
       if (close(fd_to) < 0)
       {
          fd_to = -1;

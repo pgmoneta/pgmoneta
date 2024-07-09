@@ -34,6 +34,7 @@
 #include <network.h>
 #include <security.h>
 #include <shmem.h>
+#include <verify.h>
 #include <utils.h>
 
 /* system */
@@ -54,6 +55,7 @@
 #define COMMAND_BACKUP "backup"
 #define COMMAND_LIST_BACKUP "list-backup"
 #define COMMAND_RESTORE "restore"
+#define COMMAND_VERIFY "verify"
 #define COMMAND_ARCHIVE "archive"
 #define COMMAND_DELETE "delete"
 #define COMMAND_RETAIN "retain"
@@ -72,6 +74,7 @@
 static void help_backup(void);
 static void help_list_backup(void);
 static void help_restore(void);
+static void help_verify(void);
 static void help_archive(void);
 static void help_delete(void);
 static void help_retain(void);
@@ -91,6 +94,7 @@ static void display_helper(char* command);
 static int backup(SSL* ssl, int socket, char* server);
 static int list_backup(SSL* ssl, int socket, char* server, char output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
+static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, char output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
 static int delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format);
 static int stop(SSL* ssl, int socket);
@@ -140,6 +144,7 @@ usage(void)
    printf("  backup                   Backup a server\n");
    printf("  list-backup              List the backups for a server\n");
    printf("  restore                  Restore a backup from a server\n");
+   printf("  verify                   Verify a backup from a server\n");
    printf("  archive                  Archive a backup from a server\n");
    printf("  delete                   Delete a backup from a server\n");
    printf("  retain                   Retain a backup from a server\n");
@@ -185,6 +190,14 @@ const struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_RESTORE,
       .deprecated = false,
       .log_message = "<restore> [%s]",
+   },
+   {
+      .command = "verify",
+      .subcommand = "",
+      .accepted_argument_count = {3, 4},
+      .action = MANAGEMENT_VERIFY,
+      .deprecated = false,
+      .log_message = "<verify> [%s]",
    },
    {
       .command = "archive",
@@ -643,6 +656,17 @@ password:
          exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
       }
    }
+   else if (parsed.cmd->action == MANAGEMENT_VERIFY)
+   {
+      if (parsed.args[3])
+      {
+         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], output_format);
+      }
+      else
+      {
+         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], "failed", output_format);
+      }
+   }
    else if (parsed.cmd->action == MANAGEMENT_ARCHIVE)
    {
       if (parsed.args[3])
@@ -763,7 +787,7 @@ static void
 help_backup(void)
 {
    printf("Backup a server\n");
-   printf("  pgmoneta-cli backup [<server>|all]\n");
+   printf("  pgmoneta-cli backup <server|all>\n");
 }
 
 static void
@@ -777,35 +801,42 @@ static void
 help_restore(void)
 {
    printf("Restore a backup for a server\n");
-   printf("  pgmoneta-cli restore <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+   printf("  pgmoneta-cli restore <server> <timestamp|oldest|newest> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+}
+
+static void
+help_verify(void)
+{
+   printf("Verify a backup for a server\n");
+   printf("  pgmoneta-cli verify <server> <timestamp|oldest|newest> <directory> [failed|all]\n");
 }
 
 static void
 help_archive(void)
 {
    printf("Archive a backup for a server\n");
-   printf("  pgmoneta-cli archive [<server>|all] [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+   printf("  pgmoneta-cli archive <server|all> <timestamp|oldest|newest> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
 }
 
 static void
 help_delete(void)
 {
    printf("Delete a backup for a server\n");
-   printf("  pgmoneta-cli delete <server> [<timestamp>|oldest|newest]\n");
+   printf("  pgmoneta-cli delete <server> <timestamp|oldest|newest>\n");
 }
 
 static void
 help_retain(void)
 {
    printf("Retain a backup for a server\n");
-   printf("  pgmoneta-cli retain <server> [<timestamp>|oldest|newest]\n");
+   printf("  pgmoneta-cli retain <server> <timestamp|oldest|newest>\n");
 }
 
 static void
 help_expunge(void)
 {
    printf("Expunge a backup for a server\n");
-   printf("  pgmoneta-cli expunge <server> [<timestamp>|oldest|newest]\n");
+   printf("  pgmoneta-cli expunge <server> <timestamp|oldest|newest>\n");
 }
 
 static void
@@ -892,6 +923,10 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_RESTORE))
    {
       help_restore();
+   }
+   else if (!strcmp(command, COMMAND_VERIFY))
+   {
+      help_verify();
    }
    else if (!strcmp(command, COMMAND_ARCHIVE))
    {
@@ -1004,6 +1039,21 @@ restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, cha
    }
 
    return ret;
+}
+
+static int
+verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, char output_format)
+{
+   if (pgmoneta_management_verify(ssl, socket, server, backup_id, directory, files) == 0)
+   {
+      pgmoneta_management_read_verify(ssl, socket, output_format);
+   }
+   else
+   {
+      return 1;
+   }
+
+   return 0;
 }
 
 static int

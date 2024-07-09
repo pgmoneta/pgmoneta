@@ -28,8 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <aes.h>
 #include <achv.h>
+#include <aes.h>
 #include <backup.h>
 #include <bzip2_compression.h>
 #include <configuration.h>
@@ -51,6 +51,7 @@
 #include <server.h>
 #include <shmem.h>
 #include <utils.h>
+#include <verify.h>
 #include <wal.h>
 #include <zstandard_compression.h>
 
@@ -1049,6 +1050,53 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          free(payload_s3);
          free(payload_s4);
          break;
+      case MANAGEMENT_VERIFY:
+         pgmoneta_log_debug("Management verify: %s/%s %s [%s]", payload_s1, payload_s2, payload_s3, payload_s4 != NULL ? payload_s4 : "failed");
+
+         srv = -1;
+         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         {
+            if (!strcmp(config->servers[i].name, payload_s1))
+            {
+               srv = i;
+            }
+         }
+
+         if (srv != -1)
+         {
+            pid = fork();
+            if (pid == -1)
+            {
+               pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
+
+               /* No process */
+               pgmoneta_log_error("Cannot create process");
+            }
+            else if (pid == 0)
+            {
+               char* backup_id = NULL;
+               char* directory = NULL;
+               char* files = NULL;
+
+               shutdown_ports();
+
+               backup_id = pgmoneta_append(backup_id, payload_s2);
+               directory = pgmoneta_append(directory, payload_s3);
+               files = pgmoneta_append(files, payload_s4);
+
+               pgmoneta_verify(NULL, client_fd, srv, backup_id, directory, files, ai->argv);
+            }
+         }
+         else
+         {
+            pgmoneta_log_error("Verify - Unknown server %s", payload_s1);
+         }
+
+         free(payload_s1);
+         free(payload_s2);
+         free(payload_s3);
+         free(payload_s4);
+         break;
       case MANAGEMENT_ARCHIVE:
          pgmoneta_log_debug("Management archive: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
 
@@ -1533,9 +1581,9 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    if (!fork())
    {
-      char* addr = malloc(strlen(address) + 1);
-      memset(addr, 0, strlen(address) + 1);
-      memcpy(addr, address, strlen(address));
+      char* addr = NULL;
+
+      addr = pgmoneta_append(addr, address);
 
       ev_loop_fork(loop);
       shutdown_ports();

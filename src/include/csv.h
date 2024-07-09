@@ -64,7 +64,8 @@ int
 pgmoneta_csv_reader_init(char* path, struct csv_reader** reader);
 
 /**
- * Get the next row in csv file
+ * Get the next row in csv file.
+ * You need to do free(cols) as the structure is allocated by the function 
  * @param reader The reader
  * @param num_col [out] The number of columns in the row
  * @param cols [out] The columns in the row

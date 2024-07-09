@@ -218,12 +218,22 @@ pgmoneta_deque_prev(struct deque* deque, struct deque_node* node)
 struct deque_node*
 pgmoneta_deque_head(struct deque* deque)
 {
+   if (deque == NULL)
+   {
+      return NULL;
+   }
+
    return pgmoneta_deque_next(deque, deque->start);
 }
 
 struct deque_node*
 pgmoneta_deque_tail(struct deque* deque)
 {
+   if (deque == NULL)
+   {
+      return NULL;
+   }
+
    return pgmoneta_deque_prev(deque, deque->end);
 }
 

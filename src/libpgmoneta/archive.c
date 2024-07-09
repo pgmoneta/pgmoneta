@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
+#include <deque.h>
 #include <gzip_compression.h>
 #include <info.h>
 #include <logging.h>

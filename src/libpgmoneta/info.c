@@ -352,11 +352,8 @@ error:
 int
 pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
 {
-   char buffer[MISC_LENGTH];
-   char* fn;
-   FILE* file = NULL;
-   int tbl_idx = 0;
-   struct backup* bck;
+   char* fn = NULL;
+   int ret = 0;
 
    *backup = NULL;
 
@@ -365,6 +362,23 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    fn = pgmoneta_append(fn, "/");
    fn = pgmoneta_append(fn, label);
    fn = pgmoneta_append(fn, "/backup.info");
+
+   ret = pgmoneta_get_backup_file(fn, backup);
+
+   free(fn);
+
+   return ret;
+}
+
+int
+pgmoneta_get_backup_file(char* fn, struct backup** backup)
+{
+   char buffer[MISC_LENGTH];
+   FILE* file = NULL;
+   int tbl_idx = 0;
+   struct backup* bck;
+
+   *backup = NULL;
 
    file = fopen(fn, "r");
 
@@ -376,8 +390,6 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    }
 
    memset(bck, 0, sizeof(struct backup));
-
-   memcpy(&bck->label[0], label, strlen(label));
    bck->valid = VALID_UNKNOWN;
 
    if (file != NULL)
@@ -504,8 +516,6 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
       fclose(file);
    }
 
-   free(fn);
-
    return 0;
 
 error:
@@ -516,8 +526,6 @@ error:
    {
       fclose(file);
    }
-
-   free(fn);
 
    return 1;
 }

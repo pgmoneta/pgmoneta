@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <deque.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -58,6 +59,7 @@ extern "C" {
 #define MANAGEMENT_DECOMPRESS     16
 #define MANAGEMENT_COMPRESS       17
 #define MANAGEMENT_INFO           18
+#define MANAGEMENT_VERIFY         19
 
 /**
  * Available command output formats
@@ -140,6 +142,40 @@ pgmoneta_management_write_list_backup(SSL* ssl, int socket, int server);
  */
 int
 pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
+
+/**
+ * Management operation: Verify a server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup_id The backup identifier
+ * @param directory The directory
+ * @param files Which files should be displayed
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files);
+
+/**
+ * Management: Read verify
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_read_verify(SSL* ssl, int socket, char output_format);
+
+/**
+ * Management: Write verify
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param failed The failed files
+ * @param all The all files
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_write_verify(SSL* ssl, int socket, struct deque* failed, struct deque* all);
 
 /**
  * Management operation: Archive a server

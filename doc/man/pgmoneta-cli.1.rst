@@ -60,6 +60,9 @@ list-backup
 restore
   Restore a backup from a server
 
+verify
+  Verify a backup from a server
+
 archive
   Archive a backup from a server
 

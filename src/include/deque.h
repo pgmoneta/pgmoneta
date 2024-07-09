@@ -89,7 +89,7 @@ pgmoneta_deque_put(struct deque* deque, char* tag, void* data, size_t data_size)
  * @param deque The deque
  * @param tag The tag,optional
  * @param data The data
- * @return
+ * @return 0 if success, otherwise 1
  */
 int
 pgmoneta_deque_add(struct deque* deque, char* tag, void* data);
