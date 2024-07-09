@@ -32,9 +32,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define IS_LEAF(x) (((uintptr_t)x & 1))
-#define SET_LEAF(x) ((void*)((uintptr_t)x | 1))
-#define GET_LEAF(x) ((struct art_leaf*)((void*)((uintptr_t)x & ~1)))
+#define IS_LEAF(x) (((uintptr_t)(x) & 1))
+#define SET_LEAF(x) ((void*)((uintptr_t)(x) | 1))
+#define GET_LEAF(x) ((struct art_leaf*)((void*)((uintptr_t)(x) & ~1)))
 
 enum art_node_type {
    Node4,
@@ -123,7 +123,7 @@ static struct art_leaf*
 node_get_minimum(struct art_node* node);
 
 static void
-create_art_leaf(struct art_leaf** leaf, unsigned char* key, int key_len, void* value);
+create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, void* value);
 
 static void
 create_art_node(struct art_node** node, enum art_node_type type);
@@ -154,7 +154,7 @@ destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb);
  * @return The length of the part of the prefix that matches
  */
 static uint32_t
-check_prefix_partial(struct art_node* node, unsigned char* key, uint32_t depth, int key_len);
+check_prefix_partial(struct art_node* node, unsigned char* key, uint32_t depth, uint32_t key_len);
 
 /**
  * Get where the keys diverge starting from depth.
@@ -166,7 +166,7 @@ check_prefix_partial(struct art_node* node, unsigned char* key, uint32_t depth, 
  * @return The length of the part of the prefix that matches
  */
 static uint32_t
-check_prefix(struct art_node* node, unsigned char* key, uint32_t depth, int key_len);
+check_prefix(struct art_node* node, unsigned char* key, uint32_t depth, uint32_t key_len);
 
 /**
  * Compare the key stored in leaf and the original key
@@ -176,7 +176,7 @@ check_prefix(struct art_node* node, unsigned char* key, uint32_t depth, int key_
  * @return true if the key matches
  */
 static bool
-leaf_match(struct art_leaf* leaf, unsigned char* key, int key_len);
+leaf_match(struct art_leaf* leaf, unsigned char* key, uint32_t key_len);
 
 /**
  * Find the index of the corresponding key character using binary search.
@@ -203,7 +203,7 @@ find_index(unsigned char ch, const unsigned char* keys, int length);
  * @return Old value if the key exists, otherwise NULL
  */
 static void*
-art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, int key_len, void* value, bool* new);
+art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, void* value, bool* new);
 
 /**
  * Delete a value from a node recursively.
@@ -215,7 +215,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
  * @return Deleted value if the key exists, otherwise NULL
  */
 static struct art_leaf*
-art_node_delete(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, int key_len);
+art_node_delete(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len);
 
 static int
 art_node_iterate(struct art_node* node, art_callback cb, void* data);
@@ -301,7 +301,7 @@ pgmoneta_art_destroy(struct art* tree)
 }
 
 void*
-pgmoneta_art_search(struct art* t, unsigned char* key, int key_len)
+pgmoneta_art_search(struct art* t, unsigned char* key, uint32_t key_len)
 {
    struct art_node* node = NULL;
    struct art_node** child = NULL;
@@ -338,7 +338,7 @@ pgmoneta_art_search(struct art* t, unsigned char* key, int key_len)
 }
 
 void*
-pgmoneta_art_insert(struct art* t, unsigned char* key, int key_len, void* value)
+pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, void* value)
 {
    void* old_val = NULL;
    bool new = false;
@@ -356,7 +356,7 @@ pgmoneta_art_insert(struct art* t, unsigned char* key, int key_len, void* value)
 }
 
 void*
-pgmoneta_art_delete(struct art* t, unsigned char* key, int key_len)
+pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len)
 {
    struct art_leaf* l = NULL;
    void* old_val = NULL;
@@ -392,7 +392,7 @@ min(uint32_t a, uint32_t b)
 }
 
 static void
-create_art_leaf(struct art_leaf** leaf, unsigned char* key, int key_len, void* value)
+create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, void* value)
 {
    struct art_leaf* l = NULL;
    l = malloc(sizeof(struct art_leaf) + key_len);
@@ -587,7 +587,7 @@ error:
 }
 
 static void*
-art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, int key_len, void* value, bool* new)
+art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, void* value, bool* new)
 {
    struct art_leaf* leaf = NULL;
    struct art_leaf* min_leaf = NULL;
@@ -726,7 +726,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
 }
 
 static struct art_leaf*
-art_node_delete(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, int key_len)
+art_node_delete(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len)
 {
    struct art_leaf* l = NULL;
    struct art_node** child = NULL;
@@ -1038,7 +1038,7 @@ copy_header(struct art_node* dest, struct art_node* src)
 }
 
 static uint32_t
-check_prefix_partial(struct art_node* node, unsigned char* key, uint32_t depth, int key_len)
+check_prefix_partial(struct art_node* node, unsigned char* key, uint32_t depth, uint32_t key_len)
 {
    uint32_t len = 0;
    uint32_t max_cmp = min(min(node->prefix_len, MAX_PREFIX_LEN), key_len - depth);
@@ -1050,7 +1050,7 @@ check_prefix_partial(struct art_node* node, unsigned char* key, uint32_t depth, 
 }
 
 static uint32_t
-check_prefix(struct art_node* node, unsigned char* key, uint32_t depth, int key_len)
+check_prefix(struct art_node* node, unsigned char* key, uint32_t depth, uint32_t key_len)
 {
    uint32_t len = 0;
    struct art_leaf* leaf = NULL;
@@ -1076,7 +1076,7 @@ check_prefix(struct art_node* node, unsigned char* key, uint32_t depth, int key_
 }
 
 static bool
-leaf_match(struct art_leaf* leaf, unsigned char* key, int key_len)
+leaf_match(struct art_leaf* leaf, unsigned char* key, uint32_t key_len)
 {
    if (leaf->key_len != key_len)
    {
@@ -1187,7 +1187,7 @@ node4_remove_child(struct art_node4* node, struct art_node** node_ref, unsigned 
          len++;
       }
       // keep filling as much as we can
-      for (int i = 0; len + i < MAX_PREFIX_LEN && i < child->prefix_len; i++)
+      for (uint32_t i = 0; len + i < MAX_PREFIX_LEN && i < child->prefix_len; i++)
       {
          node->node.prefix[len + i] = child->prefix[i];
       }
@@ -1408,7 +1408,7 @@ pgmoneta_art_iterator_has_next(struct art_iterator* iter)
 void
 pgmoneta_art_destroy_value_noop(void* val)
 {
-   return;
+   (void)val;
 }
 
 void

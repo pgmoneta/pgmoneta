@@ -93,7 +93,7 @@ pgmoneta_art_destroy(struct art* tree);
  * the old value pointer is returned
  */
 void*
-pgmoneta_art_insert(struct art* t, unsigned char* key, int key_len, void* value);
+pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, void* value);
 
 /**
  * Deletes a value from the ART tree
@@ -104,7 +104,7 @@ pgmoneta_art_insert(struct art* t, unsigned char* key, int key_len, void* value)
  * the value pointer is returned
  */
 void*
-pgmoneta_art_delete(struct art* t, unsigned char* key, int key_len);
+pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
  * Searches for a value in the ART tree
@@ -115,7 +115,7 @@ pgmoneta_art_delete(struct art* t, unsigned char* key, int key_len);
  * the value pointer is returned
  */
 void*
-pgmoneta_art_search(struct art* t, unsigned char* key, int key_len);
+pgmoneta_art_search(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
  * Iterates through the entries pairs in the map,
