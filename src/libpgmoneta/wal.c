@@ -63,9 +63,9 @@ static int wal_close(char* root, char* filename, bool partial, FILE* file);
 static int wal_prepare(FILE* file, int segsize);
 static int wal_send_status_report(SSL* ssl, int socket, int64_t received, int64_t flushed, int64_t applied);
 static int wal_xlog_offset(size_t xlogptr, int segsize);
-static int wal_convert_xlogpos(char* xlogpos, uint32_t* high32, uint32_t* low32, int segsize);
-static int wal_find_streaming_start(char* basedir, uint32_t* timeline, uint32_t* high32, uint32_t* low32, int segsize);
-static int wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, uint32_t* high32, uint32_t* low32, uint32_t* timeline, int segsize);
+static int wal_convert_xlogpos(char* xlogpos, int segsize, uint32_t* high32, uint32_t* low32);
+static int wal_find_streaming_start(char* basedir, int segsize, uint32_t* timeline, uint32_t* high32, uint32_t* low32);
+static int wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segsize, uint32_t* high32, uint32_t* low32, uint32_t* timeline);
 static int wal_shipping_setup(int srv, char** wal_shipping);
 static void update_wal_lsn(int srv, size_t xlogptr);
 
@@ -205,6 +205,11 @@ pgmoneta_wal(int srv, char** argv)
       goto error;
    }
 
+   if (identify_system_response == NULL || identify_system_response->number_of_columns < 4)
+   {
+      goto error;
+   }
+
    cur_timeline = atoi(pgmoneta_query_response_get_data(identify_system_response, 1));
    if (cur_timeline < 1)
    {
@@ -213,15 +218,15 @@ pgmoneta_wal(int srv, char** argv)
    }
    config->servers[srv].cur_timeline = cur_timeline;
 
-   wal_find_streaming_start(d, &timeline, &high32, &low32, segsize);
+   wal_find_streaming_start(d, segsize, &timeline, &high32, &low32);
    if (timeline == 0)
    {
       read_replication = (config->servers[srv].version >= 15) ? 1 : 0;
 
-      // query the replication slot to gey the starting LSN and timeline ID
+      // query the replication slot to get the starting LSN and timeline ID
       if (read_replication)
       {
-         if (wal_read_replication_slot(ssl, socket, config->servers[srv].wal_slot, config->servers[srv].name, &high32, &low32, &timeline, segsize))
+         if (wal_read_replication_slot(ssl, socket, config->servers[srv].wal_slot, config->servers[srv].name, segsize, &high32, &low32, &timeline))
          {
             read_replication = 0;   // Fallback if not PostgreSQL 15+
          }
@@ -240,7 +245,7 @@ pgmoneta_wal(int srv, char** argv)
          }
          memset(xlogpos, 0, xlogpos_size);
          memcpy(xlogpos, pgmoneta_query_response_get_data(identify_system_response, 2), xlogpos_size);
-         if (wal_convert_xlogpos(xlogpos, &high32, &low32, segsize))
+         if (wal_convert_xlogpos(xlogpos, segsize, &high32, &low32))
          {
             goto error;
          }
@@ -321,7 +326,6 @@ pgmoneta_wal(int srv, char** argv)
 
          if (msg->kind == 'E' || msg->kind == 'f')
          {
-            pgmoneta_log_info("received error response message");
             pgmoneta_log_copyfail_message(msg);
             pgmoneta_log_error_response_message(msg);
             goto error;
@@ -525,9 +529,13 @@ pgmoneta_wal(int srv, char** argv)
          break;
       }
       pgmoneta_consume_data_row_messages(ssl, socket, buffer, &end_of_timeline_response);
+      if (end_of_timeline_response == NULL || end_of_timeline_response->number_of_columns < 2)
+      {
+         goto error;
+      }
       timeline = atoi(pgmoneta_query_response_get_data(end_of_timeline_response, 0));
       xlogpos = pgmoneta_query_response_get_data(end_of_timeline_response, 1);
-      if (wal_convert_xlogpos(xlogpos, &high32, &low32, segsize))
+      if (wal_convert_xlogpos(xlogpos, segsize, &high32, &low32))
       {
          goto error;
       }
@@ -642,13 +650,17 @@ error:
 }
 
 static int
-wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, uint32_t* high32, uint32_t* low32, uint32_t* timeline, int segsize)
+wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segsize, uint32_t* high32, uint32_t* low32, uint32_t* timeline)
 {
    struct message* read_slot_msg = NULL;
    struct query_response* read_slot_response = NULL;
    char* lsn = NULL;
    int status = 0;
-   uint32_t local_timeline = 0;
+   uint32_t tli = 0;
+
+   *high32 = 0;
+   *low32 = 0;
+   *timeline = 0;
 
    pgmoneta_create_read_replication_slot_message(slot, &read_slot_msg);
    status = pgmoneta_query_execute(ssl, socket, read_slot_msg, &read_slot_response);
@@ -659,27 +671,27 @@ wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, uint32_t
       goto error;
    }
 
-   if (read_slot_response->number_of_columns < 3)
+   if (read_slot_response == NULL || read_slot_response->number_of_columns < 3)
    {
-      pgmoneta_log_error("Invalid response from READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
+      pgmoneta_log_info("Invalid response from READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
       goto error;
    }
 
-   local_timeline = atoi(pgmoneta_query_response_get_data(read_slot_response, 2));
-   if (local_timeline < 1)
+   tli = atoi(pgmoneta_query_response_get_data(read_slot_response, 2));
+   if (tli < 1)
    {
-      pgmoneta_log_error("Error occurred when reading replication slot on server %s: timeline should at least be 1, but getting %d", name, local_timeline);
+      pgmoneta_log_error("Error occurred when reading replication slot on server %s: timeline should at least be 1, but getting %d", name, tli);
       goto error;
    }
 
    lsn = pgmoneta_query_response_get_data(read_slot_response, 1);
-   if (wal_convert_xlogpos(lsn, high32, low32, segsize))
+   if (wal_convert_xlogpos(lsn, segsize, high32, low32))
    {
       pgmoneta_log_error("Failed to convert LSN from replication slot %s on server %s", slot, name);
       goto error;
    }
 
-   *timeline = local_timeline;
+   *timeline = tli;
 
    pgmoneta_free_query_response(read_slot_response);
    pgmoneta_free_copy_message(read_slot_msg);
@@ -1044,7 +1056,7 @@ wal_xlog_offset(size_t xlogptr, int segsize)
 }
 
 static int
-wal_convert_xlogpos(char* xlogpos, uint32_t* high32, uint32_t* low32, int segsize)
+wal_convert_xlogpos(char* xlogpos, int segsize, uint32_t* high32, uint32_t* low32)
 {
    char* ptr = NULL;
    int num = 0;
@@ -1066,7 +1078,7 @@ wal_convert_xlogpos(char* xlogpos, uint32_t* high32, uint32_t* low32, int segsiz
 
 // this function assumes basedir only contains wal segments and .history files
 static int
-wal_find_streaming_start(char* basedir, uint32_t* timeline, uint32_t* high32, uint32_t* low32, int segsize)
+wal_find_streaming_start(char* basedir, int segsize, uint32_t* timeline, uint32_t* high32, uint32_t* low32)
 {
    char* segname = NULL;
    char* pos = NULL;

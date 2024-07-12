@@ -2595,7 +2595,7 @@ read_delete_json(SSL* ssl, int socket, char* server, char* backup_id)
    pgmoneta_json_init(&status, JSONItem);
 
    pgmoneta_log_debug("Delete: %s/%s", server, backup_id);
-   
+
    if (status == NULL || json == NULL)
    {
       goto error;
@@ -3417,4 +3417,3 @@ print_info_json(struct json* json)
    return 0;
 
 }
-
