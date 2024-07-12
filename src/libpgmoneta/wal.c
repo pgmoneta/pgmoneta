@@ -667,27 +667,27 @@ wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segs
 
    if (status != 0)
    {
-      pgmoneta_log_error("Error occurred when executing READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
+      pgmoneta_log_debug("Error occurred when executing READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
       goto error;
    }
 
    if (read_slot_response == NULL || read_slot_response->number_of_columns < 3)
    {
-      pgmoneta_log_info("Invalid response from READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
+      pgmoneta_log_debug("Invalid response from READ_REPLICATION_SLOT for slot %s on server %s", slot, name);
       goto error;
    }
 
    tli = pgmoneta_atoi(pgmoneta_query_response_get_data(read_slot_response, 2));
    if (tli < 1)
    {
-      pgmoneta_log_error("Error occurred when reading replication slot on server %s: timeline should at least be 1, but getting %d", name, tli);
+      pgmoneta_log_debug("wal_read_replication_slot: timeline is %d, expecting 1 for server %s", tli, name);
       goto error;
    }
 
    lsn = pgmoneta_query_response_get_data(read_slot_response, 1);
    if (wal_convert_xlogpos(lsn, segsize, high32, low32))
    {
-      pgmoneta_log_error("Failed to convert LSN from replication slot %s on server %s", slot, name);
+      pgmoneta_log_debug("wal_read_replication_slot: failed to convert LSN from replication slot %s on server %s", slot, name);
       goto error;
    }
 
