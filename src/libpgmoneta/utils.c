@@ -3838,6 +3838,17 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens)
    return 1;
 }
 
+int
+pgmoneta_atoi(const char* input)
+{
+   if (input == NULL)
+   {
+      return 0;
+   }
+
+   return atoi(input);
+}
+
 #ifdef DEBUG
 
 int

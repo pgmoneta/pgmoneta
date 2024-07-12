@@ -210,7 +210,7 @@ pgmoneta_wal(int srv, char** argv)
       goto error;
    }
 
-   cur_timeline = atoi(pgmoneta_query_response_get_data(identify_system_response, 1));
+   cur_timeline = pgmoneta_atoi(pgmoneta_query_response_get_data(identify_system_response, 1));
    if (cur_timeline < 1)
    {
       pgmoneta_log_error("identify system: timeline should at least be 1, getting %d", timeline);
@@ -533,7 +533,7 @@ pgmoneta_wal(int srv, char** argv)
       {
          goto error;
       }
-      timeline = atoi(pgmoneta_query_response_get_data(end_of_timeline_response, 0));
+      timeline = pgmoneta_atoi(pgmoneta_query_response_get_data(end_of_timeline_response, 0));
       xlogpos = pgmoneta_query_response_get_data(end_of_timeline_response, 1);
       if (wal_convert_xlogpos(xlogpos, segsize, &high32, &low32))
       {
@@ -677,7 +677,7 @@ wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segs
       goto error;
    }
 
-   tli = atoi(pgmoneta_query_response_get_data(read_slot_response, 2));
+   tli = pgmoneta_atoi(pgmoneta_query_response_get_data(read_slot_response, 2));
    if (tli < 1)
    {
       pgmoneta_log_error("Error occurred when reading replication slot on server %s: timeline should at least be 1, but getting %d", name, tli);

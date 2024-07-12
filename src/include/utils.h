@@ -1109,6 +1109,14 @@ pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens);
 int
 pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
 
+/**
+ * Wrapper for the atoi() function, which provides NULL input check
+ * @param input The string input
+ * @return 0 if input is NULL, otherwise what atoi() returns
+ */
+int
+pgmoneta_atoi(const char* input);
+
 #ifdef DEBUG
 
 /**
