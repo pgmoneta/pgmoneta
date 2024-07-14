@@ -292,7 +292,7 @@ pgmoneta_append_node(struct node** chain, struct node* node)
 }
 
 void
-pgmoneta_list_nodes(struct node* chain)
+pgmoneta_list_nodes(struct node* chain, bool input)
 {
    struct node* current = NULL;
 
@@ -300,26 +300,61 @@ pgmoneta_list_nodes(struct node* chain)
 
    if (current == NULL)
    {
-      pgmoneta_log_trace("No nodes");
+      if (input)
+      {
+         pgmoneta_log_trace("No nodes (input)");
+      }
+      else
+      {
+         pgmoneta_log_trace("No nodes (output)");
+      }
    }
 
    while (current != NULL)
    {
       if (current->type == NODE_TYPE_STRING)
       {
-         pgmoneta_log_trace("Node: %s -> %s (%p)", current->tag, (char*)current->data, current->data);
+         if (input)
+         {
+            pgmoneta_log_trace("Node (input): %s -> %s (%p)", current->tag, (char*)current->data, current->data);
+         }
+         else
+         {
+            pgmoneta_log_trace("Node (output): %s -> %s (%p)", current->tag, (char*)current->data, current->data);
+         }
       }
       else if (current->type == NODE_TYPE_INT)
       {
-         pgmoneta_log_trace("Node: %s -> %d (%p)", current->tag, *(int*)current->data, current->data);
+         if (input)
+         {
+            pgmoneta_log_trace("Node (input): %s -> %d (%p)", current->tag, *(int*)current->data, current->data);
+         }
+         else
+         {
+            pgmoneta_log_trace("Node (output): %s -> %d (%p)", current->tag, *(int*)current->data, current->data);
+         }
       }
       else if (current->type == NODE_TYPE_BOOL)
       {
-         pgmoneta_log_trace("Node: %s -> %s (%p)", current->tag, *(bool*)current->data ? "true" : "false", current->data);
+         if (input)
+         {
+            pgmoneta_log_trace("Node (input): %s -> %s (%p)", current->tag, *(bool*)current->data ? "true" : "false", current->data);
+         }
+         else
+         {
+            pgmoneta_log_trace("Node (output): %s -> %s (%p)", current->tag, *(bool*)current->data ? "true" : "false", current->data);
+         }
       }
       else
       {
-         pgmoneta_log_trace("Node: %s -> %p", current->tag, current->data);
+         if (input)
+         {
+            pgmoneta_log_trace("Node (input): %s -> %p", current->tag, current->data);
+         }
+         else
+         {
+            pgmoneta_log_trace("Node (output): %s -> %p", current->tag, current->data);
+         }
       }
 
       current = current->next;

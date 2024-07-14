@@ -79,8 +79,8 @@ lz4_setup(int server, char* identifier, struct node* i_nodes, struct node** o_no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -105,8 +105,8 @@ lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (compress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    compression_time = time(NULL);
 
@@ -179,8 +179,8 @@ lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struc
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (uncompress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    to = pgmoneta_get_node_string(*o_nodes, "to");
 
@@ -232,8 +232,8 @@ lz4_teardown(int server, char* identifier, struct node* i_nodes, struct node** o
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

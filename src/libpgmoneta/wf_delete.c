@@ -72,8 +72,8 @@ delete_backup_setup(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -98,8 +98,8 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    active = false;
 
@@ -291,8 +291,8 @@ delete_backup_teardown(int server, char* identifier, struct node* i_nodes, struc
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

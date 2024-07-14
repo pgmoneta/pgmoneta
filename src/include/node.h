@@ -112,9 +112,10 @@ void pgmoneta_append_node(struct node** chain, struct node* node);
 /**
  * List the nodes
  * @param chain The node chain
+ * @param input Are the nodes input (true), or output (false)
  */
 void
-pgmoneta_list_nodes(struct node* chain);
+pgmoneta_list_nodes(struct node* chain, bool input);
 
 /**
  * Delete the node

@@ -82,8 +82,8 @@ azure_storage_setup(int server, char* identifier, struct node* i_nodes, struct n
    }
 
    pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 
@@ -104,8 +104,8 @@ azure_storage_execute(int server, char* identifier, struct node* i_nodes, struct
    azure_root = azure_get_basepath(server, identifier);
 
    pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (azure_upload_files(local_root, azure_root, ""))
    {
@@ -140,8 +140,8 @@ azure_storage_teardown(int server, char* identifier, struct node* i_nodes, struc
    curl_easy_cleanup(curl);
 
    pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    free(root);
 

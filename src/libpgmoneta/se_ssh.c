@@ -131,8 +131,8 @@ ssh_storage_setup(int server, char* identifier, struct node* i_nodes,
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    homedir = getenv("HOME");
    pubkey_path = "/.ssh/id_rsa.pub";
@@ -297,8 +297,8 @@ ssh_storage_backup_execute(int server, char* identifier,
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    remote_root = get_remote_server_backup_identifier(server, identifier);
 
@@ -409,8 +409,8 @@ ssh_storage_wal_shipping_execute(int server, char* identifier, struct node* i_no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    remote_root = get_remote_server_wal(server);
    local_root = pgmoneta_get_server_wal(server);
@@ -445,8 +445,8 @@ ssh_storage_backup_teardown(int server, char* identifier,
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (!is_error)
    {
@@ -482,8 +482,8 @@ ssh_storage_wal_shipping_teardown(int server, char* identifier,
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    sftp_free(sftp);
 

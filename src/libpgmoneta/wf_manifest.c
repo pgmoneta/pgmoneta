@@ -67,8 +67,8 @@ manifest_setup(int server, char* identifier, struct node* i_nodes, struct node**
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -94,8 +94,8 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    backup_dir = pgmoneta_get_server_backup(server);
    root = pgmoneta_get_server_backup_identifier(server, identifier);
@@ -169,8 +169,8 @@ manifest_teardown(int server, char* identifier, struct node* i_nodes, struct nod
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

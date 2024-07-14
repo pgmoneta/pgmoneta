@@ -75,8 +75,8 @@ cleanup_setup(int server, char* identifier, struct node* i_nodes, struct node** 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Cleanup (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -94,8 +94,8 @@ cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, stru
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Cleanup (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -184,8 +184,8 @@ cleanup_teardown(int server, char* identifier, struct node* i_nodes, struct node
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Cleanup (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

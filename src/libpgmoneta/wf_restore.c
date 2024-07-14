@@ -125,8 +125,8 @@ restore_setup(int server, char* identifier, struct node* i_nodes, struct node** 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Restore (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -164,9 +164,9 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Restore (execure): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_log_debug("Restore (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    position = pgmoneta_get_node_string(i_nodes, "position");
 
@@ -483,8 +483,8 @@ restore_teardown(int server, char* identifier, struct node* i_nodes, struct node
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Restore (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -497,8 +497,8 @@ recovery_info_setup(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Recovery (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -525,8 +525,8 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    is_recovery_info = pgmoneta_get_node_bool(*o_nodes, "recovery info");
 
@@ -854,8 +854,8 @@ recovery_info_teardown(int server, char* identifier, struct node* i_nodes, struc
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Recovery (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -868,8 +868,8 @@ restore_excluded_files_setup(int server, char* identifier, struct node* i_nodes,
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Excluded (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -890,8 +890,8 @@ restore_excluded_files_execute(int server, char* identifier, struct node* i_node
    struct configuration* config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Excluded (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
    {
@@ -1035,8 +1035,8 @@ restore_excluded_files_teardown(int server, char* identifier, struct node* i_nod
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Excluded (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

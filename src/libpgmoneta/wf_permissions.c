@@ -83,8 +83,8 @@ permissions_setup(int server, char* identifier, struct node* i_nodes, struct nod
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -98,8 +98,8 @@ permissions_execute_backup(int server, char* identifier, struct node* i_nodes, s
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (backup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    path = pgmoneta_get_server_backup_identifier_data(server, identifier);
 
@@ -123,8 +123,8 @@ permissions_execute_restore(int server, char* identifier, struct node* i_nodes, 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (restore): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -215,8 +215,8 @@ permissions_execute_archive(int server, char* identifier, struct node* i_nodes, 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (archive): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -319,8 +319,8 @@ permissions_teardown(int server, char* identifier, struct node* i_nodes, struct 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

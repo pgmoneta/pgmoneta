@@ -79,8 +79,8 @@ zstd_setup(int server, char* identifier, struct node* i_nodes, struct node** o_n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -105,8 +105,8 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (compress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    compression_time = time(NULL);
 
@@ -179,8 +179,8 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (decompress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    root = pgmoneta_get_node_string(*o_nodes, "root");
    if (root == NULL)
@@ -225,8 +225,8 @@ zstd_teardown(int server, char* identifier, struct node* i_nodes, struct node** 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

@@ -83,8 +83,8 @@ encryption_setup(int server, char* identifier, struct node* i_nodes, struct node
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Encryption (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -111,8 +111,8 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Encryption (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
 
@@ -216,8 +216,8 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Decryption (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -331,8 +331,8 @@ encryption_teardown(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Encryption (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

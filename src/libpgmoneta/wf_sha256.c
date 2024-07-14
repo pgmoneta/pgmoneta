@@ -68,8 +68,8 @@ sha256_setup(int server, char* identifier, struct node* i_nodes, struct node** o
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SHA256 (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -85,8 +85,8 @@ sha256_execute(int server, char* identifier, struct node* i_nodes, struct node**
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SHA256 (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    root = pgmoneta_get_server_backup_identifier(server, identifier);
 
@@ -138,8 +138,8 @@ sha256_teardown(int server, char* identifier, struct node* i_nodes, struct node*
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SHA256 (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

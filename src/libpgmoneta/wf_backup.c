@@ -77,8 +77,8 @@ basebackup_setup(int server, char* identifier, struct node* i_nodes, struct node
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Basebackup (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -129,8 +129,8 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Basebackup (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    start_time = time(NULL);
 
@@ -439,8 +439,8 @@ basebackup_teardown(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Basebackup (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

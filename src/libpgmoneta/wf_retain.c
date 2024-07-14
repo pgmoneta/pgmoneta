@@ -76,8 +76,8 @@ retain_setup(int server, char* identifier, struct node* i_nodes, struct node** o
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Retain (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -94,8 +94,8 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Retain (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
@@ -177,8 +177,8 @@ retain_teardown(int server, char* identifier, struct node* i_nodes, struct node*
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Retain (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }

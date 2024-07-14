@@ -70,8 +70,8 @@ hot_standby_setup(int server, char* identifier, struct node* i_nodes, struct nod
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Hot standby (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
@@ -109,8 +109,8 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Hot standby (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    if (strlen(config->servers[server].hot_standby) > 0)
    {
@@ -329,8 +329,8 @@ hot_standby_teardown(int server, char* identifier, struct node* i_nodes, struct 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Hot standby (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes);
-   pgmoneta_list_nodes(*o_nodes);
+   pgmoneta_list_nodes(i_nodes, true);
+   pgmoneta_list_nodes(*o_nodes, false);
 
    return 0;
 }
