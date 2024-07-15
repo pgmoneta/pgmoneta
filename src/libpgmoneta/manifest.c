@@ -147,7 +147,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
    *changed_files = NULL;
    *added_files = NULL;
 
-   pgmoneta_deque_create(&que);
+   pgmoneta_deque_create(false, &que);
 
    pgmoneta_art_init(&deleted, NULL);
    pgmoneta_art_init(&added, NULL);
@@ -184,8 +184,8 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          // build every right chunk into an ART
          pgmoneta_art_init(&tree, NULL);
          build_tree(tree, r2, f2);
-         entry = pgmoneta_deque_peek(que);
-         while (entry != NULL && entry != que->end)
+         entry = pgmoneta_deque_head(que);
+         while (entry != NULL)
          {
             checksum = pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
             if (checksum != NULL)
@@ -193,7 +193,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
                if (!strcmp(entry->data, checksum))
                {
                   // not changed but not deleted, remove the entry
-                  entry = pgmoneta_deque_node_remove(que, entry);
+                  entry = pgmoneta_deque_remove(que, entry);
                }
                else
                {
@@ -202,18 +202,18 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
                   val = pgmoneta_append(NULL, entry->data);
                   pgmoneta_art_insert(changed, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
                   // changed but not deleted, remove the entry
-                  entry = pgmoneta_deque_node_remove(que, entry);
+                  entry = pgmoneta_deque_remove(que, entry);
                }
             }
             else
             {
-               entry = entry->next;
+               entry = pgmoneta_deque_next(que, entry);
             }
          }
          pgmoneta_art_destroy(tree);
          tree = NULL;
       }
-      entry = pgmoneta_deque_peek(que);
+      entry = pgmoneta_deque_head(que);
       // traverse
       while (!pgmoneta_deque_empty(que))
       {
@@ -221,7 +221,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          // make a copy since tree insert doesn't do that
          val = pgmoneta_append(NULL, entry->data);
          pgmoneta_art_insert(deleted, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
-         entry = pgmoneta_deque_node_remove(que, entry);
+         entry = pgmoneta_deque_remove(que, entry);
       }
       // reset right reader for the next left chunk
       if (pgmoneta_csv_reader_reset(r2))
@@ -253,30 +253,30 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          }
          pgmoneta_art_init(&tree, NULL);
          build_tree(tree, r1, f1);
-         entry = pgmoneta_deque_peek(que);
+         entry = pgmoneta_deque_head(que);
          while (entry != NULL && entry != que->end)
          {
             checksum = pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
             if (checksum != NULL)
             {
                // the entry is not new, remove it
-               entry = pgmoneta_deque_node_remove(que, entry);
+               entry = pgmoneta_deque_remove(que, entry);
             }
             else
             {
-               entry = entry->next;
+               entry = pgmoneta_deque_next(que, entry);
             }
          }
          pgmoneta_art_destroy(tree);
          tree = NULL;
       }
-      entry = pgmoneta_deque_peek(que);
+      entry = pgmoneta_deque_head(que);
       while (!pgmoneta_deque_empty(que))
       {
          manifest_changed = true;
          val = pgmoneta_append(NULL, entry->data);
          pgmoneta_art_insert(added, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
-         entry = pgmoneta_deque_node_remove(que, entry);;
+         entry = pgmoneta_deque_remove(que, entry);
       }
       if (pgmoneta_csv_reader_reset(r1))
       {
@@ -323,7 +323,7 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f)
    }
    path = f[MANIFEST_PATH_INDEX];
    checksum = f[MANIFEST_CHECKSUM_INDEX];
-   pgmoneta_deque_offer_string(deque, checksum, path);
+   pgmoneta_deque_put(deque, path, checksum, strlen(checksum) + 1);
    free(f);
    while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(reader, &cols, &entry))
    {
@@ -335,7 +335,7 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f)
       }
       path = entry[MANIFEST_PATH_INDEX];
       checksum = entry[MANIFEST_CHECKSUM_INDEX];
-      pgmoneta_deque_offer_string(deque, checksum, path);
+      pgmoneta_deque_put(deque, path, checksum, strlen(checksum) + 1);
       free(entry);
       entry = NULL;
    }

@@ -38,6 +38,11 @@ extern "C" {
 
 #define MANIFEST_CHUNK_SIZE 8192
 
+// simple manifest csv structure definition in case we want to change later
+#define MANIFEST_COLUMN_COUNT 2
+#define MANIFEST_PATH_INDEX 0
+#define MANIFEST_CHECKSUM_INDEX 1
+
 /** @struct manifest_file
  * Defines a manifest file
  */

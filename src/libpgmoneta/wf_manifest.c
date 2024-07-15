@@ -28,6 +28,7 @@
 #include <csv.h>
 #include <json.h>
 #include <logging.h>
+#include <manifest.h>
 #include <utils.h>
 #include <workflow.h>
 

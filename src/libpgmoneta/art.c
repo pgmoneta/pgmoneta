@@ -1300,7 +1300,7 @@ pgmoneta_art_iterator_init(struct art* t, struct art_iterator** iter)
    i->tree = t;
    i->key = NULL;
    i->value = NULL;
-   pgmoneta_deque_create(&i->que);
+   pgmoneta_deque_create(false, &i->que);
    *iter = i;
    return 0;
 }
@@ -1321,11 +1321,11 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
    tree = iter->tree;
    if (iter->count == 0)
    {
-      pgmoneta_deque_offer_ref(que, tree->root, NULL);
+      pgmoneta_deque_add(que, NULL, tree->root);
    }
    while (!pgmoneta_deque_empty(que))
    {
-      node = pgmoneta_deque_poll_ref(que);
+      node = pgmoneta_deque_poll(que, NULL);
       if (IS_LEAF(node))
       {
          iter->count++;
@@ -1341,7 +1341,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
             for (int i = 0; i < node->num_children; i++)
             {
                child = n->children[i];
-               pgmoneta_deque_offer_ref(que, child, NULL);
+               pgmoneta_deque_add(que, NULL, child);
             }
             break;
          }
@@ -1351,7 +1351,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
             for (int i = 0; i < node->num_children; i++)
             {
                child = n->children[i];
-               pgmoneta_deque_offer_ref(que, child, NULL);
+               pgmoneta_deque_add(que, NULL, child);
             }
             break;
          }
@@ -1366,7 +1366,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
                   continue;
                }
                child = n->children[idx - 1];
-               pgmoneta_deque_offer_ref(que, child, NULL);
+               pgmoneta_deque_add(que, NULL, child);
             }
             break;
          }
@@ -1380,7 +1380,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
                   continue;
                }
                child = n->children[i];
-               pgmoneta_deque_offer_ref(que, child, NULL);
+               pgmoneta_deque_add(que, NULL, child);
             }
             break;
          }

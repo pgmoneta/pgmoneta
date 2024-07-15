@@ -32,26 +32,40 @@
 #include <stdlib.h>
 #include <string.h>
 
-// tag is copied if not NULL, while data is not
+// tag is copied if not NULL
 static void
-deque_offer(struct deque* deque, void* data, char* tag, enum node_type type);
+deque_offer(struct deque* deque, void* data, char* tag, bool copied);
 
-// tag is copied if not NULL, while data is not
+// tag is copied if not NULL
 static void
-deque_node_create(struct deque_node** node, void* data, char* tag, enum node_type type);
+deque_node_create(void* data, char* tag, bool copied, struct deque_node** node);
 
-// if node type is not ref, data is freed. Tag will always be freed
+// tag will always be freed
 static void
 deque_node_destroy(struct deque_node* node);
 
+static void
+deque_read_lock(struct deque* deque);
+
+static void
+deque_write_lock(struct deque* deque);
+
+static void
+deque_unlock(struct deque* deque);
+
 int
-pgmoneta_deque_create(struct deque** deque)
+pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 {
    struct deque* q = NULL;
    q = malloc(sizeof(struct deque));
    q->size = 0;
-   deque_node_create(&q->start, NULL, NULL, NodeRef);
-   deque_node_create(&q->end, NULL, NULL, NodeRef);
+   q->thread_safe = thread_safe;
+   if (thread_safe)
+   {
+      pthread_rwlock_init(&q->mutex, NULL);
+   }
+   deque_node_create(NULL, NULL, false, &q->start);
+   deque_node_create(NULL, NULL, false, &q->end);
    q->start->next = q->end;
    q->end->prev = q->start;
    *deque = q;
@@ -59,186 +73,137 @@ pgmoneta_deque_create(struct deque** deque)
 }
 
 int
-pgmoneta_deque_offer_string(struct deque* deque, char* data, char* tag)
+pgmoneta_deque_put(struct deque* deque, char* tag, void* data, size_t data_size)
 {
-   char* s = NULL;
+   void* val = NULL;
    if (data != NULL)
    {
-      s = malloc(strlen(data) + 1);
-      strcpy(s, data);
+      val = malloc(data_size);
+      memcpy(val, data, data_size);
    }
-   deque_offer(deque, (void*)s, tag, NodeString);
+   deque_offer(deque, val, tag, true);
    return 0;
 }
 
 int
-pgmoneta_deque_offer_int(struct deque* deque, int data, char* tag)
+pgmoneta_deque_add(struct deque* deque, char* tag, void* data)
 {
-   int* i = NULL;
-   i = malloc(sizeof(int));
-   *i = data;
-   deque_offer(deque, (void*)i, tag, NodeInt);
+   deque_offer(deque, data, tag, false);
    return 0;
 }
 
-int
-pgmoneta_deque_offer_bool(struct deque* deque, bool data, char* tag)
-{
-   bool* f = NULL;
-   f = malloc(sizeof(bool));
-   *f = data;
-   deque_offer(deque, (void*)f, tag, NodeBool);
-   return 0;
-}
-
-int
-pgmoneta_deque_offer_ref(struct deque* deque, void* data, char* tag)
-{
-   deque_offer(deque, data, tag, NodeRef);
-   return 0;
-}
-
-struct deque_node*
-pgmoneta_deque_poll(struct deque* deque)
+void*
+pgmoneta_deque_poll(struct deque* deque, char** tag)
 {
    struct deque_node* head = NULL;
-   if (deque == NULL || deque->size == 0)
+   void* val = NULL;
+   if (deque == NULL || pgmoneta_deque_size(deque) == 0)
    {
       return NULL;
    }
+   deque_write_lock(deque);
    head = deque->start->next;
+   // this should not happen when size is not 0, but just in case
+   if (head == deque->end)
+   {
+      deque_unlock(deque);
+      return NULL;
+   }
    // remove node
    deque->start->next = head->next;
    head->next->prev = deque->start;
    deque->size--;
-   return head;
+   val = head->data;
+   if (tag != NULL)
+   {
+      *tag = head->tag;
+   }
+   free(head);
+   deque_unlock(deque);
+   return val;
+}
+
+void*
+pgmoneta_deque_peek(struct deque* deque, char** tag)
+{
+   struct deque_node* head = NULL;
+   void* val = NULL;
+   if (deque == NULL || pgmoneta_deque_size(deque) == 0)
+   {
+      return NULL;
+   }
+   deque_read_lock(deque);
+   head = deque->start->next;
+   // this should not happen when size is not 0, but just in case
+   if (head == deque->end)
+   {
+      deque_unlock(deque);
+      return NULL;
+   }
+   val = head->data;
+   if (tag != NULL)
+   {
+      *tag = head->tag;
+   }
+   deque_unlock(deque);
+   return val;
 }
 
 struct deque_node*
-pgmoneta_deque_peek(struct deque* deque)
+pgmoneta_deque_next(struct deque* deque, struct deque_node* node)
 {
-   if (deque == NULL || deque->size == 0)
+   struct deque_node* next = NULL;
+   if (deque == NULL || pgmoneta_deque_size(deque) == 0 || node == NULL)
    {
       return NULL;
    }
-   return deque->start->next;
-}
-
-int
-pgmoneta_deque_poll_int(struct deque* deque)
-{
-   int res = 0;
-   struct deque_node* node = pgmoneta_deque_poll(deque);
-   if (node == NULL || node->type != NodeInt)
+   deque_read_lock(deque);
+   if (node->next == deque->end)
    {
-      return 0;
+      deque_unlock(deque);
+      return NULL;
    }
-   res = *((int*)node->data);
-   deque_node_destroy(node);
-   return res;
+   next = node->next;
+   deque_unlock(deque);
+   return next;
 }
 
-int
-pgmoneta_deque_peek_int(struct deque* deque)
+struct deque_node*
+pgmoneta_deque_prev(struct deque* deque, struct deque_node* node)
 {
-   int res = 0;
-   struct deque_node* node = pgmoneta_deque_peek(deque);
-   if (node == NULL || node->type != NodeInt)
-   {
-      return 0;
-   }
-   res = *((int*)node->data);
-   return res;
-}
-
-char*
-pgmoneta_deque_poll_string(struct deque* deque)
-{
-   char* res = NULL;
-   struct deque_node* node = pgmoneta_deque_poll(deque);
-   if (node == NULL || node->type != NodeString)
+   struct deque_node* prev = NULL;
+   if (deque == NULL || pgmoneta_deque_size(deque) == 0 || node == NULL)
    {
       return NULL;
    }
-   if (node->data != NULL)
+   deque_read_lock(deque);
+   if (node->prev == deque->start)
    {
-      res = malloc(strlen((char*)node->data) + 1);
-      strcpy(res, (char*)node->data);
-   }
-   deque_node_destroy(node);
-   return res;
-}
-
-char*
-pgmoneta_deque_peek_string(struct deque* deque)
-{
-   struct deque_node* node = pgmoneta_deque_peek(deque);
-   if (node == NULL || node->type != NodeString)
-   {
+      deque_unlock(deque);
       return NULL;
    }
-   return (char*)node->data;
+   deque_unlock(deque);
+   prev = node->prev;
+   deque_unlock(deque);
+   return prev;
 }
 
-bool
-pgmoneta_deque_poll_bool(struct deque* deque)
+struct deque_node*
+pgmoneta_deque_head(struct deque* deque)
 {
-   bool res = 0;
-   struct deque_node* node = pgmoneta_deque_poll(deque);
-   if (node == NULL || node->type != NodeBool)
-   {
-      return false;
-   }
-   res = *((bool*)node->data);
-   deque_node_destroy(node);
-   return res;
+   return pgmoneta_deque_next(deque, deque->start);
 }
 
-bool
-pgmoneta_deque_peek_bool(struct deque* deque)
+struct deque_node*
+pgmoneta_deque_tail(struct deque* deque)
 {
-   bool res = 0;
-   struct deque_node* node = pgmoneta_deque_peek(deque);
-   if (node == NULL || node->type != NodeBool)
-   {
-      return false;
-   }
-   res = *((bool*)node->data);
-   return res;
-}
-
-void*
-pgmoneta_deque_poll_ref(struct deque* deque)
-{
-   void* res = NULL;
-   struct deque_node* node = pgmoneta_deque_poll(deque);
-   if (node == NULL || node->type != NodeRef)
-   {
-      return false;
-   }
-   res = node->data;
-   deque_node_destroy(node);
-   return res;
-}
-
-void*
-pgmoneta_deque_peek_ref(struct deque* deque)
-{
-   void* res = NULL;
-   struct deque_node* node = pgmoneta_deque_peek(deque);
-   if (node == NULL || node->type != NodeRef)
-   {
-      return false;
-   }
-   res = node->data;
-   deque_node_destroy(node);
-   return res;
+   return pgmoneta_deque_prev(deque, deque->end);
 }
 
 bool
 pgmoneta_deque_empty(struct deque* deque)
 {
-   return deque->size == 0;
+   return pgmoneta_deque_size(deque) == 0;
 }
 
 void
@@ -257,45 +222,72 @@ pgmoneta_deque_destroy(struct deque* deque)
       deque_node_destroy(n);
       n = next;
    }
+   if (deque->thread_safe)
+   {
+      pthread_rwlock_destroy(&deque->mutex);
+   }
    free(deque);
 }
 
 struct deque_node*
-pgmoneta_deque_node_remove(struct deque* deque, struct deque_node* node)
+pgmoneta_deque_remove(struct deque* deque, struct deque_node* node)
 {
    if (deque == NULL || node == NULL || node == deque->start || node == deque->end)
    {
       return NULL;
    }
+   deque_write_lock(deque);
    struct deque_node* prev = node->prev;
    struct deque_node* next = node->next;
    prev->next = next;
    next->prev = prev;
    deque_node_destroy(node);
    deque->size--;
+   if (next == deque->end)
+   {
+      deque_unlock(deque);
+      return NULL;
+   }
+   deque_unlock(deque);
    return next;
 }
 
+uint32_t
+pgmoneta_deque_size(struct deque* deque)
+{
+   uint32_t size = 0;
+   if (deque == NULL)
+   {
+      return 0;
+   }
+   deque_read_lock(deque);
+   size = deque->size;
+   deque_unlock(deque);
+   return size;
+}
+
 static void
-deque_offer(struct deque* deque, void* data, char* tag, enum node_type type)
+deque_offer(struct deque* deque, void* data, char* tag, bool copied)
 {
    struct deque_node* n = NULL;
    struct deque_node* last = NULL;
-   deque_node_create(&n, data, tag, type);
+   deque_node_create(data, tag, copied, &n);
+   deque_write_lock(deque);
    deque->size++;
    last = deque->end->prev;
    last->next = n;
    n->prev = last;
    n->next = deque->end;
    deque->end->prev = n;
+   deque_unlock(deque);
 }
 
 static void
-deque_node_create(struct deque_node** node, void* data, char* tag, enum node_type type)
+deque_node_create(void* data, char* tag, bool copied, struct deque_node** node)
 {
    struct deque_node* n = NULL;
    n = malloc(sizeof(struct deque_node));
-   n->type = type;
+   n->copied = copied;
    n->data = data;
    n->prev = NULL;
    n->next = NULL;
@@ -318,10 +310,40 @@ deque_node_destroy(struct deque_node* node)
    {
       return;
    }
-   if (node->type != NodeRef)
+   if (node->copied)
    {
       free(node->data);
    }
    free(node->tag);
    free(node);
+}
+
+static void
+deque_read_lock(struct deque* deque)
+{
+   if (deque == NULL || !deque->thread_safe)
+   {
+      return;
+   }
+   pthread_rwlock_rdlock(&deque->mutex);
+}
+
+static void
+deque_write_lock(struct deque* deque)
+{
+   if (deque == NULL || !deque->thread_safe)
+   {
+      return;
+   }
+   pthread_rwlock_wrlock(&deque->mutex);
+}
+
+static void
+deque_unlock(struct deque* deque)
+{
+   if (deque == NULL || !deque->thread_safe)
+   {
+      return;
+   }
+   pthread_rwlock_unlock(&deque->mutex);
 }

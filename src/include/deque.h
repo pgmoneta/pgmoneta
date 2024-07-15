@@ -33,23 +33,17 @@
 extern "C" {
 #endif
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-enum node_type {
-   NodeInt,
-   NodeString,
-   NodeBool,
-   NodeRef,
-};
 
 /** @struct deque_node
  * Defines a deque node
  */
 struct deque_node
 {
-   enum node_type type;     /**< The type */
-   char* data;              /**< The data */
+   bool copied;             /**< The flag if the value is copied */
+   void* data;              /**< The data */
    char* tag;               /**< The tag */
    struct deque_node* next; /**< The next pointer */
    struct deque_node* prev; /**< The previous pointer */
@@ -61,137 +55,125 @@ struct deque_node
 struct deque
 {
    uint32_t size;            /**< The size of the deque */
+   bool thread_safe;         /**< If the deque is thread safe */
+   pthread_rwlock_t mutex;   /**< The mutex of the deque */
    struct deque_node* start; /**< The start node */
    struct deque_node* end;   /**< The end node */
 };
 
 /**
  * Create a deque
+ * @param thread_safe If the deque needs to be thread safe
  * @param deque The deque
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_deque_create(struct deque** deque);
+pgmoneta_deque_create(bool thread_safe, struct deque** deque);
 
 /**
- * Add a string node to deque's tail, the string and tag are copied if not NULL
+ * Add a node to deque's tail, the data and tag will be copied.
+ * This function is thread safe
  * @param deque The deque
- * @param data The nullable string data
  * @param tag The tag, optional
+ * @param data The data
+ * @param data_size The size of data
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_deque_offer_string(struct deque* deque, char* data, char* tag);
+pgmoneta_deque_put(struct deque* deque, char* tag, void* data, size_t data_size);
 
 /**
- * Add an integer node to deque's tail, the tag is copied if not NULL
+ * Add a node to deque's tail, the tag will be copied, but the data will not
+ * This function is thread safe
  * @param deque The deque
- * @param data The int data
- * @param tag The tag, optional
- * @return 0 if success, otherwise 1
+ * @param tag The tag,optional
+ * @param data The data
+ * @return
  */
 int
-pgmoneta_deque_offer_int(struct deque* deque, int data, char* tag);
+pgmoneta_deque_add(struct deque* deque, char* tag, void* data);
 
 /**
- * Add a bool node to deque's tail, the tag is copied if not NULL
+ * Retrieve value and remove the node from deque's head.
+ * Note that if the value was copied into node,
+ * this function will return the original value and tag
+ * rather than making a copy of it.
+ * This function is thread safe, but the returned value is not protected
  * @param deque The deque
- * @param data The bool data
- * @param tag The tag, optional
- * @return 0 if success, otherwise 1
- */
-int
-pgmoneta_deque_offer_bool(struct deque* deque, bool data, char* tag);
-
-/**
- * Add a object reference node to deque's tail, that tag is copied if not NULL
- * @param deque The deque
- * @param data The object pointer
- * @param tag The tag, optional
- * @return 0 if success, otherwise 1
- */
-int
-pgmoneta_deque_offer_ref(struct deque* deque, void* data, char* tag);
-
-/**
- * Retrieve and remove the node from deque's head
- * @param deque The deque
- * @return The node if deque's not empty, otherwise NULL
- */
-struct deque_node*
-pgmoneta_deque_poll(struct deque* deque);
-
-/**
- * Retrieve but not remove the node from deque's head
- * @param deque The deque
- * @return The node if deque's not empty, otherwise NULL
- */
-struct deque_node*
-pgmoneta_deque_peek(struct deque* deque);
-
-/**
- * Retrieve and remove the int value from deque's head
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise 0
- */
-int
-pgmoneta_deque_poll_int(struct deque* deque);
-
-/**
- * Retrieve but not remove the int value from deque's head
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise 0
- */
-int
-pgmoneta_deque_peek_int(struct deque* deque);
-
-/**
- * Retrieve and remove the string value from deque's head, note that the string is copied so it must be freed explicitly
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise NULL
- */
-char*
-pgmoneta_deque_poll_string(struct deque* deque);
-
-/**
- * Retrieve but not remove the string value from deque's head
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise NULL
- */
-char*
-pgmoneta_deque_peek_string(struct deque* deque);
-
-/**
- * Retrieve and remove the bool value from deque's head
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise false
- */
-bool
-pgmoneta_deque_poll_bool(struct deque* deque);
-
-/**
- * Retrieve but not remove the bool value from deque's head
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise false
- */
-bool
-pgmoneta_deque_peek_bool(struct deque* deque);
-
-/**
- * Retrieve and remove the object pointer from deque's head
- * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise NULL
+ * @param tag [out] Optional, tag will be returned through if not NULL
+ * @return The value if deque's not empty, otherwise NULL
  */
 void*
-pgmoneta_deque_poll_ref(struct deque* deque);
+pgmoneta_deque_poll(struct deque* deque, char** tag);
 
 /**
- * Retrieve but not remove the object pointer from deque's head
+ * Retrieve value without removing the node from deque's head.
+ * Note that if the value was copied into node,
+ * this function will return the original value and tag
+ * rather than making a copy of it.
+ * This function is thread safe, but the returned value is not protected
  * @param deque The deque
- * @return The value if deque's not empty and the node type matches, otherwise NULL
+ * @param tag [out] Optional, tag will be returned through if not NULL
+ * @return The value if deque's not empty, otherwise NULL
  */
 void*
-pgmoneta_deque_peek_ref(struct deque* deque);
+pgmoneta_deque_peek(struct deque* deque, char** tag);
+
+/**
+ * Get the next deque node
+ * The function is thread safe for put/add but not for polling,
+ * meaning that the returned node could get destroyed by other thread
+ * @param node The current node
+ * @return The next node if there is a next node, NULL if otherwise
+ */
+struct deque_node*
+pgmoneta_deque_next(struct deque* deque, struct deque_node* node);
+
+/**
+ * Get the previous deque node
+ * The function is thread safe for put/add but not for polling,
+ * meaning that the returned node could get destroyed by other thread
+ * @param node The current node
+ * @return The next node if there is a previous node, NULL if otherwise
+ */
+struct deque_node*
+pgmoneta_deque_prev(struct deque* deque, struct deque_node* node);
+
+/**
+ * Get the head of the deque.
+ * The function is thread safe, but it doesn't protect the head from being removed
+ * @param deque The deque
+ * @return The head, or NULL if deque is empty
+ */
+struct deque_node*
+pgmoneta_deque_head(struct deque* deque);
+
+/**
+ * Get the tail of the deque.
+ * The function is thread safe, but it doesn't protect the head from being removed
+ * @param deque The deque
+ * @return The tail, or NULL if deque is empty
+ */
+struct deque_node*
+pgmoneta_deque_tail(struct deque* deque);
+
+/**
+ * Remove a node from the deque.
+ * The function is thread safe, but it does not protect the returned node from being removed
+ * @param deque The deque
+ * @param node The node
+ * @return Next node of the deleted node, or NULL if there is no next node
+ */
+struct deque_node*
+pgmoneta_deque_remove(struct deque* deque, struct deque_node* node);
+
+/**
+ * Get the size of the deque
+ * @param deque The deque
+ * @return The size
+ */
+uint32_t
+pgmoneta_deque_size(struct deque* deque);
 
 /**
  * Check if the deque is empty
@@ -207,15 +189,6 @@ pgmoneta_deque_empty(struct deque* deque);
  */
 void
 pgmoneta_deque_destroy(struct deque* deque);
-
-/**
- * Remove a node from the deque.
- * @param deque The deque
- * @param node The node
- * @return Next node of the deleted node
- */
-struct deque_node*
-pgmoneta_deque_node_remove(struct deque* deque, struct deque_node* node);
 
 #ifdef __cplusplus
 }
