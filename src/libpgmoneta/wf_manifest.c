@@ -130,7 +130,7 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
       snprintf(file_path, MAX_PATH, "%s", pgmoneta_json_get_string_value(entry, "Path"));
       info[MANIFEST_PATH_INDEX] = file_path;
       info[MANIFEST_CHECKSUM_INDEX] = pgmoneta_json_get_string_value(entry, "Checksum");
-      pgmoneta_csv_write(MANIFEST_COLUMN_COUNT, info, writer);
+      pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
       pgmoneta_json_free(entry);
       entry = NULL;
    }

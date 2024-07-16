@@ -65,13 +65,13 @@ pgmoneta_csv_reader_init(char* path, struct csv_reader** reader);
 
 /**
  * Get the next row in csv file
+ * @param reader The reader
  * @param num_col [out] The number of columns in the row
  * @param cols [out] The columns in the row
- * @param reader The reader
  * @return true if has next row, false if otherwise
  */
 bool
-pgmoneta_csv_next_row(int* num_col, char*** cols, struct csv_reader* reader);
+pgmoneta_csv_next_row(struct csv_reader* reader, int* num_col, char*** cols);
 
 /**
  * Reset the reader pointer to the head of the file
@@ -100,13 +100,13 @@ pgmoneta_csv_writer_init(char* path, struct csv_writer** writer);
 
 /**
  * Write a row to csv file
+ * @param writer The csv writer
  * @param num_col The number of columns
  * @param cols The columns of the row
- * @param writer The csv writer
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_csv_write(int num_col, char** cols, struct csv_writer* writer);
+pgmoneta_csv_write(struct csv_writer* writer, int num_col, char** cols);
 
 /**
  * Destroy a csv writer

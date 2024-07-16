@@ -163,7 +163,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
       goto error;
    }
 
-   while (pgmoneta_csv_next_row(&cols, &f1, r1))
+   while (pgmoneta_csv_next_row(r1, &cols, &f1))
    {
       if (cols != MANIFEST_COLUMN_COUNT)
       {
@@ -173,7 +173,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
       }
       // build left chunk into a deque
       build_deque(que, r1, f1);
-      while (pgmoneta_csv_next_row(&cols, &f2, r2))
+      while (pgmoneta_csv_next_row(r2, &cols, &f2))
       {
          if (cols != MANIFEST_COLUMN_COUNT)
          {
@@ -234,7 +234,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
       goto error;
    }
 
-   while (pgmoneta_csv_next_row(&cols, &f2, r2))
+   while (pgmoneta_csv_next_row(r2, &cols, &f2))
    {
       if (cols != MANIFEST_COLUMN_COUNT)
       {
@@ -243,7 +243,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          continue;
       }
       build_deque(que, r2, f2);
-      while (pgmoneta_csv_next_row(&cols, &f1, r1))
+      while (pgmoneta_csv_next_row(r1, &cols, &f1))
       {
          if (cols != MANIFEST_COLUMN_COUNT)
          {
@@ -325,7 +325,7 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f)
    checksum = f[MANIFEST_CHECKSUM_INDEX];
    pgmoneta_deque_offer_string(deque, checksum, path);
    free(f);
-   while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(&cols, &entry, reader))
+   while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(reader, &cols, &entry))
    {
       if (cols != MANIFEST_COLUMN_COUNT)
       {
@@ -358,7 +358,7 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
    pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
    checksum = NULL;
    free(f);
-   while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(&cols, &entry, reader))
+   while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(reader, &cols, &entry))
    {
       if (cols != MANIFEST_COLUMN_COUNT)
       {

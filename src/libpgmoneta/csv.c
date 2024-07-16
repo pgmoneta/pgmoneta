@@ -52,70 +52,8 @@ error:
    return 1;
 }
 
-int
-pgmoneta_csv_reader_reset(struct csv_reader* reader)
-{
-   if (reader == NULL || reader->file == NULL)
-   {
-      goto error;
-   }
-   rewind(reader->file);
-   return 0;
-error:
-   return 1;
-}
-
-int
-pgmoneta_csv_writer_init(char* path, struct csv_writer** writer)
-{
-   struct csv_writer* w = malloc(sizeof(struct csv_writer));
-   w->file = fopen(path, "w+");
-   if (w->file == NULL)
-   {
-      goto error;
-   }
-   *writer = w;
-   return 0;
-error:
-   if (w->file != NULL)
-   {
-      fclose(w->file);
-   }
-   free(w);
-   return 1;
-}
-
-int
-pgmoneta_csv_write(int num_col, char** cols, struct csv_writer* writer)
-{
-   char* row = NULL;
-   if (writer == NULL || writer->file == NULL)
-   {
-      goto error;
-   }
-   for (int i = 0; i < num_col; i++)
-   {
-      row = pgmoneta_append(row, cols[i]);
-      if (i != num_col - 1)
-      {
-         row = pgmoneta_append(row, ",");
-      }
-      else
-      {
-         row = pgmoneta_append(row, "\n");
-      }
-   }
-   fwrite(row, 1, strlen(row), writer->file);
-   fflush(writer->file);
-   free(row);
-   return 0;
-error:
-   free(row);
-   return 1;
-}
-
 bool
-pgmoneta_csv_next_row(int* num_col, char*** cols, struct csv_reader* reader)
+pgmoneta_csv_next_row(struct csv_reader* reader, int* num_col, char*** cols)
 {
    char** cs = NULL;
    char* col = NULL;
@@ -165,6 +103,68 @@ pgmoneta_csv_reader_destroy(struct csv_reader* reader)
    }
    free(reader);
    return 0;
+}
+
+int
+pgmoneta_csv_reader_reset(struct csv_reader* reader)
+{
+   if (reader == NULL || reader->file == NULL)
+   {
+      goto error;
+   }
+   rewind(reader->file);
+   return 0;
+error:
+   return 1;
+}
+
+int
+pgmoneta_csv_writer_init(char* path, struct csv_writer** writer)
+{
+   struct csv_writer* w = malloc(sizeof(struct csv_writer));
+   w->file = fopen(path, "w+");
+   if (w->file == NULL)
+   {
+      goto error;
+   }
+   *writer = w;
+   return 0;
+error:
+   if (w->file != NULL)
+   {
+      fclose(w->file);
+   }
+   free(w);
+   return 1;
+}
+
+int
+pgmoneta_csv_write(struct csv_writer* writer, int num_col, char** cols)
+{
+   char* row = NULL;
+   if (writer == NULL || writer->file == NULL)
+   {
+      goto error;
+   }
+   for (int i = 0; i < num_col; i++)
+   {
+      row = pgmoneta_append(row, cols[i]);
+      if (i != num_col - 1)
+      {
+         row = pgmoneta_append(row, ",");
+      }
+      else
+      {
+         row = pgmoneta_append(row, "\n");
+      }
+   }
+   fwrite(row, 1, strlen(row), writer->file);
+   fflush(writer->file);
+   free(row);
+   return 0;
+error:
+   free(row);
+   return 1;
 }
 
 int
