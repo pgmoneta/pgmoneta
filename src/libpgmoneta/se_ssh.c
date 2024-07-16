@@ -30,7 +30,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <hashmap.h>
+#include <art.h>
 #include <info.h>
 #include <logging.h>
 #include <string.h>
@@ -69,12 +69,10 @@ static int sftp_permission(char* path, int user, int group, int all);
 static ssh_session session = NULL;
 static sftp_session sftp = NULL;
 
-static struct hashmap* hash_map = NULL;
+static struct art* tree_map = NULL;
 
 static bool is_error = false;
 
-static char** file_paths = NULL;
-static char** hashes = NULL;
 static char* latest_remote_root = NULL;
 
 struct workflow*
@@ -328,7 +326,7 @@ ssh_storage_backup_execute(int server, char* identifier,
       }
    }
 
-   if (pgmoneta_hashmap_create(16384, &hash_map))
+   if (pgmoneta_art_init(&tree_map, NULL))
    {
       goto error;
    }
@@ -459,8 +457,7 @@ ssh_storage_backup_teardown(int server, char* identifier,
 
    pgmoneta_delete_directory(root);
 
-   pgmoneta_hashmap_destroy(hash_map);
-   free(hash_map);
+   pgmoneta_art_destroy(tree_map);
 
    free(root);
 
@@ -647,10 +644,8 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
       latest_backup_path = pgmoneta_append(latest_backup_path, latest_remote_root);
       latest_backup_path = pgmoneta_append(latest_backup_path, relative_path);
 
-      if (pgmoneta_hashmap_contains_key(hash_map, relative_path))
+      if ((latest_sha256 = pgmoneta_art_search(tree_map, (unsigned char*)relative_path, strlen(relative_path) + 1)) != NULL)
       {
-         latest_sha256 = pgmoneta_hashmap_get(hash_map, relative_path);
-
          if (!strcmp(latest_sha256, sha256))
          {
             is_link = true;
@@ -765,8 +760,6 @@ static int
 read_latest_backup_sha256(char* path)
 {
    char buffer[4096];
-   int n = 0;
-   int lines = 0;
    FILE* file = NULL;
 
    file = fopen(path, "r");
@@ -775,69 +768,40 @@ read_latest_backup_sha256(char* path)
       goto error;
    }
 
-   while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
-   {
-      lines++;
-   }
-
    fclose(file);
 
    file = fopen(path, "r");
-
-   file_paths = (char**)malloc(sizeof(char*) * lines);
-
-   if (file_paths == NULL)
-   {
-      goto error;
-   }
-
-   hashes = (char**)malloc(sizeof(char*) * lines);
-
-   if (hashes == NULL)
-   {
-      goto error;
-   }
 
    memset(&buffer[0], 0, sizeof(buffer));
 
    while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
    {
       char* ptr = NULL;
+      char* file_path = NULL;
+      char* hash = NULL;
+
       ptr = strtok(&buffer[0], ":");
 
       if (ptr == NULL)
       {
          goto error;
       }
-
-      file_paths[n] = (char*)malloc(strlen(ptr) + 1);
-
-      if (file_paths[n] == NULL)
-      {
-         goto error;
-      }
-
-      memset(file_paths[n], 0, strlen(ptr) + 1);
-      memcpy(file_paths[n], ptr, strlen(ptr));
+      file_path = pgmoneta_append(NULL, ptr);
 
       ptr = strtok(NULL, ":");
 
-      hashes[n] = (char*)malloc(strlen(ptr));
+      hash = (char*)malloc(strlen(ptr));
 
-      if (hashes[n] == NULL)
+      if (hash == NULL)
       {
          goto error;
       }
 
-      memset(hashes[n], 0, strlen(ptr));
-      memcpy(hashes[n], ptr, strlen(ptr) - 1);
+      memset(hash, 0, strlen(ptr));
+      memcpy(hash, ptr, strlen(ptr) - 1);
 
-      if (pgmoneta_hashmap_put(hash_map, file_paths[n], hashes[n]))
-      {
-         goto error;
-      }
-
-      n++;
+      pgmoneta_art_insert(tree_map, (unsigned char*)file_path, strlen(file_path) + 1, hash);
+      free(file_path);
    }
 
    fclose(file);
