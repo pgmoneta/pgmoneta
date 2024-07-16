@@ -232,7 +232,7 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
             struct message* warning_msg = NULL;
             pgmoneta_extract_message_offset(offset, msg->data, &warning_msg);
             pgmoneta_log_notice_response_message(warning_msg);
-            pgmoneta_free_copy_message(warning_msg);
+            pgmoneta_free_message(warning_msg);
          }
          offset += 1;
          offset += pgmoneta_read_int32(msg->data + offset);
@@ -355,7 +355,7 @@ pgmoneta_extract_message_from_data(char type, void* data, size_t data_size, stru
             struct message* warning_msg = NULL;
             pgmoneta_extract_message_offset(offset, data, &warning_msg);
             pgmoneta_log_notice_response_message(warning_msg);
-            pgmoneta_free_copy_message(warning_msg);
+            pgmoneta_free_message(warning_msg);
          }
          offset += 1;
          offset += pgmoneta_read_int32(data + offset);

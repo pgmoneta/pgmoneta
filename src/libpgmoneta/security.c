@@ -170,7 +170,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          {
             goto error;
          }
-         pgmoneta_free_message();
+         pgmoneta_clear_message();
 
          status = SSL_accept(c_ssl);
          if (status != 1)
@@ -196,7 +196,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          {
             goto error;
          }
-         pgmoneta_free_message();
+         pgmoneta_clear_message();
 
          status = pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg);
          if (status != MESSAGE_STATUS_OK)
@@ -254,7 +254,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          goto error;
       }
 
-      pgmoneta_free_copy_message(request_msg);
+      pgmoneta_free_message(request_msg);
       free(username);
       free(database);
       free(appname);
@@ -275,8 +275,8 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
    }
 
 bad_password:
-   pgmoneta_free_message();
-   pgmoneta_free_copy_message(request_msg);
+   pgmoneta_clear_message();
+   pgmoneta_free_message(request_msg);
 
    free(username);
    free(database);
@@ -286,8 +286,8 @@ bad_password:
    return AUTH_BAD_PASSWORD;
 
 error:
-   pgmoneta_free_message();
-   pgmoneta_free_copy_message(request_msg);
+   pgmoneta_clear_message();
+   pgmoneta_free_message(request_msg);
 
    free(username);
    free(database);
@@ -595,13 +595,13 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_message();
-   pgmoneta_free_copy_message(sslrequest_msg);
-   pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_copy_message(sasl_response);
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_continue_response);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_clear_message();
+   pgmoneta_free_message(sslrequest_msg);
+   pgmoneta_free_message(startup_msg);
+   pgmoneta_free_message(sasl_response);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_continue_response);
+   pgmoneta_free_message(sasl_final);
 
    pgmoneta_memory_destroy();
 
@@ -621,13 +621,13 @@ bad_password:
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_message();
-   pgmoneta_free_copy_message(sslrequest_msg);
-   pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_copy_message(sasl_response);
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_continue_response);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_clear_message();
+   pgmoneta_free_message(sslrequest_msg);
+   pgmoneta_free_message(startup_msg);
+   pgmoneta_free_message(sasl_response);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_continue_response);
+   pgmoneta_free_message(sasl_final);
 
    pgmoneta_memory_destroy();
 
@@ -647,13 +647,13 @@ error:
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_message();
-   pgmoneta_free_copy_message(sslrequest_msg);
-   pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_copy_message(sasl_response);
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_continue_response);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_clear_message();
+   pgmoneta_free_message(sslrequest_msg);
+   pgmoneta_free_message(startup_msg);
+   pgmoneta_free_message(sasl_response);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_continue_response);
+   pgmoneta_free_message(sasl_final);
 
    pgmoneta_memory_destroy();
 
@@ -916,7 +916,7 @@ retry:
 
    sasl_continue = pgmoneta_copy_message(msg);
 
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    msg = NULL;
 
    status = pgmoneta_write_message(c_ssl, client_fd, sasl_continue);
@@ -975,7 +975,7 @@ retry:
 
    sasl_final = pgmoneta_copy_message(msg);
 
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    msg = NULL;
 
    status = pgmoneta_write_message(c_ssl, client_fd, sasl_final);
@@ -1000,8 +1000,8 @@ retry:
    free(server_signature_calc);
    free(base64_server_signature_calc);
 
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_final);
 
    return AUTH_SUCCESS;
 
@@ -1020,8 +1020,8 @@ bad_password:
    free(server_signature_calc);
    free(base64_server_signature_calc);
 
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_final);
 
    return AUTH_BAD_PASSWORD;
 
@@ -1040,8 +1040,8 @@ error:
    free(server_signature_calc);
    free(base64_server_signature_calc);
 
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_final);
 
    return AUTH_ERROR;
 }
@@ -1234,17 +1234,17 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    *fd = server_fd;
    *ssl = c_ssl;
 
-   pgmoneta_free_copy_message(ssl_msg);
-   pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(ssl_msg);
+   pgmoneta_free_message(startup_msg);
+   pgmoneta_clear_message();
 
    return AUTH_SUCCESS;
 
 bad_password:
 
-   pgmoneta_free_copy_message(ssl_msg);
-   pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(ssl_msg);
+   pgmoneta_free_message(startup_msg);
+   pgmoneta_clear_message();
 
    pgmoneta_close_ssl(c_ssl);
    if (server_fd != -1)
@@ -1256,9 +1256,9 @@ bad_password:
 
 error:
 
-   pgmoneta_free_copy_message(ssl_msg);
-   pgmoneta_free_copy_message(startup_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(ssl_msg);
+   pgmoneta_free_message(startup_msg);
+   pgmoneta_clear_message();
 
    pgmoneta_close_ssl(c_ssl);
    if (server_fd != -1)
@@ -1336,8 +1336,8 @@ server_password(char* username, char* password, SSL* ssl, int server_fd)
       goto bad_password;
    }
 
-   pgmoneta_free_copy_message(password_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(password_msg);
+   pgmoneta_clear_message();
 
    return AUTH_SUCCESS;
 
@@ -1345,15 +1345,15 @@ bad_password:
 
    pgmoneta_log_warn("Wrong password for user: %s", username);
 
-   pgmoneta_free_copy_message(password_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(password_msg);
+   pgmoneta_clear_message();
 
    return AUTH_BAD_PASSWORD;
 
 error:
 
-   pgmoneta_free_copy_message(password_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(password_msg);
+   pgmoneta_clear_message();
 
    return AUTH_ERROR;
 }
@@ -1457,8 +1457,8 @@ server_md5(char* username, char* password, SSL* ssl, int server_fd)
    free(md5);
    free(salt);
 
-   pgmoneta_free_copy_message(md5_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(md5_msg);
+   pgmoneta_clear_message();
 
    return AUTH_SUCCESS;
 
@@ -1472,8 +1472,8 @@ bad_password:
    free(md5);
    free(salt);
 
-   pgmoneta_free_copy_message(md5_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(md5_msg);
+   pgmoneta_clear_message();
 
    return AUTH_BAD_PASSWORD;
 
@@ -1485,8 +1485,8 @@ error:
    free(md5);
    free(salt);
 
-   pgmoneta_free_copy_message(md5_msg);
-   pgmoneta_free_message();
+   pgmoneta_free_message(md5_msg);
+   pgmoneta_clear_message();
 
    return AUTH_ERROR;
 }
@@ -1665,10 +1665,10 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_copy_message(sasl_response);
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_continue_response);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_free_message(sasl_response);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_continue_response);
+   pgmoneta_free_message(sasl_final);
 
    return AUTH_SUCCESS;
 
@@ -1688,10 +1688,10 @@ bad_password:
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_copy_message(sasl_response);
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_continue_response);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_free_message(sasl_response);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_continue_response);
+   pgmoneta_free_message(sasl_final);
 
    return AUTH_BAD_PASSWORD;
 
@@ -1709,10 +1709,10 @@ error:
    free(server_signature_received);
    free(server_signature_calc);
 
-   pgmoneta_free_copy_message(sasl_response);
-   pgmoneta_free_copy_message(sasl_continue);
-   pgmoneta_free_copy_message(sasl_continue_response);
-   pgmoneta_free_copy_message(sasl_final);
+   pgmoneta_free_message(sasl_response);
+   pgmoneta_free_message(sasl_continue);
+   pgmoneta_free_message(sasl_continue_response);
+   pgmoneta_free_message(sasl_final);
 
    return AUTH_ERROR;
 }

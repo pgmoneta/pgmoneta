@@ -113,7 +113,7 @@ query_execute(int server, char* qs, struct query_response** qr)
 
    pgmoneta_close_ssl(ssl);
    pgmoneta_disconnect(socket);
-   pgmoneta_free_copy_message(query_msg);
+   pgmoneta_free_message(query_msg);
    pgmoneta_memory_destroy();
 
    return 0;
@@ -129,7 +129,7 @@ error:
    }
    if (query_msg != NULL)
    {
-      pgmoneta_free_copy_message(query_msg);
+      pgmoneta_free_message(query_msg);
    }
 
    pgmoneta_memory_destroy();

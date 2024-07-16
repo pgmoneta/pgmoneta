@@ -92,7 +92,7 @@ pgmoneta_write_message(SSL* ssl, int socket, struct message* msg)
 }
 
 void
-pgmoneta_free_message(void)
+pgmoneta_clear_message(void)
 {
    pgmoneta_memory_free();
 }
@@ -119,7 +119,7 @@ pgmoneta_copy_message(struct message* msg)
 }
 
 void
-pgmoneta_free_copy_message(struct message* msg)
+pgmoneta_free_message(struct message* msg)
 {
    if (msg)
    {
@@ -1082,11 +1082,11 @@ pgmoneta_send_copy_done_message(SSL* ssl, int socket)
       goto error;
    }
 
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 0;
 
 error:
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 1;
 }
 
@@ -1165,7 +1165,7 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
          goto error;
       }
 
-      pgmoneta_free_message();
+      pgmoneta_clear_message();
       reply = NULL;
    }
 
@@ -1230,13 +1230,13 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
          current = dtuple;
       }
 
-      pgmoneta_free_copy_message(msg);
+      pgmoneta_free_message(msg);
       msg = NULL;
    }
 
    *response = r;
 
-   pgmoneta_free_copy_message(tmsg);
+   pgmoneta_free_message(tmsg);
    pgmoneta_memory_dynamic_destroy(data);
 
    free(content);
@@ -1247,8 +1247,8 @@ error:
 
    pgmoneta_disconnect(fd);
 
-   pgmoneta_free_message();
-   pgmoneta_free_copy_message(tmsg);
+   pgmoneta_clear_message();
+   pgmoneta_free_message(tmsg);
    pgmoneta_memory_dynamic_destroy(data);
 
    free(content);
@@ -1275,7 +1275,7 @@ pgmoneta_has_message(char type, void* data, size_t data_size)
             struct message* msg = NULL;
             pgmoneta_extract_message_offset(offset, data, &msg);
             pgmoneta_log_error_response_message(msg);
-            pgmoneta_free_copy_message(msg);
+            pgmoneta_free_message(msg);
          }
          return true;
       }
@@ -1939,7 +1939,7 @@ pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer,
    int status;
    int length;
 
-   pgmoneta_free_copy_message(*message);
+   pgmoneta_free_message(*message);
    do
    {
       while (buffer->cursor >= buffer->end)
@@ -2023,7 +2023,7 @@ pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer,
    return MESSAGE_STATUS_OK;
 
 error:
-   pgmoneta_free_copy_message(m);
+   pgmoneta_free_message(m);
    *message = NULL;
    return status;
 }
@@ -2245,13 +2245,13 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
    *response = r;
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    msg = NULL;
 
    return 0;
 error:
    pgmoneta_close_ssl(ssl);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    pgmoneta_disconnect(socket);
    pgmoneta_free_query_response(r);
    return 1;
@@ -2397,7 +2397,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       // extract the file
       pgmoneta_extract_tar_file(file_path, directory);
       remove(file_path);
-      pgmoneta_free_copy_message(msg);
+      pgmoneta_free_message(msg);
 
       msg = NULL;
       tup = tup->next;
@@ -2449,7 +2449,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
    }
 
    pgmoneta_free_query_response(response);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 0;
 
 error:
@@ -2459,7 +2459,7 @@ error:
       pgmoneta_disconnect(socket);
    }
    pgmoneta_free_query_response(response);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 1;
 }
 
@@ -2735,7 +2735,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
    }
 
    pgmoneta_free_query_response(response);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 0;
 
 error:
@@ -2750,7 +2750,7 @@ error:
       fclose(file);
    }
    pgmoneta_free_query_response(response);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 1;
 }
 
@@ -2847,12 +2847,12 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
    }
    fflush(file);
    fclose(file);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 0;
 
 error:
    fflush(file);
    fclose(file);
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    return 1;
 }

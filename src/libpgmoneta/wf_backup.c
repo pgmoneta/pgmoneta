@@ -396,8 +396,8 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_memory_destroy();
    pgmoneta_memory_stream_buffer_free(buffer);
    pgmoneta_free_tablespaces(tablespaces);
-   pgmoneta_free_copy_message(basebackup_msg);
-   pgmoneta_free_copy_message(tablespace_msg);
+   pgmoneta_free_message(basebackup_msg);
+   pgmoneta_free_message(tablespace_msg);
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
@@ -418,7 +418,7 @@ error:
    pgmoneta_memory_destroy();
    pgmoneta_memory_stream_buffer_free(buffer);
    pgmoneta_free_tablespaces(tablespaces);
-   pgmoneta_free_copy_message(basebackup_msg);
+   pgmoneta_free_message(basebackup_msg);
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);

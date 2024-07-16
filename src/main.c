@@ -1987,10 +1987,10 @@ init_replication_slots(void)
                   pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->servers[srv].name);
                }
 
-               pgmoneta_free_copy_message(slot_request_msg);
+               pgmoneta_free_message(slot_request_msg);
                slot_request_msg = NULL;
 
-               pgmoneta_free_message();
+               pgmoneta_clear_message();
                slot_response_msg = NULL;
             }
             else
@@ -2043,7 +2043,7 @@ verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket)
       }
    }
 
-   pgmoneta_free_copy_message(query);
+   pgmoneta_free_message(query);
    pgmoneta_free_query_response(response);
 
    return ret;

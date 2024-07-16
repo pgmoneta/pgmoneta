@@ -111,10 +111,10 @@ int
 pgmoneta_write_message(SSL* ssl, int socket, struct message* msg);
 
 /**
- * Free a message
+ * Clear the shared message
  */
 void
-pgmoneta_free_message(void);
+pgmoneta_clear_message(void);
 
 /**
  * Copy a message
@@ -125,11 +125,11 @@ struct message*
 pgmoneta_copy_message(struct message* msg);
 
 /**
- * Free a copy message
+ * Free a message
  * @param msg The resulting message
  */
 void
-pgmoneta_free_copy_message(struct message* msg);
+pgmoneta_free_message(struct message* msg);
 
 /**
  * Log a message

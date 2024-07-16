@@ -550,7 +550,7 @@ pgmoneta_wal(int srv, char** argv)
 
       pgmoneta_free_query_response(end_of_timeline_response);
       end_of_timeline_response = NULL;
-      pgmoneta_free_copy_message(start_replication_msg);
+      pgmoneta_free_message(start_replication_msg);
       start_replication_msg = NULL;
    }
 
@@ -583,13 +583,13 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
-   pgmoneta_free_copy_message(identify_system_msg);
-   pgmoneta_free_copy_message(start_replication_msg);
+   pgmoneta_free_message(identify_system_msg);
+   pgmoneta_free_message(start_replication_msg);
    if (msg != NULL)
    {
       msg->data = NULL;
    }
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_free_query_response(end_of_timeline_response);
    pgmoneta_memory_stream_buffer_free(buffer);
@@ -619,13 +619,13 @@ error:
       pgmoneta_sftp_wal_close(srv, filename, true, &sftp_wal_file);
       sftp_wal_file = NULL;
    }
-   pgmoneta_free_copy_message(identify_system_msg);
-   pgmoneta_free_copy_message(start_replication_msg);
+   pgmoneta_free_message(identify_system_msg);
+   pgmoneta_free_message(start_replication_msg);
    if (msg != NULL)
    {
       msg->data = NULL;
    }
-   pgmoneta_free_copy_message(msg);
+   pgmoneta_free_message(msg);
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_free_query_response(end_of_timeline_response);
    pgmoneta_memory_stream_buffer_free(buffer);
@@ -694,13 +694,13 @@ wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segs
    *timeline = tli;
 
    pgmoneta_free_query_response(read_slot_response);
-   pgmoneta_free_copy_message(read_slot_msg);
+   pgmoneta_free_message(read_slot_msg);
 
    return 0;
 
 error:
    pgmoneta_free_query_response(read_slot_response);
-   pgmoneta_free_copy_message(read_slot_msg);
+   pgmoneta_free_message(read_slot_msg);
    return 1;
 }
 
@@ -872,7 +872,7 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
    fwrite(history_content, 1, strlen(history_content) + 1, history_file);
    fflush(history_file);
 
-   pgmoneta_free_copy_message(timeline_history_msg);
+   pgmoneta_free_message(timeline_history_msg);
    pgmoneta_free_query_response(timeline_history_response);
    if (history_file != NULL)
    {
@@ -881,7 +881,7 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
    return 0;
 
 error:
-   pgmoneta_free_copy_message(timeline_history_msg);
+   pgmoneta_free_message(timeline_history_msg);
    pgmoneta_free_query_response(timeline_history_response);
    if (history_file != NULL)
    {
@@ -1040,11 +1040,11 @@ wal_send_status_report(SSL* ssl, int socket, int64_t received, int64_t flushed, 
    {
       goto error;
    }
-   pgmoneta_free_copy_message(status_report_msg);
+   pgmoneta_free_message(status_report_msg);
    return 0;
 
 error:
-   pgmoneta_free_copy_message(status_report_msg);
+   pgmoneta_free_message(status_report_msg);
    return 1;
 }
 
