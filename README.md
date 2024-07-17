@@ -24,8 +24,8 @@
 
 * [User guide](https://raw.githubusercontent.com/pgmoneta/pgmoneta.github.io/main/doc/pgmoneta-user-guide.pdf)
 * [Developer guide](https://raw.githubusercontent.com/pgmoneta/pgmoneta.github.io/main/doc/pgmoneta-dev-guide.pdf)
-* [Getting Started](./doc/GETTING_STARTED.md) on how to get started with **pgmoneta**.
-* [Configuration](./doc/CONFIGURATION.md) on how to configure **pgmoneta**.
+* [Getting Started](./doc/GETTING_STARTED.md)
+* [Configuration](./doc/CONFIGURATION.md)
 
 ## Overview
 
@@ -43,7 +43,6 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of **pgmoneta**.
 * [Fedora](https://getfedora.org/) 32+
 * [RHEL](https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux) 8.x with
   [AppStream](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/installing_managing_and_removing_user-space_components/using-appstream_using-appstream)
-
 * [FreeBSD](https://www.freebsd.org/)
 * [OpenBSD](http://www.openbsd.org/)
 
