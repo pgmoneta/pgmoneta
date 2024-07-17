@@ -553,6 +553,18 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
 int
 pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
+/**
+ * Receive extra file from the server side
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param username The current server username
+ * @param source_dir The directory for the extra files on server side
+ * @param target_dir The target directory for writing the extra files
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_dir, char* target_dir, char** info_extra);
+
 #ifdef __cplusplus
 }
 #endif

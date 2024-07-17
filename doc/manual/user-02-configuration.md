@@ -81,6 +81,7 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
+| extra | | String | No | The source directory for retrieval on the server side (details are in the extra parameter) |
 | wal_slot | | String | Yes | The replication slot for WAL |
 | create_slot | no | Bool | No | Create a replication slot for this server. Valid values are: yes, no |
 | follow | | String | No | Failover to this server if follow server fails |
@@ -102,6 +103,20 @@ The `user` specified must have the `REPLICATION` option in order to stream the W
 Note, that PostgreSQL 13+ is required, as well as having `wal_level` at `replica` or `logical` level.
 
 Note, that if `host` starts with a `/` it represents a path and [**pgmoneta**][pgmoneta] will connect using a Unix Domain Socket.
+
+### extra parameter
+
+The `extra` configuration is set in the server section. It is not required, but if you configure this parameter, when you perform a backup using the CLI `pgmoneta-cli -c pgmoneta.conf backup primary`, it will also copy all specified files on the server side and send them back to the client side.
+
+This `extra` feature requires the server side to install the [pgmoneta_ext][pgmoneta_ext] extension and also make the role `repl` a `SUPERUSER` (this will be improved in the future). Currently, this feature is only available to the `SUPERUSER` role.
+
+You can set up `pgmoneta_ext` by following the [README][ext_readme] to easily install the extension. There are also more detailed instructions available in the [DEVELOPERS][ext_developers] documentation.
+
+The format for the `extra` parameter is a path to a file or directory. You can list more than one file or directory separated by commas. The format is as follows:
+
+```ini
+extra = /tmp/myfile1, /tmp/myfile2, /tmp/mydir1, /tmp/mydir2
+```
 
 ## pgmoneta_users configuration
 

@@ -240,6 +240,9 @@ port
 user
   The user name for the replication role. Mandatory
 
+extra 
+  The source directory for retrieval on the server side
+
 wal_slot
   The WAL slot. Mandatory
 

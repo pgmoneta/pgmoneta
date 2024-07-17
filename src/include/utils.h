@@ -962,6 +962,15 @@ char*
 pgmoneta_get_server_backup_identifier(int server, char* identifier);
 
 /**
+ * Get the extra directory for a server with an identifier
+ * @param server The server
+ * @param identifier The identifier
+ * @return The extra directory
+ */
+char*
+pgmoneta_get_server_extra_identifier(int server, char* identifier);
+
+/**
  * Get the data directory for a server with an identifier
  * @param server The server
  * @param identifier The identifier

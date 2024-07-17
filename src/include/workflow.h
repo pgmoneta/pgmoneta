@@ -216,6 +216,13 @@ pgmoneta_workflow_encryption(bool encrypt);
  */
 struct workflow*
 pgmoneta_workflow_create_manifest(void);
+
+/**
+ * Create a workflow for extra files
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_workflow_create_extra(void);
 #ifdef __cplusplus
 }
 #endif

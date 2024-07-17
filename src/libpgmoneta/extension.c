@@ -38,66 +38,58 @@
 /* system */
 #include <stdlib.h>
 
-static int query_execute(int server, char* qs, struct query_response** qr);
+static int query_execute(SSL* ssl, int socket, char* qs, struct query_response** qr);
 
 int
-pgmoneta_ext_version(int server, struct query_response** qr)
+pgmoneta_ext_is_installed(SSL* ssl, int socket, struct query_response** qr)
 {
-   return query_execute(server, "SELECT pgmoneta_ext_version();", qr);
+   return query_execute(ssl, socket, "SELECT * FROM pg_available_extensions WHERE name = 'pgmoneta_ext';", qr);
 }
 
 int
-pgmoneta_ext_switch_wal(int server, struct query_response** qr)
+pgmoneta_ext_version(SSL* ssl, int socket, struct query_response** qr)
 {
-   return query_execute(server, "SELECT pgmoneta_ext_switch_wal();", qr);
+   return query_execute(ssl, socket, "SELECT pgmoneta_ext_version();", qr);
 }
 
 int
-pgmoneta_ext_checkpoint(int server, struct query_response** qr)
+pgmoneta_ext_switch_wal(SSL* ssl, int socket, struct query_response** qr)
 {
-   return query_execute(server, "SELECT pgmoneta_ext_checkpoint();", qr);
+   return query_execute(ssl, socket, "SELECT pgmoneta_ext_switch_wal();", qr);
+}
+
+int
+pgmoneta_ext_checkpoint(SSL* ssl, int socket, struct query_response** qr)
+{
+   return query_execute(ssl, socket, "SELECT pgmoneta_ext_checkpoint();", qr);
+}
+
+int
+pgmoneta_ext_priviledge(SSL* ssl, int socket, struct query_response** qr)
+{
+   return query_execute(ssl, socket, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user;", qr);
+}
+
+int
+pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_response** qr)
+{
+   char query[MAX_QUERY_LENGTH];
+   snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_file('%s');", file_path);
+   return query_execute(ssl, socket, query, qr);
+}
+
+int
+pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query_response** qr)
+{
+   char query[MAX_QUERY_LENGTH];
+   snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_files('%s');", file_path);
+   return query_execute(ssl, socket, query, qr);
 }
 
 static int
-query_execute(int server, char* qs, struct query_response** qr)
+query_execute(SSL* ssl, int socket, char* qs, struct query_response** qr)
 {
-   int usr;
-   int socket;
-   SSL* ssl = NULL;
-   struct configuration* config = NULL;
    struct message* query_msg = NULL;
-
-   usr = -1;
-   socket = 0;
-   config = (struct configuration*)shmem;
-
-   pgmoneta_memory_init();
-
-   if (server < 0 || server >= config->number_of_servers)
-   {
-      pgmoneta_log_info("Invalid server index: %d", server);
-      goto error;
-   }
-
-   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
-   {
-      if (!strcmp(config->servers[server].username, config->users[i].username))
-      {
-         usr = i;
-      }
-   }
-
-   if (usr == -1)
-   {
-      pgmoneta_log_info("User not found for server: %d", server);
-      goto error;
-   }
-
-   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
-   {
-      pgmoneta_log_info("Invalid credentials for %s", config->users[usr].username);
-      goto error;
-   }
 
    if (pgmoneta_create_query_message(qs, &query_msg) != MESSAGE_STATUS_OK || query_msg == NULL)
    {
@@ -111,27 +103,15 @@ query_execute(int server, char* qs, struct query_response** qr)
       goto error;
    }
 
-   pgmoneta_close_ssl(ssl);
-   pgmoneta_disconnect(socket);
    pgmoneta_free_message(query_msg);
-   pgmoneta_memory_destroy();
 
    return 0;
 
 error:
-   if (ssl != NULL)
-   {
-      pgmoneta_close_ssl(ssl);
-   }
-   if (socket != -1)
-   {
-      pgmoneta_disconnect(socket);
-   }
    if (query_msg != NULL)
    {
       pgmoneta_free_message(query_msg);
    }
 
-   pgmoneta_memory_destroy();
    return 1;
 }

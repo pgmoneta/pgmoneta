@@ -32,6 +32,7 @@
 #include <info.h>
 #include <logging.h>
 #include <management.h>
+#include <message.h>
 #include <network.h>
 #include <utils.h>
 #include <workflow.h>

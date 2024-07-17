@@ -1763,6 +1763,11 @@ pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup)
       goto error;
    }
 
+   if (write_string("pgmoneta_management_write_info", ssl, socket, bck->extra))
+   {
+      goto error;
+   }
+
    for (int j = 0; j < number_of_backups; j++)
    {
       free(backups[j]);
@@ -3034,6 +3039,7 @@ read_info_json(SSL* ssl, int socket)
    char* label = NULL;
    char* wal = NULL;
    char* comments = NULL;
+   char* extra = NULL;
    bool sc;
    int32_t i32;
    uint32_t u32;
@@ -3213,6 +3219,13 @@ read_info_json(SSL* ssl, int socket)
    }
 
    pgmoneta_json_put(info, "End timeline", (uintptr_t)u32, ValueUInt32);
+
+   if (read_string("pgmoneta_management_read_info", ssl, socket, &extra))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(info, "Extra", (uintptr_t)extra, ValueString);
 
    if (read_string("pgmoneta_management_read_info", ssl, socket, &comments))
    {
@@ -3931,6 +3944,7 @@ print_info_json(struct json* json)
    char* label = NULL;
    char* wal = NULL;
    char* comments = NULL;
+   char* extra = NULL;
    uint64_t number_of_tablespaces;
 
    if (!json)
@@ -3968,6 +3982,12 @@ print_info_json(struct json* json)
    if (comments != NULL)
    {
       printf("Commments            : %s\n", comments);
+   }
+
+   extra = (char*)pgmoneta_json_get(info, "Extra");
+   if (extra != NULL)
+   {
+      printf("Extra                : %s\n", extra);
    }
 
    printf("Backup size          : %" PRId64 "\n", (int64_t)pgmoneta_json_get(info, "Backup size"));
