@@ -1,8 +1,8 @@
 # pgmoneta
 
-`pgmoneta` is a backup / restore solution for [PostgreSQL](https://www.postgresql.org).
+**pgmoneta** is a backup / restore solution for [PostgreSQL](https://www.postgresql.org).
 
-`pgmoneta` is named after the Roman Goddess of Memory.
+**pgmoneta** is named after the Roman Goddess of Memory.
 
 ## Features
 
@@ -20,20 +20,23 @@
 * Daemon mode
 * User vault
 
-See [Getting Started](./doc/GETTING_STARTED.md) on how to get started with `pgmoneta`.
+## Documentation
 
-See [Configuration](./doc/CONFIGURATION.md) on how to configure `pgmoneta`.
+* [User guide](https://github.com/pgmoneta/pgmoneta.github.io/blob/main/doc/pgmoneta-user-guide.pdf)
+* [Developer guide](https://github.com/pgmoneta/pgmoneta.github.io/blob/main/doc/pgmoneta-dev-guide.pdf)
+* [Getting Started](./doc/GETTING_STARTED.md) on how to get started with **pgmoneta**.
+* [Configuration](./doc/CONFIGURATION.md) on how to configure **pgmoneta**.
 
 ## Overview
 
-`pgmoneta` makes use of
+**pgmoneta** makes use of
 
 * Process model
 * Shared memory model across processes
 * [libev](http://software.schmorp.de/pkg/libev.html) for fast network interactions
 * [Atomic operations](https://en.cppreference.com/w/c/atomic) are used to keep track of state
 
-See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
+See [Architecture](./doc/ARCHITECTURE.md) for the architecture of **pgmoneta**.
 
 ## Tested platforms
 
@@ -46,7 +49,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of `pgmoneta`.
 
 ## Compiling the source
 
-`pgmoneta` requires
+**pgmoneta** requires
 
 * [gcc 8+](https://gcc.gnu.org) (C17)
 * [cmake](https://cmake.org)
@@ -73,7 +76,7 @@ Alternative [clang 8+](https://clang.llvm.org/) can be used.
 
 ### Release build
 
-The following commands will install `pgmoneta` in the `/usr/local` hierarchy.
+The following commands will install **pgmoneta** in the `/usr/local` hierarchy.
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
@@ -85,11 +88,11 @@ make
 sudo make install
 ```
 
-See [RPM](./doc/RPM.md) for how to build a RPM of `pgmoneta`.
+See [RPM](./doc/RPM.md) for how to build a RPM of **pgmoneta**.
 
 ### Debug build
 
-The following commands will create a `DEBUG` version of `pgmoneta`.
+The following commands will create a `DEBUG` version of **pgmoneta**.
 
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
@@ -104,7 +107,7 @@ Remember to set the `log_level` configuration option to `debug5`.
 
 ## Contributing
 
-Contributions to `pgmoneta` are managed on [GitHub.com](https://github.com/pgmoneta/pgmoneta/)
+Contributions to **pgmoneta** are managed on [GitHub.com](https://github.com/pgmoneta/pgmoneta/)
 
 * [Ask a question](https://github.com/pgmoneta/pgmoneta/discussions)
 * [Raise an issue](https://github.com/pgmoneta/pgmoneta/issues)
