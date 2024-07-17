@@ -22,8 +22,8 @@
 
 ## Documentation
 
-* [User guide](https://github.com/pgmoneta/pgmoneta.github.io/blob/main/doc/pgmoneta-user-guide.pdf)
-* [Developer guide](https://github.com/pgmoneta/pgmoneta.github.io/blob/main/doc/pgmoneta-dev-guide.pdf)
+* [User guide](https://raw.githubusercontent.com/pgmoneta/pgmoneta.github.io/main/doc/pgmoneta-user-guide.pdf)
+* [Developer guide](https://raw.githubusercontent.com/pgmoneta/pgmoneta.github.io/main/doc/pgmoneta-dev-guide.pdf)
 * [Getting Started](./doc/GETTING_STARTED.md) on how to get started with **pgmoneta**.
 * [Configuration](./doc/CONFIGURATION.md) on how to configure **pgmoneta**.
 
