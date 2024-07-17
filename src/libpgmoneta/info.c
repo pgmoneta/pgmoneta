@@ -77,6 +77,7 @@ pgmoneta_create_info(char* directory, char* label, int status)
    pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
    pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
    pgmoneta_log_trace("%s=", INFO_COMMENTS);
+   pgmoneta_log_trace("%s=", INFO_EXTRA);
 
    pgmoneta_permission(s, 6, 0, 0);
 
@@ -851,6 +852,10 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
             bck->hash_algoritm = atoi(&value[0]);
          }
          else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
+         {
+            memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
+         }
+         else if (pgmoneta_starts_with(&key[0], INFO_EXTRA))
          {
             memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
          }

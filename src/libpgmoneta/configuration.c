@@ -82,6 +82,8 @@ static int restart_string(char* name, char* e, char* n);
 static bool is_empty_string(char* s);
 static int remove_leading_whitespace_and_comments(char* s, char** trimmed_line);
 
+static void split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count);
+
 /**
  *
  */
@@ -294,6 +296,30 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         max = MAX_USERNAME_LENGTH - 1;
                      }
                      memcpy(&srv.username, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "extra"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     int count = 0;
+                     split_extra(value, srv.extra, &count);
+                     srv.number_of_extra = count;
                   }
                   else
                   {
@@ -3257,4 +3283,26 @@ error:
    free(result); // Free memory in case of error
    *trimmed_line = NULL;
    return 1;
+}
+
+static void
+split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
+{
+   int i = 0;
+   char temp[MAX_BUFFER_SIZE];
+   char* token;
+
+   strcpy(temp, extra);
+   token = strtok(temp, ",");
+
+   while (token != NULL)
+   {
+      // trim_spaces(token);
+      pgmoneta_remove_whitespace(token);
+      strcpy(res[i], token);
+      token = strtok(NULL, ",");
+      i++;
+   }
+
+   *count = i;
 }

@@ -57,6 +57,7 @@ extern "C" {
 #define INFO_END_TIMELINE     "END_TIMELINE"
 #define INFO_HASH_ALGORITHM   "HASH_ALGORITM"
 #define INFO_COMMENTS         "COMMENTS"
+#define INFO_EXTRA            "EXTRA"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -90,6 +91,7 @@ struct backup
    uint32_t end_timeline;                                         /**< The ending timeline of the backup */
    int hash_algoritm;                                             /**< The hash algoritm for the manifest */
    char comments[MAX_COMMENT];                                    /**< The comments */
+   char extra[MAX_EXTRA_PATH];                                    /**< The extra directory */
 } __attribute__ ((aligned (64)));
 
 /**

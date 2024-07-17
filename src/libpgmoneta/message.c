@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
+#include <extension.h>
 #include <logging.h>
 #include <manifest.h>
 #include <memory.h>
@@ -42,6 +43,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <sys/time.h>
 #include <stdio.h>
@@ -57,6 +59,10 @@ static int get_number_of_columns(struct message* msg);
 static int get_column_name(struct message* msg, int index, char** name);
 
 static bool is_server_side_compression(void);
+
+static unsigned char* decode_base64(const char* base64_data, int* decoded_len);
+static char** get_paths(const char* data, int* count);
+static void extract_file_name(const char* path, char* file_name, char* file_path);
 
 int
 pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
@@ -2855,4 +2861,291 @@ error:
    fclose(file);
    pgmoneta_free_message(msg);
    return 1;
+}
+
+int
+pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_dir, char* target_dir, char** info_extra)
+{
+   int count = 0;
+   char** paths = NULL;
+   struct query_response* qr = NULL;
+
+   pgmoneta_ext_priviledge(ssl, socket, &qr);
+   if (qr != NULL && qr->tuples != NULL && qr->tuples->data != NULL && qr->tuples->data[0] != NULL && qr->tuples->data[0][0] == 't')
+   {
+      pgmoneta_free_query_response(qr);
+      qr = NULL;
+
+      pgmoneta_ext_get_files(ssl, socket, source_dir, &qr);
+      if (qr != NULL)
+      {
+         paths = get_paths(qr->tuples->data[0], &count);
+         pgmoneta_free_query_response(qr);
+         qr = NULL;
+      }
+      else
+      {
+         pgmoneta_log_warn("Retrieving extra files: Query failed");
+         goto error;
+      }
+
+      if (paths != NULL)
+      {
+         if (*info_extra == NULL)
+         {
+            *info_extra = malloc(MAX_EXTRA_PATH);
+            (*info_extra)[0] = '\0';
+         }
+
+         for (int j = 0; j < count; j++)
+         {
+            char* dest_dir;
+            char* dest_path;
+            char file_name[MAX_PATH];
+            char file_path[MAX_PATH];
+
+            extract_file_name(paths[j], file_name, file_path);
+
+            if (file_path[0] != '\0')
+            {
+               dest_dir = (char*)malloc((strlen(target_dir) + strlen(file_path) + 1) * sizeof(char));
+               snprintf(dest_dir, strlen(target_dir) + strlen(file_path) + 1, "%s%s", target_dir, file_path);
+            }
+            else
+            {
+               dest_dir = (char*)malloc((strlen(target_dir) + 1) * sizeof(char));
+               strncpy(dest_dir, target_dir, strlen(target_dir) + 1);
+            }
+
+            pgmoneta_mkdir(dest_dir);
+
+            dest_path = (char*)malloc((strlen(dest_dir) + strlen(file_name) + 1) * sizeof(char));
+            snprintf(dest_path, strlen(dest_dir) + strlen(file_name) + 1, "%s%s", dest_dir, file_name);
+
+            pgmoneta_ext_get_file(ssl, socket, paths[j], &qr);
+            if (qr != NULL && qr->tuples != NULL)
+            {
+               struct tuple* current_tuple = qr->tuples;
+               while (current_tuple != NULL)
+               {
+                  if (current_tuple->data != NULL && current_tuple->data[0] != NULL)
+                  {
+                     int decoded_len;
+                     unsigned char* decoded_data;
+
+                     decoded_data = decode_base64(current_tuple->data[0], &decoded_len);
+                     if (decoded_data != NULL)
+                     {
+                        FILE* file = fopen(dest_path, "wb");
+                        if (file != NULL)
+                        {
+                           fwrite(decoded_data, 1, decoded_len, file);
+                           fclose(file);
+                        }
+                        else
+                        {
+                           pgmoneta_log_error("Retrieving extra files: Could not open file \"%s\" for writing", dest_path);
+                           free(dest_dir);
+                           free(dest_path);
+                           goto error;
+                        }
+                        free(decoded_data);
+                     }
+                  }
+                  current_tuple = current_tuple->next;
+               }
+               if (strlen(*info_extra) == 0)
+               {
+                  *info_extra = pgmoneta_append(*info_extra, paths[j]);
+               }
+               else
+               {
+                  *info_extra = pgmoneta_append(*info_extra, ", ");
+                  *info_extra = pgmoneta_append(*info_extra, paths[j]);
+               }
+            }
+            else
+            {
+               pgmoneta_log_warn("Retrieving extra files: Query failed");
+               goto error;
+            }
+
+            pgmoneta_free_query_response(qr);
+            free(dest_dir);
+            free(dest_path);
+            free(paths[j]);
+            qr = NULL;
+         }
+         free(paths);
+      }
+      else
+      {
+         pgmoneta_log_warn("Retrieving extra files: Incorrect path \"%s\"", source_dir);
+      }
+
+      pgmoneta_free_query_response(qr);
+      return 0;
+   }
+   else if (qr != NULL && qr->tuples != NULL && qr->tuples->data != NULL && qr->tuples->data[0] != NULL && qr->tuples->data[0][0] == 'f')
+   {
+      pgmoneta_log_warn("Retrieving extra files: User %s is not SUPERUSER", username);
+      goto error;
+   }
+   else
+   {
+      pgmoneta_log_warn("Retrieving extra files: Query failed");
+      goto error;
+   }
+
+error:
+   if (paths != NULL)
+   {
+      for (int i = 0; i < count; i++)
+      {
+         free(paths[i]);
+      }
+      free(paths);
+   }
+   pgmoneta_free_query_response(qr);
+
+   return 1;
+}
+
+static char**
+get_paths(const char* data, int* count)
+{
+   if (data == NULL || count == NULL)
+   {
+      return NULL;
+   }
+
+   int index;
+   size_t data_length;
+   char* cleaned_data = NULL;
+   char* token = NULL;
+   char** paths;
+
+   // Remove the first '{' and the last '}'
+   data_length = strlen(data);
+   if (data_length < 2 || data[0] != '{' || data[data_length - 1] != '}')
+   {
+      return NULL;
+   }
+   cleaned_data = (char*)malloc(data_length - 1);
+   strncpy(cleaned_data, data + 1, data_length - 2);
+   cleaned_data[data_length - 2] = '\0';
+
+   if (strlen(cleaned_data) == 0)
+   {
+      *count = 0;
+      goto error;
+   }
+
+   *count = 1;
+   for (char* tmp = cleaned_data; *tmp; tmp++)
+   {
+      if (*tmp == ',')
+      {
+         (*count)++;
+      }
+   }
+
+   paths = (char**)malloc(*count * sizeof(char*));
+   if (paths == NULL)
+   {
+      goto error;
+   }
+
+   index = 0;
+   token = strtok(cleaned_data, ",");
+   while (token != NULL)
+   {
+      paths[index] = strdup(token);
+      if (paths[index] == NULL)
+      {
+         for (int i = 0; i < index; i++)
+         {
+            free(paths[i]);
+         }
+         free(paths);
+         goto error;
+      }
+      index++;
+      token = strtok(NULL, ",");
+   }
+
+   free(cleaned_data);
+
+   return paths;
+
+error:
+   if (cleaned_data != NULL)
+   {
+      free(cleaned_data);
+   }
+
+   return NULL;
+}
+
+static void
+extract_file_name(const char* path, char* file_name, char* file_path)
+{
+   const char* last_slash;
+
+   last_slash = strrchr(path, '/');
+
+   if (last_slash != NULL)
+   {
+      size_t path_length;
+
+      // Copy the file name (the part after the last '/')
+      strcpy(file_name, last_slash + 1);
+
+      // Copy the path up to and including the last '/'
+      path_length = last_slash - path + 1;
+      strncpy(file_path, path, path_length);
+      file_path[path_length] = '\0';   // Null-terminate the file_path string
+   }
+   else
+   {
+      // If no '/' is found, the entire path is the file name and file_path is empty
+      strcpy(file_name, path);
+      file_path[0] = '\0';
+   }
+}
+
+static unsigned char*
+decode_base64(const char* base64_data, int* decoded_len)
+{
+   size_t base64_len;
+   size_t max_decoded_len;
+   unsigned char* decoded_data;
+   int actual_decoded_len;
+
+   base64_len = strlen(base64_data);
+   max_decoded_len = (base64_len / 4) * 3;
+   decoded_data = (unsigned char*)malloc(max_decoded_len);
+
+   // Perform base64 decoding using OpenSSL
+   actual_decoded_len = EVP_DecodeBlock(decoded_data, (const unsigned char*)base64_data, base64_len);
+
+   // Handle padding
+   if (base64_data[base64_len - 1] == '=')
+   {
+      actual_decoded_len--;
+   }
+   if (base64_data[base64_len - 2] == '=')
+   {
+      actual_decoded_len--;
+   }
+
+   if (actual_decoded_len < 0)
+   {
+      pgmoneta_log_error("error decode: Base64 decoding failed");
+      free(decoded_data);
+      return NULL;
+   }
+
+   *decoded_len = actual_decoded_len;
+   return decoded_data;
 }

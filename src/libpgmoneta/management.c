@@ -1763,6 +1763,11 @@ pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup)
       goto error;
    }
 
+   if (write_string("pgmoneta_management_write_info", ssl, socket, bck->extra))
+   {
+      goto error;
+   }
+
    for (int j = 0; j < number_of_backups; j++)
    {
       free(backups[j]);
@@ -3034,6 +3039,7 @@ read_info_json(SSL* ssl, int socket)
    char* label = NULL;
    char* wal = NULL;
    char* comments = NULL;
+   char* extra = NULL;
    bool sc;
    int32_t i32;
    uint32_t u32;
@@ -3213,6 +3219,13 @@ read_info_json(SSL* ssl, int socket)
    }
 
    pgmoneta_json_put(info, "End timeline", (uintptr_t)u32, ValueUInt32);
+
+   if (read_string("pgmoneta_management_read_info", ssl, socket, &extra))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(info, "Extra", extra != NULL && strlen(extra) > 0 ? extra : "", ValueString);
 
    if (read_string("pgmoneta_management_read_info", ssl, socket, &comments))
    {
@@ -3931,6 +3944,7 @@ print_info_json(struct json* json)
    char* label = NULL;
    char* wal = NULL;
    char* comments = NULL;
+   char* extra = NULL;
    uint64_t number_of_tablespaces;
 
    if (!json)
@@ -3970,6 +3984,7 @@ print_info_json(struct json* json)
       printf("Commments            : %s\n", comments);
    }
 
+<<<<<<< HEAD
    printf("Backup size          : %" PRId64 "\n", (int64_t)pgmoneta_json_get(info, "Backup size"));
    printf("Restore size         : %" PRId64 "\n", (int64_t)pgmoneta_json_get(info, "Restore size"));
    printf("Elapsed time         : %d\n", (int)pgmoneta_json_get(info, "Elapsed time"));
@@ -3977,6 +3992,21 @@ print_info_json(struct json* json)
    printf("Minor version        : %d\n", (int)pgmoneta_json_get(info, "Minor version"));
    printf("Keep                 : %d\n", (bool)pgmoneta_json_get(info, "Keep"));
    printf("Valid                : %d\n", (bool)pgmoneta_json_get(info, "Valid"));
+=======
+   extra = pgmoneta_json_get_string(info, "Extra");
+   if (extra != NULL)
+   {
+      printf("Extra                : %s\n", extra);
+   }
+
+   printf("Backup size          : %" PRId64 "\n", pgmoneta_json_get_uint64(info, "Backup size"));
+   printf("Restore size         : %" PRId64 "\n", pgmoneta_json_get_uint64(info, "Restore size"));
+   printf("Elapsed time         : %d\n", (int)pgmoneta_json_get_int32(info, "Elapsed time"));
+   printf("Version              : %d\n", (int)pgmoneta_json_get_int32(info, "Version"));
+   printf("Minor version        : %d\n", (int)pgmoneta_json_get_int32(info, "Minor version"));
+   printf("Keep                 : %d\n", (bool)pgmoneta_json_get_bool(info, "Keep"));
+   printf("Valid                : %d\n", (char)pgmoneta_json_get_bool(info, "Valid"));
+>>>>>>> 71bfb27 ([#328] Get extra files)
 
    number_of_tablespaces = (uint64_t)pgmoneta_json_get(info, "Number of tablespaces");
    printf("Number of tablespaces: %" PRId64 "\n", number_of_tablespaces);
@@ -4049,19 +4079,31 @@ print_verify_json(struct json* json)
 
    number_of_failed = pgmoneta_json_array_length(failed);
    printf("Number of failed        : %d\n", number_of_failed);
+<<<<<<< HEAD
    pgmoneta_json_iterator_init(failed, &iter);
    while (pgmoneta_json_iterator_next(iter))
+=======
+   for (int i = 0; i < number_of_failed; i++)
+>>>>>>> 71bfb27 ([#328] Get extra files)
    {
       char* filename = NULL;
       char* original = NULL;
       char* calculated = NULL;
       struct json* entry = NULL;
 
+<<<<<<< HEAD
       entry = (struct json*)pgmoneta_value_data(iter->value);
 
       filename = (char*)pgmoneta_json_get(entry, "File name");
       original = (char*)pgmoneta_json_get(entry, "Original");
       calculated = (char*)pgmoneta_json_get(entry, "Calculated");
+=======
+      entry = pgmoneta_json_array_get(failed, i);
+
+      filename = pgmoneta_json_get_string(entry, "File name");
+      original = pgmoneta_json_get_string(entry, "Original");
+      calculated = pgmoneta_json_get_string(entry, "Calculated");
+>>>>>>> 71bfb27 ([#328] Get extra files)
 
       printf("File name : %s\n", filename);
       printf("Original  : %s\n", original);
@@ -4072,17 +4114,27 @@ print_verify_json(struct json* json)
 
    number_of_all = pgmoneta_json_array_length(all);
    printf("Number of all           : %d\n", number_of_all);
+<<<<<<< HEAD
    pgmoneta_json_iterator_init(all, &iter);
+=======
+>>>>>>> 71bfb27 ([#328] Get extra files)
    for (int i = 0; i < number_of_all; i++)
    {
       char* filename = NULL;
       char* hash = NULL;
       struct json* entry = NULL;
 
+<<<<<<< HEAD
       entry = (struct json*)pgmoneta_value_data(iter->value);
 
       filename = (char*)pgmoneta_json_get(entry, "File name");
       hash = (char*)pgmoneta_json_get(entry, "Hash");
+=======
+      entry = pgmoneta_json_array_get(all, i);
+
+      filename = pgmoneta_json_get_string(entry, "File name");
+      hash = pgmoneta_json_get_string(entry, "Hash");
+>>>>>>> 71bfb27 ([#328] Get extra files)
 
       printf("File name : %s\n", filename);
       printf("Hash      : %s\n", hash);

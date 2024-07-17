@@ -198,3 +198,64 @@ where `$HOME` is your home directory.
 ### Build
 
 These packages will be detected during `cmake` and built as part of the main build.
+
+## Extension installation
+
+When you configure the `extra` parameter in the server section of `pgmoneta.conf`, it requires the server side to have the [pgmoneta_ext][pgmoneta_ext] extension installed to make it work.
+
+The following instructions can help you easily install `pgmoneta_ext`. If you encounter any problems, please refer to the more detailed instructions in the [DEVELOPERS][ext_developers] documentation.
+
+### Install pgmoneta_ext
+
+After you have successfully installed `pgmoneta`, the following commands will help you install `pgmoneta_ext`:
+
+```sh
+dnf install -y pgmoneta_ext
+```
+
+You need to add the `pgmoneta_ext` library for PostgreSQL in `postgrersql.conf` as well:
+
+```ini
+shared_preload_libraries = 'pgmoneta_ext'
+```
+
+And remember to restart PostgreSQL to make it work.
+
+### Verify success
+
+You can use the `postgres` role to test.
+
+1. Log into PostgreSQL
+
+    ``` sh
+    psql
+    ```
+
+2. Create a new test database
+
+    ``` sql
+    CREATE DATABASE testdb;
+    ```
+
+3. Enter the database
+
+    ``` sql
+    \c testdb
+    ```
+
+4. Follow the SQL commands below to check the function
+
+    ``` sql
+    DROP EXTENSION IF EXISTS pgmoneta_ext;
+    CREATE EXTENSION pgmoneta_ext;
+    SELECT pgmoneta_ext_version();
+    ```
+
+You should see
+
+``` console
+ pgmoneta_ext_version 
+----------------------
+ 0.1.0
+(1 row)
+```

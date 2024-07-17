@@ -3272,6 +3272,18 @@ pgmoneta_get_server_backup_identifier(int server, char* identifier)
 }
 
 char*
+pgmoneta_get_server_extra_identifier(int server, char* identifier)
+{
+   char* d = NULL;
+
+   d = pgmoneta_get_server_backup(server);
+   d = pgmoneta_append(d, identifier);
+   d = pgmoneta_append(d, "/extra/");
+
+   return d;
+}
+
+char*
 pgmoneta_get_server_backup_identifier_data(int server, char* identifier)
 {
    char* d = NULL;
