@@ -11,6 +11,7 @@ pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 -L, --logfile FILE       Set the log file
 -v, --verbose            Output text string of result
 -V, --version            Display version information
+-F, --format text|json   Set the output format
 -?, --help               Display help
 ```
 

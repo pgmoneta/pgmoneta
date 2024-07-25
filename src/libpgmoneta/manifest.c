@@ -84,28 +84,28 @@ pgmoneta_manifest_checksum_verify(char* root)
       memset(file_path, 0, MAX_PATH);
       if (pgmoneta_ends_with(root, "/"))
       {
-         snprintf(file_path, MAX_PATH, "%s%s", root, pgmoneta_json_get_string_value(file, "Path"));
+         snprintf(file_path, MAX_PATH, "%s%s", root, pgmoneta_json_get_string(file, "Path"));
       }
       else
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", root, pgmoneta_json_get_string_value(file, "Path"));
+         snprintf(file_path, MAX_PATH, "%s/%s", root, pgmoneta_json_get_string(file, "Path"));
       }
 
       file_size = pgmoneta_get_file_size(file_path);
-      file_size_manifest = pgmoneta_json_get_int64_value(file, "Size");
+      file_size_manifest = pgmoneta_json_get_int64(file, "Size");
       if (file_size != file_size_manifest)
       {
          pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file_size_manifest);
       }
 
-      algorithm = pgmoneta_json_get_string_value(file, "Checksum-Algorithm");
+      algorithm = pgmoneta_json_get_string(file, "Checksum-Algorithm");
       if (pgmoneta_create_file_hash(pgmoneta_get_hash_algorithm(algorithm), file_path, &hash))
       {
          pgmoneta_log_error("Unable to generate hash for file %s with algorithm %s", file_path, algorithm);
          goto error;
       }
 
-      checksum = pgmoneta_json_get_string_value(file, "Checksum");
+      checksum = pgmoneta_json_get_string(file, "Checksum");
       if (!pgmoneta_compare_string(hash, checksum))
       {
          pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, hash, checksum);
@@ -114,12 +114,12 @@ pgmoneta_manifest_checksum_verify(char* root)
       pgmoneta_json_free(file);
       file = NULL;
    }
-   pgmoneta_json_close_reader(reader);
+   pgmoneta_json_reader_close(reader);
    pgmoneta_json_free(file);
    return 0;
 
 error:
-   pgmoneta_json_close_reader(reader);
+   pgmoneta_json_reader_close(reader);
    pgmoneta_json_free(file);
    return 1;
 }

@@ -55,6 +55,33 @@
 
 #define MANAGEMENT_HEADER_SIZE 1
 
+/**
+ * JSON related command tags, used to build and retrieve
+ * a JSON piece of information related to a single command
+ */
+#define JSON_TAG_COMMAND "command"
+#define JSON_TAG_COMMAND_NAME "name"
+#define JSON_TAG_COMMAND_STATUS "status"
+#define JSON_TAG_COMMAND_ERROR "error"
+#define JSON_TAG_COMMAND_OUTPUT "output"
+#define JSON_TAG_COMMAND_EXIT_STATUS "exit-status"
+
+#define JSON_TAG_APPLICATION_NAME "name"
+#define JSON_TAG_APPLICATION_VERSION_MAJOR "major"
+#define JSON_TAG_APPLICATION_VERSION_MINOR "minor"
+#define JSON_TAG_APPLICATION_VERSION_PATCH "patch"
+#define JSON_TAG_APPLICATION_VERSION "version"
+
+#define JSON_TAG_ARRAY_NAME "list"
+
+/**
+ * JSON pre-defined values
+ */
+#define JSON_STRING_SUCCESS "OK"
+#define JSON_STRING_ERROR   "KO"
+#define JSON_BOOL_SUCCESS   "0"
+#define JSON_BOOL_ERROR     "1"
+
 static int read_byte(char* prefix, SSL* ssl, int socket, signed char* c);
 static int read_int32(char* prefix, SSL* ssl, int socket, int32_t* i);
 static int read_uint32(char* prefix, SSL* ssl, int socket, uint32_t* i);
@@ -82,6 +109,12 @@ static struct json* read_details_json(SSL* ssl, int socket);
 static struct json* read_list_backup_json(SSL* ssl, int socket, char* server);
 static struct json* read_delete_json(SSL* ssl, int socket, char* server, char* backup_id);
 static struct json* read_info_json(SSL* ssl, int socket);
+static struct json* create_new_command_json_object(char* command_name, bool success, char* executable_name);
+static struct json* extract_command_output_json_object(struct json* json);
+static bool json_command_name_equals_to(struct json* json, char* command_name);
+static int set_command_json_object_faulty(struct json* json, char* message);
+static bool is_command_json_object_faulty(struct json* json);
+static void print_and_free_json_object(struct json* json);
 
 int
 pgmoneta_management_read_header(int socket, signed char* id)
@@ -215,7 +248,7 @@ pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server, char ou
    }
    else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
    {
-      pgmoneta_json_print_and_free_json_object(json);
+      print_and_free_json_object(json);
       json = NULL;
    }
    else
@@ -472,7 +505,7 @@ pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup
    }
    else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
    {
-      pgmoneta_json_print_and_free_json_object(json);
+      print_and_free_json_object(json);
       json = NULL;
    }
    else
@@ -607,7 +640,7 @@ pgmoneta_management_read_status(SSL* ssl, int socket, char output_format)
    }
    else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
    {
-      pgmoneta_json_print_and_free_json_object(json);
+      print_and_free_json_object(json);
       json = NULL;
    }
    else
@@ -833,7 +866,7 @@ pgmoneta_management_read_details(SSL* ssl, int socket, char output_format)
    }
    else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
    {
-      pgmoneta_json_print_and_free_json_object(json);
+      print_and_free_json_object(json);
       json = NULL;
    }
    else
@@ -1336,7 +1369,7 @@ pgmoneta_management_read_info(SSL* ssl, int socket, char output_format)
    }
    else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
    {
-      pgmoneta_json_print_and_free_json_object(json);
+      print_and_free_json_object(json);
       json = NULL;
    }
    else
@@ -2153,27 +2186,27 @@ read_status_json(SSL* ssl, int socket)
    struct json* status = NULL;
    struct json* servers_array = NULL;
 
-   json = pgmoneta_json_create_new_command_object("status", true, "pgmoneta-cli");
-   pgmoneta_json_init(&status, JSONItem);
+   json = create_new_command_json_object("status", true, "pgmoneta-cli");
+   pgmoneta_json_init(&status);
    if (status == NULL || json == NULL)
    {
       goto error;
    }
 
-   output = pgmoneta_json_extract_command_output_object(json);
+   output = extract_command_output_json_object(json);
 
    if (read_bool("pgmoneta_management_read_status", ssl, socket, &offline))
    {
       goto error;
    }
-   pgmoneta_json_item_put_string(status, "Mode", (offline == 0 ? "Running" : "Offline"));
+   pgmoneta_json_put(status, "Mode", (offline == 0 ? "Running" : "Offline"), ValueString);
 
    if (read_uint64("pgmoneta_management_read_status", ssl, socket, &used_size))
    {
       goto error;
    }
    size_string = pgmoneta_bytes_to_string(used_size);
-   pgmoneta_json_item_put_string(status, "Used space", size_string);
+   pgmoneta_json_put(status, "Used space", size_string, ValueString);
    free(size_string);
 
    if (read_uint64("pgmoneta_management_read_status", ssl, socket, &free_size))
@@ -2181,7 +2214,7 @@ read_status_json(SSL* ssl, int socket)
       goto error;
    }
    size_string = pgmoneta_bytes_to_string(free_size);
-   pgmoneta_json_item_put_string(status, "Free space", size_string);
+   pgmoneta_json_put(status, "Free space", size_string, ValueString);
    free(size_string);
 
    if (read_uint64("pgmoneta_management_read_status", ssl, socket, &total_size))
@@ -2189,22 +2222,23 @@ read_status_json(SSL* ssl, int socket)
       goto error;
    }
    size_string = pgmoneta_bytes_to_string(total_size);
-   pgmoneta_json_item_put_string(status, "Total space", size_string);
+   pgmoneta_json_put(status, "Total space", size_string, ValueString);
    free(size_string);
 
    if (read_int32("pgmoneta_management_read_status", ssl, socket, &workers))
    {
       goto error;
    }
-   pgmoneta_json_item_put_int32(status, "Workers", workers);
+
+   pgmoneta_json_put(status, "Workers", &workers, ValueInt32);
 
    if (read_int32("pgmoneta_management_read_status", ssl, socket, &num_servers))
    {
       goto error;
    }
-   pgmoneta_json_item_put_int32(status, "Number of servers", num_servers);
+   pgmoneta_json_put(status, "Number of servers", &num_servers, ValueInt32);
 
-   pgmoneta_json_init(&servers_array, JSONArray);
+   pgmoneta_json_init(&servers_array);
    if (servers_array == NULL)
    {
       goto error;
@@ -2257,27 +2291,27 @@ read_status_json(SSL* ssl, int socket)
          goto error;
       }
       struct json* server = NULL;
-      pgmoneta_json_init(&server, JSONItem);
-      pgmoneta_json_item_put_string(server, "Server", &name[0]);
-      pgmoneta_json_item_put_int32(server, "Retention days", retention_days);
+      pgmoneta_json_init(&server);
+      pgmoneta_json_put(server, "Server", &name[0], ValueString);
+      pgmoneta_json_put(server, "Retention days", &retention_days, ValueInt32);
       if (retention_weeks != -1)
       {
-         pgmoneta_json_item_put_int32(server, "Retention weeks", retention_weeks);
+         pgmoneta_json_put(server, "Retention weeks", &retention_weeks, ValueInt32);
       }
       if (retention_months != -1)
       {
-         pgmoneta_json_item_put_int32(server, "Retention months", retention_months);
+         pgmoneta_json_put(server, "Retention months", &retention_months, ValueInt32);
       }
       if (retention_years != -1)
       {
-         pgmoneta_json_item_put_int32(server, "Retention years", retention_years);
+         pgmoneta_json_put(server, "Retention years", &retention_years, ValueInt32);
       }
-      pgmoneta_json_item_put_int32(server, "Backups", number_of_directories);
-      pgmoneta_json_item_put_string(server, "Space", size_string);
-      pgmoneta_json_item_put_string(server, "Hot standby", hot_standby_size_string);
-      pgmoneta_json_item_put_int32(server, "Workers", workers);
+      pgmoneta_json_put(server, "Backups", &number_of_directories, ValueInt32);
+      pgmoneta_json_put(server, "Space", size_string, ValueString);
+      pgmoneta_json_put(server, "Hot standby", hot_standby_size_string, ValueString);
+      pgmoneta_json_put(server, "Workers", &workers, ValueInt32);
 
-      pgmoneta_json_array_append_object(servers_array, server);
+      pgmoneta_json_append(servers_array, server, ValueObject);
 
       free(size_string);
       size_string = NULL;
@@ -2289,8 +2323,8 @@ read_status_json(SSL* ssl, int socket)
       name = NULL;
    }
 
-   pgmoneta_json_item_put_object(status, "servers", servers_array);
-   pgmoneta_json_item_put_object(output, "status", status);
+   pgmoneta_json_put(status, "servers", servers_array, ValueObject);
+   pgmoneta_json_put(output, "status", status, ValueObject);
 
    return json;
 
@@ -2298,7 +2332,7 @@ error:
    // return json anyway with error code set
    if (json != NULL)
    {
-      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+      set_command_json_object_faulty(json, strerror(errno));
    }
    errno = 0;
    return json;
@@ -2338,27 +2372,27 @@ read_details_json(SSL* ssl, int socket)
    struct json* status = NULL;
    struct json* servers_array = NULL;
 
-   json = pgmoneta_json_create_new_command_object("details", true, "pgmoneta-cli");
-   pgmoneta_json_init(&status, JSONItem);
+   json = create_new_command_json_object("details", true, "pgmoneta-cli");
+   pgmoneta_json_init(&status);
    if (status == NULL || json == NULL)
    {
       goto error;
    }
 
-   output = pgmoneta_json_extract_command_output_object(json);
+   output = extract_command_output_json_object(json);
 
    if (read_bool("pgmoneta_management_read_details", ssl, socket, &offline))
    {
       goto error;
    }
-   pgmoneta_json_item_put_string(status, "Mode", (offline == 0 ? "Running" : "Offline"));
+   pgmoneta_json_put(status, "Mode", (offline == 0 ? "Running" : "Offline"), ValueString);
 
    if (read_uint64("pgmoneta_management_read_details", ssl, socket, &used_size))
    {
       goto error;
    }
    size_string = pgmoneta_bytes_to_string(used_size);
-   pgmoneta_json_item_put_string(status, "Used space", size_string);
+   pgmoneta_json_put(status, "Used space", size_string, ValueString);
    free(size_string);
 
    if (read_uint64("pgmoneta_management_read_details", ssl, socket, &free_size))
@@ -2366,7 +2400,7 @@ read_details_json(SSL* ssl, int socket)
       goto error;
    }
    size_string = pgmoneta_bytes_to_string(free_size);
-   pgmoneta_json_item_put_string(status, "Free space", size_string);
+   pgmoneta_json_put(status, "Free space", size_string, ValueString);
    free(size_string);
 
    if (read_uint64("pgmoneta_management_read_details", ssl, socket, &total_size))
@@ -2374,21 +2408,21 @@ read_details_json(SSL* ssl, int socket)
       goto error;
    }
    size_string = pgmoneta_bytes_to_string(total_size);
-   pgmoneta_json_item_put_string(status, "Total space", size_string);
+   pgmoneta_json_put(status, "Total space", size_string, ValueString);
    free(size_string);
 
    if (read_int32("pgmoneta_management_read_status", ssl, socket, &workers))
    {
       goto error;
    }
-   pgmoneta_json_item_put_int32(status, "Workers", workers);
+   pgmoneta_json_put(status, "Workers", &workers, ValueInt32);
 
    if (read_int32("pgmoneta_management_read_details", ssl, socket, &num_servers))
    {
       goto error;
    }
-   pgmoneta_json_item_put_int32(status, "Number of servers", num_servers);
-   pgmoneta_json_init(&servers_array, JSONArray);
+   pgmoneta_json_put(status, "Number of servers", &num_servers, ValueInt32);
+   pgmoneta_json_init(&servers_array);
    if (servers_array == NULL)
    {
       goto error;
@@ -2440,25 +2474,25 @@ read_details_json(SSL* ssl, int socket)
          goto error;
       }
       struct json* server = NULL;
-      pgmoneta_json_init(&server, JSONItem);
-      pgmoneta_json_item_put_string(server, "Server", &name[0]);
-      pgmoneta_json_item_put_int32(server, "Retention days", retention_days);
+      pgmoneta_json_init(&server);
+      pgmoneta_json_put(server, "Server", &name[0], ValueString);
+      pgmoneta_json_put(server, "Retention days", &retention_days, ValueInt32);
       if (retention_weeks != -1)
       {
-         pgmoneta_json_item_put_int32(server, "Retention weeks", retention_weeks);
+         pgmoneta_json_put(server, "Retention weeks", &retention_weeks, ValueInt32);
       }
       if (retention_months != -1)
       {
-         pgmoneta_json_item_put_int32(server, "Retention months", retention_months);
+         pgmoneta_json_put(server, "Retention months", &retention_months, ValueInt32);
       }
       if (retention_years != -1)
       {
-         pgmoneta_json_item_put_int32(server, "Retention years", retention_years);
+         pgmoneta_json_put(server, "Retention years", &retention_years, ValueInt32);
       }
-      pgmoneta_json_item_put_int32(server, "Backups", number_of_backups);
-      pgmoneta_json_item_put_string(server, "Space", size_string);
-      pgmoneta_json_item_put_int32(server, "Workers", workers);
-      pgmoneta_json_item_put_string(server, "Hot standby", hot_standby_size_string);
+      pgmoneta_json_put(server, "Backups", &number_of_backups, ValueInt32);
+      pgmoneta_json_put(server, "Space", size_string, ValueString);
+      pgmoneta_json_put(server, "Workers", &workers, ValueInt32);
+      pgmoneta_json_put(server, "Hot standby", hot_standby_size_string, ValueString);
       free(size_string);
       size_string = NULL;
 
@@ -2469,7 +2503,7 @@ read_details_json(SSL* ssl, int socket)
       name = NULL;
 
       struct json* backups_array = NULL;
-      pgmoneta_json_init(&backups_array, JSONArray);
+      pgmoneta_json_init(&backups_array);
       if (backups_array == NULL)
       {
          goto error;
@@ -2521,25 +2555,25 @@ read_details_json(SSL* ssl, int socket)
          ds = pgmoneta_bytes_to_string(delta_size);
          pgmoneta_log_info(">>%s", ds);
          struct json* backup = NULL;
-         pgmoneta_json_init(&backup, JSONItem);
-         pgmoneta_json_item_put_string(backup, "Backup name", name);
+         pgmoneta_json_init(&backup);
+         pgmoneta_json_put(backup, "Backup name", name, ValueString);
          if (valid != VALID_UNKNOWN)
          {
-            pgmoneta_json_item_put_string(backup, "Backup", bck);
-            pgmoneta_json_item_put_string(backup, "Restore", res);
-            pgmoneta_json_item_put_string(backup, "WAL", ws);
-            pgmoneta_json_item_put_string(backup, "Delta", ds);
-            pgmoneta_json_item_put_string(backup, "Retain", keep ? "Yes" : "No");
-            pgmoneta_json_item_put_string(backup, "Valid", valid == VALID_TRUE ? "Yes" : "No");
+            pgmoneta_json_put(backup, "Backup", bck, ValueString);
+            pgmoneta_json_put(backup, "Restore", res, ValueString);
+            pgmoneta_json_put(backup, "WAL", ws, ValueString);
+            pgmoneta_json_put(backup, "Delta", ds, ValueString);
+            pgmoneta_json_put(backup, "Retain", keep ? "Yes" : "No", ValueString);
+            pgmoneta_json_put(backup, "Valid", valid == VALID_TRUE ? "Yes" : "No", ValueString);
          }
          else
          {
-            pgmoneta_json_item_put_string(backup, "Backup", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Restore", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "WAL", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Delta", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Retain", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Valid", "UNKNOWN");
+            pgmoneta_json_put(backup, "Backup", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Restore", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "WAL", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Delta", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Retain", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Valid", "UNKNOWN", ValueString);
          }
 
          free(bck);
@@ -2556,13 +2590,13 @@ read_details_json(SSL* ssl, int socket)
 
          free(name);
          name = NULL;
-         pgmoneta_json_array_append_object(backups_array, backup);
+         pgmoneta_json_append(backups_array, backup, ValueObject);
       }
-      pgmoneta_json_item_put_object(server, "backups", backups_array);
-      pgmoneta_json_array_append_object(servers_array, server);
+      pgmoneta_json_put(server, "backups", backups_array, ValueObject);
+      pgmoneta_json_append(servers_array, server, ValueObject);
    }
-   pgmoneta_json_item_put_object(status, "servers", servers_array);
-   pgmoneta_json_item_put_object(output, "status", status);
+   pgmoneta_json_put(status, "servers", servers_array, ValueObject);
+   pgmoneta_json_put(output, "status", status, ValueObject);
 
    return json;
 error:
@@ -2574,7 +2608,7 @@ error:
    // return json anyway with error code set
    if (json != NULL)
    {
-      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+      set_command_json_object_faulty(json, strerror(errno));
    }
    errno = 0;
    return json;
@@ -2591,8 +2625,8 @@ read_delete_json(SSL* ssl, int socket, char* server, char* backup_id)
    struct json* status = NULL;
    struct json* backups_array = NULL;
 
-   json = pgmoneta_json_create_new_command_object("delete", true, "pgmoneta-cli");
-   pgmoneta_json_init(&status, JSONItem);
+   json = create_new_command_json_object("delete", true, "pgmoneta-cli");
+   pgmoneta_json_init(&status);
 
    pgmoneta_log_debug("Delete: %s/%s", server, backup_id);
 
@@ -2601,14 +2635,14 @@ read_delete_json(SSL* ssl, int socket, char* server, char* backup_id)
       goto error;
    }
 
-   output = pgmoneta_json_extract_command_output_object(json);
+   output = extract_command_output_json_object(json);
 
    if (read_int32("pgmoneta_management_read_delete", ssl, socket, &srv))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_string(status, "Server", srv == -1 ? "Unknown" : server);
+   pgmoneta_json_put(status, "Server", srv == -1 ? "Unknown" : server, ValueString);
 
    if (srv != -1)
    {
@@ -2616,8 +2650,8 @@ read_delete_json(SSL* ssl, int socket, char* server, char* backup_id)
       {
          goto error;
       }
-      pgmoneta_json_item_put_int32(status, "Number of backups", number_of_backups);
-      pgmoneta_json_init(&backups_array, JSONArray);
+      pgmoneta_json_put(status, "Number of backups", &number_of_backups, ValueInt32);
+      pgmoneta_json_init(&backups_array);
       if (backups_array == NULL)
       {
          goto error;
@@ -2629,20 +2663,20 @@ read_delete_json(SSL* ssl, int socket, char* server, char* backup_id)
             goto error;
          }
          struct json* backup = NULL;
-         pgmoneta_json_init(&backup, JSONItem);
+         pgmoneta_json_init(&backup);
          if (backup == NULL)
          {
             goto error;
          }
-         pgmoneta_json_item_put_string(backup, "Backup name", name);
-         pgmoneta_json_array_append_object(backups_array, backup);
+         pgmoneta_json_put(backup, "Backup name", name, ValueString);
+         pgmoneta_json_append(backups_array, backup, ValueObject);
          free(name);
          name = NULL;
       }
    }
 
-   pgmoneta_json_item_put_object(status, "backups", backups_array);
-   pgmoneta_json_item_put_object(output, "status", status);
+   pgmoneta_json_put(status, "backups", backups_array, ValueObject);
+   pgmoneta_json_put(output, "status", status, ValueObject);
    return json;
 
 error:
@@ -2651,7 +2685,7 @@ error:
    // return json anyway with error code set
    if (json != NULL)
    {
-      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+      set_command_json_object_faulty(json, strerror(errno));
    }
    errno = 0;
    return json;
@@ -2673,88 +2707,88 @@ read_info_json(SSL* ssl, int socket)
    struct json* output = NULL;
    struct json* info = NULL;
 
-   json = pgmoneta_json_create_new_command_object("info", true, "pgmoneta-cli");
-   pgmoneta_json_init(&info, JSONItem);
+   json = create_new_command_json_object("info", true, "pgmoneta-cli");
+   pgmoneta_json_init(&info);
 
    if (info == NULL || json == NULL)
    {
       goto error;
    }
 
-   output = pgmoneta_json_extract_command_output_object(json);
+   output = extract_command_output_json_object(json);
 
    if (read_string("pgmoneta_management_read_info", ssl, socket, &label))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_string(info, "Label", label);
+   pgmoneta_json_put(info, "Label", label, ValueString);
 
    if (read_string("pgmoneta_management_read_info", ssl, socket, &wal))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_string(info, "WAL", wal);
+   pgmoneta_json_put(info, "WAL", wal, ValueString);
 
    if (read_uint64("pgmoneta_management_read_info", ssl, socket, &u64))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Backup size", u64);
+   pgmoneta_json_put(info, "Backup size", &u64, ValueUInt64);
 
    if (read_uint64("pgmoneta_management_read_info", ssl, socket, &u64))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int64(info, "Restore size", u64);
+   pgmoneta_json_put(info, "Restore size", &u64, ValueUInt64);
 
    if (read_int32("pgmoneta_management_read_info", ssl, socket, &i32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int32(info, "Elapsed time", i32);
+   pgmoneta_json_put(info, "Elapsed time", &i32, ValueInt32);
 
    if (read_int32("pgmoneta_management_read_info", ssl, socket, &i32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int32(info, "Version", i32);
+   pgmoneta_json_put(info, "Version", &i32, ValueInt32);
 
    if (read_int32("pgmoneta_management_read_info", ssl, socket, &i32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_int32(info, "Minor version", i32);
+   pgmoneta_json_put(info, "Minor version", &i32, ValueInt32);
 
    if (read_bool("pgmoneta_management_read_info", ssl, socket, &sc))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_bool(info, "Keep", sc);
+   pgmoneta_json_put(info, "Keep", &sc, ValueBool);
 
    if (read_bool("pgmoneta_management_read_info", ssl, socket, &sc))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_bool(info, "Valid", sc);
+   pgmoneta_json_put(info, "Valid", &sc, ValueBool);
 
    if (read_uint64("pgmoneta_management_read_info", ssl, socket, &u64))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint64(info, "Number of tablespaces", u64);
+   pgmoneta_json_put(info, "Number of tablespaces", &u64, ValueUInt64);
    number_of_tablespaces = (uint64_t)u64;
 
-   pgmoneta_json_init(&tbl_array, JSONArray);
+   pgmoneta_json_init(&tbl_array);
 
    if (tbl_array == NULL)
    {
@@ -2770,79 +2804,79 @@ read_info_json(SSL* ssl, int socket)
          goto error;
       }
 
-      pgmoneta_json_init(&tbl, JSONItem);
+      pgmoneta_json_init(&tbl);
 
       if (tbl == NULL)
       {
          goto error;
       }
 
-      pgmoneta_json_item_put_string(tbl, "Table space", tablespace);
-      pgmoneta_json_array_append_object(tbl_array, tbl);
+      pgmoneta_json_put(tbl, "Table space", tablespace, ValueString);
+      pgmoneta_json_append(tbl_array, tbl, ValueObject);
 
       free(tablespace);
       tablespace = NULL;
    }
 
-   pgmoneta_json_item_put_object(info, "Table spaces", tbl_array);
+   pgmoneta_json_put(info, "Table spaces", tbl_array, ValueObject);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "Start LSN Hi32", u32);
+   pgmoneta_json_put(info, "Start LSN Hi32", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "Start LSN Lo32", u32);
+   pgmoneta_json_put(info, "Start LSN Lo32", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "End LSN Hi32", u32);
+   pgmoneta_json_put(info, "End LSN Hi32", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "End LSN Lo32", u32);
+   pgmoneta_json_put(info, "End LSN Lo32", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "Checkpoint LSN Hi32", u32);
+   pgmoneta_json_put(info, "Checkpoint LSN Hi32", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "Checkpoint LSN Lo32", u32);
+   pgmoneta_json_put(info, "Checkpoint LSN Lo32", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "Start timeline", u32);
+   pgmoneta_json_put(info, "Start timeline", &u32, ValueUInt32);
 
    if (read_uint32("pgmoneta_management_read_info", ssl, socket, &u32))
    {
       goto error;
    }
 
-   pgmoneta_json_item_put_uint32(info, "End timeline", u32);
+   pgmoneta_json_put(info, "End timeline", &u32, ValueUInt32);
 
-   pgmoneta_json_item_put_object(output, "info", info);
+   pgmoneta_json_put(output, "info", info, ValueObject);
 
    free(label);
    free(wal);
@@ -2856,7 +2890,7 @@ error:
 
    if (json != NULL)
    {
-      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+      set_command_json_object_faulty(json, strerror(errno));
    }
 
    errno = 0;
@@ -2884,31 +2918,31 @@ read_list_backup_json(SSL* ssl, int socket, char* server)
    struct json* output = NULL;
    struct json* status = NULL;
    struct json* backups_array = NULL;
-   json = pgmoneta_json_create_new_command_object("list-backup", true, "pgmoneta-cli");
-   pgmoneta_json_init(&status, JSONItem);
+   json = create_new_command_json_object("list-backup", true, "pgmoneta-cli");
+   pgmoneta_json_init(&status);
    if (status == NULL || json == NULL)
    {
       goto error;
    }
-   pgmoneta_json_init(&backups_array, JSONArray);
+   pgmoneta_json_init(&backups_array);
    if (backups_array == NULL)
    {
       goto error;
    }
 
-   output = pgmoneta_json_extract_command_output_object(json);
+   output = extract_command_output_json_object(json);
    if (read_int32("pgmoneta_management_read_list_backup", ssl, socket, &srv))
    {
       goto error;
    }
-   pgmoneta_json_item_put_string(status, "Server", (srv == -1 ? "Unknown" : server));
+   pgmoneta_json_put(status, "Server", (srv == -1 ? "Unknown" : server), ValueString);
    if (srv != -1)
    {
       if (read_int32("pgmoneta_management_read_list_backup", ssl, socket, &number_of_backups))
       {
          goto error;
       }
-      pgmoneta_json_item_put_int32(status, "Number of backups", number_of_backups);
+      pgmoneta_json_put(status, "Number of backups", &number_of_backups, ValueInt32);
       for (int i = 0; i < number_of_backups; i++)
       {
          if (read_string("pgmoneta_management_read_list_backup", ssl, socket, &name))
@@ -2959,26 +2993,26 @@ read_list_backup_json(SSL* ssl, int socket, char* server)
 
          ds = pgmoneta_bytes_to_string(delta_size);
          struct json* backup = NULL;
-         pgmoneta_json_init(&backup, JSONItem);
-         pgmoneta_json_item_put_string(backup, "Backup name", name);
+         pgmoneta_json_init(&backup);
+         pgmoneta_json_put(backup, "Backup name", name, ValueString);
 
          if (valid != VALID_UNKNOWN)
          {
-            pgmoneta_json_item_put_string(backup, "Backup", bck);
-            pgmoneta_json_item_put_string(backup, "Restore", res);
-            pgmoneta_json_item_put_string(backup, "WAL", ws);
-            pgmoneta_json_item_put_string(backup, "Delta", ds);
-            pgmoneta_json_item_put_string(backup, "Retain", keep ? "Yes" : "No");
-            pgmoneta_json_item_put_string(backup, "Valid", valid == VALID_TRUE ? "Yes" : "No");
+            pgmoneta_json_put(backup, "Backup", bck, ValueString);
+            pgmoneta_json_put(backup, "Restore", res, ValueString);
+            pgmoneta_json_put(backup, "WAL", ws, ValueString);
+            pgmoneta_json_put(backup, "Delta", ds, ValueString);
+            pgmoneta_json_put(backup, "Retain", keep ? "Yes" : "No", ValueString);
+            pgmoneta_json_put(backup, "Valid", valid == VALID_TRUE ? "Yes" : "No", ValueString);
          }
          else
          {
-            pgmoneta_json_item_put_string(backup, "Backup", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Restore", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "WAL", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Delta", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Retain", "UNKNOWN");
-            pgmoneta_json_item_put_string(backup, "Valid", "UNKNOWN");
+            pgmoneta_json_put(backup, "Backup", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Restore", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "WAL", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Delta", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Retain", "UNKNOWN", ValueString);
+            pgmoneta_json_put(backup, "Valid", "UNKNOWN", ValueString);
          }
 
          free(bck);
@@ -2995,16 +3029,16 @@ read_list_backup_json(SSL* ssl, int socket, char* server)
 
          free(name);
          name = NULL;
-         pgmoneta_json_array_append_object(backups_array, backup);
+         pgmoneta_json_append(backups_array, backup, ValueObject);
       }
    }
    else
    {
-      pgmoneta_json_item_put_int32(status, "Number of backups", 0);
+      int num = 0;
+      pgmoneta_json_put(status, "Number of backups", &num, ValueInt32);
    }
-
-   pgmoneta_json_item_put_object(status, "backups", backups_array);
-   pgmoneta_json_item_put_object(output, "status", status);
+   pgmoneta_json_put(status, "backups", backups_array, ValueObject);
+   pgmoneta_json_put(output, "status", status, ValueObject);
    return json;
 
 error:
@@ -3016,7 +3050,7 @@ error:
    // return json anyway with error code set
    if (json != NULL)
    {
-      pgmoneta_json_set_command_object_faulty(json, strerror(errno));
+      set_command_json_object_faulty(json, strerror(errno));
    }
    errno = 0;
    return json;
@@ -3031,78 +3065,78 @@ print_status_json(struct json* json)
       return 1;
    }
 
-   if (!pgmoneta_json_command_name_equals_to(json, "status"))
+   if (!json_command_name_equals_to(json, "status"))
    {
       return 1;
    }
 
-   struct json* output = pgmoneta_json_extract_command_output_object(json);
+   struct json* output = extract_command_output_json_object(json);
 
-   struct json* status = pgmoneta_json_get_json_object_value(output, "status");
+   struct json* status = pgmoneta_json_get_json_object(output, "status");
    if (status == NULL)
    {
       return 1;
    }
 
-   char* mode = pgmoneta_json_get_string_value(status, "Mode");
+   char* mode = pgmoneta_json_get_string(status, "Mode");
    if (mode != NULL)
    {
       printf("Mode             : %s\n", mode);
    }
 
-   char* used_space = pgmoneta_json_get_string_value(status, "Used space");
+   char* used_space = pgmoneta_json_get_string(status, "Used space");
    if (used_space != NULL)
    {
       printf("Used space       : %s\n", used_space);
    }
 
-   char* free_space = pgmoneta_json_get_string_value(status, "Free space");
+   char* free_space = pgmoneta_json_get_string(status, "Free space");
    if (free_space != NULL)
    {
       printf("Free space       : %s\n", free_space);
    }
 
-   char* total_space = pgmoneta_json_get_string_value(status, "Total space");
+   char* total_space = pgmoneta_json_get_string(status, "Total space");
    if (total_space != NULL)
    {
       printf("Total space      : %s\n", total_space);
    }
 
-   int32_t workers = pgmoneta_json_get_int32_value(status, "Workers");
+   int32_t workers = pgmoneta_json_get_int32(status, "Workers");
    printf("Workers          : %" PRId32 "\n", workers);
 
-   int32_t num_servers = pgmoneta_json_get_int32_value(status, "Number of servers");
+   int32_t num_servers = pgmoneta_json_get_int32(status, "Number of servers");
    printf("Number of servers: %" PRId32 "\n", num_servers);
 
-   struct json* servers = pgmoneta_json_get_json_object_value(status, "servers");
+   struct json* servers = pgmoneta_json_get_json_object(status, "servers");
    if (servers != NULL)
    {
       for (int i = 0; i < pgmoneta_json_array_length(servers); i++)
       {
          server = pgmoneta_json_array_get(servers, i);
-         printf("Server           : %s\n", pgmoneta_json_get_string_value(server, "Server"));
+         printf("Server           : %s\n", pgmoneta_json_get_string(server, "Server"));
          printf("  Retention      : ");
-         printf("%" PRId32 " day(s) ", pgmoneta_json_get_int32_value(server, "Retention days"));
-         int32_t weeks = pgmoneta_json_get_int32_value(server, "Retention weeks");
+         printf("%" PRId32 " day(s) ", pgmoneta_json_get_int32(server, "Retention days"));
+         int32_t weeks = pgmoneta_json_get_int32(server, "Retention weeks");
          if (weeks != 0)
          {
             printf("%" PRId32 " week(s) ", weeks);
          }
-         int32_t months = pgmoneta_json_get_int32_value(server, "Retention months");
+         int32_t months = pgmoneta_json_get_int32(server, "Retention months");
          if (months != 0)
          {
             printf("%" PRId32 " month(s) ", months);
          }
-         int32_t years = pgmoneta_json_get_int32_value(server, "Retention years");
+         int32_t years = pgmoneta_json_get_int32(server, "Retention years");
          if (years != 0)
          {
-            printf("%" PRId32 " year(s) ", pgmoneta_json_get_int32_value(server, "Retention years"));
+            printf("%" PRId32 " year(s) ", pgmoneta_json_get_int32(server, "Retention years"));
          }
          printf("\n");
-         printf("  Workers        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Workers"));
-         printf("  Backups        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Backups"));
-         printf("  Space          : %s\n", pgmoneta_json_get_string_value(server, "Space"));
-         printf("  Hot standby    : %s\n", pgmoneta_json_get_string_value(server, "Hot standby"));
+         printf("  Workers        : %" PRId32 "\n", pgmoneta_json_get_int32(server, "Workers"));
+         printf("  Backups        : %" PRId32 "\n", pgmoneta_json_get_int32(server, "Backups"));
+         printf("  Space          : %s\n", pgmoneta_json_get_string(server, "Space"));
+         printf("  Hot standby    : %s\n", pgmoneta_json_get_string(server, "Hot standby"));
       }
    }
    return 0;
@@ -3119,102 +3153,102 @@ print_details_json(struct json* json)
       return 1;
    }
 
-   if (!pgmoneta_json_command_name_equals_to(json, "details"))
+   if (!json_command_name_equals_to(json, "details"))
    {
       return 1;
    }
 
-   struct json* output = pgmoneta_json_extract_command_output_object(json);
+   struct json* output = extract_command_output_json_object(json);
 
-   struct json* status = pgmoneta_json_get_json_object_value(output, "status");
+   struct json* status = pgmoneta_json_get_json_object(output, "status");
    if (status == NULL)
    {
       return 1;
    }
 
-   char* mode = pgmoneta_json_get_string_value(status, "Mode");
+   char* mode = pgmoneta_json_get_string(status, "Mode");
    if (mode != NULL)
    {
       printf("Mode             : %s\n", mode);
    }
 
-   char* used_space = pgmoneta_json_get_string_value(status, "Used space");
+   char* used_space = pgmoneta_json_get_string(status, "Used space");
    if (used_space != NULL)
    {
       printf("Used space       : %s\n", used_space);
    }
 
-   char* free_space = pgmoneta_json_get_string_value(status, "Free space");
+   char* free_space = pgmoneta_json_get_string(status, "Free space");
    if (free_space != NULL)
    {
       printf("Free space       : %s\n", free_space);
    }
 
-   char* total_space = pgmoneta_json_get_string_value(status, "Total space");
+   char* total_space = pgmoneta_json_get_string(status, "Total space");
    if (total_space != NULL)
    {
       printf("Total space      : %s\n", total_space);
    }
 
-   int32_t workers = pgmoneta_json_get_int32_value(status, "Workers");
+   int32_t workers = pgmoneta_json_get_int32(status, "Workers");
    printf("Workers          : %" PRId32 "\n", workers);
 
-   int32_t num_servers = pgmoneta_json_get_int32_value(status, "Number of servers");
+   int32_t num_servers = pgmoneta_json_get_int32(status, "Number of servers");
    printf("Number of servers: %" PRId32 "\n", num_servers);
 
-   struct json* servers = pgmoneta_json_get_json_object_value(status, "servers");
+   struct json* servers = pgmoneta_json_get_json_object(status, "servers");
    if (servers != NULL)
    {
       for (int i = 0; i < pgmoneta_json_array_length(servers); i++)
       {
          server = pgmoneta_json_array_get(servers, i);
-         printf("Server           : %s\n", pgmoneta_json_get_string_value(server, "Server"));
+         printf("Server           : %s\n", pgmoneta_json_get_string(server, "Server"));
          printf("  Retention      : ");
-         printf("%" PRId32 " day(s) ", pgmoneta_json_get_int32_value(server, "Retention days"));
-         int32_t weeks = pgmoneta_json_get_int32_value(server, "Retention weeks");
+         printf("%" PRId32 " day(s) ", pgmoneta_json_get_int32(server, "Retention days"));
+         int32_t weeks = pgmoneta_json_get_int32(server, "Retention weeks");
          if (weeks != 0)
          {
             printf("%" PRId32 " week(s) ", weeks);
          }
-         int32_t months = pgmoneta_json_get_int32_value(server, "Retention months");
+         int32_t months = pgmoneta_json_get_int32(server, "Retention months");
          if (months != 0)
          {
             printf("%" PRId32 " month(s) ", months);
          }
-         int32_t years = pgmoneta_json_get_int32_value(server, "Retention years");
+         int32_t years = pgmoneta_json_get_int32(server, "Retention years");
          if (years != 0)
          {
-            printf("%" PRId32 " year(s) ", pgmoneta_json_get_int32_value(server, "Retention years"));
+            printf("%" PRId32 " year(s) ", pgmoneta_json_get_int32(server, "Retention years"));
          }
          printf("\n");
-         printf("  Workers        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Workers"));
-         printf("  Backups        : %" PRId32 "\n", pgmoneta_json_get_int32_value(server, "Backups"));
+         printf("  Workers        : %" PRId32 "\n", pgmoneta_json_get_int32(server, "Workers"));
+         printf("  Backups        : %" PRId32 "\n", pgmoneta_json_get_int32(server, "Backups"));
 
-         struct json* backups = pgmoneta_json_get_json_object_value(server, "backups");
+         struct json* backups = pgmoneta_json_get_json_object(server, "backups");
          if (backups != NULL)
          {
             for (int j = 0; j < pgmoneta_json_array_length(backups); j++)
             {
                backup = pgmoneta_json_array_get(backups, j);
-               valid = pgmoneta_json_get_string_value(backup, "Valid");
+               valid = pgmoneta_json_get_string(backup, "Valid");
                if (pgmoneta_compare_string(valid, "Unknown"))
                {
-                  printf("                   %s (Unknown)\n", pgmoneta_json_get_string_value(backup, "Backup name"));
+                  printf("                   %s (Unknown)\n", pgmoneta_json_get_string(backup, "Backup name"));
                }
                else
                {
                   printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                         pgmoneta_json_get_string_value(backup, "Backup name"),
-                         pgmoneta_json_get_string_value(backup, "Backup"),
-                         pgmoneta_json_get_string_value(backup, "Restore"),
-                         pgmoneta_json_get_string_value(backup, "WAL"),
-                         pgmoneta_json_get_string_value(backup, "Delta"),
-                         pgmoneta_json_get_string_value(backup, "Retain"),
-                         pgmoneta_json_get_string_value(backup, "Valid"));
+                         pgmoneta_json_get_string(backup, "Backup name"),
+                         pgmoneta_json_get_string(backup, "Backup"),
+                         pgmoneta_json_get_string(backup, "Restore"),
+                         pgmoneta_json_get_string(backup, "WAL"),
+                         pgmoneta_json_get_string(backup, "Delta"),
+                         pgmoneta_json_get_string(backup, "Retain"),
+                         pgmoneta_json_get_string(backup, "Valid"));
                }
             }
-            printf("  Space          : %s\n", pgmoneta_json_get_string_value(server, "Space"));
-            printf("  Hot standby    : %s\n", pgmoneta_json_get_string_value(server, "Hot standby"));
+            printf("  Space          : %s\n", pgmoneta_json_get_string(server, "Space"));
+            printf("  Hot standby    : %s\n", pgmoneta_json_get_string(server, "Hot standby"));
          }
       }
    }
@@ -3227,24 +3261,24 @@ print_delete_json(struct json* json)
    struct json* backup = NULL;
    char* srv = NULL;
    int32_t number_of_backups = 0;
-   if (!json || pgmoneta_json_is_command_object_faulty(json))
+   if (!json || is_command_json_object_faulty(json))
    {
       return 1;
    }
 
-   if (!pgmoneta_json_command_name_equals_to(json, "delete"))
+   if (!json_command_name_equals_to(json, "delete"))
    {
       return 1;
    }
 
-   struct json* output = pgmoneta_json_extract_command_output_object(json);
+   struct json* output = extract_command_output_json_object(json);
 
-   struct json* status = pgmoneta_json_get_json_object_value(output, "status");
+   struct json* status = pgmoneta_json_get_json_object(output, "status");
    if (status == NULL)
    {
       return 1;
    }
-   srv = pgmoneta_json_get_string_value(status, "Server");
+   srv = pgmoneta_json_get_string(status, "Server");
    if (srv == NULL)
    {
       return 1;
@@ -3252,19 +3286,19 @@ print_delete_json(struct json* json)
    printf("Server           : %s\n", srv);
    if (!pgmoneta_compare_string(srv, "Unknown"))
    {
-      number_of_backups = pgmoneta_json_get_int32_value(status, "Number of backups");
+      number_of_backups = pgmoneta_json_get_int32(status, "Number of backups");
       printf("Number of backups: %" PRId32 "\n", number_of_backups);
 
       if (number_of_backups > 0)
       {
          printf("Backup           :\n");
-         struct json* backups = pgmoneta_json_get_json_object_value(status, "backups");
+         struct json* backups = pgmoneta_json_get_json_object(status, "backups");
          if (backups != NULL)
          {
             for (int i = 0; i < pgmoneta_json_array_length(backups); i++)
             {
                backup = pgmoneta_json_array_get(backups, i);
-               printf("                   %s\n", pgmoneta_json_get_string_value(backup, "Backup name"));
+               printf("                   %s\n", pgmoneta_json_get_string(backup, "Backup name"));
             }
          }
       }
@@ -3279,37 +3313,37 @@ print_list_backup_json(struct json* json)
    char* valid = NULL;
    char* srv = NULL;
    int64_t number_of_backups = 0;
-   if (!json || pgmoneta_json_is_command_object_faulty(json))
+   if (!json || is_command_json_object_faulty(json))
    {
       return 1;
    }
 
-   if (!pgmoneta_json_command_name_equals_to(json, "list-backup"))
+   if (!json_command_name_equals_to(json, "list-backup"))
    {
       return 1;
    }
 
-   struct json* output = pgmoneta_json_extract_command_output_object(json);
+   struct json* output = extract_command_output_json_object(json);
 
-   struct json* status = pgmoneta_json_get_json_object_value(output, "status");
+   struct json* status = pgmoneta_json_get_json_object(output, "status");
    if (status == NULL)
    {
       return 1;
    }
-   srv = pgmoneta_json_get_string_value(status, "Server");
+   srv = pgmoneta_json_get_string(status, "Server");
    if (srv == NULL)
    {
       return 1;
    }
 
-   number_of_backups = pgmoneta_json_get_int32_value(status, "Number of backups");
+   number_of_backups = pgmoneta_json_get_int32(status, "Number of backups");
 
    printf("Server           : %s\n", srv);
    if (!pgmoneta_compare_string(srv, "Unknown"))
    {
       printf("Number of backups: %" PRId64 "\n", number_of_backups);
 
-      struct json* backups = pgmoneta_json_get_json_object_value(status, "backups");
+      struct json* backups = pgmoneta_json_get_json_object(status, "backups");
       if (number_of_backups > 0)
       {
          printf("Backup           :\n");
@@ -3317,21 +3351,21 @@ print_list_backup_json(struct json* json)
       for (int i = 0; i < pgmoneta_json_array_length(backups); i++)
       {
          backup = pgmoneta_json_array_get(backups, i);
-         valid = pgmoneta_json_get_string_value(backup, "Valid");
+         valid = pgmoneta_json_get_string(backup, "Valid");
          if (pgmoneta_compare_string(valid, "Unknown"))
          {
-            printf("                   %s (Unknown)\n", pgmoneta_json_get_string_value(backup, "Backup name"));
+            printf("                   %s (Unknown)\n", pgmoneta_json_get_string(backup, "Backup name"));
          }
          else
          {
             printf("                   %s (Backup: %s Restore: %s WAL: %s Delta: %s Retain: %s Valid: %s)\n",
-                   pgmoneta_json_get_string_value(backup, "Backup name"),
-                   pgmoneta_json_get_string_value(backup, "Backup"),
-                   pgmoneta_json_get_string_value(backup, "Restore"),
-                   pgmoneta_json_get_string_value(backup, "WAL"),
-                   pgmoneta_json_get_string_value(backup, "Delta"),
-                   pgmoneta_json_get_string_value(backup, "Retain"),
-                   pgmoneta_json_get_string_value(backup, "Valid"));
+                   pgmoneta_json_get_string(backup, "Backup name"),
+                   pgmoneta_json_get_string(backup, "Backup"),
+                   pgmoneta_json_get_string(backup, "Restore"),
+                   pgmoneta_json_get_string(backup, "WAL"),
+                   pgmoneta_json_get_string(backup, "Delta"),
+                   pgmoneta_json_get_string(backup, "Retain"),
+                   pgmoneta_json_get_string(backup, "Valid"));
          }
       }
    }
@@ -3355,65 +3389,214 @@ print_info_json(struct json* json)
       return 1;
    }
 
-   if (!pgmoneta_json_command_name_equals_to(json, "info"))
+   if (!json_command_name_equals_to(json, "info"))
    {
       return 1;
    }
 
-   output = pgmoneta_json_extract_command_output_object(json);
+   output = extract_command_output_json_object(json);
 
-   info = pgmoneta_json_get_json_object_value(output, "info");
+   info = pgmoneta_json_get_json_object(output, "info");
 
    if (info == NULL)
    {
       return 1;
    }
 
-   label = pgmoneta_json_get_string_value(info, "Label");
+   label = pgmoneta_json_get_string(info, "Label");
    if (label != NULL)
    {
       printf("Label                : %s\n", label);
    }
 
-   wal = pgmoneta_json_get_string_value(info, "WAL");
+   wal = pgmoneta_json_get_string(info, "WAL");
    if (label != NULL)
    {
       printf("WAL                  : %s\n", wal);
    }
 
-   printf("Backup size          : %" PRId64 "\n", pgmoneta_json_get_int64_value(info, "Backup size"));
-   printf("Restore size         : %" PRId64 "\n", pgmoneta_json_get_int64_value(info, "Restore size"));
-   printf("Elapsed time         : %d\n", (int)pgmoneta_json_get_int32_value(info, "Elapsed time"));
-   printf("Version              : %d\n", (int)pgmoneta_json_get_int32_value(info, "Version"));
-   printf("Minor version        : %d\n", (int)pgmoneta_json_get_int32_value(info, "Minor version"));
-   printf("Keep                 : %d\n", (bool)pgmoneta_json_get_bool_value(info, "Keep"));
-   printf("Valid                : %d\n", (char)pgmoneta_json_get_bool_value(info, "Valid"));
+   printf("Backup size          : %" PRId64 "\n", pgmoneta_json_get_uint64(info, "Backup size"));
+   printf("Restore size         : %" PRId64 "\n", pgmoneta_json_get_uint64(info, "Restore size"));
+   printf("Elapsed time         : %d\n", (int)pgmoneta_json_get_int32(info, "Elapsed time"));
+   printf("Version              : %d\n", (int)pgmoneta_json_get_int32(info, "Version"));
+   printf("Minor version        : %d\n", (int)pgmoneta_json_get_int32(info, "Minor version"));
+   printf("Keep                 : %d\n", (bool)pgmoneta_json_get_bool(info, "Keep"));
+   printf("Valid                : %d\n", (char)pgmoneta_json_get_bool(info, "Valid"));
 
-   number_of_tablespaces = (uint64_t)pgmoneta_json_get_int64_value(info, "Number of tablespaces");
+   number_of_tablespaces = (uint64_t)pgmoneta_json_get_int64(info, "Number of tablespaces");
    printf("Number of tablespaces: %" PRId64 "\n", number_of_tablespaces);
 
-   tablespaces = pgmoneta_json_get_json_object_value(info, "Table spaces");
+   tablespaces = pgmoneta_json_get_json_object(info, "Table spaces");
    if (tablespaces != NULL)
    {
       for (int i = 0; i < pgmoneta_json_array_length(tablespaces); i++)
       {
          tablespace = pgmoneta_json_array_get(tablespaces, i);
-         printf("Table space          : %s\n", pgmoneta_json_get_string_value(tablespace, "Table space"));
+         printf("Table space          : %s\n", pgmoneta_json_get_string(tablespace, "Table space"));
       }
    }
 
-   printf("Start LSN Hi32       : %X\n", pgmoneta_json_get_uint32_value(info, "Start LSN Hi32"));
-   printf("Start LSN Lo32       : %X\n", pgmoneta_json_get_uint32_value(info, "Start LSN Lo32"));
+   printf("Start LSN Hi32       : %X\n", pgmoneta_json_get_uint32(info, "Start LSN Hi32"));
+   printf("Start LSN Lo32       : %X\n", pgmoneta_json_get_uint32(info, "Start LSN Lo32"));
 
-   printf("End LSN Hi32         : %X\n", pgmoneta_json_get_uint32_value(info, "End LSN Hi32"));
-   printf("End LSN Lo32         : %X\n", pgmoneta_json_get_uint32_value(info, "End LSN Lo32"));
+   printf("End LSN Hi32         : %X\n", pgmoneta_json_get_uint32(info, "End LSN Hi32"));
+   printf("End LSN Lo32         : %X\n", pgmoneta_json_get_uint32(info, "End LSN Lo32"));
 
-   printf("Checkpoint LSN Hi32  : %X\n", pgmoneta_json_get_uint32_value(info, "Checkpoint LSN Hi32"));
-   printf("Checkpoint LSN Lo32  : %X\n", pgmoneta_json_get_uint32_value(info, "Checkpoint LSN Lo32"));
+   printf("Checkpoint LSN Hi32  : %X\n", pgmoneta_json_get_uint32(info, "Checkpoint LSN Hi32"));
+   printf("Checkpoint LSN Lo32  : %X\n", pgmoneta_json_get_uint32(info, "Checkpoint LSN Lo32"));
 
-   printf("Start timeline       : %u\n", pgmoneta_json_get_uint32_value(info, "Start timeline"));
-   printf("End timeline         : %u\n", pgmoneta_json_get_uint32_value(info, "End timeline"));
+   printf("Start timeline       : %u\n", pgmoneta_json_get_uint32(info, "Start timeline"));
+   printf("End timeline         : %u\n", pgmoneta_json_get_uint32(info, "End timeline"));
 
    return 0;
 
+}
+
+static struct json*
+create_new_command_json_object(char* command_name, bool success, char* executable_name)
+{
+   struct json* json = NULL;
+   struct json* command = NULL;
+   struct json* output = NULL;
+   struct json* application = NULL;
+   // root of the JSON structure
+   pgmoneta_json_init(&json);
+
+   if (!json)
+   {
+      goto error;
+   }
+
+   // the command structure
+   pgmoneta_json_init(&command);
+   if (!command)
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(command, JSON_TAG_COMMAND_NAME, command_name, ValueString);
+   pgmoneta_json_put(command, JSON_TAG_COMMAND_STATUS, success ? JSON_STRING_SUCCESS : JSON_STRING_ERROR, ValueString);
+   pgmoneta_json_put(command, JSON_TAG_COMMAND_ERROR, success ? JSON_BOOL_SUCCESS : JSON_BOOL_ERROR, ValueString);
+   pgmoneta_json_put(command, JSON_TAG_APPLICATION_VERSION, VERSION, ValueString);
+
+   // the output of the command, this has to be filled by the caller
+   pgmoneta_json_init(&output);
+   if (!output)
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(command, JSON_TAG_COMMAND_OUTPUT, output, ValueObject);
+
+   pgmoneta_json_init(&application);
+   if (!application)
+   {
+      goto error;
+   }
+   pgmoneta_json_put(application, JSON_TAG_APPLICATION_NAME, executable_name, ValueString);
+   // add objects to the whole json thing
+   pgmoneta_json_put(json, "command", command, ValueObject);
+   pgmoneta_json_put(json, "application", application, ValueObject);
+
+   return json;
+error:
+   if (json)
+   {
+      pgmoneta_json_free(json);
+   }
+
+   return NULL;
+}
+
+static struct json*
+extract_command_output_json_object(struct json* json)
+{
+   struct json* command = pgmoneta_json_get_json_object(json, JSON_TAG_COMMAND);
+   if (!command)
+   {
+      goto error;
+   }
+
+   return pgmoneta_json_get_json_object(command, JSON_TAG_COMMAND_OUTPUT);
+
+error:
+   return NULL;
+}
+
+static bool
+json_command_name_equals_to(struct json* json, char* command_name)
+{
+   if (!json || !command_name || strlen(command_name) <= 0)
+   {
+      goto error;
+   }
+
+   struct json* command = pgmoneta_json_get_json_object(json, JSON_TAG_COMMAND);
+   if (!command)
+   {
+      goto error;
+   }
+
+   char* cName = pgmoneta_json_get_string(command, JSON_TAG_COMMAND_NAME);
+   if (!cName)
+   {
+      goto error;
+   }
+
+   return !strncmp(command_name, cName, MISC_LENGTH);
+
+error:
+   return false;
+}
+
+static int
+set_command_json_object_faulty(struct json* json, char* message)
+{
+   if (!json)
+   {
+      goto error;
+   }
+
+   struct json* command = pgmoneta_json_get_json_object(json, JSON_TAG_COMMAND);
+   if (!command)
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(command, JSON_TAG_COMMAND_STATUS, message, ValueString);
+   pgmoneta_json_put(command, JSON_TAG_COMMAND_ERROR, JSON_BOOL_ERROR, ValueString);
+
+   return 0;
+
+error:
+   return 1;
+}
+
+static bool
+is_command_json_object_faulty(struct json* json)
+{
+   if (!json)
+   {
+      goto error;
+   }
+
+   struct json* command = pgmoneta_json_get_json_object(json, JSON_TAG_COMMAND);
+   if (!command)
+   {
+      goto error;
+   }
+
+   int64_t status = pgmoneta_json_get_int64(command, JSON_TAG_COMMAND_ERROR);
+
+   return status == 0 ? false : true;
+
+error:
+   return false;
+}
+
+static void
+print_and_free_json_object(struct json* json)
+{
+   pgmoneta_json_print(json, 2);
+   pgmoneta_json_free(json);
 }

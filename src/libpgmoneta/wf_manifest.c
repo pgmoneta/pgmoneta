@@ -128,15 +128,15 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
    while (pgmoneta_json_next_array_item(reader, &entry))
    {
       memset(file_path, 0, MAX_PATH);
-      snprintf(file_path, MAX_PATH, "%s", pgmoneta_json_get_string_value(entry, "Path"));
+      snprintf(file_path, MAX_PATH, "%s", pgmoneta_json_get_string(entry, "Path"));
       info[MANIFEST_PATH_INDEX] = file_path;
-      info[MANIFEST_CHECKSUM_INDEX] = pgmoneta_json_get_string_value(entry, "Checksum");
+      info[MANIFEST_CHECKSUM_INDEX] = pgmoneta_json_get_string(entry, "Checksum");
       pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
       pgmoneta_json_free(entry);
       entry = NULL;
    }
 
-   pgmoneta_json_close_reader(reader);
+   pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_free(entry);
    free(root);
@@ -149,7 +149,7 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
    return 0;
 
 error:
-   pgmoneta_json_close_reader(reader);
+   pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_free(entry);
    free(root);
