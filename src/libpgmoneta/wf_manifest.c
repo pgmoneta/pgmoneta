@@ -36,9 +36,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int manifest_setup(int, char*, struct node*, struct node**);
-static int manifest_execute_build(int, char*, struct node*, struct node**);
-static int manifest_teardown(int, char*, struct node*, struct node**);
+static int manifest_setup(int, char*, struct deque*);
+static int manifest_execute_build(int, char*, struct deque*);
+static int manifest_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_manifest(void)
@@ -61,21 +61,20 @@ pgmoneta_workflow_create_manifest(void)
 }
 
 static int
-manifest_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+manifest_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-manifest_execute_build(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+manifest_execute_build(int server, char* identifier, struct deque* nodes)
 {
    char* root = NULL;
    char* data = NULL;
@@ -95,8 +94,7 @@ manifest_execute_build(int server, char* identifier, struct node* i_nodes, struc
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    backup_dir = pgmoneta_get_server_backup(server);
    root = pgmoneta_get_server_backup_identifier(server, identifier);
@@ -163,15 +161,14 @@ error:
 }
 
 static int
-manifest_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+manifest_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

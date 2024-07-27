@@ -67,12 +67,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
    struct backup** backups = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct node* i_nodes = NULL;
-   struct node* o_nodes = NULL;
-   struct node* i_ident = NULL;
-   struct node* i_directory = NULL;
-   struct node* i_destination = NULL;
-   struct node* i_output = NULL;
+   struct deque* nodes = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -132,44 +127,38 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
    memset(real_directory, 0, sizeof(real_directory));
    snprintf(real_directory, sizeof(real_directory), "%s/archive-%s-%s", directory, config->servers[server].name, id);
 
+   pgmoneta_deque_create(false, &nodes);
+
    if (!pgmoneta_restore_backup(server, backup_id, position, real_directory, &output, &id))
    {
       result = 0;
 
-      if (pgmoneta_create_node_string(real_directory, "directory", &i_directory))
+      if (pgmoneta_deque_put(nodes, "directory", real_directory, strlen(real_directory) + 1))
       {
          goto error;
       }
 
-      pgmoneta_append_node(&i_nodes, i_directory);
-
-      if (pgmoneta_create_node_string(id, "id", &i_ident))
+      if (pgmoneta_deque_put(nodes, "id", id, strlen(id) + 1))
       {
          goto error;
       }
 
-      pgmoneta_append_node(&i_nodes, i_ident);
-
-      if (pgmoneta_create_node_string(output, "output", &i_output))
+      if (pgmoneta_deque_put(nodes, "output", output, strlen(output) + 1))
       {
          goto error;
       }
 
-      pgmoneta_append_node(&i_nodes, i_output);
-
-      if (pgmoneta_create_node_string(directory, "destination", &i_destination))
+      if (pgmoneta_deque_put(nodes, "destination", directory, strlen(directory) + 1))
       {
          goto error;
       }
-
-      pgmoneta_append_node(&i_nodes, i_destination);
 
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE);
 
       current = workflow;
       while (current != NULL)
       {
-         if (current->setup(server, backup_id, i_nodes, &o_nodes))
+         if (current->setup(server, backup_id, nodes))
          {
             goto error;
          }
@@ -179,7 +168,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
       current = workflow;
       while (current != NULL)
       {
-         if (current->execute(server, backup_id, i_nodes, &o_nodes))
+         if (current->execute(server, backup_id, nodes))
          {
             goto error;
          }
@@ -189,7 +178,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
       current = workflow;
       while (current != NULL)
       {
-         if (current->teardown(server, backup_id, i_nodes, &o_nodes))
+         if (current->teardown(server, backup_id, nodes))
          {
             goto error;
          }
@@ -220,9 +209,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
 
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_free_nodes(i_nodes);
-
-   pgmoneta_free_nodes(o_nodes);
+   pgmoneta_deque_destroy(nodes);
 
    free(id);
    free(output);
@@ -243,9 +230,7 @@ error:
    free(backups);
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_free_nodes(i_nodes);
-
-   pgmoneta_free_nodes(o_nodes);
+   pgmoneta_deque_destroy(nodes);
 
    free(id);
    free(output);

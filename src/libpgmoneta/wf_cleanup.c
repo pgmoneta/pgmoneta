@@ -36,9 +36,9 @@
 /* system */
 #include <stdlib.h>
 
-static int cleanup_setup(int, char*, struct node*, struct node**);
-static int cleanup_execute_restore(int, char*, struct node*, struct node**);
-static int cleanup_teardown(int, char*, struct node*, struct node**);
+static int cleanup_setup(int, char*, struct deque*);
+static int cleanup_execute_restore(int, char*, struct deque*);
+static int cleanup_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_cleanup(int type)
@@ -68,21 +68,20 @@ pgmoneta_workflow_create_cleanup(int type)
 }
 
 static int
-cleanup_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+cleanup_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Cleanup (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    int number_of_backups = 0;
@@ -94,8 +93,7 @@ cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, stru
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Cleanup (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -136,7 +134,7 @@ cleanup_execute_restore(int server, char* identifier, struct node* i_nodes, stru
       id = identifier;
    }
 
-   path = pgmoneta_append(path, pgmoneta_get_node_string(i_nodes, "directory"));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, "directory"));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
@@ -177,15 +175,14 @@ error:
 }
 
 static int
-cleanup_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+cleanup_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Cleanup (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

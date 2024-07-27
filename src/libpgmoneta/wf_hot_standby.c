@@ -38,9 +38,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int hot_standby_setup(int, char*, struct node*, struct node**);
-static int hot_standby_execute(int, char*, struct node*, struct node**);
-static int hot_standby_teardown(int, char*, struct node*, struct node**);
+static int hot_standby_setup(int, char*, struct deque*);
+static int hot_standby_execute(int, char*, struct deque*);
+static int hot_standby_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_create_hot_standby(void)
@@ -63,21 +63,20 @@ pgmoneta_create_hot_standby(void)
 }
 
 static int
-hot_standby_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+hot_standby_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Hot standby (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+hot_standby_execute(int server, char* identifier, struct deque* nodes)
 {
    char* root = NULL;
    char* base = NULL;
@@ -109,8 +108,7 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Hot standby (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (strlen(config->servers[server].hot_standby) > 0)
    {
@@ -322,15 +320,14 @@ hot_standby_execute(int server, char* identifier, struct node* i_nodes, struct n
 }
 
 static int
-hot_standby_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+hot_standby_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Hot standby (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

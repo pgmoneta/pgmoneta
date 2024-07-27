@@ -113,8 +113,7 @@ pgmoneta_wal(int srv, char** argv)
    struct stream_buffer* buffer = NULL;
    struct workflow* head = NULL;
    struct workflow* current = NULL;
-   struct node* i_nodes = NULL;
-   struct node* o_nodes = NULL;
+   struct deque* nodes = NULL;
 
    config = (struct configuration*) shmem;
 
@@ -155,6 +154,8 @@ pgmoneta_wal(int srv, char** argv)
    d = pgmoneta_get_server_wal(srv);
    pgmoneta_mkdir(d);
 
+   pgmoneta_deque_create(false, &nodes);
+
    if (config->storage_engine & STORAGE_ENGINE_SSH)
    {
       head = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_WAL_SHIPPING);
@@ -164,7 +165,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->setup(srv, &date[0], i_nodes, &o_nodes))
+      if (current->setup(srv, &date[0], nodes))
       {
          goto error;
       }
@@ -174,7 +175,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->execute(srv, &date[0], i_nodes, &o_nodes))
+      if (current->execute(srv, &date[0], nodes))
       {
          goto error;
       }
@@ -575,7 +576,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      current->teardown(srv, &date[0], i_nodes, &o_nodes);
+      current->teardown(srv, &date[0], nodes);
 
       current = current->next;
    }
@@ -593,6 +594,8 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_free_query_response(identify_system_response);
    pgmoneta_free_query_response(end_of_timeline_response);
    pgmoneta_memory_stream_buffer_free(buffer);
+
+   pgmoneta_deque_destroy(nodes);
 
    free(remain_buffer);
    free(d);
@@ -633,13 +636,15 @@ error:
    current = head;
    while (current != NULL)
    {
-      current->teardown(srv, &date[0], i_nodes, &o_nodes);
+      current->teardown(srv, &date[0], nodes);
 
       current = current->next;
    }
 
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
+
+   pgmoneta_deque_destroy(nodes);
 
    free(remain_buffer);
    free(d);

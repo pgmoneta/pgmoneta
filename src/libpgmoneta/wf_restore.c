@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
-#include <node.h>
 #include <pgmoneta.h>
+#include <deque.h>
 #include <info.h>
 #include <logging.h>
 #include <restore.h>
@@ -42,17 +42,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static int restore_setup(int, char*, struct node*, struct node**);
-static int restore_execute(int, char*, struct node*, struct node**);
-static int restore_teardown(int, char*, struct node*, struct node**);
+static int restore_setup(int, char*, struct deque*);
+static int restore_execute(int, char*, struct deque*);
+static int restore_teardown(int, char*, struct deque*);
 
-static int recovery_info_setup(int, char*, struct node*, struct node**);
-static int recovery_info_execute(int, char*, struct node*, struct node**);
-static int recovery_info_teardown(int, char*, struct node*, struct node**);
+static int recovery_info_setup(int, char*, struct deque*);
+static int recovery_info_execute(int, char*, struct deque*);
+static int recovery_info_teardown(int, char*, struct deque*);
 
-static int restore_excluded_files_setup(int, char*, struct node*, struct node**);
-static int restore_excluded_files_execute(int, char*, struct node*, struct node**);
-static int restore_excluded_files_teardown(int, char*, struct node*, struct node**);
+static int restore_excluded_files_setup(int, char*, struct deque*);
+static int restore_excluded_files_execute(int, char*, struct deque*);
+static int restore_excluded_files_teardown(int, char*, struct deque*);
 
 static char* get_user_password(char* username);
 static void create_standby_signal(char* basedir);
@@ -118,21 +118,20 @@ pgmoneta_restore_excluded_files(void)
 }
 
 static int
-restore_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+restore_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Restore (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-restore_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+restore_execute(int server, char* identifier, struct deque* nodes)
 {
    char* position = NULL;
    char* directory = NULL;
@@ -152,25 +151,17 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
    char* waldir = NULL;
    char* waltarget = NULL;
    int number_of_workers = 0;
-   struct node* o_root = NULL;
-   struct node* o_output = NULL;
-   struct node* o_identifier = NULL;
-   struct node* o_to = NULL;
-   struct node* o_version = NULL;
-   struct node* o_primary = NULL;
-   struct node* o_recovery_info = NULL;
    struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Restore (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   position = pgmoneta_get_node_string(i_nodes, "position");
+   position = (char*)pgmoneta_deque_get(nodes, "position");
 
-   directory = pgmoneta_get_node_string(i_nodes, "directory");
+   directory = (char*)pgmoneta_deque_get(nodes, "directory");
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -259,12 +250,10 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
       goto error;
    }
 
-   if (pgmoneta_create_node_string(directory, "root", &o_root))
+   if (pgmoneta_deque_put(nodes, "root", directory, strlen(directory) + 1))
    {
       goto error;
    }
-
-   pgmoneta_append_node(o_nodes, o_root);
 
    from = pgmoneta_get_server_backup_identifier_data(server, id);
 
@@ -298,6 +287,7 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
          char tokens[512];
          bool primary = true;
          bool copy_wal = false;
+         char ver[MISC_LENGTH] = {0};
          char* ptr = NULL;
 
          memset(&tokens[0], 0, sizeof(tokens));
@@ -353,26 +343,21 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
          pgmoneta_get_backup(root, id, &backup);
 
-         if (pgmoneta_create_node_bool(primary, "primary", &o_primary))
+         if (pgmoneta_deque_put(nodes, "primary", primary ? "true" : "false", (primary ? strlen("true") : strlen("false")) + 1))
          {
             goto error;
          }
 
-         pgmoneta_append_node(o_nodes, o_primary);
-
-         if (pgmoneta_create_node_int(backup->version, "version", &o_version))
+         snprintf(&ver[0], sizeof(ver), "%d", backup->version);
+         if (pgmoneta_deque_put(nodes, "version", ver, strlen(ver) + 1))
          {
             goto error;
          }
 
-         pgmoneta_append_node(o_nodes, o_version);
-
-         if (pgmoneta_create_node_bool(true, "recovery info", &o_recovery_info))
+         if (pgmoneta_deque_put(nodes, "recovery info", "true", strlen("true") + 1))
          {
             goto error;
          }
-
-         pgmoneta_append_node(o_nodes, o_recovery_info);
 
          if (copy_wal)
          {
@@ -390,13 +375,10 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
          }
       }
 
-      if (pgmoneta_create_node_string(to, "to", &o_to))
+      if (pgmoneta_deque_put(nodes, "to", to, strlen(to) + 1))
       {
          goto error;
       }
-
-      pgmoneta_append_node(o_nodes, o_to);
-
    }
 
    if (number_of_workers > 0)
@@ -410,19 +392,15 @@ restore_execute(int server, char* identifier, struct node* i_nodes, struct node*
 
    ident = pgmoneta_append(ident, id);
 
-   if (pgmoneta_create_node_string(o, "output", &o_output))
+   if (pgmoneta_deque_put(nodes, "output", o, strlen(o) + 1))
    {
       goto error;
    }
 
-   pgmoneta_append_node(o_nodes, o_output);
-
-   if (pgmoneta_create_node_string(ident, "identifier", &o_identifier))
+   if (pgmoneta_deque_put(nodes, "identifier", ident, strlen(ident) + 1))
    {
       goto error;
    }
-
-   pgmoneta_append_node(o_nodes, o_identifier);
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -476,35 +454,33 @@ error:
 }
 
 static int
-restore_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+restore_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Restore (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-recovery_info_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+recovery_info_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Recovery (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+recovery_info_execute(int server, char* identifier, struct deque* nodes)
 {
    char* base = NULL;
    char* position = NULL;
@@ -525,31 +501,30 @@ recovery_info_execute(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   is_recovery_info = pgmoneta_get_node_bool(*o_nodes, "recovery info");
+   is_recovery_info = !strcmp((char*)pgmoneta_deque_get(nodes, "recovery info"), "true");
 
    if (!is_recovery_info)
    {
       goto done;
    }
 
-   base = pgmoneta_get_node_string(*o_nodes, "to");
+   base = (char*)pgmoneta_deque_get(nodes, "to");
 
    if (base == NULL)
    {
       goto error;
    }
 
-   position = pgmoneta_get_node_string(i_nodes, "position");
+   position = (char*)pgmoneta_deque_get(nodes, "position");
 
    if (position == NULL)
    {
       goto error;
    }
 
-   primary = pgmoneta_get_node_bool(*o_nodes, "primary");
+   primary = !strcmp((char*)pgmoneta_deque_get(nodes, "primary"), "true");
 
    if (!primary)
    {
@@ -847,35 +822,33 @@ error:
 }
 
 static int
-recovery_info_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+recovery_info_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Recovery (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-restore_excluded_files_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+restore_excluded_files_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Excluded (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-restore_excluded_files_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+restore_excluded_files_execute(int server, char* identifier, struct deque* nodes)
 {
    char* id = NULL;
    char* from = NULL;
@@ -890,8 +863,7 @@ restore_excluded_files_execute(int server, char* identifier, struct node* i_node
    struct configuration* config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Excluded (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
    {
@@ -937,7 +909,7 @@ restore_excluded_files_execute(int server, char* identifier, struct node* i_node
       id = identifier;
    }
 
-   directory = pgmoneta_get_node_string(i_nodes, "directory");
+   directory = (char*)pgmoneta_deque_get(nodes, "directory");
 
    from = pgmoneta_get_server_backup_identifier_data(server, id);
 
@@ -1028,15 +1000,14 @@ error:
 }
 
 static int
-restore_excluded_files_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+restore_excluded_files_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Excluded (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

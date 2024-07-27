@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#include <node.h>
+#include <deque.h>
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -51,9 +51,9 @@ extern "C" {
 
 #define CLEANUP_TYPE_RESTORE 0
 
-typedef int (* setup)(int, char*, struct node*, struct node**);
-typedef int (* execute)(int, char*, struct node*, struct node**);
-typedef int (* teardown)(int, char*, struct node*, struct node**);
+typedef int (* setup)(int, char*, struct deque*);
+typedef int (* execute)(int, char*, struct deque*);
+typedef int (* teardown)(int, char*, struct deque*);
 
 /** @struct workflow
  * Defines a workflow

@@ -41,9 +41,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int s3_storage_setup(int, char*, struct node*, struct node**);
-static int s3_storage_execute(int, char*, struct node*, struct node**);
-static int s3_storage_teardown(int, char*, struct node*, struct node**);
+static int s3_storage_setup(int, char*, struct deque*);
+static int s3_storage_execute(int, char*, struct deque*);
+static int s3_storage_teardown(int, char*, struct deque*);
 
 static int s3_upload_files(char* local_root, char* s3_root, char* relative_path);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path);
@@ -69,15 +69,14 @@ pgmoneta_storage_create_s3(void)
 }
 
 static int
-s3_storage_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+s3_storage_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("S3 storage engine (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    curl = curl_easy_init();
    if (curl == NULL)
@@ -92,7 +91,7 @@ error:
 }
 
 static int
-s3_storage_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+s3_storage_execute(int server, char* identifier, struct deque* nodes)
 {
    char* local_root = NULL;
    char* s3_root = NULL;
@@ -101,8 +100,7 @@ s3_storage_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("S3 storage engine (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    local_root = pgmoneta_get_server_backup_identifier(server, identifier);
    s3_root = s3_get_basepath(server, identifier);
@@ -126,7 +124,7 @@ error:
 }
 
 static int
-s3_storage_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+s3_storage_teardown(int server, char* identifier, struct deque* nodes)
 {
    char* root = NULL;
    struct configuration* config;
@@ -134,8 +132,7 @@ s3_storage_teardown(int server, char* identifier, struct node* i_nodes, struct n
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("S3 storage engine (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    root = pgmoneta_get_server_backup_identifier_data(server, identifier);
 

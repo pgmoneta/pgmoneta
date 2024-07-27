@@ -37,10 +37,10 @@
 /* system */
 #include <stdlib.h>
 
-static int lz4_setup(int, char*, struct node*, struct node**);
-static int lz4_execute_compress(int, char*, struct node*, struct node**);
-static int lz4_execute_uncompress(int, char*, struct node*, struct node**);
-static int lz4_teardown(int, char*, struct node*, struct node**);
+static int lz4_setup(int, char*, struct deque*);
+static int lz4_execute_compress(int, char*, struct deque*);
+static int lz4_execute_uncompress(int, char*, struct deque*);
+static int lz4_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_lz4(bool compress)
@@ -72,21 +72,20 @@ pgmoneta_workflow_create_lz4(bool compress)
 }
 
 static int
-lz4_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+lz4_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+lz4_execute_compress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* root = NULL;
@@ -105,12 +104,11 @@ lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (compress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    compression_time = time(NULL);
 
-   tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
 
    if (tarfile == NULL)
    {
@@ -120,8 +118,8 @@ lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct 
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = pgmoneta_get_node_string(*o_nodes, "root");
-      to = pgmoneta_get_node_string(*o_nodes, "to");
+      root = (char*)pgmoneta_deque_get(nodes, "root");
+      to = (char*)pgmoneta_deque_get(nodes, "to");
       d = pgmoneta_append(d, to);
 
       pgmoneta_lz4c_data(d, workers);
@@ -162,7 +160,7 @@ lz4_execute_compress(int server, char* identifier, struct node* i_nodes, struct 
 }
 
 static int
-lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* to = NULL;
@@ -179,10 +177,9 @@ lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struc
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (uncompress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   to = pgmoneta_get_node_string(*o_nodes, "to");
+   to = (char*)pgmoneta_deque_get(nodes, "to");
 
    if (to != NULL)
    {
@@ -225,15 +222,14 @@ lz4_execute_uncompress(int server, char* identifier, struct node* i_nodes, struc
 }
 
 static int
-lz4_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+lz4_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("LZ4 (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

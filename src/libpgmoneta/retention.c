@@ -38,8 +38,7 @@ pgmoneta_retention(char** argv)
 {
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct node* i_nodes = NULL;
-   struct node* o_nodes = NULL;
+   struct deque* nodes = NULL;
 
    pgmoneta_start_logging();
 
@@ -47,10 +46,12 @@ pgmoneta_retention(char** argv)
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETAIN);
 
+   pgmoneta_deque_create(false, &nodes);
+
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(0, NULL, i_nodes, &o_nodes))
+      if (current->setup(0, NULL, nodes))
       {
          goto error;
       }
@@ -60,7 +61,7 @@ pgmoneta_retention(char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(0, NULL, i_nodes, &o_nodes))
+      if (current->execute(0, NULL, nodes))
       {
          goto error;
       }
@@ -70,7 +71,7 @@ pgmoneta_retention(char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(0, NULL, i_nodes, &o_nodes))
+      if (current->teardown(0, NULL, nodes))
       {
          goto error;
       }
@@ -80,6 +81,8 @@ pgmoneta_retention(char** argv)
    pgmoneta_stop_logging();
 
    pgmoneta_workflow_delete(workflow);
+
+   pgmoneta_deque_destroy(nodes);
 
    exit(0);
 
@@ -87,6 +90,8 @@ error:
    pgmoneta_stop_logging();
 
    pgmoneta_workflow_delete(workflow);
+
+   pgmoneta_deque_destroy(nodes);
 
    exit(1);
 }

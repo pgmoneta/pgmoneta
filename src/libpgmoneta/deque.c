@@ -26,7 +26,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <pgmoneta.h>
 #include <deque.h>
+#include <logging.h>
 #include <utils.h>
 
 #include <stdlib.h>
@@ -34,11 +36,11 @@
 
 // tag is copied if not NULL
 static void
-deque_offer(struct deque* deque, void* data, char* tag, bool copied);
+deque_offer(struct deque* deque, void* data, size_t data_size, char* tag, bool copied);
 
 // tag is copied if not NULL
 static void
-deque_node_create(void* data, char* tag, bool copied, struct deque_node** node);
+deque_node_create(void* data, size_t data_size, char* tag, bool copied, struct deque_node** node);
 
 // tag will always be freed
 static void
@@ -64,8 +66,8 @@ pgmoneta_deque_create(bool thread_safe, struct deque** deque)
    {
       pthread_rwlock_init(&q->mutex, NULL);
    }
-   deque_node_create(NULL, NULL, false, &q->start);
-   deque_node_create(NULL, NULL, false, &q->end);
+   deque_node_create(NULL, 0, NULL, false, &q->start);
+   deque_node_create(NULL, 0, NULL, false, &q->end);
    q->start->next = q->end;
    q->end->prev = q->start;
    *deque = q;
@@ -81,14 +83,14 @@ pgmoneta_deque_put(struct deque* deque, char* tag, void* data, size_t data_size)
       val = malloc(data_size);
       memcpy(val, data, data_size);
    }
-   deque_offer(deque, val, tag, true);
+   deque_offer(deque, val, data_size, tag, true);
    return 0;
 }
 
 int
 pgmoneta_deque_add(struct deque* deque, char* tag, void* data)
 {
-   deque_offer(deque, data, tag, false);
+   deque_offer(deque, data, 0, tag, false);
    return 0;
 }
 
@@ -149,6 +151,31 @@ pgmoneta_deque_peek(struct deque* deque, char** tag)
    return val;
 }
 
+void*
+pgmoneta_deque_get(struct deque* deque, char* tag)
+{
+   struct deque_node* n = NULL;
+
+   if (deque == NULL || pgmoneta_deque_size(deque) == 0 || tag == NULL || strlen(tag) == 0)
+   {
+      return NULL;
+   }
+
+   n = pgmoneta_deque_head(deque);
+
+   while (n != NULL)
+   {
+      if (!strcmp(tag, n->tag))
+      {
+         return n->data;
+      }
+
+      n = pgmoneta_deque_next(deque, n);
+   }
+
+   return NULL;
+}
+
 struct deque_node*
 pgmoneta_deque_next(struct deque* deque, struct deque_node* node)
 {
@@ -204,6 +231,30 @@ bool
 pgmoneta_deque_empty(struct deque* deque)
 {
    return pgmoneta_deque_size(deque) == 0;
+}
+
+void
+pgmoneta_deque_list(struct deque* deque)
+{
+   struct deque_node* n = NULL;
+
+   if (deque != NULL && pgmoneta_deque_size(deque) > 0)
+   {
+      n = pgmoneta_deque_head(deque);
+
+      pgmoneta_log_trace("Deque:");
+      while (n != NULL)
+      {
+         pgmoneta_log_trace("%s", n->tag);
+         pgmoneta_log_mem(n->data, n->data_size);
+
+         n = pgmoneta_deque_next(deque, n);
+      }
+   }
+   else
+   {
+      pgmoneta_log_trace("Deque: Empty");
+   }
 }
 
 void
@@ -267,11 +318,11 @@ pgmoneta_deque_size(struct deque* deque)
 }
 
 static void
-deque_offer(struct deque* deque, void* data, char* tag, bool copied)
+deque_offer(struct deque* deque, void* data, size_t data_size, char* tag, bool copied)
 {
    struct deque_node* n = NULL;
    struct deque_node* last = NULL;
-   deque_node_create(data, tag, copied, &n);
+   deque_node_create(data, data_size, tag, copied, &n);
    deque_write_lock(deque);
    deque->size++;
    last = deque->end->prev;
@@ -283,12 +334,13 @@ deque_offer(struct deque* deque, void* data, char* tag, bool copied)
 }
 
 static void
-deque_node_create(void* data, char* tag, bool copied, struct deque_node** node)
+deque_node_create(void* data, size_t data_size, char* tag, bool copied, struct deque_node** node)
 {
    struct deque_node* n = NULL;
    n = malloc(sizeof(struct deque_node));
    n->copied = copied;
    n->data = data;
+   n->data_size = data_size;
    n->prev = NULL;
    n->next = NULL;
    if (tag != NULL)

@@ -45,9 +45,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int basebackup_setup(int, char*, struct node*, struct node**);
-static int basebackup_execute(int, char*, struct node*, struct node**);
-static int basebackup_teardown(int, char*, struct node*, struct node**);
+static int basebackup_setup(int, char*, struct deque*);
+static int basebackup_execute(int, char*, struct deque*);
+static int basebackup_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_basebackup(void)
@@ -70,21 +70,20 @@ pgmoneta_workflow_create_basebackup(void)
 }
 
 static int
-basebackup_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+basebackup_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Basebackup (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-basebackup_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+basebackup_execute(int server, char* identifier, struct deque* nodes)
 {
    time_t start_time;
    int status;
@@ -113,8 +112,6 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    int backup_max_rate;
    int network_max_rate;
    int hash;
-   struct node* o_root = NULL;
-   struct node* o_to = NULL;
    struct configuration* config;
    struct message* basebackup_msg = NULL;
    struct message* tablespace_msg = NULL;
@@ -129,8 +126,7 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Basebackup (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    start_time = time(NULL);
 
@@ -337,17 +333,15 @@ basebackup_execute(int server, char* identifier, struct node* i_nodes, struct no
    pgmoneta_read_wal(d, &wal);
    pgmoneta_read_checkpoint_info(d, &chkptpos);
 
-   if (pgmoneta_create_node_string(root, "root", &o_root))
+   if (pgmoneta_deque_put(nodes, "root", root, strlen(root) + 1))
    {
       goto error;
    }
-   pgmoneta_append_node(o_nodes, o_root);
 
-   if (pgmoneta_create_node_string(d, "to", &o_to))
+   if (pgmoneta_deque_put(nodes, "to", d, strlen(d) + 1))
    {
       goto error;
    }
-   pgmoneta_append_node(o_nodes, o_to);
 
    pgmoneta_create_info(root, identifier, 1);
    pgmoneta_update_info_string(root, INFO_WAL, wal);
@@ -432,15 +426,14 @@ error:
 }
 
 static int
-basebackup_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+basebackup_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Basebackup (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

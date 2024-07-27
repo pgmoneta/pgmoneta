@@ -44,6 +44,7 @@ struct deque_node
 {
    bool copied;             /**< The flag if the value is copied */
    void* data;              /**< The data */
+   size_t data_size;        /**< The data size */
    char* tag;               /**< The tag */
    struct deque_node* next; /**< The next pointer */
    struct deque_node* prev; /**< The previous pointer */
@@ -120,9 +121,19 @@ void*
 pgmoneta_deque_peek(struct deque* deque, char** tag);
 
 /**
+ * Get the data for the specified tag
+ * @param deque The deque
+ * @param tag The tag
+ * @return The data, or NULL
+ */
+void*
+pgmoneta_deque_get(struct deque* deque, char* tag);
+
+/**
  * Get the next deque node
  * The function is thread safe for put/add but not for polling,
  * meaning that the returned node could get destroyed by other thread
+ * @param deque The deque
  * @param node The current node
  * @return The next node if there is a next node, NULL if otherwise
  */
@@ -133,6 +144,7 @@ pgmoneta_deque_next(struct deque* deque, struct deque_node* node);
  * Get the previous deque node
  * The function is thread safe for put/add but not for polling,
  * meaning that the returned node could get destroyed by other thread
+ * @param deque The deque
  * @param node The current node
  * @return The next node if there is a previous node, NULL if otherwise
  */
@@ -182,6 +194,13 @@ pgmoneta_deque_size(struct deque* deque);
  */
 bool
 pgmoneta_deque_empty(struct deque* deque);
+
+/**
+ * List the nodes in the deque
+ * @param deque The deque
+ */
+void
+pgmoneta_deque_list(struct deque* deque);
 
 /**
  * Destroy the deque and free its and its nodes' memory

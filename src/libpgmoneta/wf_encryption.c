@@ -29,10 +29,10 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
+#include <deque.h>
 #include <info.h>
 #include <link.h>
 #include <logging.h>
-#include <node.h>
 #include <pgmoneta.h>
 #include <utils.h>
 #include <workers.h>
@@ -41,10 +41,10 @@
 /* system */
 #include <stdlib.h>
 
-static int encryption_setup(int, char*, struct node*, struct node**);
-static int encryption_execute(int, char*, struct node*, struct node**);
-static int decryption_execute(int, char*, struct node*, struct node**);
-static int encryption_teardown(int, char*, struct node*, struct node**);
+static int encryption_setup(int, char*, struct deque*);
+static int encryption_execute(int, char*, struct deque*);
+static int decryption_execute(int, char*, struct deque*);
+static int encryption_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_encryption(bool encrypt)
@@ -76,21 +76,20 @@ pgmoneta_workflow_encryption(bool encrypt)
 }
 
 static int
-encryption_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+encryption_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Encryption (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-encryption_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+encryption_execute(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* enc_file = NULL;
@@ -111,10 +110,9 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Encryption (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
 
    encrypt_time = time(NULL);
 
@@ -126,8 +124,8 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = pgmoneta_get_node_string(*o_nodes, "root");
-      to = pgmoneta_get_node_string(*o_nodes, "to");
+      root = (char*)pgmoneta_deque_get(nodes, "root");
+      to = (char*)pgmoneta_deque_get(nodes, "to");
       d = pgmoneta_append(d, to);
 
       pgmoneta_encrypt_data(d, workers);
@@ -196,7 +194,7 @@ encryption_execute(int server, char* identifier, struct node* i_nodes, struct no
 }
 
 static int
-decryption_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+decryption_execute(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* to = NULL;
@@ -216,8 +214,7 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Decryption (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -264,7 +261,7 @@ decryption_execute(int server, char* identifier, struct node* i_nodes, struct no
       id = identifier;
    }
 
-   to = pgmoneta_get_node_string(*o_nodes, "to");
+   to = (char*)pgmoneta_deque_get(nodes, "to");
 
    if (to != NULL)
    {
@@ -324,15 +321,14 @@ error:
 }
 
 static int
-encryption_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+encryption_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Encryption (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

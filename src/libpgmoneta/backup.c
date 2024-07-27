@@ -60,8 +60,7 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    unsigned long size;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct node* i_nodes = NULL;
-   struct node* o_nodes = NULL;
+   struct deque* nodes = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -96,10 +95,12 @@ pgmoneta_backup(int client_fd, int server, char** argv)
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_BACKUP);
 
+   pgmoneta_deque_create(false, &nodes);
+
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, &date[0], i_nodes, &o_nodes))
+      if (current->setup(server, &date[0], nodes))
       {
          goto error;
       }
@@ -109,7 +110,7 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, &date[0], i_nodes, &o_nodes))
+      if (current->execute(server, &date[0], nodes))
       {
          goto error;
       }
@@ -119,7 +120,7 @@ pgmoneta_backup(int client_fd, int server, char** argv)
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, &date[0], i_nodes, &o_nodes))
+      if (current->teardown(server, &date[0], nodes))
       {
          goto error;
       }
@@ -147,9 +148,7 @@ done:
 
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_free_nodes(i_nodes);
-
-   pgmoneta_free_nodes(o_nodes);
+   pgmoneta_deque_destroy(nodes);
 
    free(root);
    free(d);
@@ -165,9 +164,7 @@ error:
 
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_free_nodes(i_nodes);
-
-   pgmoneta_free_nodes(o_nodes);
+   pgmoneta_deque_destroy(nodes);
 
    free(root);
    free(d);

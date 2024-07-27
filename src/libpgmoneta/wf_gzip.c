@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
-#include <node.h>
 #include <pgmoneta.h>
+#include <deque.h>
 #include <gzip_compression.h>
 #include <logging.h>
 #include <utils.h>
@@ -39,10 +39,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int gzip_setup(int, char*, struct node*, struct node**);
-static int gzip_execute_compress(int, char*, struct node*, struct node**);
-static int gzip_execute_uncompress(int, char*, struct node*, struct node**);
-static int gzip_teardown(int, char*, struct node*, struct node**);
+static int gzip_setup(int, char*, struct deque*);
+static int gzip_execute_compress(int, char*, struct deque*);
+static int gzip_execute_uncompress(int, char*, struct deque*);
+static int gzip_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_gzip(bool compress)
@@ -74,21 +74,20 @@ pgmoneta_workflow_create_gzip(bool compress)
 }
 
 static int
-gzip_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+gzip_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("GZip (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+gzip_execute_compress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* root = NULL;
@@ -107,12 +106,11 @@ gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("GZip (compress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    compression_time = time(NULL);
 
-   tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
 
    if (tarfile == NULL)
    {
@@ -122,8 +120,8 @@ gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = pgmoneta_get_node_string(*o_nodes, "root");
-      to = pgmoneta_get_node_string(*o_nodes, "to");
+      root = (char*)pgmoneta_deque_get(nodes, "root");
+      to = (char*)pgmoneta_deque_get(nodes, "to");
       d = pgmoneta_append(d, to);
 
       pgmoneta_gzip_data(d, workers);
@@ -164,7 +162,7 @@ gzip_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 }
 
 static int
-gzip_execute_uncompress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+gzip_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* to = NULL;
@@ -181,10 +179,9 @@ gzip_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("GZip (uncompress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   to = pgmoneta_get_node_string(*o_nodes, "to");
+   to = (char*)pgmoneta_deque_get(nodes, "to");
 
    if (to != NULL)
    {
@@ -227,15 +224,14 @@ gzip_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
 }
 
 static int
-gzip_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+gzip_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("GZip (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

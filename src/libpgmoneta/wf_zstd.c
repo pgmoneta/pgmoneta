@@ -37,10 +37,10 @@
 /* system */
 #include <stdlib.h>
 
-static int zstd_setup(int, char*, struct node*, struct node**);
-static int zstd_execute_compress(int, char*, struct node*, struct node**);
-static int zstd_execute_uncompress(int, char*, struct node*, struct node**);
-static int zstd_teardown(int, char*, struct node*, struct node**);
+static int zstd_setup(int, char*, struct deque*);
+static int zstd_execute_compress(int, char*, struct deque*);
+static int zstd_execute_uncompress(int, char*, struct deque*);
+static int zstd_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_zstd(bool compress)
@@ -72,21 +72,20 @@ pgmoneta_workflow_create_zstd(bool compress)
 }
 
 static int
-zstd_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+zstd_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+zstd_execute_compress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* root = NULL;
@@ -105,12 +104,11 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (compress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    compression_time = time(NULL);
 
-   tarfile = pgmoneta_get_node_string(*o_nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
 
    if (tarfile == NULL)
    {
@@ -120,8 +118,8 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = pgmoneta_get_node_string(*o_nodes, "root");
-      to = pgmoneta_get_node_string(*o_nodes, "to");
+      root = (char*)pgmoneta_deque_get(nodes, "root");
+      to = (char*)pgmoneta_deque_get(nodes, "to");
 
       d = pgmoneta_append(d, to);
 
@@ -163,7 +161,7 @@ zstd_execute_compress(int server, char* identifier, struct node* i_nodes, struct
 }
 
 static int
-zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
    char* root = NULL;
    time_t decompress_time;
@@ -179,13 +177,12 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (decompress): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   root = pgmoneta_get_node_string(*o_nodes, "root");
+   root = (char*)pgmoneta_deque_get(nodes, "root");
    if (root == NULL)
    {
-      root = pgmoneta_get_node_string(*o_nodes, "to");
+      root = (char*)pgmoneta_deque_get(nodes, "to");
    }
 
    decompress_time = time(NULL);
@@ -218,15 +215,14 @@ zstd_execute_uncompress(int server, char* identifier, struct node* i_nodes, stru
 }
 
 static int
-zstd_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+zstd_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("ZSTD (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

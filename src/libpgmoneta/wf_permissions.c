@@ -36,11 +36,11 @@
 /* system */
 #include <stdlib.h>
 
-static int permissions_setup(int, char*, struct node*, struct node**);
-static int permissions_execute_backup(int, char*, struct node*, struct node**);
-static int permissions_execute_restore(int, char*, struct node*, struct node**);
-static int permissions_execute_archive(int, char*, struct node*, struct node**);
-static int permissions_teardown(int, char*, struct node*, struct node**);
+static int permissions_setup(int, char*, struct deque*);
+static int permissions_execute_backup(int, char*, struct deque*);
+static int permissions_execute_restore(int, char*, struct deque*);
+static int permissions_execute_archive(int, char*, struct deque*);
+static int permissions_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_permissions(int type)
@@ -76,21 +76,20 @@ pgmoneta_workflow_create_permissions(int type)
 }
 
 static int
-permissions_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+permissions_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-permissions_execute_backup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+permissions_execute_backup(int server, char* identifier, struct deque* nodes)
 {
    char* path = NULL;
    struct configuration* config;
@@ -98,8 +97,7 @@ permissions_execute_backup(int server, char* identifier, struct node* i_nodes, s
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (backup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    path = pgmoneta_get_server_backup_identifier_data(server, identifier);
 
@@ -111,7 +109,7 @@ permissions_execute_backup(int server, char* identifier, struct node* i_nodes, s
 }
 
 static int
-permissions_execute_restore(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+permissions_execute_restore(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    int number_of_backups = 0;
@@ -123,8 +121,7 @@ permissions_execute_restore(int server, char* identifier, struct node* i_nodes, 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (restore): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -165,7 +162,7 @@ permissions_execute_restore(int server, char* identifier, struct node* i_nodes, 
       id = identifier;
    }
 
-   path = pgmoneta_append(path, pgmoneta_get_node_string(i_nodes, "directory"));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, "directory"));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
@@ -203,7 +200,7 @@ error:
 }
 
 static int
-permissions_execute_archive(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+permissions_execute_archive(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    int number_of_backups = 0;
@@ -215,8 +212,7 @@ permissions_execute_archive(int server, char* identifier, struct node* i_nodes, 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (archive): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (!strcmp(identifier, "oldest"))
    {
@@ -257,7 +253,7 @@ permissions_execute_archive(int server, char* identifier, struct node* i_nodes, 
       id = identifier;
    }
 
-   path = pgmoneta_append(path, pgmoneta_get_node_string(i_nodes, "directory"));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, "directory"));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
@@ -312,15 +308,14 @@ error:
 }
 
 static int
-permissions_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+permissions_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Permissions (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

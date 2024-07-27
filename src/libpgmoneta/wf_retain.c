@@ -27,12 +27,12 @@
  */
 
 /* pgmoneta */
-#include <node.h>
 #include <pgmoneta.h>
+#include <delete.h>
+#include <deque.h>
 #include <info.h>
 #include <link.h>
 #include <logging.h>
-#include <delete.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -42,9 +42,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
-static int retain_setup(int, char*, struct node*, struct node**);
-static int retain_execute(int, char*, struct node*, struct node**);
-static int retain_teardown(int, char*, struct node*, struct node**);
+static int retain_setup(int, char*, struct deque*);
+static int retain_execute(int, char*, struct deque*);
+static int retain_teardown(int, char*, struct deque*);
 static void mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int retention_months,
                         int retention_years, int number_of_backups, struct backup** backups);
 
@@ -69,21 +69,20 @@ pgmoneta_workflow_create_retention(void)
 }
 
 static int
-retain_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+retain_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Retain (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-retain_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+retain_execute(int server, char* identifier, struct deque* nodes)
 {
    char* d;
    int number_of_backups = 0;
@@ -94,8 +93,7 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Retain (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
@@ -170,15 +168,14 @@ retain_execute(int server, char* identifier, struct node* i_nodes, struct node**
 }
 
 static int
-retain_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+retain_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Retain (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

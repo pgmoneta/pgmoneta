@@ -41,9 +41,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int azure_storage_setup(int, char*, struct node*, struct node**);
-static int azure_storage_execute(int, char*, struct node*, struct node**);
-static int azure_storage_teardown(int, char*, struct node*, struct node**);
+static int azure_storage_setup(int, char*, struct deque*);
+static int azure_storage_execute(int, char*, struct deque*);
+static int azure_storage_teardown(int, char*, struct deque*);
 
 static int azure_upload_files(char* local_root, char* azure_root, char* relative_path);
 static int azure_send_upload_request(char* local_root, char* azure_root, char* relative_path);
@@ -69,7 +69,7 @@ pgmoneta_storage_create_azure(void)
 }
 
 static int
-azure_storage_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+azure_storage_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
@@ -82,8 +82,7 @@ azure_storage_setup(int server, char* identifier, struct node* i_nodes, struct n
    }
 
    pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 
@@ -92,7 +91,7 @@ error:
 }
 
 static int
-azure_storage_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+azure_storage_execute(int server, char* identifier, struct deque* nodes)
 {
    char* local_root = NULL;
    char* azure_root = NULL;
@@ -104,8 +103,7 @@ azure_storage_execute(int server, char* identifier, struct node* i_nodes, struct
    azure_root = azure_get_basepath(server, identifier);
 
    pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    if (azure_upload_files(local_root, azure_root, ""))
    {
@@ -126,7 +124,7 @@ error:
 }
 
 static int
-azure_storage_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+azure_storage_teardown(int server, char* identifier, struct deque* nodes)
 {
    char* root = NULL;
    struct configuration* config;
@@ -140,8 +138,7 @@ azure_storage_teardown(int server, char* identifier, struct node* i_nodes, struc
    curl_easy_cleanup(curl);
 
    pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    free(root);
 

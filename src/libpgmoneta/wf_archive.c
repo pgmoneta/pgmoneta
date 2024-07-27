@@ -29,11 +29,11 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
-#include <node.h>
+#include <deque.h>
 #include <info.h>
+#include <logging.h>
 #include <management.h>
 #include <network.h>
-#include <logging.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -51,9 +51,9 @@
 #include <sys/param.h>
 #include <sys/types.h>
 
-static int archive_setup(int, char*, struct node*, struct node**);
-static int archive_execute(int, char*, struct node*, struct node**);
-static int archive_teardown(int, char*, struct node*, struct node**);
+static int archive_setup(int, char*, struct deque*);
+static int archive_execute(int, char*, struct deque*);
+static int archive_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_create_archive(void)
@@ -76,22 +76,20 @@ pgmoneta_workflow_create_archive(void)
 }
 
 static int
-archive_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+archive_setup(int server, char* identifier, struct deque* nodes)
 {
    char* tarfile = NULL;
    char* destination = NULL;
    char* id = NULL;
-   struct node* o_tarfile = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Archive (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   destination = pgmoneta_get_node_string(i_nodes, "destination");
-   id = pgmoneta_get_node_string(i_nodes, "id");
+   destination = (char*)pgmoneta_deque_get(nodes, "destination");
+   id = (char*)pgmoneta_deque_get(nodes, "id");
 
    tarfile = pgmoneta_append(tarfile, destination);
    tarfile = pgmoneta_append(tarfile, "/archive-");
@@ -100,12 +98,10 @@ archive_setup(int server, char* identifier, struct node* i_nodes, struct node** 
    tarfile = pgmoneta_append(tarfile, id);
    tarfile = pgmoneta_append(tarfile, ".tar");
 
-   if (pgmoneta_create_node_string(tarfile, "tarfile", &o_tarfile))
+   if (pgmoneta_deque_put(nodes, "tarfile", tarfile, strlen(tarfile) + 1))
    {
       goto error;
    }
-
-   pgmoneta_append_node(o_nodes, o_tarfile);
 
    free(tarfile);
 
@@ -119,7 +115,7 @@ error:
 }
 
 static int
-archive_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+archive_execute(int server, char* identifier, struct deque* nodes)
 {
    char* output = NULL;
    char* tarfile = NULL;
@@ -131,18 +127,17 @@ archive_execute(int server, char* identifier, struct node* i_nodes, struct node*
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   output = pgmoneta_get_node_string(i_nodes, "output");
+   output = (char*)pgmoneta_deque_get(nodes, "output");
 
    if (output == NULL)
    {
       goto error;
    }
 
-   id = pgmoneta_get_node_string(i_nodes, "id");
-   destination = pgmoneta_get_node_string(i_nodes, "destination");
+   id = (char*)pgmoneta_deque_get(nodes, "id");
+   destination = (char*)pgmoneta_deque_get(nodes, "destination");
 
    tarfile = pgmoneta_append(tarfile, destination);
    tarfile = pgmoneta_append(tarfile, "/archive-");
@@ -171,7 +166,7 @@ error:
 }
 
 static int
-archive_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+archive_teardown(int server, char* identifier, struct deque* nodes)
 {
    char* output = NULL;
    struct configuration* config;
@@ -179,10 +174,9 @@ archive_teardown(int server, char* identifier, struct node* i_nodes, struct node
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
-   output = pgmoneta_get_node_string(i_nodes, "output");
+   output = (char*)pgmoneta_deque_get(nodes, "output");
 
    if (output == NULL)
    {

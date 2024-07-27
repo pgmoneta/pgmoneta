@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
-#include <node.h>
 #include <pgmoneta.h>
+#include <deque.h>
 #include <info.h>
 #include <link.h>
 #include <logging.h>
@@ -40,9 +40,9 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
-static int delete_backup_setup(int, char*, struct node*, struct node**);
-static int delete_backup_execute(int, char*, struct node*, struct node**);
-static int delete_backup_teardown(int, char*, struct node*, struct node**);
+static int delete_backup_setup(int, char*, struct deque*);
+static int delete_backup_execute(int, char*, struct deque*);
+static int delete_backup_teardown(int, char*, struct deque*);
 
 struct workflow*
 pgmoneta_workflow_delete_backup(void)
@@ -65,21 +65,20 @@ pgmoneta_workflow_delete_backup(void)
 }
 
 static int
-delete_backup_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+delete_backup_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+delete_backup_execute(int server, char* identifier, struct deque* nodes)
 {
    bool active;
    int backup_index = -1;
@@ -98,8 +97,7 @@ delete_backup_execute(int server, char* identifier, struct node* i_nodes, struct
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    active = false;
 
@@ -284,15 +282,14 @@ error:
 }
 
 static int
-delete_backup_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+delete_backup_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }

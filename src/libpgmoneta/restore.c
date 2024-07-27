@@ -28,11 +28,11 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <deque.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
-#include <node.h>
 #include <restore.h>
 #include <string.h>
 #include <utils.h>
@@ -128,34 +128,29 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    char* ident = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct node* i_nodes = NULL;
-   struct node* o_nodes = NULL;
-   struct node* i_position = NULL;
-   struct node* i_directory = NULL;
+   struct deque* nodes = NULL;
 
    *output = NULL;
    *identifier = NULL;
 
-   if (pgmoneta_create_node_string(position, "position", &i_position))
+   pgmoneta_deque_create(false, &nodes);
+
+   if (pgmoneta_deque_put(nodes, "position", position, strlen(position) + 1))
    {
       goto error;
    }
 
-   pgmoneta_append_node(&i_nodes, i_position);
-
-   if (pgmoneta_create_node_string(directory, "directory", &i_directory))
+   if (pgmoneta_deque_put(nodes, "directory", directory, strlen(directory) + 1))
    {
       goto error;
    }
-
-   pgmoneta_append_node(&i_nodes, i_directory);
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE);
 
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, backup_id, i_nodes, &o_nodes))
+      if (current->setup(server, backup_id, nodes))
       {
          goto error;
       }
@@ -165,7 +160,7 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, backup_id, i_nodes, &o_nodes))
+      if (current->execute(server, backup_id, nodes))
       {
          goto error;
       }
@@ -175,21 +170,21 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, backup_id, i_nodes, &o_nodes))
+      if (current->teardown(server, backup_id, nodes))
       {
          goto error;
       }
       current = current->next;
    }
 
-   o = pgmoneta_get_node_string(o_nodes, "output");
+   o = (char*)pgmoneta_deque_get(nodes, "output");
 
    if (o == NULL)
    {
       goto error;
    }
 
-   ident = pgmoneta_get_node_string(o_nodes, "identifier");
+   ident = (char*)pgmoneta_deque_get(nodes, "identifier");
 
    if (ident == NULL)
    {
@@ -218,18 +213,14 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
 
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_free_nodes(i_nodes);
-
-   pgmoneta_free_nodes(o_nodes);
+   pgmoneta_deque_destroy(nodes);
 
    return 0;
 
 error:
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_free_nodes(i_nodes);
-
-   pgmoneta_free_nodes(o_nodes);
+   pgmoneta_deque_destroy(nodes);
 
    return 1;
 }

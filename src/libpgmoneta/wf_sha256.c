@@ -27,19 +27,19 @@
  */
 
 /* pgmoneta */
-#include "logging.h"
-#include "security.h"
 #include <pgmoneta.h>
-#include <node.h>
+#include <deque.h>
+#include <logging.h>
+#include <security.h>
 #include <utils.h>
 #include <workflow.h>
 
 /* system */
 #include <dirent.h>
 
-static int sha256_setup(int, char*, struct node*, struct node**);
-static int sha256_execute(int, char*, struct node*, struct node**);
-static int sha256_teardown(int, char*, struct node*, struct node**);
+static int sha256_setup(int, char*, struct deque*);
+static int sha256_execute(int, char*, struct deque*);
+static int sha256_teardown(int, char*, struct deque*);
 
 static int write_backup_sha256(char* root, char* relative_path);
 
@@ -61,21 +61,20 @@ pgmoneta_workflow_create_sha256(void)
 }
 
 static int
-sha256_setup(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+sha256_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SHA256 (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-sha256_execute(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+sha256_execute(int server, char* identifier, struct deque* nodes)
 {
    char* root = NULL;
    char* d = NULL;
@@ -85,8 +84,7 @@ sha256_execute(int server, char* identifier, struct node* i_nodes, struct node**
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SHA256 (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    root = pgmoneta_get_server_backup_identifier(server, identifier);
 
@@ -131,15 +129,14 @@ error:
 }
 
 static int
-sha256_teardown(int server, char* identifier, struct node* i_nodes, struct node** o_nodes)
+sha256_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("SHA256 (teardown): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_list_nodes(i_nodes, true);
-   pgmoneta_list_nodes(*o_nodes, false);
+   pgmoneta_deque_list(nodes);
 
    return 0;
 }
