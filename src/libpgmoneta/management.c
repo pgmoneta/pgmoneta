@@ -692,7 +692,7 @@ pgmoneta_management_write_status(SSL* ssl, int socket, bool offline)
    free_size = pgmoneta_free_space(config->base_dir);
    total_size = pgmoneta_total_space(config->base_dir);
 
-   if (write_int32("pgmoneta_management_write_status", ssl, socket, offline))
+   if (write_bool("pgmoneta_management_write_status", ssl, socket, offline))
    {
       goto error;
    }
