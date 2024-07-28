@@ -260,6 +260,41 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    }
    free(backups);
 
+   if (strlen(config->servers[server].hot_standby) > 0)
+   {
+      char* srv = NULL;
+      char* hs = NULL;
+
+      srv = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      if (number_of_backups == 0)
+      {
+         hs = pgmoneta_append(hs, config->servers[server].hot_standby);
+         if (!pgmoneta_ends_with(hs, "/"))
+         {
+            hs = pgmoneta_append_char(hs, '/');
+         }
+
+         pgmoneta_delete_directory(hs);
+
+         pgmoneta_log_info("Hot standby deleted: %s", config->servers[server].name);
+      }
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
+
+      free(srv);
+      free(hs);
+   }
+
    free(d);
 
    atomic_store(&config->servers[server].delete, false);

@@ -92,7 +92,6 @@ retain_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Retain (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
    for (int i = 0; i < config->number_of_servers; i++)
@@ -101,6 +100,9 @@ retain_execute(int server, char* identifier, struct deque* nodes)
       int retention_weeks = -1;
       int retention_months = -1;
       int retention_years = -1;
+
+      pgmoneta_log_debug("Retain (execute): %s/%s", config->servers[i].name, identifier);
+
       retention_days = config->servers[i].retention_days;
       if (retention_days <= 0)
       {
@@ -160,6 +162,40 @@ retain_execute(int server, char* identifier, struct deque* nodes)
          free(backups[j]);
       }
       free(backups);
+
+      if (strlen(config->servers[i].hot_standby) > 0)
+      {
+         char* srv = NULL;
+         char* hs = NULL;
+
+         srv = pgmoneta_get_server_backup(i);
+
+         if (!pgmoneta_get_backups(d, &number_of_backups, &backups))
+         {
+            if (number_of_backups == 0)
+            {
+               hs = pgmoneta_append(hs, config->servers[i].hot_standby);
+               if (!pgmoneta_ends_with(hs, "/"))
+               {
+                  hs = pgmoneta_append_char(hs, '/');
+               }
+
+               pgmoneta_delete_directory(hs);
+
+               pgmoneta_log_info("Hot standby deleted: %s", config->servers[i].name);
+            }
+         }
+
+         for (int i = 0; i < number_of_backups; i++)
+         {
+            free(backups[i]);
+         }
+         free(backups);
+
+         free(srv);
+         free(hs);
+      }
+
       free(retain_flags);
       free(d);
    }
