@@ -133,7 +133,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
       destination = pgmoneta_append(destination, root);
       destination = pgmoneta_append(destination, config->servers[server].name);
 
-      if (pgmoneta_exists(destination))
+      if (pgmoneta_exists(destination) && number_of_backups >= 2)
       {
          source = pgmoneta_append(source, base);
          if (!pgmoneta_ends_with(source, "/"))
@@ -245,6 +245,11 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
       }
       else
       {
+         if (pgmoneta_exists(destination))
+         {
+            pgmoneta_delete_directory(destination);
+         }
+
          source = pgmoneta_append(source, base);
          source = pgmoneta_append(source, identifier);
          source = pgmoneta_append_char(source, '/');
