@@ -280,9 +280,12 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
             hs = pgmoneta_append_char(hs, '/');
          }
 
-         pgmoneta_delete_directory(hs);
+         if (pgmoneta_exists(hs))
+         {
+            pgmoneta_delete_directory(hs);
 
-         pgmoneta_log_info("Hot standby deleted: %s", config->servers[server].name);
+            pgmoneta_log_info("Hot standby deleted: %s", config->servers[server].name);
+         }
       }
 
       for (int i = 0; i < number_of_backups; i++)
