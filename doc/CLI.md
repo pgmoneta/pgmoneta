@@ -1,5 +1,11 @@
 # pgmoneta-cli user guide
 
+The **pgmoneta-cli** command line interface controls your interaction with **pgmoneta**.
+
+**It is important that you only use the pgmoneta-cli command line interface to operate on your backup directory**
+
+Using other commands on the backup directory could cause problems.
+
 ```
 pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 
