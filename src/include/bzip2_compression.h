@@ -76,6 +76,15 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers);
 int
 pgmoneta_bzip2_file(char* from, char* to);
 
+/**
+ * BUNZip a file
+ * @param from The from file
+ * @param to The to file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_bunzip2_file(char* from, char* to);
+
 #ifdef __cplusplus
 }
 #endif

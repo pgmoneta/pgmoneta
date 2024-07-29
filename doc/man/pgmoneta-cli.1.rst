@@ -93,6 +93,12 @@ decrypt
 encrypt
   Encrypt the file in place, remove unencrypted file after successful encryption.
 
+decompress
+  Decompress the file in place, remove compressed file after successful decompression.
+
+compress
+  Compress the file in place, remove uncompressed file after successful compression.
+
 REPORTING BUGS
 ==============
 

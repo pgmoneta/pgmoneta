@@ -60,6 +60,8 @@
 #define COMMAND_EXPUNGE "expunge"
 #define COMMAND_ENCRYPT "encrypt"
 #define COMMAND_DECRYPT "decrypt"
+#define COMMAND_COMPRESS "compress"
+#define COMMAND_DECOMPRESS "decompress"
 #define COMMAND_PING "ping"
 #define COMMAND_STOP "stop"
 #define COMMAND_STATUS "status"
@@ -76,6 +78,8 @@ static void help_retain(void);
 static void help_expunge(void);
 static void help_decrypt(void);
 static void help_encrypt(void);
+static void help_decompress(void);
+static void help_compress(void);
 static void help_stop(void);
 static void help_ping(void);
 static void help_status_details(void);
@@ -99,6 +103,8 @@ static int retain(SSL* ssl, int socket, char* server, char* backup_id);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
 static int decrypt_data(SSL* ssl, int socket, char* path);
 static int encrypt_data(SSL* ssl, int socket, char* path);
+static int decompress_data(SSL* ssl, int socket, char* path);
+static int compress_data(SSL* ssl, int socket, char* path);
 static int info(SSL* ssl, int socket, char* server, char* backup, char output_format);
 
 static void
@@ -140,6 +146,8 @@ usage(void)
    printf("  expunge                  Expunge a backup from a server\n");
    printf("  encrypt                  Encrypt a file using master-key\n");
    printf("  decrypt                  Decrypt a file using master-key\n");
+   printf("  compress                 Compress a file using configured method\n");
+   printf("  decompress               Decompress a file using configured method\n");
    printf("  info                     Information about a backup\n");
    printf("  ping                     Check if pgmoneta is alive\n");
    printf("  stop                     Stop pgmoneta\n");
@@ -225,6 +233,22 @@ const struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_ENCRYPT,
       .deprecated = false,
       .log_message = "<encrypt> [%s]"
+   },
+   {
+      .command = "decompress",
+      .subcommand = "",
+      .accepted_argument_count = {1},
+      .action = MANAGEMENT_DECOMPRESS,
+      .deprecated = false,
+      .log_message = "<decompress> [%s]"
+   },
+   {
+      .command = "compress",
+      .subcommand = "",
+      .accepted_argument_count = {1},
+      .action = MANAGEMENT_COMPRESS,
+      .deprecated = false,
+      .log_message = "<compress> [%s]"
    },
    {
       .command = "ping",
@@ -674,6 +698,14 @@ password:
    {
       exit_code = encrypt_data(s_ssl, socket, parsed.args[0]);
    }
+   else if (parsed.cmd->action == MANAGEMENT_DECOMPRESS)
+   {
+      exit_code = decompress_data(s_ssl, socket, parsed.args[0]);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_COMPRESS)
+   {
+      exit_code = compress_data(s_ssl, socket, parsed.args[0]);
+   }
    else if (parsed.cmd->action == MANAGEMENT_INFO)
    {
       exit_code = info(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
@@ -791,6 +823,20 @@ help_encrypt(void)
 }
 
 static void
+help_decompress(void)
+{
+   printf("Decompress a file using configured method\n");
+   printf("  pgmoneta-cli decompress <file>\n");
+}
+
+static void
+help_compress(void)
+{
+   printf("Compress a single file using configured method\n");
+   printf("  pgmoneta-cli compress <file>\n");
+}
+
+static void
 help_stop(void)
 {
    printf("Stop pgmoneta\n");
@@ -870,6 +916,14 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_ENCRYPT))
    {
       help_encrypt();
+   }
+   else if (!strcmp(command, COMMAND_DECOMPRESS))
+   {
+      help_decompress();
+   }
+   else if (!strcmp(command, COMMAND_COMPRESS))
+   {
+      help_compress();
    }
    else if (!strcmp(command, COMMAND_PING))
    {
@@ -1114,6 +1168,32 @@ encrypt_data(SSL* ssl, int socket, char* path)
    int ret;
 
    if (pgmoneta_management_encrypt(ssl, socket, path))
+   {
+      return 1;
+   }
+   pgmoneta_management_read_int32(ssl, socket, &ret);
+   return ret;
+}
+
+static int
+decompress_data(SSL* ssl, int socket, char* path)
+{
+   int ret;
+
+   if (pgmoneta_management_decompress(ssl, socket, path))
+   {
+      return 1;
+   }
+   pgmoneta_management_read_int32(ssl, socket, &ret);
+   return ret;
+}
+
+static int
+compress_data(SSL* ssl, int socket, char* path)
+{
+   int ret;
+
+   if (pgmoneta_management_compress(ssl, socket, path))
    {
       return 1;
    }
