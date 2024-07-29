@@ -91,6 +91,7 @@ static int json_array_append_uint64(struct json* array, uint64_t val);
 static int json_array_append_string(struct json* array, char* str);
 static int json_array_append_float(struct json* array, float val);
 static int json_array_append_object(struct json* array, struct json* object);
+static int json_stream_parse_item(struct json_reader* reader, struct json** item);
 
 int
 pgmoneta_json_reader_init(char* path, struct json_reader** reader)
@@ -345,7 +346,7 @@ pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item)
    json_next_char(reader, &ch);
    reader->state = ItemStart;
    // parse the item, it'll be nicer to push the state to stack, but is not necessary right now
-   if (pgmoneta_json_stream_parse_item(reader, item))
+   if (json_stream_parse_item(reader, item))
    {
       goto done;
    }
@@ -369,184 +370,6 @@ pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item)
 done:
    reader->state = InvalidReaderState;
    return false;
-}
-
-int
-pgmoneta_json_stream_parse_item(struct json_reader* reader, struct json** item)
-{
-   struct json* i = NULL;
-   char* key = NULL;
-   char ch = 0;
-   pgmoneta_json_init(&i);
-   if (reader->state != ItemStart)
-   {
-      goto error;
-   }
-   while (json_next_char(reader, &ch))
-   {
-      if (ch != '"' && ch != ':' && ch != '{' && ch != '}' &&
-          !(reader->state == ValueStart && (isdigit(ch) || ch == '[')))
-      {
-         if (reader->state == KeyStart)
-         {
-            key = pgmoneta_append_char(key, ch);
-         }
-         continue;
-      }
-      if (reader->state == ItemStart)
-      {
-         if (ch == '"')
-         {
-            reader->state = KeyStart;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      else if (reader->state == KeyStart)
-      {
-         if (ch == '"')
-         {
-            reader->state = KeyEnd;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      else if (reader->state == KeyEnd)
-      {
-         if (ch == ':')
-         {
-            reader->state = ValueStart;
-         }
-         else
-         {
-            goto error;
-         }
-      }
-      else if (reader->state == ValueStart)
-      {
-         if (key == NULL)
-         {
-            goto error;
-         }
-         if (ch == '[' || ch == '{')
-         {
-            if (json_fast_forward_value(reader, ch))
-            {
-               goto error;
-            }
-            free(key);
-            key = NULL;
-         }
-         else if (ch == '"' || isdigit(ch))
-         {
-            if (ch == '"')
-            {
-               char* str = NULL;
-               while (json_next_char(reader, &ch) && ch != '"')
-               {
-                  str = pgmoneta_append_char(str, ch);
-               }
-               if (ch != '"')
-               {
-                  free(str);
-                  goto error;
-               }
-               pgmoneta_json_put(i, key, str, ValueString);
-               free(key);
-               free(str);
-               key = NULL;
-               str = NULL;
-            }
-            else
-            {
-               bool has_digit_point = false;
-               char* str = NULL;
-               str = pgmoneta_append_char(str, ch);
-               // peek first in case we advance to non-digit accidentally
-               while (json_peek_next_char(reader, &ch) && (isdigit(ch) || ch == '.'))
-               {
-                  if (ch == '.')
-                  {
-                     if (has_digit_point)
-                     {
-                        free(str);
-                        goto error;
-                     }
-                     else
-                     {
-                        has_digit_point = true;
-                     }
-                  }
-                  str = pgmoneta_append_char(str, ch);
-                  // advance
-                  json_next_char(reader, &ch);
-               }
-               if (isdigit(ch) || ch == '.')
-               {
-                  free(str);
-                  goto error;
-               }
-               if (has_digit_point)
-               {
-                  float num = 0;
-                  if (sscanf(str, "%f", &num) != 1)
-                  {
-                     free(str);
-                     goto error;
-                  }
-                  free(str);
-                  str = NULL;
-                  pgmoneta_json_put(i, key, &num, ValueFloat);
-               }
-               else
-               {
-                  int64_t num = 0;
-                  if (sscanf(str, "%" PRId64, &num) != 1)
-                  {
-                     free(str);
-                     goto error;
-                  }
-                  free(str);
-                  str = NULL;
-                  pgmoneta_json_put(i, key, &num, ValueInt64);
-               }
-               free(key);
-               key = NULL;
-            }
-         }
-         else
-         {
-            goto error;
-         }
-         reader->state = ValueEnd;
-      }
-      else if (reader->state == ValueEnd)
-      {
-         if (ch == '"')
-         {
-            reader->state = KeyStart;
-         }
-         else if (ch == '}')
-         {
-            reader->state = ItemEnd;
-            break;
-         }
-      }
-      else
-      {
-         goto error;
-      }
-   }
-   *item = i;
-   return 0;
-error:
-   pgmoneta_json_free(i);
-   free(key);
-   return 1;
 }
 
 int8_t
@@ -1312,7 +1135,7 @@ is_array_typed_value(enum json_value_type type)
 static void
 print_json_item(struct json* item, int indent, int indent_per_level)
 {
-   if (item == NULL || item->type != JSONItem)
+   if (item == NULL || (item->type != JSONItem && item->type != JSONUnknown))
    {
       return;
    }
@@ -2391,5 +2214,183 @@ json_array_append_object(struct json* array, struct json* object)
    }
    return json_value_append(value, object);
 error:
+   return 1;
+}
+
+static int
+json_stream_parse_item(struct json_reader* reader, struct json** item)
+{
+   struct json* i = NULL;
+   char* key = NULL;
+   char ch = 0;
+   pgmoneta_json_init(&i);
+   if (reader->state != ItemStart)
+   {
+      goto error;
+   }
+   while (json_next_char(reader, &ch))
+   {
+      if (ch != '"' && ch != ':' && ch != '{' && ch != '}' &&
+          !(reader->state == ValueStart && (isdigit(ch) || ch == '[')))
+      {
+         if (reader->state == KeyStart)
+         {
+            key = pgmoneta_append_char(key, ch);
+         }
+         continue;
+      }
+      if (reader->state == ItemStart)
+      {
+         if (ch == '"')
+         {
+            reader->state = KeyStart;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      else if (reader->state == KeyStart)
+      {
+         if (ch == '"')
+         {
+            reader->state = KeyEnd;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      else if (reader->state == KeyEnd)
+      {
+         if (ch == ':')
+         {
+            reader->state = ValueStart;
+         }
+         else
+         {
+            goto error;
+         }
+      }
+      else if (reader->state == ValueStart)
+      {
+         if (key == NULL)
+         {
+            goto error;
+         }
+         if (ch == '[' || ch == '{')
+         {
+            if (json_fast_forward_value(reader, ch))
+            {
+               goto error;
+            }
+            free(key);
+            key = NULL;
+         }
+         else if (ch == '"' || isdigit(ch))
+         {
+            if (ch == '"')
+            {
+               char* str = NULL;
+               while (json_next_char(reader, &ch) && ch != '"')
+               {
+                  str = pgmoneta_append_char(str, ch);
+               }
+               if (ch != '"')
+               {
+                  free(str);
+                  goto error;
+               }
+               pgmoneta_json_put(i, key, str, ValueString);
+               free(key);
+               free(str);
+               key = NULL;
+               str = NULL;
+            }
+            else
+            {
+               bool has_digit_point = false;
+               char* str = NULL;
+               str = pgmoneta_append_char(str, ch);
+               // peek first in case we advance to non-digit accidentally
+               while (json_peek_next_char(reader, &ch) && (isdigit(ch) || ch == '.'))
+               {
+                  if (ch == '.')
+                  {
+                     if (has_digit_point)
+                     {
+                        free(str);
+                        goto error;
+                     }
+                     else
+                     {
+                        has_digit_point = true;
+                     }
+                  }
+                  str = pgmoneta_append_char(str, ch);
+                  // advance
+                  json_next_char(reader, &ch);
+               }
+               if (isdigit(ch) || ch == '.')
+               {
+                  free(str);
+                  goto error;
+               }
+               if (has_digit_point)
+               {
+                  float num = 0;
+                  if (sscanf(str, "%f", &num) != 1)
+                  {
+                     free(str);
+                     goto error;
+                  }
+                  free(str);
+                  str = NULL;
+                  pgmoneta_json_put(i, key, &num, ValueFloat);
+               }
+               else
+               {
+                  int64_t num = 0;
+                  if (sscanf(str, "%" PRId64, &num) != 1)
+                  {
+                     free(str);
+                     goto error;
+                  }
+                  free(str);
+                  str = NULL;
+                  pgmoneta_json_put(i, key, &num, ValueInt64);
+               }
+               free(key);
+               key = NULL;
+            }
+         }
+         else
+         {
+            goto error;
+         }
+         reader->state = ValueEnd;
+      }
+      else if (reader->state == ValueEnd)
+      {
+         if (ch == '"')
+         {
+            reader->state = KeyStart;
+         }
+         else if (ch == '}')
+         {
+            reader->state = ItemEnd;
+            break;
+         }
+      }
+      else
+      {
+         goto error;
+      }
+   }
+   *item = i;
+   return 0;
+error:
+   pgmoneta_json_free(i);
+   free(key);
    return 1;
 }

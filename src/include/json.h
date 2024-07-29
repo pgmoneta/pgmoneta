@@ -173,18 +173,6 @@ bool
 pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item);
 
 /**
- * Parse input to a json item as the reader progresses through the input stream,
- * reader should be in ItemStart state.
- * The function is the non-recursive version - it will ignore array and nested item,
- * since we don't need that for now.
- * @param reader The reader
- * @param item [out]The item
- * @return 0 on success, 1 if otherwise
- */
-int
-pgmoneta_json_stream_parse_item(struct json_reader* reader, struct json** item);
-
-/**
  * Get int8_t value from json
  * @param item The item
  * @param key The key
