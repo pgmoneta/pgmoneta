@@ -776,6 +776,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    int client_fd;
    int ret;
    signed char id;
+   char* to = NULL;
    char* payload_s1 = NULL;
    char* payload_s2 = NULL;
    char* payload_s3 = NULL;
@@ -1328,6 +1329,76 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_log_debug("Management encrypt: %s", payload_s1);
          ret = pgmoneta_encrypt_file(payload_s1, NULL);
          pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
+         free(payload_s1);
+         break;
+      case MANAGEMENT_DECOMPRESS:
+         pgmoneta_log_debug("Management decompress: %s", payload_s1);
+         ret = 1;
+
+         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         {
+            to = malloc(strlen(payload_s1) - 2);
+            memset(to, 0, strlen(payload_s1) - 2);
+            memcpy(to, payload_s1, strlen(payload_s1) - 3);
+            ret = pgmoneta_gunzip_file(payload_s1, to);
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+         {
+            to = malloc(strlen(payload_s1) - 4);
+            memset(to, 0, strlen(payload_s1) - 4);
+            memcpy(to, payload_s1, strlen(payload_s1) - 5);
+            ret = pgmoneta_zstandardd_file(payload_s1, to);
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         {
+            to = malloc(strlen(payload_s1) - 3);
+            memset(to, 0, strlen(payload_s1) - 3);
+            memcpy(to, payload_s1, strlen(payload_s1) - 4);
+            ret = pgmoneta_lz4d_file(payload_s1, to);
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         {
+            to = malloc(strlen(payload_s1) - 3);
+            memset(to, 0, strlen(payload_s1) - 3);
+            memcpy(to, payload_s1, strlen(payload_s1) - 4);
+            ret = pgmoneta_bunzip2_file(payload_s1, to);
+         }
+
+         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
+         free(to);
+         free(payload_s1);
+         break;
+      case MANAGEMENT_COMPRESS:
+         pgmoneta_log_debug("Management compress: %s", payload_s1);
+         ret = 1;
+
+         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         {
+            to = pgmoneta_append(to, payload_s1);
+            to = pgmoneta_append(to, ".gz");
+            ret = pgmoneta_gzip_file(payload_s1, to);
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+         {
+            to = pgmoneta_append(to, payload_s1);
+            to = pgmoneta_append(to, ".zstd");
+            ret = pgmoneta_zstandardc_file(payload_s1, to);
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         {
+            to = pgmoneta_append(to, payload_s1);
+            to = pgmoneta_append(to, ".lz4");
+            ret = pgmoneta_lz4c_file(payload_s1, to);
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         {
+            to = pgmoneta_append(to, payload_s1);
+            to = pgmoneta_append(to, ".bz2");
+            ret = pgmoneta_bzip2_file(payload_s1, to);
+         }
+
+         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
+         free(to);
          free(payload_s1);
          break;
       case MANAGEMENT_INFO:

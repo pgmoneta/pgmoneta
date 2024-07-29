@@ -144,6 +144,7 @@ Command
 ``` sh
 pgmoneta-cli encrypt <file>
 ```
+
 ## decrypt
 
 Decrypt the file in place, remove encrypted file after successful decryption.
@@ -152,6 +153,26 @@ Command
 
 ``` sh
 pgmoneta-cli decrypt <file>
+```
+
+## compress
+
+Compress the file in place, remove uncompressed file after successful compression.
+
+Command
+
+``` sh
+pgmoneta-cli compress <file>
+```
+
+## decompress
+
+Decompress the file in place, remove compressed file after successful decompression.
+
+Command
+
+``` sh
+pgmoneta-cli decompress <file>
 ```
 
 ## info

@@ -48,6 +48,7 @@
 
 static int bzip2_compress(char* from, int level, char* to);
 static int bzip2_decompress(char* from, char* to);
+static int bzip2_decompress_file(char* from, char* to);
 
 static void do_bzip2_compress(void* arg);
 static void do_bzip2_decompress(void* arg);
@@ -408,7 +409,7 @@ bzip2_compress(char* from, int level, char* to)
    char buf[BUFFER_LENGTH] = {0};
    size_t buf_len = BUFFER_LENGTH;
    size_t length;
-   int bzip2_err;
+   int bzip2_err = 1;
 
    from_ptr = fopen(from, "r");
    if (!from_ptr)
@@ -455,7 +456,7 @@ error:
       fclose(to_ptr);
    }
 
-   return 1;
+   return bzip2_err;
 }
 
 static int
@@ -520,6 +521,103 @@ error:
    {
       fclose(from_ptr);
    }
+
+   return 1;
+}
+
+static int
+bzip2_decompress_file(char* from, char* to)
+{
+   FILE* from_ptr = NULL;
+   FILE* to_ptr = NULL;
+
+   char buf[BUFFER_LENGTH] = {0};
+   size_t buf_len = BUFFER_LENGTH;
+   int length = 0;
+   int bzip2_err = 1;
+   BZFILE* zip_file = NULL;
+
+   from_ptr = fopen(from, "r");
+   if (!from_ptr)
+   {
+      goto error;
+   }
+
+   to_ptr = fopen(to, "wb+");
+   if (!to_ptr)
+   {
+      goto error;
+   }
+
+   zip_file = BZ2_bzReadOpen(&bzip2_err, from_ptr, 0, 0, NULL, 0);
+   if (bzip2_err != BZ_OK)
+   {
+      goto error_unzip;
+   }
+
+   do
+   {
+      length = BZ2_bzRead(&bzip2_err, zip_file, buf, (int)buf_len);
+      if (bzip2_err != BZ_OK && bzip2_err != BZ_STREAM_END)
+      {
+         goto error_unzip;
+      }
+
+      if (length > 0)
+      {
+         if (fwrite(buf, 1, length, to_ptr) != (size_t)length)
+         {
+            goto error_unzip;
+         }
+      }
+
+   }
+   while (bzip2_err != BZ_STREAM_END);
+
+   BZ2_bzReadClose(&bzip2_err, zip_file);
+   zip_file = NULL;
+
+error_unzip:
+   if (zip_file)
+   {
+      BZ2_bzReadClose(&bzip2_err, zip_file);
+   }
+
+error:
+   if (to_ptr)
+   {
+      fclose(to_ptr);
+   }
+
+   if (from_ptr)
+   {
+      fclose(from_ptr);
+   }
+
+   return bzip2_err;
+}
+
+int
+pgmoneta_bunzip2_file(char* from, char* to)
+{
+   if (pgmoneta_ends_with(from, ".bz2"))
+   {
+      if (bzip2_decompress_file(from, to))
+      {
+         pgmoneta_log_error("Bzip2: Could not decompress %s", from);
+         goto error;
+      }
+
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
 
    return 1;
 }

@@ -55,7 +55,9 @@ extern "C" {
 #define MANAGEMENT_EXPUNGE        13
 #define MANAGEMENT_DECRYPT        14
 #define MANAGEMENT_ENCRYPT        15
-#define MANAGEMENT_INFO           16
+#define MANAGEMENT_DECOMPRESS     16
+#define MANAGEMENT_COMPRESS       17
+#define MANAGEMENT_INFO           18
 
 /**
  * Available command output formats
@@ -336,6 +338,26 @@ pgmoneta_management_decrypt(SSL* ssl, int socket, char* path);
  */
 int
 pgmoneta_management_encrypt(SSL* ssl, int socket, char* path);
+
+/**
+ * Management operation: Decompress a file on server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_decompress(SSL* ssl, int socket, char* path);
+
+/**
+ * Management operation: Compress a file on server
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_compress(SSL* ssl, int socket, char* path);
 
 /**
  * Management operation: Information about a back
