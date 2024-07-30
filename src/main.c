@@ -978,9 +978,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             char* backup_id = NULL;
 
             shutdown_ports();
-            backup_id = malloc(strlen(payload_s2) + 1);
-            memset(backup_id, 0, strlen(payload_s2) + 1);
-            memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+            backup_id = pgmoneta_append(backup_id, payload_s2);
 
             result = pgmoneta_delete(srv, backup_id);
             pgmoneta_log_trace("Delete: %d", result);
@@ -1030,20 +1029,10 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                char* directory = NULL;
 
                shutdown_ports();
-               backup_id = malloc(strlen(payload_s2) + 1);
-               memset(backup_id, 0, strlen(payload_s2) + 1);
-               memcpy(backup_id, payload_s2, strlen(payload_s2));
 
-               if (payload_s3 != NULL)
-               {
-                  position = malloc(strlen(payload_s3) + 1);
-                  memset(position, 0, strlen(payload_s3) + 1);
-                  memcpy(position, payload_s3, strlen(payload_s3));
-               }
-
-               directory = malloc(strlen(payload_s4) + 1);
-               memset(directory, 0, strlen(payload_s4) + 1);
-               memcpy(directory, payload_s4, strlen(payload_s4));
+               backup_id = pgmoneta_append(backup_id, payload_s2);
+               position = pgmoneta_append(position, payload_s3);
+               directory = pgmoneta_append(directory, payload_s4);
 
                pgmoneta_restore(NULL, client_fd, srv, backup_id, position, directory, ai->argv);
             }
@@ -1098,20 +1087,10 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                      char* directory = NULL;
 
                      shutdown_ports();
-                     backup_id = malloc(strlen(payload_s2) + 1);
-                     memset(backup_id, 0, strlen(payload_s2) + 1);
-                     memcpy(backup_id, payload_s2, strlen(payload_s2));
 
-                     if (payload_s3 != NULL)
-                     {
-                        position = malloc(strlen(payload_s3) + 1);
-                        memset(position, 0, strlen(payload_s3) + 1);
-                        memcpy(position, payload_s3, strlen(payload_s3));
-                     }
-
-                     directory = malloc(strlen(payload_s4) + 1);
-                     memset(directory, 0, strlen(payload_s4) + 1);
-                     memcpy(directory, payload_s4, strlen(payload_s4));
+                     backup_id = pgmoneta_append(backup_id, payload_s2);
+                     position = pgmoneta_append(position, payload_s3);
+                     directory = pgmoneta_append(directory, payload_s4);
 
                      pgmoneta_archive(NULL, client_fd, i, backup_id, position, directory, ai->argv);
                   }
@@ -1153,20 +1132,10 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                   char* directory = NULL;
 
                   shutdown_ports();
-                  backup_id = malloc(strlen(payload_s2) + 1);
-                  memset(backup_id, 0, strlen(payload_s2) + 1);
-                  memcpy(backup_id, payload_s2, strlen(payload_s2));
 
-                  if (payload_s3 != NULL)
-                  {
-                     position = malloc(strlen(payload_s3) + 1);
-                     memset(position, 0, strlen(payload_s3) + 1);
-                     memcpy(position, payload_s3, strlen(payload_s3));
-                  }
-
-                  directory = malloc(strlen(payload_s4) + 1);
-                  memset(directory, 0, strlen(payload_s4) + 1);
-                  memcpy(directory, payload_s4, strlen(payload_s4));
+                  backup_id = pgmoneta_append(backup_id, payload_s2);
+                  position = pgmoneta_append(position, payload_s3);
+                  directory = pgmoneta_append(directory, payload_s4);
 
                   pgmoneta_archive(NULL, client_fd, srv, backup_id, position, directory, ai->argv);
                }
@@ -1260,9 +1229,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             char* backup_id = NULL;
 
             shutdown_ports();
-            backup_id = malloc(strlen(payload_s2) + 1);
-            memset(backup_id, 0, strlen(payload_s2) + 1);
-            memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+            backup_id = pgmoneta_append(backup_id, payload_s2);
 
             pgmoneta_retain_backup(srv, backup_id);
 
@@ -1301,9 +1269,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             char* backup_id = NULL;
 
             shutdown_ports();
-            backup_id = malloc(strlen(payload_s2) + 1);
-            memset(backup_id, 0, strlen(payload_s2) + 1);
-            memcpy(backup_id, payload_s2, strlen(payload_s2));
+
+            backup_id = pgmoneta_append(backup_id, payload_s2);
 
             pgmoneta_expunge_backup(srv, backup_id);
 

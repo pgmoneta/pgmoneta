@@ -135,7 +135,7 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
 
    pgmoneta_deque_create(false, &nodes);
 
-   if (pgmoneta_deque_put(nodes, "position", position, strlen(position) + 1))
+   if (pgmoneta_deque_put(nodes, "position", position, position != NULL ? strlen(position) + 1 : 0))
    {
       goto error;
    }
