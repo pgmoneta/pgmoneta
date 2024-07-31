@@ -321,7 +321,15 @@ do_verify(void* arg)
       goto error;
    }
 
-   memcpy(ve->calculated, hash_cal, strlen(hash_cal));
+   if (hash_cal != NULL && strlen(hash_cal) > 0)
+   {
+      memcpy(ve->calculated, hash_cal, strlen(hash_cal));
+   }
+   else
+   {
+      failed = true;
+      memcpy(ve->calculated, "Unknown", strlen("Unknown"));
+   }
 
    if (failed)
    {
