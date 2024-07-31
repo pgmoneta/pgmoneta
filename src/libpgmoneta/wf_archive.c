@@ -155,13 +155,17 @@ archive_execute(int server, char* identifier, struct deque* nodes)
    {
       goto error;
    }
+
    free(tarfile);
+   free(save_path);
 
    return 0;
 
 error:
 
    free(tarfile);
+   free(save_path);
+
    return 1;
 }
 
