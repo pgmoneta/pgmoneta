@@ -1397,6 +1397,7 @@ pgmoneta_art_iterator_destroy(struct art_iterator* iter)
       return;
    }
    pgmoneta_deque_destroy(iter->que);
+   free(iter);
 }
 
 bool
