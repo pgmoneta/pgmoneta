@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <info.h>
 #include <logging.h>
+#include <management.h>
 #include <utils.h>
 
 /* system */
@@ -50,25 +51,30 @@ pgmoneta_create_info(char* directory, char* label, int status)
    sfile = fopen(s, "w");
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "STATUS=%d\n", status);
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
    fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "LABEL=%s\n", label);
+   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
    fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "TABLESPACES=0\n");
+   snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
    fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "PGMONETA_VERSION=%s\n", VERSION);
+   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n",INFO_PGMONETA_VERSION,  VERSION);
    fputs(&buffer[0], sfile);
 
-   pgmoneta_log_trace("STATUS=%d", status);
-   pgmoneta_log_trace("LABEL=%s", label);
-   pgmoneta_log_trace("TABLESPACES=0");
-   pgmoneta_log_trace("PGMONETA_VERSION=%s", VERSION);
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
+   fputs(&buffer[0], sfile);
+
+   pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
+   pgmoneta_log_trace("%s=%s", INFO_LABEL, label);
+   pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
+   pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
+   pgmoneta_log_trace("%s=", INFO_COMMENTS);
 
    pgmoneta_permission(s, 6, 0, 0);
 
@@ -240,6 +246,339 @@ pgmoneta_update_info_bool(char* directory, char* key, bool value)
 }
 
 int
+pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment)
+{
+   char* d = NULL;
+   char* dir = NULL;
+   char* old_comments = NULL;
+   char* new_comments = NULL;
+   int srv = -1;
+   int number_of_backups = 0;
+   bool found = false;
+   bool fail = false;
+   struct backup** backups = NULL;
+   struct backup* bck = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+   {
+      if (!strcmp(config->servers[i].name, server))
+      {
+         srv = i;
+      }
+   }
+
+   if (srv == -1)
+   {
+      pgmoneta_log_error("Annotate: No server defined by %s", server);
+      goto error;
+   }
+   
+   d = pgmoneta_get_server_backup(srv);
+
+   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   {
+      goto error;
+   }
+
+   if (!strcmp(backup, "oldest"))
+   {
+      bck = backups[0];
+   }
+   else if (!strcmp(backup, "latest") || !strcmp(backup, "newest"))
+   {
+      bck = backups[number_of_backups - 1];
+   }
+   else
+   {
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (!strcmp(backups[i]->label, backup))
+         {
+            bck = backups[i];
+         }
+      }
+   }
+
+   if (bck == NULL)
+   {
+      pgmoneta_log_error("Annotate: No backup for %s/%s", config->servers[srv].name, backup);
+      goto error;
+   }
+   
+   if (pgmoneta_get_info_string(bck, INFO_COMMENTS, &old_comments))
+   {
+      goto error;
+   }
+
+   if (!strcmp("add", command))
+   {
+      if (old_comments == NULL || strlen(old_comments) == 0)
+      {
+         new_comments = pgmoneta_append(new_comments, key);
+         new_comments = pgmoneta_append(new_comments, "|");
+         new_comments = pgmoneta_append(new_comments, comment);
+      }
+      else
+      {
+         char* tokens = NULL;
+         char* ptr = NULL;
+
+         pgmoneta_log_info("old_comments=%s", old_comments);
+
+         tokens = pgmoneta_append(tokens, old_comments);
+
+         ptr = strtok(tokens, ",");
+
+         pgmoneta_log_info("ptr=%p", ptr);
+
+         while (ptr != NULL && !fail)
+         {
+            char tk[256];
+            char tv[256];
+            char* equal = NULL;
+
+            memset(&tk[0], 0, sizeof(tk));
+            memset(&tv[0], 0, sizeof(tv));
+
+            equal = strchr(ptr, '|');
+
+            pgmoneta_log_info("equal=%p", equal);
+
+            memcpy(&tk[0], ptr, strlen(ptr) - strlen(equal));
+            memcpy(&tv[0], equal + 1, strlen(equal) - 1);
+
+            pgmoneta_log_info("TK=%s TV=%s", tk, tv);
+
+            if (strcmp(key, tk))
+            {
+               new_comments = pgmoneta_append(new_comments, tk);
+               new_comments = pgmoneta_append(new_comments, "|");
+               new_comments = pgmoneta_append(new_comments, tv);
+               found = true;
+
+               pgmoneta_log_info("ptr=%p", ptr);
+            }
+            else
+            {
+               fail = true;
+            }
+
+            ptr = strtok(NULL, ",");
+            if (ptr != NULL)
+            {
+               new_comments = pgmoneta_append(new_comments, ",");
+            }
+         }
+
+         if (!fail)
+         {
+            new_comments = pgmoneta_append(new_comments, ",");
+            new_comments = pgmoneta_append(new_comments, key);
+            new_comments = pgmoneta_append(new_comments, "|");
+            new_comments = pgmoneta_append(new_comments, comment);
+            found = true;
+         }
+
+         free(tokens);
+      }
+   }
+   else if (!strcmp("update", command))
+   {
+      if (old_comments == NULL || strlen(old_comments) == 0)
+      {
+         fail = true;
+      }
+      else
+      {
+         char tokens[512];
+         char* ptr = NULL;
+
+         memset(&tokens[0], 0, sizeof(tokens));
+         memcpy(&tokens[0], old_comments, strlen(old_comments));
+
+         ptr = strtok(&tokens[0], ",");
+
+         while (ptr != NULL)
+         {
+            char tk[256];
+            char tv[256];
+            char* equal = NULL;
+
+            memset(&tk[0], 0, sizeof(tk));
+            memset(&tv[0], 0, sizeof(tv));
+
+            equal = strchr(ptr, '|');
+
+            memcpy(&tk[0], ptr, strlen(ptr) - strlen(equal));
+            memcpy(&tv[0], equal + 1, strlen(equal) - 1);
+
+            if (strcmp(key, tk))
+            {
+               new_comments = pgmoneta_append(new_comments, tk);
+               new_comments = pgmoneta_append(new_comments, "|");
+               new_comments = pgmoneta_append(new_comments, tv);
+            }
+            else
+            {
+               new_comments = pgmoneta_append(new_comments, ",");
+               new_comments = pgmoneta_append(new_comments, key);
+               new_comments = pgmoneta_append(new_comments, "|");
+               new_comments = pgmoneta_append(new_comments, comment);
+               found = true;
+            }
+
+            ptr = strtok(NULL, ",");
+            if (ptr != NULL)
+            {
+               new_comments = pgmoneta_append(new_comments, ",");
+            }
+         }
+
+         if (!found)
+         {
+            fail = true;
+         }
+      }
+   }
+   else if (!strcmp("remove", command))
+   {
+      if (old_comments == NULL || strlen(old_comments) == 0)
+      {
+         fail = true;
+      }
+      else
+      {
+         char tokens[512];
+         char* ptr = NULL;
+
+         memset(&tokens[0], 0, sizeof(tokens));
+         memcpy(&tokens[0], old_comments, strlen(old_comments));
+
+         ptr = strtok(&tokens[0], ",");
+
+         while (ptr != NULL)
+         {
+            char tk[256];
+            char tv[256];
+            char* equal = NULL;
+
+            memset(&tk[0], 0, sizeof(tk));
+            memset(&tv[0], 0, sizeof(tv));
+
+            equal = strchr(ptr, '|');
+
+            memcpy(&tk[0], ptr, strlen(ptr) - strlen(equal));
+            memcpy(&tv[0], equal + 1, strlen(equal) - 1);
+
+            if (strcmp(key, tk))
+            {
+               new_comments = pgmoneta_append(new_comments, tk);
+               new_comments = pgmoneta_append(new_comments, "|");
+               new_comments = pgmoneta_append(new_comments, tv);
+            }
+            else
+            {
+               found = true;
+            }
+
+            ptr = strtok(NULL, ",");
+            if (ptr != NULL)
+            {
+               new_comments = pgmoneta_append(new_comments, ",");
+            }
+         }
+
+         if (!found)
+         {
+            fail = true;
+         }
+      }
+   }
+   else
+   {
+      fail = true;
+   }
+
+   if (!strcmp(new_comments, ",") || pgmoneta_ends_with(new_comments, ","))
+   {
+      new_comments = pgmoneta_remove_last(new_comments);
+      
+      if (new_comments == NULL)
+      {
+         fail = true;
+      }
+   }
+
+   if (fail)
+   {
+      free(new_comments);
+      new_comments = NULL;
+
+      if (old_comments != NULL && strlen(old_comments) > 0)
+      {
+         new_comments = pgmoneta_append(new_comments, old_comments);
+      }
+   }
+
+   dir = pgmoneta_append(dir, d);
+   if (!pgmoneta_ends_with(dir, "/"))
+   {
+      dir = pgmoneta_append(dir, "/");
+   }
+   dir = pgmoneta_append(dir, bck->label);
+   dir = pgmoneta_append(dir, "/");
+
+   pgmoneta_update_info_string(dir, INFO_COMMENTS, new_comments != NULL && strlen(new_comments) > 0 ? new_comments : "");
+   
+   pgmoneta_management_write_annotate(ssl, socket, server, bck->label, new_comments != NULL && strlen(new_comments) > 0 ? new_comments : "");
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(d);
+   free(dir);
+   free(old_comments);
+   free(new_comments);
+
+   free(server);
+   free(backup);
+   free(command);
+   free(key);
+   free(comment);
+   
+   return 0;
+
+error:
+
+   pgmoneta_management_write_annotate(ssl, socket, srv != -1 ? server : "Unknown", bck != NULL ? bck->label : "Unknown", "");
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(d);
+   free(dir);
+   free(old_comments);
+   free(new_comments);
+
+   free(server);
+   free(backup);
+   free(command);
+   free(key);
+   free(comment);
+   
+   return 1;
+}
+
+int
 pgmoneta_get_info_string(struct backup* backup, char* key, char** value)
 {
    char* result = NULL;
@@ -269,6 +608,10 @@ pgmoneta_get_info_string(struct backup* backup, char* key, char** value)
       unsigned long number = strtoul(key + 10, NULL, 10);
 
       result = pgmoneta_append(result, backup->tablespaces[number - 1]);
+   }
+   else if (!strcmp(INFO_COMMENTS, key))
+   {
+      result = pgmoneta_append(result, backup->comments);
    }
    else
    {
@@ -505,6 +848,10 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          else if (pgmoneta_starts_with(&key[0], INFO_HASH_ALGORITHM))
          {
             bck->hash_algoritm = atoi(&value[0]);
+         }
+         else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
+         {
+            memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
          }
       }
    }

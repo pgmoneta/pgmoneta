@@ -147,7 +147,7 @@ Options:
 Commands:
   backup                   Backup a server
   list-backup              List the backups for a server
-  restore                  Restore a backup from a server 
+  restore                  Restore a backup from a server
   verify                   Verify a backup from a server
   archive                  Archive a backup from a server
   delete                   Delete a backup from a server
@@ -155,7 +155,10 @@ Commands:
   expunge                  Expunge a backup from a server
   encrypt                  Encrypt a file using master-key
   decrypt                  Decrypt a file using master-key
+  compress                 Compress a file using configured method
+  decompress               Decompress a file using configured method
   info                     Information about a backup
+  annotate                 Annotate a backup with comments
   ping                     Check if pgmoneta is alive
   stop                     Stop pgmoneta
   status [details]         Status of pgmoneta, with optional details
@@ -258,14 +261,16 @@ There are a few short tutorials available to help you better understand and conf
 - [Enabling remote management](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_remote_management.md)
 - [Enabling Prometheus metrics](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/03_prometheus.md)
 - [Doing backup and restore](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/04_backup_restore.md)
-- [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_archive.md)
-- [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_delete.md)
-- [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_encryption.md)
-- [Retention](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_retention.md)
-- [Enabling Grafana dashboard](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_grafana.md)
-- [Add WAL shipping](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_wal_shipping.md)
-- [Working with Transport Level Security](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/11_tls.md)
-- [Hot standby](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_hot_standby.md)
+- [Veridy a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_verify.md)
+- [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_archive.md)
+- [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md)
+- [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
+- [Retention](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/09_retention.md)
+- [Enabling Grafana dashboard](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/10_grafana.md)
+- [Add WAL shipping](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/11_wal_shipping.md)
+- [Working with Transport Level Security](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_tls.md)
+- [Hot standby](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/13_hot_standby.md)
+- [Annotate](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/14_annotate.md)
 
 ## Closing
 

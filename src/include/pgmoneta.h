@@ -67,6 +67,7 @@ extern "C" {
 
 #define MAX_PATH 1024
 #define MISC_LENGTH 128
+#define MAX_COMMENT 2048
 
 #define NUMBER_OF_SERVERS 64
 #define NUMBER_OF_USERS   64

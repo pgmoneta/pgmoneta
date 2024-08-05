@@ -75,6 +75,24 @@ retain
 expunge
   Expunge a backup from a server - include in deletion by retention policy
 
+encrypt
+  Encrypt the file in place, remove unencrypted file after successful encryption.
+
+decrypt
+  Decrypt the file in place, remove encrypted file after successful decryption.
+
+compress
+  Compress the file in place, remove uncompressed file after successful compression.
+
+decompress
+  Decompress the file in place, remove compressed file after successful decompression.
+
+info
+  Information about a backup
+
+annotate
+  Annotate a backup with comments
+
 ping
   Check if pgmoneta is alive
 
@@ -89,18 +107,6 @@ conf [reload]
 
 clear [prometheus]
   Reset the Prometheus statistics
-
-decrypt
-  Decrypt the file in place, remove encrypted file after successful decryption.
-
-encrypt
-  Encrypt the file in place, remove unencrypted file after successful encryption.
-
-decompress
-  Decompress the file in place, remove compressed file after successful decompression.
-
-compress
-  Compress the file in place, remove uncompressed file after successful compression.
 
 REPORTING BUGS
 ==============

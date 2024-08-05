@@ -782,6 +782,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    char* payload_s2 = NULL;
    char* payload_s3 = NULL;
    char* payload_s4 = NULL;
+   char* payload_s5 = NULL;
    int srv;
    pid_t pid;
    int number_of_results = 0;
@@ -830,7 +831,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    {
       goto disconnect;
    }
-   if (pgmoneta_management_read_payload(client_fd, id, &payload_s1, &payload_s2, &payload_s3, &payload_s4))
+   if (pgmoneta_management_read_payload(client_fd, id, &payload_s1, &payload_s2, &payload_s3, &payload_s4, &payload_s5))
    {
       goto disconnect;
    }
@@ -1433,6 +1434,49 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_management_write_info(NULL, client_fd, payload_s1, payload_s2);
             free(payload_s1);
             free(payload_s2);
+            exit(0);
+         }
+
+         break;
+      case MANAGEMENT_ANNOTATE:
+         pgmoneta_log_debug("Management annotate: %s/%s", payload_s1, payload_s2);
+
+         pid = fork();
+         if (pid == -1)
+         {
+            /* No process */
+            pgmoneta_log_error("Cannot create process");
+
+            free(payload_s1);
+            free(payload_s2);
+            free(payload_s3);
+            free(payload_s4);
+            free(payload_s5);
+         }
+         else if (pid == 0)
+         {
+            char* server = NULL;
+            char* backup = NULL;
+            char* command = NULL;
+            char* key = NULL;
+            char* comment = NULL;
+
+            server = pgmoneta_append(server, payload_s1);
+            backup = pgmoneta_append(backup, payload_s2);
+            command = pgmoneta_append(command, payload_s3);
+            key = pgmoneta_append(key, payload_s4);
+            comment = pgmoneta_append(comment, payload_s5);
+
+            shutdown_ports();
+
+            pgmoneta_update_info_annotate(NULL, client_fd, server, backup, command, key, comment);
+
+            free(payload_s1);
+            free(payload_s2);
+            free(payload_s3);
+            free(payload_s4);
+            free(payload_s5);
+
             exit(0);
          }
 

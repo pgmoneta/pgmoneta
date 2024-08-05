@@ -38,7 +38,10 @@ Commands:
   expunge                  Expunge a backup from a server
   encrypt                  Encrypt a file using master-key
   decrypt                  Decrypt a file using master-key
+  compress                 Compress a file using configured method
+  decompress               Decompress a file using configured method
   info                     Information about a backup
+  annotate                 Annotate a backup with comments
   ping                     Check if pgmoneta is alive
   stop                     Stop pgmoneta
   status [details]         Status of pgmoneta, with optional details

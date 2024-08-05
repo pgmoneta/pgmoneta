@@ -60,6 +60,7 @@ extern "C" {
 #define MANAGEMENT_COMPRESS       17
 #define MANAGEMENT_INFO           18
 #define MANAGEMENT_VERIFY         19
+#define MANAGEMENT_ANNOTATE       20
 
 /**
  * Available command output formats
@@ -84,10 +85,11 @@ pgmoneta_management_read_header(int socket, signed char* id);
  * @param payload_s2 The resulting string payload
  * @param payload_s3 The resulting string payload
  * @param payload_s4 The resulting string payload
+ * @param payload_s5 The resulting string payload
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4);
+pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4, char** payload_s5);
 
 /**
  * Management operation: Backup a server
@@ -396,7 +398,7 @@ int
 pgmoneta_management_compress(SSL* ssl, int socket, char* path);
 
 /**
- * Management operation: Information about a back
+ * Management operation: Information about a backup
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server name
@@ -426,6 +428,39 @@ pgmoneta_management_read_info(SSL* ssl, int socket, char output_format);
  */
 int
 pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup);
+
+/**
+ * Management operation: Annotate a backup
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server name
+ * @param backup The backup
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment);
+
+/**
+ * Management operation: Read annotate for a backup
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_read_annotate(SSL* ssl, int socket, char output_format);
+
+/**
+ * Management: Write annotate
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param server The server name
+ * @param backup The backup
+ * @param comment The comment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_write_annotate(SSL* ssl, int socket, char* server, char* backup, char* comment);
 
 /**
  * Management: Read int32

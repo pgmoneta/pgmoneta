@@ -70,6 +70,7 @@
 #define COMMAND_CONF "conf"
 #define COMMAND_CLEAR "clear"
 #define COMMAND_INFO "info"
+#define COMMAND_ANNOTATE "annotate"
 
 static void help_backup(void);
 static void help_list_backup(void);
@@ -89,6 +90,7 @@ static void help_status_details(void);
 static void help_conf(void);
 static void help_clear(void);
 static void help_info(void);
+static void help_annotate(void);
 static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server);
@@ -110,6 +112,7 @@ static int encrypt_data(SSL* ssl, int socket, char* path);
 static int decompress_data(SSL* ssl, int socket, char* path);
 static int compress_data(SSL* ssl, int socket, char* path);
 static int info(SSL* ssl, int socket, char* server, char* backup, char output_format);
+static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, char output_format);
 
 static void
 version(void)
@@ -154,6 +157,7 @@ usage(void)
    printf("  compress                 Compress a file using configured method\n");
    printf("  decompress               Decompress a file using configured method\n");
    printf("  info                     Information about a backup\n");
+   printf("  annotate                 Annotate a backup with comments\n");
    printf("  ping                     Check if pgmoneta is alive\n");
    printf("  stop                     Stop pgmoneta\n");
    printf("  status [details]         Status of pgmoneta, with optional details\n");
@@ -318,6 +322,14 @@ const struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_INFO,
       .deprecated = false,
       .log_message = "<info> [%s]"
+   },
+   {
+      .command = "annotate",
+      .subcommand = "",
+      .accepted_argument_count = {4, 5},
+      .action = MANAGEMENT_ANNOTATE,
+      .deprecated = false,
+      .log_message = "<annotate> [%s]"
    },
    {
       .command = "details",
@@ -734,6 +746,10 @@ password:
    {
       exit_code = info(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_ANNOTATE)
+   {
+      exit_code = annotate(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], parsed.args[4], output_format);
+   }
 
 done:
 
@@ -910,6 +926,13 @@ help_info(void)
 }
 
 static void
+help_annotate(void)
+{
+   printf("Annotate a backup with comments\n");
+   printf("  pgmoneta-cli annotate <server> <timestamp|oldest|newest> <add|update|remove> <key> [comment]\n");
+}
+
+static void
 display_helper(char* command)
 {
    if (!strcmp(command, COMMAND_BACKUP))
@@ -983,6 +1006,10 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_INFO))
    {
       help_info();
+   }
+   else if (!strcmp(command, COMMAND_ANNOTATE))
+   {
+      help_annotate();
    }
    else
    {
@@ -1257,6 +1284,21 @@ info(SSL* ssl, int socket, char* server, char* backup, char output_format)
    if (pgmoneta_management_info(ssl, socket, server, backup) == 0)
    {
       pgmoneta_management_read_info(ssl, socket, output_format);
+   }
+   else
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
+annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, char output_format)
+{
+   if (pgmoneta_management_annotate(ssl, socket, server, backup, command, key, comment) == 0)
+   {
+      pgmoneta_management_read_annotate(ssl, socket, output_format);
    }
    else
    {

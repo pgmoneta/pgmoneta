@@ -39,22 +39,24 @@ extern "C" {
 /* system */
 #include <stdlib.h>
 
-#define INFO_STATUS         "STATUS"
-#define INFO_LABEL          "LABEL"
-#define INFO_WAL            "WAL"
-#define INFO_ELAPSED        "ELAPSED"
-#define INFO_VERSION        "VERSION"
-#define INFO_MINOR_VERSION  "MINOR_VERSION"
-#define INFO_KEEP           "KEEP"
-#define INFO_BACKUP         "BACKUP"
-#define INFO_RESTORE        "RESTORE"
-#define INFO_TABLESPACES    "TABLESPACES"
-#define INFO_START_WALPOS   "START_WALPOS"
-#define INFO_END_WALPOS     "END_WALPOS"
-#define INFO_CHKPT_WALPOS   "CHKPT_WALPOS"
-#define INFO_START_TIMELINE "START_TIMELINE"
-#define INFO_END_TIMELINE   "END_TIMELINE"
-#define INFO_HASH_ALGORITHM "HASH_ALGORITM"
+#define INFO_PGMONETA_VERSION "PGMONETA_VERSION"
+#define INFO_STATUS           "STATUS"
+#define INFO_LABEL            "LABEL"
+#define INFO_WAL              "WAL"
+#define INFO_ELAPSED          "ELAPSED"
+#define INFO_VERSION          "VERSION"
+#define INFO_MINOR_VERSION    "MINOR_VERSION"
+#define INFO_KEEP             "KEEP"
+#define INFO_BACKUP           "BACKUP"
+#define INFO_RESTORE          "RESTORE"
+#define INFO_TABLESPACES      "TABLESPACES"
+#define INFO_START_WALPOS     "START_WALPOS"
+#define INFO_END_WALPOS       "END_WALPOS"
+#define INFO_CHKPT_WALPOS     "CHKPT_WALPOS"
+#define INFO_START_TIMELINE   "START_TIMELINE"
+#define INFO_END_TIMELINE     "END_TIMELINE"
+#define INFO_HASH_ALGORITHM   "HASH_ALGORITM"
+#define INFO_COMMENTS         "COMMENTS"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -87,6 +89,7 @@ struct backup
    uint32_t start_timeline;                                       /**< The starting timeline of the backup */
    uint32_t end_timeline;                                         /**< The ending timeline of the backup */
    int hash_algoritm;                                             /**< The hash algoritm for the manifest */
+   char comments[MAX_COMMENT];                                    /**< The comments */
 } __attribute__ ((aligned (64)));
 
 /**
@@ -124,6 +127,20 @@ pgmoneta_update_info_string(char* directory, char* key, char* value);
  */
 void
 pgmoneta_update_info_bool(char* directory, char* key, bool value);
+
+/**
+ * Update backup information: annotate
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup The backup label
+ * @param command The command (add / remove)
+ * @param key The key
+ * @param comment The comment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment);
 
 /**
  * Get a backup string value

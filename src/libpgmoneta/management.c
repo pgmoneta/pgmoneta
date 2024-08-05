@@ -106,12 +106,14 @@ static int print_list_backup_json(struct json* json);
 static int print_info_json(struct json* json);
 static int print_delete_json(struct json* json);
 static int print_verify_json(struct json* json);
+static int print_annotate_json(struct json* json);
 static struct json* read_status_json(SSL* ssl, int socket);
 static struct json* read_details_json(SSL* ssl, int socket);
 static struct json* read_list_backup_json(SSL* ssl, int socket, char* server);
 static struct json* read_delete_json(SSL* ssl, int socket, char* server, char* backup_id);
 static struct json* read_info_json(SSL* ssl, int socket);
 static struct json* read_verify_json(SSL* ssl, int socket);
+static struct json* read_annotate_json(SSL* ssl, int socket);
 static struct json* create_new_command_json_object(char* command_name, bool success, char* executable_name);
 static struct json* extract_command_output_json_object(struct json* json);
 static bool json_command_name_equals_to(struct json* json, char* command_name);
@@ -142,12 +144,13 @@ error:
 }
 
 int
-pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4)
+pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4, char** payload_s5)
 {
    *payload_s1 = NULL;
    *payload_s2 = NULL;
    *payload_s3 = NULL;
    *payload_s4 = NULL;
+   *payload_s5 = NULL;
 
    switch (id)
    {
@@ -181,16 +184,24 @@ pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, 
       case MANAGEMENT_RELOAD:
       case MANAGEMENT_ISALIVE:
          break;
+      case MANAGEMENT_ANNOTATE:
+         read_string("pgmoneta_management_read_payload", NULL, socket, payload_s1);
+         read_string("pgmoneta_management_read_payload", NULL, socket, payload_s2);
+         read_string("pgmoneta_management_read_payload", NULL, socket, payload_s3);
+         read_string("pgmoneta_management_read_payload", NULL, socket, payload_s4);
+         read_string("pgmoneta_management_read_payload", NULL, socket, payload_s5);
+         break;
       default:
          goto error;
          break;
    }
 
    pgmoneta_log_trace("Management: %d", id);
-   pgmoneta_log_trace("Payload 1 : %s", *payload_s1);
-   pgmoneta_log_trace("Payload 2 : %s", *payload_s2);
-   pgmoneta_log_trace("Payload 4 : %s", *payload_s3);
-   pgmoneta_log_trace("Payload 4 : %s", *payload_s4);
+   pgmoneta_log_trace("Payload 1: %s", *payload_s1);
+   pgmoneta_log_trace("Payload 2: %s", *payload_s2);
+   pgmoneta_log_trace("Payload 4: %s", *payload_s3);
+   pgmoneta_log_trace("Payload 4: %s", *payload_s4);
+   pgmoneta_log_trace("Payload 5: %s", *payload_s5);
 
    return 0;
 
@@ -1750,6 +1761,11 @@ pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup)
       goto error;
    }
 
+   if (write_string("pgmoneta_management_write_info", ssl, socket, bck->comments))
+   {
+      goto error;
+   }
+
    for (int j = 0; j < number_of_backups; j++)
    {
       free(backups[j]);
@@ -1769,6 +1785,116 @@ error:
    free(backups);
 
    free(d);
+
+   return 1;
+}
+
+int
+pgmoneta_management_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment)
+{
+   if (write_header(ssl, socket, MANAGEMENT_ANNOTATE))
+   {
+      pgmoneta_log_warn("pgmoneta_management_annotate: write: %d", socket);
+      errno = 0;
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_annotate", ssl, socket, server))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_annotate", ssl, socket, backup))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_annotate", ssl, socket, command))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_annotate", ssl, socket, key))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_annotate", ssl, socket, comment))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
+pgmoneta_management_read_annotate(SSL* ssl, int socket, char output_format)
+{
+   struct json* json = read_annotate_json(ssl, socket);
+
+   if (json == NULL)
+   {
+      goto error;
+   }
+
+   if (output_format == COMMAND_OUTPUT_FORMAT_TEXT)
+   {
+      if (print_annotate_json(json))
+      {
+         goto error;
+      }
+   }
+   else if (output_format == COMMAND_OUTPUT_FORMAT_JSON)
+   {
+      print_and_free_json_object(json);
+      json = NULL;
+   }
+   else
+   {
+      goto error;
+   }
+
+   if (json != NULL)
+   {
+      pgmoneta_json_free(json);
+   }
+
+   return 0;
+
+error:
+
+   if (json != NULL)
+   {
+      pgmoneta_json_free(json);
+   }
+   return 1;
+}
+
+int
+pgmoneta_management_write_annotate(SSL* ssl, int socket, char* server, char* backup, char* comment)
+{
+   if (write_string("pgmoneta_management_write_annotate", ssl, socket, server))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_write_annotate", ssl, socket, backup))
+   {
+      goto error;
+   }
+
+   if (write_string("pgmoneta_management_write_annotate", ssl, socket, comment))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
 
    return 1;
 }
@@ -2910,6 +3036,7 @@ read_info_json(SSL* ssl, int socket)
 {
    char* label = NULL;
    char* wal = NULL;
+   char* comments = NULL;
    bool sc;
    int32_t i32;
    uint32_t u32;
@@ -3089,6 +3216,13 @@ read_info_json(SSL* ssl, int socket)
    }
 
    pgmoneta_json_put(info, "End timeline", &u32, ValueUInt32);
+
+   if (read_string("pgmoneta_management_read_info", ssl, socket, &comments))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(info, "Comments", comments != NULL && strlen(comments) > 0 ? comments : "", ValueString);
 
    pgmoneta_json_put(output, "info", info, ValueObject);
 
@@ -3382,6 +3516,71 @@ read_verify_json(SSL* ssl, int socket)
    return json;
 
 error:
+
+   if (json != NULL)
+   {
+      set_command_json_object_faulty(json, strerror(errno));
+   }
+
+   errno = 0;
+
+   return json;
+}
+
+static struct json*
+read_annotate_json(SSL* ssl, int socket)
+{
+   char* server = NULL;
+   char* backup = NULL;
+   char* comment = NULL;
+   struct json* json = NULL;
+   struct json* output = NULL;
+   struct json* annotate = NULL;
+
+   json = create_new_command_json_object("annotate", true, "pgmoneta-cli");
+   pgmoneta_json_init(&annotate);
+
+   if (annotate == NULL || json == NULL)
+   {
+      goto error;
+   }
+
+   output = extract_command_output_json_object(json);
+
+   if (read_string("pgmoneta_management_read_annotate", ssl, socket, &server))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(annotate, "Server", server != NULL && strlen(server) > 0 ? server : "", ValueString);
+
+   if (read_string("pgmoneta_management_read_annotate", ssl, socket, &backup))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(annotate, "Backup", backup != NULL && strlen(backup) > 0 ? backup : "", ValueString);
+
+   if (read_string("pgmoneta_management_read_annotate", ssl, socket, &comment))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(annotate, "Comment", comment != NULL && strlen(comment) > 0 ? comment : "", ValueString);
+
+   pgmoneta_json_put(output, "annotate", annotate, ValueObject);
+
+   free(server);
+   free(backup);
+   free(comment);
+
+   return json;
+
+error:
+
+   free(server);
+   free(backup);
+   free(comment);
 
    if (json != NULL)
    {
@@ -3719,6 +3918,7 @@ print_info_json(struct json* json)
    struct json* tablespace = NULL;
    char* label = NULL;
    char* wal = NULL;
+   char* comments = NULL;
    uint64_t number_of_tablespaces;
 
    if (!json)
@@ -3750,6 +3950,12 @@ print_info_json(struct json* json)
    if (label != NULL)
    {
       printf("WAL                  : %s\n", wal);
+   }
+
+   comments = pgmoneta_json_get_string(info, "Comments");
+   if (comments != NULL)
+   {
+      printf("Commments            : %s\n", comments);
    }
 
    printf("Backup size          : %" PRId64 "\n", pgmoneta_json_get_uint64(info, "Backup size"));
@@ -3860,6 +4066,47 @@ print_verify_json(struct json* json)
        printf("Hash      : %s\n", hash);
    }
    return 0;
+}
+
+static int
+print_annotate_json(struct json* json)
+{
+   char* server = NULL;
+   char* backup = NULL;
+   char* comment = NULL;
+   struct json* output = NULL;
+   struct json* annotate = NULL;
+
+   if (!json)
+   {
+      return 1;
+   }
+
+   if (!json_command_name_equals_to(json, "annotate"))
+   {
+      return 1;
+   }
+
+   output = extract_command_output_json_object(json);
+
+   annotate = pgmoneta_json_get_json_object(output, "annotate");
+
+   if (annotate == NULL)
+   {
+      return 1;
+   }
+
+   server = pgmoneta_json_get_string(annotate, "Server");
+   printf("Server : %s\n", server);
+
+   backup = pgmoneta_json_get_string(annotate, "Backup");
+   printf("Backup : %s\n", backup);
+
+   comment = pgmoneta_json_get_string(annotate, "Comment");
+   printf("Comment: %s\n", comment);
+
+   return 0;
+
 }
 
 static struct json*

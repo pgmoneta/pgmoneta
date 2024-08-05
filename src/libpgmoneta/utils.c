@@ -2882,6 +2882,30 @@ pgmoneta_contains(char* str, char* s)
    return strstr(str, s) != NULL;
 }
 
+char*
+pgmoneta_remove_last(char* str)
+{
+   char* new_str = NULL;
+   
+   new_str = (char*)malloc(strlen(str));
+   
+   if (new_str == NULL)
+   {
+      goto error;
+   }
+
+   memset(new_str, 0, strlen(str));
+   memcpy(new_str, str, strlen(str) - 1);
+
+   free(str);
+
+   return new_str;
+
+error:
+
+   return NULL;
+}
+
 void
 pgmoneta_sort(size_t size, char** array)
 {

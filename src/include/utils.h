@@ -845,6 +845,14 @@ bool
 pgmoneta_contains(char* str, char* s);
 
 /**
+ * Remove the last character of a string
+ * @param str The string
+ * @return The result
+ */
+char*
+pgmoneta_remove_last(char* str);
+
+/**
  * Sort a string array
  * @param size The size of the array
  * @param array The array
