@@ -36,11 +36,11 @@
 
 // tag is copied if not NULL
 static void
-deque_offer(struct deque* deque, void* data, size_t data_size, char* tag, bool copied);
+deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type);
 
 // tag is copied if not NULL
 static void
-deque_node_create(void* data, size_t data_size, char* tag, bool copied, struct deque_node** node);
+deque_node_create(uintptr_t data, enum value_type type, char* tag, struct deque_node** node);
 
 // tag will always be freed
 static void
@@ -55,6 +55,12 @@ deque_write_lock(struct deque* deque);
 static void
 deque_unlock(struct deque* deque);
 
+static struct deque_node*
+deque_next(struct deque* deque, struct deque_node* node);
+
+static struct deque_node*
+deque_find(struct deque* deque, char* tag);
+
 int
 pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 {
@@ -66,8 +72,8 @@ pgmoneta_deque_create(bool thread_safe, struct deque** deque)
    {
       pthread_rwlock_init(&q->mutex, NULL);
    }
-   deque_node_create(NULL, 0, NULL, false, &q->start);
-   deque_node_create(NULL, 0, NULL, false, &q->end);
+   deque_node_create(0, ValueInt32, NULL, &q->start);
+   deque_node_create(0, ValueInt32, NULL, &q->end);
    q->start->next = q->end;
    q->end->prev = q->start;
    *deque = q;
@@ -75,33 +81,21 @@ pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 }
 
 int
-pgmoneta_deque_put(struct deque* deque, char* tag, void* data, size_t data_size)
+pgmoneta_deque_add(struct deque* deque, char* tag, uintptr_t data, enum value_type type)
 {
-   void* val = NULL;
-   if (data != NULL)
-   {
-      val = malloc(data_size);
-      memcpy(val, data, data_size);
-   }
-   deque_offer(deque, val, data_size, tag, true);
+   deque_offer(deque, tag, data, type);
    return 0;
 }
 
-int
-pgmoneta_deque_add(struct deque* deque, char* tag, void* data)
-{
-   deque_offer(deque, data, 0, tag, false);
-   return 0;
-}
-
-void*
+uintptr_t
 pgmoneta_deque_poll(struct deque* deque, char** tag)
 {
    struct deque_node* head = NULL;
-   void* val = NULL;
+   struct value* val = NULL;
+   uintptr_t data = 0;
    if (deque == NULL || pgmoneta_deque_size(deque) == 0)
    {
-      return NULL;
+      return 0;
    }
    deque_write_lock(deque);
    head = deque->start->next;
@@ -109,7 +103,7 @@ pgmoneta_deque_poll(struct deque* deque, char** tag)
    if (head == deque->end)
    {
       deque_unlock(deque);
-      return NULL;
+      return 0;
    }
    // remove node
    deque->start->next = head->next;
@@ -121,18 +115,22 @@ pgmoneta_deque_poll(struct deque* deque, char** tag)
       *tag = head->tag;
    }
    free(head);
+
+   data = pgmoneta_value_data(val);
+   free(val);
+
    deque_unlock(deque);
-   return val;
+   return data;
 }
 
-void*
+uintptr_t
 pgmoneta_deque_peek(struct deque* deque, char** tag)
 {
    struct deque_node* head = NULL;
-   void* val = NULL;
+   struct value* val = NULL;
    if (deque == NULL || pgmoneta_deque_size(deque) == 0)
    {
-      return NULL;
+      return 0;
    }
    deque_read_lock(deque);
    head = deque->start->next;
@@ -140,7 +138,7 @@ pgmoneta_deque_peek(struct deque* deque, char** tag)
    if (head == deque->end)
    {
       deque_unlock(deque);
-      return NULL;
+      return 0;
    }
    val = head->data;
    if (tag != NULL)
@@ -148,49 +146,67 @@ pgmoneta_deque_peek(struct deque* deque, char** tag)
       *tag = head->tag;
    }
    deque_unlock(deque);
-   return val;
+   return pgmoneta_value_data(val);
 }
 
-void*
+uintptr_t
 pgmoneta_deque_get(struct deque* deque, char* tag)
 {
    struct deque_node* n = NULL;
-
-   if (deque == NULL || pgmoneta_deque_size(deque) == 0 || tag == NULL || strlen(tag) == 0)
+   uintptr_t ret = 0;
+   deque_read_lock(deque);
+   n = deque_find(deque, tag);
+   if (n == NULL)
    {
-      return NULL;
+      goto error;
    }
+   ret = pgmoneta_value_data(n->data);
+   deque_unlock(deque);
+   return ret;
+error:
+   deque_unlock(deque);
+   return 0;
+}
 
-   n = pgmoneta_deque_head(deque);
+bool
+pgmoneta_deque_contains_tag(struct deque* deque, char* tag)
+{
+   struct deque_node* n = NULL;
+   bool ret = false;
+   deque_read_lock(deque);
+   n = deque_find(deque, tag);
+   ret = n != NULL;
+   deque_unlock(deque);
+   return ret;
+}
 
-   while (n != NULL)
+int
+pgmoneta_deque_set(struct deque* deque, char* tag, uintptr_t val, enum value_type type)
+{
+   struct deque_node* n = NULL;
+   deque_write_lock(deque);
+   n = deque_find(deque, tag);
+   if (n == NULL)
    {
-      if (!strcmp(tag, n->tag))
-      {
-         return n->data;
-      }
-
-      n = pgmoneta_deque_next(deque, n);
+      goto error;
    }
+   pgmoneta_value_destroy(n->data);
+   n->data = NULL;
+   pgmoneta_value_create(type, val, &n->data);
+   deque_unlock(deque);
+   return 0;
 
-   return NULL;
+error:
+   deque_unlock(deque);
+   return 1;
 }
 
 struct deque_node*
 pgmoneta_deque_next(struct deque* deque, struct deque_node* node)
 {
    struct deque_node* next = NULL;
-   if (deque == NULL || pgmoneta_deque_size(deque) == 0 || node == NULL)
-   {
-      return NULL;
-   }
    deque_read_lock(deque);
-   if (node->next == deque->end)
-   {
-      deque_unlock(deque);
-      return NULL;
-   }
-   next = node->next;
+   next = deque_next(deque, node);
    deque_unlock(deque);
    return next;
 }
@@ -246,24 +262,12 @@ pgmoneta_deque_empty(struct deque* deque)
 void
 pgmoneta_deque_list(struct deque* deque)
 {
-   struct deque_node* n = NULL;
-
-   if (deque != NULL && pgmoneta_deque_size(deque) > 0)
+   char* str = NULL;
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
-      n = pgmoneta_deque_head(deque);
-
-      pgmoneta_log_trace("Deque:");
-      while (n != NULL)
-      {
-         pgmoneta_log_trace("%s", n->tag);
-         pgmoneta_log_mem(n->data, n->data_size);
-
-         n = pgmoneta_deque_next(deque, n);
-      }
-   }
-   else
-   {
-      pgmoneta_log_trace("Deque: Empty");
+      str = pgmoneta_deque_to_string(deque, NULL, 0);
+      pgmoneta_log_trace("Deque: %s", str);
+      free(str);
    }
 }
 
@@ -313,6 +317,35 @@ pgmoneta_deque_remove(struct deque* deque, struct deque_node* node)
    return next;
 }
 
+char*
+pgmoneta_deque_to_string(struct deque* deque, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   struct deque_node* cur = NULL;
+   if (deque == NULL || pgmoneta_deque_empty(deque))
+   {
+      ret = pgmoneta_append(ret, "[]");
+      return ret;
+   }
+   deque_read_lock(deque);
+   ret = pgmoneta_append(ret, "[\n");
+   cur = deque_next(deque, deque->start);
+   while (cur != NULL)
+   {
+      bool has_next = cur != deque->end;
+      char* str = pgmoneta_value_to_string(cur->data, cur->tag, indent + INDENT_PER_LEVEL);
+      ret = pgmoneta_append(ret, str);
+      ret = pgmoneta_append(ret, has_next?",\n":"\n");
+      free(str);
+      cur = deque_next(deque, cur);
+   }
+   ret = pgmoneta_indent(ret, NULL, indent);
+   ret = pgmoneta_append(ret, "]");
+   deque_unlock(deque);
+   return ret;
+}
+
 uint32_t
 pgmoneta_deque_size(struct deque* deque)
 {
@@ -327,12 +360,66 @@ pgmoneta_deque_size(struct deque* deque)
    return size;
 }
 
+int
+pgmoneta_deque_iterator_init(struct deque* deque, struct deque_iterator** iter)
+{
+   struct deque_iterator* i = NULL;
+   if (deque == NULL)
+   {
+      return 1;
+   }
+   i = malloc(sizeof(struct deque_iterator));
+   i->deque = deque;
+   i->cur = deque->start;
+   i->tag = NULL;
+   i->value = NULL;
+   *iter = i;
+   return 0;
+}
+
+void
+pgmoneta_deque_iterator_destroy(struct deque_iterator* iter)
+{
+   if (iter == NULL)
+   {
+      return;
+   }
+   free(iter);
+}
+
+bool
+pgmoneta_deque_iterator_next(struct deque_iterator* iter)
+{
+   if (iter == NULL)
+   {
+      return false;
+   }
+   iter->cur = deque_next(iter->deque, iter->cur);
+   if (iter->cur == NULL)
+   {
+      return false;
+   }
+   iter->value = iter->cur->data;
+   iter->tag = iter->cur->tag;
+   return true;
+}
+
+bool
+pgmoneta_deque_iterator_has_next(struct deque_iterator* iter)
+{
+   if (iter == NULL)
+   {
+      return false;
+   }
+   return deque_next(iter->deque, iter->cur) != NULL;
+}
+
 static void
-deque_offer(struct deque* deque, void* data, size_t data_size, char* tag, bool copied)
+deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type)
 {
    struct deque_node* n = NULL;
    struct deque_node* last = NULL;
-   deque_node_create(data, data_size, tag, copied, &n);
+   deque_node_create(data, type, tag, &n);
    deque_write_lock(deque);
    deque->size++;
    last = deque->end->prev;
@@ -344,15 +431,12 @@ deque_offer(struct deque* deque, void* data, size_t data_size, char* tag, bool c
 }
 
 static void
-deque_node_create(void* data, size_t data_size, char* tag, bool copied, struct deque_node** node)
+deque_node_create(uintptr_t data, enum value_type type, char* tag, struct deque_node** node)
 {
    struct deque_node* n = NULL;
    n = malloc(sizeof(struct deque_node));
-   n->copied = copied;
-   n->data = data;
-   n->data_size = data_size;
-   n->prev = NULL;
-   n->next = NULL;
+   memset(n, 0, sizeof(struct deque_node));
+   pgmoneta_value_create(type, data, &n->data);
    if (tag != NULL)
    {
       n->tag = malloc(strlen(tag) + 1);
@@ -372,10 +456,7 @@ deque_node_destroy(struct deque_node* node)
    {
       return;
    }
-   if (node->copied)
-   {
-      free(node->data);
-   }
+   pgmoneta_value_destroy(node->data);
    free(node->tag);
    free(node);
 }
@@ -408,4 +489,42 @@ deque_unlock(struct deque* deque)
       return;
    }
    pthread_rwlock_unlock(&deque->mutex);
+}
+
+static struct deque_node*
+deque_next(struct deque* deque, struct deque_node* node)
+{
+   struct deque_node* next = NULL;
+   if (deque == NULL || deque->size == 0 || node == NULL)
+   {
+      return NULL;
+   }
+   if (node->next == deque->end)
+   {
+      return NULL;
+   }
+   next = node->next;
+   return next;
+}
+
+static struct deque_node*
+deque_find(struct deque* deque, char* tag)
+{
+   struct deque_node* n = NULL;
+   if (tag == NULL || strlen(tag) == 0 || deque == NULL || deque->size == 0)
+   {
+      return NULL;
+   }
+   n = deque_next(deque, deque->start);
+
+   while (n != NULL)
+   {
+      if (pgmoneta_compare_string(tag, n->tag))
+      {
+         return n;
+      }
+
+      n = deque_next(deque, n);
+   }
+   return NULL;
 }

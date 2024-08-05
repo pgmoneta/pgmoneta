@@ -65,7 +65,7 @@ pgmoneta_create_info(char* directory, char* label, int status)
    fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n",INFO_PGMONETA_VERSION,  VERSION);
+   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
    fputs(&buffer[0], sfile);
 
    memset(&buffer[0], 0, sizeof(buffer));
@@ -277,7 +277,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       pgmoneta_log_error("Annotate: No server defined by %s", server);
       goto error;
    }
-   
+
    d = pgmoneta_get_server_backup(srv);
 
    if (pgmoneta_get_backups(d, &number_of_backups, &backups))
@@ -309,7 +309,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       pgmoneta_log_error("Annotate: No backup for %s/%s", config->servers[srv].name, backup);
       goto error;
    }
-   
+
    if (pgmoneta_get_info_string(bck, INFO_COMMENTS, &old_comments))
    {
       goto error;
@@ -496,7 +496,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
    if (!strcmp(new_comments, ",") || pgmoneta_starts_with(new_comments, ","))
    {
       new_comments = pgmoneta_remove_first(new_comments);
-      
+
       if (new_comments == NULL)
       {
          fail = true;
@@ -506,7 +506,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
    if (pgmoneta_ends_with(new_comments, ","))
    {
       new_comments = pgmoneta_remove_last(new_comments);
-      
+
       if (new_comments == NULL)
       {
          fail = true;
@@ -533,7 +533,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
    dir = pgmoneta_append(dir, "/");
 
    pgmoneta_update_info_string(dir, INFO_COMMENTS, new_comments != NULL && strlen(new_comments) > 0 ? new_comments : "");
-   
+
    pgmoneta_management_write_annotate(ssl, socket, server, bck->label, new_comments != NULL && strlen(new_comments) > 0 ? new_comments : "");
 
    for (int i = 0; i < number_of_backups; i++)
@@ -552,7 +552,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
    free(command);
    free(key);
    free(comment);
-   
+
    return 0;
 
 error:
@@ -575,7 +575,7 @@ error:
    free(command);
    free(key);
    free(comment);
-   
+
    return 1;
 }
 

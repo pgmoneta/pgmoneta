@@ -36,6 +36,7 @@
 #include <restore.h>
 #include <string.h>
 #include <utils.h>
+#include <value.h>
 #include <workflow.h>
 
 /* system */
@@ -135,12 +136,12 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
 
    pgmoneta_deque_create(false, &nodes);
 
-   if (pgmoneta_deque_put(nodes, "position", position, position != NULL ? strlen(position) + 1 : 0))
+   if (pgmoneta_deque_add(nodes, "position", (uintptr_t)position, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_put(nodes, "directory", directory, strlen(directory) + 1))
+   if (pgmoneta_deque_add(nodes, "directory", (uintptr_t)directory, ValueString))
    {
       goto error;
    }

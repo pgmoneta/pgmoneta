@@ -333,12 +333,12 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_read_wal(d, &wal);
    pgmoneta_read_checkpoint_info(d, &chkptpos);
 
-   if (pgmoneta_deque_put(nodes, "root", root, strlen(root) + 1))
+   if (pgmoneta_deque_add(nodes, "root", (uintptr_t)root, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_put(nodes, "to", d, strlen(d) + 1))
+   if (pgmoneta_deque_add(nodes, "to", (uintptr_t)d, ValueString))
    {
       goto error;
    }

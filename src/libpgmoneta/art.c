@@ -27,6 +27,7 @@
  */
 
 #include <art.h>
+#include <utils.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -64,7 +65,7 @@ struct art_node
  */
 struct art_leaf
 {
-   void* value;
+   struct value* value;
    uint32_t key_len;
    unsigned char key[];
 } __attribute__ ((aligned (64)));
@@ -115,6 +116,14 @@ struct art_node256
    struct art_node* children[256];
 } __attribute__ ((aligned (64)));
 
+struct to_string_param
+{
+   char* str;
+   int indent;
+   int cnt;
+   struct art* t;
+};
+
 static struct art_node**
 node_get_child(struct art_node* node, unsigned char ch);
 
@@ -123,7 +132,7 @@ static struct art_leaf*
 node_get_minimum(struct art_node* node);
 
 static void
-create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, void* value);
+create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type);
 
 static void
 create_art_node(struct art_node** node, enum art_node_type type);
@@ -142,7 +151,7 @@ create_art_node256(struct art_node256** node);
 
 // Destroy ART nodes/leaves recursively
 static void
-destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb);
+destroy_art_node(struct art_node* node);
 
 /**
  * Get where the keys diverge starting from depth.
@@ -198,12 +207,13 @@ find_index(unsigned char ch, const unsigned char* keys, int length);
  * @param depth The depth into the node, which is the same as the total prefix length
  * @param key The key
  * @param key_len The length of the key
- * @param value The value
+ * @param value The value data
+ * @param type The value type
  * @param new If the key value is newly inserted (not replaced)
  * @return Old value if the key exists, otherwise NULL
  */
-static void*
-art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, void* value, bool* new);
+static struct value*
+art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, bool* new);
 
 /**
  * Delete a value from a node recursively.
@@ -269,21 +279,19 @@ copy_header(struct art_node* dest, struct art_node* src);
 static uint32_t
 min(uint32_t a, uint32_t b);
 
+static struct value*
+art_search(struct art* t, unsigned char* key, uint32_t key_len);
+
+static int
+art_to_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value);
+
 int
-pgmoneta_art_init(struct art** tree, value_destroy_callback val_destroy_cb)
+pgmoneta_art_init(struct art** tree)
 {
    struct art* t = NULL;
    t = malloc(sizeof(struct art));
    t->size = 0;
    t->root = NULL;
-   if (val_destroy_cb == NULL)
-   {
-      t->val_destroy_cb = pgmoneta_art_destroy_value_default;
-   }
-   else
-   {
-      t->val_destroy_cb = val_destroy_cb;
-   }
    *tree = t;
    return 0;
 }
@@ -295,90 +303,87 @@ pgmoneta_art_destroy(struct art* tree)
    {
       return 0;
    }
-   destroy_art_node(tree->root, tree->val_destroy_cb);
+   destroy_art_node(tree->root);
    free(tree);
    return 0;
 }
 
-void*
+uintptr_t
 pgmoneta_art_search(struct art* t, unsigned char* key, uint32_t key_len)
 {
-   struct art_node* node = NULL;
-   struct art_node** child = NULL;
-   uint32_t depth = 0;
-   if (t == NULL || t->root == NULL)
-   {
-      return NULL;
-   }
-   node = t->root;
-   while (node != NULL)
-   {
-      if (IS_LEAF(node))
-      {
-         if (!leaf_match(GET_LEAF(node), key, key_len))
-         {
-            return NULL;
-         }
-         return GET_LEAF(node)->value;
-      }
-      // optimistically check the prefix,
-      // we move forward as long as up to MAX_PREFIX_LEN characters match
-      if (check_prefix_partial(node, key, depth, key_len) != min(node->prefix_len, MAX_PREFIX_LEN))
-      {
-         return NULL;
-      }
-      depth += node->prefix_len;
-      // you can't dereference what the function returns directly since it could be null
-      child = node_get_child(node, key[depth]);
-      node = child != NULL ? *child : NULL;
-      // child is indexed by key[depth], so the next round we should skip this byte and start checking at the next
-      depth++;
-   }
-   return NULL;
+   struct value* val = art_search(t, key, key_len);
+   return pgmoneta_value_data(val);
 }
 
-void*
-pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, void* value)
+bool
+pgmoneta_art_contains_key(struct art* t, unsigned char* key, uint32_t key_len)
 {
-   void* old_val = NULL;
+   struct value* val = art_search(t, key, key_len);
+   return val != NULL;
+}
+
+int
+pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type)
+{
+   struct value* old_val = NULL;
    bool new = false;
    if (t == NULL)
    {
       // c'mon, at least create a tree first...
-      return NULL;
+      return 0;
    }
-   old_val = art_node_insert(t->root, &t->root, 0, key, key_len, value, &new);
+   old_val = art_node_insert(t->root, &t->root, 0, key, key_len, value, type, &new);
+   pgmoneta_value_destroy(old_val);
    if (new)
    {
       t->size++;
    }
-   return old_val;
+   return 1;
 }
 
-void*
+int
 pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len)
 {
    struct art_leaf* l = NULL;
-   void* old_val = NULL;
    if (t == NULL)
    {
-      return NULL;
+      return 1;
    }
    l = art_node_delete(t->root, &t->root, 0, key, key_len);
-   if (l == NULL)
-   {
-      return NULL;
-   }
    t->size--;
-   old_val = l->value;
+   pgmoneta_value_destroy(l->value);
    free(l);
-   return old_val;
+   return 0;
 }
 
 int
 pgmoneta_art_iterate(struct art* t, art_callback cb, void* data)
 {
    return art_node_iterate(t->root, cb, data);
+}
+
+char*
+pgmoneta_art_to_string(struct art* t, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   if (t == NULL || t->size == 0)
+   {
+      ret = pgmoneta_append(ret, "{}");
+      return ret;
+   }
+   ret = pgmoneta_append(ret, "{\n");
+   struct to_string_param param = {
+      .indent = indent + INDENT_PER_LEVEL,
+      .str = ret,
+      .t = t,
+      .cnt = 0,
+   };
+   pgmoneta_art_iterate(t, art_to_string_cb, &param);
+   ret = pgmoneta_append(NULL, param.str);
+   ret = pgmoneta_indent(ret, NULL, indent);
+   ret = pgmoneta_append(ret, "}");
+   return ret;
 }
 
 static uint32_t
@@ -392,12 +397,12 @@ min(uint32_t a, uint32_t b)
 }
 
 static void
-create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, void* value)
+create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type)
 {
    struct art_leaf* l = NULL;
    l = malloc(sizeof(struct art_leaf) + key_len);
    memset(l, 0, sizeof(struct art_leaf) + key_len);
-   l->value = value;
+   pgmoneta_value_create(type, value, &l->value);
    l->key_len = key_len;
    memcpy(l->key, key, key_len);
    *leaf = l;
@@ -478,7 +483,7 @@ create_art_node256(struct art_node256** node)
 }
 
 static void
-destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb)
+destroy_art_node(struct art_node* node)
 {
    if (node == NULL)
    {
@@ -486,7 +491,7 @@ destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb)
    }
    if (IS_LEAF(node))
    {
-      val_destroy_cb(GET_LEAF(node)->value);
+      pgmoneta_value_destroy(GET_LEAF(node)->value);
       free(GET_LEAF(node));
       return;
    }
@@ -497,7 +502,7 @@ destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb)
          struct art_node4* n = (struct art_node4*) node;
          for (int i = 0; i < node->num_children; i++)
          {
-            destroy_art_node(n->children[i], val_destroy_cb);
+            destroy_art_node(n->children[i]);
          }
          break;
       }
@@ -506,7 +511,7 @@ destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb)
          struct art_node16* n = (struct art_node16*) node;
          for (int i = 0; i < node->num_children; i++)
          {
-            destroy_art_node(n->children[i], val_destroy_cb);
+            destroy_art_node(n->children[i]);
          }
          break;
       }
@@ -520,7 +525,7 @@ destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb)
             {
                continue;
             }
-            destroy_art_node(n->children[idx - 1], val_destroy_cb);
+            destroy_art_node(n->children[idx - 1]);
          }
          break;
       }
@@ -534,7 +539,7 @@ destroy_art_node(struct art_node* node, value_destroy_callback val_destroy_cb)
             {
                continue;
             }
-            destroy_art_node(n->children[i], val_destroy_cb);
+            destroy_art_node(n->children[i]);
          }
          break;
       }
@@ -586,8 +591,8 @@ error:
    return NULL;
 }
 
-static void*
-art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, void* value, bool* new)
+static struct value*
+art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, bool* new)
 {
    struct art_leaf* leaf = NULL;
    struct art_leaf* min_leaf = NULL;
@@ -601,7 +606,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
    {
       // Lazy expansion, skip creating an inner node since it currently will have only this one leaf.
       // We will compare keys when reach leaf anyway, the path doesn't need to 100% match the key along the way
-      create_art_leaf(&leaf, key, key_len, value);
+      create_art_leaf(&leaf, key, key_len, value, type);
       *node_ref = SET_LEAF(leaf);
       *new = true;
       return NULL;
@@ -614,7 +619,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
       if (leaf_match(GET_LEAF(node), key, key_len))
       {
          old_val = GET_LEAF(node)->value;
-         GET_LEAF(node)->value = value;
+         pgmoneta_value_create(type, value, &(GET_LEAF(node)->value));
          return old_val;
       }
       // If the key does not match with existing key, old key and new key diverged some point after depth
@@ -624,7 +629,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
       // This way we inductively guarantee that all children to a parent share the same prefix even if it's only partially stored
       leaf_key = GET_LEAF(node)->key;
       create_art_node(&new_node, Node4);
-      create_art_leaf(&leaf, key, key_len, value);
+      create_art_leaf(&leaf, key, key_len, value, type);
       // Get the diverging index after point of depth
       for (idx = depth; idx < min(key_len, GET_LEAF(node)->key_len); idx++)
       {
@@ -666,7 +671,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
    {
       // case 2, split the node
       create_art_node(&new_node, Node4);
-      create_art_leaf(&leaf, key, key_len, value);
+      create_art_leaf(&leaf, key, key_len, value, type);
       new_node->prefix_len = diff_len;
       memcpy(new_node->prefix, node->prefix, min(MAX_PREFIX_LEN, diff_len));
       // We need to know if new bytes that were once outside the partial prefix range will now come into the range
@@ -712,12 +717,12 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
          {
             node->num_children++;
          }
-         return art_node_insert(*next, next, depth + 1, key, key_len, value, new);
+         return art_node_insert(*next, next, depth + 1, key, key_len, value, type, new);
       }
       else
       {
          // add a child to current node since the spot is available
-         create_art_leaf(&leaf, key, key_len, value);
+         create_art_leaf(&leaf, key, key_len, value, type);
          node_add_child(node, node_ref, key[depth], SET_LEAF(leaf));
          *new = true;
          return NULL;
@@ -1291,11 +1296,11 @@ int
 pgmoneta_art_iterator_init(struct art* t, struct art_iterator** iter)
 {
    struct art_iterator* i = NULL;
-   i = malloc(sizeof(struct art_iterator));
-   if (i == NULL || t == NULL)
+   if (t == NULL)
    {
       return 1;
    }
+   i = malloc(sizeof(struct art_iterator));
    i->count = 0;
    i->tree = t;
    i->key = NULL;
@@ -1321,11 +1326,11 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
    tree = iter->tree;
    if (iter->count == 0)
    {
-      pgmoneta_deque_add(que, NULL, tree->root);
+      pgmoneta_deque_add(que, NULL, (uintptr_t)tree->root, ValueRef);
    }
    while (!pgmoneta_deque_empty(que))
    {
-      node = pgmoneta_deque_poll(que, NULL);
+      node = (struct art_node*)pgmoneta_deque_poll(que, NULL);
       if (IS_LEAF(node))
       {
          iter->count++;
@@ -1341,7 +1346,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
             for (int i = 0; i < node->num_children; i++)
             {
                child = n->children[i];
-               pgmoneta_deque_add(que, NULL, child);
+               pgmoneta_deque_add(que, NULL, (uintptr_t)child, ValueRef);
             }
             break;
          }
@@ -1351,7 +1356,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
             for (int i = 0; i < node->num_children; i++)
             {
                child = n->children[i];
-               pgmoneta_deque_add(que, NULL, child);
+               pgmoneta_deque_add(que, NULL, (uintptr_t)child, ValueRef);
             }
             break;
          }
@@ -1366,7 +1371,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
                   continue;
                }
                child = n->children[idx - 1];
-               pgmoneta_deque_add(que, NULL, child);
+               pgmoneta_deque_add(que, NULL, (uintptr_t)child, ValueRef);
             }
             break;
          }
@@ -1380,7 +1385,7 @@ pgmoneta_art_iterator_next(struct art_iterator* iter)
                   continue;
                }
                child = n->children[i];
-               pgmoneta_deque_add(que, NULL, child);
+               pgmoneta_deque_add(que, NULL, (uintptr_t)child, ValueRef);
             }
             break;
          }
@@ -1403,6 +1408,10 @@ pgmoneta_art_iterator_destroy(struct art_iterator* iter)
 bool
 pgmoneta_art_iterator_has_next(struct art_iterator* iter)
 {
+   if (iter == NULL)
+   {
+      return false;
+   }
    return iter->count < iter->tree->size;
 }
 
@@ -1416,4 +1425,55 @@ void
 pgmoneta_art_destroy_value_default(void* val)
 {
    free(val);
+}
+
+static struct value*
+art_search(struct art* t, unsigned char* key, uint32_t key_len)
+{
+   struct art_node* node = NULL;
+   struct art_node** child = NULL;
+   uint32_t depth = 0;
+   if (t == NULL || t->root == NULL)
+   {
+      return NULL;
+   }
+   node = t->root;
+   while (node != NULL)
+   {
+      if (IS_LEAF(node))
+      {
+         if (!leaf_match(GET_LEAF(node), key, key_len))
+         {
+            return NULL;
+         }
+         return GET_LEAF(node)->value;
+      }
+      // optimistically check the prefix,
+      // we move forward as long as up to MAX_PREFIX_LEN characters match
+      if (check_prefix_partial(node, key, depth, key_len) != min(node->prefix_len, MAX_PREFIX_LEN))
+      {
+         return NULL;
+      }
+      depth += node->prefix_len;
+      // you can't dereference what the function returns directly since it could be null
+      child = node_get_child(node, key[depth]);
+      node = child != NULL ? *child : NULL;
+      // child is indexed by key[depth], so the next round we should skip this byte and start checking at the next
+      depth++;
+   }
+   return NULL;
+}
+
+static int
+art_to_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value)
+{
+   struct to_string_param* p = (struct to_string_param*) param;
+   char* str = NULL;
+   p->cnt++;
+   bool has_next = p->cnt < p->t->size;
+   str = pgmoneta_value_to_string(value, (char*)key, p->indent);
+   p->str = pgmoneta_append(p->str, str);
+   p->str = pgmoneta_append(p->str, has_next ? ",\n" : "\n");
+   free(str);
+   return 0;
 }

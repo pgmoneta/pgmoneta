@@ -110,14 +110,14 @@ verify_execute(int server, char* identifier, struct deque* nodes)
       info_file = pgmoneta_append(info_file, "/");
    }
    info_file = pgmoneta_append(info_file, "backup.info");
-   
+
    manifest_file = pgmoneta_append(manifest_file, base);
    if (!pgmoneta_ends_with(manifest_file, "/"))
    {
       manifest_file = pgmoneta_append(manifest_file, "/");
    }
    manifest_file = pgmoneta_append(manifest_file, "backup.manifest");
-   
+
    pgmoneta_get_backup_file(info_file, &backup);
 
    if (pgmoneta_deque_create(true, &failed_deque))
@@ -151,10 +151,10 @@ verify_execute(int server, char* identifier, struct deque* nodes)
       ve = (struct verify_entry*)malloc(sizeof(struct verify_entry));
 
       memset(ve, 0, sizeof(struct verify_entry));
-      memcpy(ve->directory, (char*)pgmoneta_deque_get(nodes, "to"), strlen(pgmoneta_deque_get(nodes, "to")));
+      memcpy(ve->directory, (char*)pgmoneta_deque_get(nodes, "to"),
+             strlen((char*)pgmoneta_deque_get(nodes, "to")));
       memcpy(ve->filename, columns[0], strlen(columns[0]));
       memcpy(ve->original, columns[1], strlen(columns[1]));
-
       ve->hash_algoritm = backup->hash_algoritm;
 
       ve->failed = failed_deque;
@@ -182,8 +182,8 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_deque_list(failed_deque);
    pgmoneta_deque_list(all_deque);
 
-   pgmoneta_deque_add(nodes, "failed", failed_deque);
-   pgmoneta_deque_add(nodes, "all", all_deque);
+   pgmoneta_deque_add(nodes, "failed", (uintptr_t)failed_deque, ValueDeque);
+   pgmoneta_deque_add(nodes, "all", (uintptr_t)all_deque, ValueDeque);
 
    pgmoneta_csv_reader_destroy(csv);
 
@@ -333,17 +333,16 @@ do_verify(void* arg)
 
    if (failed)
    {
-      pgmoneta_deque_put(ve->failed, f, ve, sizeof(struct verify_entry));
+      pgmoneta_deque_add(ve->failed, f, (uintptr_t)ve, ValueVerifyEntry);
    }
    else
    {
       if (ve->all != NULL)
       {
-         pgmoneta_deque_put(ve->all, f, ve, sizeof(struct verify_entry));
+         pgmoneta_deque_add(ve->all, f, (uintptr_t)ve, ValueVerifyEntry);
       }
    }
 
-   free(ve);
    free(hash_cal);
    free(f);
 

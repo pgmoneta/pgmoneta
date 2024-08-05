@@ -1133,6 +1133,16 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
 int
 pgmoneta_atoi(const char* input);
 
+/**
+ * Indent a string
+ * @param str The string
+ * @param tag [Optional] The tag, which will be applied after indentation if not NULL
+ * @param indent The indent
+ * @return The indented string
+ */
+char*
+pgmoneta_indent(char* str, char* tag, int indent);
+
 #ifdef DEBUG
 
 /**

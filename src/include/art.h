@@ -34,12 +34,13 @@ extern "C" {
 #endif
 
 #include <deque.h>
+#include <value.h>
 
 #include <stdint.h>
 
 #define MAX_PREFIX_LEN 10
 
-typedef int (*art_callback)(void* data, const unsigned char* key, uint32_t key_len, void* value);
+typedef int (*art_callback)(void* data, const unsigned char* key, uint32_t key_len, struct value* value);
 
 typedef void (*value_destroy_callback)(void* value);
 
@@ -50,7 +51,6 @@ struct art
 {
    struct art_node* root;                 /**< The root node of ART */
    uint64_t size;                         /**< The size of the ART */
-   value_destroy_callback val_destroy_cb; /**< The callback for the value destroy */
 };
 
 /** @struct art_iterator
@@ -58,23 +58,20 @@ struct art
  */
 struct art_iterator
 {
-   struct deque* que;  /**< The deque */
-   struct art* tree;   /**< The ART */
-   uint32_t count;     /**< The count of the iterator */
-   unsigned char* key; /**< The key */
-   void* value;        /**< The value */
+   struct deque* que;           /**< The deque */
+   struct art* tree;            /**< The ART */
+   uint32_t count;              /**< The count of the iterator */
+   unsigned char* key;          /**< The key */
+   struct value* value;         /**< The value */
 };
 
 /**
  * Initializes an adaptive radix tree
  * @param tree [out] The tree
- * @param val_destroy_cb The callback to destroy the val in leaf,
- * simple free() is used as default if input is NULL.
- * See pgmoneta_art_destroy_value_noop() if you don't need value to be freed.
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_art_init(struct art** tree, value_destroy_callback val_destroy_cb);
+pgmoneta_art_init(struct art** tree);
 
 /**
  * Destroys an ART tree
@@ -85,25 +82,24 @@ pgmoneta_art_destroy(struct art* tree);
 
 /**
  * inserts a new value into the art tree, note that the key is copied while the value is not
- * @param t the tree
- * @param key the key
- * @param key_len the length of the key
- * @param value opaque value
- * @return null if the item was newly inserted, otherwise
- * the old value pointer is returned
+ * @param t The tree
+ * @param key The key
+ * @param key_len The length of the key
+ * @param value The value data
+ * @param type The value type
+ * @return 0 if the item was newly inserted, otherwise 1
  */
-void*
-pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, void* value);
+int
+pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type);
 
 /**
  * Deletes a value from the ART tree
  * @param t The tree
  * @param key The key
  * @param key_len The length of the key
- * @return NULL if the item was not found, otherwise
- * the value pointer is returned
+ * @return 0 if success or value not found, 1 if otherwise
  */
-void*
+int
 pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
@@ -111,11 +107,20 @@ pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
  * @param t The tree
  * @param key The key
  * @param key_len The length of the key
- * @return NULL if the item was not found, otherwise
- * the value pointer is returned
+ * @return NULL if the item was not found, otherwise the value pointer is returned
  */
-void*
+uintptr_t
 pgmoneta_art_search(struct art* t, unsigned char* key, uint32_t key_len);
+
+/**
+ * Check if a key exists in the ART tree
+ * @param t The tree
+ * @param key The key
+ * @param key_len The length of the key
+ * @return true if the key exists, false if otherwise
+ */
+bool
+pgmoneta_art_contains_key(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
  * Iterates through the entries pairs in the map,
@@ -163,18 +168,14 @@ bool
 pgmoneta_art_iterator_has_next(struct art_iterator* iter);
 
 /**
- * The noop callback function for destroying value when destroying ART
- * @param val The value
+ * Convert the ART tree to string
+ * @param t The ART tree
+ * @param tag The optional tag
+ * @param indent The indent
+ * @return The string
  */
-void
-pgmoneta_art_destroy_value_noop(void* val);
-
-/**
- * The default callback function for destroying value when destroying ART
- * @param val The value
- */
-void
-pgmoneta_art_destroy_value_default(void* val);
+char*
+pgmoneta_art_to_string(struct art* t, char* tag, int indent);
 
 #ifdef __cplusplus
 }

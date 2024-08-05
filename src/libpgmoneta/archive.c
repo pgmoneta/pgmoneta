@@ -134,22 +134,22 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
    {
       result = 0;
 
-      if (pgmoneta_deque_put(nodes, "directory", real_directory, strlen(real_directory) + 1))
+      if (pgmoneta_deque_add(nodes, "directory", (uintptr_t)real_directory, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_put(nodes, "id", id, strlen(id) + 1))
+      if (pgmoneta_deque_add(nodes, "id", (uintptr_t)id, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_put(nodes, "output", output, strlen(output) + 1))
+      if (pgmoneta_deque_add(nodes, "output", (uintptr_t)output, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_put(nodes, "destination", directory, strlen(directory) + 1))
+      if (pgmoneta_deque_add(nodes, "destination", (uintptr_t)directory, ValueString))
       {
          goto error;
       }

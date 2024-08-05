@@ -2886,9 +2886,9 @@ char*
 pgmoneta_remove_first(char* str)
 {
    char* new_str = NULL;
-   
+
    new_str = (char*)malloc(strlen(str));
-   
+
    if (new_str == NULL)
    {
       goto error;
@@ -2910,9 +2910,9 @@ char*
 pgmoneta_remove_last(char* str)
 {
    char* new_str = NULL;
-   
+
    new_str = (char*)malloc(strlen(str));
-   
+
    if (new_str == NULL)
    {
       goto error;
@@ -3897,6 +3897,22 @@ pgmoneta_atoi(const char* input)
    }
 
    return atoi(input);
+}
+
+char*
+pgmoneta_indent(char* str, char* tag, int indent)
+{
+   for (int i = 0; i < indent; i++)
+   {
+      str = pgmoneta_append(str, " ");
+   }
+   if (tag != NULL)
+   {
+      str = pgmoneta_append(str, "\"");
+      str = pgmoneta_append(str, tag);
+      str = pgmoneta_append(str, "\": ");
+   }
+   return str;
 }
 
 #ifdef DEBUG

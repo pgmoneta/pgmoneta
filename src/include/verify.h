@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <value.h>
+
 #include <ev.h>
 #include <stdlib.h>
 
@@ -62,6 +64,16 @@ struct verify_entry
  */
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, char* backup_id, char* directory, char* files, char** argv);
+
+/**
+ * Convert a verify entry to string
+ * @param entry The entry
+ * @param tag The optional tag
+ * @param indent The indent
+ * @return The string in json format
+ */
+char*
+pgmoneta_verify_entry_to_string(struct verify_entry* entry, char* tag, int indent);
 
 #ifdef __cplusplus
 }

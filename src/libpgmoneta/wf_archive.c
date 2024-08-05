@@ -98,7 +98,7 @@ archive_setup(int server, char* identifier, struct deque* nodes)
    tarfile = pgmoneta_append(tarfile, id);
    tarfile = pgmoneta_append(tarfile, ".tar");
 
-   if (pgmoneta_deque_put(nodes, "tarfile", tarfile, strlen(tarfile) + 1))
+   if (pgmoneta_deque_add(nodes, "tarfile", (uintptr_t)tarfile, ValueString))
    {
       goto error;
    }
@@ -129,7 +129,7 @@ archive_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   output = (char*)pgmoneta_deque_get(nodes, "output");
+   output = (char*)(pgmoneta_deque_get(nodes, "output"));
 
    if (output == NULL)
    {

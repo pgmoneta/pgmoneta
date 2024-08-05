@@ -249,7 +249,7 @@ restore_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   if (pgmoneta_deque_put(nodes, "root", directory, strlen(directory) + 1))
+   if (pgmoneta_deque_add(nodes, "root", (uintptr_t)directory, ValueString))
    {
       goto error;
    }
@@ -342,18 +342,18 @@ restore_execute(int server, char* identifier, struct deque* nodes)
 
          pgmoneta_get_backup(root, id, &backup);
 
-         if (pgmoneta_deque_put(nodes, "primary", primary ? "true" : "false", (primary ? strlen("true") : strlen("false")) + 1))
+         if (pgmoneta_deque_add(nodes, "primary", primary, ValueBool))
          {
             goto error;
          }
 
          snprintf(&ver[0], sizeof(ver), "%d", backup->version);
-         if (pgmoneta_deque_put(nodes, "version", ver, strlen(ver) + 1))
+         if (pgmoneta_deque_add(nodes, "version", (uintptr_t)ver, ValueString))
          {
             goto error;
          }
 
-         if (pgmoneta_deque_put(nodes, "recovery info", "true", strlen("true") + 1))
+         if (pgmoneta_deque_add(nodes, "recovery info", true, ValueBool))
          {
             goto error;
          }
@@ -375,13 +375,13 @@ restore_execute(int server, char* identifier, struct deque* nodes)
       }
       else
       {
-         if (pgmoneta_deque_put(nodes, "recovery info", "false", strlen("false") + 1))
+         if (pgmoneta_deque_add(nodes, "recovery info", false, ValueBool))
          {
             goto error;
          }
       }
 
-      if (pgmoneta_deque_put(nodes, "to", to, strlen(to) + 1))
+      if (pgmoneta_deque_add(nodes, "to", (uintptr_t)to, ValueString))
       {
          goto error;
       }
@@ -398,12 +398,12 @@ restore_execute(int server, char* identifier, struct deque* nodes)
 
    ident = pgmoneta_append(ident, id);
 
-   if (pgmoneta_deque_put(nodes, "output", o, strlen(o) + 1))
+   if (pgmoneta_deque_add(nodes, "output", (uintptr_t)o, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_put(nodes, "identifier", ident, strlen(ident) + 1))
+   if (pgmoneta_deque_add(nodes, "identifier", (uintptr_t)ident, ValueString))
    {
       goto error;
    }
@@ -509,7 +509,7 @@ recovery_info_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   is_recovery_info = !strcmp((char*)pgmoneta_deque_get(nodes, "recovery info"), "true");
+   is_recovery_info = (bool)pgmoneta_deque_get(nodes, "recovery info");
 
    if (!is_recovery_info)
    {
@@ -524,7 +524,7 @@ recovery_info_execute(int server, char* identifier, struct deque* nodes)
    }
 
    position = (char*)pgmoneta_deque_get(nodes, "position");
-   primary = !strcmp((char*)pgmoneta_deque_get(nodes, "primary"), "true");
+   primary = (bool)pgmoneta_deque_get(nodes, "primary");
 
    if (!primary)
    {

@@ -84,28 +84,28 @@ pgmoneta_manifest_checksum_verify(char* root)
       memset(file_path, 0, MAX_PATH);
       if (pgmoneta_ends_with(root, "/"))
       {
-         snprintf(file_path, MAX_PATH, "%s%s", root, pgmoneta_json_get_string(file, "Path"));
+         snprintf(file_path, MAX_PATH, "%s%s", root, (char*)pgmoneta_json_get(file, "Path"));
       }
       else
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", root, pgmoneta_json_get_string(file, "Path"));
+         snprintf(file_path, MAX_PATH, "%s/%s", root, (char*)pgmoneta_json_get(file, "Path"));
       }
 
       file_size = pgmoneta_get_file_size(file_path);
-      file_size_manifest = pgmoneta_json_get_int64(file, "Size");
+      file_size_manifest = (int64_t)pgmoneta_json_get(file, "Size");
       if (file_size != file_size_manifest)
       {
          pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file_size_manifest);
       }
 
-      algorithm = pgmoneta_json_get_string(file, "Checksum-Algorithm");
+      algorithm = (char*)pgmoneta_json_get(file, "Checksum-Algorithm");
       if (pgmoneta_create_file_hash(pgmoneta_get_hash_algorithm(algorithm), file_path, &hash))
       {
          pgmoneta_log_error("Unable to generate hash for file %s with algorithm %s", file_path, algorithm);
          goto error;
       }
 
-      checksum = pgmoneta_json_get_string(file, "Checksum");
+      checksum = (char*)pgmoneta_json_get(file, "Checksum");
       if (!pgmoneta_compare_string(hash, checksum))
       {
          pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, hash, checksum);
@@ -141,7 +141,6 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
    struct deque* que = NULL;
    struct deque_node* entry = NULL;
    char* key = NULL;
-   char* val = NULL;
 
    *deleted_files = NULL;
    *changed_files = NULL;
@@ -149,9 +148,9 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    pgmoneta_deque_create(false, &que);
 
-   pgmoneta_art_init(&deleted, NULL);
-   pgmoneta_art_init(&added, NULL);
-   pgmoneta_art_init(&changed, NULL);
+   pgmoneta_art_init(&deleted);
+   pgmoneta_art_init(&added);
+   pgmoneta_art_init(&changed);
 
    if (pgmoneta_csv_reader_init(old_manifest, &r1))
    {
@@ -182,15 +181,15 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
             continue;
          }
          // build every right chunk into an ART
-         pgmoneta_art_init(&tree, NULL);
+         pgmoneta_art_init(&tree);
          build_tree(tree, r2, f2);
          entry = pgmoneta_deque_head(que);
          while (entry != NULL)
          {
-            checksum = pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
+            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
             if (checksum != NULL)
             {
-               if (!strcmp(entry->data, checksum))
+               if (!strcmp((char*)pgmoneta_value_data(entry->data), checksum))
                {
                   // not changed but not deleted, remove the entry
                   entry = pgmoneta_deque_remove(que, entry);
@@ -199,8 +198,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
                {
                   // file is changed
                   manifest_changed = true;
-                  val = pgmoneta_append(NULL, entry->data);
-                  pgmoneta_art_insert(changed, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
+                  pgmoneta_art_insert(changed, (unsigned char*)entry->tag, strlen(entry->tag) + 1, pgmoneta_value_data(entry->data), ValueString);
                   // changed but not deleted, remove the entry
                   entry = pgmoneta_deque_remove(que, entry);
                }
@@ -218,9 +216,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
       while (!pgmoneta_deque_empty(que))
       {
          manifest_changed = true;
-         // make a copy since tree insert doesn't do that
-         val = pgmoneta_append(NULL, entry->data);
-         pgmoneta_art_insert(deleted, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
+         pgmoneta_art_insert(deleted, (unsigned char*)entry->tag, strlen(entry->tag) + 1, pgmoneta_value_data(entry->data), ValueString);
          entry = pgmoneta_deque_remove(que, entry);
       }
       // reset right reader for the next left chunk
@@ -251,12 +247,12 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
             free(f1);
             continue;
          }
-         pgmoneta_art_init(&tree, NULL);
+         pgmoneta_art_init(&tree);
          build_tree(tree, r1, f1);
          entry = pgmoneta_deque_head(que);
          while (entry != NULL && entry != que->end)
          {
-            checksum = pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
+            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
             if (checksum != NULL)
             {
                // the entry is not new, remove it
@@ -274,8 +270,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
       while (!pgmoneta_deque_empty(que))
       {
          manifest_changed = true;
-         val = pgmoneta_append(NULL, entry->data);
-         pgmoneta_art_insert(added, (unsigned char*)entry->tag, strlen(entry->tag) + 1, val);
+         pgmoneta_art_insert(added, (unsigned char*)entry->tag, strlen(entry->tag) + 1, pgmoneta_value_data(entry->data), ValueString);
          entry = pgmoneta_deque_remove(que, entry);
       }
       if (pgmoneta_csv_reader_reset(r1))
@@ -286,9 +281,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    if (manifest_changed)
    {
-      key = pgmoneta_append(NULL, "backup_manifest");
-      val = pgmoneta_append(NULL, "backup manifest");
-      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, val);
+      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, (uintptr_t)"backup manifest", ValueString);
       free(key);
    }
 
@@ -323,7 +316,7 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f)
    }
    path = f[MANIFEST_PATH_INDEX];
    checksum = f[MANIFEST_CHECKSUM_INDEX];
-   pgmoneta_deque_put(deque, path, checksum, strlen(checksum) + 1);
+   pgmoneta_deque_add(deque, path, (uintptr_t)checksum, ValueString);
    free(f);
    while (deque->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(reader, &cols, &entry))
    {
@@ -335,7 +328,7 @@ build_deque(struct deque* deque, struct csv_reader* reader, char** f)
       }
       path = entry[MANIFEST_PATH_INDEX];
       checksum = entry[MANIFEST_CHECKSUM_INDEX];
-      pgmoneta_deque_put(deque, path, checksum, strlen(checksum) + 1);
+      pgmoneta_deque_add(deque, path, (uintptr_t)checksum, ValueString);
       free(entry);
       entry = NULL;
    }
@@ -346,17 +339,13 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
 {
    char** entry = NULL;
    char* path = NULL;
-   char* checksum = NULL;
    int cols = 0;
    if (tree == NULL)
    {
       return;
    }
    path = f[MANIFEST_PATH_INDEX];
-   // make a copy of checksum since ART doesn't do that for us
-   checksum = pgmoneta_append(checksum, f[MANIFEST_CHECKSUM_INDEX]);
-   pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
-   checksum = NULL;
+   pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, (uintptr_t)f[MANIFEST_CHECKSUM_INDEX], ValueString);
    free(f);
    while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(reader, &cols, &entry))
    {
@@ -367,9 +356,7 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
          continue;
       }
       path = entry[MANIFEST_PATH_INDEX];
-      checksum = pgmoneta_append(checksum, entry[MANIFEST_CHECKSUM_INDEX]);
-      pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, checksum);
+      pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
       free(entry);
-      checksum = NULL;
    }
 }

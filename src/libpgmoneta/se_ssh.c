@@ -323,7 +323,7 @@ ssh_storage_backup_execute(int server, char* identifier,
       }
    }
 
-   if (pgmoneta_art_init(&tree_map, NULL))
+   if (pgmoneta_art_init(&tree_map))
    {
       goto error;
    }
@@ -636,7 +636,7 @@ sftp_copy_file(char* local_root, char* remote_root, char* relative_path)
       latest_backup_path = pgmoneta_append(latest_backup_path, latest_remote_root);
       latest_backup_path = pgmoneta_append(latest_backup_path, relative_path);
 
-      if ((latest_sha256 = pgmoneta_art_search(tree_map, (unsigned char*)relative_path, strlen(relative_path) + 1)) != NULL)
+      if ((latest_sha256 = (char*)pgmoneta_art_search(tree_map, (unsigned char*)relative_path, strlen(relative_path) + 1)) != NULL)
       {
          if (!strcmp(latest_sha256, sha256))
          {
@@ -792,7 +792,7 @@ read_latest_backup_sha256(char* path)
       memset(hash, 0, strlen(ptr));
       memcpy(hash, ptr, strlen(ptr) - 1);
 
-      pgmoneta_art_insert(tree_map, (unsigned char*)file_path, strlen(file_path) + 1, hash);
+      pgmoneta_art_insert(tree_map, (unsigned char*)file_path, strlen(file_path) + 1, (uintptr_t)hash, ValueString);
       free(file_path);
    }
 

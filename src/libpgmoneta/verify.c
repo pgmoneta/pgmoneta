@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <deque.h>
 #include <info.h>
+#include <json.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
@@ -112,17 +113,17 @@ verify_backup(SSL* ssl, int client_fd, int server, char* backup_id, char* direct
 
    pgmoneta_deque_create(false, &nodes);
 
-   if (pgmoneta_deque_put(nodes, "position", "", 1))
+   if (pgmoneta_deque_add(nodes, "position", (uintptr_t)"", ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_put(nodes, "directory", directory, strlen(directory) + 1))
+   if (pgmoneta_deque_add(nodes, "directory", (uintptr_t)directory, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_put(nodes, "files", files, strlen(files) + 1))
+   if (pgmoneta_deque_add(nodes, "files", (uintptr_t)files, ValueString))
    {
       goto error;
    }
@@ -185,8 +186,6 @@ verify_backup(SSL* ssl, int client_fd, int server, char* backup_id, char* direct
 
    pgmoneta_workflow_delete(workflow);
 
-   pgmoneta_deque_destroy(failed);
-   pgmoneta_deque_destroy(all);
    pgmoneta_deque_destroy(nodes);
 
    return 0;
@@ -195,12 +194,23 @@ error:
 
    pgmoneta_workflow_delete(workflow);
 
-   failed = (struct deque*)pgmoneta_deque_get(nodes, "failed");
-   all = (struct deque*)pgmoneta_deque_get(nodes, "all");
-
-   pgmoneta_deque_destroy(failed);
-   pgmoneta_deque_destroy(all);
    pgmoneta_deque_destroy(nodes);
 
    return 1;
+}
+
+char*
+pgmoneta_verify_entry_to_string(struct verify_entry* entry, char* tag, int indent)
+{
+   struct json* obj = NULL;
+   char* str = NULL;
+   pgmoneta_json_init(&obj);
+   pgmoneta_json_put(obj, "directory", (uintptr_t)entry->directory, ValueString);
+   pgmoneta_json_put(obj, "filename", (uintptr_t)entry->filename, ValueString);
+   pgmoneta_json_put(obj, "original", (uintptr_t)entry->original, ValueString);
+   pgmoneta_json_put(obj, "calculated", (uintptr_t)entry->calculated, ValueString);
+   pgmoneta_json_put(obj, "hash_algorithm", (uintptr_t)entry->hash_algoritm, ValueInt32);
+   str = pgmoneta_json_to_string(obj, tag, indent);
+   pgmoneta_json_free(obj);
+   return str;
 }

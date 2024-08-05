@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <value.h>
+
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,9 +44,7 @@ extern "C" {
  */
 struct deque_node
 {
-   bool copied;             /**< The flag if the value is copied */
-   void* data;              /**< The data */
-   size_t data_size;        /**< The data size */
+   struct value* data;      /**< The value */
    char* tag;               /**< The tag */
    struct deque_node* next; /**< The next pointer */
    struct deque_node* prev; /**< The previous pointer */
@@ -62,6 +62,17 @@ struct deque
    struct deque_node* end;   /**< The end node */
 };
 
+/** @struct deque_iterator
+ * Defines a deque iterator
+ */
+struct deque_iterator
+{
+   struct deque* deque;      /**< The deque */
+   struct deque_node* cur;   /**< The current deque node */
+   char* tag;                /**< The current tag */
+   struct value* value;      /**< The current value */
+};
+
 /**
  * Create a deque
  * @param thread_safe If the deque needs to be thread safe
@@ -72,27 +83,16 @@ int
 pgmoneta_deque_create(bool thread_safe, struct deque** deque);
 
 /**
- * Add a node to deque's tail, the data and tag will be copied.
- * This function is thread safe
- * @param deque The deque
- * @param tag The tag, optional
- * @param data The data
- * @param data_size The size of data
- * @return 0 if success, otherwise 1
- */
-int
-pgmoneta_deque_put(struct deque* deque, char* tag, void* data, size_t data_size);
-
-/**
  * Add a node to deque's tail, the tag will be copied, but the data will not
  * This function is thread safe
  * @param deque The deque
  * @param tag The tag,optional
  * @param data The data
+ * @param type The data type
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_deque_add(struct deque* deque, char* tag, void* data);
+pgmoneta_deque_add(struct deque* deque, char* tag, uintptr_t data, enum value_type type);
 
 /**
  * Retrieve value and remove the node from deque's head.
@@ -102,9 +102,9 @@ pgmoneta_deque_add(struct deque* deque, char* tag, void* data);
  * This function is thread safe, but the returned value is not protected
  * @param deque The deque
  * @param tag [out] Optional, tag will be returned through if not NULL
- * @return The value if deque's not empty, otherwise NULL
+ * @return The value data if deque's not empty, otherwise 0
  */
-void*
+uintptr_t
 pgmoneta_deque_poll(struct deque* deque, char** tag);
 
 /**
@@ -115,19 +115,39 @@ pgmoneta_deque_poll(struct deque* deque, char** tag);
  * This function is thread safe, but the returned value is not protected
  * @param deque The deque
  * @param tag [out] Optional, tag will be returned through if not NULL
- * @return The value if deque's not empty, otherwise NULL
+ * @return The value data if deque's not empty, otherwise 0
  */
-void*
+uintptr_t
 pgmoneta_deque_peek(struct deque* deque, char** tag);
 
 /**
  * Get the data for the specified tag
  * @param deque The deque
  * @param tag The tag
- * @return The data, or NULL
+ * @return The data, or 0
  */
-void*
+uintptr_t
 pgmoneta_deque_get(struct deque* deque, char* tag);
+
+/**
+ * Check if deque contains certain tag
+ * @param deque The deque
+ * @param tag The tag
+ * @return true if the tag exists, false if otherwise
+ */
+bool
+pgmoneta_deque_contains_tag(struct deque* deque, char* tag);
+
+/**
+ * Set the value of a tag if it exists
+ * @param deque The deque
+ * @param tag The tag
+ * @param val The value data
+ * @param type The value type
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_deque_set(struct deque* deque, char* tag, uintptr_t val, enum value_type type);
 
 /**
  * Get the next deque node
@@ -208,6 +228,48 @@ pgmoneta_deque_list(struct deque* deque);
  */
 void
 pgmoneta_deque_destroy(struct deque* deque);
+
+/**
+ * Convert what's inside deque to string
+ * @param deque The deque
+ * @param tag [Optional] The tag, which will be applied before the content if not null
+ * @param indent The current indentation
+ * @return The string
+ */
+char*
+pgmoneta_deque_to_string(struct deque* deque, char* tag, int indent);
+
+/**
+ * Create a deque iterator
+ * @param deque The deque
+ * @param iter [out] The iterator
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_deque_iterator_init(struct deque* deque, struct deque_iterator** iter);
+
+/**
+ * Destroy a deque iterator
+ * @param iter The iterator
+ */
+void
+pgmoneta_deque_iterator_destroy(struct deque_iterator* iter);
+
+/**
+ * Get the next deque value
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_deque_iterator_next(struct deque_iterator* iter);
+
+/**
+ * Check if deque has next value
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_deque_iterator_has_next(struct deque_iterator* iter);
 
 #ifdef __cplusplus
 }

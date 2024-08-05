@@ -27,8 +27,9 @@
  */
 
 /* pgmoneta */
-#include <logging.h>
 #include <pgmoneta.h>
+#include <art.h>
+#include <logging.h>
 #include <json.h>
 #include <message.h>
 #include <utils.h>
@@ -38,60 +39,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define DEREF(ptr, type) (*((type*)(ptr)))
-
 static int advance_to_first_array_element(struct json_reader* reader);
-static void print_indent(int indent);
-static void print_json_item(struct json* item, int indent, int indent_per_level);
-static void print_json_array_value(struct json_value* value, int indent, int indent_per_level);
-static void print_json_array(struct json* array, int indent, int indent_per_level);
-static void print_json_state(enum json_reader_state state);
-static bool is_array_typed_value(enum json_value_type type);
 static int json_read(struct json_reader* reader);
 static bool json_next_char(struct json_reader* reader, char* next);
 static bool json_peek_next_char(struct json_reader* reader, char* next);
-static struct json_value* json_get_value(struct json* item, char* key);
 static int json_fast_forward_value(struct json_reader* reader, char ch);
-static int json_element_init(struct json_element** element);
-static struct json_element* json_element_free(struct json_element* element);
-static int json_value_init(struct json_value** value, enum json_value_type type);
-static int json_value_free(struct json_value* value);
-static int json_value_append(struct json_value* value, void* ptr);
-static int json_add(struct json* object, struct json_element* element);
-static int json_object_put(struct json* object, char* key, enum json_value_type type, void* payload, uint32_t length);
-static int json_item_put_string(struct json* item, char* key, char* val);
-static int json_item_put_int8(struct json* item, char* key, int8_t val);
-static int json_item_put_uint8(struct json* item, char* key, uint8_t val);
-static int json_item_put_int16(struct json* item, char* key, int16_t val);
-static int json_item_put_uint16(struct json* item, char* key, uint16_t val);
-static int json_item_put_int32(struct json* item, char* key, int32_t val);
-static int json_item_put_uint32(struct json* item, char* key, uint32_t val);
-static int json_item_put_int64(struct json* item, char* key, int64_t val);
-static int json_item_put_uint64(struct json* item, char* key, uint64_t val);
-static int json_item_put_bool(struct json* item, char* key, bool val);
-static int json_item_put_float(struct json* item, char* key, float val);
-static int json_item_put_object(struct json* item, char* key, struct json* val);
-static int json_item_put_int8_array(struct json* item, char* key, int8_t* vals, uint32_t length);
-static int json_item_put_uint8_array(struct json* item, char* key, uint8_t* vals, uint32_t length);
-static int json_item_put_int16_array(struct json* item, char* key, int16_t* vals, uint32_t length);
-static int json_item_put_uint16_array(struct json* item, char* key, uint16_t* vals, uint32_t length);
-static int json_item_put_int32_array(struct json* item, char* key, int32_t* vals, uint32_t length);
-static int json_item_put_uint32_array(struct json* item, char* key, uint32_t* vals, uint32_t length);
-static int json_item_put_int64_array(struct json* item, char* key, int64_t* vals, uint32_t length);
-static int json_item_put_uint64_array(struct json* item, char* key, uint64_t* vals, uint32_t length);
-static int json_item_put_item_array(struct json* item, char* key, struct json* items, uint32_t length);
-static int json_array_append_int8(struct json* array, int8_t val);
-static int json_array_append_uint8(struct json* array, uint8_t val);
-static int json_array_append_int16(struct json* array, int16_t val);
-static int json_array_append_uint16(struct json* array, uint16_t val);
-static int json_array_append_int32(struct json* array, int32_t val);
-static int json_array_append_uint32(struct json* array, uint32_t val);
-static int json_array_append_int64(struct json* array, int64_t val);
-static int json_array_append_uint64(struct json* array, uint64_t val);
-static int json_array_append_string(struct json* array, char* str);
-static int json_array_append_float(struct json* array, float val);
-static int json_array_append_object(struct json* array, struct json* object);
 static int json_stream_parse_item(struct json_reader* reader, struct json** item);
+static bool type_allowed(enum value_type type);
+static char* item_to_string(struct json* item, char* tag, int indent);
+static char* array_to_string(struct json* array, char* tag, int indent);
 
 int
 pgmoneta_json_reader_init(char* path, struct json_reader** reader)
@@ -372,498 +328,36 @@ done:
    return false;
 }
 
-int8_t
-pgmoneta_json_get_int8(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt8)
-   {
-      return 0;
-   }
-   return pgmoneta_read_byte(val->payload);
-}
-
-uint8_t
-pgmoneta_json_get_uint8(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt8)
-   {
-      return 0;
-   }
-   return pgmoneta_read_uint8(val->payload);
-}
-
-int16_t
-pgmoneta_json_get_int16(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt16)
-   {
-      return 0;
-   }
-   return pgmoneta_read_int16(val->payload);
-}
-
-uint16_t
-pgmoneta_json_get_uint16(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt16)
-   {
-      return 0;
-   }
-   return pgmoneta_read_uint16(val->payload);
-}
-
-int32_t
-pgmoneta_json_get_int32(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt32)
-   {
-      return 0;
-   }
-   return pgmoneta_read_int32(val->payload);
-}
-
-uint32_t
-pgmoneta_json_get_uint32(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt32)
-   {
-      return 0;
-   }
-   return pgmoneta_read_uint32(val->payload);
-}
-
-int64_t
-pgmoneta_json_get_int64(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt64)
-   {
-      return 0;
-   }
-   return pgmoneta_read_int64(val->payload);
-}
-
-uint64_t
-pgmoneta_json_get_uint64(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt64)
-   {
-      return 0;
-   }
-   return pgmoneta_read_uint64(val->payload);
-}
-
-bool
-pgmoneta_json_get_bool(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueBool)
-   {
-      return 0;
-   }
-   return pgmoneta_read_bool(val->payload);
-}
-
-int8_t*
-pgmoneta_json_get_int8_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt8Array)
-   {
-      return NULL;
-   }
-   return (int8_t*)val->payload;
-}
-
-uint8_t*
-pgmoneta_json_get_uint8_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt8Array)
-   {
-      return NULL;
-   }
-   return (uint8_t*)val->payload;
-}
-
-int16_t*
-pgmoneta_json_get_int16_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt16Array)
-   {
-      return NULL;
-   }
-   return (int16_t*)val->payload;
-}
-
-uint16_t*
-pgmoneta_json_get_uint16_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt16Array)
-   {
-      return NULL;
-   }
-   return (uint16_t*)val->payload;
-}
-
-int32_t*
-pgmoneta_json_get_int32_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt32Array)
-   {
-      return NULL;
-   }
-   return (int32_t*)val->payload;
-}
-
-uint32_t*
-pgmoneta_json_get_uint32_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt32Array)
-   {
-      return NULL;
-   }
-   return (uint32_t*)val->payload;
-}
-
-int64_t*
-pgmoneta_json_get_int64_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueInt64Array)
-   {
-      return NULL;
-   }
-   return (int64_t*)val->payload;
-}
-
-uint64_t*
-pgmoneta_json_get_uint64_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueUInt64Array)
-   {
-      return NULL;
-   }
-   return (uint64_t*)val->payload;
-}
-
-char*
-pgmoneta_json_get_string(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueString)
-   {
-      return NULL;
-   }
-   return (char*)val->payload;
-}
-
-char**
-pgmoneta_json_get_string_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueStringArray)
-   {
-      return NULL;
-   }
-   return (char**)val->payload;
-}
-
-float
-pgmoneta_json_get_float(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return 0;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueFloat)
-   {
-      return 0;
-   }
-   return *((float*)val->payload);
-}
-
-float*
-pgmoneta_json_get_float_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueFloatArray)
-   {
-      return NULL;
-   }
-   return (float*)val->payload;
-}
-
-struct json*
-pgmoneta_json_get_json_object(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || val->type != ValueObject)
-   {
-      return NULL;
-   }
-   return (struct json*)val->payload;
-}
-
-struct json**
-pgmoneta_json_get_json_object_array(struct json* item, char* key)
-{
-   struct json_value* val = NULL;
-   if (item == NULL)
-   {
-      return NULL;
-   }
-   val = json_get_value(item, key);
-   if (val == NULL || (val->type != ValueItemArray && val->type != ValueArrayArray))
-   {
-      return NULL;
-   }
-   return (struct json**)val->payload;
-}
-
 int
-pgmoneta_json_append(struct json* array, void* entry, enum json_value_type type)
+pgmoneta_json_append(struct json* array, uintptr_t entry, enum value_type type)
 {
    if (array != NULL && array->type == JSONUnknown)
    {
       array->type = JSONArray;
+      pgmoneta_deque_create(false, (struct deque**)&array->elements);
    }
-   if (array == NULL || array->type != JSONArray)
+   if (array == NULL || array->type != JSONArray || !type_allowed(type))
    {
       goto error;
    }
-   switch (type)
-   {
-      case ValueInt8:
-         return json_array_append_int8(array, DEREF(entry, int8_t));
-      case ValueUInt8:
-         return json_array_append_uint8(array, DEREF(entry, uint8_t));
-      case ValueInt16:
-         return json_array_append_int16(array, DEREF(entry, int16_t));
-      case ValueUInt16:
-         return json_array_append_uint16(array, DEREF(entry, uint16_t));
-      case ValueInt32:
-         return json_array_append_int32(array, DEREF(entry, int32_t));
-      case ValueUInt32:
-         return json_array_append_uint32(array, DEREF(entry, uint32_t));
-      case ValueInt64:
-         return json_array_append_int64(array, DEREF(entry, int64_t));
-      case ValueUInt64:
-         return json_array_append_uint64(array, DEREF(entry, uint64_t));
-      case ValueString:
-         return json_array_append_string(array, (char*)entry);
-      case ValueFloat:
-         return json_array_append_float(array, DEREF(entry, float));
-      case ValueObject:
-         return json_array_append_object(array, (struct json*)entry);
-      default:
-         pgmoneta_log_error("pgmoneta_json_append: attempting to append a currently unsupported typed entry");
-         goto error;
-   }
-   return 0;
+   return pgmoneta_deque_add(array->elements, NULL, entry, type);
 error:
    return 1;
 }
 
 int
-pgmoneta_json_put(struct json* item, char* key, void* val, enum json_value_type type, ...)
+pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type type)
 {
-   uint32_t length = 0;
-   va_list args;
    if (item != NULL && item->type == JSONUnknown)
    {
       item->type = JSONItem;
+      pgmoneta_art_init((struct art**)&item->elements);
    }
-   if (item == NULL || item->type != JSONItem)
+   if (item == NULL || item->type != JSONItem || !type_allowed(type) || key == NULL || strlen(key) == 0)
    {
       goto error;
    }
-   switch (type)
-   {
-      case ValueInt8Array:
-      case ValueUInt8Array:
-      case ValueInt16Array:
-      case ValueUInt16Array:
-      case ValueInt32Array:
-      case ValueUInt32Array:
-      case ValueInt64Array:
-      case ValueUInt64Array:
-      case ValueItemArray:
-         va_start(args, type);
-         length = va_arg(args, uint32_t);
-         va_end(args);
-         break;
-      default:
-         break;
-   }
-   switch (type)
-   {
-      case ValueInt8:
-         return json_item_put_int8(item, key, DEREF(val, int8_t));
-      case ValueUInt8:
-         return json_item_put_uint8(item, key, DEREF(val, uint8_t));
-      case ValueInt16:
-         return json_item_put_int16(item, key, DEREF(val, int16_t));
-      case ValueUInt16:
-         return json_item_put_uint16(item, key, DEREF(val, uint16_t));
-      case ValueInt32:
-         return json_item_put_int32(item, key, DEREF(val, int32_t));
-      case ValueUInt32:
-         return json_item_put_uint32(item, key, DEREF(val, uint32_t));
-      case ValueInt64:
-         return json_item_put_int64(item, key, DEREF(val, int64_t));
-      case ValueUInt64:
-         return json_item_put_uint64(item, key, DEREF(val, uint64_t));
-      case ValueBool:
-         return json_item_put_bool(item, key, DEREF(val, bool));
-      case ValueString:
-         return json_item_put_string(item, key, (char*)val);
-      case ValueFloat:
-         return json_item_put_float(item, key, DEREF(val, float));
-      case ValueObject:
-         return json_item_put_object(item, key, (struct json*)val);
-      case ValueInt8Array:
-         return json_item_put_int8_array(item, key, (int8_t*) val, length);
-      case ValueUInt8Array:
-         return json_item_put_uint8_array(item, key, (uint8_t*) val, length);
-      case ValueInt16Array:
-         return json_item_put_int16_array(item, key, (int16_t*) val, length);
-      case ValueUInt16Array:
-         return json_item_put_uint16_array(item, key, (uint16_t*) val, length);
-      case ValueInt32Array:
-         return json_item_put_int32_array(item, key, (int32_t*) val, length);
-      case ValueUInt32Array:
-         return json_item_put_uint32_array(item, key, (uint32_t*) val, length);
-      case ValueInt64Array:
-         return json_item_put_int64_array(item, key, (int64_t*) val, length);
-      case ValueUInt64Array:
-         return json_item_put_uint64_array(item, key, (uint64_t*) val, length);
-      case ValueItemArray:
-         return json_item_put_item_array(item, key, (struct json*) val, length);
-      default:
-         pgmoneta_log_error("pgmoneta_json_put: attempting to put a currently unsupported typed value");
-         goto error;
-   }
-   return 0;
+   return pgmoneta_art_insert((struct art*)item->elements, (unsigned char*)key, strlen(key) + 1, val, type);
 error:
    return 1;
 }
@@ -885,65 +379,153 @@ pgmoneta_json_free(struct json* object)
    {
       return 0;
    }
-   struct json_element* e = object->element;
-   while (e != NULL)
+   if (object->type == JSONArray)
    {
-      e = json_element_free(e);
+      pgmoneta_deque_destroy(object->elements);
+   }
+   else if (object->type == JSONItem)
+   {
+      pgmoneta_art_destroy(object->elements);
    }
    free(object);
    return 0;
 }
 
-void
-pgmoneta_json_print(struct json* object, int indent_per_level)
+char*
+pgmoneta_json_to_string(struct json* object, char* tag, int indent)
 {
-   if (object == NULL)
-   {
-      printf("Null\n");
-      return;
+   char* str = NULL;
+   if (object == NULL || (object->type == JSONUnknown || object->elements == NULL)) {
+       str = pgmoneta_indent(str, tag, indent);
+       str = pgmoneta_append(str, "{}");
+       return str;
    }
-   if (object->type == JSONArray)
+   if (object->type != JSONArray)
    {
-      print_json_array_value(object->element->value, 0, indent_per_level);
+      return item_to_string(object, tag, indent);
    }
    else
    {
-      print_json_item(object, 0, indent_per_level);
+      return array_to_string(object, tag, indent);
    }
 }
 
-struct json*
-pgmoneta_json_array_get(struct json* array, int index)
+void
+pgmoneta_json_print(struct json* object)
 {
-   if (array == NULL || array->type != JSONArray ||
-       array->element == NULL || array->element->value == NULL)
-   {
-      goto error;
-   }
-   if (array->element->value->type != ValueArrayArray && array->element->value->type != ValueItemArray)
-   {
-      goto error;
-   }
-   if (array->element->value->length <= index)
-   {
-      goto error;
-   }
-   return ((struct json**)array->element->value->payload)[index];
-error:
-   return NULL;
+   char* str = pgmoneta_json_to_string(object, NULL, 0);
+   printf("%s", str);
+   free(str);
 }
 
 uint32_t
 pgmoneta_json_array_length(struct json* array)
 {
-   if (array == NULL || array->type != JSONArray
-       || array->element == NULL || array->element->value == NULL)
+   if (array == NULL || array->type != JSONArray)
    {
       goto error;
    }
-   return array->element->value->length;
+   return pgmoneta_deque_size(array->elements);
 error:
    return 0;
+}
+
+uintptr_t
+pgmoneta_json_get(struct json* item, char* tag)
+{
+   if (item == NULL || item->type != JSONItem || tag == NULL || strlen(tag) == 0)
+   {
+      return 0;
+   }
+   return pgmoneta_art_search(item->elements, (unsigned char*)tag, strlen(tag)+1);
+}
+
+int
+pgmoneta_json_iterator_init(struct json* object, struct json_iterator** iter)
+{
+   struct json_iterator* i = NULL;
+   if (object == NULL || object->type == JSONUnknown)
+   {
+      return 1;
+   }
+   i = malloc(sizeof (struct json_iterator));
+   memset(i, 0, sizeof (struct json_iterator));
+   i->obj = object;
+   if (object->type == JSONItem)
+   {
+      pgmoneta_art_iterator_init(object->elements, (struct art_iterator**)(&i->iter));
+   }
+   else
+   {
+      pgmoneta_deque_iterator_init(object->elements, (struct deque_iterator**)(&i->iter));
+   }
+   *iter = i;
+   return 0;
+}
+
+void
+pgmoneta_json_iterator_destroy(struct json_iterator* iter)
+{
+   if (iter == NULL)
+   {
+      return;
+   }
+   if (iter->obj->type == JSONArray)
+   {
+      pgmoneta_deque_iterator_destroy((struct deque_iterator*)iter->iter);
+   }
+   else
+   {
+      pgmoneta_art_iterator_destroy((struct art_iterator*)iter->iter);
+   }
+   free(iter);
+}
+
+bool
+pgmoneta_json_iterator_next(struct json_iterator* iter)
+{
+   bool has_next = false;
+   if (iter == NULL || iter->iter == NULL)
+   {
+      return false;
+   }
+   if (iter->obj->type == JSONArray)
+   {
+      has_next = pgmoneta_deque_iterator_next((struct deque_iterator*)iter->iter);
+      if (has_next)
+      {
+         iter->value = ((struct deque_iterator*)iter->iter)->value;
+      }
+   }
+   else
+   {
+      has_next = pgmoneta_art_iterator_next((struct art_iterator*)iter->iter);
+      if (has_next)
+      {
+         iter->value = ((struct art_iterator*)iter->iter)->value;
+         iter->key = (char*)((struct art_iterator*)iter->iter)->key;
+      }
+   }
+   return has_next;
+}
+
+bool
+pgmoneta_json_iterator_has_next(struct json_iterator* iter)
+{
+   bool has_next = false;
+   if (iter == NULL || iter->iter == NULL)
+   {
+      return false;
+   }
+   if (iter->obj->type == JSONArray)
+   {
+      has_next = pgmoneta_deque_iterator_has_next((struct deque_iterator*)iter->iter);
+   }
+   else
+   {
+      has_next = pgmoneta_art_iterator_has_next((struct art_iterator*)iter->iter);
+   }
+   return has_next;
 }
 
 static int
@@ -971,94 +553,6 @@ advance_to_first_array_element(struct json_reader* reader)
       json_next_char(reader, &ch);
    }
    return 1;
-}
-
-static void
-print_json_array(struct json* array, int indent, int indent_per_level)
-{
-   if (array == NULL || array->type != JSONArray)
-   {
-      return;
-   }
-   if (array->element == NULL || array->element->value == NULL)
-   {
-      print_json_array_value(NULL, indent, indent_per_level);
-   }
-   else
-   {
-      print_json_array_value(array->element->value, indent, indent_per_level);
-   }
-}
-
-static void
-print_json_array_value(struct json_value* value, int indent, int indent_per_level)
-{
-   if (value == NULL)
-   {
-      printf("[]");
-      return;
-   }
-   printf("[\n");
-   indent += indent_per_level;
-   uint32_t length = 0;
-   if (value != NULL)
-   {
-      length = value->length;
-   }
-   for (int i = 0; i < length; i++)
-   {
-      print_indent(indent);
-      bool has_next = i != value->length - 1;
-      switch (value->type)
-      {
-         case ValueStringArray:
-         {
-            char* str = ((char**)value->payload)[i];
-            printf("\"%s\"%s\n", str, has_next?",":"");
-            break;
-         }
-         case ValueInt64Array:
-         {
-            int64_t num = ((int64_t*)value->payload)[i];
-            printf("%" PRId64 "%s\n", num, has_next?",":"");
-            break;
-         }
-         case ValueFloatArray:
-         {
-            float num = ((float*)value->payload)[i];
-            printf("%.4f%s\n", num, has_next?",":"");
-            break;
-         }
-         case ValueItemArray:
-         {
-            struct json* item = ((struct json**)value->payload)[i];
-            print_json_item(item, indent, indent_per_level);
-            printf("%s\n", has_next?",":"");
-            break;
-         }
-         case ValueArrayArray:
-         {
-            struct json* array = ((struct json**)value->payload)[i];
-            print_json_array(array, indent, indent_per_level);
-            printf("%s\n", has_next?",":"");
-            break;
-         }
-         default:
-            return;
-      }
-   }
-   indent -= indent_per_level;
-   print_indent(indent);
-   printf("]");
-}
-
-static void
-print_indent(int indent)
-{
-   for (int i = 0; i < indent; i++)
-   {
-      printf(" ");
-   }
 }
 
 __attribute__((used))
@@ -1095,130 +589,6 @@ print_json_state(enum json_reader_state state)
          printf("invalid state\n");
          break;
    }
-}
-
-static bool
-is_array_typed_value(enum json_value_type type)
-{
-   switch (type)
-   {
-      case ValueInt8:
-      case ValueUInt8:
-      case ValueInt16:
-      case ValueUInt16:
-      case ValueInt32:
-      case ValueUInt32:
-      case ValueInt64:
-      case ValueUInt64:
-      case ValueBool:
-      case ValueString:
-      case ValueFloat:
-      case ValueObject:
-         return false;
-      case ValueInt8Array:
-      case ValueUInt8Array:
-      case ValueInt16Array:
-      case ValueUInt16Array:
-      case ValueInt32Array:
-      case ValueUInt32Array:
-      case ValueInt64Array:
-      case ValueUInt64Array:
-      case ValueStringArray:
-      case ValueFloatArray:
-      case ValueItemArray:
-      case ValueArrayArray:
-         return true;
-   }
-   return false;
-}
-
-static void
-print_json_item(struct json* item, int indent, int indent_per_level)
-{
-   if (item == NULL || (item->type != JSONItem && item->type != JSONUnknown))
-   {
-      return;
-   }
-   struct json_element* element = NULL;
-   printf("{\n");
-   indent += indent_per_level;
-   element = item->element;
-   while (element != NULL)
-   {
-      bool has_next = element->next != NULL;
-      struct json_value* val = element->value;
-      print_indent(indent);
-      printf("\"%s\": ", element->key);
-      switch (val->type)
-      {
-         case ValueInt8:
-            printf("%" PRId8 "%s\n", pgmoneta_read_byte(val->payload), has_next?",":"");
-            break;
-         case ValueUInt8:
-            printf("%" PRIu8 "%s\n", pgmoneta_read_uint8(val->payload), has_next?",":"");
-            break;
-         case ValueInt16:
-            printf("%" PRId16 "%s\n", pgmoneta_read_int16(val->payload), has_next?",":"");
-            break;
-         case ValueUInt16:
-            printf("%" PRIu16 "%s\n", pgmoneta_read_uint16(val->payload), has_next?",":"");
-            break;
-         case ValueInt32:
-            printf("%" PRId32 "%s\n", pgmoneta_read_int32(val->payload), has_next?",":"");
-            break;
-         case ValueUInt32:
-            printf("%" PRIu32 "%s\n", pgmoneta_read_uint32(val->payload), has_next?",":"");
-            break;
-         case ValueInt64:
-            printf("%" PRId64 "%s\n", pgmoneta_read_int64(val->payload), has_next?",":"");
-            break;
-         case ValueUInt64:
-            printf("%" PRIu64 "%s\n", pgmoneta_read_uint64(val->payload), has_next?",":"");
-            break;
-         case ValueBool:
-            printf("%s%s\n", pgmoneta_read_bool(val->payload)? "true": "false", has_next?",":"");
-            break;
-         case ValueFloat:
-            printf("%.4f%s\n", *((float*)val->payload), has_next?",":"");
-            break;
-         case ValueString:
-            printf("\"%s\"%s\n", (char*)val->payload, has_next?",":"");
-            break;
-         case ValueObject:
-         {
-            struct json* obj = (struct json*)val->payload;
-            if (obj != NULL && obj->type == JSONArray)
-            {
-               print_json_array(obj, indent, indent_per_level);
-            }
-            else
-            {
-               print_json_item(obj, indent, indent_per_level);
-            }
-            printf("%s\n", has_next?",":"");
-         }
-         break;
-         case ValueStringArray:
-         case ValueInt8Array:
-         case ValueUInt8Array:
-         case ValueInt16Array:
-         case ValueUInt16Array:
-         case ValueInt32Array:
-         case ValueUInt32Array:
-         case ValueInt64Array:
-         case ValueUInt64Array:
-         case ValueFloatArray:
-         case ValueItemArray:
-         case ValueArrayArray:
-            print_json_array_value(val, indent + indent_per_level, indent_per_level);
-            printf("%s\n", has_next?",":"");
-            break;
-      }
-      element = element->next;
-   }
-   indent -= indent_per_level;
-   print_indent(indent);
-   printf("}");
 }
 
 static int
@@ -1288,26 +658,6 @@ json_peek_next_char(struct json_reader* reader, char* next)
    }
    *next = *(reader->buffer->buffer + reader->buffer->cursor);
    return true;
-}
-
-static struct json_value*
-json_get_value(struct json* item, char* key)
-{
-   struct json_element* e = NULL;
-   if (item->type == JSONArray)
-   {
-      return NULL;
-   }
-   e = item->element;
-   while (e != NULL)
-   {
-      if (!strcmp(e->key, key))
-      {
-         return e->value;
-      }
-      e = e->next;
-   }
-   return NULL;
 }
 
 static int
@@ -1399,825 +749,6 @@ error:
 }
 
 static int
-json_element_init(struct json_element** element)
-{
-   struct json_element* e = malloc(sizeof(struct json_element));
-   memset(e, 0, sizeof(struct json_element));
-   *element = e;
-   return 0;
-}
-
-static struct json_element*
-json_element_free(struct json_element* element)
-{
-   if (element == NULL)
-   {
-      return NULL;
-   }
-   free(element->key);
-   json_value_free(element->value);
-   struct json_element* e = element->next;
-   free(element);
-   return e;
-}
-
-static int
-json_value_init(struct json_value** value, enum json_value_type type)
-{
-   struct json_value* v = malloc(sizeof(struct json_value));
-   memset(v, 0, sizeof(struct json_value));
-   v->type = type;
-   *value = v;
-   return 0;
-}
-
-static int
-json_value_append(struct json_value* value, void* ptr)
-{
-   if (value == NULL || ptr == NULL)
-   {
-      goto error;
-   }
-   switch (value->type)
-   {
-      case ValueInt8Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(int8_t));
-         ((int8_t*)value->payload)[value->length] = *((int8_t*)ptr);
-         value->length++;
-         break;
-      case ValueUInt8Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(uint8_t));
-         ((uint8_t*)value->payload)[value->length] = *((uint8_t*)ptr);
-         value->length++;
-         break;
-      case ValueInt16Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(int16_t));
-         ((int16_t*)value->payload)[value->length] = *((int16_t*)ptr);
-         value->length++;
-         break;
-      case ValueUInt16Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(uint16_t));
-         ((uint16_t*)value->payload)[value->length] = *((uint16_t*)ptr);
-         value->length++;
-         break;
-      case ValueInt32Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(int32_t));
-         ((int32_t*)value->payload)[value->length] = *((int32_t*)ptr);
-         value->length++;
-         break;
-      case ValueUInt32Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(uint32_t));
-         ((uint32_t*)value->payload)[value->length] = *((uint32_t*)ptr);
-         value->length++;
-         break;
-      case ValueInt64Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(int64_t));
-         ((int64_t*)value->payload)[value->length] = *((int64_t*)ptr);
-         value->length++;
-         break;
-      case ValueUInt64Array:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(uint64_t));
-         ((uint64_t*)value->payload)[value->length] = *((uint64_t*)ptr);
-         value->length++;
-         break;
-      case ValueFloatArray:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(float));
-         ((float*)value->payload)[value->length] = *((float*)ptr);
-         value->length++;
-         break;
-      case ValueStringArray:
-      {
-         char* str = NULL;
-         str = pgmoneta_append(str, ptr);
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(char*));
-         ((char**)value->payload)[value->length] = str;
-         value->length++;
-         break;
-      }
-      case ValueArrayArray:
-      case ValueItemArray:
-         value->payload = realloc(value->payload, (value->length + 1) * sizeof(struct json**));
-         ((struct json**)value->payload)[value->length] = (struct json*)ptr;
-         value->length++;
-         break;
-      default:
-         goto error;
-   }
-   return 0;
-error:
-   return 1;
-}
-
-static int
-json_value_free(struct json_value* value)
-{
-   if (value == NULL)
-   {
-      return 0;
-   }
-   switch (value->type)
-   {
-      case ValueInt8:
-      case ValueUInt8:
-      case ValueInt16:
-      case ValueUInt16:
-      case ValueInt32:
-      case ValueUInt32:
-      case ValueInt64:
-      case ValueUInt64:
-      case ValueBool:
-      case ValueString:
-      case ValueFloat:
-      case ValueFloatArray:
-      case ValueInt8Array:
-      case ValueUInt8Array:
-      case ValueInt16Array:
-      case ValueUInt16Array:
-      case ValueInt32Array:
-      case ValueUInt32Array:
-      case ValueInt64Array:
-      case ValueUInt64Array:
-         // payload points to actual memory
-         free(value->payload);
-         value->payload = NULL;
-         break;
-      case ValueStringArray:
-         // payload points to an array of pointers to actual memories
-         for (int i = 0; i < value->length; i++)
-         {
-            free(*((char**)value->payload + i));
-         }
-         free(value->payload);
-         value->payload = NULL;
-         break;
-      case ValueObject:
-         // payload points to actual memory that contains pointers
-         pgmoneta_json_free((struct json*)value->payload);
-         break;
-      case ValueItemArray:
-      case ValueArrayArray:
-         // payload points to actual memory that contains pointers
-         for (int i = 0; i < value->length; i++)
-         {
-            pgmoneta_json_free(*((struct json**)value->payload + i));
-         }
-         free(value->payload);
-         value->payload = NULL;
-         break;
-   }
-   value->payload = NULL;
-   free(value);
-   return 0;
-}
-
-static int
-json_add(struct json* object, struct json_element* element)
-{
-   if (object == NULL || element == NULL)
-   {
-      goto error;
-   }
-   // a json array can have at most one json element, use append to add element in array
-   if (object->type == JSONArray && object->element != NULL)
-   {
-      goto error;
-   }
-   element->next = object->element;
-   object->element = element;
-   return 0;
-error:
-   return 1;
-}
-
-static int
-json_object_put(struct json* object, char* key, enum json_value_type type, void* payload, uint32_t length)
-{
-   struct json_element* element = NULL;
-   if (object == NULL || (object->type == JSONItem && key == NULL) || (object->type == JSONItem && payload == NULL))
-   {
-      goto error;
-   }
-   // can't add element to json array if key is not null or it already has an element
-   if (object->type == JSONArray && (key != NULL || object->element != NULL))
-   {
-      goto error;
-   }
-   // empty payload of an array object should have length of 0
-   if (object->type == JSONArray && payload == NULL && length != 0)
-   {
-      goto error;
-   }
-   // Array type should match
-   if (object->type == JSONArray && !is_array_typed_value(type))
-   {
-      goto error;
-   }
-   json_element_init(&element);
-   json_value_init(&element->value, type);
-   element->value->payload = payload;
-   element->value->length = length;
-   element->key = pgmoneta_append(element->key, key);
-   if (json_add(object, element))
-   {
-      goto error;
-   }
-   return 0;
-error:
-   // only free the element and key value space, not the payload
-   if (element != NULL)
-   {
-      free(element->value);
-      free(element->key);
-   }
-   free(element);
-   return 1;
-}
-
-static int
-json_item_put_string(struct json* item, char* key, char* val)
-{
-   if (val == NULL)
-   {
-      return 1;
-   }
-   char* payload = NULL;
-   struct json_value* strval = json_get_value(item, key);
-   if (strval != NULL && strval->type != ValueString)
-   {
-      pgmoneta_log_error("json key exists but not the string type");
-      return 1;
-   }
-   payload = pgmoneta_append(payload, val);
-   if (strval == NULL)
-   {
-      return json_object_put(item, key, ValueString, (void*)payload, 0);
-   }
-   else
-   {
-      free(strval->payload);
-      strval->payload = (void*)payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_int8(struct json* item, char* key, int8_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueInt8)
-   {
-      pgmoneta_log_error("json key exists but not the int8 type");
-      return 1;
-   }
-   payload = malloc(sizeof(int8_t));
-   // int value is stored in place
-   pgmoneta_write_byte(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueInt8, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_uint8(struct json* item, char* key, uint8_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueUInt8)
-   {
-      pgmoneta_log_error("json key exists but not the uint8 type");
-      return 1;
-   }
-   payload = malloc(sizeof(uint8_t));
-   // int value is stored in place
-   pgmoneta_write_uint8(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueUInt8, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_int16(struct json* item, char* key, int16_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueInt16)
-   {
-      pgmoneta_log_error("json key exists but not the int16 type");
-      return 1;
-   }
-   payload = malloc(sizeof(int16_t));
-   // int value is stored in place
-   pgmoneta_write_int16(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueInt16, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_uint16(struct json* item, char* key, uint16_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueUInt16)
-   {
-      pgmoneta_log_error("json key exists but not the uint16 type");
-      return 1;
-   }
-   payload = malloc(sizeof(uint16_t));
-   // int value is stored in place
-   pgmoneta_write_uint16(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueUInt16, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_int32(struct json* item, char* key, int32_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueInt32)
-   {
-      pgmoneta_log_error("json key exists but not the int32 type");
-      return 1;
-   }
-   payload = malloc(sizeof(int32_t));
-   // int value is stored in place
-   pgmoneta_write_int32(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueInt32, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_uint32(struct json* item, char* key, uint32_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueUInt32)
-   {
-      pgmoneta_log_error("json key exists but not the uint32 type");
-      return 1;
-   }
-   payload = malloc(sizeof(uint32_t));
-   // int value is stored in place
-   pgmoneta_write_uint32(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueUInt32, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_int64(struct json* item, char* key, int64_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueInt64)
-   {
-      pgmoneta_log_error("json key exists but not the int64 type");
-      return 1;
-   }
-   payload = malloc(sizeof(int64_t));
-   // int value is stored in place
-   pgmoneta_write_int64(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueInt64, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_uint64(struct json* item, char* key, uint64_t val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueUInt64)
-   {
-      pgmoneta_log_error("json key exists but not the uint64 type");
-      return 1;
-   }
-   payload = malloc(sizeof(uint64_t));
-   // int value is stored in place
-   pgmoneta_write_uint64(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueUInt64, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_bool(struct json* item, char* key, bool val)
-{
-   void* payload = NULL;
-   struct json_value* intval = json_get_value(item, key);
-   if (intval != NULL && intval->type != ValueBool)
-   {
-      pgmoneta_log_error("json key exists but not the bool type");
-      return 1;
-   }
-   payload = malloc(sizeof(bool));
-   // int value is stored in place
-   pgmoneta_write_byte(payload, val);
-   if (intval == NULL)
-   {
-      return json_object_put(item, key, ValueBool, payload, 0);
-   }
-   else
-   {
-      free(intval->payload);
-      intval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_float(struct json* item, char* key, float val)
-{
-   float* payload = NULL;
-   struct json_value* floatval = json_get_value(item, key);
-   if (floatval != NULL && floatval->type != ValueFloat)
-   {
-      pgmoneta_log_error("json key exists but not the float type");
-      return 1;
-   }
-   payload = malloc(sizeof(float));
-   *payload = val;
-   // int value is stored in place
-   if (floatval == NULL)
-   {
-      return json_object_put(item, key, ValueFloat, payload, 0);
-   }
-   else
-   {
-      free(floatval->payload);
-      floatval->payload = payload;
-   }
-   return 0;
-}
-
-static int
-json_item_put_object(struct json* item, char* key, struct json* val)
-{
-   return json_object_put(item, key, ValueObject, (void*)val, 0);
-}
-
-static int
-json_item_put_int8_array(struct json* item, char* key, int8_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueInt8Array, vals, length);
-}
-
-static int
-json_item_put_uint8_array(struct json* item, char* key, uint8_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueUInt8Array, vals, length);
-}
-
-static int
-json_item_put_int16_array(struct json* item, char* key, int16_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueInt16Array, vals, length);
-}
-
-static int
-json_item_put_uint16_array(struct json* item, char* key, uint16_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueUInt16Array, vals, length);
-}
-
-static int
-json_item_put_int32_array(struct json* item, char* key, int32_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueInt32Array, vals, length);
-}
-
-static int
-json_item_put_uint32_array(struct json* item, char* key, uint32_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueUInt32Array, vals, length);
-}
-
-static int
-json_item_put_int64_array(struct json* item, char* key, int64_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueInt64Array, vals, length);
-}
-
-static int
-json_item_put_uint64_array(struct json* item, char* key, uint64_t* vals, uint32_t length)
-{
-   return json_object_put(item, key, ValueUInt64Array, vals, length);
-}
-
-static int
-json_item_put_item_array(struct json* item, char* key, struct json* items, uint32_t length)
-{
-   return json_object_put(item, key, ValueItemArray, items, length);
-}
-
-static int
-json_array_append_int8(struct json* array, int8_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueInt8Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueInt8Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_uint8(struct json* array, uint8_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueUInt8Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueUInt8Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_int16(struct json* array, int16_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueInt16Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueInt16Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_uint16(struct json* array, uint16_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueUInt16Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueUInt16Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_int32(struct json* array, int32_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueInt32Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueInt32Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_uint32(struct json* array, uint32_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueUInt32Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueUInt32Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_int64(struct json* array, int64_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueInt64Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueInt64Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_uint64(struct json* array, uint64_t val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueUInt64Array, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueUInt64Array)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_string(struct json* array, char* str)
-{
-   if (array == NULL || array->element == NULL)
-   {
-      goto error;
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueStringArray)
-   {
-      goto error;
-   }
-   return json_value_append(value, str);
-error:
-   return 1;
-}
-
-static int
-json_array_append_float(struct json* array, float val)
-{
-   if (array == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      json_object_put(array, NULL, ValueFloatArray, NULL, 0);
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray || value->type != ValueFloatArray)
-   {
-      goto error;
-   }
-   return json_value_append(value, &val);
-error:
-   return 1;
-}
-
-static int
-json_array_append_object(struct json* array, struct json* object)
-{
-   if (array == NULL || object == NULL)
-   {
-      goto error;
-   }
-   if (array->element == NULL)
-   {
-      if (object->type == JSONArray)
-      {
-         json_object_put(array, NULL, ValueArrayArray, NULL, 0);
-      }
-      else if (object->type == JSONItem)
-      {
-         json_object_put(array, NULL, ValueItemArray, NULL, 0);
-      }
-   }
-   struct json_value* value = array->element->value;
-   // type check
-   if (array->type != JSONArray ||
-       (!(value->type == ValueItemArray && object->type == JSONItem) &&
-        !(value->type == ValueArrayArray && object->type == JSONArray)))
-   {
-      goto error;
-   }
-   return json_value_append(value, object);
-error:
-   return 1;
-}
-
-static int
 json_stream_parse_item(struct json_reader* reader, struct json** item)
 {
    struct json* i = NULL;
@@ -2301,7 +832,7 @@ json_stream_parse_item(struct json_reader* reader, struct json** item)
                   free(str);
                   goto error;
                }
-               pgmoneta_json_put(i, key, str, ValueString);
+               pgmoneta_json_put(i, key, (uintptr_t)str, ValueString);
                free(key);
                free(str);
                key = NULL;
@@ -2346,7 +877,7 @@ json_stream_parse_item(struct json_reader* reader, struct json** item)
                   }
                   free(str);
                   str = NULL;
-                  pgmoneta_json_put(i, key, &num, ValueFloat);
+                  pgmoneta_json_put(i, key, (uintptr_t)num, ValueFloat);
                }
                else
                {
@@ -2358,7 +889,7 @@ json_stream_parse_item(struct json_reader* reader, struct json** item)
                   }
                   free(str);
                   str = NULL;
-                  pgmoneta_json_put(i, key, &num, ValueInt64);
+                  pgmoneta_json_put(i, key, (uintptr_t)num, ValueInt64);
                }
                free(key);
                key = NULL;
@@ -2393,4 +924,41 @@ error:
    pgmoneta_json_free(i);
    free(key);
    return 1;
+}
+
+static bool
+type_allowed(enum value_type type)
+{
+   switch (type)
+   {
+      case ValueInt8:
+      case ValueUInt8:
+      case ValueInt16:
+      case ValueUInt16:
+      case ValueInt32:
+      case ValueUInt32:
+      case ValueInt64:
+      case ValueUInt64:
+      case ValueBool:
+      case ValueString:
+      case ValueFloat:
+      case ValueDouble:
+      case ValueJSON:
+      case ValueDeque:
+         return true;
+      default:
+         return false;
+   }
+}
+
+static char*
+item_to_string(struct json* item, char* tag, int indent)
+{
+   return pgmoneta_art_to_string(item->elements, tag, indent);
+}
+
+static char*
+array_to_string(struct json* array, char* tag, int indent)
+{
+   return pgmoneta_deque_to_string(array->elements, tag, indent);
 }

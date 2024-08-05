@@ -35,36 +35,11 @@ extern "C" {
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <deque.h>
+#include <value.h>
 
 /* System */
 #include <stdarg.h>
-
-enum json_value_type {
-   ValueInt8,
-   ValueUInt8,
-   ValueInt16,
-   ValueUInt16,
-   ValueInt32,
-   ValueUInt32,
-   ValueInt64,
-   ValueUInt64,
-   ValueBool,
-   ValueString,
-   ValueFloat,
-   ValueObject,
-   ValueInt8Array,
-   ValueUInt8Array,
-   ValueInt16Array,
-   ValueUInt16Array,
-   ValueInt32Array,
-   ValueUInt32Array,
-   ValueInt64Array,
-   ValueUInt64Array,
-   ValueStringArray,
-   ValueFloatArray,
-   ValueItemArray,
-   ValueArrayArray,
-};
 
 enum json_type {
    JSONUnknown,
@@ -87,43 +62,15 @@ enum json_reader_state {
    InvalidReaderState,
 };
 
-/** @struct json_value
- * Defines a JSON value
- */
-struct json_value
-{
-   enum json_value_type type; /**< The json value type */
-   uint32_t length;     /**< (optional) The json array length */
-   // Payload can hold a 64bit value such as an integer, or be a pointer to a string, float or an array
-   // Based on value type, payload could be converted to the following:
-   // int64 (ValueInt), int64*(ValueInt64Array), char*(ValueString),
-   // char**(ValueStringArray), float*(ValueFloat/ValueFloatArray),
-   // json*(ValueObject), json**(ValueItemArray/ValueArrayArray)
-   void* payload;             /**< The json value payload */
-};
-
 /** @struct json
  * Defines a JSON structure
  */
 struct json
 {
    // a json object can only be item or array
-   enum json_type type;          /**< The json object type */
+   enum json_type type;            /**< The json object type */
    // if the object is an array, it can have at most one json element
-   struct json_element* element;   /**< The kv element start */
-};
-
-/** @struct json_element
- * Defines a JSON element
- */
-struct json_element
-{
-   // if the element holds an array value,
-   // if it belongs to a json array object, then the key is NULL, and it will not have next element,
-   // if it belongs to a json item object, then the key is not NULL, and it probably has next element
-   char* key;                    /**< The json element key */
-   struct json_value* value;     /**< The json element value */
-   struct json_element* next;    /**< The next element */
+   void* elements;                /**< The json elements, could be an array or some kv pairs */
 };
 
 /** @struct json_reader
@@ -134,6 +81,17 @@ struct json_reader
    struct stream_buffer* buffer; /**< The buffer */
    int fd;                       /**< The file descriptor */
    enum json_reader_state state; /**< The current reader state of the JSON reader */
+};
+
+/** @struct json_iterator
+ * Defines a JSON iterator
+ */
+struct json_iterator
+{
+   void* iter;
+   struct json* obj;
+   char* key;
+   struct value* value;
 };
 
 /**
@@ -173,213 +131,6 @@ bool
 pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item);
 
 /**
- * Get int8_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-int8_t
-pgmoneta_json_get_int8(struct json* item, char* key);
-
-/**
- * Get uint8_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-uint8_t
-pgmoneta_json_get_uint8(struct json* item, char* key);
-
-/**
- * Get int16_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-int16_t
-pgmoneta_json_get_int16(struct json* item, char* key);
-
-/**
- * Get uint16_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-uint16_t
-pgmoneta_json_get_uint16(struct json* item, char* key);
-
-/**
- * Get int32_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-int32_t
-pgmoneta_json_get_int32(struct json* item, char* key);
-
-/**
- * Get uint32_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-uint32_t
-pgmoneta_json_get_uint32(struct json* item, char* key);
-
-/**
- * Get int64_t value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-int64_t
-pgmoneta_json_get_int64(struct json* item, char* key);
-
-/**
- * Get uint64 value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-uint64_t
-pgmoneta_json_get_uint64(struct json* item, char* key);
-
-/**
- * Get bool value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-bool
-pgmoneta_json_get_bool(struct json* item, char* key);
-
-/**
- * Get int8 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-int8_t*
-pgmoneta_json_get_int8_array(struct json* item, char* key);
-
-/**
- * Get uint8 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-uint8_t*
-pgmoneta_json_get_uint8_array(struct json* item, char* key);
-
-/**
- * Get int16 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-int16_t*
-pgmoneta_json_get_int16_array(struct json* item, char* key);
-
-/**
- * Get uint16 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-uint16_t*
-pgmoneta_json_get_uint16_array(struct json* item, char* key);
-
-/**
- * Get int32 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-int32_t*
-pgmoneta_json_get_int32_array(struct json* item, char* key);
-
-/**
- * Get uint32 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-uint32_t*
-pgmoneta_json_get_uint32_array(struct json* item, char* key);
-
-/**
- * Get int64 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-int64_t*
-pgmoneta_json_get_int64_array(struct json* item, char* key);
-
-/**
- * Get uint64 array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-uint64_t*
-pgmoneta_json_get_uint64_array(struct json* item, char* key);
-
-/**
- * Get string value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-char*
-pgmoneta_json_get_string(struct json* item, char* key);
-
-/**
- * Get string array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-char**
-pgmoneta_json_get_string_array(struct json* item, char* key);
-
-/**
- * Get float value from json
- * @param item The item
- * @param key The key
- * @return The value, 0 if not found
- */
-float
-pgmoneta_json_get_float(struct json* item, char* key);
-
-/**
- * Get float array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-float*
-pgmoneta_json_get_float_array(struct json* item, char* key);
-
-/**
- * Get json object value from json.
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-struct json*
-pgmoneta_json_get_json_object(struct json* item, char* key);
-
-/**
- * Get json object array value from json
- * @param item The item
- * @param key The key
- * @return The value, NULL if not found
- */
-struct json**
-pgmoneta_json_get_json_object_array(struct json* item, char* key);
-
-/**
  * Init a json object
  * @param item [out] The json item
  * @return 0 if success, 1 if otherwise
@@ -398,32 +149,40 @@ pgmoneta_json_free(struct json* object);
 /**
  * Put a key value pair into the json item,
  * if the key exists, value will be overwritten,
- * if value is of primitive types, old value will be freed if necessary
  *
  * If the kv pair is put into an empty json object, it will be treated as json item,
  * otherwise if the json object is an array, it will reject the kv pair
  * @param item The json item
- * @param key The key, which will be copied into the item
- * @param val The pointer to the value, which will be interpreted differently based on the value type
- * @param type The json value type
- * @param length [Maybe unused] The length of the value if it is an array, necessary when the value is array
- * @return 0 is successful,
- * otherwise when the json object is an array, value is null, or value type conflicts with old value, 1 will be returned
+ * @param key The json key
+ * @param val The value data
+ * @param type The value type
+ * @return 0 on success, otherwise 1
  */
 int
-pgmoneta_json_put(struct json* item, char* key, void* val, enum json_value_type type, ...);
+pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type type);
 
 /**
  * Append an entry into the json array
  * If the entry is put into an empty json object, it will be treated as json array,
  * otherwise if the json object is an item, it will reject the entry
- * @param entry The pointer to the entry, which will be interpreted differently based on the type
- * @param type The json value type
+ * @param array The json array
+ * @param entry The entry data
+ * @param type The entry value type
  * @return 0 is successful,
  * otherwise when the json object is an array, value is null, or value type conflicts with old value, 1 will be returned
  */
 int
-pgmoneta_json_append(struct json* array, void* entry, enum json_value_type type);
+pgmoneta_json_append(struct json* array, uintptr_t entry, enum value_type type);
+
+/**
+ * Convert a json to string
+ * @param object The json object
+ * @param tag The optional tag
+ * @param indent The indent
+ * @return The json formatted string
+ */
+char*
+pgmoneta_json_to_string(struct json* object, char* tag, int indent);
 
 /**
  * Print a json object
@@ -431,15 +190,7 @@ pgmoneta_json_append(struct json* array, void* entry, enum json_value_type type)
  * @param indent_per_level The indent per level
  */
 void
-pgmoneta_json_print(struct json* object, int indent_per_level);
-
-/**
- * Get the json element from json array
- * @param index The index
- * @return The element, NULL if error or index out of bound;
- */
-struct json*
-pgmoneta_json_array_get(struct json* array, int index);
+pgmoneta_json_print(struct json* object);
 
 /**
  * Get json array length
@@ -448,6 +199,47 @@ pgmoneta_json_array_get(struct json* array, int index);
  */
 uint32_t
 pgmoneta_json_array_length(struct json* array);
+
+/**
+ * Get the value data from json item
+ * @param item The item
+ * @param tag The tag
+ * @return The value data, 0 if not found
+ */
+uintptr_t
+pgmoneta_json_get(struct json* item, char* tag);
+
+/**
+ * Create a json iterator
+ * @param object The JSON object
+ * @param iter [out] The iterator
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_json_iterator_init(struct json* object, struct json_iterator** iter);
+
+/**
+ * Destroy a iterator
+ * @param iter The iterator
+ */
+void
+pgmoneta_json_iterator_destroy(struct json_iterator* iter);
+
+/**
+ * Get the next kv pair/entry from JSON object
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_json_iterator_next(struct json_iterator* iter);
+
+/**
+ * Check if the JSON object has next kv pair/entry
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_json_iterator_has_next(struct json_iterator* iter);
 
 #ifdef __cplusplus
 }
