@@ -1623,11 +1623,27 @@ pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup)
 
    pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-   for (int i = 0; bck == NULL && i < number_of_backups; i++)
+   if (number_of_backups == 0)
    {
-      if (!strcmp(backups[i]->label, backup))
+      goto error;
+   }
+
+   if (!strcmp("oldest", backup))
+   {
+      bck = backups[0];
+   }
+   else if (!strcmp("newest", backup) || !strcmp("latest", backup))
+   {
+      bck = backups[number_of_backups - 1];
+   }
+   else
+   {
+      for (int i = 0; bck == NULL && i < number_of_backups; i++)
       {
-         bck = backups[i];
+         if (!strcmp(backups[i]->label, backup))
+         {
+            bck = backups[i];
+         }
       }
    }
 
