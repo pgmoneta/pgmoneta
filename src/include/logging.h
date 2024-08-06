@@ -86,6 +86,14 @@ int
 pgmoneta_stop_logging(void);
 
 /**
+ * Is the logging level enabled
+ * @param level The level
+ * @return True if enabled, otherwise false
+ */
+bool
+pgmoneta_log_is_enabled(int level);
+
+/**
  * Log a line
  * @param level The level
  * @param file The file

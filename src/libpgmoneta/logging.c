@@ -300,6 +300,21 @@ pgmoneta_stop_logging(void)
    return 0;
 }
 
+bool
+pgmoneta_log_is_enabled(int level)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (level >= config->log_level)
+   {
+      return true;
+   }
+
+   return false;
+}
+
 void
 pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
 {
