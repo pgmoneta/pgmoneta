@@ -502,7 +502,17 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       fail = true;
    }
 
-   if (!strcmp(new_comments, ",") || pgmoneta_ends_with(new_comments, ","))
+   if (!strcmp(new_comments, ",") || pgmoneta_starts_with(new_comments, ","))
+   {
+      new_comments = pgmoneta_remove_first(new_comments);
+      
+      if (new_comments == NULL)
+      {
+         fail = true;
+      }
+   }
+
+   if (pgmoneta_ends_with(new_comments, ","))
    {
       new_comments = pgmoneta_remove_last(new_comments);
       

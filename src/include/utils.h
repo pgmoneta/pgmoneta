@@ -845,6 +845,14 @@ bool
 pgmoneta_contains(char* str, char* s);
 
 /**
+ * Remove the first character of a string
+ * @param str The string
+ * @return The result
+ */
+char*
+pgmoneta_remove_first(char* str);
+
+/**
  * Remove the last character of a string
  * @param str The string
  * @return The result
