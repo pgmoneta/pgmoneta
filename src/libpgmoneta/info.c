@@ -38,10 +38,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define INFO_BUFFER_SIZE 8192
+
 void
 pgmoneta_create_info(char* directory, char* label, int status)
 {
-   char buffer[128];
+   char buffer[INFO_BUFFER_SIZE];
    char* s = NULL;
    FILE* sfile = NULL;
 
@@ -89,8 +91,8 @@ pgmoneta_create_info(char* directory, char* label, int status)
 void
 pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long value)
 {
-   char buffer[128];
-   char line[128];
+   char buffer[INFO_BUFFER_SIZE];
+   char line[INFO_BUFFER_SIZE];
    bool found = false;
    char* s = NULL;
    FILE* sfile = NULL;
@@ -108,8 +110,8 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
-      char k[MISC_LENGTH];
-      char v[MISC_LENGTH];
+      char k[INFO_BUFFER_SIZE];
+      char v[INFO_BUFFER_SIZE];
       char* ptr = NULL;
 
       memset(&k[0], 0, sizeof(k));
@@ -165,8 +167,8 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
 void
 pgmoneta_update_info_string(char* directory, char* key, char* value)
 {
-   char buffer[128];
-   char line[128];
+   char buffer[INFO_BUFFER_SIZE];
+   char line[INFO_BUFFER_SIZE];
    bool found = false;
    char* s = NULL;
    FILE* sfile = NULL;
@@ -184,8 +186,8 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
-      char k[MISC_LENGTH];
-      char v[MISC_LENGTH];
+      char k[INFO_BUFFER_SIZE];
+      char v[INFO_BUFFER_SIZE];
       char* ptr = NULL;
 
       memset(&k[0], 0, sizeof(k));
@@ -326,18 +328,13 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
          char* tokens = NULL;
          char* ptr = NULL;
 
-         pgmoneta_log_info("old_comments=%s", old_comments);
-
          tokens = pgmoneta_append(tokens, old_comments);
-
          ptr = strtok(tokens, ",");
-
-         pgmoneta_log_info("ptr=%p", ptr);
 
          while (ptr != NULL && !fail)
          {
-            char tk[256];
-            char tv[256];
+            char tk[INFO_BUFFER_SIZE];
+            char tv[INFO_BUFFER_SIZE];
             char* equal = NULL;
 
             memset(&tk[0], 0, sizeof(tk));
@@ -345,12 +342,8 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
 
             equal = strchr(ptr, '|');
 
-            pgmoneta_log_info("equal=%p", equal);
-
             memcpy(&tk[0], ptr, strlen(ptr) - strlen(equal));
             memcpy(&tv[0], equal + 1, strlen(equal) - 1);
-
-            pgmoneta_log_info("TK=%s TV=%s", tk, tv);
 
             if (strcmp(key, tk))
             {
@@ -358,8 +351,6 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
                new_comments = pgmoneta_append(new_comments, "|");
                new_comments = pgmoneta_append(new_comments, tv);
                found = true;
-
-               pgmoneta_log_info("ptr=%p", ptr);
             }
             else
             {
@@ -393,7 +384,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       }
       else
       {
-         char tokens[512];
+         char tokens[INFO_BUFFER_SIZE];
          char* ptr = NULL;
 
          memset(&tokens[0], 0, sizeof(tokens));
@@ -403,8 +394,8 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
 
          while (ptr != NULL)
          {
-            char tk[256];
-            char tv[256];
+            char tk[INFO_BUFFER_SIZE];
+            char tv[INFO_BUFFER_SIZE];
             char* equal = NULL;
 
             memset(&tk[0], 0, sizeof(tk));
@@ -451,7 +442,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       }
       else
       {
-         char tokens[512];
+         char tokens[INFO_BUFFER_SIZE];
          char* ptr = NULL;
 
          memset(&tokens[0], 0, sizeof(tokens));
@@ -461,8 +452,8 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
 
          while (ptr != NULL)
          {
-            char tk[256];
-            char tv[256];
+            char tk[INFO_BUFFER_SIZE];
+            char tv[INFO_BUFFER_SIZE];
             char* equal = NULL;
 
             memset(&tk[0], 0, sizeof(tk));
@@ -726,7 +717,7 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
 int
 pgmoneta_get_backup_file(char* fn, struct backup** backup)
 {
-   char buffer[MISC_LENGTH];
+   char buffer[INFO_BUFFER_SIZE];
    FILE* file = NULL;
    int tbl_idx = 0;
    struct backup* bck;
@@ -749,8 +740,8 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
    {
       while ((fgets(&buffer[0], sizeof(buffer), file)) != NULL)
       {
-         char key[MISC_LENGTH];
-         char value[MISC_LENGTH];
+         char key[INFO_BUFFER_SIZE];
+         char value[INFO_BUFFER_SIZE];
          char* ptr = NULL;
 
          memset(&key[0], 0, sizeof(key));
