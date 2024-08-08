@@ -403,8 +403,8 @@ error:
 static int
 bzip2_compress(char* from, int level, char* to)
 {
-   FILE* from_ptr = NULL,
-       * to_ptr = NULL;
+   FILE* from_ptr = NULL;
+   FILE* to_ptr = NULL;
 
    char buf[BUFFER_LENGTH] = {0};
    size_t buf_len = BUFFER_LENGTH;
@@ -442,6 +442,13 @@ bzip2_compress(char* from, int level, char* to)
       memset(buf, 0, buf_len);
    }
 
+   BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
+
+   fclose(from_ptr);
+   fclose(to_ptr);
+
+   return 0;
+
 error_zip:
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
 
@@ -456,14 +463,14 @@ error:
       fclose(to_ptr);
    }
 
-   return bzip2_err;
+   return 1;
 }
 
 static int
 bzip2_decompress(char* from, char* to)
 {
-   FILE* from_ptr = NULL,
-       * to_ptr = NULL;
+   FILE* from_ptr = NULL;
+   FILE* to_ptr = NULL;
 
    char buf[BUFFER_LENGTH] = {0};
    size_t buf_len = BUFFER_LENGTH;
@@ -508,8 +515,18 @@ bzip2_decompress(char* from, char* to)
    }
    while (bzip2_err == BZ_STREAM_END && length == BUFFER_LENGTH);
 
+   BZ2_bzReadClose(&bzip2_err, zip_file);
+
+   fclose(from_ptr);
+   fclose(to_ptr);
+
+   return 0;
+
 error_unzip:
-   BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
+   if (zip_file != NULL)
+   {
+      BZ2_bzReadClose(&bzip2_err, zip_file);
+   }
 
 error:
    if (to_ptr)
@@ -577,7 +594,12 @@ bzip2_decompress_file(char* from, char* to)
    BZ2_bzReadClose(&bzip2_err, zip_file);
    zip_file = NULL;
 
-error_unzip:
+   fclose(from_ptr);
+   fclose(to_ptr);
+
+   return 0;
+
+ error_unzip:
    if (zip_file)
    {
       BZ2_bzReadClose(&bzip2_err, zip_file);
@@ -594,7 +616,7 @@ error:
       fclose(from_ptr);
    }
 
-   return bzip2_err;
+   return 1;
 }
 
 int
