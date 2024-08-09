@@ -140,7 +140,6 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
    struct art* tree = NULL;
    struct deque* que = NULL;
    struct deque_node* entry = NULL;
-   char* key = NULL;
 
    *deleted_files = NULL;
    *changed_files = NULL;
@@ -281,8 +280,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    if (manifest_changed)
    {
-      pgmoneta_art_insert(changed, (unsigned char*)key, strlen(key) + 1, (uintptr_t)"backup manifest", ValueString);
-      free(key);
+      pgmoneta_art_insert(changed, (unsigned char*)"backup_manifest", strlen("backup_manifest") + 1, (uintptr_t)"backup manifest", ValueString);
    }
 
    *deleted_files = deleted;
