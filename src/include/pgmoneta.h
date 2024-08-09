@@ -68,7 +68,9 @@ extern "C" {
 #define MAX_PATH 1024
 #define MISC_LENGTH 128
 #define MAX_COMMENT 2048
+#define MAX_EXTRA_PATH 8192
 
+#define MAX_EXTRA 64
 #define NUMBER_OF_SERVERS 64
 #define NUMBER_OF_USERS   64
 #define NUMBER_OF_ADMINS   8
@@ -236,6 +238,8 @@ struct server
    int backup_max_rate;     /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
    int manifest;  /**< The manifest hash algorithm */
+   int number_of_extra; /**< The number of source directory*/
+   char extra[MAX_EXTRA][MAX_EXTRA_PATH];  /**< Source directory*/
 } __attribute__ ((aligned (64)));
 
 /** @struct user

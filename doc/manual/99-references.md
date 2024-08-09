@@ -38,6 +38,9 @@
   [ART_paper]: http://www-db.in.tum.de/~leis/papers/ART.pdf
   [libart]: https://github.com/armon/libart
   [pgsqlrepo]: https://github.com/postgres/postgres
+  [pgmoneta_ext]: https://github.com/pgmoneta/pgmoneta_ext
+  [ext_readme]: https://github.com/pgmoneta/pgmoneta_ext/blob/main/README.md
+  [ext_developers]: https://github.com/pgmoneta/pgmoneta_ext/blob/main/doc/DEVELOPERS.md
 
 <!-- doc/ -->
   [rpm]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/RPM.md

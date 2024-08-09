@@ -39,32 +39,79 @@ extern "C" {
 #include <stdbool.h>
 #include <stdlib.h>
 
+#define MAX_QUERY_LENGTH 1024
+
 /**
- * Return the extension version number
- * @param server The server
+ * Check if the server has the extension installed
+ * @param ssl The SSL structure
+ * @param socket The socket
  * @param qr The query result
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_ext_version(int server, struct query_response** qr);
+pgmoneta_ext_is_installed(SSL* ssl, int socket, struct query_response** qr);
+
+/**
+ * Return the extension version number
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_version(SSL* ssl, int socket, struct query_response** qr);
 
 /**
  * Trigger WAL switch operation
- * @param server The server
+ * @param ssl The SSL structure
+ * @param socket The socket
  * @param qr The query result
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_ext_switch_wal(int server, struct query_response** qr);
+pgmoneta_ext_switch_wal(SSL* ssl, int socket, struct query_response** qr);
 
 /**
  * Force PostgreSQL to carry out an immediate checkpoint
- * @param server The server
+ * @param ssl The SSL structure
+ * @param socket The socket
  * @param qr The query result
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_ext_checkpoint(int server, struct query_response** qr);
+pgmoneta_ext_checkpoint(SSL* ssl, int socket, struct query_response** qr);
+
+/**
+ * Check if the current user is a superuser
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_priviledge(SSL* ssl, int socket, struct query_response** qr);
+
+/**
+ * Retrieve the bytes of the specified file
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param file_path The path to the file
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
+
+/**
+ * Retrieve all file paths under the specified directory
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param file_path The path to the directory
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
 
 #ifdef __cplusplus
 }
