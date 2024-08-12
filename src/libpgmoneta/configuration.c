@@ -215,6 +215,10 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   srv.wal_streaming = false;
                   srv.valid = false;
                   srv.cur_timeline = 1; // by default current timeline is 1
+                  atomic_init(&srv.operation_count, 0);
+                  atomic_init(&srv.failed_operation_count, 0);
+                  atomic_init(&srv.last_operation_time, 0);
+                  atomic_init(&srv.last_failed_operation_time, 0);
                   memset(srv.wal_shipping, 0, MAX_PATH);
                   srv.workers = -1;
                   srv.backup_max_rate = -1;

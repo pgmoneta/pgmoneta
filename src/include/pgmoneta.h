@@ -201,45 +201,45 @@ extern void* prometheus_cache_shmem;
  */
 struct server
 {
-   char name[MISC_LENGTH];             /**< The name of the server */
-   char host[MISC_LENGTH];             /**< The host name of the server */
-   int port;                           /**< The port of the server */
-   char username[MAX_USERNAME_LENGTH]; /**< The user name */
-   char wal_slot[MISC_LENGTH];         /**< The WAL slot name */
-   char current_wal_filename[MISC_LENGTH]; /**< The current WAL filename*/
-   char current_wal_lsn[MISC_LENGTH]; /**< The current WAL log sequence number*/
-   char follow[MISC_LENGTH];           /**< Follow a server */
-   int retention_days;                 /**< The retention days for the server */
-   int retention_weeks;                /**< The retention weeks for the server */
-   int retention_months;               /**< The retention months for the server */
-   int retention_years;                /**< The retention years for the server */
-   int create_slot;                    /**< Create a slot */
-   atomic_bool backup;                 /**< Is there an active backup */
-   atomic_bool delete;                 /**< Is there an active delete */
-   atomic_bool wal;                    /**< Is there an active wal */
-   int wal_size;                       /**< The size of the WAL files */
-   bool wal_streaming;                 /**< Is WAL streaming active */
-   bool valid;                         /**< Is the server valid */
-   int version;                        /**< The major version of the server*/
-   int minor_version;                  /**< The minor version of the server*/
-   int operation_count;                /**< Operation count of the server */
-   int failed_operation_count;         /**< Failed operation count of the server */
-   uint32_t cur_timeline;              /**< Current timeline the server is on*/
-   char last_operation_time[MISC_LENGTH];         /**< Last operation time of the server */
-   char last_failed_operation_time[MISC_LENGTH];  /**< Last failed operation time of the server */
-   char wal_shipping[MAX_PATH];                   /**< The WAL shipping directory */
-   char hot_standby[MAX_PATH];                    /**< The hot standby directory */
-   char hot_standby_overrides[MAX_PATH];          /**< The hot standby overrides directory */
-   char hot_standby_tablespaces[MAX_PATH];        /**< The hot standby tablespaces mappings */
-   char tls_cert_file[MISC_LENGTH];   /**< TLS certificate path */
-   char tls_key_file[MISC_LENGTH];    /**< TLS key path */
-   char tls_ca_file[MISC_LENGTH];     /**< TLS CA certificate path */
-   int workers;                       /**< The number of workers */
-   int backup_max_rate;     /**< Number of tokens added to the bucket with each replenishment for backup. */
-   int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
-   int manifest;  /**< The manifest hash algorithm */
-   int number_of_extra; /**< The number of source directory*/
-   char extra[MAX_EXTRA][MAX_EXTRA_PATH];  /**< Source directory*/
+   char name[MISC_LENGTH];                  /**< The name of the server */
+   char host[MISC_LENGTH];                  /**< The host name of the server */
+   int port;                                /**< The port of the server */
+   char username[MAX_USERNAME_LENGTH];      /**< The user name */
+   char wal_slot[MISC_LENGTH];              /**< The WAL slot name */
+   char current_wal_filename[MISC_LENGTH];  /**< The current WAL filename*/
+   char current_wal_lsn[MISC_LENGTH];       /**< The current WAL log sequence number*/
+   char follow[MISC_LENGTH];                /**< Follow a server */
+   int retention_days;                      /**< The retention days for the server */
+   int retention_weeks;                     /**< The retention weeks for the server */
+   int retention_months;                    /**< The retention months for the server */
+   int retention_years;                     /**< The retention years for the server */
+   int create_slot;                         /**< Create a slot */
+   atomic_bool backup;                      /**< Is there an active backup */
+   atomic_bool delete;                      /**< Is there an active delete */
+   atomic_bool wal;                         /**< Is there an active wal */
+   int wal_size;                            /**< The size of the WAL files */
+   bool wal_streaming;                      /**< Is WAL streaming active */
+   bool valid;                              /**< Is the server valid */
+   int version;                             /**< The major version of the server*/
+   int minor_version;                       /**< The minor version of the server*/
+   atomic_ulong operation_count;            /**< Operation count of the server */
+   atomic_ulong failed_operation_count;     /**< Failed operation count of the server */
+   uint32_t cur_timeline;                   /**< Current timeline the server is on*/
+   atomic_llong last_operation_time;        /**< Last operation time of the server */
+   atomic_llong last_failed_operation_time; /**< Last failed operation time of the server */
+   char wal_shipping[MAX_PATH];             /**< The WAL shipping directory */
+   char hot_standby[MAX_PATH];              /**< The hot standby directory */
+   char hot_standby_overrides[MAX_PATH];    /**< The hot standby overrides directory */
+   char hot_standby_tablespaces[MAX_PATH];  /**< The hot standby tablespaces mappings */
+   char tls_cert_file[MISC_LENGTH];         /**< TLS certificate path */
+   char tls_key_file[MISC_LENGTH];          /**< TLS key path */
+   char tls_ca_file[MISC_LENGTH];           /**< TLS CA certificate path */
+   int workers;                             /**< The number of workers */
+   int backup_max_rate;                     /**< Number of tokens added to the bucket with each replenishment for backup. */
+   int network_max_rate;                    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
+   int manifest;                            /**< The manifest hash algorithm */
+   int number_of_extra;                     /**< The number of source directory*/
+   char extra[MAX_EXTRA][MAX_EXTRA_PATH];   /**< Source directory*/
 } __attribute__ ((aligned (64)));
 
 /** @struct user

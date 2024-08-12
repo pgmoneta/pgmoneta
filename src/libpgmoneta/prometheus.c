@@ -990,6 +990,9 @@ general_information(int client_fd)
    unsigned long size;
    int retention;
    char* data = NULL;
+   time_t t;
+   char time_str[128];
+   struct tm* time_info;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -1553,7 +1556,7 @@ general_information(int client_fd)
       data = pgmoneta_append(data, config->servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_int(data, config->servers[i].operation_count);
+      data = pgmoneta_append_ulong(data, atomic_load(&config->servers[i].operation_count));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1569,7 +1572,7 @@ general_information(int client_fd)
       data = pgmoneta_append(data, config->servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_int(data, config->servers[i].failed_operation_count);
+      data = pgmoneta_append_ulong(data, atomic_load(&config->servers[i].failed_operation_count));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1585,9 +1588,14 @@ general_information(int client_fd)
       data = pgmoneta_append(data, config->servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      if (config->servers[i].operation_count > 0)
+      if (atomic_load(&config->servers[i].operation_count) > 0)
       {
-         data = pgmoneta_append(data, config->servers[i].last_operation_time);
+         memset(&time_str[0], 0, sizeof(time_str));
+         t = (time_t)atomic_load(&config->servers[i].last_operation_time);
+         time_info = localtime(&t);
+         strftime(&time_str[0], sizeof(time_str), "%Y%m%d%H%M%S", time_info);
+
+         data = pgmoneta_append(data, time_str);
       }
       else
       {
@@ -1608,9 +1616,14 @@ general_information(int client_fd)
       data = pgmoneta_append(data, config->servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      if (config->servers[i].failed_operation_count > 0)
+      if (atomic_load(&config->servers[i].failed_operation_count) > 0)
       {
-         data = pgmoneta_append(data, config->servers[i].last_failed_operation_time);
+         memset(&time_str[0], 0, sizeof(time_str));
+         t = (time_t)atomic_load(&config->servers[i].last_failed_operation_time);
+         time_info = localtime(&t);
+         strftime(&time_str[0], sizeof(time_str), "%Y%m%d%H%M%S", time_info);
+
+         data = pgmoneta_append(data, time_str);
       }
       else
       {

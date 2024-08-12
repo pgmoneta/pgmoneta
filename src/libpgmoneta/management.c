@@ -1928,9 +1928,7 @@ int
 pgmoneta_management_process_result(SSL* ssl, int socket, int srv, char* server, int code, bool send)
 {
    struct configuration* config;
-   time_t end_time;
-   struct tm* end_time_info;
-   char end_time_str[128];
+   time_t t;
 
    config = (struct configuration*)shmem;
 
@@ -1948,17 +1946,13 @@ pgmoneta_management_process_result(SSL* ssl, int socket, int srv, char* server, 
 
    if (srv != -1)
    {
-      time(&end_time);
-      end_time_info = localtime(&end_time);
-      memset(&end_time_str[0], 0, sizeof(end_time_str));
-      strftime(&end_time_str[0], sizeof(end_time_str), "%Y%m%d%H%M%S", end_time_info);
-
-      config->servers[srv].operation_count++;
-      memcpy(config->servers[srv].last_operation_time, end_time_str, strlen(end_time_str));
+      time(&t);
+      atomic_store(&config->servers[srv].last_operation_time, (long long)t);
+      atomic_fetch_add(&config->servers[srv].operation_count, 1);
       if (code)
       {
-         config->servers[srv].failed_operation_count++;
-         memcpy(config->servers[srv].last_failed_operation_time, end_time_str, strlen(end_time_str));
+         atomic_fetch_add(&config->servers[srv].failed_operation_count, 1);
+         atomic_store(&config->servers[srv].last_failed_operation_time, (long long)t);
       }
    }
 
