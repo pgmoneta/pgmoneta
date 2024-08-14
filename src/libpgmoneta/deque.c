@@ -333,7 +333,7 @@ pgmoneta_deque_to_string(struct deque* deque, char* tag, int indent)
    cur = deque_next(deque, deque->start);
    while (cur != NULL)
    {
-      bool has_next = cur != deque->end;
+      bool has_next = cur->next != deque->end;
       char* str = pgmoneta_value_to_string(cur->data, cur->tag, indent + INDENT_PER_LEVEL);
       ret = pgmoneta_append(ret, str);
       ret = pgmoneta_append(ret, has_next?",\n":"\n");

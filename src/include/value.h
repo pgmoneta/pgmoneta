@@ -107,6 +107,38 @@ pgmoneta_value_data(struct value* value);
 char*
 pgmoneta_value_to_string(struct value* value, char* tag, int indent);
 
+/**
+ * Convert a double value to value data, since straight type cast discards the decimal part
+ * @param val The value
+ * @return The value data
+ */
+uintptr_t
+pgmoneta_value_from_double(double val);
+
+/**
+ * Convert a value data to double
+ * @param val The value
+ * @return
+ */
+double
+pgmoneta_value_to_double(uintptr_t val);
+
+/**
+ * Convert a float value to value data, since straight type cast discards the decimal part
+ * @param val The value
+ * @return The value data
+ */
+uintptr_t
+pgmoneta_value_from_float(float val);
+
+/**
+ * Convert a value data to float
+ * @param val The value
+ * @return
+ */
+float
+pgmoneta_value_to_float(uintptr_t val);
+
 #ifdef __cplusplus
 }
 #endif

@@ -869,7 +869,7 @@ art_node_iterate(struct art_node* node, art_callback cb, void* data)
          break;
       }
    }
-   return 1;
+   return 0;
 }
 
 static void

@@ -200,6 +200,51 @@ pgmoneta_value_to_string(struct value* value, char* tag, int indent)
    return value->to_string(value->data, tag, indent);
 }
 
+
+uintptr_t
+pgmoneta_value_from_double(double val) {
+    union duni {
+        double val;
+        uintptr_t data;
+    };
+    union duni uni;
+    uni.val = val;
+    return uni.data;
+}
+
+double
+pgmoneta_value_to_double(uintptr_t val) {
+    union duni {
+        double val;
+        uintptr_t data;
+    };
+    union duni uni;
+    uni.data = val;
+    return uni.val;
+}
+
+uintptr_t
+pgmoneta_value_from_float(float val) {
+    union funi {
+        float val;
+        uintptr_t data;
+    };
+    union funi uni;
+    uni.val = val;
+    return uni.data;
+}
+
+float
+pgmoneta_value_to_float(uintptr_t val) {
+    union funi {
+        float val;
+        uintptr_t data;
+    };
+    union funi uni;
+    uni.data = val;
+    return uni.val;
+}
+
 static void
 noop_destroy_cb(uintptr_t data)
 {
@@ -342,7 +387,7 @@ float_to_string_cb(uintptr_t data, char* tag, int indent)
    ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%f", (float)data);
+   snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_float(data));
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
@@ -354,7 +399,7 @@ double_to_string_cb(uintptr_t data, char* tag, int indent)
    ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
    memset(buf, 0, MISC_LENGTH);
-   snprintf(buf, MISC_LENGTH, "%f", (double)data);
+   snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_double(data));
    ret = pgmoneta_append(ret, buf);
    return ret;
 }

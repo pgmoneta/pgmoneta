@@ -48,6 +48,10 @@ static int json_stream_parse_item(struct json_reader* reader, struct json** item
 static bool type_allowed(enum value_type type);
 static char* item_to_string(struct json* item, char* tag, int indent);
 static char* array_to_string(struct json* array, char* tag, int indent);
+static int parse_string(char* str, uint64_t* index, struct json** obj);
+static int json_add(struct json* obj, char* key, uintptr_t val, enum value_type type);
+static int fill_value(char* str, char* key, uint64_t* index, struct json* o);
+static bool value_start(char ch);
 
 int
 pgmoneta_json_reader_init(char* path, struct json_reader** reader)
@@ -62,7 +66,7 @@ pgmoneta_json_reader_init(char* path, struct json_reader** reader)
    r = malloc(sizeof(struct json_reader));
    pgmoneta_memory_stream_buffer_init(&r->buffer);
    r->fd = fd;
-   r->state = InvalidReaderState;
+   r->state = InvalidState;
    // read until the first '{' or '[', and set the state correspondingly
    char ch = 0;
    while (json_next_char(r, &ch))
@@ -112,7 +116,7 @@ pgmoneta_json_locate(struct json_reader* reader, char** key_path, int key_path_l
 {
    char ch = 0;
    char* cur_key = NULL;
-   if (reader == NULL || reader->state == InvalidReaderState)
+   if (reader == NULL || reader->state == InvalidState)
    {
       goto error;
    }
@@ -283,7 +287,7 @@ done:
    return 0;
 error:
    free(cur_key);
-   reader->state = InvalidReaderState;
+   reader->state = InvalidState;
    return 1;
 }
 
@@ -324,7 +328,7 @@ pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item)
    }
    return true;
 done:
-   reader->state = InvalidReaderState;
+   reader->state = InvalidState;
    return false;
 }
 
@@ -395,10 +399,11 @@ char*
 pgmoneta_json_to_string(struct json* object, char* tag, int indent)
 {
    char* str = NULL;
-   if (object == NULL || (object->type == JSONUnknown || object->elements == NULL)) {
-       str = pgmoneta_indent(str, tag, indent);
-       str = pgmoneta_append(str, "{}");
-       return str;
+   if (object == NULL || (object->type == JSONUnknown || object->elements == NULL))
+   {
+      str = pgmoneta_indent(str, tag, indent);
+      str = pgmoneta_append(str, "{}");
+      return str;
    }
    if (object->type != JSONArray)
    {
@@ -437,7 +442,7 @@ pgmoneta_json_get(struct json* item, char* tag)
    {
       return 0;
    }
-   return pgmoneta_art_search(item->elements, (unsigned char*)tag, strlen(tag)+1);
+   return pgmoneta_art_search(item->elements, (unsigned char*)tag, strlen(tag) + 1);
 }
 
 int
@@ -528,6 +533,268 @@ pgmoneta_json_iterator_has_next(struct json_iterator* iter)
    return has_next;
 }
 
+int
+pgmoneta_json_parse_string(char* str, struct json** obj)
+{
+   uint64_t idx = 0;
+   if (str == NULL || strlen(str) < 2)
+   {
+      return 1;
+   }
+
+   return parse_string(str, &idx, obj);
+}
+
+static int
+parse_string(char* str, uint64_t* index, struct json** obj)
+{
+   enum json_type type;
+   struct json* o = NULL;
+   uint64_t idx = *index;
+   char ch = str[idx];
+   char* key = NULL;
+   uint64_t len = strlen(str);
+
+   if (ch == '{')
+   {
+      type = JSONItem;
+   }
+   else if (ch == '[')
+   {
+      type = JSONArray;
+   }
+   else
+   {
+      goto error;
+   }
+   idx++;
+   pgmoneta_json_init(&o);
+   if (type == JSONItem)
+   {
+      while (idx < len)
+      {
+         // pre key
+         while (idx < len && isspace(str[idx]))
+         {
+            idx++;
+         }
+         if (idx == len)
+         {
+            goto error;
+         }
+         if (str[idx] == ',')
+         {
+            idx++;
+         }
+         else if (str[idx] == '}')
+         {
+            idx++;
+            break;
+         }
+         else if (!(str[idx] == '"' && o->type == JSONUnknown))
+         {
+            // if it's first key we won't see comma, otherwise we must see comma
+            goto error;
+         }
+         while (idx < len && str[idx] != '"')
+         {
+            idx++;
+         }
+         if (idx == len)
+         {
+            goto error;
+         }
+         idx++;
+         // The key
+         while (idx < len && str[idx] != '"')
+         {
+            key = pgmoneta_append_char(key, str[idx++]);
+         }
+         if (idx == len || key == NULL)
+         {
+            goto error;
+         }
+         // The lands between
+         while (idx < len && (str[idx] == '"' || isspace(str[idx])))
+         {
+            idx++;
+         }
+         if (idx == len || str[idx] != ':')
+         {
+            goto error;
+         }
+         while (idx < len && (str[idx] == ':' || isspace(str[idx])))
+         {
+            idx++;
+         }
+         if (idx == len)
+         {
+            goto error;
+         }
+         // The value
+         if (fill_value(str, key, &idx, o))
+         {
+            goto error;
+         }
+         free(key);
+         key = NULL;
+      }
+   }
+   else
+   {
+      while (idx < len)
+      {
+         while (idx < len && isspace(str[idx]))
+         {
+            idx++;
+         }
+         if (idx == len)
+         {
+            goto error;
+         }
+         if (str[idx] == ',')
+         {
+            idx++;
+         }
+         else if (str[idx] == ']')
+         {
+            idx++;
+            break;
+         }
+         else if (!(value_start(str[idx]) && o->type == JSONUnknown))
+         {
+            // if it's first key we won't see comma, otherwise we must see comma
+            goto error;
+         }
+         while (idx < len && !value_start(str[idx]))
+         {
+            idx++;
+         }
+         if (idx == len)
+         {
+            goto error;
+         }
+
+         if (fill_value(str, key, &idx, o))
+         {
+            goto error;
+         }
+      }
+   }
+
+   *index = idx;
+   *obj = o;
+   return 0;
+error:
+   pgmoneta_json_free(o);
+   free(key);
+   return 1;
+}
+
+static int
+json_add(struct json* obj, char* key, uintptr_t val, enum value_type type)
+{
+   if (obj == NULL)
+   {
+      return 1;
+   }
+   if (key == NULL)
+   {
+      return pgmoneta_json_append(obj, val, type);
+   }
+   return pgmoneta_json_put(obj, key, val, type);
+}
+
+static bool
+value_start(char ch)
+{
+   return (isdigit(ch) || ch == '-' || ch == '+') || (ch == '[') || (ch == '{') || (ch == '"');
+}
+
+static int
+fill_value(char* str, char* key, uint64_t* index, struct json* o)
+{
+   uint64_t idx = *index;
+   uint64_t len = strlen(str);
+   if (str[idx] == '"')
+   {
+      char* val = NULL;
+      idx++;
+      while (idx < len && str[idx] != '"')
+      {
+         val = pgmoneta_append_char(val, str[idx++]);
+      }
+      if (idx == len)
+      {
+         goto error;
+      }
+      json_add(o, key, (uintptr_t)val, ValueString);
+      idx++;
+      free(val);
+   }
+   else if (str[idx] == '-' || str[idx] == '+' || isdigit(str[idx]))
+   {
+      bool has_digit = false;
+      char* val_str = NULL;
+      while (idx < len && (isdigit(str[idx]) || str[idx] == '.' || str[idx] == '-' || str[idx] == '+'))
+      {
+         if (str[idx] == '.')
+         {
+            has_digit = true;
+         }
+         val_str = pgmoneta_append_char(val_str, str[idx++]);
+      }
+      if (has_digit)
+      {
+         double val = 0.;
+         if (sscanf(val_str, "%lf", &val) != 1)
+         {
+            free(val_str);
+            goto error;
+         }
+         json_add(o, key, pgmoneta_value_from_double(val), ValueDouble);
+         free(val_str);
+      }
+      else
+      {
+         int64_t val = 0;
+         if (sscanf(val_str, "%" PRId64, &val) != 1)
+         {
+            free(val_str);
+            goto error;
+         }
+         json_add(o, key, (uintptr_t)val, ValueInt64);
+         free(val_str);
+      }
+   }
+   else if (str[idx] == '{')
+   {
+      struct json* val = NULL;
+      if (parse_string(str, &idx, &val))
+      {
+         goto error;
+      }
+      json_add(o, key, (uintptr_t)val, ValueJSON);
+   }
+   else if (str[idx] == '[')
+   {
+      struct json* val = NULL;
+      if (parse_string(str, &idx, &val))
+      {
+         goto error;
+      }
+      json_add(o, key, (uintptr_t)val, ValueJSON);
+   }
+   else
+   {
+      goto error;
+   }
+   *index = idx;
+   return 0;
+error:
+   return 1;
+}
+
 static int
 advance_to_first_array_element(struct json_reader* reader)
 {
@@ -557,7 +824,7 @@ advance_to_first_array_element(struct json_reader* reader)
 
 __attribute__((used))
 static void
-print_json_state(enum json_reader_state state)
+print_json_state(enum parse_state state)
 {
    switch (state)
    {
@@ -585,7 +852,7 @@ print_json_state(enum json_reader_state state)
       case ItemEnd:
          printf("item end\n");
          break;
-      case InvalidReaderState:
+      case InvalidState:
          printf("invalid state\n");
          break;
    }

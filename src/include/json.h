@@ -50,7 +50,7 @@ enum json_type {
 // This is just a subset of all possible state during parsing,
 // since we basically only look into the item array in json,
 // some state transition will be fast-forwarded
-enum json_reader_state {
+enum parse_state {
    KeyStart,
    KeyEnd,
    ValueStart,
@@ -59,7 +59,7 @@ enum json_reader_state {
    ArrayEnd,
    ItemStart,
    ItemEnd,
-   InvalidReaderState,
+   InvalidState,
 };
 
 /** @struct json
@@ -80,7 +80,7 @@ struct json_reader
 {
    struct stream_buffer* buffer; /**< The buffer */
    int fd;                       /**< The file descriptor */
-   enum json_reader_state state; /**< The current reader state of the JSON reader */
+   enum parse_state state; /**< The current reader state of the JSON reader */
 };
 
 /** @struct json_iterator
@@ -240,6 +240,15 @@ pgmoneta_json_iterator_next(struct json_iterator* iter);
  */
 bool
 pgmoneta_json_iterator_has_next(struct json_iterator* iter);
+
+/**
+ * Parse a string into json item
+ * @param str The string
+ * @param obj [out] The json object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_parse_string(char* str, struct json** obj);
 
 #ifdef __cplusplus
 }

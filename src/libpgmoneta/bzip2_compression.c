@@ -599,7 +599,7 @@ bzip2_decompress_file(char* from, char* to)
 
    return 0;
 
- error_unzip:
+error_unzip:
    if (zip_file)
    {
       BZ2_bzReadClose(&bzip2_err, zip_file);
