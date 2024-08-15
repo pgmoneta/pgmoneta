@@ -421,7 +421,7 @@ string_to_string_cb(uintptr_t data, char* tag, int indent)
    memset(buf, 0, MISC_LENGTH);
    if (str == NULL)
    {
-      snprintf(buf, MISC_LENGTH, "(null)");
+      snprintf(buf, MISC_LENGTH, "null");
    }
    else
    {

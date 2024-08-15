@@ -708,7 +708,11 @@ json_add(struct json* obj, char* key, uintptr_t val, enum value_type type)
 static bool
 value_start(char ch)
 {
-   return (isdigit(ch) || ch == '-' || ch == '+') || (ch == '[') || (ch == '{') || (ch == '"');
+   return (isdigit(ch) || ch == '-' || ch == '+') || // number
+          (ch == '[') || // array
+          (ch == '{') || // item
+          (ch == '"' || ch == 'n') || // string or null string
+          (ch == 't' || ch == 'f'); // potential boolean value
 }
 
 static int
@@ -728,7 +732,14 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
       {
          goto error;
       }
-      json_add(o, key, (uintptr_t)val, ValueString);
+      if (val == NULL)
+      {
+         json_add(o, key, (uintptr_t)"", ValueString);
+      }
+      else
+      {
+         json_add(o, key, (uintptr_t)val, ValueString);
+      }
       idx++;
       free(val);
    }
@@ -784,6 +795,32 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
          goto error;
       }
       json_add(o, key, (uintptr_t)val, ValueJSON);
+   }
+   else if (str[idx] == 'n' || str[idx] == 't' || str[idx] == 'f')
+   {
+      char* val = NULL;
+      while (idx < len && str[idx] >= 'a' && str[idx] <= 'z')
+      {
+         val = pgmoneta_append_char(val, str[idx++]);
+      }
+      if (pgmoneta_compare_string(val, "null"))
+      {
+         json_add(o, key, 0, ValueString);
+      }
+      else if (pgmoneta_compare_string(val, "true"))
+      {
+         json_add(o, key, true, ValueBool);
+      }
+      else if (pgmoneta_compare_string(val, "false"))
+      {
+         json_add(o, key, false, ValueBool);
+      }
+      else
+      {
+         free(val);
+         goto error;
+      }
+      free(val);
    }
    else
    {
