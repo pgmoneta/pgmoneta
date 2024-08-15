@@ -61,6 +61,12 @@ deque_next(struct deque* deque, struct deque_node* node);
 static struct deque_node*
 deque_find(struct deque* deque, char* tag);
 
+static char*
+to_json_string(struct deque* deque, char* tag, int indent);
+
+static char*
+to_text_string(struct deque* deque, char* tag, int indent);
+
 int
 pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 {
@@ -265,7 +271,7 @@ pgmoneta_deque_list(struct deque* deque)
    char* str = NULL;
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
-      str = pgmoneta_deque_to_string(deque, NULL, 0);
+      str = pgmoneta_deque_to_string(deque, FORMAT_JSON, NULL, 0);
       pgmoneta_log_trace("Deque: %s", str);
       free(str);
    }
@@ -318,32 +324,17 @@ pgmoneta_deque_remove(struct deque* deque, struct deque_node* node)
 }
 
 char*
-pgmoneta_deque_to_string(struct deque* deque, char* tag, int indent)
+pgmoneta_deque_to_string(struct deque* deque, int32_t format, char* tag, int indent)
 {
-   char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
-   struct deque_node* cur = NULL;
-   if (deque == NULL || pgmoneta_deque_empty(deque))
+   if (format == FORMAT_JSON)
    {
-      ret = pgmoneta_append(ret, "[]");
-      return ret;
+      return to_json_string(deque, tag, indent);
    }
-   deque_read_lock(deque);
-   ret = pgmoneta_append(ret, "[\n");
-   cur = deque_next(deque, deque->start);
-   while (cur != NULL)
+   else if (format == FORMAT_TEXT)
    {
-      bool has_next = cur->next != deque->end;
-      char* str = pgmoneta_value_to_string(cur->data, cur->tag, indent + INDENT_PER_LEVEL);
-      ret = pgmoneta_append(ret, str);
-      ret = pgmoneta_append(ret, has_next?",\n":"\n");
-      free(str);
-      cur = deque_next(deque, cur);
+      return to_text_string(deque, tag, indent);
    }
-   ret = pgmoneta_indent(ret, NULL, indent);
-   ret = pgmoneta_append(ret, "]");
-   deque_unlock(deque);
-   return ret;
+   return NULL;
 }
 
 uint32_t
@@ -527,4 +518,87 @@ deque_find(struct deque* deque, char* tag)
       n = deque_next(deque, n);
    }
    return NULL;
+}
+
+static char*
+to_json_string(struct deque* deque, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   struct deque_node* cur = NULL;
+   if (deque == NULL || pgmoneta_deque_empty(deque))
+   {
+      ret = pgmoneta_append(ret, "[]");
+      return ret;
+   }
+   deque_read_lock(deque);
+   ret = pgmoneta_append(ret, "[\n");
+   cur = deque_next(deque, deque->start);
+   while (cur != NULL)
+   {
+      bool has_next = cur->next != deque->end;
+      char* str = NULL;
+      char* t = NULL;
+      if (cur->tag != NULL)
+      {
+         t = pgmoneta_append(t, cur->tag);
+         t = pgmoneta_append(t, ": ");
+      }
+      str = pgmoneta_value_to_string(cur->data, FORMAT_JSON, t, indent + INDENT_PER_LEVEL);
+      free(t);
+      ret = pgmoneta_append(ret, str);
+      ret = pgmoneta_append(ret, has_next ? ",\n" : "\n");
+      free(str);
+      cur = deque_next(deque, cur);
+   }
+   ret = pgmoneta_indent(ret, NULL, indent);
+   ret = pgmoneta_append(ret, "]");
+   deque_unlock(deque);
+   return ret;
+}
+
+static char*
+to_text_string(struct deque* deque, char* tag, int indent)
+{
+   char* ret = NULL;
+   int cnt = 0;
+   int next_indent = pgmoneta_compare_string(tag, BULLET_POINT) ? 0 : indent;
+   // we have a tag and it's not the bullet point, so that means another line
+   if (tag != NULL && !pgmoneta_compare_string(tag, BULLET_POINT))
+   {
+      ret = pgmoneta_indent(ret, tag, indent);
+      next_indent += INDENT_PER_LEVEL;
+   }
+   struct deque_node* cur = NULL;
+   if (deque == NULL || pgmoneta_deque_empty(deque))
+   {
+      ret = pgmoneta_append(ret, "[]");
+      return ret;
+   }
+   deque_read_lock(deque);
+   cur = deque_next(deque, deque->start);
+   while (cur != NULL)
+   {
+      bool has_next = cur->next != deque->end;
+      char* str = NULL;
+      str = pgmoneta_value_to_string(cur->data, FORMAT_TEXT, BULLET_POINT, next_indent);
+      if (cnt == 0)
+      {
+         cnt++;
+         if (pgmoneta_compare_string(tag, BULLET_POINT))
+         {
+            next_indent = indent + INDENT_PER_LEVEL;
+         }
+      }
+      if (cur->data->type == ValueJSON)
+      {
+         ret = pgmoneta_indent(ret, BULLET_POINT, next_indent);
+      }
+      ret = pgmoneta_append(ret, str);
+      ret = pgmoneta_append(ret, has_next ? "\n" : "");
+      free(str);
+      cur = deque_next(deque, cur);
+   }
+   deque_unlock(deque);
+   return ret;
 }

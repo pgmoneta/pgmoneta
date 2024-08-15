@@ -44,23 +44,23 @@ static void free_destroy_cb(uintptr_t data);
 static void art_destroy_cb(uintptr_t data);
 static void deque_destroy_cb(uintptr_t data);
 static void json_destroy_cb(uintptr_t data);
-static char* noop_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* int8_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* uint8_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* int16_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* uint16_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* int32_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* uint32_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* int64_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* uint64_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* float_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* double_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* string_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* bool_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* deque_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* art_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* json_to_string_cb(uintptr_t data, char* tag, int indent);
-static char* verify_entry_to_string_cb(uintptr_t data, char* tag, int indent);
+static char* noop_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* int8_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* uint8_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* int16_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* uint16_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* int32_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* uint32_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* int64_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* uint64_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* float_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* double_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* deque_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* art_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* json_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* verify_entry_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 
 int
 pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value)
@@ -195,9 +195,9 @@ pgmoneta_value_data(struct value* value)
 }
 
 char*
-pgmoneta_value_to_string(struct value* value, char* tag, int indent)
+pgmoneta_value_to_string(struct value* value, int32_t format, char* tag, int indent)
 {
-   return value->to_string(value->data, tag, indent);
+   return value->to_string(value->data, format, tag, indent);
 }
 
 uintptr_t
@@ -283,16 +283,17 @@ json_destroy_cb(uintptr_t data)
 }
 
 static char*
-noop_to_string_cb(uintptr_t data, char* tag, int indent)
+noop_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    (void) data;
    (void) tag;
    (void) indent;
+   (void) format;
    return NULL;
 }
 
 static char*
-int8_to_string_cb(uintptr_t data, char* tag, int indent)
+int8_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -304,7 +305,7 @@ int8_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-uint8_to_string_cb(uintptr_t data, char* tag, int indent)
+uint8_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -316,7 +317,7 @@ uint8_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-int16_to_string_cb(uintptr_t data, char* tag, int indent)
+int16_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -328,7 +329,7 @@ int16_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-uint16_to_string_cb(uintptr_t data, char* tag, int indent)
+uint16_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -340,7 +341,7 @@ uint16_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-int32_to_string_cb(uintptr_t data, char* tag, int indent)
+int32_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -352,7 +353,7 @@ int32_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-uint32_to_string_cb(uintptr_t data, char* tag, int indent)
+uint32_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -364,7 +365,7 @@ uint32_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-int64_to_string_cb(uintptr_t data, char* tag, int indent)
+int64_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -376,7 +377,7 @@ int64_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-uint64_to_string_cb(uintptr_t data, char* tag, int indent)
+uint64_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -388,7 +389,7 @@ uint64_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-float_to_string_cb(uintptr_t data, char* tag, int indent)
+float_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -400,7 +401,7 @@ float_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-double_to_string_cb(uintptr_t data, char* tag, int indent)
+double_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -412,7 +413,7 @@ double_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-string_to_string_cb(uintptr_t data, char* tag, int indent)
+string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -421,18 +422,39 @@ string_to_string_cb(uintptr_t data, char* tag, int indent)
    memset(buf, 0, MISC_LENGTH);
    if (str == NULL)
    {
-      snprintf(buf, MISC_LENGTH, "null");
+      if (format == FORMAT_JSON)
+      {
+         snprintf(buf, MISC_LENGTH, "null");
+      }
+   }
+   else if (strlen(str) == 0)
+   {
+      if (format == FORMAT_JSON)
+      {
+         snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+      }
+      else if (format == FORMAT_TEXT)
+      {
+         snprintf(buf, MISC_LENGTH, "''");
+      }
    }
    else
    {
-      snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+      if (format == FORMAT_JSON)
+      {
+         snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+      }
+      else if (format == FORMAT_TEXT)
+      {
+         snprintf(buf, MISC_LENGTH, "%s", str);
+      }
    }
    ret = pgmoneta_append(ret, buf);
    return ret;
 }
 
 static char*
-bool_to_string_cb(uintptr_t data, char* tag, int indent)
+bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
    ret = pgmoneta_indent(ret, tag, indent);
@@ -442,25 +464,25 @@ bool_to_string_cb(uintptr_t data, char* tag, int indent)
 }
 
 static char*
-deque_to_string_cb(uintptr_t data, char* tag, int indent)
+deque_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
-   return pgmoneta_deque_to_string((struct deque*)data, tag, indent);
+   return pgmoneta_deque_to_string((struct deque*)data, format, tag, indent);
 }
 
 static char*
-art_to_string_cb(uintptr_t data, char* tag, int indent)
+art_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
-   return pgmoneta_art_to_string((struct art*) data, tag, indent);
+   return pgmoneta_art_to_string((struct art*) data, format, tag, indent);
 }
 
 static char*
-json_to_string_cb(uintptr_t data, char* tag, int indent)
+json_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
-   return pgmoneta_json_to_string((struct json*)data, tag, indent);
+   return pgmoneta_json_to_string((struct json*)data, format, tag, indent);
 }
 
 static char*
-verify_entry_to_string_cb(uintptr_t data, char* tag, int indent)
+verify_entry_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
-   return pgmoneta_verify_entry_to_string((struct verify_entry*)data, tag, indent);
+   return pgmoneta_verify_entry_to_string((struct verify_entry*)data, format, tag, indent);
 }

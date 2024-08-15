@@ -46,8 +46,8 @@ static bool json_peek_next_char(struct json_reader* reader, char* next);
 static int json_fast_forward_value(struct json_reader* reader, char ch);
 static int json_stream_parse_item(struct json_reader* reader, struct json** item);
 static bool type_allowed(enum value_type type);
-static char* item_to_string(struct json* item, char* tag, int indent);
-static char* array_to_string(struct json* array, char* tag, int indent);
+static char* item_to_string(struct json* item, int32_t format, char* tag, int indent);
+static char* array_to_string(struct json* array, int32_t format, char* tag, int indent);
 static int parse_string(char* str, uint64_t* index, struct json** obj);
 static int json_add(struct json* obj, char* key, uintptr_t val, enum value_type type);
 static int fill_value(char* str, char* key, uint64_t* index, struct json* o);
@@ -396,29 +396,32 @@ pgmoneta_json_free(struct json* object)
 }
 
 char*
-pgmoneta_json_to_string(struct json* object, char* tag, int indent)
+pgmoneta_json_to_string(struct json* object, int32_t format, char* tag, int indent)
 {
    char* str = NULL;
    if (object == NULL || (object->type == JSONUnknown || object->elements == NULL))
    {
       str = pgmoneta_indent(str, tag, indent);
-      str = pgmoneta_append(str, "{}");
+      if (format == FORMAT_JSON)
+      {
+         str = pgmoneta_append(str, "{}");
+      }
       return str;
    }
    if (object->type != JSONArray)
    {
-      return item_to_string(object, tag, indent);
+      return item_to_string(object, format, tag, indent);
    }
    else
    {
-      return array_to_string(object, tag, indent);
+      return array_to_string(object, format, tag, indent);
    }
 }
 
 void
-pgmoneta_json_print(struct json* object)
+pgmoneta_json_print(struct json* object, int32_t format)
 {
-   char* str = pgmoneta_json_to_string(object, NULL, 0);
+   char* str = pgmoneta_json_to_string(object, format, NULL, 0);
    printf("%s", str);
    free(str);
 }
@@ -543,6 +546,24 @@ pgmoneta_json_parse_string(char* str, struct json** obj)
    }
 
    return parse_string(str, &idx, obj);
+}
+
+int
+pgmoneta_json_clone(struct json* from, struct json** to)
+{
+   struct json* o = NULL;
+   char* str = NULL;
+   str = pgmoneta_json_to_string(from, FORMAT_JSON, NULL, 0);
+   if (pgmoneta_json_parse_string(str, &o))
+   {
+      goto error;
+   }
+   *to = o;
+   free(str);
+   return 0;
+error:
+   free(str);
+   return 1;
 }
 
 static int
@@ -1256,13 +1277,13 @@ type_allowed(enum value_type type)
 }
 
 static char*
-item_to_string(struct json* item, char* tag, int indent)
+item_to_string(struct json* item, int32_t format, char* tag, int indent)
 {
-   return pgmoneta_art_to_string(item->elements, tag, indent);
+   return pgmoneta_art_to_string(item->elements, format, tag, indent);
 }
 
 static char*
-array_to_string(struct json* array, char* tag, int indent)
+array_to_string(struct json* array, int32_t format, char* tag, int indent)
 {
-   return pgmoneta_deque_to_string(array->elements, tag, indent);
+   return pgmoneta_deque_to_string(array->elements, format, tag, indent);
 }

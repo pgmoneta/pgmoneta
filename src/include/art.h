@@ -170,12 +170,13 @@ pgmoneta_art_iterator_has_next(struct art_iterator* iter);
 /**
  * Convert the ART tree to string
  * @param t The ART tree
+ * @param format The format
  * @param tag The optional tag
  * @param indent The indent
  * @return The string
  */
 char*
-pgmoneta_art_to_string(struct art* t, char* tag, int indent);
+pgmoneta_art_to_string(struct art* t, int32_t format, char* tag, int indent);
 
 #ifdef __cplusplus
 }

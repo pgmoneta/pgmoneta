@@ -232,12 +232,13 @@ pgmoneta_deque_destroy(struct deque* deque);
 /**
  * Convert what's inside deque to string
  * @param deque The deque
+ * @param format The format
  * @param tag [Optional] The tag, which will be applied before the content if not null
  * @param indent The current indentation
  * @return The string
  */
 char*
-pgmoneta_deque_to_string(struct deque* deque, char* tag, int indent);
+pgmoneta_deque_to_string(struct deque* deque, int32_t format, char* tag, int indent);
 
 /**
  * Create a deque iterator

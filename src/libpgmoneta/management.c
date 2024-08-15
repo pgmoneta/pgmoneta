@@ -4290,6 +4290,6 @@ error:
 static void
 print_and_free_json_object(struct json* json)
 {
-   pgmoneta_json_print(json);
+   pgmoneta_json_print(json, FORMAT_JSON);
    pgmoneta_json_free(json);
 }

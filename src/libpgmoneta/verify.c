@@ -200,7 +200,7 @@ error:
 }
 
 char*
-pgmoneta_verify_entry_to_string(struct verify_entry* entry, char* tag, int indent)
+pgmoneta_verify_entry_to_string(struct verify_entry* entry, int32_t format, char* tag, int indent)
 {
    struct json* obj = NULL;
    char* str = NULL;
@@ -210,7 +210,7 @@ pgmoneta_verify_entry_to_string(struct verify_entry* entry, char* tag, int inden
    pgmoneta_json_put(obj, "original", (uintptr_t)entry->original, ValueString);
    pgmoneta_json_put(obj, "calculated", (uintptr_t)entry->calculated, ValueString);
    pgmoneta_json_put(obj, "hash_algorithm", (uintptr_t)entry->hash_algoritm, ValueInt32);
-   str = pgmoneta_json_to_string(obj, tag, indent);
+   str = pgmoneta_json_to_string(obj, format, tag, indent);
    pgmoneta_json_free(obj);
    return str;
 }

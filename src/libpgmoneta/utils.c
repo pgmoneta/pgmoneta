@@ -3920,9 +3920,7 @@ pgmoneta_indent(char* str, char* tag, int indent)
    }
    if (tag != NULL)
    {
-      str = pgmoneta_append(str, "\"");
       str = pgmoneta_append(str, tag);
-      str = pgmoneta_append(str, "\": ");
    }
    return str;
 }

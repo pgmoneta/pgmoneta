@@ -177,20 +177,22 @@ pgmoneta_json_append(struct json* array, uintptr_t entry, enum value_type type);
 /**
  * Convert a json to string
  * @param object The json object
+ * @param format The format
  * @param tag The optional tag
  * @param indent The indent
  * @return The json formatted string
  */
 char*
-pgmoneta_json_to_string(struct json* object, char* tag, int indent);
+pgmoneta_json_to_string(struct json* object, int32_t format, char* tag, int indent);
 
 /**
  * Print a json object
  * @param object The object
+ * @param format The format
  * @param indent_per_level The indent per level
  */
 void
-pgmoneta_json_print(struct json* object);
+pgmoneta_json_print(struct json* object, int32_t format);
 
 /**
  * Get json array length
@@ -249,6 +251,15 @@ pgmoneta_json_iterator_has_next(struct json_iterator* iter);
  */
 int
 pgmoneta_json_parse_string(char* str, struct json** obj);
+
+/**
+ * Clone a json object
+ * @param from The from object
+ * @param to [out] The to object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_clone(struct json* from, struct json** to);
 
 #ifdef __cplusplus
 }

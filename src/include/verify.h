@@ -68,12 +68,13 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, char* backup_id, char* dire
 /**
  * Convert a verify entry to string
  * @param entry The entry
+ * @param format The format
  * @param tag The optional tag
  * @param indent The indent
  * @return The string in json format
  */
 char*
-pgmoneta_verify_entry_to_string(struct verify_entry* entry, char* tag, int indent);
+pgmoneta_verify_entry_to_string(struct verify_entry* entry, int32_t format, char* tag, int indent);
 
 #ifdef __cplusplus
 }

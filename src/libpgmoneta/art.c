@@ -121,6 +121,7 @@ struct to_string_param
    char* str;
    int indent;
    int cnt;
+   char* tag;
    struct art* t;
 };
 
@@ -283,7 +284,16 @@ static struct value*
 art_search(struct art* t, unsigned char* key, uint32_t key_len);
 
 static int
-art_to_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value);
+art_to_json_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value);
+
+static int
+art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value);
+
+static char*
+to_json_string(struct art* t, char* tag, int indent);
+
+static char*
+to_text_string(struct art* t, char* tag, int indent);
 
 int
 pgmoneta_art_init(struct art** tree)
@@ -363,27 +373,17 @@ pgmoneta_art_iterate(struct art* t, art_callback cb, void* data)
 }
 
 char*
-pgmoneta_art_to_string(struct art* t, char* tag, int indent)
+pgmoneta_art_to_string(struct art* t, int32_t format, char* tag, int indent)
 {
-   char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
-   if (t == NULL || t->size == 0)
+   if (format == FORMAT_JSON)
    {
-      ret = pgmoneta_append(ret, "{}");
-      return ret;
+      return to_json_string(t, tag, indent);
    }
-   ret = pgmoneta_append(ret, "{\n");
-   struct to_string_param param = {
-      .indent = indent + INDENT_PER_LEVEL,
-      .str = ret,
-      .t = t,
-      .cnt = 0,
-   };
-   pgmoneta_art_iterate(t, art_to_string_cb, &param);
-   ret = pgmoneta_append(NULL, param.str);
-   ret = pgmoneta_indent(ret, NULL, indent);
-   ret = pgmoneta_append(ret, "}");
-   return ret;
+   else if (format == FORMAT_TEXT)
+   {
+      return to_text_string(t, tag, indent);
+   }
+   return NULL;
 }
 
 static uint32_t
@@ -1465,15 +1465,110 @@ art_search(struct art* t, unsigned char* key, uint32_t key_len)
 }
 
 static int
-art_to_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value)
+art_to_json_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value)
 {
    struct to_string_param* p = (struct to_string_param*) param;
    char* str = NULL;
+   char* tag = NULL;
    p->cnt++;
    bool has_next = p->cnt < p->t->size;
-   str = pgmoneta_value_to_string(value, (char*)key, p->indent);
+   tag = pgmoneta_append_char(tag, '"');
+   tag = pgmoneta_append(tag, (char*)key);
+   tag = pgmoneta_append_char(tag, '"');
+   tag = pgmoneta_append(tag, ": ");
+   str = pgmoneta_value_to_string(value, FORMAT_JSON, tag, p->indent);
+   free(tag);
    p->str = pgmoneta_append(p->str, str);
    p->str = pgmoneta_append(p->str, has_next ? ",\n" : "\n");
+
    free(str);
    return 0;
+}
+
+static int
+art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value)
+{
+   struct to_string_param* p = (struct to_string_param*) param;
+   char* str = NULL;
+   char* tag = NULL;
+   p->cnt++;
+   bool has_next = p->cnt < p->t->size;
+   tag = pgmoneta_append(tag, (char*)key);
+   tag = pgmoneta_append(tag, ": ");
+   if (value->type == ValueJSON)
+   {
+      tag = pgmoneta_append(tag, "\n");
+   }
+   if (pgmoneta_compare_string(p->tag, BULLET_POINT))
+   {
+      if (p->cnt == 1)
+      {
+         str = pgmoneta_value_to_string(value, FORMAT_TEXT, tag, 0);
+      }
+      else
+      {
+         str = pgmoneta_value_to_string(value, FORMAT_TEXT, tag, p->indent + INDENT_PER_LEVEL);
+      }
+   }
+   else
+   {
+      str = pgmoneta_value_to_string(value, FORMAT_TEXT, tag, p->indent);
+   }
+   free(tag);
+   p->str = pgmoneta_append(p->str, str);
+   p->str = pgmoneta_append(p->str, has_next ? "\n" : "");
+
+   free(str);
+   return 0;
+}
+
+static char*
+to_json_string(struct art* t, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   if (t == NULL || t->size == 0)
+   {
+      ret = pgmoneta_append(ret, "{}");
+      return ret;
+   }
+   ret = pgmoneta_append(ret, "{\n");
+   struct to_string_param param = {
+      .indent = indent + INDENT_PER_LEVEL,
+      .str = ret,
+      .t = t,
+      .cnt = 0,
+   };
+   pgmoneta_art_iterate(t, art_to_json_string_cb, &param);
+   ret = pgmoneta_append(NULL, param.str);
+   ret = pgmoneta_indent(ret, NULL, indent);
+   ret = pgmoneta_append(ret, "}");
+   return ret;
+}
+
+static char*
+to_text_string(struct art* t, char* tag, int indent)
+{
+   char* ret = NULL;
+   int next_indent = indent;
+   if (tag != NULL && !pgmoneta_compare_string(tag, BULLET_POINT))
+   {
+      ret = pgmoneta_indent(ret, tag, indent);
+      next_indent += INDENT_PER_LEVEL;
+   }
+   if (t == NULL || t->size == 0)
+   {
+      ret = pgmoneta_append(ret, "{}");
+      return ret;
+   }
+   struct to_string_param param = {
+      .indent = next_indent,
+      .str = ret,
+      .t = t,
+      .cnt = 0,
+      .tag = tag
+   };
+   pgmoneta_art_iterate(t, art_to_text_string_cb, &param);
+   ret = pgmoneta_append(NULL, param.str);
+   return ret;
 }

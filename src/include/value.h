@@ -37,7 +37,7 @@ extern "C" {
 #include <stdbool.h>
 
 typedef void (*data_destroy_cb)(uintptr_t data);
-typedef char* (*data_to_string_cb)(uintptr_t data, char* tag, int indent);
+typedef char* (*data_to_string_cb)(uintptr_t data, int32_t format, char* tag, int indent);
 
 enum value_type {
    ValueInt8,
@@ -100,12 +100,13 @@ pgmoneta_value_data(struct value* value);
 /**
  * Convert a value to string
  * @param value The value
+ * @param format The format
  * @param tag The optional tag
  * @param indent The indent
  * @return The string
  */
 char*
-pgmoneta_value_to_string(struct value* value, char* tag, int indent);
+pgmoneta_value_to_string(struct value* value, int32_t format, char* tag, int indent);
 
 /**
  * Convert a double value to value data, since straight type cast discards the decimal part
