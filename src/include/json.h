@@ -88,10 +88,10 @@ struct json_reader
  */
 struct json_iterator
 {
-   void* iter;
-   struct json* obj;
-   char* key;
-   struct value* value;
+   void* iter;            /**< The internal iterator */
+   struct json* obj;      /**< The json object */
+   char* key;             /**< The current key, if it's json item */
+   struct value* value;   /**< The current value or entry */
 };
 
 /**
