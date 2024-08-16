@@ -126,14 +126,22 @@ if (DOXYGEN_FOUND)
 
   set(DOXYGEN_GENERATE_HTML YES)
   set(DOXYGEN_GENERATE_MAN NO)
+  set(DOXYGEN_WARN_AS_ERROR FAIL_ON_WARNINGS)
   set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.doxygen)
 
   doxygen_add_docs(doxygen ${PROJECT_SOURCE_DIR}/src/include/)
 
-  add_custom_command(
-    TARGET api
-    COMMAND ${DOXYGEN_EXECUTABLE} -q ${DOXYFILE_OUT}
-    COMMENT "Generating API documentation"
-  )
-
+  if (${DOXYGEN_VERSION} STREQUAL "1.10.0" OR ${DOXYGEN_VERSION} STREQUAL "1.11.0" OR ${DOXYGEN_VERSION} STREQUAL "1.12.0")
+    add_custom_command(
+      TARGET api
+      COMMAND ${DOXYGEN_EXECUTABLE} -q ${DOXYFILE_OUT}
+      COMMENT "Generating API documentation"
+    )
+  else()
+    add_custom_command(
+      TARGET api
+      COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYFILE_OUT}
+      COMMENT "Generating API documentation"
+    )
+  endif()
 endif()
