@@ -422,7 +422,7 @@ void
 pgmoneta_json_print(struct json* object, int32_t format)
 {
    char* str = pgmoneta_json_to_string(object, format, NULL, 0);
-   printf("%s", str);
+   printf("%s\n", str);
    free(str);
 }
 
