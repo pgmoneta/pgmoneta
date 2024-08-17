@@ -1540,7 +1540,7 @@ to_json_string(struct art* t, char* tag, int indent)
       .cnt = 0,
    };
    pgmoneta_art_iterate(t, art_to_json_string_cb, &param);
-   ret = pgmoneta_append(NULL, param.str);
+   ret = param.str;
    ret = pgmoneta_indent(ret, NULL, indent);
    ret = pgmoneta_append(ret, "}");
    return ret;
@@ -1569,6 +1569,6 @@ to_text_string(struct art* t, char* tag, int indent)
       .tag = tag
    };
    pgmoneta_art_iterate(t, art_to_text_string_cb, &param);
-   ret = pgmoneta_append(NULL, param.str);
+   ret = param.str;
    return ret;
 }
