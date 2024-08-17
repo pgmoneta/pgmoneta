@@ -48,6 +48,7 @@ enum value_type {
    ValueUInt32,
    ValueInt64,
    ValueUInt64,
+   ValueChar,
    ValueBool,
    ValueString,
    ValueFloat,

@@ -1269,7 +1269,6 @@ type_allowed(enum value_type type)
       case ValueFloat:
       case ValueDouble:
       case ValueJSON:
-      case ValueDeque:
          return true;
       default:
          return false;

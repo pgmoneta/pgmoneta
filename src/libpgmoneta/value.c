@@ -56,6 +56,7 @@ static char* uint64_to_string_cb(uintptr_t data, int32_t format, char* tag, int 
 static char* float_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* double_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* char_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* deque_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* art_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
@@ -107,6 +108,9 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
          break;
       case ValueBool:
          val->to_string = bool_to_string_cb;
+         break;
+      case ValueChar:
+         val->to_string = char_to_string_cb;
          break;
       case ValueString:
          val->to_string = string_to_string_cb;
@@ -460,6 +464,18 @@ bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    ret = pgmoneta_indent(ret, tag, indent);
    bool val = (bool) data;
    ret = pgmoneta_append(ret, val?"true":"false");
+   return ret;
+}
+
+static char*
+char_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   char buf[MISC_LENGTH];
+   memset(buf, 0, MISC_LENGTH);
+   snprintf(buf, MISC_LENGTH, "'%c'", (char)data);
+   ret = pgmoneta_append(ret, buf);
    return ret;
 }
 
