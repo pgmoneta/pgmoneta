@@ -340,7 +340,7 @@ pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr
    if (t == NULL)
    {
       // c'mon, at least create a tree first...
-      return 0;
+      goto error;
    }
    old_val = art_node_insert(t->root, &t->root, 0, key, key_len, value, type, &new);
    pgmoneta_value_destroy(old_val);
@@ -348,6 +348,8 @@ pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr
    {
       t->size++;
    }
+   return 0;
+error:
    return 1;
 }
 

@@ -87,7 +87,7 @@ pgmoneta_art_destroy(struct art* tree);
  * @param key_len The length of the key
  * @param value The value data
  * @param type The value type
- * @return 0 if the item was newly inserted, otherwise 1
+ * @return 0 if the item was successfully inserted, otherwise 1
  */
 int
 pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type);
