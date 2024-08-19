@@ -247,7 +247,7 @@ pgmoneta_deque_to_string(struct deque* deque, int32_t format, char* tag, int ind
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_deque_iterator_init(struct deque* deque, struct deque_iterator** iter);
+pgmoneta_deque_iterator_create(struct deque* deque, struct deque_iterator** iter);
 
 /**
  * Destroy a deque iterator

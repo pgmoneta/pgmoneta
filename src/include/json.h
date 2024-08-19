@@ -136,7 +136,7 @@ pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item);
  * @return 0 if success, 1 if otherwise
  */
 int
-pgmoneta_json_init(struct json** object);
+pgmoneta_json_create(struct json** object);
 
 /**
  * Free the json object
@@ -144,7 +144,7 @@ pgmoneta_json_init(struct json** object);
  * @return 0 if success, 1 if otherwise
  */
 int
-pgmoneta_json_free(struct json* object);
+pgmoneta_json_destroy(struct json* object);
 
 /**
  * Put a key value pair into the json item,
@@ -218,7 +218,7 @@ pgmoneta_json_get(struct json* item, char* tag);
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_json_iterator_init(struct json* object, struct json_iterator** iter);
+pgmoneta_json_iterator_create(struct json* object, struct json_iterator** iter);
 
 /**
  * Destroy a iterator

@@ -355,7 +355,7 @@ pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type t
    if (item != NULL && item->type == JSONUnknown)
    {
       item->type = JSONItem;
-      pgmoneta_art_init((struct art**)&item->elements);
+      pgmoneta_art_create((struct art**)&item->elements);
    }
    if (item == NULL || item->type != JSONItem || !type_allowed(type) || key == NULL || strlen(key) == 0)
    {
@@ -367,7 +367,7 @@ error:
 }
 
 int
-pgmoneta_json_init(struct json** object)
+pgmoneta_json_create(struct json** object)
 {
    struct json* o = malloc(sizeof(struct json));
    memset(o, 0, sizeof(struct json));
@@ -377,7 +377,7 @@ pgmoneta_json_init(struct json** object)
 }
 
 int
-pgmoneta_json_free(struct json* object)
+pgmoneta_json_destroy(struct json* object)
 {
    if (object == NULL)
    {
@@ -449,7 +449,7 @@ pgmoneta_json_get(struct json* item, char* tag)
 }
 
 int
-pgmoneta_json_iterator_init(struct json* object, struct json_iterator** iter)
+pgmoneta_json_iterator_create(struct json* object, struct json_iterator** iter)
 {
    struct json_iterator* i = NULL;
    if (object == NULL || object->type == JSONUnknown)
@@ -461,11 +461,11 @@ pgmoneta_json_iterator_init(struct json* object, struct json_iterator** iter)
    i->obj = object;
    if (object->type == JSONItem)
    {
-      pgmoneta_art_iterator_init(object->elements, (struct art_iterator**)(&i->iter));
+      pgmoneta_art_iterator_create(object->elements, (struct art_iterator**)(&i->iter));
    }
    else
    {
-      pgmoneta_deque_iterator_init(object->elements, (struct deque_iterator**)(&i->iter));
+      pgmoneta_deque_iterator_create(object->elements, (struct deque_iterator**)(&i->iter));
    }
    *iter = i;
    return 0;
@@ -589,7 +589,7 @@ parse_string(char* str, uint64_t* index, struct json** obj)
       goto error;
    }
    idx++;
-   pgmoneta_json_init(&o);
+   pgmoneta_json_create(&o);
    if (type == JSONItem)
    {
       while (idx < len)
@@ -707,7 +707,7 @@ parse_string(char* str, uint64_t* index, struct json** obj)
    *obj = o;
    return 0;
 error:
-   pgmoneta_json_free(o);
+   pgmoneta_json_destroy(o);
    free(key);
    return 1;
 }
@@ -1079,7 +1079,7 @@ json_stream_parse_item(struct json_reader* reader, struct json** item)
    struct json* i = NULL;
    char* key = NULL;
    char ch = 0;
-   pgmoneta_json_init(&i);
+   pgmoneta_json_create(&i);
    if (reader->state != ItemStart)
    {
       goto error;
@@ -1246,7 +1246,7 @@ json_stream_parse_item(struct json_reader* reader, struct json** item)
    *item = i;
    return 0;
 error:
-   pgmoneta_json_free(i);
+   pgmoneta_json_destroy(i);
    free(key);
    return 1;
 }

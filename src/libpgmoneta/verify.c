@@ -204,13 +204,13 @@ pgmoneta_verify_entry_to_string(struct verify_entry* entry, int32_t format, char
 {
    struct json* obj = NULL;
    char* str = NULL;
-   pgmoneta_json_init(&obj);
+   pgmoneta_json_create(&obj);
    pgmoneta_json_put(obj, "directory", (uintptr_t)entry->directory, ValueString);
    pgmoneta_json_put(obj, "filename", (uintptr_t)entry->filename, ValueString);
    pgmoneta_json_put(obj, "original", (uintptr_t)entry->original, ValueString);
    pgmoneta_json_put(obj, "calculated", (uintptr_t)entry->calculated, ValueString);
    pgmoneta_json_put(obj, "hash_algorithm", (uintptr_t)entry->hash_algoritm, ValueInt32);
    str = pgmoneta_json_to_string(obj, format, tag, indent);
-   pgmoneta_json_free(obj);
+   pgmoneta_json_destroy(obj);
    return str;
 }

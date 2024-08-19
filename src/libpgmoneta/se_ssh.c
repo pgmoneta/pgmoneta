@@ -323,7 +323,7 @@ ssh_storage_backup_execute(int server, char* identifier,
       }
    }
 
-   if (pgmoneta_art_init(&tree_map))
+   if (pgmoneta_art_create(&tree_map))
    {
       goto error;
    }

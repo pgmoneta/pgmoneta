@@ -283,7 +283,7 @@ deque_destroy_cb(uintptr_t data)
 static void
 json_destroy_cb(uintptr_t data)
 {
-   pgmoneta_json_free((struct json*) data);
+   pgmoneta_json_destroy((struct json*) data);
 }
 
 static char*

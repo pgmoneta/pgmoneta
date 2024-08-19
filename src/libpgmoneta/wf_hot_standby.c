@@ -166,9 +166,9 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
 
          pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files);
 
-         pgmoneta_art_iterator_init(deleted_files, &deleted_iter);
-         pgmoneta_art_iterator_init(changed_files, &changed_iter);
-         pgmoneta_art_iterator_init(added_files, &added_iter);
+         pgmoneta_art_iterator_create(deleted_files, &deleted_iter);
+         pgmoneta_art_iterator_create(changed_files, &changed_iter);
+         pgmoneta_art_iterator_create(added_files, &added_iter);
 
          while (pgmoneta_art_iterator_next(deleted_iter))
          {

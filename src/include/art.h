@@ -71,7 +71,7 @@ struct art_iterator
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_art_init(struct art** tree);
+pgmoneta_art_create(struct art** tree);
 
 /**
  * Destroys an ART tree
@@ -142,7 +142,7 @@ pgmoneta_art_iterate(struct art* t, art_callback cb, void* data);
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_art_iterator_init(struct art* t, struct art_iterator** iter);
+pgmoneta_art_iterator_create(struct art* t, struct art_iterator** iter);
 
 /**
  * Destroy the iterator

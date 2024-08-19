@@ -352,7 +352,7 @@ pgmoneta_deque_size(struct deque* deque)
 }
 
 int
-pgmoneta_deque_iterator_init(struct deque* deque, struct deque_iterator** iter)
+pgmoneta_deque_iterator_create(struct deque* deque, struct deque_iterator** iter)
 {
    struct deque_iterator* i = NULL;
    if (deque == NULL)

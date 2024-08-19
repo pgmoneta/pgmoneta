@@ -111,16 +111,16 @@ pgmoneta_manifest_checksum_verify(char* root)
          pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, hash, checksum);
       }
       free(hash);
-      pgmoneta_json_free(file);
+      pgmoneta_json_destroy(file);
       file = NULL;
    }
    pgmoneta_json_reader_close(reader);
-   pgmoneta_json_free(file);
+   pgmoneta_json_destroy(file);
    return 0;
 
 error:
    pgmoneta_json_reader_close(reader);
-   pgmoneta_json_free(file);
+   pgmoneta_json_destroy(file);
    return 1;
 }
 
@@ -147,9 +147,9 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    pgmoneta_deque_create(false, &que);
 
-   pgmoneta_art_init(&deleted);
-   pgmoneta_art_init(&added);
-   pgmoneta_art_init(&changed);
+   pgmoneta_art_create(&deleted);
+   pgmoneta_art_create(&added);
+   pgmoneta_art_create(&changed);
 
    if (pgmoneta_csv_reader_init(old_manifest, &r1))
    {
@@ -180,7 +180,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
             continue;
          }
          // build every right chunk into an ART
-         pgmoneta_art_init(&tree);
+         pgmoneta_art_create(&tree);
          build_tree(tree, r2, f2);
          entry = pgmoneta_deque_head(que);
          while (entry != NULL)
@@ -246,7 +246,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
             free(f1);
             continue;
          }
-         pgmoneta_art_init(&tree);
+         pgmoneta_art_create(&tree);
          build_tree(tree, r1, f1);
          entry = pgmoneta_deque_head(que);
          while (entry != NULL && entry != que->end)

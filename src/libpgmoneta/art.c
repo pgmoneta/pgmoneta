@@ -296,7 +296,7 @@ static char*
 to_text_string(struct art* t, char* tag, int indent);
 
 int
-pgmoneta_art_init(struct art** tree)
+pgmoneta_art_create(struct art** tree)
 {
    struct art* t = NULL;
    t = malloc(sizeof(struct art));
@@ -1295,7 +1295,7 @@ node256_remove_child(struct art_node256* node, struct art_node** node_ref, unsig
 }
 
 int
-pgmoneta_art_iterator_init(struct art* t, struct art_iterator** iter)
+pgmoneta_art_iterator_create(struct art* t, struct art_iterator** iter)
 {
    struct art_iterator* i = NULL;
    if (t == NULL)

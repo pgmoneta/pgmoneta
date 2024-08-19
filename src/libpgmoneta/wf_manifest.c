@@ -130,13 +130,13 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
       info[MANIFEST_PATH_INDEX] = file_path;
       info[MANIFEST_CHECKSUM_INDEX] = (char*)pgmoneta_json_get(entry, "Checksum");
       pgmoneta_csv_write(writer, MANIFEST_COLUMN_COUNT, info);
-      pgmoneta_json_free(entry);
+      pgmoneta_json_destroy(entry);
       entry = NULL;
    }
 
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
-   pgmoneta_json_free(entry);
+   pgmoneta_json_destroy(entry);
    free(root);
    free(data);
    free(manifest);
@@ -149,7 +149,7 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
 error:
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
-   pgmoneta_json_free(entry);
+   pgmoneta_json_destroy(entry);
    free(root);
    free(data);
    free(manifest);
