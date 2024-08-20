@@ -111,40 +111,12 @@ void
 pgmoneta_json_reader_close(struct json_reader* reader);
 
 /**
- * Navigate the reader to the target json object(array or item) according to the key prefix array,
- * it currently does not handle escape character
- * @param reader The json reader
- * @param key_path The key path as an array leading to the key to the array
- * @param key_path_length The length of the prefix
- * @return 0 if found, 1 if otherwise
- */
-int
-pgmoneta_json_locate(struct json_reader* reader, char** key_path, int key_path_length);
-
-/**
- * Return the next item in the found array
- * @param reader The json reader
- * @param item The item in the array, parsed into json structure, all array and nested items will be ignored currently
- * @return true if has next item, false if no next item, or the array hasn't been found
- */
-bool
-pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item);
-
-/**
- * Init a json object
+ * Create a json object
  * @param item [out] The json item
  * @return 0 if success, 1 if otherwise
  */
 int
 pgmoneta_json_create(struct json** object);
-
-/**
- * Free the json object
- * @param item The json object
- * @return 0 if success, 1 if otherwise
- */
-int
-pgmoneta_json_destroy(struct json* object);
 
 /**
  * Put a key value pair into the json item,
@@ -162,6 +134,26 @@ int
 pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type type);
 
 /**
+ * Get the value data from json item
+ * @param item The item
+ * @param tag The tag
+ * @return The value data, 0 if not found
+ */
+uintptr_t
+pgmoneta_json_get(struct json* item, char* tag);
+
+/**
+ * Navigate the reader to the target json object(array or item) according to the key prefix array,
+ * it currently does not handle escape character
+ * @param reader The json reader
+ * @param key_path The key path as an array leading to the key to the array
+ * @param key_path_length The length of the prefix
+ * @return 0 if found, 1 if otherwise
+ */
+int
+pgmoneta_json_locate(struct json_reader* reader, char** key_path, int key_path_length);
+
+/**
  * Append an entry into the json array
  * If the entry is put into an empty json object, it will be treated as json array,
  * otherwise if the json object is an item, it will reject the entry
@@ -173,6 +165,64 @@ pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type t
  */
 int
 pgmoneta_json_append(struct json* array, uintptr_t entry, enum value_type type);
+
+/**
+ * Return the next item in the found array
+ * @param reader The json reader
+ * @param item The item in the array, parsed into json structure, all array and nested items will be ignored currently
+ * @return true if has next item, false if no next item, or the array hasn't been found
+ */
+bool
+pgmoneta_json_next_array_item(struct json_reader* reader, struct json** item);
+
+/**
+ * Get json array length
+ * @param array The json array
+ * @return The length
+ */
+uint32_t
+pgmoneta_json_array_length(struct json* array);
+
+/**
+ * Create a json iterator
+ * @param object The JSON object
+ * @param iter [out] The iterator
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_json_iterator_create(struct json* object, struct json_iterator** iter);
+/**
+ * Get the next kv pair/entry from JSON object
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_json_iterator_next(struct json_iterator* iter);
+
+/**
+ * Destroy a iterator
+ * @param iter The iterator
+ */
+void
+pgmoneta_json_iterator_destroy(struct json_iterator* iter);
+
+/**
+ * Parse a string into json item
+ * @param str The string
+ * @param obj [out] The json object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_parse_string(char* str, struct json** obj);
+
+/**
+ * Clone a json object
+ * @param from The from object
+ * @param to [out] The to object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_json_clone(struct json* from, struct json** to);
 
 /**
  * Convert a json to string
@@ -195,63 +245,12 @@ void
 pgmoneta_json_print(struct json* object, int32_t format);
 
 /**
- * Get json array length
- * @param array The json array
- * @return The length
- */
-uint32_t
-pgmoneta_json_array_length(struct json* array);
-
-/**
- * Get the value data from json item
- * @param item The item
- * @param tag The tag
- * @return The value data, 0 if not found
- */
-uintptr_t
-pgmoneta_json_get(struct json* item, char* tag);
-
-/**
- * Create a json iterator
- * @param object The JSON object
- * @param iter [out] The iterator
- * @return 0 on success, 1 if otherwise
- */
-int
-pgmoneta_json_iterator_create(struct json* object, struct json_iterator** iter);
-
-/**
- * Destroy a iterator
- * @param iter The iterator
- */
-void
-pgmoneta_json_iterator_destroy(struct json_iterator* iter);
-
-/**
- * Get the next kv pair/entry from JSON object
- * @param iter The iterator
- * @return true if has next, false if otherwise
- */
-bool
-pgmoneta_json_iterator_next(struct json_iterator* iter);
-
-/**
- * Parse a string into json item
- * @param str The string
- * @param obj [out] The json object
+ * Destroy the json object
+ * @param item The json object
  * @return 0 if success, 1 if otherwise
  */
 int
-pgmoneta_json_parse_string(char* str, struct json** obj);
-
-/**
- * Clone a json object
- * @param from The from object
- * @param to [out] The to object
- * @return 0 if success, 1 if otherwise
- */
-int
-pgmoneta_json_clone(struct json* from, struct json** to);
+pgmoneta_json_destroy(struct json* object);
 
 #ifdef __cplusplus
 }

@@ -130,6 +130,37 @@ uintptr_t
 pgmoneta_deque_get(struct deque* deque, char* tag);
 
 /**
+ * Create a deque iterator
+ * @param deque The deque
+ * @param iter [out] The iterator
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_deque_iterator_create(struct deque* deque, struct deque_iterator** iter);
+
+/**
+ * Get the next deque value
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_deque_iterator_next(struct deque_iterator* iter);
+
+/**
+ * Remove the current node iterator points to and place the iterator to the previous node
+ * @param iter The iterator
+ */
+void
+pgmoneta_deque_iterator_remove(struct deque_iterator* iter);
+
+/**
+ * Destroy a deque iterator
+ * @param iter The iterator
+ */
+void
+pgmoneta_deque_iterator_destroy(struct deque_iterator* iter);
+
+/**
  * Get the size of the deque
  * @param deque The deque
  * @return The size
@@ -153,13 +184,6 @@ void
 pgmoneta_deque_list(struct deque* deque);
 
 /**
- * Destroy the deque and free its and its nodes' memory
- * @param deque The deque
- */
-void
-pgmoneta_deque_destroy(struct deque* deque);
-
-/**
  * Convert what's inside deque to string
  * @param deque The deque
  * @param format The format
@@ -171,35 +195,11 @@ char*
 pgmoneta_deque_to_string(struct deque* deque, int32_t format, char* tag, int indent);
 
 /**
- * Create a deque iterator
+ * Destroy the deque and free its and its nodes' memory
  * @param deque The deque
- * @param iter [out] The iterator
- * @return 0 on success, 1 if otherwise
- */
-int
-pgmoneta_deque_iterator_create(struct deque* deque, struct deque_iterator** iter);
-
-/**
- * Remove the current node iterator points to and place the iterator to the previous node
- * @param iter The iterator
  */
 void
-pgmoneta_deque_iterator_remove(struct deque_iterator* iter);
-
-/**
- * Destroy a deque iterator
- * @param iter The iterator
- */
-void
-pgmoneta_deque_iterator_destroy(struct deque_iterator* iter);
-
-/**
- * Get the next deque value
- * @param iter The iterator
- * @return true if has next, false if otherwise
- */
-bool
-pgmoneta_deque_iterator_next(struct deque_iterator* iter);
+pgmoneta_deque_destroy(struct deque* deque);
 
 #ifdef __cplusplus
 }

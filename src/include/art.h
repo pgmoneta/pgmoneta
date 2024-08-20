@@ -74,13 +74,6 @@ int
 pgmoneta_art_create(struct art** tree);
 
 /**
- * Destroys an ART tree
- * @return 0 on success, 1 if otherwise
- */
-int
-pgmoneta_art_destroy(struct art* tree);
-
-/**
  * inserts a new value into the art tree, note that the key is copied while the value is not
  * @param t The tree
  * @param key The key
@@ -93,14 +86,14 @@ int
 pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type);
 
 /**
- * Deletes a value from the ART tree
+ * Check if a key exists in the ART tree
  * @param t The tree
  * @param key The key
  * @param key_len The length of the key
- * @return 0 if success or value not found, 1 if otherwise
+ * @return true if the key exists, false if otherwise
  */
-int
-pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
+bool
+pgmoneta_art_contains_key(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
  * Searches for a value in the ART tree
@@ -113,14 +106,22 @@ uintptr_t
 pgmoneta_art_search(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
- * Check if a key exists in the ART tree
+ * Deletes a value from the ART tree
  * @param t The tree
  * @param key The key
  * @param key_len The length of the key
- * @return true if the key exists, false if otherwise
+ * @return 0 if success or value not found, 1 if otherwise
+ */
+int
+pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
+
+/**
+ * Get the next key value pair into iterator
+ * @param iter The iterator
+ * @return true if iterator has next, otherwise false
  */
 bool
-pgmoneta_art_contains_key(struct art* t, unsigned char* key, uint32_t key_len);
+pgmoneta_art_iterator_next(struct art_iterator* iter);
 
 /**
  * Create an art iterator
@@ -139,14 +140,6 @@ void
 pgmoneta_art_iterator_destroy(struct art_iterator* iter);
 
 /**
- * Get the next key value pair into iterator
- * @param iter The iterator
- * @return true if iterator has next, otherwise false
- */
-bool
-pgmoneta_art_iterator_next(struct art_iterator* iter);
-
-/**
  * Convert the ART tree to string
  * @param t The ART tree
  * @param format The format
@@ -156,6 +149,13 @@ pgmoneta_art_iterator_next(struct art_iterator* iter);
  */
 char*
 pgmoneta_art_to_string(struct art* t, int32_t format, char* tag, int indent);
+
+/**
+ * Destroys an ART tree
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_art_destroy(struct art* tree);
 
 #ifdef __cplusplus
 }
