@@ -123,19 +123,6 @@ bool
 pgmoneta_art_contains_key(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
- * Iterates through the entries pairs in the map,
- * invoking a callback for each. The call back gets a
- * key, value for each and returns an integer stop value
- * If the callback returns non-zero, then the iteration stops
- * @param t The tree to iterate over
- * @param cb The callback function to invoke
- * @param data Opaque handle passed to the callback
- * @return 0 on success, or the return of the callback
- */
-int
-pgmoneta_art_iterate(struct art* t, art_callback cb, void* data);
-
-/**
  * Create an art iterator
  * @param t The tree
  * @param iter [out] The iterator
@@ -158,14 +145,6 @@ pgmoneta_art_iterator_destroy(struct art_iterator* iter);
  */
 bool
 pgmoneta_art_iterator_next(struct art_iterator* iter);
-
-/**
- * Check if iterator has next
- * @param iter The iterator
- * @return true if the iterator has the next leaf, otherwise false
- */
-bool
-pgmoneta_art_iterator_has_next(struct art_iterator* iter);
 
 /**
  * Convert the ART tree to string

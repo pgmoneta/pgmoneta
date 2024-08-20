@@ -527,17 +527,17 @@ error:
 int
 pgmoneta_management_write_verify(SSL* ssl, int socket, struct deque* failed, struct deque* all)
 {
-   struct deque_node* entry = NULL;
+   struct deque_iterator* iter = NULL;
 
    if (write_int32("pgmoneta_management_write_verify", ssl, socket, (int)pgmoneta_deque_size(failed)))
    {
       goto error;
    }
 
-   entry = pgmoneta_deque_head(failed);
-   while (entry != NULL)
+   pgmoneta_deque_iterator_create(failed, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
    {
-      struct verify_entry* ve = (struct verify_entry*)pgmoneta_value_data(entry->data);
+      struct verify_entry* ve = (struct verify_entry*)pgmoneta_value_data(iter->value);
 
       if (write_string("pgmoneta_management_verify", ssl, socket, ve->filename))
       {
@@ -553,19 +553,19 @@ pgmoneta_management_write_verify(SSL* ssl, int socket, struct deque* failed, str
       {
          goto error;
       }
-
-      entry = pgmoneta_deque_next(failed, entry);
    }
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
 
    if (write_int32("pgmoneta_management_write_verify", ssl, socket, (int)pgmoneta_deque_size(all)))
    {
       goto error;
    }
 
-   entry = pgmoneta_deque_head(all);
-   while (entry != NULL)
+   pgmoneta_deque_iterator_create(all, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
    {
-      struct verify_entry* ve = (struct verify_entry*)pgmoneta_value_data(entry->data);
+      struct verify_entry* ve = (struct verify_entry*)pgmoneta_value_data(iter->value);
 
       if (write_string("pgmoneta_management_verify", ssl, socket, ve->filename))
       {
@@ -575,14 +575,15 @@ pgmoneta_management_write_verify(SSL* ssl, int socket, struct deque* failed, str
       {
          goto error;
       }
-
-      entry = pgmoneta_deque_next(all, entry);
    }
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
 
    return 0;
 
 error:
-
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
    return 1;
 }
 

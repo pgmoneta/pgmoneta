@@ -139,7 +139,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
    bool manifest_changed = false;
    struct art* tree = NULL;
    struct deque* que = NULL;
-   struct deque_node* entry = NULL;
+   struct deque_iterator* iter = NULL;
 
    *deleted_files = NULL;
    *changed_files = NULL;
@@ -182,41 +182,43 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          // build every right chunk into an ART
          pgmoneta_art_create(&tree);
          build_tree(tree, r2, f2);
-         entry = pgmoneta_deque_head(que);
-         while (entry != NULL)
+         pgmoneta_deque_iterator_create(que, &iter);
+         while (pgmoneta_deque_iterator_next(iter))
          {
-            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
+            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)iter->tag, strlen(iter->tag) + 1);
             if (checksum != NULL)
             {
-               if (!strcmp((char*)pgmoneta_value_data(entry->data), checksum))
+               if (!strcmp((char*)pgmoneta_value_data(iter->value), checksum))
                {
                   // not changed but not deleted, remove the entry
-                  entry = pgmoneta_deque_remove(que, entry);
+                  pgmoneta_deque_iterator_remove(iter);
                }
                else
                {
                   // file is changed
                   manifest_changed = true;
-                  pgmoneta_art_insert(changed, (unsigned char*)entry->tag, strlen(entry->tag) + 1, pgmoneta_value_data(entry->data), ValueString);
+                  pgmoneta_art_insert(changed, (unsigned char*)iter->tag, strlen(iter->tag) + 1, pgmoneta_value_data(iter->value), ValueString);
                   // changed but not deleted, remove the entry
-                  entry = pgmoneta_deque_remove(que, entry);
+                  pgmoneta_deque_iterator_remove(iter);
                }
-            }
-            else
-            {
-               entry = pgmoneta_deque_next(que, entry);
             }
          }
          pgmoneta_art_destroy(tree);
          tree = NULL;
       }
-      entry = pgmoneta_deque_head(que);
+      pgmoneta_deque_iterator_destroy(iter);
+      iter = NULL;
+
       // traverse
       while (!pgmoneta_deque_empty(que))
       {
+         char* tag = NULL;
+         uintptr_t val = 0;
          manifest_changed = true;
-         pgmoneta_art_insert(deleted, (unsigned char*)entry->tag, strlen(entry->tag) + 1, pgmoneta_value_data(entry->data), ValueString);
-         entry = pgmoneta_deque_remove(que, entry);
+         val = pgmoneta_deque_poll(que, &tag);
+         pgmoneta_art_insert(deleted, (unsigned char*)tag, strlen(tag) + 1, val, ValueString);
+         free(tag);
+         free((void*)val);
       }
       // reset right reader for the next left chunk
       if (pgmoneta_csv_reader_reset(r2))
@@ -248,29 +250,31 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          }
          pgmoneta_art_create(&tree);
          build_tree(tree, r1, f1);
-         entry = pgmoneta_deque_head(que);
-         while (entry != NULL && entry != que->end)
+         pgmoneta_deque_iterator_create(que, &iter);
+         while (pgmoneta_deque_iterator_next(iter))
          {
-            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)entry->tag, strlen(entry->tag) + 1);
+            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)iter->tag, strlen(iter->tag) + 1);
             if (checksum != NULL)
             {
                // the entry is not new, remove it
-               entry = pgmoneta_deque_remove(que, entry);
-            }
-            else
-            {
-               entry = pgmoneta_deque_next(que, entry);
+               pgmoneta_deque_iterator_remove(iter);
             }
          }
          pgmoneta_art_destroy(tree);
          tree = NULL;
       }
-      entry = pgmoneta_deque_head(que);
+      pgmoneta_deque_iterator_destroy(iter);
+      iter = NULL;
+
       while (!pgmoneta_deque_empty(que))
       {
+         char* tag = NULL;
+         uintptr_t val = 0;
          manifest_changed = true;
-         pgmoneta_art_insert(added, (unsigned char*)entry->tag, strlen(entry->tag) + 1, pgmoneta_value_data(entry->data), ValueString);
-         entry = pgmoneta_deque_remove(que, entry);
+         val = pgmoneta_deque_poll(que, &tag);
+         pgmoneta_art_insert(added, (unsigned char*)tag, strlen(tag) + 1, val, ValueString);
+         free(tag);
+         free((void*)val);
       }
       if (pgmoneta_csv_reader_reset(r1))
       {
@@ -294,6 +298,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    return 0;
 error:
+   pgmoneta_deque_iterator_destroy(iter);
    pgmoneta_csv_reader_destroy(r1);
    pgmoneta_csv_reader_destroy(r2);
    pgmoneta_art_destroy(tree);

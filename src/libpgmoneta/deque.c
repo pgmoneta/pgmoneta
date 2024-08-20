@@ -67,6 +67,9 @@ to_json_string(struct deque* deque, char* tag, int indent);
 static char*
 to_text_string(struct deque* deque, char* tag, int indent);
 
+static struct deque_node*
+deque_remove(struct deque* deque, struct deque_node* node);
+
 int
 pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 {
@@ -175,91 +178,6 @@ error:
 }
 
 bool
-pgmoneta_deque_contains_tag(struct deque* deque, char* tag)
-{
-   struct deque_node* n = NULL;
-   bool ret = false;
-   deque_read_lock(deque);
-   n = deque_find(deque, tag);
-   ret = n != NULL;
-   deque_unlock(deque);
-   return ret;
-}
-
-int
-pgmoneta_deque_set(struct deque* deque, char* tag, uintptr_t val, enum value_type type)
-{
-   struct deque_node* n = NULL;
-   deque_write_lock(deque);
-   n = deque_find(deque, tag);
-   if (n == NULL)
-   {
-      goto error;
-   }
-   pgmoneta_value_destroy(n->data);
-   n->data = NULL;
-   pgmoneta_value_create(type, val, &n->data);
-   deque_unlock(deque);
-   return 0;
-
-error:
-   deque_unlock(deque);
-   return 1;
-}
-
-struct deque_node*
-pgmoneta_deque_next(struct deque* deque, struct deque_node* node)
-{
-   struct deque_node* next = NULL;
-   deque_read_lock(deque);
-   next = deque_next(deque, node);
-   deque_unlock(deque);
-   return next;
-}
-
-struct deque_node*
-pgmoneta_deque_prev(struct deque* deque, struct deque_node* node)
-{
-   struct deque_node* prev = NULL;
-   if (deque == NULL || pgmoneta_deque_size(deque) == 0 || node == NULL)
-   {
-      return NULL;
-   }
-   deque_read_lock(deque);
-   if (node->prev == deque->start)
-   {
-      deque_unlock(deque);
-      return NULL;
-   }
-   deque_unlock(deque);
-   prev = node->prev;
-   deque_unlock(deque);
-   return prev;
-}
-
-struct deque_node*
-pgmoneta_deque_head(struct deque* deque)
-{
-   if (deque == NULL)
-   {
-      return NULL;
-   }
-
-   return pgmoneta_deque_next(deque, deque->start);
-}
-
-struct deque_node*
-pgmoneta_deque_tail(struct deque* deque)
-{
-   if (deque == NULL)
-   {
-      return NULL;
-   }
-
-   return pgmoneta_deque_prev(deque, deque->end);
-}
-
-bool
 pgmoneta_deque_empty(struct deque* deque)
 {
    return pgmoneta_deque_size(deque) == 0;
@@ -298,29 +216,6 @@ pgmoneta_deque_destroy(struct deque* deque)
       pthread_rwlock_destroy(&deque->mutex);
    }
    free(deque);
-}
-
-struct deque_node*
-pgmoneta_deque_remove(struct deque* deque, struct deque_node* node)
-{
-   if (deque == NULL || node == NULL || node == deque->start || node == deque->end)
-   {
-      return NULL;
-   }
-   deque_write_lock(deque);
-   struct deque_node* prev = node->prev;
-   struct deque_node* next = node->next;
-   prev->next = next;
-   next->prev = prev;
-   deque_node_destroy(node);
-   deque->size--;
-   if (next == deque->end)
-   {
-      deque_unlock(deque);
-      return NULL;
-   }
-   deque_unlock(deque);
-   return next;
 }
 
 char*
@@ -369,6 +264,26 @@ pgmoneta_deque_iterator_create(struct deque* deque, struct deque_iterator** iter
 }
 
 void
+pgmoneta_deque_iterator_remove(struct deque_iterator* iter)
+{
+   if (iter == NULL || iter->cur == NULL || iter->deque == NULL ||
+       iter->cur == iter->deque->start || iter->cur == iter->deque->end)
+   {
+      return;
+   }
+   iter->cur = deque_remove(iter->deque, iter->cur);
+   if (iter->cur == iter->deque->start)
+   {
+      iter->value = NULL;
+      iter->tag = NULL;
+      return;
+   }
+   iter->value = iter->cur->data;
+   iter->tag = iter->cur->tag;
+   return;
+}
+
+void
 pgmoneta_deque_iterator_destroy(struct deque_iterator* iter)
 {
    if (iter == NULL)
@@ -393,16 +308,6 @@ pgmoneta_deque_iterator_next(struct deque_iterator* iter)
    iter->value = iter->cur->data;
    iter->tag = iter->cur->tag;
    return true;
-}
-
-bool
-pgmoneta_deque_iterator_has_next(struct deque_iterator* iter)
-{
-   if (iter == NULL)
-   {
-      return false;
-   }
-   return deque_next(iter->deque, iter->cur) != NULL;
 }
 
 static void
@@ -601,4 +506,20 @@ to_text_string(struct deque* deque, char* tag, int indent)
    }
    deque_unlock(deque);
    return ret;
+}
+
+static struct deque_node*
+deque_remove(struct deque* deque, struct deque_node* node)
+{
+   if (deque == NULL || node == NULL || node == deque->start || node == deque->end)
+   {
+      return NULL;
+   }
+   struct deque_node* prev = node->prev;
+   struct deque_node* next = node->next;
+   prev->next = next;
+   next->prev = prev;
+   deque_node_destroy(node);
+   deque->size--;
+   return prev;
 }

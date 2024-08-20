@@ -154,6 +154,9 @@ create_art_node256(struct art_node256** node);
 static void
 destroy_art_node(struct art_node* node);
 
+static int
+art_iterate(struct art* t, art_callback cb, void* data);
+
 /**
  * Get where the keys diverge starting from depth.
  * This function only compares within the partial prefix range
@@ -366,12 +369,6 @@ pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len)
    pgmoneta_value_destroy(l->value);
    free(l);
    return 0;
-}
-
-int
-pgmoneta_art_iterate(struct art* t, art_callback cb, void* data)
-{
-   return art_node_iterate(t->root, cb, data);
 }
 
 char*
@@ -1407,16 +1404,6 @@ pgmoneta_art_iterator_destroy(struct art_iterator* iter)
    free(iter);
 }
 
-bool
-pgmoneta_art_iterator_has_next(struct art_iterator* iter)
-{
-   if (iter == NULL)
-   {
-      return false;
-   }
-   return iter->count < iter->tree->size;
-}
-
 void
 pgmoneta_art_destroy_value_noop(void* val)
 {
@@ -1541,7 +1528,7 @@ to_json_string(struct art* t, char* tag, int indent)
       .t = t,
       .cnt = 0,
    };
-   pgmoneta_art_iterate(t, art_to_json_string_cb, &param);
+   art_iterate(t, art_to_json_string_cb, &param);
    ret = param.str;
    ret = pgmoneta_indent(ret, NULL, indent);
    ret = pgmoneta_append(ret, "}");
@@ -1570,7 +1557,13 @@ to_text_string(struct art* t, char* tag, int indent)
       .cnt = 0,
       .tag = tag
    };
-   pgmoneta_art_iterate(t, art_to_text_string_cb, &param);
+   art_iterate(t, art_to_text_string_cb, &param);
    ret = param.str;
    return ret;
+}
+
+static int
+art_iterate(struct art* t, art_callback cb, void* data)
+{
+   return art_node_iterate(t->root, cb, data);
 }

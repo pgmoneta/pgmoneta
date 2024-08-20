@@ -130,76 +130,6 @@ uintptr_t
 pgmoneta_deque_get(struct deque* deque, char* tag);
 
 /**
- * Check if deque contains certain tag
- * @param deque The deque
- * @param tag The tag
- * @return true if the tag exists, false if otherwise
- */
-bool
-pgmoneta_deque_contains_tag(struct deque* deque, char* tag);
-
-/**
- * Set the value of a tag if it exists
- * @param deque The deque
- * @param tag The tag
- * @param val The value data
- * @param type The value type
- * @return 0 if success, 1 if otherwise
- */
-int
-pgmoneta_deque_set(struct deque* deque, char* tag, uintptr_t val, enum value_type type);
-
-/**
- * Get the next deque node
- * The function is thread safe for put/add but not for polling,
- * meaning that the returned node could get destroyed by other thread
- * @param deque The deque
- * @param node The current node
- * @return The next node if there is a next node, NULL if otherwise
- */
-struct deque_node*
-pgmoneta_deque_next(struct deque* deque, struct deque_node* node);
-
-/**
- * Get the previous deque node
- * The function is thread safe for put/add but not for polling,
- * meaning that the returned node could get destroyed by other thread
- * @param deque The deque
- * @param node The current node
- * @return The next node if there is a previous node, NULL if otherwise
- */
-struct deque_node*
-pgmoneta_deque_prev(struct deque* deque, struct deque_node* node);
-
-/**
- * Get the head of the deque.
- * The function is thread safe, but it doesn't protect the head from being removed
- * @param deque The deque
- * @return The head, or NULL if deque is empty
- */
-struct deque_node*
-pgmoneta_deque_head(struct deque* deque);
-
-/**
- * Get the tail of the deque.
- * The function is thread safe, but it doesn't protect the head from being removed
- * @param deque The deque
- * @return The tail, or NULL if deque is empty
- */
-struct deque_node*
-pgmoneta_deque_tail(struct deque* deque);
-
-/**
- * Remove a node from the deque.
- * The function is thread safe, but it does not protect the returned node from being removed
- * @param deque The deque
- * @param node The node
- * @return Next node of the deleted node, or NULL if there is no next node
- */
-struct deque_node*
-pgmoneta_deque_remove(struct deque* deque, struct deque_node* node);
-
-/**
  * Get the size of the deque
  * @param deque The deque
  * @return The size
@@ -250,6 +180,13 @@ int
 pgmoneta_deque_iterator_create(struct deque* deque, struct deque_iterator** iter);
 
 /**
+ * Remove the current node iterator points to and place the iterator to the previous node
+ * @param iter The iterator
+ */
+void
+pgmoneta_deque_iterator_remove(struct deque_iterator* iter);
+
+/**
  * Destroy a deque iterator
  * @param iter The iterator
  */
@@ -263,14 +200,6 @@ pgmoneta_deque_iterator_destroy(struct deque_iterator* iter);
  */
 bool
 pgmoneta_deque_iterator_next(struct deque_iterator* iter);
-
-/**
- * Check if deque has next value
- * @param iter The iterator
- * @return true if has next, false if otherwise
- */
-bool
-pgmoneta_deque_iterator_has_next(struct deque_iterator* iter);
 
 #ifdef __cplusplus
 }
