@@ -86,6 +86,91 @@ pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query
    return query_execute(ssl, socket, query, qr);
 }
 
+int
+pgmoneta_ext_create_manifest_table(SSL* ssl, int socket, const char* file_path, struct query_response** qr)
+{
+   char line[128];
+   char insert_sql[2048];
+   int result = 1;
+   FILE* file;
+
+   char* create_table_sql = "CREATE TABLE IF NOT EXISTS backup_manifest ("
+                            "filename TEXT, "
+                            "checksum TEXT);";
+
+   result = query_execute(ssl, socket, create_table_sql, qr);
+   if (result != 0)
+   {
+      pgmoneta_log_error("Failed to create backup_manifest table");
+      return result;
+   }
+
+   file = fopen(file_path, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Failed to open backup.manifest file: %s", file_path);
+      return 1;
+   }
+
+   while (fgets(line, sizeof(line), file))
+   {
+      char* filename = strtok(line, ",");
+      char* checksum = strtok(NULL, ",");
+
+      if (filename && checksum)
+      {
+         checksum[strcspn(checksum, "\r\n")] = 0;
+
+         // prevent SQL injection
+         char escaped_filename[512];
+         char escaped_checksum[512];
+
+         char* ef_ptr = escaped_filename;
+         for (const char* f_ptr = filename; *f_ptr; f_ptr++)
+         {
+            if (*f_ptr == '\'')
+            {
+               *ef_ptr++ = '\'';
+            }
+            *ef_ptr++ = *f_ptr;
+         }
+         *ef_ptr = '\0';
+
+         char* ec_ptr = escaped_checksum;
+         for (const char* c_ptr = checksum; *c_ptr; c_ptr++)
+         {
+            if (*c_ptr == '\'')
+            {
+               *ec_ptr++ = '\'';
+            }
+            *ec_ptr++ = *c_ptr;
+         }
+         *ec_ptr = '\0';
+
+         snprintf(insert_sql, sizeof(insert_sql),
+                  "INSERT INTO backup_manifest (filename, checksum) VALUES ('%s', '%s');",
+                  escaped_filename, escaped_checksum);
+
+         result = query_execute(ssl, socket, insert_sql, qr);
+         if (result != 0)
+         {
+            pgmoneta_log_error("Failed to insert into backup_manifest: %s, %s", filename, checksum);
+            fclose(file);
+            return result;
+         }
+      }
+   }
+
+   fclose(file);
+   return 0;
+}
+
+int
+pgmoneta_ext_delete_manifest_table(SSL* ssl, int socket, struct query_response** qr)
+{
+   return query_execute(ssl, socket, "DROP TABLE backup_manifest;", qr);
+}
+
 static int
 query_execute(SSL* ssl, int socket, char* qs, struct query_response** qr)
 {

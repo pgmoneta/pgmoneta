@@ -113,6 +113,27 @@ pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_
 int
 pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
 
+/**
+ * Creates a table and inserts data from a manifest file
+ * @param ssl The SSL structure used for secure communication
+ * @param socket The socket file descriptor for the connection
+ * @param file_path The path to the manifest file
+ * @param qr The query result structure to store the result of the executed queries
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_create_manifest_table(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
+
+/**
+ * Delete backup_manifest table
+ * @param ssl The SSL structure used for secure communication
+ * @param socket The socket file descriptor for the connection
+ * @param qr The query result structure to store the result of the executed queries
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_delete_manifest_table(SSL* ssl, int socket, struct query_response** qr);
+
 #ifdef __cplusplus
 }
 #endif
