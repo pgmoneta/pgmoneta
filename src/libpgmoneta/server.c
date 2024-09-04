@@ -295,8 +295,8 @@ pgmoneta_server_get_version(SSL* ssl, int socket, int server)
       goto error;
    }
 
-   config->servers[server].version = atoi(response->tuples->data[0]);
-   config->servers[server].minor_version = atoi(response->tuples->data[1]);
+   config->servers[server].version = pgmoneta_atoi(response->tuples->data[0]);
+   config->servers[server].minor_version = pgmoneta_atoi(response->tuples->data[1]);
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
