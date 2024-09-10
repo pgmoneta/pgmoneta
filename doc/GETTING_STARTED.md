@@ -261,7 +261,7 @@ There are a few short tutorials available to help you better understand and conf
 - [Enabling remote management](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/02_remote_management.md)
 - [Enabling Prometheus metrics](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/03_prometheus.md)
 - [Doing backup and restore](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/04_backup_restore.md)
-- [Veridy a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_verify.md)
+- [Verify a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/05_verify.md)
 - [Creating an archive](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/06_archive.md)
 - [Deleting a backup](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/07_delete.md)
 - [Encryption and decryption](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/08_encryption.md)
