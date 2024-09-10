@@ -252,6 +252,8 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_destroy(workers);
    }
 
+   pgmoneta_deque_add(nodes, "backup", (uintptr_t)backups[backup_index]->label, ValueString);
+
    pgmoneta_log_info("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);
 
    for (int i = 0; i < number_of_backups; i++)

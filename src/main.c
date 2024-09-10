@@ -50,6 +50,7 @@
 #include <security.h>
 #include <server.h>
 #include <shmem.h>
+#include <status.h>
 #include <utils.h>
 #include <verify.h>
 #include <wal.h>
@@ -775,18 +776,17 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
-   int ret;
-   signed char id;
-   char* to = NULL;
-   char* payload_s1 = NULL;
-   char* payload_s2 = NULL;
-   char* payload_s3 = NULL;
-   char* payload_s4 = NULL;
-   char* payload_s5 = NULL;
+   int32_t id;
+   char* server = NULL;
    int srv;
    pid_t pid;
-   int number_of_results = 0;
+   char* str = NULL;
+   time_t start_time;
+   time_t end_time;
    struct accept_io* ai;
+   struct json* payload = NULL;
+   struct json* header = NULL;
+   struct json* request = NULL;
    struct configuration* config;
 
    if (EV_ERROR & revents)
@@ -826,667 +826,680 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       return;
    }
 
-   /* Process internal management request -- f.ex. returning a file descriptor to the pool */
-   if (pgmoneta_management_read_header(client_fd, &id))
+   /* Process internal management request */
+   if (pgmoneta_management_read_json(NULL, client_fd, &payload))
    {
-      goto disconnect;
-   }
-   if (pgmoneta_management_read_payload(client_fd, id, &payload_s1, &payload_s2, &payload_s3, &payload_s4, &payload_s5))
-   {
-      goto disconnect;
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, NULL);
+      pgmoneta_log_error("Management: Bad payload (%d)", MANAGEMENT_ERROR_BAD_PAYLOAD);
+      goto error;
    }
 
-   switch (id)
-   {
-      case MANAGEMENT_BACKUP:
-         pgmoneta_log_debug("Management backup: %s", payload_s1);
+   header = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_HEADER);
+   id = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_COMMAND);
 
-         if (!offline)
+   str = pgmoneta_json_to_string(payload, FORMAT_JSON, NULL, 0);
+   pgmoneta_log_debug("Management %d: %s", id, str);
+
+   request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+
+   if (id == MANAGEMENT_BACKUP)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+      if (!offline)
+      {
+         srv = -1;
+         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
          {
-            if (!strcmp("all", payload_s1))
+            if (!strcmp(config->servers[i].name, server))
             {
-               for (int i = 0; i < config->number_of_servers; i++)
-               {
-                  if (config->servers[i].wal_streaming)
-                  {
-                     number_of_results++;
-                  }
-               }
-
-               pgmoneta_management_write_int32(NULL, client_fd, number_of_results);
-
-               for (int i = 0; i < config->number_of_servers; i++)
-               {
-                  if (config->servers[i].wal_streaming)
-                  {
-                     pid = fork();
-                     if (pid == -1)
-                     {
-                        pgmoneta_management_process_result(NULL, client_fd, i, NULL, 1, true);
-
-                        /* No process */
-                        pgmoneta_log_error("Cannot create process");
-                     }
-                     else if (pid == 0)
-                     {
-                        shutdown_ports();
-                        pgmoneta_backup(client_fd, i, ai->argv);
-                     }
-                  }
-               }
+               srv = i;
             }
-            else
+         }
+
+         if (srv != -1)
+         {
+            pid = fork();
+            if (pid == -1)
             {
-               srv = -1;
-               for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-               {
-                  if (!strcmp(config->servers[i].name, payload_s1))
-                  {
-                     srv = i;
-                  }
-               }
+               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, payload);
+               pgmoneta_log_error("Backup: No fork (%d)", MANAGEMENT_ERROR_BACKUP_NOFORK);
+               goto error;
+            }
+            else if (pid == 0)
+            {
+               struct json* pyl = NULL;
 
-               if (srv != -1)
-               {
-                  pgmoneta_management_write_int32(NULL, client_fd, 1);
+               shutdown_ports();
 
-                  pid = fork();
-                  if (pid == -1)
-                  {
-                     pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
+               pgmoneta_json_clone(payload, &pyl);
 
-                     /* No process */
-                     pgmoneta_log_error("Cannot create process");
-                  }
-                  else if (pid == 0)
-                  {
-                     shutdown_ports();
-                     pgmoneta_backup(client_fd, srv, ai->argv);
-                  }
-               }
-               else
-               {
-                  pgmoneta_management_write_int32(NULL, client_fd, 0);
-
-                  pgmoneta_log_error("Backup - Unknown server %s", payload_s1);
-               }
+               pgmoneta_set_proc_title(1, ai->argv, "backup", config->servers[srv].name);
+               pgmoneta_backup(client_fd, srv, pyl);
             }
          }
          else
          {
-            pgmoneta_management_write_int32(NULL, client_fd, 0);
-            pgmoneta_log_warn("Can not create backups in offline mode");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, payload);
+            pgmoneta_log_error("Backup: No server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_NOSERVER);
+            goto error;
          }
+      }
+      else
+      {
+         pgmoneta_log_warn("Can not create backups in offline mode");
 
-         free(payload_s1);
-         break;
-      case MANAGEMENT_LIST_BACKUP:
-         pgmoneta_log_debug("Management list backup: %s", payload_s1);
+         pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER), MANAGEMENT_ERROR_BACKUP_OFFLINE, payload);
+         pgmoneta_log_error("Offline: Server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_OFFLINE);
+      }
+   }
+   else if (id == MANAGEMENT_LIST_BACKUP)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
          {
-            if (!strcmp(config->servers[i].name, payload_s1))
-            {
-               srv = i;
-            }
+            srv = i;
          }
+      }
 
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, false);
-
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK, payload);
+            pgmoneta_log_error("List backup: No fork %s (%d)", server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
+            struct json* pyl = NULL;
+
             shutdown_ports();
-            pgmoneta_management_write_list_backup(NULL, client_fd, srv);
-            exit(0);
-         }
 
-         if (srv == -1)
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "list-backup", config->servers[srv].name);
+            pgmoneta_list_backup(client_fd, srv, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER, payload);
+         pgmoneta_log_error("List backup: No server %s (%d)", server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_DELETE)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
          {
-            pgmoneta_log_error("List backup - Unknown server %s", payload_s1);
+            srv = i;
          }
+      }
 
-         free(payload_s1);
-         break;
-      case MANAGEMENT_DELETE:
-         pgmoneta_log_debug("Management delete: %s/%s", payload_s1, payload_s2);
-
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-         {
-            if (!strcmp(config->servers[i].name, payload_s1))
-            {
-               srv = i;
-            }
-         }
-
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, false);
-
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOFORK, payload);
+            pgmoneta_log_error("Delete: No fork %s (%d)", server, MANAGEMENT_ERROR_DELETE_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
-            int result;
-            char* backup_id = NULL;
+            struct json* pyl = NULL;
 
             shutdown_ports();
 
-            backup_id = pgmoneta_append(backup_id, payload_s2);
+            pgmoneta_json_clone(payload, &pyl);
 
-            result = pgmoneta_delete(srv, backup_id);
-            pgmoneta_log_trace("Delete: %d", result);
+            pgmoneta_set_proc_title(1, ai->argv, "delete", config->servers[srv].name);
+            pgmoneta_delete_backup(client_fd, srv, pyl);
             pgmoneta_delete_wal(srv);
-            pgmoneta_management_write_delete(NULL, client_fd, srv /*, result */);
-
-            free(backup_id);
-            exit(0);
          }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOSERVER, payload);
+         pgmoneta_log_error("Delete: No server %s (%d)", server, MANAGEMENT_ERROR_DELETE_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_RESTORE)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         if (srv == -1)
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
          {
-            pgmoneta_log_error("Delete - Unknown server %s", payload_s1);
+            srv = i;
          }
+      }
 
-         free(payload_s1);
-         free(payload_s2);
-         break;
-      case MANAGEMENT_RESTORE:
-         pgmoneta_log_debug("Management restore: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
-
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-         {
-            if (!strcmp(config->servers[i].name, payload_s1))
-            {
-               srv = i;
-            }
-         }
-
-         pgmoneta_management_write_int32(NULL, client_fd, 1);
-
-         if (srv != -1)
-         {
-            pid = fork();
-            if (pid == -1)
-            {
-               pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
-
-               /* No process */
-               pgmoneta_log_error("Cannot create process");
-            }
-            else if (pid == 0)
-            {
-               char* backup_id = NULL;
-               char* position = NULL;
-               char* directory = NULL;
-
-               shutdown_ports();
-
-               backup_id = pgmoneta_append(backup_id, payload_s2);
-               position = pgmoneta_append(position, payload_s3);
-               directory = pgmoneta_append(directory, payload_s4);
-
-               pgmoneta_restore(NULL, client_fd, srv, backup_id, position, directory, ai->argv);
-            }
-         }
-         else
-         {
-            pgmoneta_management_write_int32(NULL, client_fd, 1);
-
-            pgmoneta_log_error("Restore - Unknown server %s", payload_s1);
-         }
-
-         free(payload_s1);
-         free(payload_s2);
-         free(payload_s3);
-         free(payload_s4);
-         break;
-      case MANAGEMENT_VERIFY:
-         pgmoneta_log_debug("Management verify: %s/%s %s [%s]", payload_s1, payload_s2, payload_s3, payload_s4 != NULL ? payload_s4 : "failed");
-
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-         {
-            if (!strcmp(config->servers[i].name, payload_s1))
-            {
-               srv = i;
-            }
-         }
-
-         if (srv != -1)
-         {
-            pid = fork();
-            if (pid == -1)
-            {
-               pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
-
-               /* No process */
-               pgmoneta_log_error("Cannot create process");
-            }
-            else if (pid == 0)
-            {
-               char* backup_id = NULL;
-               char* directory = NULL;
-               char* files = NULL;
-
-               shutdown_ports();
-
-               backup_id = pgmoneta_append(backup_id, payload_s2);
-               directory = pgmoneta_append(directory, payload_s3);
-               files = pgmoneta_append(files, payload_s4);
-
-               pgmoneta_verify(NULL, client_fd, srv, backup_id, directory, files, ai->argv);
-            }
-         }
-         else
-         {
-            pgmoneta_log_error("Verify - Unknown server %s", payload_s1);
-         }
-
-         free(payload_s1);
-         free(payload_s2);
-         free(payload_s3);
-         free(payload_s4);
-         break;
-      case MANAGEMENT_ARCHIVE:
-         pgmoneta_log_debug("Management archive: %s/%s (%s) -> %s", payload_s1, payload_s2, payload_s3 != NULL ? payload_s3 : "none", payload_s4);
-
-         if (!strcmp("all", payload_s1))
-         {
-            for (int i = 0; i < config->number_of_servers; i++)
-            {
-               int number_of_backups = pgmoneta_get_number_of_valid_backups(i);
-
-               if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2) || !strcmp("latest", payload_s2)))
-               {
-                  number_of_results++;
-               }
-            }
-
-            pgmoneta_management_write_int32(NULL, client_fd, number_of_results);
-
-            for (int i = 0; i < config->number_of_servers; i++)
-            {
-               pid = fork();
-               if (pid == -1)
-               {
-                  pgmoneta_management_process_result(NULL, client_fd, i, NULL, 1, true);
-
-                  /* No process */
-                  pgmoneta_log_error("Cannot create process");
-               }
-               else if (pid == 0)
-               {
-                  int number_of_backups = pgmoneta_get_number_of_valid_backups(i);
-
-                  if (number_of_backups > 0 && (!strcmp("oldest", payload_s2) || !strcmp("newest", payload_s2) || !strcmp("latest", payload_s2)))
-                  {
-                     char* backup_id = NULL;
-                     char* position = NULL;
-                     char* directory = NULL;
-
-                     shutdown_ports();
-
-                     backup_id = pgmoneta_append(backup_id, payload_s2);
-                     position = pgmoneta_append(position, payload_s3);
-                     directory = pgmoneta_append(directory, payload_s4);
-
-                     pgmoneta_archive(NULL, client_fd, i, backup_id, position, directory, ai->argv);
-                  }
-               }
-            }
-
-            free(payload_s1);
-            free(payload_s2);
-            free(payload_s3);
-            free(payload_s4);
-         }
-         else
-         {
-            srv = -1;
-            for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-            {
-               if (!strcmp(config->servers[i].name, payload_s1))
-               {
-                  srv = i;
-               }
-            }
-
-            pgmoneta_management_write_int32(NULL, client_fd, 1);
-
-            if (srv != -1)
-            {
-               pid = fork();
-               if (pid == -1)
-               {
-                  pgmoneta_management_process_result(NULL, client_fd, srv, NULL, 1, true);
-
-                  /* No process */
-                  pgmoneta_log_error("Cannot create process");
-               }
-               else if (pid == 0)
-               {
-                  char* backup_id = NULL;
-                  char* position = NULL;
-                  char* directory = NULL;
-
-                  shutdown_ports();
-
-                  backup_id = pgmoneta_append(backup_id, payload_s2);
-                  position = pgmoneta_append(position, payload_s3);
-                  directory = pgmoneta_append(directory, payload_s4);
-
-                  pgmoneta_archive(NULL, client_fd, srv, backup_id, position, directory, ai->argv);
-               }
-            }
-            else
-            {
-               pgmoneta_management_write_int32(NULL, client_fd, 1);
-
-               pgmoneta_log_error("Archive - Unknown server %s", payload_s1);
-            }
-
-            free(payload_s1);
-            free(payload_s2);
-            free(payload_s3);
-            free(payload_s4);
-         }
-         break;
-      case MANAGEMENT_STOP:
-         pgmoneta_log_debug("Management stop");
-         ev_break(loop, EVBREAK_ALL);
-         keep_running = 0;
-         stop = 1;
-         config->running = false;
-         break;
-      case MANAGEMENT_STATUS:
-         pgmoneta_log_debug("Management status");
-
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOFORK, payload);
+            pgmoneta_log_error("Restore: No fork %s (%d)", server, MANAGEMENT_ERROR_RESTORE_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
+            struct json* pyl = NULL;
+
             shutdown_ports();
-            pgmoneta_management_write_status(NULL, client_fd, offline);
-            exit(0);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "restore", config->servers[srv].name);
+            pgmoneta_restore(NULL, client_fd, srv, pyl);
          }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOSERVER, payload);
+         pgmoneta_log_error("Restore: No server %s (%d)", server, MANAGEMENT_ERROR_RESTORE_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_VERIFY)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         break;
-      case MANAGEMENT_STATUS_DETAILS:
-         pgmoneta_log_debug("Management details");
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
 
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOFORK, payload);
+            pgmoneta_log_error("Verify: No fork %s (%d)", server, MANAGEMENT_ERROR_VERIFY_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
+            struct json* pyl = NULL;
+
             shutdown_ports();
-            pgmoneta_management_write_details(NULL, client_fd, offline);
-            exit(0);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "verify", config->servers[srv].name);
+            pgmoneta_verify(NULL, client_fd, srv, pyl);
          }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOSERVER, payload);
+         pgmoneta_log_error("Restore: No server %s (%d)", server, MANAGEMENT_ERROR_VERIFY_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_ARCHIVE)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         break;
-      case MANAGEMENT_ISALIVE:
-         pgmoneta_log_debug("Management isalive");
-         pgmoneta_management_write_isalive(NULL, client_fd);
-         break;
-      case MANAGEMENT_RESET:
-         pgmoneta_log_debug("Management reset");
-         pgmoneta_prometheus_reset();
-         break;
-      case MANAGEMENT_RELOAD:
-         pgmoneta_log_debug("Management reload");
-         reload_configuration();
-         break;
-      case MANAGEMENT_RETAIN:
-         pgmoneta_log_debug("Management retain: %s/%s", payload_s1, payload_s2);
-
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
          {
-            if (!strcmp(config->servers[i].name, payload_s1))
-            {
-               srv = i;
-            }
+            srv = i;
          }
+      }
 
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOFORK, payload);
+            pgmoneta_log_error("Archive: No fork %s (%d)", server, MANAGEMENT_ERROR_ARCHIVE_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
-            char* backup_id = NULL;
+            struct json* pyl = NULL;
 
             shutdown_ports();
 
-            backup_id = pgmoneta_append(backup_id, payload_s2);
+            pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_retain_backup(srv, backup_id);
-
-            free(backup_id);
-            exit(0);
+            pgmoneta_set_proc_title(1, ai->argv, "archive", config->servers[srv].name);
+            pgmoneta_archive(NULL, client_fd, srv, pyl);
          }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER, payload);
+         pgmoneta_log_error("Archive: No server %s (%d)", server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_STOP)
+   {
+      start_time = time(NULL);
 
-         if (srv == -1)
+      end_time = time(NULL);
+
+      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload);
+
+      ev_break(loop, EVBREAK_ALL);
+      keep_running = 0;
+      stop = 1;
+      config->running = false;
+   }
+   else if (id == MANAGEMENT_ISALIVE)
+   {
+      struct json* response = NULL;
+
+      start_time = time(NULL);
+
+      pgmoneta_management_create_response(payload, &response);
+
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
+
+      end_time = time(NULL);
+
+      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload);
+   }
+   else if (id == MANAGEMENT_RESET)
+   {
+      start_time = time(NULL);
+
+      pgmoneta_prometheus_reset();
+
+      end_time = time(NULL);
+
+      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload);
+   }
+   else if (id == MANAGEMENT_RELOAD)
+   {
+      start_time = time(NULL);
+
+      reload_configuration();
+
+      end_time = time(NULL);
+
+      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload);
+   }
+   else if (id == MANAGEMENT_STATUS)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, payload);
+         pgmoneta_log_error("Status: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "status", NULL);
+         pgmoneta_status(NULL, client_fd, offline, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_STATUS_DETAILS)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, payload);
+         pgmoneta_log_error("Details: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "details", NULL);
+         pgmoneta_status_details(NULL, client_fd, offline, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_RETAIN)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
          {
-            pgmoneta_log_error("Retain - Unknown server %s", payload_s1);
+            srv = i;
          }
+      }
 
-         free(payload_s1);
-         free(payload_s2);
-         break;
-      case MANAGEMENT_EXPUNGE:
-         pgmoneta_log_debug("Management expunge: %s/%s", payload_s1, payload_s2);
-
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-         {
-            if (!strcmp(config->servers[i].name, payload_s1))
-            {
-               srv = i;
-            }
-         }
-
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOFORK, payload);
+            pgmoneta_log_error("Retain: No fork %s (%d)", server, MANAGEMENT_ERROR_RETAIN_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
-            char* backup_id = NULL;
+            struct json* pyl = NULL;
 
             shutdown_ports();
 
-            backup_id = pgmoneta_append(backup_id, payload_s2);
+            pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_expunge_backup(srv, backup_id);
-
-            free(backup_id);
-            exit(0);
+            pgmoneta_set_proc_title(1, ai->argv, "retain", config->servers[srv].name);
+            pgmoneta_retain_backup(NULL, client_fd, srv, pyl);
          }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOSERVER, payload);
+         pgmoneta_log_error("Retain: No server %s (%d)", server, MANAGEMENT_ERROR_RETAIN_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_EXPUNGE)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         if (srv == -1)
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
          {
-            pgmoneta_log_error("Expunge - Unknown server %s", payload_s1);
+            srv = i;
          }
+      }
 
-         free(payload_s1);
-         free(payload_s2);
-         break;
-      case MANAGEMENT_DECRYPT:
-         pgmoneta_log_debug("Management decrypt: %s", payload_s1);
-         ret = pgmoneta_decrypt_archive(payload_s1);
-         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
-         free(payload_s1);
-         break;
-      case MANAGEMENT_ENCRYPT:
-         pgmoneta_log_debug("Management encrypt: %s", payload_s1);
-         ret = pgmoneta_encrypt_file(payload_s1, NULL);
-         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
-         free(payload_s1);
-         break;
-      case MANAGEMENT_DECOMPRESS:
-         pgmoneta_log_debug("Management decompress: %s", payload_s1);
-         ret = 1;
+      if (srv != -1)
+      {
+         pid = fork();
+         if (pid == -1)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOFORK, payload);
+            pgmoneta_log_error("Expunge: No fork %s (%d)", server, MANAGEMENT_ERROR_EXPUNGE_NOFORK);
+            goto error;
+         }
+         else if (pid == 0)
+         {
+            struct json* pyl = NULL;
+
+            shutdown_ports();
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "expunge", config->servers[srv].name);
+            pgmoneta_expunge_backup(NULL, client_fd, srv, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER, payload);
+         pgmoneta_log_error("Expunge: No server %s (%d)", server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_DECRYPT)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, payload);
+         pgmoneta_log_error("Decrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_DECRYPT_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "decrypt", NULL);
+         pgmoneta_decrypt_request(NULL, client_fd, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_ENCRYPT)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, payload);
+         pgmoneta_log_error("Encrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_ENCRYPT_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "encrypt", NULL);
+         pgmoneta_encrypt_request(NULL, client_fd, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_DECOMPRESS)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, payload);
+         pgmoneta_log_error("Decompress: No fork %s (%d)", server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
 
          if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
          {
-            to = malloc(strlen(payload_s1) - 2);
-            memset(to, 0, strlen(payload_s1) - 2);
-            memcpy(to, payload_s1, strlen(payload_s1) - 3);
-            ret = pgmoneta_gunzip_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "decompress/gzip", NULL);
+            pgmoneta_gunzip_request(NULL, client_fd, pyl);
          }
          else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
          {
-            to = malloc(strlen(payload_s1) - 4);
-            memset(to, 0, strlen(payload_s1) - 4);
-            memcpy(to, payload_s1, strlen(payload_s1) - 5);
-            ret = pgmoneta_zstandardd_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "decompress/zstd", NULL);
+            pgmoneta_zstandardd_request(NULL, client_fd, pyl);
          }
          else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
          {
-            to = malloc(strlen(payload_s1) - 3);
-            memset(to, 0, strlen(payload_s1) - 3);
-            memcpy(to, payload_s1, strlen(payload_s1) - 4);
-            ret = pgmoneta_lz4d_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "decompress/lz4", NULL);
+            pgmoneta_lz4d_request(NULL, client_fd, pyl);
          }
          else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
          {
-            to = malloc(strlen(payload_s1) - 3);
-            memset(to, 0, strlen(payload_s1) - 3);
-            memcpy(to, payload_s1, strlen(payload_s1) - 4);
-            ret = pgmoneta_bunzip2_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "decompress/bz2", NULL);
+            pgmoneta_bunzip2_request(NULL, client_fd, pyl);
          }
+         else
+         {
+            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, payload);
+            pgmoneta_log_error("Decompress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+         }
+      }
+   }
+   else if (id == MANAGEMENT_COMPRESS)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, payload);
+         pgmoneta_log_error("Compress: No fork %s (%d)", server, MANAGEMENT_ERROR_COMPRESS_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
 
-         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
-         free(to);
-         free(payload_s1);
-         break;
-      case MANAGEMENT_COMPRESS:
-         pgmoneta_log_debug("Management compress: %s", payload_s1);
-         ret = 1;
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
 
          if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
          {
-            to = pgmoneta_append(to, payload_s1);
-            to = pgmoneta_append(to, ".gz");
-            ret = pgmoneta_gzip_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "compress/gzip", NULL);
+            pgmoneta_gzip_request(NULL, client_fd, pyl);
          }
          else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
          {
-            to = pgmoneta_append(to, payload_s1);
-            to = pgmoneta_append(to, ".zstd");
-            ret = pgmoneta_zstandardc_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "compress/zstd", NULL);
+            pgmoneta_zstandardc_request(NULL, client_fd, pyl);
          }
          else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
          {
-            to = pgmoneta_append(to, payload_s1);
-            to = pgmoneta_append(to, ".lz4");
-            ret = pgmoneta_lz4c_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "compress/lz4", NULL);
+            pgmoneta_lz4c_request(NULL, client_fd, pyl);
          }
          else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
          {
-            to = pgmoneta_append(to, payload_s1);
-            to = pgmoneta_append(to, ".bz2");
-            ret = pgmoneta_bzip2_file(payload_s1, to);
+            pgmoneta_set_proc_title(1, ai->argv, "compress/bz2", NULL);
+            pgmoneta_bzip2_request(NULL, client_fd, pyl);
          }
+         else
+         {
+            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, payload);
+            pgmoneta_log_error("Compress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+         }
+      }
+   }
+   else if (id == MANAGEMENT_INFO)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         pgmoneta_management_process_result(NULL, client_fd, -1, payload_s1, ret, true);
-         free(to);
-         free(payload_s1);
-         break;
-      case MANAGEMENT_INFO:
-         pgmoneta_log_debug("Management info: %s/%s", payload_s1, payload_s2);
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
 
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
-            free(payload_s1);
-            free(payload_s2);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOFORK, payload);
+            pgmoneta_log_error("Info: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
+            struct json* pyl = NULL;
+
             shutdown_ports();
-            pgmoneta_management_write_info(NULL, client_fd, payload_s1, payload_s2);
-            free(payload_s1);
-            free(payload_s2);
-            exit(0);
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "info", config->servers[srv].name);
+            pgmoneta_info_request(NULL, client_fd, srv, pyl);
          }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOSERVER, payload);
+         pgmoneta_log_error("Info: No server %s (%d)", server, MANAGEMENT_ERROR_INFO_NOSERVER);
+         goto error;
+      }
+   }
+   else if (id == MANAGEMENT_ANNOTATE)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-         break;
-      case MANAGEMENT_ANNOTATE:
-         pgmoneta_log_debug("Management annotate: %s/%s", payload_s1, payload_s2);
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      {
+         if (!strcmp(config->servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
 
+      if (srv != -1)
+      {
          pid = fork();
          if (pid == -1)
          {
-            /* No process */
-            pgmoneta_log_error("Cannot create process");
-
-            free(payload_s1);
-            free(payload_s2);
-            free(payload_s3);
-            free(payload_s4);
-            free(payload_s5);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, payload);
+            pgmoneta_log_error("Annotate: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
+            goto error;
          }
          else if (pid == 0)
          {
-            char* server = NULL;
-            char* backup = NULL;
-            char* command = NULL;
-            char* key = NULL;
-            char* comment = NULL;
-
-            server = pgmoneta_append(server, payload_s1);
-            backup = pgmoneta_append(backup, payload_s2);
-            command = pgmoneta_append(command, payload_s3);
-            key = pgmoneta_append(key, payload_s4);
-            comment = pgmoneta_append(comment, payload_s5);
+            struct json* pyl = NULL;
 
             shutdown_ports();
 
-            pgmoneta_update_info_annotate(NULL, client_fd, server, backup, command, key, comment);
+            pgmoneta_json_clone(payload, &pyl);
 
-            free(payload_s1);
-            free(payload_s2);
-            free(payload_s3);
-            free(payload_s4);
-            free(payload_s5);
-
-            exit(0);
+            pgmoneta_set_proc_title(1, ai->argv, "annotate", config->servers[srv].name);
+            pgmoneta_annotate_request(NULL, client_fd, srv, pyl);
          }
-
-         break;
-      default:
-         pgmoneta_log_debug("Unknown management id: %d", id);
-         break;
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, payload);
+         pgmoneta_log_error("Annotate: No server %s (%d)", server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER);
+         goto error;
+      }
+   }
+   else
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_UNKNOWN_COMMAND, payload);
+      pgmoneta_log_error("Unknown: %s (%d)", pgmoneta_json_to_string(payload, FORMAT_JSON, NULL, 0), MANAGEMENT_ERROR_UNKNOWN_COMMAND);
+      goto error;
    }
 
-disconnect:
+   free(str);
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_disconnect(client_fd);
+
+   return;
+
+error:
+
+   free(str);
+   pgmoneta_json_destroy(payload);
 
    pgmoneta_disconnect(client_fd);
 }

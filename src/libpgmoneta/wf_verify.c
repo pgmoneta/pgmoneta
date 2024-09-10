@@ -31,6 +31,7 @@
 #include <csv.h>
 #include <deque.h>
 #include <logging.h>
+#include <management.h>
 #include <security.h>
 #include <utils.h>
 #include <verify.h>
@@ -41,6 +42,13 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+struct payload
+{
+   struct json* data;
+   struct deque* failed;
+   struct deque* all;
+};
 
 static int verify_setup(int, char*, struct deque*);
 static int verify_execute(int, char*, struct deque*);
@@ -91,9 +99,9 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    char** columns = NULL;
    int number_of_workers = 0;
    struct backup* backup = NULL;
-   struct csv_reader* csv = NULL;
    struct deque* failed_deque = NULL;
    struct deque* all_deque = NULL;
+   struct csv_reader* csv = NULL;
    struct workers* workers = NULL;
    struct configuration* config;
 
@@ -146,27 +154,39 @@ verify_execute(int server, char* identifier, struct deque* nodes)
 
    while (pgmoneta_csv_next_row(csv, &number_of_columns, &columns))
    {
-      struct verify_entry* ve = NULL;
+      struct payload* payload = NULL;
+      struct json* j = NULL;
 
-      ve = (struct verify_entry*)malloc(sizeof(struct verify_entry));
+      payload = (struct payload*)malloc(sizeof(struct payload));
 
-      memset(ve, 0, sizeof(struct verify_entry));
-      memcpy(ve->directory, (char*)pgmoneta_deque_get(nodes, "to"),
-             strlen((char*)pgmoneta_deque_get(nodes, "to")));
-      memcpy(ve->filename, columns[0], strlen(columns[0]));
-      memcpy(ve->original, columns[1], strlen(columns[1]));
-      ve->hash_algoritm = backup->hash_algoritm;
+      if (payload == NULL)
+      {
+         goto error;
+      }
 
-      ve->failed = failed_deque;
-      ve->all = all_deque;
+      memset(payload, 0, sizeof(struct payload));
+
+      if (pgmoneta_json_create(&j))
+      {
+         goto error;
+      }
+
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_deque_get(nodes, "to"), ValueString);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)columns[0], ValueString);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)columns[1], ValueString);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)backup->hash_algoritm, ValueInt32);
+
+      payload->data = j;
+      payload->failed = failed_deque;
+      payload->all = all_deque;
 
       if (number_of_workers > 0)
       {
-         pgmoneta_workers_add(workers, do_verify, (void*)ve);
+         pgmoneta_workers_add(workers, do_verify, (void*)payload);
       }
       else
       {
-         do_verify((void*)ve);
+         do_verify((void*)payload);
       }
 
       free(columns);
@@ -196,6 +216,9 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    return 0;
 
 error:
+
+   pgmoneta_deque_add(nodes, "failed", (uintptr_t)NULL, ValueDeque);
+   pgmoneta_deque_add(nodes, "all", (uintptr_t)NULL, ValueDeque);
 
    pgmoneta_deque_destroy(failed_deque);
    pgmoneta_deque_destroy(all_deque);
@@ -230,27 +253,32 @@ do_verify(void* arg)
    char* f = NULL;
    char* hash_cal = NULL;
    bool failed = false;
-   struct verify_entry* ve = NULL;
+   int ha = 0;
+   struct payload* p = NULL;
+   struct json* j = NULL;
 
-   ve = (struct verify_entry*)arg;
+   p = (struct payload*)arg;
 
-   f = pgmoneta_append(f, ve->directory);
+   j = p->data;
+
+   f = pgmoneta_append(f, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_DIRECTORY));
    if (!pgmoneta_ends_with(f, "/"))
    {
       f = pgmoneta_append(f, "/");
    }
-   f = pgmoneta_append(f, ve->filename);
+   f = pgmoneta_append(f, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_FILENAME));
 
    if (!pgmoneta_exists(f))
    {
       goto error;
    }
 
-   if (ve->hash_algoritm == HASH_ALGORITHM_SHA256)
+   ha = (int)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM);
+   if (ha == HASH_ALGORITHM_SHA256)
    {
       if (!pgmoneta_create_sha256_file(f, &hash_cal))
       {
-         if (strcmp(ve->original, hash_cal))
+         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
          {
             failed = true;
          }
@@ -260,11 +288,11 @@ do_verify(void* arg)
          failed = true;
       }
    }
-   else if (ve->hash_algoritm == HASH_ALGORITHM_SHA384)
+   else if (ha == HASH_ALGORITHM_SHA384)
    {
       if (!pgmoneta_create_sha384_file(f, &hash_cal))
       {
-         if (strcmp(ve->original, hash_cal))
+         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
          {
             failed = true;
          }
@@ -274,11 +302,11 @@ do_verify(void* arg)
          failed = true;
       }
    }
-   else if (ve->hash_algoritm == HASH_ALGORITHM_SHA512)
+   else if (ha == HASH_ALGORITHM_SHA512)
    {
       if (!pgmoneta_create_sha512_file(f, &hash_cal))
       {
-         if (strcmp(ve->original, hash_cal))
+         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
          {
             failed = true;
          }
@@ -288,11 +316,11 @@ do_verify(void* arg)
          failed = true;
       }
    }
-   else if (ve->hash_algoritm == HASH_ALGORITHM_SHA224)
+   else if (ha == HASH_ALGORITHM_SHA224)
    {
       if (!pgmoneta_create_sha224_file(f, &hash_cal))
       {
-         if (strcmp(ve->original, hash_cal))
+         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
          {
             failed = true;
          }
@@ -302,11 +330,11 @@ do_verify(void* arg)
          failed = true;
       }
    }
-   else if (ve->hash_algoritm == HASH_ALGORITHM_CRC32C)
+   else if (ha == HASH_ALGORITHM_CRC32C)
    {
       if (!pgmoneta_create_crc32c_file(f, &hash_cal))
       {
-         if (strcmp(ve->original, hash_cal))
+         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
          {
             failed = true;
          }
@@ -321,37 +349,39 @@ do_verify(void* arg)
       goto error;
    }
 
-   if (hash_cal != NULL && strlen(hash_cal) > 0)
-   {
-      memcpy(ve->calculated, hash_cal, strlen(hash_cal));
-   }
-   else
-   {
-      failed = true;
-      memcpy(ve->calculated, "Unknown", strlen("Unknown"));
-   }
-
    if (failed)
    {
-      pgmoneta_deque_add(ve->failed, f, (uintptr_t)ve, ValueVerifyEntry);
+      if (hash_cal != NULL && strlen(hash_cal) > 0)
+      {
+         pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_CALCULATED, (uintptr_t)hash_cal, ValueString);
+      }
+      else
+      {
+         failed = true;
+         pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_CALCULATED, (uintptr_t)"Unknown", ValueString);
+      }
+
+      pgmoneta_deque_add(p->failed, f, (uintptr_t)j, ValueJSON);
+   }
+   else if (p->all != NULL)
+   {
+      pgmoneta_deque_add(p->all, f, (uintptr_t)j, ValueJSON);
    }
    else
    {
-      if (ve->all != NULL)
-      {
-         pgmoneta_deque_add(ve->all, f, (uintptr_t)ve, ValueVerifyEntry);
-      }
+      pgmoneta_json_destroy(j);
    }
 
    free(hash_cal);
    free(f);
+   free(p);
 
    return;
 
 error:
    pgmoneta_log_error("Unable to calculate hash for %s", f);
 
-   free(ve);
    free(hash_cal);
    free(f);
+   free(p);
 }

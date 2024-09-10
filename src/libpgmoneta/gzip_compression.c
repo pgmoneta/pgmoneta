@@ -29,7 +29,9 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <gzip_compression.h>
+#include <json.h>
 #include <logging.h>
+#include <management.h>
 #include <utils.h>
 #include <workers.h>
 
@@ -260,6 +262,197 @@ pgmoneta_gzip_wal(char* directory)
    closedir(dir);
 }
 
+void
+pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, payload);
+      pgmoneta_log_error("GZip: No file for %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, ".gz");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("GZip: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_gzip_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, payload);
+      pgmoneta_log_error("GZip: Error gzip %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("GZip: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, payload);
+      pgmoneta_log_error("GZip: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("GZip: %s (Elapsed: %s)", from, elapsed);
+
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(to);
+   free(elapsed);
+
+   exit(1);
+}
+
+int
+pgmoneta_gzip_file(char* from, char* to)
+{
+   int level;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   level = config->compression_level;
+   if (level < 1)
+   {
+      level = 1;
+   }
+   else if (level > 9)
+   {
+      level = 9;
+   }
+
+   if (gz_compress(from, level, to))
+   {
+      goto error;
+   }
+   else
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+void
+pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* orig = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, payload);
+      pgmoneta_log_error("GZip: No file for %s", from);
+      goto error;
+   }
+
+   orig = pgmoneta_append(orig, from);
+   to = pgmoneta_remove_suffix(orig, ".gz");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("GZip: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_gunzip_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, payload);
+      pgmoneta_log_error("GZip: Error gunzip %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("GZip: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, payload);
+      pgmoneta_log_error("GZip: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("GZip: %s (Elapsed: %s)", from, elapsed);
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(1);
+}
+
 int
 pgmoneta_gunzip_file(char* from, char* to)
 {
@@ -388,40 +581,6 @@ do_gz_decompress(void* arg)
    }
 
    free(wi);
-}
-
-int
-pgmoneta_gzip_file(char* from, char* to)
-{
-   int level;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-   level = config->compression_level;
-   if (level < 1)
-   {
-      level = 1;
-   }
-   else if (level > 9)
-   {
-      level = 9;
-   }
-
-   if (gz_compress(from, level, to))
-   {
-      goto error;
-   }
-   else
-   {
-      pgmoneta_delete_file(from, NULL);
-   }
-
-   return 0;
-
-error:
-
-   return 1;
 }
 
 static int

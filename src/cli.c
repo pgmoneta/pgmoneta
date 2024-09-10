@@ -29,13 +29,15 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <configuration.h>
+#include <json.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
 #include <security.h>
 #include <shmem.h>
-#include <verify.h>
 #include <utils.h>
+#include <value.h>
+#include <verify.h>
 
 /* system */
 #include <err.h>
@@ -93,26 +95,28 @@ static void help_info(void);
 static void help_annotate(void);
 static void display_helper(char* command);
 
-static int backup(SSL* ssl, int socket, char* server);
-static int list_backup(SSL* ssl, int socket, char* server, char output_format);
-static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
-static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, char output_format);
-static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
-static int delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format);
-static int stop(SSL* ssl, int socket);
-static int status(SSL* ssl, int socket, char output_format);
-static int details(SSL* ssl, int socket, char output_format);
-static int isalive(SSL* ssl, int socket);
-static int reset(SSL* ssl, int socket);
-static int reload(SSL* ssl, int socket);
-static int retain(SSL* ssl, int socket, char* server, char* backup_id);
-static int expunge(SSL* ssl, int socket, char* server, char* backup_id);
-static int decrypt_data(SSL* ssl, int socket, char* path);
-static int encrypt_data(SSL* ssl, int socket, char* path);
-static int decompress_data(SSL* ssl, int socket, char* path);
-static int compress_data(SSL* ssl, int socket, char* path);
-static int info(SSL* ssl, int socket, char* server, char* backup, char output_format);
-static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, char output_format);
+static int backup(SSL* ssl, int socket, char* server, int32_t output_format);
+static int list_backup(SSL* ssl, int socket, char* server, int32_t output_format);
+static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format);
+static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, int32_t output_format);
+static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format);
+static int delete(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+static int stop(SSL* ssl, int socket, int32_t output_format);
+static int status(SSL* ssl, int socket, int32_t output_format);
+static int details(SSL* ssl, int socket, int32_t output_format);
+static int isalive(SSL* ssl, int socket, int32_t output_format);
+static int reset(SSL* ssl, int socket, int32_t output_format);
+static int reload(SSL* ssl, int socket, int32_t output_format);
+static int retain(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+static int expunge(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+static int decrypt_data(SSL* ssl, int socket, char* path, int32_t output_format);
+static int encrypt_data(SSL* ssl, int socket, char* path, int32_t output_format);
+static int decompress_data(SSL* ssl, int socket, char* path, int32_t output_format);
+static int compress_data(SSL* ssl, int socket, char* path, int32_t output_format);
+static int info(SSL* ssl, int socket, char* server, char* backup, int32_t output_format);
+static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, int32_t output_format);
+
+static int  process_result(SSL* ssl, int socket, int32_t output_format);
 
 static void
 version(void)
@@ -399,7 +403,7 @@ main(int argc, char** argv)
    size_t size;
    char un[MAX_USERNAME_LENGTH];
    struct configuration* config = NULL;
-   char output_format = COMMAND_OUTPUT_FORMAT_TEXT;
+   int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
 
@@ -459,11 +463,11 @@ main(int argc, char** argv)
          case 'F':
             if (!strncmp(optarg, "json", MISC_LENGTH))
             {
-               output_format = COMMAND_OUTPUT_FORMAT_JSON;
+               output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
             }
             else
             {
-               output_format = COMMAND_OUTPUT_FORMAT_TEXT;
+               output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
             }
             break;
          case '?':
@@ -651,7 +655,7 @@ password:
 
    if (parsed.cmd->action == MANAGEMENT_BACKUP)
    {
-      exit_code = backup(s_ssl, socket, parsed.args[0]);
+      exit_code = backup(s_ssl, socket, parsed.args[0], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_LIST_BACKUP)
    {
@@ -661,11 +665,11 @@ password:
    {
       if (parsed.args[3])
       {
-         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3]);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], output_format);
       }
       else
       {
-         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_VERIFY)
@@ -683,11 +687,11 @@ password:
    {
       if (parsed.args[3])
       {
-         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3]);
+         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], output_format);
       }
       else
       {
-         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2]);
+         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_DELETE)
@@ -696,7 +700,7 @@ password:
    }
    else if (parsed.cmd->action == MANAGEMENT_STOP)
    {
-      exit_code = stop(s_ssl, socket);
+      exit_code = stop(s_ssl, socket, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_STATUS)
    {
@@ -708,39 +712,39 @@ password:
    }
    else if (parsed.cmd->action == MANAGEMENT_ISALIVE)
    {
-      exit_code = isalive(s_ssl, socket);
+      exit_code = isalive(s_ssl, socket, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RESET)
    {
-      exit_code = reset(s_ssl, socket);
+      exit_code = reset(s_ssl, socket, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RELOAD)
    {
-      exit_code = reload(s_ssl, socket);
+      exit_code = reload(s_ssl, socket, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RETAIN)
    {
-      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1]);
+      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_EXPUNGE)
    {
-      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1]);
+      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_DECRYPT)
    {
-      exit_code = decrypt_data(s_ssl, socket, parsed.args[0]);
+      exit_code = decrypt_data(s_ssl, socket, parsed.args[0], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_ENCRYPT)
    {
-      exit_code = encrypt_data(s_ssl, socket, parsed.args[0]);
+      exit_code = encrypt_data(s_ssl, socket, parsed.args[0], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_DECOMPRESS)
    {
-      exit_code = decompress_data(s_ssl, socket, parsed.args[0]);
+      exit_code = decompress_data(s_ssl, socket, parsed.args[0], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_COMPRESS)
    {
-      exit_code = compress_data(s_ssl, socket, parsed.args[0]);
+      exit_code = compress_data(s_ssl, socket, parsed.args[0], output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_INFO)
    {
@@ -803,7 +807,7 @@ static void
 help_backup(void)
 {
    printf("Backup a server\n");
-   printf("  pgmoneta-cli backup <server|all>\n");
+   printf("  pgmoneta-cli backup <server>\n");
 }
 
 static void
@@ -831,7 +835,7 @@ static void
 help_archive(void)
 {
    printf("Archive a backup for a server\n");
-   printf("  pgmoneta-cli archive <server|all> <timestamp|oldest|newest> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
+   printf("  pgmoneta-cli archive <server> <timestamp|oldest|newest> [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>\n");
 }
 
 static void
@@ -1018,292 +1022,431 @@ display_helper(char* command)
 }
 
 static int
-backup(SSL* ssl, int socket, char* server)
+backup(SSL* ssl, int socket, char* server, int32_t output_format)
 {
-   int ret;
-   int number_of_returns = 0;
-   int code = 0;
-
-   ret = pgmoneta_management_backup(ssl, socket, server);
-   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
-
-   for (int i = 0; i < number_of_returns; i++)
+   if (pgmoneta_management_request_backup(ssl, socket, server, output_format))
    {
-      pgmoneta_management_read_int32(ssl, socket, &code);
+      goto error;
    }
 
-   return ret;
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
 }
 
 static int
-list_backup(SSL* ssl, int socket, char* server, char output_format)
+list_backup(SSL* ssl, int socket, char* server, int32_t output_format)
 {
-   if (pgmoneta_management_list_backup(ssl, socket, server) == 0)
+   if (pgmoneta_management_request_list_backup(ssl, socket, server, output_format))
    {
-      pgmoneta_management_read_list_backup(ssl, socket, server, output_format);
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format)
+{
+   if (pgmoneta_management_request_restore(ssl, socket, server, backup_id, position, directory, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, int32_t output_format)
+{
+   if (pgmoneta_management_request_verify(ssl, socket, server, backup_id, directory, files, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format)
+{
+   if (pgmoneta_management_request_archive(ssl, socket, server, backup_id, position, directory, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+delete(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+{
+   if (pgmoneta_management_request_delete(ssl, socket, server, backup_id, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+stop(SSL* ssl, int socket, int32_t output_format)
+{
+   if (pgmoneta_management_request_stop(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+status(SSL* ssl, int socket, int32_t output_format)
+{
+   if (pgmoneta_management_request_status(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+details(SSL* ssl, int socket, int32_t output_format)
+{
+   if (pgmoneta_management_request_status_details(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+isalive(SSL* ssl, int socket, int32_t output_format)
+{
+   if (pgmoneta_management_request_isalive(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+reset(SSL* ssl, int socket, int32_t output_format)
+{
+   if (pgmoneta_management_request_reset(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+reload(SSL* ssl, int socket, int32_t output_format)
+{
+   if (pgmoneta_management_request_reload(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+retain(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+{
+   if (pgmoneta_management_request_retain(ssl, socket, server, backup_id, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+expunge(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+{
+   if (pgmoneta_management_request_expunge(ssl, socket, server, backup_id, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+decrypt_data(SSL* ssl, int socket, char* path, int32_t output_format)
+{
+   if (pgmoneta_management_request_decrypt(ssl, socket, path, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+encrypt_data(SSL* ssl, int socket, char* path, int32_t output_format)
+{
+   if (pgmoneta_management_request_encrypt(ssl, socket, path, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+decompress_data(SSL* ssl, int socket, char* path, int32_t output_format)
+{
+   if (pgmoneta_management_request_decompress(ssl, socket, path, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+compress_data(SSL* ssl, int socket, char* path, int32_t output_format)
+{
+   if (pgmoneta_management_request_compress(ssl, socket, path, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+info(SSL* ssl, int socket, char* server, char* backup, int32_t output_format)
+{
+   if (pgmoneta_management_request_info(ssl, socket, server, backup, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+annotate(SSL* ssl, int socket, char* server, char* backup, char* action, char* key, char* comment, int32_t output_format)
+{
+   if (pgmoneta_management_request_annotate(ssl, socket, server, backup, action, key, comment, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+process_result(SSL* ssl, int socket, int32_t output_format)
+{
+   struct json* read = NULL;
+
+   if (pgmoneta_management_read_json(ssl, socket, &read))
+   {
+      goto error;
+   }
+
+   if (MANAGEMENT_OUTPUT_FORMAT_TEXT == output_format)
+   {
+      pgmoneta_json_print(read, FORMAT_TEXT);
    }
    else
    {
-      return 1;
+      pgmoneta_json_print(read, FORMAT_JSON);
    }
+
+   pgmoneta_json_destroy(read);
 
    return 0;
-}
 
-static int
-restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
-{
-   int ret;
-   int number_of_returns = 0;
-   int code = 0;
+error:
 
-   ret = pgmoneta_management_restore(ssl, socket, server, backup_id, position, directory);
-   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
+   pgmoneta_json_destroy(read);
 
-   for (int i = 0; i < number_of_returns; i++)
-   {
-      pgmoneta_management_read_int32(ssl, socket, &code);
-   }
-
-   return ret;
-}
-
-static int
-verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, char output_format)
-{
-   if (pgmoneta_management_verify(ssl, socket, server, backup_id, directory, files) == 0)
-   {
-      pgmoneta_management_read_verify(ssl, socket, output_format);
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory)
-{
-   int ret;
-   int number_of_returns = 0;
-   int code = 0;
-
-   ret = pgmoneta_management_archive(ssl, socket, server, backup_id, position, directory);
-   pgmoneta_management_read_int32(ssl, socket, &number_of_returns);
-
-   for (int i = 0; i < number_of_returns; i++)
-   {
-      pgmoneta_management_read_int32(ssl, socket, &code);
-   }
-
-   return ret;
-}
-
-static int
-delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format)
-{
-   if (pgmoneta_management_delete(ssl, socket, server, backup_id) == 0)
-   {
-      pgmoneta_management_read_delete(ssl, socket, server, backup_id, output_format);
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-stop(SSL* ssl, int socket)
-{
-   if (pgmoneta_management_stop(ssl, socket))
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-status(SSL* ssl, int socket, char output_format)
-{
-   if (pgmoneta_management_status(ssl, socket) == 0)
-   {
-      pgmoneta_management_read_status(ssl, socket, output_format);
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-details(SSL* ssl, int socket, char output_format)
-{
-   if (pgmoneta_management_details(ssl, socket) == 0)
-   {
-      pgmoneta_management_read_details(ssl, socket, output_format);
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-isalive(SSL* ssl, int socket)
-{
-   int status = -1;
-
-   if (pgmoneta_management_isalive(ssl, socket) == 0)
-   {
-      if (pgmoneta_management_read_isalive(ssl, socket, &status))
-      {
-         return 1;
-      }
-
-      if (status != 1 && status != 2)
-      {
-         return 1;
-      }
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-reset(SSL* ssl, int socket)
-{
-   if (pgmoneta_management_reset(ssl, socket))
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-reload(SSL* ssl, int socket)
-{
-   if (pgmoneta_management_reload(ssl, socket))
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-retain(SSL* ssl, int socket, char* server, char* backup_id)
-{
-   if (pgmoneta_management_retain(ssl, socket, server, backup_id))
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-expunge(SSL* ssl, int socket, char* server, char* backup_id)
-{
-   if (pgmoneta_management_expunge(ssl, socket, server, backup_id))
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-decrypt_data(SSL* ssl, int socket, char* path)
-{
-   int ret;
-
-   if (pgmoneta_management_decrypt(ssl, socket, path))
-   {
-      return 1;
-   }
-   pgmoneta_management_read_int32(ssl, socket, &ret);
-   return ret;
-}
-
-static int
-encrypt_data(SSL* ssl, int socket, char* path)
-{
-   int ret;
-
-   if (pgmoneta_management_encrypt(ssl, socket, path))
-   {
-      return 1;
-   }
-   pgmoneta_management_read_int32(ssl, socket, &ret);
-   return ret;
-}
-
-static int
-decompress_data(SSL* ssl, int socket, char* path)
-{
-   int ret;
-
-   if (pgmoneta_management_decompress(ssl, socket, path))
-   {
-      return 1;
-   }
-   pgmoneta_management_read_int32(ssl, socket, &ret);
-   return ret;
-}
-
-static int
-compress_data(SSL* ssl, int socket, char* path)
-{
-   int ret;
-
-   if (pgmoneta_management_compress(ssl, socket, path))
-   {
-      return 1;
-   }
-   pgmoneta_management_read_int32(ssl, socket, &ret);
-   return ret;
-}
-
-static int
-info(SSL* ssl, int socket, char* server, char* backup, char output_format)
-{
-   if (pgmoneta_management_info(ssl, socket, server, backup) == 0)
-   {
-      pgmoneta_management_read_info(ssl, socket, output_format);
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
-}
-
-static int
-annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, char output_format)
-{
-   if (pgmoneta_management_annotate(ssl, socket, server, backup, command, key, comment) == 0)
-   {
-      pgmoneta_management_read_annotate(ssl, socket, output_format);
-   }
-   else
-   {
-      return 1;
-   }
-
-   return 0;
+   return 1;
 }

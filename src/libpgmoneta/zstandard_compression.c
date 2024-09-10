@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <management.h>
 #include <utils.h>
 #include <workers.h>
 #include <zstandard_compression.h>
@@ -319,6 +320,86 @@ error:
    free(zout);
 }
 
+void
+pgmoneta_zstandardd_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* orig = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, payload);
+      pgmoneta_log_error("ZSTD: No file for %s", from);
+      goto error;
+   }
+
+   orig = pgmoneta_append(orig, from);
+   to = pgmoneta_remove_suffix(orig, ".zstd");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("ZSTD: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_zstandardd_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, payload);
+      pgmoneta_log_error("ZSTD: Error ztsd %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("ZSTD: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, payload);
+      pgmoneta_log_error("ZSTD: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("ZSTD: %s (Elapsed: %s)", from, elapsed);
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(1);
+}
+
 int
 pgmoneta_zstandardd_file(char* from, char* to)
 {
@@ -503,6 +584,83 @@ error:
 
    free(zin);
    free(zout);
+}
+
+void
+pgmoneta_zstandardc_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, payload);
+      pgmoneta_log_error("ZSTD: No file for %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, ".zstd");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("ZSTD: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_zstandardc_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, payload);
+      pgmoneta_log_error("ZSTD: Error ztsd %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("ZSTD: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, payload);
+      pgmoneta_log_error("ZSTD: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("ZSTD: %s (Elapsed: %s)", from, elapsed);
+
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(to);
+   free(elapsed);
+
+   exit(1);
 }
 
 int

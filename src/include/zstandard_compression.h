@@ -33,6 +33,7 @@
 extern "C" {
 #endif
 
+#include <json.h>
 #include <workers.h>
 
 #include <stdlib.h>
@@ -61,6 +62,15 @@ void
 pgmoneta_zstandardc_wal(char* directory);
 
 /**
+ * ZSTD decompress a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_zstandardd_request(SSL* ssl, int client_fd, struct json* payload);
+
+/**
  * Decompress a Zstandard file
  * @param from The from file
  * @param to The to file
@@ -76,6 +86,15 @@ pgmoneta_zstandardd_file(char* from, char* to);
  */
 void
 pgmoneta_zstandardd_directory(char* directory, struct workers* workers);
+
+/**
+ * ZSTD compress a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_zstandardc_request(SSL* ssl, int client_fd, struct json* payload);
 
 /**
  * Compress a file

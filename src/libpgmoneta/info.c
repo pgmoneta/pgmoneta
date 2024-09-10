@@ -29,8 +29,10 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <info.h>
+#include <json.h>
 #include <logging.h>
 #include <management.h>
+#include <network.h>
 #include <utils.h>
 
 /* system */
@@ -83,6 +85,7 @@ pgmoneta_create_info(char* directory, char* label, int status)
 
    if (sfile != NULL)
    {
+      fsync(fileno(sfile));
       fclose(sfile);
    }
 
@@ -150,11 +153,13 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
 
    if (sfile != NULL)
    {
+      fsync(fileno(sfile));
       fclose(sfile);
    }
 
    if (dfile != NULL)
    {
+      fsync(fileno(dfile));
       fclose(dfile);
    }
 
@@ -226,11 +231,13 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
 
    if (sfile != NULL)
    {
+      fsync(fileno(sfile));
       fclose(sfile);
    }
 
    if (dfile != NULL)
    {
+      fsync(fileno(dfile));
       fclose(dfile);
    }
 
@@ -249,74 +256,18 @@ pgmoneta_update_info_bool(char* directory, char* key, bool value)
 }
 
 int
-pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment)
+pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, char* key, char* comment)
 {
    char* d = NULL;
    char* dir = NULL;
    char* old_comments = NULL;
    char* new_comments = NULL;
-   int srv = -1;
-   int number_of_backups = 0;
    bool found = false;
    bool fail = false;
-   struct backup** backups = NULL;
-   struct backup* bck = NULL;
-   struct configuration* config;
 
-   config = (struct configuration*)shmem;
+   old_comments = pgmoneta_append(old_comments, backup->comments);
 
-   for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
-   {
-      if (!strcmp(config->servers[i].name, server))
-      {
-         srv = i;
-      }
-   }
-
-   if (srv == -1)
-   {
-      pgmoneta_log_error("Annotate: No server defined by %s", server);
-      goto error;
-   }
-
-   d = pgmoneta_get_server_backup(srv);
-
-   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-   {
-      goto error;
-   }
-
-   if (!strcmp(backup, "oldest"))
-   {
-      bck = backups[0];
-   }
-   else if (!strcmp(backup, "latest") || !strcmp(backup, "newest"))
-   {
-      bck = backups[number_of_backups - 1];
-   }
-   else
-   {
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         if (!strcmp(backups[i]->label, backup))
-         {
-            bck = backups[i];
-         }
-      }
-   }
-
-   if (bck == NULL)
-   {
-      pgmoneta_log_error("Annotate: No backup for %s/%s", config->servers[srv].name, backup);
-      goto error;
-   }
-
-   if (pgmoneta_get_info_string(bck, INFO_COMMENTS, &old_comments))
-   {
-      goto error;
-   }
-
-   if (!strcmp("add", command))
+   if (!strcmp("add", action))
    {
       if (old_comments == NULL || strlen(old_comments) == 0)
       {
@@ -377,7 +328,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
          free(tokens);
       }
    }
-   else if (!strcmp("update", command))
+   else if (!strcmp("update", action))
    {
       if (old_comments == NULL || strlen(old_comments) == 0)
       {
@@ -435,7 +386,7 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
          }
       }
    }
-   else if (!strcmp("remove", command))
+   else if (!strcmp("remove", action))
    {
       if (old_comments == NULL || strlen(old_comments) == 0)
       {
@@ -494,24 +445,31 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       fail = true;
    }
 
-   if (!strcmp(new_comments, ",") || pgmoneta_starts_with(new_comments, ","))
+   if (new_comments != NULL)
    {
-      new_comments = pgmoneta_remove_first(new_comments);
-
-      if (new_comments == NULL)
+      if (!strcmp(new_comments, ",") || pgmoneta_starts_with(new_comments, ","))
       {
-         fail = true;
+         new_comments = pgmoneta_remove_first(new_comments);
+
+         if (new_comments == NULL)
+         {
+            fail = true;
+         }
+      }
+
+      if (pgmoneta_ends_with(new_comments, ","))
+      {
+         new_comments = pgmoneta_remove_last(new_comments);
+
+         if (new_comments == NULL)
+         {
+            fail = true;
+         }
       }
    }
-
-   if (pgmoneta_ends_with(new_comments, ","))
+   else
    {
-      new_comments = pgmoneta_remove_last(new_comments);
-
-      if (new_comments == NULL)
-      {
-         fail = true;
-      }
+      new_comments = pgmoneta_append(new_comments, "");
    }
 
    if (fail)
@@ -519,65 +477,31 @@ pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, 
       free(new_comments);
       new_comments = NULL;
 
-      if (old_comments != NULL && strlen(old_comments) > 0)
-      {
-         new_comments = pgmoneta_append(new_comments, old_comments);
-      }
+      new_comments = pgmoneta_append(new_comments, backup->comments);
    }
+
+   d = pgmoneta_get_server(server);
+   d = pgmoneta_append(d, "backup/");
 
    dir = pgmoneta_append(dir, d);
    if (!pgmoneta_ends_with(dir, "/"))
    {
       dir = pgmoneta_append(dir, "/");
    }
-   dir = pgmoneta_append(dir, bck->label);
+   dir = pgmoneta_append(dir, backup->label);
    dir = pgmoneta_append(dir, "/");
 
-   pgmoneta_update_info_string(dir, INFO_COMMENTS, new_comments != NULL && strlen(new_comments) > 0 ? new_comments : "");
+   pgmoneta_update_info_string(dir, INFO_COMMENTS, new_comments);
 
-   pgmoneta_management_write_annotate(ssl, socket, server, bck->label, new_comments != NULL && strlen(new_comments) > 0 ? new_comments : "");
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
+   memset(backup->comments, 0, sizeof(backup->comments));
+   memcpy(backup->comments, new_comments, strlen(new_comments));
 
    free(d);
    free(dir);
    free(old_comments);
    free(new_comments);
-
-   free(server);
-   free(backup);
-   free(command);
-   free(key);
-   free(comment);
 
    return 0;
-
-error:
-
-   pgmoneta_management_write_annotate(ssl, socket, srv != -1 ? server : "Unknown", bck != NULL ? bck->label : "Unknown", "");
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(d);
-   free(dir);
-   free(old_comments);
-   free(new_comments);
-
-   free(server);
-   free(backup);
-   free(command);
-   free(key);
-   free(comment);
-
-   return 1;
 }
 
 int
@@ -866,6 +790,7 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
 
    if (file != NULL)
    {
+      fsync(fileno(file));
       fclose(file);
    }
 
@@ -877,6 +802,7 @@ error:
 
    if (file != NULL)
    {
+      fsync(fileno(file));
       fclose(file);
    }
 
@@ -923,4 +849,370 @@ pgmoneta_get_number_of_valid_backups(int server)
 error:
 
    return 0;
+}
+
+void
+pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload)
+{
+   char* backup = NULL;
+   char* d = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   int32_t number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct backup* bck = NULL;
+   struct json* tablespaces = NULL;
+   struct json* req = NULL;
+   struct json* response = NULL;
+   struct configuration* config = NULL;
+
+   config = (struct configuration*)shmem;
+
+   start_time = time(NULL);
+
+   d = pgmoneta_get_server_backup(server);
+
+   number_of_backups = 0;
+   backups = NULL;
+
+   pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+   if (number_of_backups == 0)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, payload);
+      pgmoneta_log_warn("Info: No backups");
+
+      goto error;
+   }
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   backup = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+
+   if (!strcmp("oldest", backup))
+   {
+      bck = backups[0];
+   }
+   else if (!strcmp("newest", backup) || !strcmp("latest", backup))
+   {
+      bck = backups[number_of_backups - 1];
+   }
+   else
+   {
+      for (int i = 0; bck == NULL && i < number_of_backups; i++)
+      {
+         if (!strcmp(backups[i]->label, backup))
+         {
+            bck = backups[i];
+         }
+      }
+   }
+
+   if (bck == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, payload);
+      pgmoneta_log_warn("Info: No backup (%s)", backup);
+
+      goto error;
+   }
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Info: Allocation error");
+
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)bck->label, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)bck->wal, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)bck->backup_size, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)bck->restore_size, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->elapsed_time, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)bck->version, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)bck->minor_version, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)bck->keep, ValueBool);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)bck->valid, ValueInt8);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES, (uintptr_t)bck->number_of_tablespaces, ValueUInt64);
+
+   if (pgmoneta_json_create(&tablespaces))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Info: Allocation error");
+
+      goto error;
+   }
+
+   for (uint64_t i = 0; i < bck->number_of_tablespaces; i++)
+   {
+      struct json* tbl = NULL;
+
+      if (pgmoneta_json_create(&tablespaces))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+         pgmoneta_log_error("Info: Allocation error");
+
+         goto error;
+      }
+
+      pgmoneta_json_put(tbl, MANAGEMENT_ARGUMENT_TABLESPACE_NAME, (uintptr_t)bck->tablespaces[i], ValueString);
+
+      pgmoneta_json_append(tablespaces, (uintptr_t)tbl, ValueJSON);
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TABLESPACES, (uintptr_t)tablespaces, ValueJSON);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_HILSN, (uintptr_t)bck->start_lsn_hi32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_LOLSN, (uintptr_t)bck->start_lsn_lo32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_HILSN, (uintptr_t)bck->end_lsn_hi32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_LOLSN, (uintptr_t)bck->end_lsn_lo32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN, (uintptr_t)bck->checkpoint_lsn_hi32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN, (uintptr_t)bck->checkpoint_lsn_lo32, ValueUInt32);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_TIMELINE, (uintptr_t)bck->start_timeline, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_TIMELINE, (uintptr_t)bck->end_timeline, ValueUInt32);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)bck->comments, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NETWORK, payload);
+      pgmoneta_log_error("Info: Error sending response");
+
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("Info: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
+
+   pgmoneta_json_destroy(payload);
+
+   for (int j = 0; j < number_of_backups; j++)
+   {
+      free(backups[j]);
+   }
+   free(backups);
+
+   free(d);
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   exit(0);
+
+error:
+
+   pgmoneta_json_destroy(payload);
+
+   for (int j = 0; j < number_of_backups; j++)
+   {
+      free(backups[j]);
+   }
+   free(backups);
+
+   free(d);
+
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   exit(1);
+}
+
+void
+pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payload)
+{
+   char* backup = NULL;
+   char* action = NULL;
+   char* key = NULL;
+   char* comment = NULL;
+   char* d = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   int32_t number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct backup* bck = NULL;
+   struct json* tablespaces = NULL;
+   struct json* req = NULL;
+   struct json* response = NULL;
+   struct configuration* config = NULL;
+
+   config = (struct configuration*)shmem;
+
+   start_time = time(NULL);
+
+   d = pgmoneta_get_server_backup(server);
+
+   number_of_backups = 0;
+   backups = NULL;
+
+   pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+   if (number_of_backups == 0)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NOBACKUP, payload);
+      pgmoneta_log_warn("Annotate: No backups");
+
+      goto error;
+   }
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   backup = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   action = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_ACTION);
+   key = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_KEY);
+   comment = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_COMMENT);
+
+   if (!strcmp("oldest", backup))
+   {
+      bck = backups[0];
+   }
+   else if (!strcmp("newest", backup) || !strcmp("latest", backup))
+   {
+      bck = backups[number_of_backups - 1];
+   }
+   else
+   {
+      for (int i = 0; bck == NULL && i < number_of_backups; i++)
+      {
+         if (!strcmp(backups[i]->label, backup))
+         {
+            bck = backups[i];
+         }
+      }
+   }
+
+   if (bck == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NOBACKUP, payload);
+      pgmoneta_log_warn("Annotate: No backup (%s)", backup);
+
+      goto error;
+   }
+
+   if (pgmoneta_update_info_annotate(server, bck, action, key, comment))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_FAILED, payload);
+      pgmoneta_log_error("Annotate: Failed annotate (%s)", backup);
+
+      goto error;
+   }
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Annotate: Allocation error");
+
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)bck->label, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)bck->wal, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)bck->backup_size, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)bck->restore_size, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->elapsed_time, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)bck->version, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)bck->minor_version, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)bck->keep, ValueBool);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)bck->valid, ValueInt8);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES, (uintptr_t)bck->number_of_tablespaces, ValueUInt64);
+
+   if (pgmoneta_json_create(&tablespaces))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Annotate: Allocation error");
+
+      goto error;
+   }
+
+   for (uint64_t i = 0; i < bck->number_of_tablespaces; i++)
+   {
+      struct json* tbl = NULL;
+
+      if (pgmoneta_json_create(&tablespaces))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+         pgmoneta_log_error("Annotate: Allocation error");
+
+         goto error;
+      }
+
+      pgmoneta_json_put(tbl, MANAGEMENT_ARGUMENT_TABLESPACE_NAME, (uintptr_t)bck->tablespaces[i], ValueString);
+
+      pgmoneta_json_append(tablespaces, (uintptr_t)tbl, ValueJSON);
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TABLESPACES, (uintptr_t)tablespaces, ValueJSON);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_HILSN, (uintptr_t)bck->start_lsn_hi32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_LOLSN, (uintptr_t)bck->start_lsn_lo32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_HILSN, (uintptr_t)bck->end_lsn_hi32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_LOLSN, (uintptr_t)bck->end_lsn_lo32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN, (uintptr_t)bck->checkpoint_lsn_hi32, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN, (uintptr_t)bck->checkpoint_lsn_lo32, ValueUInt32);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_TIMELINE, (uintptr_t)bck->start_timeline, ValueUInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_TIMELINE, (uintptr_t)bck->end_timeline, ValueUInt32);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)bck->comments, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NETWORK, payload);
+      pgmoneta_log_error("Annotate: Error sending response");
+
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("Annotate: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
+
+   pgmoneta_json_destroy(payload);
+
+   for (int j = 0; j < number_of_backups; j++)
+   {
+      free(backups[j]);
+   }
+   free(backups);
+
+   free(d);
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   exit(0);
+
+error:
+
+   pgmoneta_json_destroy(payload);
+
+   for (int j = 0; j < number_of_backups; j++)
+   {
+      free(backups[j]);
+   }
+   free(backups);
+
+   free(d);
+
+   free(elapsed);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   exit(1);
 }

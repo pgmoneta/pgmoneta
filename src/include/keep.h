@@ -33,25 +33,30 @@
 extern "C" {
 #endif
 
+#include <pgmoneta.h>
+#include <json.h>
+
 #include <stdlib.h>
 
 /**
  * Retain the backup
+ * @param ssl The SSL connection
+ * @param client_fd The client
  * @param server The server
- * @param backup_id The backup identifier
- * @return The result
+ * @param payload The payload
  */
-int
-pgmoneta_retain_backup(int server, char* backup_id);
+void
+pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, struct json* payload);
 
 /**
  * Expunge the backup
+ * @param ssl The SSL connection
+ * @param client_fd The client
  * @param server The server
- * @param backup_id The backup identifier
- * @return The result
+ * @param payload The payload
  */
-int
-pgmoneta_expunge_backup(int server, char* backup_id);
+void
+pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, struct json* payload);
 
 #ifdef __cplusplus
 }

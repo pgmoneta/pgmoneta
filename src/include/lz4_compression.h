@@ -33,6 +33,7 @@
 extern "C" {
 #endif
 
+#include <json.h>
 #include <workers.h>
 
 #include <stdlib.h>
@@ -71,6 +72,15 @@ void
 pgmoneta_lz4d_data(char* directory, struct workers* workers);
 
 /**
+ * LZ4 decompress a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_lz4d_request(SSL* ssl, int client_fd, struct json* payload);
+
+/**
  * Decompress a Lz4 file
  * @param from The from file
  * @param to The to file
@@ -78,6 +88,15 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers);
  */
 int
 pgmoneta_lz4d_file(char* from, char* to);
+
+/**
+ * LZ4 compress a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_lz4c_request(SSL* ssl, int client_fd, struct json* payload);
 
 /**
  * Compress a file

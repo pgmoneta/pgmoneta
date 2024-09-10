@@ -33,7 +33,8 @@
 extern "C" {
 #endif
 
-#include <ev.h>
+#include <json.h>
+
 #include <stdlib.h>
 
 /**
@@ -41,13 +42,10 @@ extern "C" {
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
- * @param backup_id The backup identifier
- * @param position The position
- * @param directory The target directory
- * @param argv The argv
+ * @param request The request
  */
 void
-pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
+pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* request);
 
 /**
  * Extract from a tar file to a given directory

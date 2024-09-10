@@ -33,48 +33,19 @@
 extern "C" {
 #endif
 
-#include <value.h>
+#include <json.h>
 
-#include <ev.h>
 #include <stdlib.h>
-
-/** @struct verify_entry
- * Defines a verify entry
- */
-struct verify_entry
-{
-   char directory[MAX_PATH]; /**< The directory */
-   char filename[MAX_PATH];  /**< The file name */
-   char original[256];       /**< The original hash */
-   char calculated[256];     /**< The calculated hash */
-   int32_t hash_algoritm;    /**< The hash algorithm */
-   struct deque* failed;     /**< The failed files */
-   struct deque* all;        /**< All the files */
-};
 
 /**
  * Create a verify
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
- * @param backup_id The backup identifier
- * @param directory The base directory
- * @param files Which files to display
- * @param argv The argv
+ * @param payload The payload
  */
 void
-pgmoneta_verify(SSL* ssl, int client_fd, int server, char* backup_id, char* directory, char* files, char** argv);
-
-/**
- * Convert a verify entry to string
- * @param entry The entry
- * @param format The format
- * @param tag The optional tag
- * @param indent The indent
- * @return The string in json format
- */
-char*
-pgmoneta_verify_entry_to_string(struct verify_entry* entry, int32_t format, char* tag, int indent);
+pgmoneta_verify(SSL* ssl, int client_fd, int server, struct json* payload);
 
 #ifdef __cplusplus
 }

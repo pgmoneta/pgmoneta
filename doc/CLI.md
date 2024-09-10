@@ -56,7 +56,7 @@ Backup a server
 Command
 
 ``` sh
-pgmoneta-cli backup [<server>|all]
+pgmoneta-cli backup <server>
 ```
 
 Example

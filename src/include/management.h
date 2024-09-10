@@ -35,12 +35,16 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <deque.h>
+#include <json.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include <openssl/ssl.h>
 
+/**
+ * Management commands
+ */
 #define MANAGEMENT_BACKUP          1
 #define MANAGEMENT_LIST_BACKUP     2
 #define MANAGEMENT_RESTORE         3
@@ -63,437 +67,485 @@ extern "C" {
 #define MANAGEMENT_ANNOTATE       20
 
 /**
- * Available command output formats
+ * Management categories
  */
-#define COMMAND_OUTPUT_FORMAT_TEXT 'T'
-#define COMMAND_OUTPUT_FORMAT_JSON 'J'
+#define MANAGEMENT_CATEGORY_HEADER   "Header"
+#define MANAGEMENT_CATEGORY_REQUEST  "Request"
+#define MANAGEMENT_CATEGORY_RESPONSE "Response"
+#define MANAGEMENT_CATEGORY_OUTCOME  "Outcome"
 
 /**
- * Read the management header
- * @param socket The socket descriptor
- * @param id The resulting management identifier
- * @return 0 upon success, otherwise 1
+ * Management arguments
  */
-int
-pgmoneta_management_read_header(int socket, signed char* id);
+#define MANAGEMENT_ARGUMENT_ACTION                "Action"
+#define MANAGEMENT_ARGUMENT_ALL                   "All"
+#define MANAGEMENT_ARGUMENT_BACKUP                "Backup"
+#define MANAGEMENT_ARGUMENT_BACKUPS               "Backups"
+#define MANAGEMENT_ARGUMENT_BACKUP_SIZE           "BackupSize"
+#define MANAGEMENT_ARGUMENT_CALCULATED            "Calculated"
+#define MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN      "CheckpointHiLSN"
+#define MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN      "CheckpointLoLSN"
+#define MANAGEMENT_ARGUMENT_COMMAND               "Command"
+#define MANAGEMENT_ARGUMENT_COMMENT               "Comment"
+#define MANAGEMENT_ARGUMENT_COMMENTS              "Comments"
+#define MANAGEMENT_ARGUMENT_DELTA                 "Delta"
+#define MANAGEMENT_ARGUMENT_DESTINATION_FILE      "DestinationFile"
+#define MANAGEMENT_ARGUMENT_DIRECTORY             "Directory"
+#define MANAGEMENT_ARGUMENT_ELAPSED               "Elapsed"
+#define MANAGEMENT_ARGUMENT_END_HILSN             "EndHiLSN"
+#define MANAGEMENT_ARGUMENT_END_LOLSN             "EndLoLSN"
+#define MANAGEMENT_ARGUMENT_END_TIMELINE          "EndTimeline"
+#define MANAGEMENT_ARGUMENT_ERROR                 "Error"
+#define MANAGEMENT_ARGUMENT_FAILED                "Failed"
+#define MANAGEMENT_ARGUMENT_FILENAME              "FileName"
+#define MANAGEMENT_ARGUMENT_FILES                 "Files"
+#define MANAGEMENT_ARGUMENT_FREE_SPACE            "FreeSpace"
+#define MANAGEMENT_ARGUMENT_HASH_ALGORITHM        "HashAlgorithm"
+#define MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE      "HotStandbySize"
+#define MANAGEMENT_ARGUMENT_KEEP                  "Keep"
+#define MANAGEMENT_ARGUMENT_KEY                   "Key"
+#define MANAGEMENT_ARGUMENT_MAJOR_VERSION         "MajorVersion"
+#define MANAGEMENT_ARGUMENT_MINOR_VERSION         "MinorVersion"
+#define MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS     "NumberOfBackups"
+#define MANAGEMENT_ARGUMENT_NUMBER_OF_DIRECTORIES "NumberOfDirectories"
+#define MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS     "NumberOfServers"
+#define MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES "NumberOfTablespaces"
+#define MANAGEMENT_ARGUMENT_OFFLINE               "Offline"
+#define MANAGEMENT_ARGUMENT_ORIGINAL              "Original"
+#define MANAGEMENT_ARGUMENT_OUTPUT                "Output"
+#define MANAGEMENT_ARGUMENT_POSITION              "Position"
+#define MANAGEMENT_ARGUMENT_RESTORE_SIZE          "RestoreSize"
+#define MANAGEMENT_ARGUMENT_RETENTION_DAYS        "RetentionDays"
+#define MANAGEMENT_ARGUMENT_RETENTION_MONTHS      "RetentionMonths"
+#define MANAGEMENT_ARGUMENT_RETENTION_WEEKS       "RetentionWeeks"
+#define MANAGEMENT_ARGUMENT_RETENTION_YEARS       "RetentionYears"
+#define MANAGEMENT_ARGUMENT_SERVER                "Server"
+#define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
+#define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
+#define MANAGEMENT_ARGUMENT_SERVER_VERSION        "ServerVersion"
+#define MANAGEMENT_ARGUMENT_SOURCE_FILE           "SourceFile"
+#define MANAGEMENT_ARGUMENT_START_HILSN           "StartHiLSN"
+#define MANAGEMENT_ARGUMENT_START_LOLSN           "StartLoLSN"
+#define MANAGEMENT_ARGUMENT_START_TIMELINE        "StartTimeline"
+#define MANAGEMENT_ARGUMENT_STATUS                "Status"
+#define MANAGEMENT_ARGUMENT_TABLESPACE            "Tablespace"
+#define MANAGEMENT_ARGUMENT_TABLESPACES           "Tablespaces"
+#define MANAGEMENT_ARGUMENT_TABLESPACE_NAME       "TablespaceName"
+#define MANAGEMENT_ARGUMENT_TIME                  "Time"
+#define MANAGEMENT_ARGUMENT_TIMESTAMP             "Timestamp"
+#define MANAGEMENT_ARGUMENT_TOTAL_SPACE           "TotalSpace"
+#define MANAGEMENT_ARGUMENT_USED_SPACE            "UsedSpace"
+#define MANAGEMENT_ARGUMENT_VALID                 "Valid"
+#define MANAGEMENT_ARGUMENT_VERSION               "Version"
+#define MANAGEMENT_ARGUMENT_WAL                   "WAL"
+#define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 
 /**
- * Read the management payload
- * @param socket The socket descriptor
- * @param id The management identifier
- * @param payload_s1 The resulting string payload
- * @param payload_s2 The resulting string payload
- * @param payload_s3 The resulting string payload
- * @param payload_s4 The resulting string payload
- * @param payload_s5 The resulting string payload
- * @return 0 upon success, otherwise 1
+ * Management error
  */
-int
-pgmoneta_management_read_payload(int socket, signed char id, char** payload_s1, char** payload_s2, char** payload_s3, char** payload_s4, char** payload_s5);
+#define MANAGEMENT_ERROR_BAD_PAYLOAD     1
+#define MANAGEMENT_ERROR_UNKNOWN_COMMAND 2
+#define MANAGEMENT_ERROR_ALLOCATION      3
+
+#define MANAGEMENT_ERROR_BACKUP_INVALID  100
+#define MANAGEMENT_ERROR_BACKUP_WAL      101
+#define MANAGEMENT_ERROR_BACKUP_ACTIVE   102
+#define MANAGEMENT_ERROR_BACKUP_SETUP    103
+#define MANAGEMENT_ERROR_BACKUP_EXECUTE  104
+#define MANAGEMENT_ERROR_BACKUP_TEARDOWN 105
+#define MANAGEMENT_ERROR_BACKUP_NETWORK  106
+#define MANAGEMENT_ERROR_BACKUP_OFFLINE  107
+#define MANAGEMENT_ERROR_BACKUP_NOSERVER 108
+#define MANAGEMENT_ERROR_BACKUP_NOFORK   109
+#define MANAGEMENT_ERROR_BACKUP_ERROR    110
+
+#define MANAGEMENT_ERROR_LIST_BACKUP_DEQUE_CREATE 200
+#define MANAGEMENT_ERROR_LIST_BACKUP_BACKUPS      201
+#define MANAGEMENT_ERROR_LIST_BACKUP_JSON_VALUE   202
+#define MANAGEMENT_ERROR_LIST_BACKUP_NETWORK      203
+#define MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER     204
+#define MANAGEMENT_ERROR_LIST_BACKUP_NOFORK       205
+
+#define MANAGEMENT_ERROR_DELETE_SETUP    300
+#define MANAGEMENT_ERROR_DELETE_EXECUTE  301
+#define MANAGEMENT_ERROR_DELETE_TEARDOWN 302
+#define MANAGEMENT_ERROR_DELETE_NOSERVER 303
+#define MANAGEMENT_ERROR_DELETE_NOFORK   304
+#define MANAGEMENT_ERROR_DELETE_NETWORK  305
+#define MANAGEMENT_ERROR_DELETE_ERROR    306
+
+#define MANAGEMENT_ERROR_RESTORE_NOSERVER 400
+#define MANAGEMENT_ERROR_RESTORE_NOFORK   401
+#define MANAGEMENT_ERROR_RESTORE_NETWORK  402
+#define MANAGEMENT_ERROR_RESTORE_ERROR    403
+
+#define MANAGEMENT_ERROR_VERIFY_NOSERVER 500
+#define MANAGEMENT_ERROR_VERIFY_NOFORK   501
+#define MANAGEMENT_ERROR_VERIFY_NETWORK  502
+#define MANAGEMENT_ERROR_VERIFY_ERROR    503
+
+#define MANAGEMENT_ERROR_ARCHIVE_NOBACKUP 600
+#define MANAGEMENT_ERROR_ARCHIVE_NOSERVER 601
+#define MANAGEMENT_ERROR_ARCHIVE_NOFORK   602
+#define MANAGEMENT_ERROR_ARCHIVE_NETWORK  603
+#define MANAGEMENT_ERROR_ARCHIVE_ERROR    604
+
+#define MANAGEMENT_ERROR_STATUS_NOFORK   700
+#define MANAGEMENT_ERROR_STATUS_NETWORK  701
+
+#define MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK  800
+#define MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK 801
+
+#define MANAGEMENT_ERROR_RETAIN_NOBACKUP 900
+#define MANAGEMENT_ERROR_RETAIN_NOSERVER 901
+#define MANAGEMENT_ERROR_RETAIN_NOFORK   902
+#define MANAGEMENT_ERROR_RETAIN_NETWORK  903
+#define MANAGEMENT_ERROR_RETAIN_ERROR    904
+
+#define MANAGEMENT_ERROR_EXPUNGE_NOBACKUP 1000
+#define MANAGEMENT_ERROR_EXPUNGE_NOSERVER 1001
+#define MANAGEMENT_ERROR_EXPUNGE_NOFORK   1002
+#define MANAGEMENT_ERROR_EXPUNGE_NETWORK  1003
+#define MANAGEMENT_ERROR_EXPUNGE_ERROR    1004
+
+#define MANAGEMENT_ERROR_DECRYPT_NOFILE  1100
+#define MANAGEMENT_ERROR_DECRYPT_NOFORK  1101
+#define MANAGEMENT_ERROR_DECRYPT_NETWORK 1102
+#define MANAGEMENT_ERROR_DECRYPT_ERROR   1103
+
+#define MANAGEMENT_ERROR_ENCRYPT_NOFILE  1200
+#define MANAGEMENT_ERROR_ENCRYPT_NOFORK  1201
+#define MANAGEMENT_ERROR_ENCRYPT_NETWORK 1202
+#define MANAGEMENT_ERROR_ENCRYPT_ERROR   1203
+
+#define MANAGEMENT_ERROR_GZIP_NOFILE  1300
+#define MANAGEMENT_ERROR_GZIP_NOFORK  1301
+#define MANAGEMENT_ERROR_GZIP_NETWORK 1302
+#define MANAGEMENT_ERROR_GZIP_ERROR   1303
+
+#define MANAGEMENT_ERROR_ZSTD_NOFILE  1400
+#define MANAGEMENT_ERROR_ZSTD_NOFORK  1401
+#define MANAGEMENT_ERROR_ZSTD_NETWORK 1402
+#define MANAGEMENT_ERROR_ZSTD_ERROR   1403
+
+#define MANAGEMENT_ERROR_LZ4_NOFILE  1500
+#define MANAGEMENT_ERROR_LZ4_NOFORK  1501
+#define MANAGEMENT_ERROR_LZ4_NETWORK 1502
+#define MANAGEMENT_ERROR_LZ4_ERROR   1503
+
+#define MANAGEMENT_ERROR_BZIP2_NOFILE  1600
+#define MANAGEMENT_ERROR_BZIP2_NOFORK  1601
+#define MANAGEMENT_ERROR_BZIP2_NETWORK 1602
+#define MANAGEMENT_ERROR_BZIP2_ERROR   1603
+
+#define MANAGEMENT_ERROR_DECOMPRESS_NOFORK  1700
+#define MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN 1701
+
+#define MANAGEMENT_ERROR_COMPRESS_NOFORK  1800
+#define MANAGEMENT_ERROR_COMPRESS_UNKNOWN 1801
+
+#define MANAGEMENT_ERROR_INFO_NOBACKUP 1900
+#define MANAGEMENT_ERROR_INFO_NOSERVER 1901
+#define MANAGEMENT_ERROR_INFO_NOFORK   1902
+#define MANAGEMENT_ERROR_INFO_NETWORK  1903
+#define MANAGEMENT_ERROR_INFO_ERROR    1904
+
+#define MANAGEMENT_ERROR_ANNOTATE_NOBACKUP 2000
+#define MANAGEMENT_ERROR_ANNOTATE_NOSERVER 2001
+#define MANAGEMENT_ERROR_ANNOTATE_NOFORK   2002
+#define MANAGEMENT_ERROR_ANNOTATE_FAILED   2003
+#define MANAGEMENT_ERROR_ANNOTATE_NETWORK  2004
+#define MANAGEMENT_ERROR_ANNOTATE_ERROR    2005
 
 /**
- * Management operation: Backup a server
+ * Output formats
+ */
+#define MANAGEMENT_OUTPUT_FORMAT_TEXT 0
+#define MANAGEMENT_OUTPUT_FORMAT_JSON 1
+
+/**
+ * Create a backup request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param server The server name
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_backup(SSL* ssl, int socket, char* server);
-
-/**
- * Management operation: List backups for a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_list_backup(SSL* ssl, int socket, char* server);
-
-/**
- * Management operation: List backups for a server (Read)
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_list_backup(SSL* ssl, int socket, char* server, char output_format);
-
-/**
- * Management operation: List backups for a server (Write)
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server index
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_list_backup(SSL* ssl, int socket, int server);
-
-/**
- * Management operation: Restore a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup identifier
- * @param position The position
- * @param directory The directory
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
-
-/**
- * Management operation: Verify a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup identifier
- * @param directory The directory
- * @param files Which files should be displayed
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files);
-
-/**
- * Management: Read verify
- * @param ssl The SSL connection
- * @param socket The socket
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_verify(SSL* ssl, int socket, char output_format);
-
-/**
- * Management: Write verify
- * @param ssl The SSL connection
- * @param socket The socket
- * @param failed The failed files
- * @param all The all files
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_verify(SSL* ssl, int socket, struct deque* failed, struct deque* all);
-
-/**
- * Management operation: Archive a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup identifier
- * @param position The position
- * @param directory The directory
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory);
-
-/**
- * Management operation: Delete a backup for a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup id
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_delete(SSL* ssl, int socket, char* server, char* backup_id);
-
-/**
- * Management operation: Delete a backup for a server (Read)
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup identifier
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_delete(SSL* ssl, int socket, char* server, char* backup_id, char output_format);
-
-/**
- * Management operation: Delete a backup for a server (Write)
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server index
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_delete(SSL* ssl, int socket, int server);
-
-/**
- * Management operation: Stop
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_stop(SSL* ssl, int socket);
-
-/**
- * Management operation: Status
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_status(SSL* ssl, int socket);
-
-/**
- * Management: Read status
- * @param ssl The SSL connection
- * @param socket The socket
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_status(SSL* ssl, int socket, char output_format);
-
-/**
- * Management: Write status
- * @param ssl The SSL connection
- * @param socket The socket
- * @param offline Offline status
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_status(SSL* ssl, int socket, bool offline);
-
-/**
- * Management operation: Details
- * @param ssl The SSL connection
- * @param socket The socket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_details(SSL* ssl, int socket);
-
-/**
- * Management: Read details
- * @param socket The socket
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_details(SSL* ssl, int socket, char output_format);
-
-/**
- * Management: Write details
- * @param ssl The SSL connection
- * @param socket The socket
- * @param offline Offline status
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_details(SSL* ssl, int socket, bool offline);
-
-/**
- * Management operation: isalive
- * @param socket The socket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_isalive(SSL* ssl, int socket);
-
-/**
- * Management: Read isalive
- * @param socket The socket
- * @param status The resulting status
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_isalive(SSL* ssl, int socket, int* status);
-
-/**
- * Management: Write isalive
- * @param ssl The SSL connection
- * @param socket The socket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_isalive(SSL* ssl, int socket);
-
-/**
- * Management operation: Reset
- * @param ssl The SSL connection
- * @param socket The socket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_reset(SSL* ssl, int socket);
-
-/**
- * Management operation: Reload
- * @param ssl The SSL connection
- * @param socket The socket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_reload(SSL* ssl, int socket);
-
-/**
- * Management operation: Retain a backup for a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup id
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_retain(SSL* ssl, int socket, char* server, char* backup_id);
-
-/**
- * Management operation: Expunge a backup for a server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup_id The backup id
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_expunge(SSL* ssl, int socket, char* server, char* backup_id);
-
-/**
- * Management operation: Decrypt an archive file on server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param path The file path
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_decrypt(SSL* ssl, int socket, char* path);
-
-/**
- * Management operation: Encrypt a file on server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param path The file path
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_encrypt(SSL* ssl, int socket, char* path);
-
-/**
- * Management operation: Decompress a file on server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param path The file path
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_decompress(SSL* ssl, int socket, char* path);
-
-/**
- * Management operation: Compress a file on server
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param path The file path
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_compress(SSL* ssl, int socket, char* path);
-
-/**
- * Management operation: Information about a backup
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup The backup
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_info(SSL* ssl, int socket, char* server, char* backup);
-
-/**
- * Management operation: Read information for a backup
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_info(SSL* ssl, int socket, char output_format);
-
-/**
- * Management: Write info
- * @param ssl The SSL connection
- * @param socket The socket
- * @param server The server name
- * @param backup The backup
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_info(SSL* ssl, int socket, char* server, char* backup);
-
-/**
- * Management operation: Annotate a backup
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param server The server name
- * @param backup The backup
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment);
-
-/**
- * Management operation: Read annotate for a backup
- * @param ssl The SSL connection
- * @param socket The socket descriptor
- * @param output_format The output format
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_annotate(SSL* ssl, int socket, char output_format);
-
-/**
- * Management: Write annotate
- * @param ssl The SSL connection
- * @param socket The socket
- * @param server The server name
- * @param backup The backup
- * @param comment The comment
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_annotate(SSL* ssl, int socket, char* server, char* backup, char* comment);
-
-/**
- * Management: Read int32
- * @param ssl The SSL connection
- * @param socket The socket
- * @param status The resulting status
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_read_int32(SSL* ssl, int socket, int* status);
-
-/**
- * Management: Write int32
- * @param ssl The SSL connection
- * @param socket The socket
- * @param code The code
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_management_write_int32(SSL* ssl, int socket, int code);
-
-/**
- * Management: Write result
- * @param ssl The SSL connection
- * @param socket The socket
- * @param srv The server index
  * @param server The server
- * @param code The code
- * @param send Whether to send
+ * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_process_result(SSL* ssl, int socket, int srv, char* server, int code, bool send);
+pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, int32_t output_format);
+
+/**
+ * Create a list backup request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, int32_t output_format);
+
+/**
+ * Create a restore request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param position The position parameters
+ * @param directory The directory
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format);
+
+/**
+ * Create a verify request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param directory The directory
+ * @param files The files filter
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, int32_t output_format);
+
+/**
+ * Create an archive request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param position The position parameters
+ * @param directory The directory
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format);
+
+/**
+ * Create a delete request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+
+/**
+ * Create a stop request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_stop(SSL* ssl, int socket, int32_t output_format);
+
+/**
+ * Create a status payload
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_status(SSL* ssl, int socket, int32_t output_format);
+
+/**
+ * Create a status details request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_status_details(SSL* ssl, int socket, int32_t output_format);
+
+/**
+ * Create an isalive request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_isalive(SSL* ssl, int socket, int32_t output_format);
+
+/**
+ * Create a reset request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_reset(SSL* ssl, int socket, int32_t output_format);
+
+/**
+ * Create a reload request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_reload(SSL* ssl, int socket, int32_t output_format);
+
+/**
+ * Create a retain request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+
+/**
+ * Create an expunge request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+
+/**
+ * Create a decrypt request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, int32_t output_format);
+
+/**
+ * Create an encrypt request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, int32_t output_format);
+
+/**
+ * Create a decompress request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, int32_t output_format);
+
+/**
+ * Create a compress request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param path The file path
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, int32_t output_format);
+
+/**
+ * Create an info request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
+
+/**
+ * Create an annotate request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param backup_id The backup
+ * @param action The action
+ * @param key The key
+ * @param comment The comment
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, int32_t output_format);
+
+/**
+ * Create an ok response
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param start_time The start time
+ * @param end_time The end time
+ * @param payload The full payload
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, struct json* payload);
+
+/**
+ * Create an error response
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param error The error code
+ * @param payload The full payload
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, struct json* payload);
+
+/**
+ * Create a response
+ * @param json The JSON structure
+ * @param response The response
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_create_response(struct json* json, struct json** response);
+
+/**
+ * Read the management JSON
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param json The JSON structure
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_read_json(SSL* ssl, int socket, struct json** json);
+
+/**
+ * Write the management JSON
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param json The JSON structure
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_write_json(SSL* ssl, int socket, struct json* json);
 
 #ifdef __cplusplus
 }

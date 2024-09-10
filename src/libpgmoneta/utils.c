@@ -1284,6 +1284,25 @@ pgmoneta_remove_prefix(char* orig, char* prefix)
    return res;
 }
 
+char*
+pgmoneta_remove_suffix(char* orig, char* suffix)
+{
+   char* new_str = NULL;
+
+   if (pgmoneta_ends_with(orig, suffix))
+   {
+      new_str = (char*)malloc(strlen(orig) - strlen(suffix) + 1);
+
+      if (new_str != NULL)
+      {
+         memset(new_str, 0, strlen(orig) - strlen(suffix) + 1);
+         memcpy(new_str, orig, strlen(orig) - strlen(suffix));
+      }
+   }
+
+   return new_str;
+}
+
 unsigned long
 pgmoneta_directory_size(char* directory)
 {
@@ -3576,6 +3595,34 @@ pgmoneta_get_y2000_timestamp(void)
    y2000 = timegm(localtime(&y2000));
 
    return y2000 * (int64_t)1000000;
+}
+
+char*
+pgmoneta_get_timestamp_string(time_t start_time, time_t end_time, int32_t* seconds)
+{
+   int32_t total_seconds;
+   int hours;
+   int minutes;
+   int sec;
+   char elapsed[128];
+   char* result = NULL;
+
+   *seconds = 0;
+
+   total_seconds = (int32_t)difftime(end_time, start_time);
+
+   *seconds = total_seconds;
+
+   hours = total_seconds / 3600;
+   minutes = (total_seconds % 3600) / 60;
+   sec = total_seconds % 60;
+
+   memset(&elapsed[0], 0, sizeof(elapsed));
+   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, sec);
+
+   result = pgmoneta_append(result, &elapsed[0]);
+
+   return result;
 }
 
 int

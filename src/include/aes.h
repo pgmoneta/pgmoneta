@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <pgmoneta.h>
+#include <json.h>
 #include <workers.h>
 
 #include <openssl/ssl.h>
@@ -86,9 +88,18 @@ int
 pgmoneta_encrypt_wal(char* d);
 
 /**
- * Encrypt a single file, also remvoe unencrypted file.
- * @param from the path of file
- * @param to the path that encrypted file will be stored and named, or in place if NULL.
+ * Encrypt a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, struct json* payload);
+
+/**
+ * Encrypt a single file, also remove the original file
+ * @param from The from file
+ * @param to The to file
  * @return 0 upon success, otherwise 1
  */
 int
@@ -104,12 +115,13 @@ int
 pgmoneta_decrypt_directory(char* d, struct workers* workers);
 
 /**
- * Decrypt the archive file created by pgmoneta-cli archive in place, also remove encrypted archive.
- * @param d The archive file path
- * @return 0 upon success, otherwise 1
+ * Decrypt a single file, also remove encrypted file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
  */
-int
-pgmoneta_decrypt_archive(char* path);
+void
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, struct json* payload);
 
 #ifdef __cplusplus
 }

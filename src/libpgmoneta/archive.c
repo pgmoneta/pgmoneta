@@ -32,6 +32,7 @@
 #include <deque.h>
 #include <gzip_compression.h>
 #include <info.h>
+#include <json.h>
 #include <logging.h>
 #include <lz4_compression.h>
 #include <management.h>
@@ -50,34 +51,40 @@
 static void write_tar_file(struct archive* a, char* current_real_path, char* current_save_path);
 
 void
-pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
+pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
 {
-   char elapsed[128];
+   char* backup_id = NULL;
+   char* position = NULL;
+   char* directory = NULL;
+   char* elapsed = NULL;
    char real_directory[MAX_PATH];
    time_t start_time;
+   time_t end_time;
    int total_seconds;
-   int hours;
-   int minutes;
-   int seconds;
    char* to = NULL;
    char* id = NULL;
    char* d = NULL;
    char* output = NULL;
-   int result = 1;
+   char* filename = NULL;
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
+   struct json* req = NULL;
+   struct json* response = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_set_proc_title(1, argv, "archive", config->servers[server].name);
-
    start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
+   directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
    // we used to get id after restore workflow, but now we need it first to create a wrapping directory, so...
    if (!strcmp(backup_id, "oldest"))
@@ -121,7 +128,8 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
 
    if (id == NULL)
    {
-      pgmoneta_log_error("Restore: No identifier for %s/%s", config->servers[server].name, backup_id);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, payload);
+      pgmoneta_log_error("Archive: No identifier for %s/%s", config->servers[server].name, backup_id);
       goto error;
    }
 
@@ -132,8 +140,6 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
 
    if (!pgmoneta_restore_backup(server, backup_id, position, real_directory, &output, &id))
    {
-      result = 0;
-
       if (pgmoneta_deque_add(nodes, "directory", (uintptr_t)real_directory, ValueString))
       {
          goto error;
@@ -186,15 +192,48 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
          current = current->next;
       }
 
-      total_seconds = (int)difftime(time(NULL), start_time);
-      hours = total_seconds / 3600;
-      minutes = (total_seconds % 3600) / 60;
-      seconds = total_seconds % 60;
+      if (pgmoneta_management_create_response(payload, &response))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
 
-      memset(&elapsed[0], 0, sizeof(elapsed));
-      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+         goto error;
+      }
 
-      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
+      filename = pgmoneta_append(filename, (char*)pgmoneta_deque_get(nodes, "tarfile"));
+      if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+      {
+         filename = pgmoneta_append(filename, ".gz");
+      }
+      else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+      {
+         filename = pgmoneta_append(filename, ".zstd");
+      }
+      else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+      {
+         filename = pgmoneta_append(filename, ".lz4");
+      }
+      else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+      {
+         filename = pgmoneta_append(filename, ".bz2");
+      }
+
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)id, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
+
+      end_time = time(NULL);
+
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, payload);
+         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, backup_id);
+
+         goto error;
+      }
+
+      elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, elapsed);
    }
 
    for (int i = 0; i < number_of_backups; i++)
@@ -203,44 +242,45 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, char* backup_id, char* pos
    }
    free(backups);
 
-   pgmoneta_management_process_result(ssl, client_fd, server, NULL, result, true);
+   pgmoneta_deque_destroy(nodes);
+
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_workflow_delete(workflow);
+
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
 
-   pgmoneta_workflow_delete(workflow);
-
-   pgmoneta_deque_destroy(nodes);
-
    free(id);
    free(output);
    free(to);
    free(d);
 
-   free(backup_id);
-   free(position);
-   free(directory);
-
    exit(0);
 
 error:
+
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
    }
    free(backups);
-   pgmoneta_workflow_delete(workflow);
 
    pgmoneta_deque_destroy(nodes);
+
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_workflow_delete(workflow);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
 
    free(id);
    free(output);
    free(to);
    free(d);
-
-   free(backup_id);
-   free(position);
-   free(directory);
 
    exit(1);
 }

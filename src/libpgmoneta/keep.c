@@ -31,36 +31,46 @@
 #include <info.h>
 #include <keep.h>
 #include <logging.h>
+#include <management.h>
 #include <utils.h>
 
 /* system */
 #include <stdatomic.h>
 #include <stdlib.h>
 
-static int keep(char* prefix, int srv, char* backup_id, bool k);
+static void keep(char* prefix, SSL* ssl, int client_fd, int srv, struct json* payload, bool k);
 
-int
-pgmoneta_retain_backup(int srv, char* backup_id)
+void
+pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, struct json* payload)
 {
-   return keep("Retain", srv, backup_id, true);
+   keep("Retain", ssl, client_fd, server, payload, true);
 }
 
-int
-pgmoneta_expunge_backup(int srv, char* backup_id)
+void
+pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, struct json* payload)
 {
-   return keep("Expunge", srv, backup_id, false);
+   keep("Expunge", ssl, client_fd, server, payload, false);
 }
 
-static int
-keep(char* prefix, int srv, char* backup_id, bool k)
+static void
+keep(char* prefix, SSL* ssl, int client_fd, int srv, struct json* payload, bool k)
 {
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   char* backup_id = NULL;
    char* d = NULL;
    int backup_index = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
+   struct json* req = NULL;
+   struct json* response = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   start_time = time(NULL);
 
    d = pgmoneta_get_server_backup(srv);
 
@@ -71,6 +81,14 @@ keep(char* prefix, int srv, char* backup_id, bool k)
 
    free(d);
    d = NULL;
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      goto error;
+   }
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
 
    if (!strcmp(backup_id, "oldest"))
    {
@@ -103,11 +121,27 @@ keep(char* prefix, int srv, char* backup_id, bool k)
       }
    }
 
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
+
    if (backup_index == -1)
    {
-      pgmoneta_log_error("%s: No identifier for %s/%s", prefix, config->servers[srv].name, backup_id);
+      if (k)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, payload);
+         pgmoneta_log_error("Retain: No identifier for %s/%s", config->servers[srv].name, backup_id);
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, payload);
+         pgmoneta_log_error("Expunge: No identifier for %s/%s", config->servers[srv].name, backup_id);
+      }
+
       goto error;
    }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backups[backup_index]->label, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backups[backup_index]->valid, ValueInt8);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[backup_index]->comments, ValueString);
 
    if (backups[backup_index]->valid == VALID_TRUE)
    {
@@ -119,7 +153,27 @@ keep(char* prefix, int srv, char* backup_id, bool k)
       d = NULL;
    }
 
-   pgmoneta_log_info("%s: %s/%s", prefix, config->servers[srv].name, backups[backup_index]->label);
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      if (k)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_RETAIN_NETWORK, payload);
+         pgmoneta_log_error("Retain: Error sending response");
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_EXPUNGE_NETWORK, payload);
+         pgmoneta_log_error("Expunge: Error sending response");
+      }
+
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("%s: %s/%s (Elapsed: %s)", prefix, config->servers[srv].name, backups[backup_index]->label, elapsed);
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -128,8 +182,9 @@ keep(char* prefix, int srv, char* backup_id, bool k)
    free(backups);
 
    free(d);
+   free(elapsed);
 
-   return 0;
+   exit(0);
 
 error:
 
@@ -140,6 +195,7 @@ error:
    free(backups);
 
    free(d);
+   free(elapsed);
 
-   return 1;
+   exit(1);
 }

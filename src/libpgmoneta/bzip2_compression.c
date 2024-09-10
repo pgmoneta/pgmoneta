@@ -30,7 +30,7 @@
 #include <pgmoneta.h>
 #include <bzip2_compression.h>
 #include <logging.h>
-#include <stddef.h>
+#include <management.h>
 #include <utils.h>
 #include <workers.h>
 
@@ -38,6 +38,7 @@
 #include <bzlib.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -348,6 +349,86 @@ error:
    }
 }
 
+void
+pgmoneta_bunzip2_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* orig = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, payload);
+      pgmoneta_log_error("BZIP: No file for %s", from);
+      goto error;
+   }
+
+   orig = pgmoneta_append(orig, from);
+   to = pgmoneta_remove_suffix(orig, ".bz2");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("BZIP: Allocation error");
+      goto error;
+   }
+
+   if (bzip2_decompress(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, payload);
+      pgmoneta_log_error("BZIP: Error bunzip2 %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("BZIP: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, payload);
+      pgmoneta_log_error("BZIP: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("BZIP: %s (Elapsed: %s)", from, elapsed);
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(1);
+}
+
 static void
 do_bzip2_decompress(void* arg)
 {
@@ -365,6 +446,83 @@ do_bzip2_decompress(void* arg)
    }
 
    free(wi);
+}
+
+void
+pgmoneta_bzip2_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, payload);
+      pgmoneta_log_error("BZIP: No file for %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, ".bz2");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("BZIP: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_bzip2_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, payload);
+      pgmoneta_log_error("BZIP: Error bzip2 %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("BZIP: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, payload);
+      pgmoneta_log_error("BZIP: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("BZIP: %s (Elapsed: %s)", from, elapsed);
+
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(to);
+   free(elapsed);
+
+   exit(1);
 }
 
 int

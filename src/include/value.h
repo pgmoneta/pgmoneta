@@ -57,7 +57,6 @@ enum value_type {
    ValueDeque,
    ValueART,
    ValueRef,
-   ValueVerifyEntry,
 };
 
 /**

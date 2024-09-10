@@ -33,7 +33,8 @@
 extern "C" {
 #endif
 
-#include <ev.h>
+#include <json.h>
+
 #include <stdlib.h>
 
 /**
@@ -49,13 +50,10 @@ pgmoneta_get_restore_last_files_names(char*** output);
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
- * @param backup_id The backup identifier
- * @param position The position
- * @param directory The base directory
- * @param argv The argv
+ * @param request The request
  */
 void
-pgmoneta_restore(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv);
+pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* request);
 
 /**
  * Restore to a directory

@@ -35,6 +35,7 @@ extern "C" {
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <json.h>
 
 /* system */
 #include <stdlib.h>
@@ -132,17 +133,15 @@ pgmoneta_update_info_bool(char* directory, char* key, bool value);
 
 /**
  * Update backup information: annotate
- * @param ssl The SSL connection
- * @param socket The socket descriptor
  * @param server The server
- * @param backup The backup label
- * @param command The command (add / remove)
+ * @param backup The backup
+ * @param action The action (add / remove)
  * @param key The key
  * @param comment The comment
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_update_info_annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment);
+pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, char* key, char* comment);
 
 /**
  * Get a backup string value
@@ -190,6 +189,26 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup);
  */
 int
 pgmoneta_get_number_of_valid_backups(int server);
+
+/**
+ * Create an info request
+ * @param ssl The SSL connection
+ * @param client_fd The client
+ * @param server The server
+ * @param payload The payload
+ */
+void
+pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload);
+
+/**
+ * Create an annotate request
+ * @param ssl The SSL connection
+ * @param client_fd The client
+ * @param server The server
+ * @param payload The payload
+ */
+void
+pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payload);
 
 #ifdef __cplusplus
 }

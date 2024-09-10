@@ -71,55 +71,101 @@ pgmoneta_get_restore_last_files_names(char*** output)
 }
 
 void
-pgmoneta_restore(SSL* ssl, int client_fd, int server, char* backup_id, char* position, char* directory, char** argv)
+pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
 {
-   char elapsed[128];
+   char* backup_id = NULL;
+   char* position = NULL;
+   char* directory = NULL;
+   char* elapsed = NULL;
    time_t start_time;
-   int total_seconds;
-   int hours;
-   int minutes;
-   int seconds;
+   time_t end_time;
+   int total_seconds = 0;
    char* output = NULL;
    char* id = NULL;
-   int result = 1;
+   char* server_backup = NULL;
+   struct backup* backup = NULL;
+   struct json* req = NULL;
+   struct json* response = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_set_proc_title(1, argv, "restore", config->servers[server].name);
-
    start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
+   directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
    if (!pgmoneta_restore_backup(server, backup_id, position, directory, &output, &id))
    {
-      result = 0;
+      if (pgmoneta_management_create_response(payload, &response))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
 
-      total_seconds = (int)difftime(time(NULL), start_time);
-      hours = total_seconds / 3600;
-      minutes = (total_seconds % 3600) / 60;
-      seconds = total_seconds % 60;
+         goto error;
+      }
 
-      memset(&elapsed[0], 0, sizeof(elapsed));
-      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+      server_backup = pgmoneta_get_server_backup(server);
 
-      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
+      if (pgmoneta_get_backup(server_backup, id, &backup))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_ERROR, payload);
+
+         goto error;
+      }
+
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)id, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backup->comments, ValueString);
+
+      end_time = time(NULL);
+
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+      {
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, payload);
+         pgmoneta_log_error("Restore: Error sending response for %s", config->servers[server].name);
+
+         goto error;
+      }
+
+      elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, id, elapsed);
    }
 
-   pgmoneta_management_process_result(ssl, client_fd, server, NULL, result, true);
+   pgmoneta_json_destroy(payload);
+
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
 
+   free(backup);
+   free(elapsed);
+   free(server_backup);
    free(output);
    free(id);
 
-   free(backup_id);
-   free(position);
-   free(directory);
-
    exit(0);
+
+error:
+
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   free(backup);
+   free(elapsed);
+   free(server_backup);
+   free(output);
+   free(id);
+
+   exit(1);
 }
 
 int

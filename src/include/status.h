@@ -26,83 +26,36 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_BZIP_H
-#define PGMONETA_BZIP_H
+#ifndef PGMONETA_STATUS_H
+#define PGMONETA_STATUS_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <json.h>
-#include <workers.h>
 
 #include <stdlib.h>
 
 /**
- * BZip a data directory
- * @param directory The directory
- * @param workers The optional workers
+ * Create an status
+ * @param ssl The SSL connection
+ * @param client_fd The client
+ * @param offline Is the server running in offline mode
+ * @param payload The payload
  */
 void
-pgmoneta_bzip2_data(char* directory, struct workers* workers);
+pgmoneta_status(SSL* ssl, int client_fd, bool offline, struct json* payload);
 
 /**
- * Compress tablespace directories
- * @param root The root directory
- * @param workers The optional workers
+ * Create an status details
+ * @param ssl The SSL connection
+ * @param client_fd The client
+ * @param offline Is the server running in offline mode
+ * @param payload The payload
  */
 void
-pgmoneta_bzip2_tablespaces(char* root, struct workers* workers);
-
-/**
- * BZip a WAL directory
- * @param directory The directory
- */
-void
-pgmoneta_bzip2_wal(char* directory);
-
-/**
- * BUNZip a directory
- * @param directory The directory
- * @param workers The optional workers
- */
-void
-pgmoneta_bunzip2_data(char* directory, struct workers* workers);
-
-/**
- * BZip compress a single file, also remove the original file
- * @param ssl The SSL
- * @param client_fd The client descriptor
- * @param payload The payload of the request
- */
-void
-pgmoneta_bzip2_request(SSL* ssl, int client_fd, struct json* payload);
-
-/**
- * BZip a file
- * @param from The from name
- * @param to The to name
- */
-int
-pgmoneta_bzip2_file(char* from, char* to);
-
-/**
- * BUNZip decompress a single file, also remove the original file
- * @param ssl The SSL
- * @param client_fd The client descriptor
- * @param payload The payload of the request
- */
-void
-pgmoneta_bunzip2_request(SSL* ssl, int client_fd, struct json* payload);
-
-/**
- * BUNZip a file
- * @param from The from file
- * @param to The to file
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_bunzip2_file(char* from, char* to);
+pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, struct json* payload);
 
 #ifdef __cplusplus
 }

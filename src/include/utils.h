@@ -585,13 +585,22 @@ char*
 pgmoneta_remove_whitespace(char* orig);
 
 /**
- * Remove the common prefix from orig
+ * Remove the prefix from orig
  * @param orig The original string
  * @param prefix The prefix string
  * @return The resulting string
  */
 char*
 pgmoneta_remove_prefix(char* orig, char* prefix);
+
+/**
+ * Remove the prefix from orig
+ * @param orig The original string
+ * @param suffix The suffix string
+ * @return The resulting string
+ */
+char*
+pgmoneta_remove_suffix(char* orig, char* suffix);
 
 /**
  * Calculate the directory size
@@ -1065,6 +1074,16 @@ pgmoneta_get_current_timestamp(void);
  */
 int64_t
 pgmoneta_get_y2000_timestamp(void);
+
+/**
+ * Get the timestramp difference as a string
+ * @param start_time The start time
+ * @param end_time The end time
+ * @param seconds The number of seconds
+ * @return The timestamp string
+ */
+char*
+pgmoneta_get_timestamp_string(time_t start_time, time_t end_time, int32_t* seconds);
 
 /**
  * Convert base32 to hexadecimal.

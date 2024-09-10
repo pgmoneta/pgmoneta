@@ -33,6 +33,7 @@
 extern "C" {
 #endif
 
+#include <json.h>
 #include <workers.h>
 
 #include <stdlib.h>
@@ -61,6 +62,32 @@ void
 pgmoneta_gzip_wal(char* directory);
 
 /**
+ * GZip a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload);
+
+/**
+ * GZip a file
+ * @param from The from name
+ * @param to The to name
+ */
+int
+pgmoneta_gzip_file(char* from, char* to);
+
+/**
+ * GUNZip a single file, also remove the original file
+ * @param ssl The SSL
+ * @param client_fd The client descriptor
+ * @param payload The payload of the request
+ */
+void
+pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload);
+
+/**
  * GUNZip a file
  * @param from The from file
  * @param to The to file
@@ -76,14 +103,6 @@ pgmoneta_gunzip_file(char* from, char* to);
  */
 void
 pgmoneta_gunzip_data(char* directory, struct workers* workers);
-
-/**
- * GZip a file
- * @param from The from name
- * @param to The to name
- */
-int
-pgmoneta_gzip_file(char* from, char* to);
 
 #ifdef __cplusplus
 }

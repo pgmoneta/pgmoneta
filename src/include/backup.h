@@ -33,6 +33,9 @@
 extern "C" {
 #endif
 
+#include <pgmoneta.h>
+#include <json.h>
+
 #include <ev.h>
 #include <stdlib.h>
 
@@ -40,10 +43,28 @@ extern "C" {
  * Create a backup
  * @param client_fd The client
  * @param server The server
- * @param argv The argv
+ * @param payload The payload
  */
 void
-pgmoneta_backup(int client_fd, int server, char** argv);
+pgmoneta_backup(int client_fd, int server, struct json* payload);
+
+/**
+ * List backups for a server
+ * @param client_fd The client
+ * @param server The server
+ * @param payload The payload
+ */
+void
+pgmoneta_list_backup(int client_fd, int server, struct json* payload);
+
+/**
+ * Delete a backup for a server
+ * @param client_fd The client
+ * @param server The server
+ * @param payload The payload
+ */
+void
+pgmoneta_delete_backup(int client_fd, int srv, struct json* payload);
 
 /**
  * Get the backup max rate for a server

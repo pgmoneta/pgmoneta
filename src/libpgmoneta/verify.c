@@ -43,75 +43,46 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static int verify_backup(SSL* ssl, int client_fd, int server, char* backup_id, char* directory, char* files, char** output, char** identifier);
-
 void
-pgmoneta_verify(SSL* ssl, int client_fd, int server, char* backup_id, char* directory, char* files, char** argv)
+pgmoneta_verify(SSL* ssl, int client_fd, int server, struct json* payload)
 {
-   char elapsed[128];
+   char* backup_id = NULL;
+   char* directory = NULL;
+   char* files = NULL;
+   char* elapsed = NULL;
    time_t start_time;
+   time_t end_time;
    int total_seconds;
-   int hours;
-   int minutes;
-   int seconds;
-   char* output = NULL;
    char* id = NULL;
-   int result = 1;
+   struct workflow* workflow = NULL;
+   struct workflow* current = NULL;
+   struct deque* nodes = NULL;
+   struct deque* f = NULL;
+   struct deque* a = NULL;
+   struct deque_iterator* fiter = NULL;
+   struct deque_iterator* aiter = NULL;
+   struct json* failed = NULL;
+   struct json* all = NULL;
+   struct json* req = NULL;
+   struct json* response = NULL;
+   struct json* filesj = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_set_proc_title(1, argv, "verify", config->servers[server].name);
-
    start_time = time(NULL);
 
-   if (!verify_backup(ssl, client_fd, server, backup_id, directory, files, &output, &id))
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
+   files = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_FILES);
+
+   if (pgmoneta_deque_create(true, &nodes))
    {
-      result = 0;
-
-      total_seconds = (int)difftime(time(NULL), start_time);
-      hours = total_seconds / 3600;
-      minutes = (total_seconds % 3600) / 60;
-      seconds = total_seconds % 60;
-
-      memset(&elapsed[0], 0, sizeof(elapsed));
-      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
-
-      pgmoneta_log_info("Verify: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
+      goto error;
    }
-
-   pgmoneta_management_process_result(ssl, client_fd, server, NULL, result, true);
-   pgmoneta_disconnect(client_fd);
-
-   pgmoneta_stop_logging();
-
-   free(output);
-   free(id);
-
-   free(backup_id);
-   free(directory);
-   free(files);
-
-   exit(0);
-}
-
-static int
-verify_backup(SSL* ssl, int client_fd, int server, char* backup_id, char* directory, char* files, char** output, char** identifier)
-{
-   char* o = NULL;
-   char* ident = NULL;
-   struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
-   struct deque* nodes = NULL;
-   struct deque* failed = NULL;
-   struct deque* all = NULL;
-
-   *output = NULL;
-   *identifier = NULL;
-
-   pgmoneta_deque_create(false, &nodes);
 
    if (pgmoneta_deque_add(nodes, "position", (uintptr_t)"", ValueString))
    {
@@ -160,57 +131,125 @@ verify_backup(SSL* ssl, int client_fd, int server, char* backup_id, char* direct
       current = current->next;
    }
 
-   o = (char*)pgmoneta_deque_get(nodes, "output");
+   id = (char*)pgmoneta_deque_get(nodes, "identifier");
 
-   if (o == NULL)
+   f = (struct deque*)pgmoneta_deque_get(nodes, "failed");
+   a = (struct deque*)pgmoneta_deque_get(nodes, "all");
+
+   if (pgmoneta_json_create(&failed))
    {
       goto error;
    }
 
-   ident = (char*)pgmoneta_deque_get(nodes, "identifier");
-
-   if (ident == NULL)
+   if (pgmoneta_deque_iterator_create(f, &fiter))
    {
       goto error;
    }
 
-   *output = pgmoneta_append(*output, o);
-   *identifier = pgmoneta_append(*identifier, ident);
+   while (pgmoneta_deque_iterator_next(fiter))
+   {
+      struct json* j = NULL;
+
+      if (pgmoneta_json_clone((struct json*)pgmoneta_value_data(fiter->value), &j))
+      {
+         goto error;
+      }
+
+      pgmoneta_json_append(failed, (uintptr_t)j, ValueJSON);
+   }
+
+   if (!strcasecmp(files, "all"))
+   {
+      pgmoneta_json_create(&all);
+
+      if (pgmoneta_deque_iterator_create(a, &aiter))
+      {
+         goto error;
+      }
+
+      while (pgmoneta_deque_iterator_next(aiter))
+      {
+         struct json* j = NULL;
+
+         if (pgmoneta_json_clone((struct json*)pgmoneta_value_data(aiter->value), &j))
+         {
+            goto error;
+         }
+
+         pgmoneta_json_append(all, (uintptr_t)j, ValueJSON);
+      }
+   }
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
+
+      goto error;
+   }
+
+   if (pgmoneta_json_create(&filesj))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
+
+      goto error;
+   }
+
+   pgmoneta_json_put(filesj, MANAGEMENT_ARGUMENT_FAILED, (uintptr_t)failed, ValueJSON);
+   pgmoneta_json_put(filesj, MANAGEMENT_ARGUMENT_ALL, (uintptr_t)all, ValueJSON);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)id, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)filesj, ValueJSON);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, payload);
+      pgmoneta_log_error("Verify: Error sending response for %s/%s", config->servers[server].name, backup_id);
+
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("Verify: %s/%s (Elapsed: %s)", config->servers[server].name, id, elapsed);
 
    pgmoneta_deque_list(nodes);
 
-   failed = (struct deque*)pgmoneta_deque_get(nodes, "failed");
-   all = (struct deque*)pgmoneta_deque_get(nodes, "all");
-
-   pgmoneta_management_write_verify(ssl, client_fd, failed, all);
-
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_deque_iterator_destroy(fiter);
+   pgmoneta_deque_iterator_destroy(aiter);
 
    pgmoneta_deque_destroy(nodes);
 
-   return 0;
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_workflow_delete(workflow);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   free(elapsed);
+
+   exit(0);
 
 error:
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_deque_iterator_destroy(fiter);
+   pgmoneta_deque_iterator_destroy(aiter);
 
    pgmoneta_deque_destroy(nodes);
 
-   return 1;
-}
+   pgmoneta_json_destroy(payload);
 
-char*
-pgmoneta_verify_entry_to_string(struct verify_entry* entry, int32_t format, char* tag, int indent)
-{
-   struct json* obj = NULL;
-   char* str = NULL;
-   pgmoneta_json_create(&obj);
-   pgmoneta_json_put(obj, "directory", (uintptr_t)entry->directory, ValueString);
-   pgmoneta_json_put(obj, "filename", (uintptr_t)entry->filename, ValueString);
-   pgmoneta_json_put(obj, "original", (uintptr_t)entry->original, ValueString);
-   pgmoneta_json_put(obj, "calculated", (uintptr_t)entry->calculated, ValueString);
-   pgmoneta_json_put(obj, "hash_algorithm", (uintptr_t)entry->hash_algoritm, ValueInt32);
-   str = pgmoneta_json_to_string(obj, format, tag, indent);
-   pgmoneta_json_destroy(obj);
-   return str;
+   pgmoneta_workflow_delete(workflow);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   free(elapsed);
+
+   exit(1);
 }

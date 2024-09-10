@@ -32,6 +32,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <lz4_compression.h>
+#include <management.h>
 #include <utils.h>
 #include <workers.h>
 
@@ -324,6 +325,86 @@ do_lz4_decompress(void* arg)
    free(wi);
 }
 
+void
+pgmoneta_lz4d_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* orig = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, payload);
+      pgmoneta_log_error("LZ4: No file for %s", from);
+      goto error;
+   }
+
+   orig = pgmoneta_append(orig, from);
+   to = pgmoneta_remove_suffix(orig, ".lz4");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("LZ4: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_lz4d_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, payload);
+      pgmoneta_log_error("LZ4: Error lz4 %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("LZ4: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, payload);
+      pgmoneta_log_error("LZ4: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("LZ4: %s (Elapsed: %s)", from, elapsed);
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(orig);
+   free(to);
+   free(elapsed);
+
+   exit(1);
+}
+
 int
 pgmoneta_lz4d_file(char* from, char* to)
 {
@@ -347,6 +428,83 @@ pgmoneta_lz4d_file(char* from, char* to)
 error:
 
    return 1;
+}
+
+void
+pgmoneta_lz4c_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, payload);
+      pgmoneta_log_error("LZ4: No file for %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, ".lz4");
+   if (to == NULL)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("LZ4: Allocation error");
+      goto error;
+   }
+
+   if (pgmoneta_lz4c_file(from, to))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, payload);
+      pgmoneta_log_error("LZ4: Error lz4 %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("LZ4: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, payload);
+      pgmoneta_log_error("LZ4: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("LZ4: %s (Elapsed: %s)", from, elapsed);
+
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(to);
+   free(elapsed);
+
+   exit(1);
 }
 
 int

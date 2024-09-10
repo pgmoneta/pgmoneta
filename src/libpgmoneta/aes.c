@@ -26,9 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <pgmoneta.h>
 #include <aes.h>
 #include <logging.h>
-#include <pgmoneta.h>
+#include <management.h>
 #include <security.h>
 #include <utils.h>
 #include <workers.h>
@@ -246,6 +247,77 @@ pgmoneta_encrypt_wal(char* d)
    return 0;
 }
 
+void
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, struct json* payload)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
+
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NOFILE, payload);
+      pgmoneta_log_error("Encrypt: No file for %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, ".aes");
+
+   if (encrypt_file(from, to, 1))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, payload);
+      pgmoneta_log_error("Encrypt: Error encrypting %s", from);
+      goto error;
+   }
+
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Encrypt: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NETWORK, payload);
+      pgmoneta_log_error("Encrypt: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("Encrypt: %s (Elapsed: %s)", from, elapsed);
+
+   free(to);
+   free(elapsed);
+
+   exit(0);
+
+error:
+
+   free(to);
+   free(elapsed);
+
+   exit(1);
+}
+
 int
 pgmoneta_encrypt_file(char* from, char* to)
 {
@@ -375,46 +447,83 @@ do_decrypt_file(void* arg)
    free(wi);
 }
 
-int
-pgmoneta_decrypt_archive(char* path)
+void
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, struct json* payload)
 {
+   char* from = NULL;
    char* to = NULL;
+   char* elapsed = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds;
+   struct json* req = NULL;
+   struct json* response = NULL;
 
-   if (!pgmoneta_exists(path))
+   start_time = time(NULL);
+
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
+
+   if (!pgmoneta_exists(from))
    {
-      pgmoneta_log_error("pgmoneta_decrypt_archive: file not exist: %s", path);
-      return 1;
-
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NOFILE, payload);
+      pgmoneta_log_error("Decrypt: No file for %s", from);
+      goto error;
    }
 
-   to = malloc(strlen(path) - 3);
-
+   to = malloc(strlen(from) - 3);
    if (to == NULL)
    {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
 
-   memset(to, 0, strlen(path) - 3);
-   memcpy(to, path, strlen(path) - 4);
+   memset(to, 0, strlen(from) - 3);
+   memcpy(to, from, strlen(from) - 4);
 
-   if (encrypt_file(path, to, 0))
+   if (encrypt_file(from, to, 0))
    {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, payload);
+      pgmoneta_log_error("Decrypt: Error decrypting %s", from);
       goto error;
    }
 
-   pgmoneta_delete_file(path, NULL);
+   pgmoneta_delete_file(from, NULL);
+
+   if (pgmoneta_management_create_response(payload, &response))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_log_error("Decrypt: Allocation error");
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   {
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NETWORK, payload);
+      pgmoneta_log_error("Decrypt: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+
+   pgmoneta_log_info("Decrypt: %s (Elapsed: %s)", from, elapsed);
 
    free(to);
+   free(elapsed);
 
-   return 0;
+   exit(0);
 
 error:
 
-   pgmoneta_log_error("pgmoneta_decrypt_archive: error on decrypt file");
-
    free(to);
+   free(elapsed);
 
-   return 1;
+   exit(1);
 }
 
 int
