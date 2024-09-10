@@ -28,28 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-/* #include <info.h> */
 #include <json.h>
 #include <logging.h>
 #include <management.h>
-/* #include <network.h> */
-/* #include <stdint.h> */
 #include <utils.h>
-/* #include <verify.h> */
 
 /* system */
-/* #include <dirent.h> */
-/* #include <errno.h> */
-/* #include <inttypes.h> */
-/* #include <stdio.h> */
-/* #include <stdatomic.h> */
-/* #include <stdbool.h> */
-/* #include <stdlib.h> */
-/* #include <string.h> */
-/* #include <unistd.h> */
-/* #include <sys/socket.h> */
-/* #include <sys/types.h> */
-/* #include <sys/un.h> */
+#include <unistd.h>
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
