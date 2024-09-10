@@ -362,12 +362,12 @@ error:
 }
 
 int
-pgmoneta_management_request_isalive(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_ping(SSL* ssl, int socket, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_ISALIVE, output_format, &j))
+   if (create_header(MANAGEMENT_PING, output_format, &j))
    {
       goto error;
    }

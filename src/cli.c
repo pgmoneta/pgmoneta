@@ -104,7 +104,7 @@ static int delete(SSL* ssl, int socket, char* server, char* backup_id, int32_t o
 static int stop(SSL* ssl, int socket, int32_t output_format);
 static int status(SSL* ssl, int socket, int32_t output_format);
 static int details(SSL* ssl, int socket, int32_t output_format);
-static int isalive(SSL* ssl, int socket, int32_t output_format);
+static int ping(SSL* ssl, int socket, int32_t output_format);
 static int reset(SSL* ssl, int socket, int32_t output_format);
 static int reload(SSL* ssl, int socket, int32_t output_format);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format);
@@ -275,7 +275,7 @@ const struct pgmoneta_command command_table[] = {
       .command = "ping",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = MANAGEMENT_ISALIVE,
+      .action = MANAGEMENT_PING,
       .deprecated = false,
       .log_message = "<ping>"
    },
@@ -334,50 +334,6 @@ const struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_ANNOTATE,
       .deprecated = false,
       .log_message = "<annotate> [%s]"
-   },
-   {
-      .command = "details",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_STATUS_DETAILS,
-      .deprecated = true,
-      .deprecated_by = "status details",
-      .deprecated_since_major = 0,
-      .deprecated_since_minor = 11,
-      .log_message = "<status details>",
-   },
-   {
-      .command = "is-alive",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_ISALIVE,
-      .deprecated = true,
-      .deprecated_by = "ping",
-      .deprecated_since_major = 0,
-      .deprecated_since_minor = 11,
-      .log_message = "<ping>",
-   },
-   {
-      .command = "reload",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_RELOAD,
-      .deprecated = true,
-      .deprecated_by = "conf reload",
-      .deprecated_since_major = 0,
-      .deprecated_since_minor = 11,
-      .log_message = "<conf reload>",
-   },
-   {
-      .command = "reset",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_RESET,
-      .deprecated = true,
-      .deprecated_by = "clear prometheus",
-      .deprecated_since_major = 0,
-      .deprecated_since_minor = 11,
-      .log_message = "<clear prometheus>"
    }
 };
 
@@ -710,9 +666,9 @@ password:
    {
       exit_code = details(s_ssl, socket, output_format);
    }
-   else if (parsed.cmd->action == MANAGEMENT_ISALIVE)
+   else if (parsed.cmd->action == MANAGEMENT_PING)
    {
-      exit_code = isalive(s_ssl, socket, output_format);
+      exit_code = ping(s_ssl, socket, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RESET)
    {
@@ -1202,9 +1158,9 @@ error:
 }
 
 static int
-isalive(SSL* ssl, int socket, int32_t output_format)
+ping(SSL* ssl, int socket, int32_t output_format)
 {
-   if (pgmoneta_management_request_isalive(ssl, socket, output_format))
+   if (pgmoneta_management_request_ping(ssl, socket, output_format))
    {
       goto error;
    }

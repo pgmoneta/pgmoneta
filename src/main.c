@@ -1112,7 +1112,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       stop = 1;
       config->running = false;
    }
-   else if (id == MANAGEMENT_ISALIVE)
+   else if (id == MANAGEMENT_PING)
    {
       struct json* response = NULL;
 

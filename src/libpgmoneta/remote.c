@@ -99,7 +99,7 @@ pgmoneta_remote_management(int client_fd, char* address)
          case MANAGEMENT_DELETE:
          case MANAGEMENT_STATUS:
          case MANAGEMENT_STATUS_DETAILS:
-         case MANAGEMENT_ISALIVE:
+         case MANAGEMENT_PING:
             do
             {
                status = pgmoneta_read_timeout_message(NULL, server_fd, 1, &msg);

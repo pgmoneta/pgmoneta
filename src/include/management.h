@@ -53,7 +53,7 @@ extern "C" {
 #define MANAGEMENT_STOP            6
 #define MANAGEMENT_STATUS          7
 #define MANAGEMENT_STATUS_DETAILS  8
-#define MANAGEMENT_ISALIVE         9
+#define MANAGEMENT_PING            9
 #define MANAGEMENT_RESET          10
 #define MANAGEMENT_RELOAD         11
 #define MANAGEMENT_RETAIN         12
@@ -370,14 +370,14 @@ int
 pgmoneta_management_request_status_details(SSL* ssl, int socket, int32_t output_format);
 
 /**
- * Create an isalive request
+ * Create a ping request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_isalive(SSL* ssl, int socket, int32_t output_format);
+pgmoneta_management_request_ping(SSL* ssl, int socket, int32_t output_format);
 
 /**
  * Create a reset request
