@@ -347,7 +347,7 @@ restore_execute(int server, char* identifier, struct deque* nodes)
             goto error;
          }
 
-         snprintf(&ver[0], sizeof(ver), "%d", backup->version);
+         snprintf(&ver[0], sizeof(ver), "%d", backup->major_version);
          if (pgmoneta_deque_add(nodes, "version", (uintptr_t)ver, ValueString))
          {
             goto error;

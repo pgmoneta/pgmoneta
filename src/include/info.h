@@ -41,24 +41,24 @@ extern "C" {
 #include <stdlib.h>
 
 #define INFO_PGMONETA_VERSION "PGMONETA_VERSION"
-#define INFO_STATUS           "STATUS"
-#define INFO_LABEL            "LABEL"
-#define INFO_WAL              "WAL"
-#define INFO_ELAPSED          "ELAPSED"
-#define INFO_VERSION          "VERSION"
-#define INFO_MINOR_VERSION    "MINOR_VERSION"
-#define INFO_KEEP             "KEEP"
 #define INFO_BACKUP           "BACKUP"
-#define INFO_RESTORE          "RESTORE"
-#define INFO_TABLESPACES      "TABLESPACES"
-#define INFO_START_WALPOS     "START_WALPOS"
-#define INFO_END_WALPOS       "END_WALPOS"
 #define INFO_CHKPT_WALPOS     "CHKPT_WALPOS"
-#define INFO_START_TIMELINE   "START_TIMELINE"
-#define INFO_END_TIMELINE     "END_TIMELINE"
-#define INFO_HASH_ALGORITHM   "HASH_ALGORITM"
 #define INFO_COMMENTS         "COMMENTS"
+#define INFO_ELAPSED          "ELAPSED"
+#define INFO_END_TIMELINE     "END_TIMELINE"
+#define INFO_END_WALPOS       "END_WALPOS"
 #define INFO_EXTRA            "EXTRA"
+#define INFO_HASH_ALGORITHM   "HASH_ALGORITM"
+#define INFO_KEEP             "KEEP"
+#define INFO_LABEL            "LABEL"
+#define INFO_MAJOR_VERSION    "MAJOR_VERSION"
+#define INFO_MINOR_VERSION    "MINOR_VERSION"
+#define INFO_RESTORE          "RESTORE"
+#define INFO_START_TIMELINE   "START_TIMELINE"
+#define INFO_START_WALPOS     "START_WALPOS"
+#define INFO_STATUS           "STATUS"
+#define INFO_TABLESPACES      "TABLESPACES"
+#define INFO_WAL              "WAL"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -74,7 +74,7 @@ struct backup
    uint64_t backup_size;                                          /**< The backup size */
    uint64_t restore_size;                                         /**< The restore size */
    int32_t elapsed_time;                                          /**< The elapsed time in seconds */
-   int32_t version;                                               /**< The version */
+   int32_t major_version;                                         /**< The major version */
    int32_t minor_version;                                         /**< The minor version */
    bool keep;                                                     /**< Keep the backup */
    char valid;                                                    /**< Is the backup valid */

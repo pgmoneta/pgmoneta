@@ -1884,7 +1884,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", major=\"");
-               data = pgmoneta_append_int(data, backups[j]->version);
+               data = pgmoneta_append_int(data, backups[j]->major_version);
                data = pgmoneta_append(data, "\", minor=\"");
                data = pgmoneta_append_int(data, backups[j]->minor_version);
                data = pgmoneta_append(data, "\"} 1");

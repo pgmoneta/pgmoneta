@@ -120,7 +120,7 @@ link_execute(int server, char* identifier, struct deque* nodes)
    {
       for (int j = number_of_backups - 2; j >= 0 && next_newest == -1; j--)
       {
-         if (backups[j]->valid == VALID_TRUE && backups[j]->version == backups[number_of_backups - 1]->version)
+         if (backups[j]->valid == VALID_TRUE && backups[j]->major_version == backups[number_of_backups - 1]->major_version)
          {
             if (next_newest == -1)
             {

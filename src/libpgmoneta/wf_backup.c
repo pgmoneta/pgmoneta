@@ -346,7 +346,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_create_info(root, identifier, 1);
    pgmoneta_update_info_string(root, INFO_WAL, wal);
    pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
-   pgmoneta_update_info_string(root, INFO_VERSION, version);
+   pgmoneta_update_info_string(root, INFO_MAJOR_VERSION, version);
    pgmoneta_update_info_string(root, INFO_MINOR_VERSION, minor_version);
    pgmoneta_update_info_bool(root, INFO_KEEP, false);
    pgmoneta_update_info_string(root, INFO_START_WALPOS, startpos);
