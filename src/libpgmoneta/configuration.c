@@ -3107,22 +3107,19 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    restart_int("update_process_title", config->update_process_title, reload->update_process_title);
    restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir);
 
-   memset(&config->servers[0], 0, sizeof(struct server) * NUMBER_OF_SERVERS);
-   for (int i = 0; i < reload->number_of_servers; i++)
+   for (int i = 0; i < NUMBER_OF_SERVERS; i++)
    {
       copy_server(&config->servers[i], &reload->servers[i]);
    }
    restart_int("number_of_servers", config->number_of_servers, reload->number_of_servers);
 
-   memset(&config->users[0], 0, sizeof(struct user) * NUMBER_OF_USERS);
-   for (int i = 0; i < reload->number_of_users; i++)
+   for (int i = 0; i < NUMBER_OF_USERS; i++)
    {
       copy_user(&config->users[i], &reload->users[i]);
    }
    config->number_of_users = reload->number_of_users;
 
-   memset(&config->admins[0], 0, sizeof(struct user) * NUMBER_OF_ADMINS);
-   for (int i = 0; i < reload->number_of_admins; i++)
+   for (int i = 0; i < NUMBER_OF_ADMINS; i++)
    {
       copy_user(&config->admins[i], &reload->admins[i]);
    }
