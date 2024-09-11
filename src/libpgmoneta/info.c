@@ -917,7 +917,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload)
       goto error;
    }
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, server, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("Info: Allocation error");
@@ -1107,7 +1107,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payl
       goto error;
    }
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, server, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("Annotate: Allocation error");

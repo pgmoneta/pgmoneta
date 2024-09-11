@@ -82,7 +82,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, struct json* payload, bool 
    free(d);
    d = NULL;
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, srv, &response))
    {
       goto error;
    }

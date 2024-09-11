@@ -1118,9 +1118,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       start_time = time(NULL);
 
-      pgmoneta_management_create_response(payload, &response);
-
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
+      pgmoneta_management_create_response(payload, -1, &response);
 
       end_time = time(NULL);
 
@@ -1145,7 +1143,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       restart = reload_configuration();
 
-      pgmoneta_management_create_response(payload, &response);
+      pgmoneta_management_create_response(payload, -1, &response);
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTART, (uintptr_t)restart, ValueBool);
 

@@ -85,6 +85,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_CALCULATED            "Calculated"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN      "CheckpointHiLSN"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN      "CheckpointLoLSN"
+#define MANAGEMENT_ARGUMENT_CLIENT_VERSION        "ClientVersion"
 #define MANAGEMENT_ARGUMENT_COMMAND               "Command"
 #define MANAGEMENT_ARGUMENT_COMMENT               "Comment"
 #define MANAGEMENT_ARGUMENT_COMMENTS              "Comments"
@@ -137,7 +138,6 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_TOTAL_SPACE           "TotalSpace"
 #define MANAGEMENT_ARGUMENT_USED_SPACE            "UsedSpace"
 #define MANAGEMENT_ARGUMENT_VALID                 "Valid"
-#define MANAGEMENT_ARGUMENT_VERSION               "Version"
 #define MANAGEMENT_ARGUMENT_WAL                   "WAL"
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 
@@ -522,11 +522,12 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
 /**
  * Create a response
  * @param json The JSON structure
+ * @param server The server
  * @param response The response
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_create_response(struct json* json, struct json** response);
+pgmoneta_management_create_response(struct json* json, int server, struct json** response);
 
 /**
  * Read the management JSON

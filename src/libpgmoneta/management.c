@@ -737,9 +737,12 @@ error:
 }
 
 int
-pgmoneta_management_create_response(struct json* json, struct json** response)
+pgmoneta_management_create_response(struct json* json, int server, struct json** response)
 {
    struct json* r = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    *response = NULL;
 
@@ -749,6 +752,15 @@ pgmoneta_management_create_response(struct json* json, struct json** response)
    }
 
    pgmoneta_json_put(json, MANAGEMENT_CATEGORY_RESPONSE, (uintptr_t)r, ValueJSON);
+
+   if (server >= 0)
+   {
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)config->servers[server].version, ValueInt32);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)config->servers[server].minor_version, ValueInt32);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+   }
+
+   pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
 
    *response = r;
 
@@ -786,8 +798,12 @@ error:
 int
 pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, struct json* payload)
 {
+   int srv = -1;
    struct json* response = NULL;
    struct json* outcome = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    if (create_outcome_failure(payload, error, &outcome))
    {
@@ -802,7 +818,15 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
       }
       else
       {
-         if (pgmoneta_management_create_response(payload, &response))
+         for (int i = 0; i < config->number_of_servers; i++)
+         {
+            if (!strcmp(server, config->servers[i].name))
+            {
+               srv = i;
+            }
+         }
+
+         if (pgmoneta_management_create_response(payload, srv, &response))
          {
             goto error;
          }
@@ -1187,7 +1211,7 @@ create_header(int32_t command, int32_t output_format, struct json** json)
    strftime(&timestamp[0], sizeof(timestamp), "%Y%m%d%H%M%S", time_info);
 
    pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_COMMAND, (uintptr_t)command, ValueInt32);
-   pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_VERSION, (uintptr_t)VERSION, ValueString);
+   pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_CLIENT_VERSION, (uintptr_t)VERSION, ValueString);
    pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_OUTPUT, (uintptr_t)output_format, ValueUInt8);
    pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_TIMESTAMP, (uintptr_t)timestamp, ValueString);
 

@@ -150,7 +150,7 @@ pgmoneta_backup(int client_fd, int server, struct json* payload)
    size = pgmoneta_directory_size(d);
    pgmoneta_update_info_unsigned_long(root, INFO_BACKUP, size);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, server, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
 
@@ -345,7 +345,7 @@ pgmoneta_list_backup(int client_fd, int server, struct json* payload)
       }
    }
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, server, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
 
@@ -494,7 +494,7 @@ pgmoneta_delete_backup(int client_fd, int srv, struct json* payload)
       current = current->next;
    }
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, srv, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_ALLOCATION, payload);
 

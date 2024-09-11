@@ -180,7 +180,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, struct json* payload)
       }
    }
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, server, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
 

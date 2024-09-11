@@ -66,7 +66,7 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, struct json* payload)
 
    start_time = time(NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       goto error;
    }
@@ -258,7 +258,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, struct json* payl
 
    start_time = time(NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       goto error;
    }

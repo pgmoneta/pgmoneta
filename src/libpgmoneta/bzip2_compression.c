@@ -392,7 +392,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, struct json* payload)
 
    pgmoneta_delete_file(from, NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("BZIP: Allocation error");
@@ -490,7 +490,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, struct json* payload)
 
    pgmoneta_delete_file(from, NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("BZIP: Allocation error");

@@ -368,7 +368,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, struct json* payload)
 
    pgmoneta_delete_file(from, NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("LZ4: Allocation error");
@@ -472,7 +472,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, struct json* payload)
 
    pgmoneta_delete_file(from, NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("LZ4: Allocation error");

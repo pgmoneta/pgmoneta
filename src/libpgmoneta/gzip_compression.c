@@ -304,7 +304,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    pgmoneta_delete_file(from, NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("GZip: Allocation error");
@@ -416,7 +416,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    pgmoneta_delete_file(from, NULL);
 
-   if (pgmoneta_management_create_response(payload, &response))
+   if (pgmoneta_management_create_response(payload, -1, &response))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
       pgmoneta_log_error("GZip: Allocation error");
