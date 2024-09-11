@@ -73,8 +73,8 @@ static int as_bytes(char* str, int* bytes, int default_bytes);
 static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
 static int as_create_slot(char* str, int* create_slot);
 
-static int transfer_configuration(struct configuration* config, struct configuration* reload);
-static void copy_server(struct server* dst, struct server* src);
+static bool transfer_configuration(struct configuration* config, struct configuration* reload);
+static int copy_server(struct server* dst, struct server* src);
 static void copy_user(struct user* dst, struct user* src);
 static int restart_bool(char* name, bool e, bool n);
 static int restart_int(char* name, int e, int n);
@@ -1949,13 +1949,15 @@ pgmoneta_validate_admins_configuration(void* shm)
 }
 
 int
-pgmoneta_reload_configuration(void)
+pgmoneta_reload_configuration(bool* restart)
 {
    size_t reload_size;
    struct configuration* reload = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+   *restart = false;
 
    pgmoneta_log_trace("Configuration: %s", config->configuration_path);
    pgmoneta_log_trace("Users: %s", config->users_path);
@@ -2003,10 +2005,7 @@ pgmoneta_reload_configuration(void)
       goto error;
    }
 
-   if (transfer_configuration(config, reload))
-   {
-      goto error;
-   }
+   *restart = transfer_configuration(config, reload);
 
    pgmoneta_destroy_shared_memory((void*)reload, reload_size);
 
@@ -2015,6 +2014,8 @@ pgmoneta_reload_configuration(void)
    return 0;
 
 error:
+   *restart = true;
+
    if (reload != NULL)
    {
       pgmoneta_destroy_shared_memory((void*)reload, reload_size);
@@ -3046,19 +3047,30 @@ as_create_slot(char* str, int* create_slot)
    return 1;
 }
 
-static int
+static bool
 transfer_configuration(struct configuration* config, struct configuration* reload)
 {
+   bool changed = false;
+
 #ifdef HAVE_LINUX
    sd_notify(0, "RELOADING=1");
 #endif
 
-   restart_string("host", config->host, reload->host);
+   if (restart_string("host", config->host, reload->host))
+   {
+      changed = true;
+   }
    config->metrics = reload->metrics;
    config->metrics_cache_max_age = reload->metrics_cache_max_age;
-   restart_int("metrics_cache_max_size", config->metrics_cache_max_size, reload->metrics_cache_max_size);
+   if (restart_int("metrics_cache_max_size", config->metrics_cache_max_size, reload->metrics_cache_max_size))
+   {
+      changed = true;
+   }
    config->management = reload->management;
-   restart_string("base_dir", config->base_dir, reload->base_dir);
+   if (restart_string("base_dir", config->base_dir, reload->base_dir))
+   {
+      changed = true;
+   }
    config->create_slot = reload->create_slot;
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
@@ -3066,7 +3078,10 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->retention_weeks = reload->retention_weeks;
    config->retention_months = reload->retention_months;
    config->retention_years = reload->retention_years;
-   restart_int("log_type", config->log_type, reload->log_type);
+   if (restart_int("log_type", config->log_type, reload->log_type))
+   {
+      changed = true;
+   }
    config->log_level = reload->log_level;
 
    if (strncmp(config->log_path, reload->log_path, MISC_LENGTH) ||
@@ -3084,10 +3099,22 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
       pgmoneta_start_logging();
    }
 
-   restart_bool("tls", config->tls, reload->tls);
-   restart_string("tls_cert_file", config->tls_cert_file, reload->tls_cert_file);
-   restart_string("tls_key_file", config->tls_key_file, reload->tls_key_file);
-   restart_string("tls_ca_file", config->tls_ca_file, reload->tls_ca_file);
+   if (restart_bool("tls", config->tls, reload->tls))
+   {
+      changed = true;
+   }
+   if (restart_string("tls_cert_file", config->tls_cert_file, reload->tls_cert_file))
+   {
+      changed = true;
+   }
+   if (restart_string("tls_key_file", config->tls_key_file, reload->tls_key_file))
+   {
+      changed = true;
+   }
+   if (restart_string("tls_ca_file", config->tls_ca_file, reload->tls_ca_file))
+   {
+      changed = true;
+   }
 
    config->blocking_timeout = reload->blocking_timeout;
    config->authentication_timeout = reload->authentication_timeout;
@@ -3097,21 +3124,39 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
       restart_string("pidfile", config->pidfile, reload->pidfile);
    }
 
-   restart_string("libev", config->libev, reload->libev);
+   if (restart_string("libev", config->libev, reload->libev))
+   {
+      changed = true;
+   }
    config->buffer_size = reload->buffer_size;
    config->keep_alive = reload->keep_alive;
    config->nodelay = reload->nodelay;
    config->non_blocking = reload->non_blocking;
    config->backlog = reload->backlog;
-   restart_int("hugepage", config->hugepage, reload->hugepage);
-   restart_int("update_process_title", config->update_process_title, reload->update_process_title);
-   restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir);
+   if (restart_int("hugepage", config->hugepage, reload->hugepage))
+   {
+      changed = true;
+   }
+   if (restart_int("update_process_title", config->update_process_title, reload->update_process_title))
+   {
+      changed = true;
+   }
+   if (restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir))
+   {
+      changed = true;
+   }
 
    for (int i = 0; i < NUMBER_OF_SERVERS; i++)
    {
-      copy_server(&config->servers[i], &reload->servers[i]);
+      if (copy_server(&config->servers[i], &reload->servers[i]))
+      {
+         changed = true;
+      }
    }
-   restart_int("number_of_servers", config->number_of_servers, reload->number_of_servers);
+   if (restart_int("number_of_servers", config->number_of_servers, reload->number_of_servers))
+   {
+      changed = true;
+   }
 
    for (int i = 0; i < NUMBER_OF_USERS; i++)
    {
@@ -3140,20 +3185,43 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    sd_notify(0, "READY=1");
 #endif
 
-   return 0;
+   return changed;
 }
 
-static void
+static int
 copy_server(struct server* dst, struct server* src)
 {
-   restart_string("name", &dst->name[0], &src->name[0]);
-   restart_string("host", &dst->host[0], &src->host[0]);
-   restart_int("port", dst->port, src->port);
-   restart_string("username", &dst->username[0], &src->username[0]);
+   bool changed = false;
+
+   if (restart_string("name", &dst->name[0], &src->name[0]))
+   {
+      changed = true;
+   }
+   if (restart_string("host", &dst->host[0], &src->host[0]))
+   {
+      changed = true;
+   }
+   if (restart_int("port", dst->port, src->port))
+   {
+      changed = true;
+   }
+   if (restart_string("username", &dst->username[0], &src->username[0]))
+   {
+      changed = true;
+   }
    dst->create_slot = src->create_slot;
-   restart_string("wal_slot", &dst->wal_slot[0], &src->wal_slot[0]);
-   restart_string("follow", &dst->follow[0], &src->follow[0]);
-   restart_string("wal_shipping", &dst->wal_shipping[0], &src->wal_shipping[0]);
+   if (restart_string("wal_slot", &dst->wal_slot[0], &src->wal_slot[0]))
+   {
+      changed = true;
+   }
+   if (restart_string("follow", &dst->follow[0], &src->follow[0]))
+   {
+      changed = true;
+   }
+   if (restart_string("wal_shipping", &dst->wal_shipping[0], &src->wal_shipping[0]))
+   {
+      changed = true;
+   }
    memcpy(&dst->hot_standby[0], &src->hot_standby[0], MAX_PATH);
    memcpy(&dst->hot_standby_overrides[0], &src->hot_standby_overrides[0], MAX_PATH);
    memcpy(&dst->hot_standby_tablespaces[0], &src->hot_standby_tablespaces[0], MAX_PATH);
@@ -3173,15 +3241,31 @@ copy_server(struct server* dst, struct server* src)
    dst->network_max_rate = src->network_max_rate;
    dst->manifest = src->manifest;
 
-   restart_string("tls_cert_file", dst->tls_cert_file, src->tls_cert_file);
-   restart_string("tls_key_file", dst->tls_key_file, src->tls_key_file);
-   restart_string("tls_ca_file", dst->tls_ca_file, src->tls_ca_file);
+   if (restart_string("tls_cert_file", dst->tls_cert_file, src->tls_cert_file))
+   {
+      changed = true;
+   }
+   if (restart_string("tls_key_file", dst->tls_key_file, src->tls_key_file))
+   {
+      changed = true;
+   }
+   if (restart_string("tls_ca_file", dst->tls_ca_file, src->tls_ca_file))
+   {
+      changed = true;
+   }
 
    dst->number_of_extra = src->number_of_extra;
    for (int i = 0; i < MAX_EXTRA; i++)
    {
       memcpy(dst->extra[i], src->extra[i], MAX_EXTRA_PATH);
    }
+
+   if (changed)
+   {
+      return 1;
+   }
+
+   return 0;
 }
 
 static void

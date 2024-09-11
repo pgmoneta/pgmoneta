@@ -94,7 +94,7 @@ static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
-static void reload_configuration(void);
+static bool reload_configuration(void);
 static void init_receivewals(void);
 static int init_replication_slots(void);
 static int verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket);
@@ -1138,9 +1138,16 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_RELOAD)
    {
+      bool restart = false;
+      struct json* response = NULL;
+
       start_time = time(NULL);
 
-      reload_configuration();
+      restart = reload_configuration();
+
+      pgmoneta_management_create_response(payload, &response);
+
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTART, (uintptr_t)restart, ValueBool);
 
       end_time = time(NULL);
 
@@ -1896,9 +1903,10 @@ accept_fatal(int error)
    return true;
 }
 
-static void
+static bool
 reload_configuration(void)
 {
+   bool restart = false;
    int old_metrics;
    int old_management;
    struct configuration* config;
@@ -1908,7 +1916,7 @@ reload_configuration(void)
    old_metrics = config->metrics;
    old_management = config->management;
 
-   pgmoneta_reload_configuration();
+   pgmoneta_reload_configuration(&restart);
 
    if (old_metrics != config->metrics)
    {
@@ -1973,6 +1981,8 @@ reload_configuration(void)
          }
       }
    }
+
+   return restart;
 }
 
 static void

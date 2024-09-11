@@ -96,10 +96,11 @@ pgmoneta_validate_admins_configuration(void* shmem);
 
 /**
  * Reload the configuration
+ * @param restart Should the server be restarted
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_reload_configuration(void);
+pgmoneta_reload_configuration(bool* restart);
 
 #ifdef __cplusplus
 }
