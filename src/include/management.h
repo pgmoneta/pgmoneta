@@ -108,7 +108,6 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_MAJOR_VERSION         "MajorVersion"
 #define MANAGEMENT_ARGUMENT_MINOR_VERSION         "MinorVersion"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS     "NumberOfBackups"
-#define MANAGEMENT_ARGUMENT_NUMBER_OF_DIRECTORIES "NumberOfDirectories"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS     "NumberOfServers"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES "NumberOfTablespaces"
 #define MANAGEMENT_ARGUMENT_OFFLINE               "Offline"
