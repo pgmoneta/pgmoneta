@@ -76,6 +76,7 @@ static int as_create_slot(char* str, int* create_slot);
 static int transfer_configuration(struct configuration* config, struct configuration* reload);
 static void copy_server(struct server* dst, struct server* src);
 static void copy_user(struct user* dst, struct user* src);
+static int restart_bool(char* name, bool e, bool n);
 static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
 
@@ -3052,31 +3053,26 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    sd_notify(0, "RELOADING=1");
 #endif
 
-   memcpy(config->host, reload->host, MISC_LENGTH);
+   restart_string("host", config->host, reload->host);
    config->metrics = reload->metrics;
    config->metrics_cache_max_age = reload->metrics_cache_max_age;
    restart_int("metrics_cache_max_size", config->metrics_cache_max_size, reload->metrics_cache_max_size);
    config->management = reload->management;
-
-   /* base_dir */
    restart_string("base_dir", config->base_dir, reload->base_dir);
-
    config->create_slot = reload->create_slot;
-
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
-
    config->retention_days = reload->retention_days;
    config->retention_weeks = reload->retention_weeks;
    config->retention_months = reload->retention_months;
    config->retention_years = reload->retention_years;
-
-   /* log_type */
    restart_int("log_type", config->log_type, reload->log_type);
    config->log_level = reload->log_level;
-   // if the log main parameters have changed, we need
-   // to restart the logging system
-   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH) || config->log_rotation_size != reload->log_rotation_size || config->log_rotation_age != reload->log_rotation_age || config->log_mode != reload->log_mode)
+
+   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH) ||
+       config->log_rotation_size != reload->log_rotation_size ||
+       config->log_rotation_age != reload->log_rotation_age ||
+       config->log_mode != reload->log_mode)
    {
       pgmoneta_log_debug("Log restart triggered!");
       pgmoneta_stop_logging();
@@ -3087,32 +3083,28 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
       memcpy(config->log_path, reload->log_path, MISC_LENGTH);
       pgmoneta_start_logging();
    }
-   /* log_lock */
 
-   config->tls = reload->tls;
-   memcpy(config->tls_cert_file, reload->tls_cert_file, MISC_LENGTH);
-   memcpy(config->tls_key_file, reload->tls_key_file, MISC_LENGTH);
-   memcpy(config->tls_ca_file, reload->tls_ca_file, MISC_LENGTH);
+   restart_bool("tls", config->tls, reload->tls);
+   restart_string("tls_cert_file", config->tls_cert_file, reload->tls_cert_file);
+   restart_string("tls_key_file", config->tls_key_file, reload->tls_key_file);
+   restart_string("tls_ca_file", config->tls_ca_file, reload->tls_ca_file);
 
    config->blocking_timeout = reload->blocking_timeout;
    config->authentication_timeout = reload->authentication_timeout;
-   /* pidfile */
-   restart_string("pidfile", config->pidfile, reload->pidfile);
 
-   /* libev */
+   if (strcmp("", reload->pidfile))
+   {
+      restart_string("pidfile", config->pidfile, reload->pidfile);
+   }
+
    restart_string("libev", config->libev, reload->libev);
    config->buffer_size = reload->buffer_size;
    config->keep_alive = reload->keep_alive;
    config->nodelay = reload->nodelay;
    config->non_blocking = reload->non_blocking;
    config->backlog = reload->backlog;
-   /* hugepage */
    restart_int("hugepage", config->hugepage, reload->hugepage);
-
-   /* update_process_title */
    restart_int("update_process_title", config->update_process_title, reload->update_process_title);
-
-   /* unix_socket_dir */
    restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir);
 
    memset(&config->servers[0], 0, sizeof(struct server) * NUMBER_OF_SERVERS);
@@ -3120,7 +3112,7 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    {
       copy_server(&config->servers[i], &reload->servers[i]);
    }
-   config->number_of_servers = reload->number_of_servers;
+   restart_int("number_of_servers", config->number_of_servers, reload->number_of_servers);
 
    memset(&config->users[0], 0, sizeof(struct user) * NUMBER_OF_USERS);
    for (int i = 0; i < reload->number_of_users; i++)
@@ -3157,32 +3149,42 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
 static void
 copy_server(struct server* dst, struct server* src)
 {
-   memcpy(&dst->name[0], &src->name[0], MISC_LENGTH);
-   memcpy(&dst->host[0], &src->host[0], MISC_LENGTH);
-   dst->port = src->port;
-   memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
+   restart_string("name", &dst->name[0], &src->name[0]);
+   restart_string("host", &dst->host[0], &src->host[0]);
+   restart_int("port", dst->port, src->port);
+   restart_string("username", &dst->username[0], &src->username[0]);
    dst->create_slot = src->create_slot;
-   memcpy(&dst->wal_slot[0], &src->wal_slot[0], MISC_LENGTH);
-   memcpy(&dst->follow[0], &src->follow[0], MISC_LENGTH);
-   memcpy(&dst->wal_shipping[0], &src->wal_shipping[0], MAX_PATH);
+   restart_string("wal_slot", &dst->wal_slot[0], &src->wal_slot[0]);
+   restart_string("follow", &dst->follow[0], &src->follow[0]);
+   restart_string("wal_shipping", &dst->wal_shipping[0], &src->wal_shipping[0]);
    memcpy(&dst->hot_standby[0], &src->hot_standby[0], MAX_PATH);
    memcpy(&dst->hot_standby_overrides[0], &src->hot_standby_overrides[0], MAX_PATH);
    memcpy(&dst->hot_standby_tablespaces[0], &src->hot_standby_tablespaces[0], MAX_PATH);
-   dst->cur_timeline = src->cur_timeline;
+   /* dst->cur_timeline = src->cur_timeline; */
    dst->retention_days = src->retention_days;
    dst->retention_weeks = src->retention_weeks;
    dst->retention_months = src->retention_months;
    dst->retention_years = src->retention_years;
    /* dst->backup = src->backup; */
    /* dst->delete = src->delete; */
-   dst->wal_streaming = src->wal_streaming;
+   /* dst->wal_streaming = src->wal_streaming; */
    /* dst->valid = src->valid; */
-   memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH);
-   memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH);
+   /* memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH); */
+   /* memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH); */
    dst->workers = src->workers;
    dst->backup_max_rate = src->backup_max_rate;
    dst->network_max_rate = src->network_max_rate;
    dst->manifest = src->manifest;
+
+   restart_string("tls_cert_file", dst->tls_cert_file, src->tls_cert_file);
+   restart_string("tls_key_file", dst->tls_key_file, src->tls_key_file);
+   restart_string("tls_ca_file", dst->tls_ca_file, src->tls_ca_file);
+
+   dst->number_of_extra = src->number_of_extra;
+   for (int i = 0; i < MAX_EXTRA; i++)
+   {
+      memcpy(dst->extra[i], src->extra[i], MAX_EXTRA_PATH);
+   }
 }
 
 static void
@@ -3190,6 +3192,18 @@ copy_user(struct user* dst, struct user* src)
 {
    memcpy(&dst->username[0], &src->username[0], MAX_USERNAME_LENGTH);
    memcpy(&dst->password[0], &src->password[0], MAX_PASSWORD_LENGTH);
+}
+
+static int
+restart_bool(char* name, bool e, bool n)
+{
+   if (e != n)
+   {
+      pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e ? "true" : "false", n ? "true" : "false");
+      return 1;
+   }
+
+   return 0;
 }
 
 static int

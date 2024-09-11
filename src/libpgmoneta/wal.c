@@ -129,6 +129,11 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_set_proc_title(1, argv, "wal", config->servers[srv].name);
 
+   if (config->servers[srv].wal_streaming)
+   {
+      goto error;
+   }
+
    memset(&date[0], 0, sizeof(date));
    time(&current_time);
    time_info = localtime(&current_time);
@@ -297,6 +302,8 @@ pgmoneta_wal(int srv, char** argv)
          type = msg->kind;
          if (type == 'E')
          {
+            pgmoneta_backtrace();
+            
             pgmoneta_log_error("Error occurred when starting stream replication");
             pgmoneta_log_error_response_message(msg);
             goto error;
