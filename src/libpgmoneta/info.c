@@ -48,6 +48,9 @@ pgmoneta_create_info(char* directory, char* label, int status)
    char buffer[INFO_BUFFER_SIZE];
    char* s = NULL;
    FILE* sfile = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    s = pgmoneta_append(s, directory);
    s = pgmoneta_append(s, "/backup.info");
@@ -72,6 +75,10 @@ pgmoneta_create_info(char* directory, char* label, int status)
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
+   fputs(&buffer[0], sfile);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
    fputs(&buffer[0], sfile);
 
    pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
@@ -783,6 +790,10 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          {
             memcpy(&bck->comments[0], &value[0], strlen(&value[0]));
          }
+         else if (pgmoneta_starts_with(&key[0], INFO_COMPRESSION))
+         {
+            bck->compression = atoi(&value[0]);
+         }
       }
    }
 
@@ -935,6 +946,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload)
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)bck->keep, ValueBool);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)bck->valid, ValueInt8);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES, (uintptr_t)bck->number_of_tablespaces, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)bck->compression, ValueInt32);
 
    if (pgmoneta_json_create(&tablespaces))
    {
@@ -1125,6 +1137,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payl
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)bck->keep, ValueBool);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)bck->valid, ValueInt8);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES, (uintptr_t)bck->number_of_tablespaces, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)bck->compression, ValueInt32);
 
    if (pgmoneta_json_create(&tablespaces))
    {

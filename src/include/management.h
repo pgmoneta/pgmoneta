@@ -89,6 +89,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_COMMAND               "Command"
 #define MANAGEMENT_ARGUMENT_COMMENT               "Comment"
 #define MANAGEMENT_ARGUMENT_COMMENTS              "Comments"
+#define MANAGEMENT_ARGUMENT_COMPRESSION           "Compression"
 #define MANAGEMENT_ARGUMENT_DELTA                 "Delta"
 #define MANAGEMENT_ARGUMENT_DESTINATION_FILE      "DestinationFile"
 #define MANAGEMENT_ARGUMENT_DIRECTORY             "Directory"

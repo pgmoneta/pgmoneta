@@ -379,6 +379,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, struct json* payl
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backups[j]->backup_size, ValueUInt64);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backups[j]->restore_size, ValueUInt64);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[j]->comments, ValueString);
+            pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backups[j]->compression, ValueInt32);
 
             wal = pgmoneta_number_of_wal_files(wal_dir, &backups[j]->wal[0], NULL);
             wal *= config->servers[i].wal_size;

@@ -44,6 +44,7 @@ extern "C" {
 #define INFO_BACKUP           "BACKUP"
 #define INFO_CHKPT_WALPOS     "CHKPT_WALPOS"
 #define INFO_COMMENTS         "COMMENTS"
+#define INFO_COMPRESSION      "COMPRESSION"
 #define INFO_ELAPSED          "ELAPSED"
 #define INFO_END_TIMELINE     "END_TIMELINE"
 #define INFO_END_WALPOS       "END_WALPOS"
@@ -91,6 +92,7 @@ struct backup
    uint32_t start_timeline;                                       /**< The starting timeline of the backup */
    uint32_t end_timeline;                                         /**< The ending timeline of the backup */
    int hash_algoritm;                                             /**< The hash algoritm for the manifest */
+   int compression;                                               /**< The compression type */
    char comments[MAX_COMMENT];                                    /**< The comments */
    char extra[MAX_EXTRA_PATH];                                    /**< The extra directory */
 } __attribute__ ((aligned (64)));
