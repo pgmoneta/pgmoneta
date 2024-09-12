@@ -60,33 +60,37 @@ pgmoneta_create_info(char* directory, char* label, int status)
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
    fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
    fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
    fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
    fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
    fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
    fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
-   pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
-   pgmoneta_log_trace("%s=%s", INFO_LABEL, label);
-   pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
-   pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
-   pgmoneta_log_trace("%s=", INFO_COMMENTS);
-   pgmoneta_log_trace("%s=", INFO_EXTRA);
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s", &buffer[0]);
 
    pgmoneta_permission(s, 6, 0, 0);
 
@@ -794,6 +798,10 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          {
             bck->compression = atoi(&value[0]);
          }
+         else if (pgmoneta_starts_with(&key[0], INFO_ENCRYPTION))
+         {
+            bck->encryption = atoi(&value[0]);
+         }
       }
    }
 
@@ -947,6 +955,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload)
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)bck->valid, ValueInt8);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES, (uintptr_t)bck->number_of_tablespaces, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)bck->compression, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)bck->encryption, ValueInt32);
 
    if (pgmoneta_json_create(&tablespaces))
    {
@@ -1138,6 +1147,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payl
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)bck->valid, ValueInt8);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES, (uintptr_t)bck->number_of_tablespaces, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)bck->compression, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)bck->encryption, ValueInt32);
 
    if (pgmoneta_json_create(&tablespaces))
    {

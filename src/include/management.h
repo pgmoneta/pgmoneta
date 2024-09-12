@@ -94,6 +94,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_DESTINATION_FILE      "DestinationFile"
 #define MANAGEMENT_ARGUMENT_DIRECTORY             "Directory"
 #define MANAGEMENT_ARGUMENT_ELAPSED               "Elapsed"
+#define MANAGEMENT_ARGUMENT_ENCRYPTION            "Encryption"
 #define MANAGEMENT_ARGUMENT_END_HILSN             "EndHiLSN"
 #define MANAGEMENT_ARGUMENT_END_LOLSN             "EndLoLSN"
 #define MANAGEMENT_ARGUMENT_END_TIMELINE          "EndTimeline"
