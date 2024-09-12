@@ -48,23 +48,51 @@ The memory interface is defined in [memory.h][memory_h] ([memory.c][memory_c]).
 
 ## Management
 
-[**pgmoneta**][pgmoneta] has a management interface which defines the administrator abilities that can be performed when it is running. This include for example taking a backup. The `pgmoneta-cli` program is used for these operations ([cli.c][cli_c]).
+[**pgmoneta**][pgmoneta] has a management interface which defines the administrator abilities that can be performed when it is running.
+This include for example taking a backup. The `pgmoneta-cli` program is used for these operations ([cli.c][cli_c]).
 
-The management interface use Unix Domain Socket for communication.
+The management interface is defined in [management.h][management_h]. The management interface
+uses its own protocol which uses JSON as its foundation.
 
-The management interface is defined in [management.h][management_h]. The management interface uses its own protocol which always consist of a header
+### Write
 
-| Field      | Type | Description |
-|------------|------|-------------|
-| `id` | Byte | The identifier of the message type |
+The client sends a single JSON string to the server,
 
-The rest of the message is depending on the message type.
+| Field      | Type   | Description                     |
+|------------|--------|---------------------------------|
+| `length`   | Int    | The length of the JSON document |
+| `json`     | String | The JSON document               |
+
+The server sends a single JSON string to the client,
+
+| Field      | Type   | Description                      |
+|------------|--------|----------------------------------|
+| `length`   | String | The length of the JSON document  |
+| `json`     | String | The JSON document                |
+
+### Read
+
+The server sends a single JSON string to the client,
+
+| Field      | Type   | Description                      |
+|------------|--------|----------------------------------|
+| `length`   | Int    | The length of the JSON document  |
+| `json`     | String | The JSON document                |
+
+The client sends to the server a single JSON documents,
+
+| Field      | Type   | Description                      |
+|------------|--------|----------------------------------|
+| `length`   | String | The length of the JSON document  |
+| `json`     | String | The JSON document                |
 
 ### Remote management
 
 The remote management functionality uses the same protocol as the standard management method.
 
-However, before the management packet is sent the client has to authenticate using SCRAM-SHA-256 using the same message format that PostgreSQL uses, e.g. StartupMessage, AuthenticationSASL, AuthenticationSASLContinue, AuthenticationSASLFinal and AuthenticationOk. The SSLRequest message is supported.
+However, before the management packet is sent the client has to authenticate using SCRAM-SHA-256 using the
+same message format that PostgreSQL uses, e.g. StartupMessage, AuthenticationSASL, AuthenticationSASLContinue,
+AuthenticationSASLFinal and AuthenticationOk. The SSLRequest message is supported.
 
 The remote management interface is defined in [remote.h][remote_h] ([remote.c][remote_c]).
 
