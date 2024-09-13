@@ -75,7 +75,11 @@ retain_setup(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Retain (setup): %s/%s", config->servers[server].name, identifier);
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      pgmoneta_log_debug("Retain (setup): %s", config->servers[i].name);
+   }
+
    pgmoneta_deque_list(nodes);
 
    return 0;
@@ -101,7 +105,7 @@ retain_execute(int server, char* identifier, struct deque* nodes)
       int retention_months = -1;
       int retention_years = -1;
 
-      pgmoneta_log_debug("Retain (execute): %s/%s", config->servers[i].name, identifier);
+      pgmoneta_log_debug("Retain (execute): %s", config->servers[i].name);
 
       retention_days = config->servers[i].retention_days;
       if (retention_days <= 0)
@@ -213,7 +217,11 @@ retain_teardown(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Retain (teardown): %s/%s", config->servers[server].name, identifier);
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      pgmoneta_log_debug("Retain (teardown): %s", config->servers[i].name);
+   }
+
    pgmoneta_deque_list(nodes);
 
    return 0;
