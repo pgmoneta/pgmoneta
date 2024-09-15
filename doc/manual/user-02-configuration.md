@@ -81,7 +81,6 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
-| extra | | String | No | The source directory for retrieval on the server side (details are in the extra parameter) |
 | wal_slot | | String | Yes | The replication slot for WAL |
 | create_slot | no | Bool | No | Create a replication slot for this server. Valid values are: yes, no |
 | follow | | String | No | Failover to this server if follow server fails |
@@ -97,6 +96,7 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. |
 | tls_key_file | | String | No | Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. |
 | tls_ca_file | | String | No | Certificate Authority (CA) file for TLS. This file must be owned by either the user running pgmoneta or root.  |
+| extra | | String | No | The source directory for retrieval on the server side (details are in the extra section) |
 
 The `user` specified must have the `REPLICATION` option in order to stream the Write-Ahead Log (WAL), and must have access to the `postgres` database in order to get the necessary configuration parameters.
 
