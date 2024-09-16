@@ -95,7 +95,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
    start_time = time(NULL);
 
    atomic_fetch_add(&config->active_restores, 1);
-   atomic_fetch_add(&config->servers[server].active_restore, 1);
+   atomic_fetch_add(&config->servers[server].restore, 1);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -144,7 +144,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->servers[server].active_restore, 1);
+   atomic_fetch_sub(&config->servers[server].restore, 1);
    atomic_fetch_sub(&config->active_restores, 1);
 
    pgmoneta_stop_logging();
@@ -163,7 +163,7 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->servers[server].active_restore, 1);
+   atomic_fetch_sub(&config->servers[server].restore, 1);
    atomic_fetch_sub(&config->active_restores, 1);
 
    pgmoneta_stop_logging();
