@@ -39,59 +39,66 @@ pgmoneta_retention(char** argv)
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
+   struct configuration* config;
 
    pgmoneta_start_logging();
 
+   config = (struct configuration*)shmem;
+
    pgmoneta_set_proc_title(1, argv, "retention", NULL);
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETAIN);
-
-   pgmoneta_deque_create(false, &nodes);
-
-   current = workflow;
-   while (current != NULL)
+   if (atomic_load(&config->active_restores) == 0 &&
+       atomic_load(&config->active_archives) == 0)
    {
-      if (current->setup(0, NULL, nodes))
-      {
-         goto error;
-      }
-      current = current->next;
-   }
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETAIN);
 
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->execute(0, NULL, nodes))
-      {
-         goto error;
-      }
-      current = current->next;
-   }
+      pgmoneta_deque_create(false, &nodes);
 
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->teardown(0, NULL, nodes))
+      current = workflow;
+      while (current != NULL)
       {
-         goto error;
+         if (current->setup(0, NULL, nodes))
+         {
+            goto error;
+         }
+         current = current->next;
       }
-      current = current->next;
-   }
 
-   pgmoneta_stop_logging();
+      current = workflow;
+      while (current != NULL)
+      {
+         if (current->execute(0, NULL, nodes))
+         {
+            goto error;
+         }
+         current = current->next;
+      }
+
+      current = workflow;
+      while (current != NULL)
+      {
+         if (current->teardown(0, NULL, nodes))
+         {
+            goto error;
+         }
+         current = current->next;
+      }
+   }
 
    pgmoneta_workflow_delete(workflow);
 
    pgmoneta_deque_destroy(nodes);
+
+   pgmoneta_stop_logging();
 
    exit(0);
 
 error:
-   pgmoneta_stop_logging();
-
    pgmoneta_workflow_delete(workflow);
 
    pgmoneta_deque_destroy(nodes);
+
+   pgmoneta_stop_logging();
 
    exit(1);
 }

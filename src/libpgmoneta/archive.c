@@ -81,6 +81,9 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
 
    start_time = time(NULL);
 
+   atomic_fetch_add(&config->active_archives, 1);
+   atomic_fetch_add(&config->servers[server].archiving, 1);
+
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
@@ -250,6 +253,9 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
 
    pgmoneta_disconnect(client_fd);
 
+   atomic_fetch_sub(&config->servers[server].archiving, 1);
+   atomic_fetch_sub(&config->active_archives, 1);
+
    pgmoneta_stop_logging();
 
    free(id);
@@ -274,6 +280,9 @@ error:
    pgmoneta_workflow_delete(workflow);
 
    pgmoneta_disconnect(client_fd);
+
+   atomic_fetch_sub(&config->servers[server].archiving, 1);
+   atomic_fetch_sub(&config->active_archives, 1);
 
    pgmoneta_stop_logging();
 
