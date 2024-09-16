@@ -42,11 +42,11 @@
 #include <stdio.h>
 #include <unistd.h>
 
-static int retain_setup(int, char*, struct deque*);
-static int retain_execute(int, char*, struct deque*);
-static int retain_teardown(int, char*, struct deque*);
-static void mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int retention_months,
-                        int retention_years, int number_of_backups, struct backup** backups);
+static int retention_setup(int, char*, struct deque*);
+static int retention_execute(int, char*, struct deque*);
+static int retention_teardown(int, char*, struct deque*);
+static void mark_retention(bool** retention_flags, int retention_days, int retention_weeks, int retention_months,
+                           int retention_years, int number_of_backups, struct backup** backups);
 
 struct workflow*
 pgmoneta_workflow_create_retention(void)
@@ -60,16 +60,16 @@ pgmoneta_workflow_create_retention(void)
       return NULL;
    }
 
-   wf->setup = &retain_setup;
-   wf->execute = &retain_execute;
-   wf->teardown = &retain_teardown;
+   wf->setup = &retention_setup;
+   wf->execute = &retention_execute;
+   wf->teardown = &retention_teardown;
    wf->next = NULL;
 
    return wf;
 }
 
 static int
-retain_setup(int server, char* identifier, struct deque* nodes)
+retention_setup(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
@@ -77,7 +77,7 @@ retain_setup(int server, char* identifier, struct deque* nodes)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      pgmoneta_log_debug("Retain (setup): %s", config->servers[i].name);
+      pgmoneta_log_debug("Retention (setup): %s", config->servers[i].name);
    }
 
    pgmoneta_deque_list(nodes);
@@ -86,12 +86,12 @@ retain_setup(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-retain_execute(int server, char* identifier, struct deque* nodes)
+retention_execute(int server, char* identifier, struct deque* nodes)
 {
    char* d;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   bool* retain_flags = NULL;
+   bool* retention_flags = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -105,7 +105,7 @@ retain_execute(int server, char* identifier, struct deque* nodes)
       int retention_months = -1;
       int retention_years = -1;
 
-      pgmoneta_log_debug("Retain (execute): %s", config->servers[i].name);
+      pgmoneta_log_debug("Retention (execute): %s", config->servers[i].name);
 
       retention_days = config->servers[i].retention_days;
       if (retention_days <= 0)
@@ -137,11 +137,11 @@ retain_execute(int server, char* identifier, struct deque* nodes)
 
       if (number_of_backups > 0)
       {
-         mark_retain(&retain_flags, retention_days, retention_weeks, retention_months,
-                     retention_years, number_of_backups, backups);
+         mark_retention(&retention_flags, retention_days, retention_weeks, retention_months,
+                        retention_years, number_of_backups, backups);
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (!retain_flags[j])
+            if (!retention_flags[j])
             {
                if (!backups[j]->keep)
                {
@@ -203,7 +203,7 @@ retain_execute(int server, char* identifier, struct deque* nodes)
          free(hs);
       }
 
-      free(retain_flags);
+      free(retention_flags);
       free(d);
    }
 
@@ -211,7 +211,7 @@ retain_execute(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-retain_teardown(int server, char* identifier, struct deque* nodes)
+retention_teardown(int server, char* identifier, struct deque* nodes)
 {
    struct configuration* config;
 
@@ -219,7 +219,7 @@ retain_teardown(int server, char* identifier, struct deque* nodes)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      pgmoneta_log_debug("Retain (teardown): %s", config->servers[i].name);
+      pgmoneta_log_debug("Retention (teardown): %s", config->servers[i].name);
    }
 
    pgmoneta_deque_list(nodes);
@@ -228,8 +228,8 @@ retain_teardown(int server, char* identifier, struct deque* nodes)
 }
 
 static void
-mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int retention_months,
-            int retention_years, int number_of_backups, struct backup** backups)
+mark_retention(bool** retention_flags, int retention_days, int retention_weeks, int retention_months,
+               int retention_years, int number_of_backups, struct backup** backups)
 {
    bool* flags = NULL;
    time_t t;
@@ -391,5 +391,5 @@ mark_retain(bool** retain_flags, int retention_days, int retention_weeks, int re
          }
       }
    }
-   *retain_flags = flags;
+   *retention_flags = flags;
 }

@@ -50,7 +50,7 @@ pgmoneta_retention(char** argv)
    if (atomic_load(&config->active_restores) == 0 &&
        atomic_load(&config->active_archives) == 0)
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETAIN);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION);
 
       pgmoneta_deque_create(false, &nodes);
 
