@@ -123,6 +123,9 @@ pgmoneta_init_configuration(void* shm)
    config->backlog = 16;
    config->hugepage = HUGEPAGE_TRY;
 
+   atomic_init(&config->active_restores, 0);
+   atomic_init(&config->active_archives, 0);
+
    config->update_process_title = UPDATE_PROCESS_TITLE_VERBOSE;
 
    config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
@@ -211,6 +214,8 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   memcpy(&srv.name, &section, strlen(section));
 
                   atomic_init(&srv.backup, false);
+                  atomic_init(&srv.restore, 0);
+                  atomic_init(&srv.archiving, 0);
                   atomic_init(&srv.delete, false);
                   atomic_init(&srv.wal, false);
                   srv.wal_streaming = false;
