@@ -2914,7 +2914,8 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
             else
             {
                dest_dir = (char*)malloc((strlen(target_dir) + 1) * sizeof(char));
-               strncpy(dest_dir, target_dir, strlen(target_dir) + 1);
+               memset(dest_dir, 0, strlen(target_dir) + 1);
+               memcpy(dest_dir, target_dir, strlen(target_dir));
             }
 
             pgmoneta_mkdir(dest_dir);
