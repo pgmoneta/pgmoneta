@@ -13,14 +13,30 @@ rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/F-40-x86_64/pgdg
 
 **RHEL 8.x / Rocky Linux 8.x**
 
+**x86_64**
+
 ```sh
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 ```
 
+**aarch64**
+
+```sh
+rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-aarch64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
 **RHEL 9.x / Rocky Linux 9.x**
+
+**x86_64**
 
 ```sh
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
+**aarch64**
+
+```sh
+rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-aarch64/pgdg-redhat-repo-latest.noarch.rpm
 ```
 
 **PostgreSQL 13**
