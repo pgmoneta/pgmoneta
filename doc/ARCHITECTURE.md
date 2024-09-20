@@ -21,8 +21,12 @@ Backup information is handled in [info.h](../src/include/info.h) ([info.c](../sr
 
 Retention is handled in [retention.h](../src/include/retention.h) ([retention.c](../src/libpgmoneta/retention.c)).
 
-Compression is handled in [gzip.h](../src/include/gzip.h) ([gzip.c](../src/libpgmoneta/gzip.c)) and
-[zstandard.h](../src/include/zstandard.h) ([zstandard.c](../src/libpgmoneta/zstandard.c)).
+Compression is handled in [gzip_compression.h](../src/include/gzip_compression.h) ([gzip_compression.c](../src/libpgmoneta/gzip_compression.c)),
+[lz4_compression.h](../src/include/lz4_compression.h) ([lz4_compression.c](../src/libpgmoneta/lz4_compression.c)),
+[zstandard_compression.h](../src/include/zstandard_compression.h) ([zstandard_compression.c](../src/libpgmoneta/zstandard_compression.c)),
+and [bzip2_compression.h](../src/include/bzip2_compression.h) ([bzip2_compression.c](../src/libpgmoneta/bzip2_compression.c)).
+
+Encryption is handled in [aes.h](../src/include/aes.h) ([aes.c](../src/libpgmoneta/aes.c))
 
 ## Shared memory
 

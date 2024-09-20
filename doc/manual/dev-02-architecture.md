@@ -20,7 +20,12 @@ Backup information is handled in [info.h][info_h] ([info.c][info_c]).
 
 Retention is handled in [retention.h][retention_h] ([retention.c][retention_c]).
 
-Compression is handled in [gzip.h][gzip_h] ([gzip.c][gzip_c]) and [zstandard.h][zstandard_h] ([zstandard.c][zstandard_c]).
+Compression is handled in [gzip_compression.h][gzip_compression.h] ([gzip_compression.c][gzip_compression.c]),
+[lz4_compression.h][lz4_compression.h] ([lz4_compression.c][lz4_compression.c]),
+[zstandard_compression.h][zstandard_compression.h] ([zstandard_compression.c][zstandard_compression.c]),
+and [bzip2_compression.h][bzip2_compression.h] ([bzip2_compression.c][bzip2_compression.c]).
+
+Encryption is handled in [aes.h][aes.h] ([aes.c][aes.c]).
 
 ## Shared memory
 
