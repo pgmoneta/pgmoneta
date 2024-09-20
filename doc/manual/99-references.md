@@ -67,6 +67,7 @@
 <!-- src/ -->
   [main_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/main.c
 <!-- src/include -->
+  [aes.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/aes.h
   [backup_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/backup.h
   [restore_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/restore.h
   [link_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/link.h
@@ -74,8 +75,6 @@
   [wal_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/wal.h
   [info_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/info.h
   [retention_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/retention.h
-  [gzip_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/gzip.h
-  [zstandard_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/zstandard.h
   [shmem_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/shmem.h
   [pgmoneta_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/pgmoneta.h
   [messge_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/message.h
@@ -85,7 +84,12 @@
   [remote_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/remote.h
   [prometheus_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/prometheus.h
   [logging_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/logging.h
+  [gzip_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/gzip_compression.h
+  [lz4_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/lz4_compression.h
+  [zstandard_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/zstandard_compression.h
+  [bzip2_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/bzip2_compression.h
 <!-- src/libpgmoneta -->
+  [aes.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/aes.c
   [backup_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/backup.c
   [restore_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/restore.c
   [link_c]: https://github.com/pgmoneta/pgmoneta/blob/main/libpgmoneta/link.c
@@ -93,8 +97,6 @@
   [wal_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/wal.c
   [info_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/info.c
   [retention_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/retention.c
-  [gzip_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/gzip.c
-  [zstandard_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/zstandard.c
   [message_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/message.c
   [network_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/network.c
   [memory_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/memory.c
@@ -102,6 +104,10 @@
   [remote_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/remote.c
   [prometheus_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/prometheus.c
   [logging_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/logging.c
+  [gzip_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/gzip_compression.c
+  [lz4_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/lz4_compression.c
+  [zstandard_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/zstandard_compression.c
+  [bzip2_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/bzip2_compression.c
   
 <!-- Contributing -->
   [ask]: https://github.com/pgmoneta/pgmoneta/discussions
