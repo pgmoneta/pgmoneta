@@ -249,6 +249,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    char* signing_key = NULL;
    char* signature = NULL;
    char* base64_signature = NULL;
+   size_t base64_signature_length;
    char* local_path = NULL;
    char* azure_path = NULL;
    char* azure_host = NULL;
@@ -257,7 +258,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    unsigned char* signature_hmac = NULL;
    unsigned char* signature_hex = NULL;
    int hmac_length = 0;
-   int signing_key_length = 0;
+   size_t signing_key_length = 0;
    FILE* file = NULL;
    struct stat file_info;
    CURLcode res = -1;
@@ -320,7 +321,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    }
 
    // Encode the signature.
-   pgmoneta_base64_encode((char*) signature_hmac, hmac_length, &base64_signature);
+   pgmoneta_base64_encode((char*) signature_hmac, hmac_length, &base64_signature, &base64_signature_length);
 
    // Construct the authorization header.
    auth_value = pgmoneta_append(auth_value, "SharedKey ");

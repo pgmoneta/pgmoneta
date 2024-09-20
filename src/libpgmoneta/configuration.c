@@ -1602,7 +1602,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    char* username = NULL;
    char* password = NULL;
    char* decoded = NULL;
-   int decoded_length = 0;
+   size_t decoded_length = 0;
    char* ptr = NULL;
    struct configuration* config;
 
@@ -1792,7 +1792,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
    char* username = NULL;
    char* password = NULL;
    char* decoded = NULL;
-   int decoded_length = 0;
+   size_t decoded_length = 0;
    char* ptr = NULL;
    struct configuration* config;
 

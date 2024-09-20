@@ -332,6 +332,7 @@ master_key(char* password, bool generate_pwd, int pwd_length)
    FILE* file = NULL;
    char buf[MISC_LENGTH];
    char* encoded = NULL;
+   size_t encoded_length;
    struct stat st = {0};
    bool do_free = true;
 
@@ -442,7 +443,7 @@ master_key(char* password, bool generate_pwd, int pwd_length)
       }
    }
 
-   pgmoneta_base64_encode(password, strlen(password), &encoded);
+   pgmoneta_base64_encode(password, strlen(password), &encoded, &encoded_length);
    fputs(encoded, file);
    free(encoded);
 
@@ -516,6 +517,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
    char* encrypted = NULL;
    int encrypted_length = 0;
    char* encoded = NULL;
+   size_t encoded_length;
    char un[MAX_USERNAME_LENGTH];
    int number_of_users = 0;
    bool do_verify = true;
@@ -633,7 +635,7 @@ password:
    }
 
    pgmoneta_encrypt(password, master_key, &encrypted, &encrypted_length, ENCRYPTION_AES_256_CBC);
-   pgmoneta_base64_encode(encrypted, encrypted_length, &encoded);
+   pgmoneta_base64_encode(encrypted, encrypted_length, &encoded, &encoded_length);
 
    entry = pgmoneta_append(entry, username);
    entry = pgmoneta_append(entry, ":");
@@ -690,6 +692,7 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    char* encrypted = NULL;
    int encrypted_length = 0;
    char* encoded = NULL;
+   size_t encoded_length;
    char un[MAX_USERNAME_LENGTH];
    bool found = false;
    bool do_verify = true;
@@ -807,7 +810,7 @@ password:
          }
 
          pgmoneta_encrypt(password, master_key, &encrypted, &encrypted_length, ENCRYPTION_AES_256_CBC);
-         pgmoneta_base64_encode(encrypted, encrypted_length, &encoded);
+         pgmoneta_base64_encode(encrypted, encrypted_length, &encoded, &encoded_length);
 
          memset(&line, 0, sizeof(line));
          entry = NULL;

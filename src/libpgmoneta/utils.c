@@ -857,12 +857,15 @@ pgmoneta_get_password(void)
 }
 
 int
-pgmoneta_base64_encode(char* raw, int raw_length, char** encoded)
+pgmoneta_base64_encode(char* raw, size_t raw_length, char** encoded, size_t* encoded_length)
 {
    BIO* b64_bio;
    BIO* mem_bio;
    BUF_MEM* mem_bio_mem_ptr;
    char* r = NULL;
+
+   *encoded = NULL;
+   *encoded_length = 0;
 
    if (raw == NULL)
    {
@@ -892,6 +895,7 @@ pgmoneta_base64_encode(char* raw, int raw_length, char** encoded)
    BUF_MEM_free(mem_bio_mem_ptr);
 
    *encoded = r;
+   *encoded_length = strlen(r);
 
    return 0;
 
@@ -903,13 +907,16 @@ error:
 }
 
 int
-pgmoneta_base64_decode(char* encoded, size_t encoded_length, char** raw, int* raw_length)
+pgmoneta_base64_decode(char* encoded, size_t encoded_length, char** raw, size_t* raw_length)
 {
    BIO* b64_bio;
    BIO* mem_bio;
    size_t size;
    char* decoded;
    int index;
+
+   *raw = NULL;
+   *raw_length = 0;
 
    if (encoded == NULL)
    {

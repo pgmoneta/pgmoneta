@@ -107,7 +107,7 @@ static int  server_signature(char* password, char* salt, int salt_length, int it
                              char* client_first_message_bare, size_t client_first_message_bare_length,
                              char* server_first_message, size_t server_first_message_length,
                              char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                             unsigned char** result, int* result_length);
+                             unsigned char** result, size_t* result_length);
 
 static int  create_ssl_ctx(bool client, SSL_CTX** ctx);
 static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
@@ -307,7 +307,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    char root_file[MISC_LENGTH];
    struct stat st = {0};
    char* salt = NULL;
-   int salt_length = 0;
+   size_t salt_length = 0;
    char* password_prep = NULL;
    char* client_nounce = NULL;
    char* combined_nounce = NULL;
@@ -321,11 +321,12 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    unsigned char* proof = NULL;
    int proof_length;
    char* proof_base = NULL;
+   size_t proof_base_length;
    char* base64_server_signature = NULL;
    char* server_signature_received = NULL;
-   int server_signature_received_length;
+   size_t server_signature_received_length;
    unsigned char* server_signature_calc = NULL;
-   int server_signature_calc_length;
+   size_t server_signature_calc_length;
    struct message* sslrequest_msg = NULL;
    struct message* startup_msg = NULL;
    struct message* sasl_response = NULL;
@@ -529,7 +530,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base);
+   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base, &proof_base_length);
 
    status = pgmoneta_create_auth_scram256_continue_response(&wo_proof[0], (char*)proof_base, &sasl_continue_response);
    if (status != MESSAGE_STATUS_OK)
@@ -830,14 +831,16 @@ client_scram256(SSL* c_ssl, int client_fd, char* password, int slot)
    char* salt = NULL;
    int salt_length = 0;
    char* base64_salt = NULL;
+   size_t base64_salt_length;
    char* base64_client_proof = NULL;
    char* client_proof_received = NULL;
-   int client_proof_received_length = 0;
+   size_t client_proof_received_length = 0;
    unsigned char* client_proof_calc = NULL;
    int client_proof_calc_length = 0;
    unsigned char* server_signature_calc = NULL;
-   int server_signature_calc_length = 0;
+   size_t server_signature_calc_length = 0;
    char* base64_server_signature_calc = NULL;
+   size_t base64_server_signature_calc_length;
    struct configuration* config;
    struct message* msg = NULL;
    struct message* sasl_continue = NULL;
@@ -896,7 +899,7 @@ retry:
    get_scram_attribute('r', (char*)msg->data + 26, msg->length - 26, &client_nounce);
    generate_nounce(&server_nounce);
    generate_salt(&salt, &salt_length);
-   pgmoneta_base64_encode(salt, salt_length, &base64_salt);
+   pgmoneta_base64_encode(salt, salt_length, &base64_salt, &base64_salt_length);
 
    server_first_message = malloc(89);
 
@@ -965,7 +968,7 @@ retry:
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)server_signature_calc, server_signature_calc_length, &base64_server_signature_calc);
+   pgmoneta_base64_encode((char*)server_signature_calc, server_signature_calc_length, &base64_server_signature_calc, &base64_server_signature_calc_length);
 
    status = pgmoneta_create_auth_scram256_final(base64_server_signature_calc, &msg);
    if (status != MESSAGE_STATUS_OK)
@@ -1497,7 +1500,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    int status = MESSAGE_STATUS_ERROR;
    int auth_index = 1;
    char* salt = NULL;
-   int salt_length = 0;
+   size_t salt_length = 0;
    char* password_prep = NULL;
    char* client_nounce = NULL;
    char* combined_nounce = NULL;
@@ -1511,11 +1514,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    unsigned char* proof = NULL;
    int proof_length;
    char* proof_base = NULL;
+   size_t proof_base_length;
    char* base64_server_signature = NULL;
    char* server_signature_received = NULL;
-   int server_signature_received_length;
+   size_t server_signature_received_length;
    unsigned char* server_signature_calc = NULL;
-   int server_signature_calc_length;
+   size_t server_signature_calc_length;
    struct message* sasl_response = NULL;
    struct message* sasl_continue = NULL;
    struct message* sasl_continue_response = NULL;
@@ -1595,7 +1599,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base);
+   pgmoneta_base64_encode((char*)proof, proof_length, &proof_base, &proof_base_length);
 
    status = pgmoneta_create_auth_scram256_continue_response(&wo_proof[0], (char*)proof_base, &sasl_continue_response);
    if (status != MESSAGE_STATUS_OK)
@@ -1742,7 +1746,7 @@ pgmoneta_get_master_key(char** masterkey)
    char buf[MISC_LENGTH];
    char line[MISC_LENGTH];
    char* mk = NULL;
-   int mk_length = 0;
+   size_t mk_length = 0;
    struct stat st = {0};
 
    if (pgmoneta_get_home_directory() == NULL)
@@ -1965,6 +1969,7 @@ generate_nounce(char** nounce)
    size_t s = 18;
    unsigned char r[s + 1];
    char* base = NULL;
+   size_t base_length;
    int result;
 
    memset(&r[0], 0, sizeof(r));
@@ -1977,7 +1982,7 @@ generate_nounce(char** nounce)
 
    r[s] = '\0';
 
-   pgmoneta_base64_encode((char*)&r[0], s, &base);
+   pgmoneta_base64_encode((char*)&r[0], s, &base, &base_length);
 
    *nounce = base;
 
@@ -2473,7 +2478,7 @@ server_signature(char* password, char* salt, int salt_length, int iterations,
                  char* client_first_message_bare, size_t client_first_message_bare_length,
                  char* server_first_message, size_t server_first_message_length,
                  char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                 unsigned char** result, int* result_length)
+                 unsigned char** result, size_t* result_length)
 {
    size_t size = 32;
    unsigned char* r = NULL;
