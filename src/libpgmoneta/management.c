@@ -852,8 +852,8 @@ error:
 int
 pgmoneta_management_read_json(SSL* ssl, int socket, struct json** json)
 {
-   char compression = 0;
-   char encryption = 0;
+   char compression = MANAGEMENT_COMPRESSION_NONE;
+   char encryption = MANAGEMENT_ENCRYPTION_NONE;
    char* s = NULL;
    struct json* r = NULL;
 
@@ -895,8 +895,8 @@ error:
 int
 pgmoneta_management_write_json(SSL* ssl, int socket, struct json* json)
 {
-   char compression = 0;
-   char encryption = 0;
+   char compression = MANAGEMENT_COMPRESSION_NONE;
+   char encryption = MANAGEMENT_ENCRYPTION_NONE;
    char* s = NULL;
 
    s = pgmoneta_json_to_string(json, FORMAT_JSON, NULL, 0);
