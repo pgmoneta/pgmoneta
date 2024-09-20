@@ -63,33 +63,41 @@ uses its own protocol which uses JSON as its foundation.
 
 The client sends a single JSON string to the server,
 
-| Field      | Type   | Description                     |
-|------------|--------|---------------------------------|
-| `length`   | Int    | The length of the JSON document |
-| `json`     | String | The JSON document               |
+| Field         | Type   | Description                     |
+|---------------|--------|---------------------------------|
+| `compression` | Byte   | The length of the JSON document |
+| `encryption`  | Byte   | The length of the JSON document |
+| `length`      | Int    | The length of the JSON document |
+| `json`        | String | The JSON document               |
 
 The server sends a single JSON string to the client,
 
-| Field      | Type   | Description                      |
-|------------|--------|----------------------------------|
-| `length`   | String | The length of the JSON document  |
-| `json`     | String | The JSON document                |
+| Field         | Type   | Description                     |
+|---------------|--------|---------------------------------|
+| `compression` | Byte   | The length of the JSON document |
+| `encryption`  | Byte   | The length of the JSON document |
+| `length`      | String | The length of the JSON document |
+| `json`        | String | The JSON document               |
 
 ### Read
 
 The server sends a single JSON string to the client,
 
-| Field      | Type   | Description                      |
-|------------|--------|----------------------------------|
-| `length`   | Int    | The length of the JSON document  |
-| `json`     | String | The JSON document                |
+| Field         | Type   | Description                     |
+|---------------|--------|---------------------------------|
+| `compression` | Byte   | The length of the JSON document |
+| `encryption`  | Byte   | The length of the JSON document |
+| `length`      | Int    | The length of the JSON document |
+| `json`        | String | The JSON document               |
 
 The client sends to the server a single JSON documents,
 
-| Field      | Type   | Description                      |
-|------------|--------|----------------------------------|
-| `length`   | String | The length of the JSON document  |
-| `json`     | String | The JSON document                |
+| Field         | Type   | Description                     |
+|---------------|--------|---------------------------------|
+| `compression` | Byte   | The length of the JSON document |
+| `encryption`  | Byte   | The length of the JSON document |
+| `length`      | String | The length of the JSON document |
+| `json`        | String | The JSON document               |
 
 ### Remote management
 

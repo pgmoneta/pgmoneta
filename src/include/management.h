@@ -43,6 +43,13 @@ extern "C" {
 #include <openssl/ssl.h>
 
 /**
+ * Management header
+ */
+#define MANAGEMENT_COMPRESSION_NONE 0
+
+#define MANAGEMENT_ENCRYPTION_NONE 0
+
+/**
  * Management commands
  */
 #define MANAGEMENT_BACKUP          1
