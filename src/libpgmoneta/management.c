@@ -44,9 +44,9 @@ static int create_request(struct json* json, struct json** request);
 static int create_outcome_success(struct json* json, time_t start_time, time_t end_time, struct json** outcome);
 static int create_outcome_failure(struct json* json, int32_t error, struct json** outcome);
 
-static int read_byte(char* prefix, SSL* ssl, int socket, char* c);
+static int read_uint8(char* prefix, SSL* ssl, int socket, uint8_t* i);
 static int read_string(char* prefix, SSL* ssl, int socket, char** str);
-static int write_byte(char* prefix, SSL* ssl, int socket, char c);
+static int write_uint8(char* prefix, SSL* ssl, int socket, uint8_t i);
 static int write_string(char* prefix, SSL* ssl, int socket, char* str);
 static int read_complete(SSL* ssl, int socket, void* buf, size_t size);
 static int write_complete(SSL* ssl, int socket, void* buf, size_t size);
@@ -852,17 +852,17 @@ error:
 int
 pgmoneta_management_read_json(SSL* ssl, int socket, struct json** json)
 {
-   char compression = MANAGEMENT_COMPRESSION_NONE;
-   char encryption = MANAGEMENT_ENCRYPTION_NONE;
+   uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
+   uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
    char* s = NULL;
    struct json* r = NULL;
 
-   if (read_byte("pgmoneta-cli", ssl, socket, &compression))
+   if (read_uint8("pgmoneta-cli", ssl, socket, &compression))
    {
       goto error;
    }
 
-   if (read_byte("pgmoneta-cli", ssl, socket, &encryption))
+   if (read_uint8("pgmoneta-cli", ssl, socket, &encryption))
    {
       goto error;
    }
@@ -895,18 +895,18 @@ error:
 int
 pgmoneta_management_write_json(SSL* ssl, int socket, struct json* json)
 {
-   char compression = MANAGEMENT_COMPRESSION_NONE;
-   char encryption = MANAGEMENT_ENCRYPTION_NONE;
+   uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
+   uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
    char* s = NULL;
 
    s = pgmoneta_json_to_string(json, FORMAT_JSON, NULL, 0);
 
-   if (write_byte("pgmoneta-cli", ssl, socket, compression))
+   if (write_uint8("pgmoneta-cli", ssl, socket, compression))
    {
       goto error;
    }
 
-   if (write_byte("pgmoneta-cli", ssl, socket, encryption))
+   if (write_uint8("pgmoneta-cli", ssl, socket, encryption))
    {
       goto error;
    }
@@ -928,11 +928,11 @@ error:
 }
 
 static int
-read_byte(char* prefix, SSL* ssl, int socket, char* c)
+read_uint8(char* prefix, SSL* ssl, int socket, uint8_t* i)
 {
    char buf1[1] = {0};
 
-   *c = 0;
+   *i = 0;
 
    if (read_complete(ssl, socket, &buf1[0], sizeof(buf1)))
    {
@@ -941,7 +941,7 @@ read_byte(char* prefix, SSL* ssl, int socket, char* c)
       goto error;
    }
 
-   *c = pgmoneta_read_byte(&buf1);
+   *i = pgmoneta_read_uint8(&buf1);
 
    return 0;
 
@@ -955,7 +955,7 @@ read_string(char* prefix, SSL* ssl, int socket, char** str)
 {
    char* s = NULL;
    char buf4[4] = {0};
-   int size;
+   uint32_t size;
 
    *str = NULL;
 
@@ -966,7 +966,7 @@ read_string(char* prefix, SSL* ssl, int socket, char** str)
       goto error;
    }
 
-   size = pgmoneta_read_int32(&buf4);
+   size = pgmoneta_read_uint32(&buf4);
    if (size > 0)
    {
       s = malloc(size + 1);
@@ -998,11 +998,11 @@ error:
 }
 
 static int
-write_byte(char* prefix, SSL* ssl, int socket, char c)
+write_uint8(char* prefix, SSL* ssl, int socket, uint8_t i)
 {
    char buf1[1] = {0};
 
-   pgmoneta_write_byte(&buf1, c);
+   pgmoneta_write_uint8(&buf1, i);
    if (write_complete(ssl, socket, &buf1, sizeof(buf1)))
    {
       pgmoneta_log_warn("%s: write_string: %p %d %s", prefix, ssl, socket, strerror(errno));
@@ -1022,7 +1022,7 @@ write_string(char* prefix, SSL* ssl, int socket, char* str)
 {
    char buf4[4] = {0};
 
-   pgmoneta_write_int32(&buf4, str != NULL ? strlen(str) : 0);
+   pgmoneta_write_uint32(&buf4, str != NULL ? strlen(str) : 0);
    if (write_complete(ssl, socket, &buf4, sizeof(buf4)))
    {
       pgmoneta_log_warn("%s: write_string: %p %d %s", prefix, ssl, socket, strerror(errno));

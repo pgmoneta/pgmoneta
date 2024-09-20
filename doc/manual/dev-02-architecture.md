@@ -65,18 +65,18 @@ The client sends a single JSON string to the server,
 
 | Field         | Type   | Description                     |
 |---------------|--------|---------------------------------|
-| `compression` | Byte   | The compression type            |
-| `encryption`  | Byte   | The encryption type             |
-| `length`      | Int    | The length of the JSON document |
+| `compression` | uint8  | The compression type            |
+| `encryption`  | uint8  | The encryption type             |
+| `length`      | uint32 | The length of the JSON document |
 | `json`        | String | The JSON document               |
 
 The server sends a single JSON string to the client,
 
 | Field         | Type   | Description                     |
 |---------------|--------|---------------------------------|
-| `compression` | Byte   | The compression type            |
-| `encryption`  | Byte   | The encryption type             |
-| `length`      | Int    | The length of the JSON document |
+| `compression` | uint8  | The compression type            |
+| `encryption`  | uint8  | The encryption type             |
+| `length`      | uint32 | The length of the JSON document |
 | `json`        | String | The JSON document               |
 
 ### Read
@@ -85,18 +85,18 @@ The server sends a single JSON string to the client,
 
 | Field         | Type   | Description                     |
 |---------------|--------|---------------------------------|
-| `compression` | Byte   | The compression type            |
-| `encryption`  | Byte   | The encryption type             |
-| `length`      | Int    | The length of the JSON document |
+| `compression` | uint8  | The compression type            |
+| `encryption`  | uint8  | The encryption type             |
+| `length`      | uint32 | The length of the JSON document |
 | `json`        | String | The JSON document               |
 
 The client sends to the server a single JSON documents,
 
 | Field         | Type   | Description                     |
 |---------------|--------|---------------------------------|
-| `compression` | Byte   | The compression type            |
-| `encryption`  | Byte   | The encryption type             |
-| `length`      | Int    | The length of the JSON document |
+| `compression` | uint8  | The compression type            |
+| `encryption`  | uint8  | The encryption type             |
+| `length`      | uint32 | The length of the JSON document |
 | `json`        | String | The JSON document               |
 
 ### Remote management
