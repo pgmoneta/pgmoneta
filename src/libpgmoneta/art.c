@@ -292,8 +292,14 @@ art_to_json_string_cb(void* param, const unsigned char* key, uint32_t key_len, s
 static int
 art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value);
 
+static int
+art_to_compact_json_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value);
+
 static char*
 to_json_string(struct art* t, char* tag, int indent);
+
+static char*
+to_compact_json_string(struct art* t, char* tag, int indent);
 
 static char*
 to_text_string(struct art* t, char* tag, int indent);
@@ -381,6 +387,10 @@ pgmoneta_art_to_string(struct art* t, int32_t format, char* tag, int indent)
    else if (format == FORMAT_TEXT)
    {
       return to_text_string(t, tag, indent);
+   }
+   else if (format == FORMAT_JSON_COMPACT)
+   {
+      return to_compact_json_string(t, tag, indent);
    }
    return NULL;
 }
@@ -1475,6 +1485,27 @@ art_to_json_string_cb(void* param, const unsigned char* key, uint32_t key_len, s
 }
 
 static int
+art_to_compact_json_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value)
+{
+   struct to_string_param* p = (struct to_string_param*) param;
+   char* str = NULL;
+   char* tag = NULL;
+   p->cnt++;
+   bool has_next = p->cnt < p->t->size;
+   tag = pgmoneta_append_char(tag, '"');
+   tag = pgmoneta_append(tag, (char*)key);
+   tag = pgmoneta_append_char(tag, '"');
+   tag = pgmoneta_append(tag, ":");
+   str = pgmoneta_value_to_string(value, FORMAT_JSON_COMPACT, tag, p->indent);
+   free(tag);
+   p->str = pgmoneta_append(p->str, str);
+   p->str = pgmoneta_append(p->str, has_next ? "," : "");
+
+   free(str);
+   return 0;
+}
+
+static int
 art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, struct value* value)
 {
    struct to_string_param* p = (struct to_string_param*) param;
@@ -1531,6 +1562,29 @@ to_json_string(struct art* t, char* tag, int indent)
    art_iterate(t, art_to_json_string_cb, &param);
    ret = param.str;
    ret = pgmoneta_indent(ret, NULL, indent);
+   ret = pgmoneta_append(ret, "}");
+   return ret;
+}
+
+static char*
+to_compact_json_string(struct art* t, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   if (t == NULL || t->size == 0)
+   {
+      ret = pgmoneta_append(ret, "{}");
+      return ret;
+   }
+   ret = pgmoneta_append(ret, "{");
+   struct to_string_param param = {
+      .indent = indent,
+      .str = ret,
+      .t = t,
+      .cnt = 0,
+   };
+   art_iterate(t, art_to_compact_json_string_cb, &param);
+   ret = param.str;
    ret = pgmoneta_append(ret, "}");
    return ret;
 }
