@@ -79,7 +79,6 @@ typedef oid rel_file_number;
 #define BKPBLOCK_SAME_REL          0x80    /* rel_file_locator omitted, same as previous */
 #define BKPIMAGE_HAS_HOLE          0x01    /* Page image has a "hole" */
 #define BKPIMAGE_IS_COMPRESSED     0x02    /* Page image is compressed */
-#define BKPIMAGE_APPLY             0x04    /* Page image should be restored during replay */
 #define BKPIMAGE_COMPRESS_PGLZ     0x04
 #define BKPIMAGE_COMPRESS_LZ4      0x08
 #define BKPIMAGE_COMPRESS_ZSTD     0x10
@@ -150,6 +149,8 @@ enum wal_level
 
 /* Structs */
 
+struct walfile; // Forward declaration of walfile, defined in walfile.h
+
 /**
  * @struct xlog_page_header_data
  * @brief Represents the header of an XLOG page.
@@ -171,27 +172,6 @@ struct xlog_page_header_data
    timeline_id xlp_tli;         /**< Timeline ID of the first record on the page. */
    xlog_rec_ptr xlp_pageaddr;   /**< XLOG address of this page. */
    uint32_t xlp_rem_len;        /**< Remaining length of data for the record. */
-};
-
-/**
- * @struct xlog_long_page_header_data
- * @brief Extended XLOG page header.
- *
- * Extends `xlog_page_header_data` with additional fields such as
- * system identifier, segment size, and block size.
- *
- * Fields:
- * - std: Standard header fields.
- * - xlp_sysid: System identifier from pg_control.
- * - xlp_seg_size: Segment size for cross-checking.
- * - xlp_xlog_blcksz: XLOG block size for cross-checking.
- */
-struct xlog_long_page_header_data
-{
-   struct xlog_page_header_data std;     /**< Standard header fields. */
-   uint64_t xlp_sysid;                   /**< System identifier from pg_control. */
-   uint32_t xlp_seg_size;                /**< Segment size for cross-checking. */
-   uint32_t xlp_xlog_blcksz;             /**< XLOG block size for cross-checking. */
 };
 
 /**
@@ -349,9 +329,11 @@ extern struct server* server_config;
  *
  * @param path The file path of the WAL file.
  * @param server_info The server structure to be populated with parsed data.
+ * @param wal_file The WAL file structure to be populated with parsed data.
+ * @return 0 on success, otherwise 1.
  */
-void
-pgmoneta_wal_parse_wal_file(char* path, struct server* server_info);
+int
+pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfile* wal_file);
 
 /**
  * Decodes an XLOG record from a buffer.
@@ -361,9 +343,9 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info);
  * @param record The original XLOG record structure.
  * @param block_size The block size used for decoding.
  * @param server_info The server structure for context.
- * @return true if the decoding was successful, false otherwise.
+ * @return 0 if the decoding was successful, 1 otherwise.
  */
-bool
+int
 pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, struct server* server_info);
 
 /**
@@ -438,6 +420,14 @@ pgmoneta_wal_is_bkp_image_compressed(struct server* server_info, uint8_t bimg_in
 
 char*
 pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
+
+/**
+ * Prints the record to the console.
+ *
+ * @param record The XLOG record to print.
+ */
+void
+print_record(struct xlog_record* record);
 
 #ifdef __cplusplus
 }

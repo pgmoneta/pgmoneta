@@ -6,7 +6,98 @@
 
 This document provides an overview of the `wal_reader` tool, with a focus on the `parse_wal_file` function, which serves as the main entry point for parsing Write-Ahead Log (WAL) files. Currently, the function only parses the given WAL file and prints the description of each record. In the future, it will be integrated with other parts of the code.
 
-## Function Overview
+## High-Level API Overview
+
+The following section provides a high-level overview of how users can interact with the functions and structures defined in the `walfile.h` file. These APIs allow you to read, write, and manage Write-Ahead Log (WAL) files.
+
+### Struct `walfile`
+
+The `walfile` struct represents the core structure used for interacting with WAL files in PostgreSQL. A WAL file stores a log of changes to the database and is used for crash recovery, replication, and other purposes. Each WAL file consists of pages (each 8192 bytes by default), containing records that capture database changes.
+
+#### Fields:
+- **magic_number**: Identifies the PostgreSQL version that created the WAL file. You can find more info on supported magic numbers [here](#supporting-various-wal-structures-in-postgresql-versions-13-to-17).
+- **long_phd**: A pointer to the extended header (long header) found on the first page of the WAL file. This header contains additional metadata.
+- **page_headers**: A deque of headers representing each page in the WAL file, excluding the first page.
+- **records**: A deque of decoded WAL records. Each record represents a change made to the database and contains both metadata and the actual data to be applied during recovery or replication.
+
+### Function Overview
+
+The `walfile.h` file provides three key functions for interacting with WAL files: `pgmoneta_read_walfile`, `pgmoneta_write_walfile`, and `pgmoneta_destroy_walfile`. These functions allow users to read from, write to, and destroy WAL file objects, respectively.
+
+#### `pgmoneta_read_walfile`
+
+```c
+int pgmoneta_read_walfile(int server, char* path, struct walfile** wf);
+```
+
+##### Description:
+This function reads a WAL file from a specified path and populates a `walfile` structure with its contents, including the file's headers and records.
+
+##### Parameters:
+- **server**: The index of the Postgres server in Pgmoneta configuration.
+- **path**: The file path to the WAL file that needs to be read.
+- **wf**: A pointer to a pointer to a `walfile` structure that will be populated with the WAL file data.
+
+##### Return:
+- Returns `0` on success or `1` on failure.
+
+##### Usage Example:
+```c
+struct walfile* wf = NULL;
+int result = pgmoneta_read_walfile(0, "/path/to/walfile", &wf);
+if (result == 0) {
+    // Successfully read WAL file
+}
+```
+
+#### `pgmoneta_write_walfile`
+
+```c
+int pgmoneta_write_walfile(struct walfile* wf, int server, char* path);
+```
+
+##### Description:
+This function writes the contents of a `walfile` structure back to disk, saving it as a WAL file at the specified path.
+
+##### Parameters:
+- **wf**: The `walfile` structure containing the WAL data to be written.
+- **server**: The index or ID of the server where the WAL file should be saved.
+- **path**: The file path where the WAL file should be written.
+
+##### Return:
+- Returns `0` on success or `1` on failure.
+
+##### Usage Example:
+```c
+int result = pgmoneta_write_walfile(wf, 0, "/path/to/output_walfile");
+if (result == 0) {
+    // Successfully wrote WAL file
+}
+```
+
+#### `pgmoneta_destroy_walfile`
+
+```c
+void pgmoneta_destroy_walfile(struct walfile* wf);
+```
+
+##### Description:
+This function frees the memory allocated for a `walfile` structure, including its headers and records.
+
+##### Parameters:
+- **wf**: The `walfile` structure to be destroyed.
+
+##### Usage Example:
+```c
+struct walfile* wf = NULL;
+int result = pgmoneta_read_walfile(0, "/path/to/walfile", &wf);
+if (result == 0) {
+    // Successfully read WAL file
+}
+pgmoneta_destroy_walfile(wf);
+```
+
+## Internal API Overview
 
 ### parse_wal_file
 

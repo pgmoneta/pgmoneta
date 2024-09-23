@@ -35,7 +35,6 @@ extern "C" {
 
 #include <stdint.h>
 
-typedef uint32_t block_number;
 typedef uint16_t offset_number;
 typedef struct block_id_data* block_id;
 

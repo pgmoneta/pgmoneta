@@ -30,6 +30,7 @@
 #include <utils.h>
 #include <walfile/rmgr.h>
 #include <walfile/wal_reader.h>
+#include <walfile.h>
 
 #include <assert.h>
 #include <string.h>
@@ -68,6 +69,18 @@ print_record(struct xlog_record* record)
    pgmoneta_log_trace("xl_info: %u\n", record->xl_info);
    pgmoneta_log_trace("xl_prev: %llu\n", (unsigned long long) record->xl_prev);
    pgmoneta_log_trace("xl_rmid: %u\n", record->xl_rmid);
+   pgmoneta_log_trace("xl_crc: %u\n", record->xl_crc);
+}
+
+bool
+is_bimg_apply(uint8_t bimg_info)
+{
+   int BKPIMAGE_APPLY = 0x04;
+   if (server_config->version >= 15)
+   {
+      BKPIMAGE_APPLY = 0x02;
+   }
+   return (bimg_info & BKPIMAGE_APPLY) != 0;
 }
 
 bool
@@ -108,14 +121,34 @@ pgmoneta_wal_array_desc(char* buf, void* array,
 }
 
 void
-pgmoneta_wal_parse_wal_file(char* path, struct server* server_info)
+read_all_page_headers(FILE* file, struct xlog_long_page_header_data* long_header, struct walfile* wal_file)
+{
+   int page_number = 1;
+   while (true)
+   {
+      fseek(file, page_number * long_header->xlp_xlog_blcksz, SEEK_SET);
+      struct xlog_page_header_data* page_header = NULL;
+      page_header = malloc(SIZE_OF_XLOG_SHORT_PHD);
+      fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
+      if (page_header->xlp_magic == 0)
+      {
+         free(page_header);
+         return;
+      }
+      pgmoneta_deque_add(wal_file->page_headers, NULL, (uintptr_t) page_header, ValueRef);
+      page_number++;
+   }
+}
+
+int
+pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfile* wal_file)
 {
 #define MALLOC(pointer, size) \
         pointer = malloc(size); \
         if (pointer == NULL) \
         { \
            pgmoneta_log_fatal("Error: Could not allocate memory for %s\n", #pointer); \
-           goto finish; \
+           goto error; \
         }
 
    struct xlog_record* record = NULL;
@@ -137,10 +170,13 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info)
 
    uint32_t next_record = ftell(file);
    int page_number = 0;
+   wal_file->long_phd = long_header;
+
+   read_all_page_headers(file, long_header, wal_file);
+   fseek(file, next_record, SEEK_SET);
 
    while (true)
    {
-      pgmoneta_log_trace("next_record: %u\n", next_record);
       // Check if next record is beyond the current page
       if (next_record >= (long_header->xlp_xlog_blcksz * (page_number + 1)))
       {
@@ -177,7 +213,8 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info)
 
       if (record->xl_tot_len == 0)
       {
-         goto finish;
+         free(record);
+         break;
       }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
       next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
@@ -213,49 +250,41 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info)
 
       decoded = calloc(1, sizeof(struct decoded_xlog_record));
 
-      if (!pgmoneta_wal_decode_xlog_record(buffer, decoded, record, long_header->xlp_xlog_blcksz, server_info))
+      if (pgmoneta_wal_decode_xlog_record(buffer, decoded, record, long_header->xlp_xlog_blcksz, server_info))
       {
          pgmoneta_log_fatal("error in decoding\n");
-         continue;
+         goto error;
       }
       else
       {
          pgmoneta_wal_display_decoded_record(decoded, ++count, server_info);
-      }
-
-      free(buffer);
-      if (decoded->main_data != NULL)
-      {
-         free(decoded->main_data);
-      }
-      for (int i = 0; i <= decoded->max_block_id; i++)
-      {
-         if (decoded->blocks[i].has_data)
+         if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
          {
-            free(decoded->blocks[i].data);
+            goto error;
          }
       }
-      free(decoded);
+      free(buffer);
       free(record);
    }
 
-finish:
-   free(record);
-   free(long_header);
    fclose(file);
+   return 0;
 
+error:
+   pgmoneta_log_fatal("Error: Could not parse WAL file\n");
+   fclose(file);
+   return 1;
 }
 
 void
 pgmoneta_wal_display_decoded_record(struct decoded_xlog_record* record, int count, struct server* server_info)
 {
-
    uint32_t rec_len;
    uint32_t fpi_len;
 
    print_record(&record->header);
    pgmoneta_wal_get_record_length(record, &rec_len, &fpi_len);
-   pgmoneta_log_trace("record: %d\n", count);
+
    pgmoneta_log_trace("rec/tot_len: %u/%u\t", rec_len, record->header.xl_tot_len);
 
    char* buf = NULL;
@@ -269,7 +298,7 @@ pgmoneta_wal_display_decoded_record(struct decoded_xlog_record* record, int coun
    pgmoneta_log_trace("------------------------------\n");
 }
 
-bool
+int
 pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, struct server* server_info)
 {
 #define COPY_HEADER_FIELD(_dst, _size)          \
@@ -294,7 +323,6 @@ pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decode
    int remaining = 0;
    uint32_t datatotal = 0;
    char* ptr = NULL;
-//   char* out = NULL;
    struct rel_file_locator* rlocator = NULL;
    uint8_t block_id;
 
@@ -378,7 +406,7 @@ pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decode
             COPY_HEADER_FIELD(&blk->hole_offset, sizeof(uint16_t));
             COPY_HEADER_FIELD(&blk->bimg_info, sizeof(uint8_t));
 
-            blk->apply_image = ((blk->bimg_info & BKPIMAGE_APPLY) != 0);
+            blk->apply_image = is_bimg_apply(blk->bimg_info);
 
             if (pgmoneta_wal_is_bkp_image_compressed(server_info, blk->bimg_info))
             {
@@ -484,7 +512,8 @@ pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decode
       if (blk->has_image)
       {
          /* no need to align image */
-         blk->bkp_image = ptr;
+         blk->bkp_image = malloc(blk->bimg_len);
+         memcpy(blk->bkp_image, ptr, blk->bimg_len);
          ptr += blk->bimg_len;
       }
       if (blk->has_data)
@@ -507,15 +536,15 @@ pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decode
       ptr += decoded->main_data_len;
    }
 
-   return true;
+   return 0;
 
 shortdata_err:
    pgmoneta_log_fatal("shortdata_err\n");
-   return false;
+   return 1;
 
 err:
    pgmoneta_log_fatal("err\n");
-   return false;
+   return 1;
 }
 
 char*
