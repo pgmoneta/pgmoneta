@@ -1523,7 +1523,15 @@ art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, s
    {
       if (p->cnt == 1)
       {
-         str = pgmoneta_value_to_string(value, FORMAT_TEXT, tag, 0);
+         if (value->type != ValueJSON)
+         {
+            str = pgmoneta_value_to_string(value, FORMAT_TEXT, tag, 0);
+         }
+         else
+         {
+            p->str = pgmoneta_indent(p->str, tag, 0);
+            str = pgmoneta_value_to_string(value, FORMAT_TEXT, NULL, p->indent + INDENT_PER_LEVEL);
+         }
       }
       else
       {
