@@ -198,7 +198,7 @@ libev
   The libev backend to use. Valid options: auto, select, poll, epoll, iouring, devpoll and port. Default is auto
 
 buffer_size
-  The network buffer size (SO_RCVBUF and SO_SNDBUF). Default is 65535
+  The network buffer size (SO_RCVBUF and SO_SNDBUF). Default is 65536
 
 keep_alive
   Have SO_KEEPALIVE on sockets. Default is on
