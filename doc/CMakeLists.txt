@@ -68,6 +68,7 @@ if(generation)
   FILE(GLOB UMDS_PRE "manual/user-0?-*.md")
   FILE(GLOB UMDS_POST "manual/user-1?-*.md")
   FILE(GLOB DMDS "manual/dev-??-*.md")
+  FILE(GLOB AG "manual/advanced/??-*.md")
 
   # Manuals definitions
   set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
@@ -106,15 +107,31 @@ if(generation)
     COMMENT "Generating Developer Guide HTML documentation"
   )
 
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf --from markdown --template eisvogel --listings -N --toc ${AG}
+    DEPENDS ${UMDS}
+    COMMENT "Generating Advanced PDF documentation"
+  )
+
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html -s -f markdown-smart -N --toc -t html5 ${AG}
+    DEPENDS ${UMDS}
+    COMMENT "Generating Advanced HTML documentation"
+  )
+
   add_custom_target(
     all_docs ALL
-    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html
+    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html
   )
 
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html DESTINATION share/doc/pgmoneta/manual)
 
 endif()
 
