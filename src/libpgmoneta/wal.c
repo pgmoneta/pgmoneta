@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <io.h>
 #include <logging.h>
 #include <management.h>
 #include <memory.h>
@@ -58,9 +59,9 @@
 
 static char* wal_file_name(uint32_t timeline, size_t segno, int segsize);
 static int wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket);
-static FILE* wal_open(char* root, char* filename, int segsize);
-static int wal_close(char* root, char* filename, bool partial, FILE* file);
-static int wal_prepare(FILE* file, int segsize);
+static int wal_open(char* root, char* filename, int segsize);
+static int wal_close(char* root, char* filename, bool partial, int fd);
+static int wal_prepare(int fd, int segsize);
 static int wal_send_status_report(SSL* ssl, int socket, int64_t received, int64_t flushed, int64_t applied);
 static int wal_xlog_offset(size_t xlogptr, int segsize);
 static int wal_convert_xlogpos(char* xlogpos, int segsize, uint32_t* high32, uint32_t* low32);
@@ -101,8 +102,8 @@ pgmoneta_wal(int srv, char** argv)
    char date[128];
    time_t current_time;
    struct tm* time_info;
-   FILE* wal_file = NULL;
-   FILE* wal_shipping_file = NULL;
+   int wal_fd = -1;
+   int wal_shipping_fd = -1;
    sftp_file sftp_wal_file = NULL;
    struct message* identify_system_msg = NULL;
    struct query_response* identify_system_response = NULL;
@@ -352,7 +353,7 @@ pgmoneta_wal(int srv, char** argv)
                   xlogptr = pgmoneta_read_int64(msg->data + 1);
                   xlogoff = wal_xlog_offset(xlogptr, segsize);
 
-                  if (wal_file == NULL)
+                  if (wal_fd < 0)
                   {
                      if (xlogoff != 0 && bytes_left != xlogoff)
                      {
@@ -365,14 +366,14 @@ pgmoneta_wal(int srv, char** argv)
                         segno = xlogptr / segsize;
                         curr_xlogoff = 0;
                         filename = wal_file_name(timeline, segno, segsize);
-                        if ((wal_file = wal_open(d, filename, segsize)) == NULL)
+                        if ((wal_fd = wal_open(d, filename, segsize)) < 0)
                         {
                            pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
                            goto error;
                         }
                         memset(config->servers[srv].current_wal_filename, 0, MISC_LENGTH);
                         snprintf(config->servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
-                        if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
+                        if ((wal_shipping_fd = wal_open(wal_shipping, filename, segsize)) < 0)
                         {
                            if (wal_shipping != NULL)
                            {
@@ -391,14 +392,14 @@ pgmoneta_wal(int srv, char** argv)
                         if (bytes_left > 0)
                         {
                            curr_xlogoff += bytes_left;
-                           fwrite(remain_buffer, 1, bytes_left, wal_file);
+                           pgmoneta_write_file(wal_fd, remain_buffer, bytes_left);
                            if (sftp_wal_file != NULL)
                            {
                               sftp_write(sftp_wal_file, remain_buffer, bytes_left);
                            }
-                           if (wal_shipping_file != NULL)
+                           if (wal_shipping_fd > 0)
                            {
-                              fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
+                              pgmoneta_write_file(wal_shipping_fd, remain_buffer, bytes_left);
                            }
                            bytes_left = 0;
                         }
@@ -424,7 +425,7 @@ pgmoneta_wal(int srv, char** argv)
                      {
                         bytes_to_write = bytes_left;
                      }
-                     if (bytes_to_write != fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_file))
+                     if (bytes_to_write != pgmoneta_write_file(wal_fd, msg->data + hdrlen + bytes_written, bytes_to_write))
                      {
                         pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
@@ -434,9 +435,9 @@ pgmoneta_wal(int srv, char** argv)
                         sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_to_write);
                      }
 
-                     if (wal_shipping_file != NULL)
+                     if (wal_shipping_fd > 0)
                      {
-                        fwrite(msg->data + hdrlen + bytes_written, 1, bytes_to_write, wal_shipping_file);
+                        pgmoneta_write_file(wal_shipping_fd, msg->data + hdrlen + bytes_written, bytes_to_write);
                      }
 
                      bytes_written += bytes_to_write;
@@ -448,20 +449,18 @@ pgmoneta_wal(int srv, char** argv)
                      if (wal_xlog_offset(xlogptr, segsize) == 0)
                      {
                         // the end of WAL segment
-                        fflush(wal_file);
-                        wal_close(d, filename, false, wal_file);
+                        wal_close(d, filename, false, wal_fd);
                         if (sftp_wal_file != NULL)
                         {
                            pgmoneta_sftp_wal_close(srv, filename, false, &sftp_wal_file);
                            sftp_wal_file = NULL;
                         }
 
-                        wal_file = NULL;
-                        if (wal_shipping_file != NULL)
+                        wal_fd = -1;
+                        if (wal_shipping_fd > 0)
                         {
-                           fflush(wal_shipping_file);
-                           wal_close(wal_shipping, filename, false, wal_shipping_file);
-                           wal_shipping_file = NULL;
+                           wal_close(wal_shipping, filename, false, wal_shipping_fd);
+                           wal_shipping_fd = -1;
                         }
                         free(filename);
                         filename = NULL;
@@ -474,12 +473,15 @@ pgmoneta_wal(int srv, char** argv)
                            /* Save the rest of the data for the next WAL segment */
                            if (remain_buffer == NULL)
                            {
-                              remain_buffer = malloc(bytes_left);
+                              remain_buffer = pgmoneta_aligned_malloc((bytes_left / BLOCK_SIZE + 1) * BLOCK_SIZE);
                               remain_buffer_alloc_size = bytes_left;
                            }
                            else if (bytes_left > remain_buffer_alloc_size)
                            {
                               remain_buffer = realloc(remain_buffer, bytes_left);
+                              char* tmp_buffer = pgmoneta_aligned_malloc((bytes_left / BLOCK_SIZE + 1) * BLOCK_SIZE);
+                              memcpy(tmp_buffer, remain_buffer, remain_buffer_alloc_size);
+                              remain_buffer = tmp_buffer;
                               remain_buffer_alloc_size = bytes_left;
                            }
                            memset(remain_buffer, 0, remain_buffer_alloc_size);
@@ -510,13 +512,13 @@ pgmoneta_wal(int srv, char** argv)
          {
             // handle CopyDone
             pgmoneta_send_copy_done_message(ssl, socket);
-            if (wal_file != NULL)
+            if (wal_fd > 0)
             {
                // Next file would be at a new timeline, so we treat the current wal file completed
-               wal_close(d, filename, false, wal_file);
-               wal_file = NULL;
-               wal_close(wal_shipping, filename, false, wal_shipping_file);
-               wal_shipping_file = NULL;
+               wal_close(d, filename, false, wal_fd);
+               wal_fd = -1;
+               wal_close(wal_shipping, filename, false, wal_shipping_fd);
+               wal_shipping_fd = -1;
                if (sftp_wal_file != NULL)
                {
                   pgmoneta_sftp_wal_close(srv, filename, false, &sftp_wal_file);
@@ -566,11 +568,11 @@ pgmoneta_wal(int srv, char** argv)
    {
       pgmoneta_disconnect(socket);
    }
-   if (wal_file != NULL)
+   if (wal_fd > 0)
    {
       bool partial = (wal_xlog_offset(xlogptr, segsize) != 0);
-      wal_close(d, filename, partial, wal_file);
-      wal_close(wal_shipping, filename, partial, wal_shipping_file);
+      wal_close(d, filename, partial, wal_fd);
+      wal_close(wal_shipping, filename, partial, wal_shipping_fd);
       if (sftp_wal_file != NULL)
       {
          pgmoneta_sftp_wal_close(srv, filename, partial, &sftp_wal_file);
@@ -617,10 +619,10 @@ error:
       pgmoneta_disconnect(socket);
    }
 
-   if (wal_file != NULL)
+   if (wal_fd > 0)
    {
-      wal_close(d, filename, true, wal_file);
-      wal_close(wal_shipping, filename, true, wal_shipping_file);
+      wal_close(d, filename, true, wal_fd);
+      wal_close(wal_shipping, filename, true, wal_shipping_fd);
    }
    if (sftp_wal_file != NULL)
    {
@@ -900,15 +902,15 @@ error:
    return 1;
 }
 
-static FILE*
+static int
 wal_open(char* root, char* filename, int segsize)
 {
    if (root == NULL || strlen(root) == 0 || !pgmoneta_exists(root))
    {
-      return NULL;
+      return -1;
    }
    char* path = NULL;
-   FILE* file = NULL;
+   int fd = -1;
    path = pgmoneta_append(path, root);
    if (!pgmoneta_ends_with(path, "/"))
    {
@@ -924,8 +926,8 @@ wal_open(char* root, char* filename, int segsize)
       size_t size = pgmoneta_get_file_size(path);
       if (size == (size_t)segsize)
       {
-         file = fopen(path, "r+b");
-         if (file == NULL)
+         fd = open(path, O_RDWR | O_SYNC | O_DIRECT, 0600);
+         if (fd < 0)
          {
             pgmoneta_log_error("WAL error: %s", strerror(errno));
             errno = 0;
@@ -934,7 +936,7 @@ wal_open(char* root, char* filename, int segsize)
          pgmoneta_permission(path, 6, 0, 0);
 
          free(path);
-         return file;
+         return fd;
       }
       if (size != 0)
       {
@@ -944,16 +946,16 @@ wal_open(char* root, char* filename, int segsize)
       }
    }
 
-   file = fopen(path, "wb");
+   fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC | O_DIRECT, 0600);
 
-   if (file == NULL)
+   if (fd < 0)
    {
       pgmoneta_log_error("WAL error: %s", strerror(errno));
       errno = 0;
       goto error;
    }
 
-   if (wal_prepare(file, segsize))
+   if (wal_prepare(fd, segsize))
    {
       goto error;
    }
@@ -961,21 +963,21 @@ wal_open(char* root, char* filename, int segsize)
    pgmoneta_permission(path, 6, 0, 0);
 
    free(path);
-   return file;
+   return fd;
 
 error:
-   if (file != NULL)
+   if (fd > 0)
    {
-      fclose(file);
+      close(fd);
    }
    free(path);
-   return NULL;
+   return -1;
 }
 
 static int
-wal_close(char* root, char* filename, bool partial, FILE* file)
+wal_close(char* root, char* filename, bool partial, int fd)
 {
-   if (file == NULL || root == NULL || filename == NULL || strlen(root) == 0 || strlen(filename) == 0)
+   if (fd < 0 || root == NULL || filename == NULL || strlen(root) == 0 || strlen(filename) == 0)
    {
       return 1;
    }
@@ -985,7 +987,7 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
    if (partial)
    {
       pgmoneta_log_warn("Not renaming %s.partial, this segment is incomplete", filename);
-      fclose(file);
+      close(fd);
       return 0;
    }
 
@@ -1005,33 +1007,34 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
       goto error;
    }
 
-   fclose(file);
+   close(fd);
 
    return 0;
 
 error:
-   fclose(file);
+   close(fd);
    return 1;
 }
 
 static int
-wal_prepare(FILE* file, int segsize)
+wal_prepare(int fd, int segsize)
 {
-   char buffer[8192] = {0};
+   int buf_size = 8192;
+   char* buffer = (char*)pgmoneta_aligned_malloc(buf_size * sizeof(char));
+   memset(buffer, 0, buf_size);
    size_t written = 0;
 
-   if (file == NULL)
+   if (fd < 0)
    {
       return 1;
    }
 
    while (written < (size_t)segsize)
    {
-      written += fwrite(buffer, 1, sizeof(buffer), file);
+      written += pgmoneta_write_file(fd, buffer, buf_size);
    }
 
-   fflush(file);
-   if (fseek(file, 0, SEEK_SET) != 0)
+   if (lseek(fd, 0, SEEK_SET) != 0)
    {
       pgmoneta_log_error("WAL error: %s", strerror(errno));
       errno = 0;
