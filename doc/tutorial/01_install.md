@@ -192,7 +192,7 @@ user = repl
 wal_slot = repl
 ```
 
-and press `Ctrl-D`
+and press `Ctrl-d`
 
 (`pgmoneta` user)
 
