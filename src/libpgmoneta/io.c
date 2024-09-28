@@ -37,12 +37,14 @@
 #include <string.h>
 #include <unistd.h>
 
-#define WRITE_SIZE BLOCK_SIZE*256
+#define WRITE_SIZE BLOCK_SIZE * 256
 
 ssize_t
 pgmoneta_write_file(int fd, void* buffer, size_t bytes)
 {
    ssize_t bytes_written = 0;
+   void* aligned_buf = NULL;
+   void* buf = NULL;
    int flags = fcntl(fd, F_GETFL);
    int misalignment = (uintptr_t)buffer % BLOCK_SIZE;
    int odd_bytes = bytes % BLOCK_SIZE;
@@ -51,15 +53,18 @@ pgmoneta_write_file(int fd, void* buffer, size_t bytes)
    {
       if (misalignment != 0)
       {
-         void* aligned_buf =
-            pgmoneta_aligned_malloc((bytes / BLOCK_SIZE + 1) * BLOCK_SIZE);
+         aligned_buf = pgmoneta_aligned_malloc((bytes / BLOCK_SIZE + 1) * BLOCK_SIZE);
          memcpy(aligned_buf, buffer, bytes);
-         buffer = aligned_buf;
+         buf = aligned_buf;
+      }
+      else
+      {
+         buf = buffer;
       }
 
       if (odd_bytes != 0)
       {
-         char* tmp_buf = (char*)buffer;
+         char* tmp_buf = (char*)buf;
          while (bytes_written + WRITE_SIZE < bytes)
          {
             bytes_written += write(fd, tmp_buf + bytes_written, WRITE_SIZE);
@@ -80,9 +85,10 @@ pgmoneta_write_file(int fd, void* buffer, size_t bytes)
       }
       else
       {
-         bytes_written = write(fd, buffer, bytes);
+         bytes_written = write(fd, buf, bytes);
       }
 
+      free(aligned_buf);
    }
    else
    {
@@ -96,7 +102,6 @@ pgmoneta_write_file(int fd, void* buffer, size_t bytes)
       return -1;
    }
 
-   pgmoneta_log_trace("write: +%ld bytes fd: %d", bytes_written, fd);
    return bytes_written;
 }
 

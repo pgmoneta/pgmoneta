@@ -2725,28 +2725,38 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
    {
       snprintf(dir, sizeof(dir), "%s/data", basedir);
    }
+
    if (pgmoneta_manifest_checksum_verify(dir))
    {
       pgmoneta_log_error("Manifest verification failed");
       goto error;
    }
 
+   free(null_buffer);
+
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(msg);
+
    return 0;
 
 error:
    pgmoneta_close_ssl(ssl);
+
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
    }
+
    if (file > 0)
    {
       close(file);
    }
+
+   free(null_buffer);
+
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(msg);
+
    return 1;
 }
 
