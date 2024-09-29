@@ -2148,3 +2148,34 @@ shutdown_ports(void)
       shutdown_management();
    }
 }
+
+int should_run_job(int cron_seconds, time_t last_run_time)
+{
+    time_t current_time = time(NULL);
+    double seconds_since_last_run = difftime(current_time, last_run_time);
+    if (seconds_since_last_run >= cron_seconds)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    struct configuration config;
+    time_t last_run_time = 0;
+    load_configuration("/path/to/config");
+
+    while (1)
+    {
+        if (should_run_job(config.cron_seconds, last_run_time))
+        {
+            last_run_time = time(NULL);
+            printf("Running the scheduled cron job...\n");
+        }
+
+        sleep(60);
+    }
+
+    return 0;
+}

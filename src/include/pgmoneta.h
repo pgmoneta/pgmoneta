@@ -46,6 +46,7 @@ extern "C" {
 #include <openssl/ssl.h>
 
 #define VERSION "0.13.0"
+#define MISC_LENGTH 128
 
 #define PGMONETA_HOMEPAGE "https://pgmoneta.github.io/"
 #define PGMONETA_ISSUES "https://github.com/pgmoneta/pgmoneta/issues"
@@ -372,6 +373,18 @@ struct configuration
    struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
    struct prometheus prometheus;                   /**< The Prometheus metrics */
 } __attribute__ ((aligned (64)));
+
+struct configuration
+{
+    char cron[MISC_LENGTH];
+    int cron_seconds;
+};
+
+struct server
+{
+    char cron[MISC_LENGTH];
+    int cron_seconds;
+};
 
 #ifdef __cplusplus
 }

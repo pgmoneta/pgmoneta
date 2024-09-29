@@ -3258,3 +3258,20 @@ error:
    *trimmed_line = NULL;
    return 1;
 }
+
+int cron_to_seconds(const char *cron)
+{
+    int minutes = 0;
+    int hours = 0;
+    sscanf(cron, "%d %d", &minutes, &hours);
+    int seconds = (hours * 3600) + (minutes * 60);
+    return seconds;
+}
+
+int load_configuration(char *config_path)
+{
+    char cron_string[MISC_LENGTH] = "*/5 * * * *";
+    int cron_seconds = cron_to_seconds(cron_string);
+    config->cron_seconds = cron_seconds;
+    return 0;
+}
