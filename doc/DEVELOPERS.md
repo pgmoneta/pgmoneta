@@ -16,13 +16,17 @@ rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/F-40-x86_64/pgdg
 **x86_64**
 
 ```sh
+dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+dnf config-manager --set-enabled powertools
 ```
 
 **aarch64**
 
 ```sh
+dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-aarch64/pgdg-redhat-repo-latest.noarch.rpm
+dnf config-manager --set-enabled powertools
 ```
 
 **RHEL 9.x / Rocky Linux 9.x**
@@ -30,13 +34,17 @@ rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-aarch64/pgd
 **x86_64**
 
 ```sh
+dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+dnf config-manager --set-enabled crb
 ```
 
 **aarch64**
 
 ```sh
+dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-aarch64/pgdg-redhat-repo-latest.noarch.rpm
+dnf config-manager --set-enabled crb
 ```
 
 **PostgreSQL 13**
@@ -167,7 +175,7 @@ If you use dnf to install your postgresql, chances are the binary file is in `/u
 
 ``` sh
 export PATH=/usr/bin:$PATH
-initdb /tmp/pgsql
+initdb -k /tmp/pgsql
 ```
 
 #### Remove default acess

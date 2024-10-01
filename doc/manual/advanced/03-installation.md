@@ -80,7 +80,7 @@ Then we can do the PostgreSQL initialization
 
 ```
 mkdir DB
-initdb DB
+initdb -k DB
 ```
 
 and update configuration - for a 8 GB memory machine.
@@ -95,9 +95,10 @@ password_encryption = scram-sha-256
 shared_buffers = 2GB
 huge_pages = try
 max_prepared_transactions = 100
-work_mem = 16MB	   
+work_mem = 16MB
 dynamic_shared_memory_type = posix
 wal_level = replica
+wal_log_hints = on
 max_wal_size = 16GB
 min_wal_size = 2GB
 log_destination = 'stderr'

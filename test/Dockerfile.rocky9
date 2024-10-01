@@ -64,7 +64,7 @@ RUN git clone --branch "REL_${PGVERSION}_STABLE" --single-branch --depth 1 https
     make && \
     make install
 
-RUN su - postgres -c "/pgsql/bin/initdb -D /pgsql/data" && \
+RUN su - postgres -c "/pgsql/bin/initdb -k -D /pgsql/data" && \
     su - postgres -c "sed -i 's/^#\s*password_encryption\s*=\s*\(md5\|scram-sha-256\)/password_encryption = scram-sha-256/' /pgsql/data/postgresql.conf" && \
     su - postgres -c "sed -i 's/#wal_level = replica/wal_level = replica/' /pgsql/data/postgresql.conf && \
     cp -f /conf/pg_hba.conf /pgsql/data" && \

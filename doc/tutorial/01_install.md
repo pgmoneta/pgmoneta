@@ -23,7 +23,7 @@ dnf install -y postgresql13 postgresql13-server pgmoneta
 ### Initialize cluster
 ```
 export PATH=/usr/pgsql-13/bin:$PATH
-initdb /tmp/pgsql
+initdb -k /tmp/pgsql
 ```
 
 (`postgres` user)
