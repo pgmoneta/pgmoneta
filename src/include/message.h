@@ -559,10 +559,23 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
  * @param username The current server username
  * @param source_dir The directory for the extra files on server side
  * @param target_dir The target directory for writing the extra files
+ * @param info_extra The extra infomation for display
  * @return 0 upon success, otherwise 1
  */
 int
 pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_dir, char* target_dir, char** info_extra);
+
+/**
+ * Send a file from the client side to the extension side
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param username The current server username
+ * @param source_path The file path of the source on the client side
+ * @param target_path The file path where the file will be written on the server side
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_send_file(SSL* ssl, int socket, char* username, char* source_path, char* target_path);
 
 #ifdef __cplusplus
 }
