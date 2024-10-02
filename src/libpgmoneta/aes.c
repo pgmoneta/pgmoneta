@@ -564,11 +564,6 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
 static int
 derive_key_iv(char* password, unsigned char* key, unsigned char* iv, int mode)
 {
-
-#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
-   OpenSSL_add_all_algorithms();
-#endif
-
    if (!EVP_BytesToKey(get_cipher(mode)(), EVP_sha1(), NULL,
                        (unsigned char*) password, strlen(password), 1,
                        key, iv))

@@ -675,11 +675,7 @@ main(int argc, char** argv)
    }
    pgmoneta_libev_engines();
    pgmoneta_log_debug("libev engine: %s", pgmoneta_libev_engine(ev_backend(main_loop)));
-#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
-   pgmoneta_log_debug("%s", SSLeay_version(SSLEAY_VERSION));
-#else
    pgmoneta_log_debug("%s", OpenSSL_version(OPENSSL_VERSION));
-#endif
    pgmoneta_log_debug("Configuration size: %lu", shmem_size);
    pgmoneta_log_debug("Known users: %d", config->number_of_users);
    pgmoneta_log_debug("Known admins: %d", config->number_of_admins);
