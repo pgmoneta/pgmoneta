@@ -1,9 +1,4 @@
-This tutorial will show you how to compile and install pgmoneta on various platforms.
-Currently, primarily supported platforms covered in this tutorial are:
-1. Fedora (37, 38)
-2. Rocky (8.x, 9.x)
-3. RHEL (8.x, 9.x)
-4. FreeBSD 14
+# Distributions
 
 ## Requirements
 `pgmoneta` requires:
@@ -29,20 +24,16 @@ On Fedora, these can be installed using `dnf` or `yum`:
 ```
 dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel pandoc texlive-scheme-basic 'tex(footnote.sty)'
 ```
-On Rocky, before you install the required packages, some additional repositories, PowerTools and EPEL in this case, need to be enabled or installed first.
+On Rocky, before you install the required packages, some additional repositories, CodeReady Builder and EPEL in this case, need to be enabled or installed first.
 ```
 dnf install epel-release
 ```
-Then in order to enable powertools, you need to first install subscription-manager
+Then in order to enable CodeReady Builder, you need to first install subscription-manager
 ```
 dnf install subscription-manager
 ```
 Then
 ```
-# On Rocky 8.x
-dnf config-manager --set-enabled powertools
-
-# On Rocky 9.x, PowerTools is called crb (CodeReady Builder)
 dnf config-manager --set-enabled crb
 ```
 It is OK to disregard the registration and subscription warning.
@@ -56,17 +47,11 @@ On RHEL, similarly to Rocky, some additional repos need to be enabled/installed 
 the CodeReady Linux Builder repository instead of PowerTools.
 First you will still need to install EPEL, use
 ```
-# On RHEL 8.x
-dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-# On RHEL 9.x
 dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 ```
 Then for the CodeReady Linux Builder repository, 
 ```
 dnf install subscription-manager
-# On RHEL 8.x
-dnf config-manager --set-enabled codeready-builder-for-rhel-8-rhui-rpms
-# On RHEL 9.x
 dnf config-manager --set-enabled codeready-builder-for-rhel-9-rhui-rpms
 ```
 Alternatively, after installing subscription manager, if you have a RedHat corporate account
@@ -76,9 +61,6 @@ subscription-manager register --username <your-account-email-or-login> --passwor
 ```
 Then do
 ```
-# On RHEL 8.x
-subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms
-# On RHEL 9.x
 subscription-manager repos --enable codeready-builder-for-rhel-9-x86_64-rpms
 ```
 Also verify the repos using

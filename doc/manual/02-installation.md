@@ -21,28 +21,6 @@ Additional information
 * [PostgreSQL YUM](https://yum.postgresql.org/howto/)
 * [Linux downloads](https://www.postgresql.org/download/linux/redhat/)
 
-## RHEL 8 / RockyLinux 8
-
-**x86_64**
-
-```sh
-dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-```
-
-**aarch64**
-
-```sh
-dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-aarch64/pgdg-redhat-repo-latest.noarch.rpm
-```
-
-and do the install via
-
-```
-dnf install -y pgmoneta
-```
-
 ## RHEL 9 / RockyLinux 9
 
 **x86_64**
@@ -128,12 +106,6 @@ dnf install epel-release
 Then to enable powertools
 
 ``` sh
-# On RHEL 8 / Rocky 8
-dnf config-manager --set-enabled codeready-builder-for-rhel-8-rhui-rpms
-dnf config-manager --set-enabled powertools
-dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-
-# On RHEL 9 / Rocky 9, PowerTools is called crb (CodeReady Builder)
 dnf config-manager --set-enabled codeready-builder-for-rhel-9-rhui-rpms
 dnf config-manager --set-enabled crb
 dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm

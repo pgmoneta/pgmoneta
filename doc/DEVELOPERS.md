@@ -11,24 +11,6 @@ For RPM based distributions such as Fedora and RHEL you can add the
 rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/F-40-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 ```
 
-**RHEL 8.x / Rocky Linux 8.x**
-
-**x86_64**
-
-```sh
-dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-dnf config-manager --set-enabled powertools
-```
-
-**aarch64**
-
-```sh
-dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-aarch64/pgdg-redhat-repo-latest.noarch.rpm
-dnf config-manager --set-enabled powertools
-```
-
 **RHEL 9.x / Rocky Linux 9.x**
 
 **x86_64**
