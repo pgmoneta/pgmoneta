@@ -35,9 +35,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 message(STATUS "pgmoneta ${VERSION_STRING}")
 
-set(generation TRUE)
-set(check TRUE)
-set(container FALSE)
+set(generation FALSE)
+set(check FALSE)
+set(container TRUE)
 
 include(CheckCCompilerFlag)
 include(CheckCSourceCompiles)

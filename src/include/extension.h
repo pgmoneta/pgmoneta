@@ -39,7 +39,8 @@ extern "C" {
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define MAX_QUERY_LENGTH 1024
+#define MAX_QUERY_LENGTH 2048
+#define PGMONETA_CHUNK_SIZE 1024
 
 /**
  * Check if the server has the extension installed
@@ -112,6 +113,38 @@ pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_
  */
 int
 pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
+
+/**
+ * Notify the extension to prepare for receiving a file
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param dest_path The path where the file will be written
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_start_file_transfer(SSL* ssl, int socket, const char* dest_path, struct query_response** qr);
+
+/**
+ * Send a file chunk to the extension
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param base64_data The encoded file chunk in base64
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, char* base64_data, struct query_response** qr);
+
+/**
+ * Notify the extension to finish receiving the file
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_finish_file_transfer(SSL* ssl, int socket, struct query_response** qr);
 
 #ifdef __cplusplus
 }

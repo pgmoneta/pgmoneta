@@ -631,6 +631,49 @@ main(int argc, char** argv)
       goto error;
    }
 
+   // printf("Start...\n");
+
+   // for (int srv = 0; srv < config->number_of_servers; srv++)
+   // {
+   //    int usr;
+   //    int socket = -1;
+   //    SSL* ssl = NULL;
+
+   //    pgmoneta_memory_init();
+
+   //    usr = -1;
+   //    // find the corresponding user's index of the given server
+   //    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+   //    {
+   //       if (!strcmp(config->servers[srv].username, config->users[i].username))
+   //       {
+   //          usr = i;
+   //       }
+   //    }
+
+   //    if (usr == -1)
+   //    {
+   //       pgmoneta_log_info("User not found for server: %d", srv);
+   //       goto error;
+   //    }
+
+   //    // establish a connection, with replication flag set
+   //    if (pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
+   //    {
+   //       pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
+   //       goto error;
+   //    }
+
+   //    pgmoneta_send_file(ssl, socket, config->servers[srv].username, "/tmp/tmp.txt", "/tmp/manifest.txt");
+
+   //    pgmoneta_close_ssl(ssl);
+   //    pgmoneta_disconnect(socket);
+   //    pgmoneta_memory_destroy();
+
+   // }
+
+   // printf("End...\n");
+
    if (!offline)
    {
       /* Start to retrieve WAL */
