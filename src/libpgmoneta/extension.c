@@ -65,7 +65,7 @@ pgmoneta_ext_checkpoint(SSL* ssl, int socket, struct query_response** qr)
 }
 
 int
-pgmoneta_ext_priviledge(SSL* ssl, int socket, struct query_response** qr)
+pgmoneta_ext_privilege(SSL* ssl, int socket, struct query_response** qr)
 {
    return query_execute(ssl, socket, "SELECT rolsuper FROM pg_roles WHERE rolname = current_user;", qr);
 }
@@ -83,6 +83,14 @@ pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query
 {
    char query[MAX_QUERY_LENGTH];
    snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_files('%s');", file_path);
+   return query_execute(ssl, socket, query, qr);
+}
+
+int
+pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, const char* dest_path, char* base64_data, struct query_response** qr)
+{
+   char query[MAX_QUERY_LENGTH];
+   snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_receive_file_chunk('%s', '%s');", base64_data, dest_path);
    return query_execute(ssl, socket, query, qr);
 }
 
