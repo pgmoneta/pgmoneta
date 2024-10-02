@@ -259,3 +259,17 @@ You should see
  0.1.0
 (1 row)
 ```
+
+### Granting SUPERUSER Privileges
+
+Some functions in `pgmoneta_ext` require `SUPERUSER` privileges. To enable these, grant the `repl` role superuser privileges using the command below. **Please proceed with caution**: granting superuser privileges bypasses all permission checks, allowing unrestricted access to the database, which can pose security risks. We are committed to enhancing privilege security in future updates.
+
+```sql
+ALTER ROLE repl WITH SUPERUSER;
+```
+
+To revoke superuser privileges from the `repl` role, use the following command:
+
+```sql
+ALTER ROLE repl WITH NOSUPERUSER;
+```

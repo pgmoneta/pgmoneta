@@ -2819,7 +2819,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
    char** paths = NULL;
    struct query_response* qr = NULL;
 
-   pgmoneta_ext_priviledge(ssl, socket, &qr);
+   pgmoneta_ext_privilege(ssl, socket, &qr);
    if (qr != NULL && qr->tuples != NULL && qr->tuples->data != NULL && qr->tuples->data[0] != NULL && qr->tuples->data[0][0] == 't')
    {
       pgmoneta_free_query_response(qr);
@@ -3098,4 +3098,80 @@ decode_base64(const char* base64_data, int* decoded_len)
 
    *decoded_len = actual_decoded_len;
    return decoded_data;
+}
+
+int
+pgmoneta_send_file(SSL* ssl, int socket, char* username, char* source_path, char* target_path)
+{
+   FILE* file = NULL;
+   struct query_response* qr = NULL;
+   unsigned char buffer[PGMONETA_CHUNK_SIZE];
+   char* encode_chunk = NULL;
+   size_t bytes_read;
+   size_t encoded_size;
+
+   // Check if the user has sufficient privileges
+   pgmoneta_ext_privilege(ssl, socket, &qr);
+   if (qr != NULL && qr->tuples != NULL && qr->tuples->data != NULL && qr->tuples->data[0] != NULL && qr->tuples->data[0][0] == 't')
+   {
+      pgmoneta_free_query_response(qr);
+      qr = NULL;
+
+      // Open the file for reading
+      file = fopen(source_path, "rb");
+      if (file == NULL)
+      {
+         pgmoneta_log_warn("Sending file: Failed to open file: %s", source_path);
+         goto error;
+      }
+
+      // Send the file content in chunks
+      while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0)
+      {
+         pgmoneta_base64_encode(buffer, bytes_read, &encode_chunk, &encoded_size);
+
+         pgmoneta_ext_send_file_chunk(ssl, socket, target_path, encode_chunk, &qr);
+         if (!qr)
+         {
+            pgmoneta_log_error("Sending file: Send file chunk failed");
+            goto error;
+         }
+         pgmoneta_free_query_response(qr);
+         free(encode_chunk);
+         encode_chunk = NULL;
+         qr = NULL;
+      }
+   }
+   else if (qr != NULL && qr->tuples != NULL && qr->tuples->data != NULL && qr->tuples->data[0] != NULL && qr->tuples->data[0][0] == 'f')
+   {
+      pgmoneta_log_error("Sending file: User %s is not SUPERUSER", username);
+      goto error;
+   }
+   else
+   {
+      pgmoneta_log_error("Sending file: Query failed");
+      goto error;
+   }
+
+   fclose(file);
+   if (encode_chunk)
+   {
+      free(encode_chunk);
+   }
+   pgmoneta_free_query_response(qr);
+
+   return 0;
+
+error:
+   if (file)
+   {
+      fclose(file);
+   }
+   if (encode_chunk)
+   {
+      free(encode_chunk);
+   }
+   pgmoneta_free_query_response(qr);
+
+   return 1;
 }
