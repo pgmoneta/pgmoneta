@@ -32,6 +32,7 @@
 #include <deque.h>
 #include <gzip_compression.h>
 #include <info.h>
+#include <io.h>
 #include <json.h>
 #include <logging.h>
 #include <lz4_compression.h>
@@ -461,7 +462,7 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
       }
       else if (S_ISREG(s.st_mode))
       {
-         FILE* file = NULL;
+         int fd = -1;
 
          archive_entry_set_filetype(entry, AE_IFREG);
          archive_entry_set_perm(entry, s.st_mode);
@@ -473,20 +474,21 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
             return;
          }
 
-         file = fopen(real_path, "rb");
+         fd = open(real_path, O_RDONLY | O_CREAT | O_SYNC | O_DIRECT, 0600);
 
-         if (file != NULL)
+         if (fd > 0)
          {
-            char buf[DEFAULT_BUFFER_SIZE];
+            size_t buf_size = DEFAULT_BUFFER_SIZE;
+            char* buf = pgmoneta_aligned_malloc(buf_size);
             size_t bytes_read = 0;
 
-            memset(buf, 0, sizeof(buf));
-            while ((bytes_read = fread(buf, 1, sizeof(buf), file)) > 0)
+            memset(buf, 0, buf_size);
+            while ((bytes_read = read(fd, buf, buf_size)) > 0)
             {
                archive_write_data(a, buf, bytes_read);
-               memset(buf, 0, sizeof(buf));
+               memset(buf, 0, buf_size);
             }
-            fclose(file);
+            close(fd);
          }
       }
 
