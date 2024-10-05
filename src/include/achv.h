@@ -43,9 +43,10 @@ extern "C" {
  * @param client_fd The client
  * @param server The server
  * @param request The request
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* request);
+pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* request, uint8_t compress_method);
 
 /**
  * Extract from a tar file to a given directory
