@@ -73,10 +73,11 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers);
  * BZip compress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
+ * @param compression The compress method for json format
  * @param payload The payload of the request
  */
 void
-pgmoneta_bzip2_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
 
 /**
  * BZip a file
@@ -90,10 +91,11 @@ pgmoneta_bzip2_file(char* from, char* to);
  * BUNZip decompress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
+ * @param compression The compress method for json format
  * @param payload The payload of the request
  */
 void
-pgmoneta_bunzip2_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
 
 /**
  * BUNZip a file
@@ -103,6 +105,26 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, struct json* payload);
  */
 int
 pgmoneta_bunzip2_file(char* from, char* to);
+
+/**
+ * BZip compress a string
+ * @param s The original string
+ * @param buffer The point to the compressed data buffer
+ * @param buffer_size The size of the compressed buffer will be stored.
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_bzip2_string(char* s, unsigned char** buffer, size_t* buffer_size);
+
+/**
+ * BUNZip decompress a buffer to string
+ * @param compressed_buffer The buffer containing the GZIP compressed data
+ * @param compressed_size The size of the compressed buffer
+ * @param output_string The pointer to a string where the decompressed data will be stored
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_bunzip2_string(unsigned char* compressed_buffer, size_t compressed_size, char** output_string);
 
 #ifdef __cplusplus
 }

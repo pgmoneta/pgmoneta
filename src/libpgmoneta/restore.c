@@ -71,7 +71,7 @@ pgmoneta_get_restore_last_files_names(char*** output)
 }
 
 void
-pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
+pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, struct json* payload)
 {
    char* backup_id = NULL;
    char* position = NULL;
@@ -106,7 +106,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
    {
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
 
          goto error;
       }
@@ -115,7 +115,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
 
       if (pgmoneta_get_backup(server_backup, id, &backup))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_ERROR, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_ERROR, compression, payload);
 
          goto error;
       }
@@ -130,9 +130,9 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* payload)
 
       end_time = time(NULL);
 
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, compression, payload);
          pgmoneta_log_error("Restore: Error sending response for %s", config->servers[server].name);
 
          goto error;

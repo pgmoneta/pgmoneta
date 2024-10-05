@@ -36,7 +36,7 @@
 #include <utils.h>
 
 void
-pgmoneta_status(SSL* ssl, int client_fd, bool offline, struct json* payload)
+pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -185,9 +185,9 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, struct json* payload)
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, compression, payload);
       pgmoneta_log_error("Status: Error sending response");
 
       goto error;
@@ -225,7 +225,7 @@ error:
 }
 
 void
-pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, struct json* payload)
+pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compression, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -429,9 +429,9 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, struct json* payl
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, compression, payload);
       pgmoneta_log_error("Status details: Error sending response");
 
       goto error;

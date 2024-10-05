@@ -51,6 +51,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>

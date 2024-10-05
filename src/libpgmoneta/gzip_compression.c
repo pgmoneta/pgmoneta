@@ -263,7 +263,7 @@ pgmoneta_gzip_wal(char* directory)
 }
 
 void
-pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
+pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -281,7 +281,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, compression, payload);
       pgmoneta_log_error("GZip: No file for %s", from);
       goto error;
    }
@@ -290,14 +290,14 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
    to = pgmoneta_append(to, ".gz");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
 
    if (pgmoneta_gzip_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, compression, payload);
       pgmoneta_log_error("GZip: Error gzip %s", from);
       goto error;
    }
@@ -306,7 +306,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
@@ -315,9 +315,9 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
@@ -374,7 +374,7 @@ error:
 }
 
 void
-pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
+pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;
@@ -393,7 +393,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, compression, payload);
       pgmoneta_log_error("GZip: No file for %s", from);
       goto error;
    }
@@ -402,14 +402,14 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
    to = pgmoneta_remove_suffix(orig, ".gz");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
 
    if (pgmoneta_gunzip_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, compression, payload);
       pgmoneta_log_error("GZip: Error gunzip %s", from);
       goto error;
    }
@@ -418,7 +418,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
@@ -427,9 +427,9 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload)
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
@@ -562,6 +562,169 @@ error:
    {
       closedir(dir);
    }
+}
+
+int
+pgmoneta_gzip_string(char* s, unsigned char** buffer, size_t* buffer_size)
+{
+   int ret;
+   z_stream stream;
+   size_t source_len;
+   size_t chunk_size;
+   unsigned char* temp_buffer;
+   unsigned char* final_buffer;
+
+   source_len = strlen(s);
+   chunk_size = BUFFER_LENGTH;
+
+   temp_buffer = (unsigned char*)malloc(chunk_size);
+   if (temp_buffer == NULL)
+   {
+      pgmoneta_log_error("Gzip: Allocation error");
+      return 1;
+   }
+
+   memset(&stream, 0, sizeof(stream));
+   stream.next_in = (unsigned char*)s;
+   stream.avail_in = source_len;
+
+   ret = deflateInit2(&stream, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY);
+   if (ret != Z_OK)
+   {
+      free(temp_buffer);
+      pgmoneta_log_error("Gzip: Initialization failed");
+      return 1;
+   }
+
+   size_t total_out = 0;
+   do
+   {
+      if (stream.total_out >= chunk_size)
+      {
+         chunk_size *= 2;
+         unsigned char* new_buffer = (unsigned char*)realloc(temp_buffer, chunk_size);
+         if (new_buffer == NULL)
+         {
+            free(temp_buffer);
+            deflateEnd(&stream);
+            pgmoneta_log_error("Gzip: Allocation error");
+            return 1;
+         }
+         temp_buffer = new_buffer;
+      }
+
+      stream.next_out = temp_buffer + stream.total_out;
+      stream.avail_out = chunk_size - stream.total_out;
+
+      ret = deflate(&stream, Z_FINISH);
+   }
+   while (ret == Z_OK || ret == Z_BUF_ERROR);
+
+   if (ret != Z_STREAM_END)
+   {
+      free(temp_buffer);
+      deflateEnd(&stream);
+      pgmoneta_log_error("Gzip: Compression failed");
+      return 1;
+   }
+
+   total_out = stream.total_out;
+
+   final_buffer = (unsigned char*)realloc(temp_buffer, total_out);
+   if (final_buffer == NULL)
+   {
+      *buffer = temp_buffer;
+   }
+   else
+   {
+      *buffer = final_buffer;
+   }
+   *buffer_size = total_out;
+
+   deflateEnd(&stream);
+
+   return 0;
+}
+
+int
+pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size, char** output_string)
+{
+   int ret;
+   z_stream stream;
+   size_t chunk_size;
+   size_t total_out = 0;
+
+   chunk_size = BUFFER_LENGTH;
+
+   char* temp_buffer = (char*)malloc(chunk_size);
+   if (temp_buffer == NULL)
+   {
+      pgmoneta_log_error("GUNzip: Allocation failed");
+      return 1;
+   }
+
+   memset(&stream, 0, sizeof(stream));
+   stream.next_in = (unsigned char*)compressed_buffer;
+   stream.avail_in = compressed_size;
+
+   ret = inflateInit2(&stream, MAX_WBITS + 16);
+   if (ret != Z_OK)
+   {
+      free(temp_buffer);
+      pgmoneta_log_error("GUNzip: Initialization failed");
+      return 1;
+   }
+
+   do
+   {
+      if (stream.total_out >= chunk_size)
+      {
+         chunk_size *= 2;
+         char* new_buffer = (char*)realloc(temp_buffer, chunk_size);
+         if (new_buffer == NULL)
+         {
+            free(temp_buffer);
+            inflateEnd(&stream);
+            pgmoneta_log_error("GUNzip: Allocation error");
+            return 1;
+         }
+         temp_buffer = new_buffer;
+      }
+
+      stream.next_out = (unsigned char*)(temp_buffer + stream.total_out);
+      stream.avail_out = chunk_size - stream.total_out;
+
+      ret = inflate(&stream, Z_NO_FLUSH);
+   }
+   while (ret == Z_OK || ret == Z_BUF_ERROR);
+
+   if (ret != Z_STREAM_END)
+   {
+      free(temp_buffer);
+      inflateEnd(&stream);
+      pgmoneta_log_error("GUNzip: Decompression failed");
+      return 1;
+   }
+
+   total_out = stream.total_out;
+
+   char* final_buffer = (char*)realloc(temp_buffer, total_out + 1);
+   if (final_buffer == NULL)
+   {
+      free(temp_buffer);
+      inflateEnd(&stream);
+      pgmoneta_log_error("GUNzip: Allocation failed");
+      return 1;
+   }
+   temp_buffer = final_buffer;
+
+   temp_buffer[total_out] = '\0';
+
+   *output_string = temp_buffer;
+
+   inflateEnd(&stream);
+
+   return 0;
 }
 
 static void

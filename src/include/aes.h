@@ -91,10 +91,11 @@ pgmoneta_encrypt_wal(char* d);
  * Encrypt a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
+ * @param compression The compress method for json format
  * @param payload The payload of the request
  */
 void
-pgmoneta_encrypt_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
 
 /**
  * Encrypt a single file, also remove the original file
@@ -118,10 +119,11 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers);
  * Decrypt a single file, also remove encrypted file
  * @param ssl The SSL
  * @param client_fd The client descriptor
+ * @param compression The compress method for json format
  * @param payload The payload of the request
  */
 void
-pgmoneta_decrypt_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
 
 #ifdef __cplusplus
 }

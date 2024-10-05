@@ -65,10 +65,11 @@ pgmoneta_gzip_wal(char* directory);
  * GZip a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
+ * @param compression The compress method for json format
  * @param payload The payload of the request
  */
 void
-pgmoneta_gzip_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
 
 /**
  * GZip a file
@@ -82,10 +83,11 @@ pgmoneta_gzip_file(char* from, char* to);
  * GUNZip a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
+ * @param compression The compress method for json format
  * @param payload The payload of the request
  */
 void
-pgmoneta_gunzip_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
 
 /**
  * GUNZip a file
@@ -103,6 +105,26 @@ pgmoneta_gunzip_file(char* from, char* to);
  */
 void
 pgmoneta_gunzip_data(char* directory, struct workers* workers);
+
+/**
+ * GZip a string
+ * @param s The original string
+ * @param buffer The point to the compressed data buffer
+ * @param buffer_size The size of the compressed buffer will be stored.
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_gzip_string(char* s, unsigned char** buffer, size_t* buffer_size);
+
+/**
+ * GUNZip a buffer to string
+ * @param compressed_buffer The buffer containing the GZIP compressed data
+ * @param compressed_size The size of the compressed buffer
+ * @param output_string The pointer to a string where the decompressed data will be stored
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size, char** output_string);
 
 #ifdef __cplusplus
 }

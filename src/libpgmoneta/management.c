@@ -28,10 +28,14 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <bzip2_compression.h>
+#include <gzip_compression.h>
 #include <json.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <utils.h>
+#include <zstandard_compression.h>
 
 /* system */
 #include <unistd.h>
@@ -54,7 +58,7 @@ static int write_socket(int socket, void* buf, size_t size);
 static int write_ssl(SSL* ssl, void* buf, size_t size);
 
 int
-pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, int32_t output_format)
+pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -71,7 +75,7 @@ pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, int32_t o
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -88,7 +92,7 @@ error:
 }
 
 int
-pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, int32_t output_format)
+pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -105,7 +109,7 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, int3
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -122,7 +126,7 @@ error:
 }
 
 int
-pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format)
+pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -142,7 +146,7 @@ pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* ba
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_POSITION, (uintptr_t)position, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)directory, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -159,7 +163,7 @@ error:
 }
 
 int
-pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, int32_t output_format)
+pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -179,7 +183,7 @@ pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* bac
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)directory, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)files, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -196,7 +200,7 @@ error:
 }
 
 int
-pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, int32_t output_format)
+pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -216,7 +220,7 @@ pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* ba
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_POSITION, (uintptr_t)position, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)directory, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -233,7 +237,7 @@ error:
 }
 
 int
-pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -251,7 +255,7 @@ pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* bac
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -268,7 +272,7 @@ error:
 }
 
 int
-pgmoneta_management_request_stop(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_stop(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -283,7 +287,7 @@ pgmoneta_management_request_stop(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -300,7 +304,7 @@ error:
 }
 
 int
-pgmoneta_management_request_status(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_status(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -315,7 +319,7 @@ pgmoneta_management_request_status(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -332,7 +336,7 @@ error:
 }
 
 int
-pgmoneta_management_request_status_details(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_status_details(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -347,7 +351,7 @@ pgmoneta_management_request_status_details(SSL* ssl, int socket, int32_t output_
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -364,7 +368,7 @@ error:
 }
 
 int
-pgmoneta_management_request_ping(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_ping(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -379,7 +383,7 @@ pgmoneta_management_request_ping(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -396,7 +400,7 @@ error:
 }
 
 int
-pgmoneta_management_request_reset(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_reset(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -411,7 +415,7 @@ pgmoneta_management_request_reset(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -428,7 +432,7 @@ error:
 }
 
 int
-pgmoneta_management_request_reload(SSL* ssl, int socket, int32_t output_format)
+pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -443,7 +447,7 @@ pgmoneta_management_request_reload(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -460,7 +464,7 @@ error:
 }
 
 int
-pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -478,7 +482,7 @@ pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* bac
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -495,7 +499,7 @@ error:
 }
 
 int
-pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -513,7 +517,7 @@ pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* ba
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -530,7 +534,7 @@ error:
 }
 
 int
-pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, int32_t output_format)
+pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -547,7 +551,7 @@ pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, int32_t ou
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SOURCE_FILE, (uintptr_t)path, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -564,7 +568,7 @@ error:
 }
 
 int
-pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, int32_t output_format)
+pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -581,7 +585,7 @@ pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, int32_t ou
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SOURCE_FILE, (uintptr_t)path, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -598,7 +602,7 @@ error:
 }
 
 int
-pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, int32_t output_format)
+pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -615,7 +619,7 @@ pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, int32_t
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SOURCE_FILE, (uintptr_t)path, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -632,7 +636,7 @@ error:
 }
 
 int
-pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, int32_t output_format)
+pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -649,7 +653,7 @@ pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, int32_t o
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SOURCE_FILE, (uintptr_t)path, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -666,7 +670,7 @@ error:
 }
 
 int
-pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backup_id, int32_t output_format)
+pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -684,7 +688,7 @@ pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backu
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -701,7 +705,7 @@ error:
 }
 
 int
-pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, int32_t output_format)
+pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -722,7 +726,7 @@ pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* b
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_KEY, (uintptr_t)key, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_COMMENT, (uintptr_t)comment, ValueString);
 
-   if (pgmoneta_management_write_json(ssl, socket, j))
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
    {
       goto error;
    }
@@ -776,7 +780,7 @@ error:
 }
 
 int
-pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, struct json* payload)
+pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, uint8_t compression, struct json* payload)
 {
    struct json* outcome = NULL;
 
@@ -785,7 +789,7 @@ pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t 
       goto error;
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, payload))
+   if (pgmoneta_management_write_json(ssl, socket, compression, payload))
    {
       goto error;
    }
@@ -798,7 +802,7 @@ error:
 }
 
 int
-pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, struct json* payload)
+pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, uint8_t compression, struct json* payload)
 {
    int srv = -1;
    struct json* response = NULL;
@@ -837,7 +841,7 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
       }
    }
 
-   if (pgmoneta_management_write_json(ssl, socket, payload))
+   if (pgmoneta_management_write_json(ssl, socket, compression, payload))
    {
       goto error;
    }
@@ -850,16 +854,25 @@ error:
 }
 
 int
-pgmoneta_management_read_json(SSL* ssl, int socket, struct json** json)
+pgmoneta_management_read_json(SSL* ssl, int socket, uint8_t* compression, struct json** json)
 {
-   uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
+   uint8_t compress_method = MANAGEMENT_COMPRESSION_NONE;
    uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
+
    char* s = NULL;
    struct json* r = NULL;
+   unsigned char* decoded = NULL;
+   size_t decoded_length = 0;
+   char* decompressed_string = NULL;
 
-   if (read_uint8("pgmoneta-cli", ssl, socket, &compression))
+   if (read_uint8("pgmoneta-cli", ssl, socket, &compress_method))
    {
       goto error;
+   }
+
+   if (compression != NULL)
+   {
+      *compression = compress_method;
    }
 
    if (read_uint8("pgmoneta-cli", ssl, socket, &encryption))
@@ -870,6 +883,58 @@ pgmoneta_management_read_json(SSL* ssl, int socket, struct json** json)
    if (read_string("pgmoneta-cli", ssl, socket, &s))
    {
       goto error;
+   }
+
+   if (compress_method || encryption)
+   {
+      // First, perform decode
+      if (pgmoneta_base64_decode(s, strlen(s), (void**)&decoded, &decoded_length) != 0)
+      {
+         pgmoneta_log_error("pgmoneta_management_read_json: Decoding failedg");
+         goto error;
+      }
+
+      // Second, perform dencrypt
+
+      // Third, perform decompress
+      switch (compress_method)
+      {
+         case MANAGEMENT_COMPRESSION_GZIP:
+            if (pgmoneta_gunzip_string(decoded, decoded_length, &decompressed_string) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_read_json: GZIP decompress failed");
+               goto error;
+            }
+            break;
+         case MANAGEMENT_COMPRESSION_ZSTD:
+            if (pgmoneta_zstdd_string(decoded, decoded_length, &decompressed_string) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_read_json: ZSTD decompress failed");
+               goto error;
+            }
+            break;
+         case MANAGEMENT_COMPRESSION_LZ4:
+            if (pgmoneta_lz4d_string(decoded, decoded_length, &decompressed_string) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_read_json: LZ4 decompress failed");
+               goto error;
+            }
+            break;
+         case MANAGEMENT_COMPRESSION_BZIP2:
+            if (pgmoneta_bunzip2_string(decoded, decoded_length, &decompressed_string) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_read_json: bzip2 decompress failed");
+               goto error;
+            }
+            break;
+         default:
+            break;
+      }
+
+      free(decoded);
+      free(s);
+      s = decompressed_string;
+      decompressed_string = NULL;
    }
 
    if (pgmoneta_json_parse_string(s, &r))
@@ -887,17 +952,32 @@ error:
 
    pgmoneta_json_destroy(r);
 
-   free(s);
+   if (s != NULL)
+   {
+      free(s);
+   }
+   if (decoded != NULL)
+   {
+      free(decoded);
+   }
+   if (decompressed_string != NULL)
+   {
+      free(decompressed_string);
+   }
 
    return 1;
 }
 
 int
-pgmoneta_management_write_json(SSL* ssl, int socket, struct json* json)
+pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, struct json* json)
 {
-   uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
    uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
+
    char* s = NULL;
+   unsigned char* compressed_buffer = NULL;
+   size_t compressed_size = 0;
+   char* encoded = NULL;
+   size_t encoded_length = 0;
 
    s = pgmoneta_json_to_string(json, FORMAT_JSON, NULL, 0);
 
@@ -911,6 +991,58 @@ pgmoneta_management_write_json(SSL* ssl, int socket, struct json* json)
       goto error;
    }
 
+   if (compression || encryption)
+   {
+      // First, perform compress
+      switch (compression)
+      {
+         case MANAGEMENT_COMPRESSION_GZIP:
+            if (pgmoneta_gzip_string(s, &compressed_buffer, &compressed_size) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_write_json: Failed to gzip the string");
+               goto error;
+            }
+            break;
+         case MANAGEMENT_COMPRESSION_ZSTD:
+            if (pgmoneta_zstdc_string(s, &compressed_buffer, &compressed_size) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_write_json: Failed to zstd the string");
+               goto error;
+            }
+            break;
+         case MANAGEMENT_COMPRESSION_LZ4:
+            if (pgmoneta_lz4c_string(s, &compressed_buffer, &compressed_size) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_write_json: Failed to lz4 the string");
+               goto error;
+            }
+            break;
+         case MANAGEMENT_COMPRESSION_BZIP2:
+            if (pgmoneta_bzip2_string(s, &compressed_buffer, &compressed_size) != 0)
+            {
+               pgmoneta_log_error("pgmoneta_management_write_json: Failed to bzip2 the string");
+               goto error;
+            }
+            break;
+         default:
+            break;
+      }
+
+      // Second, perform encrypt
+
+      // Third, perform base64 encode
+      if (pgmoneta_base64_encode(compressed_buffer, compressed_size, &encoded, &encoded_length) != 0)
+      {
+         pgmoneta_log_error("pgmoneta_management_write_json: Encoding failed");
+         goto error;
+      }
+
+      free(compressed_buffer);
+      free(s);
+      s = encoded;
+      encoded = NULL;
+   }
+
    if (write_string("pgmoneta-cli", ssl, socket, s))
    {
       goto error;
@@ -921,8 +1053,18 @@ pgmoneta_management_write_json(SSL* ssl, int socket, struct json* json)
    return 0;
 
 error:
-
-   free(s);
+   if (s != NULL)
+   {
+      free(s);
+   }
+   if (compressed_buffer != NULL)
+   {
+      free(compressed_buffer);
+   }
+   if (encoded != NULL)
+   {
+      free(encoded);
+   }
 
    return 1;
 }

@@ -199,20 +199,22 @@ pgmoneta_get_number_of_valid_backups(int server);
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
+ * @param compression The compress method for json format
  * @param payload The payload
  */
 void
-pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload);
+pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, struct json* payload);
 
 /**
  * Create an annotate request
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param server The server
+ * @param compression The compress method for json format
  * @param payload The payload
  */
 void
-pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payload);
+pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compression, struct json* payload);
 
 #ifdef __cplusplus
 }

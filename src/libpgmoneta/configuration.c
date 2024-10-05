@@ -3375,6 +3375,7 @@ split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
    int i = 0;
    char temp[DEFAULT_BUFFER_SIZE];
    char* token;
+   char* trimmed_token;
 
    strcpy(temp, extra);
    token = strtok(temp, ",");
@@ -3382,8 +3383,9 @@ split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
    while (token != NULL)
    {
       // trim_spaces(token);
-      pgmoneta_remove_whitespace(token);
-      strcpy(res[i], token);
+      trimmed_token = pgmoneta_remove_whitespace(token);
+      strcpy(res[i], trimmed_token);
+      free(trimmed_token);
       token = strtok(NULL, ",");
       i++;
    }
