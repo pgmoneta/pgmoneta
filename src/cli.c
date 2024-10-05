@@ -421,9 +421,14 @@ main(int argc, char** argv)
             {
                output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
             }
-            else
+            else if (!strncmp(optarg, "text", MISC_LENGTH))
             {
                output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
+            }
+            else
+            {
+               warnx("pgmoneta-cli: Format type is not correct");
+               exit(1);
             }
             break;
          case '?':
