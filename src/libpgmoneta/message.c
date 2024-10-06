@@ -64,6 +64,8 @@ static unsigned char* decode_base64(const char* base64_data, int* decoded_len);
 static char** get_paths(const char* data, int* count);
 static void extract_file_name(const char* path, char* file_name, char* file_path);
 
+// static char* encode_base64(char* buffer, int bytes_read);
+
 int
 pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
 {
@@ -3138,3 +3140,31 @@ decode_base64(const char* base64_data, int* decoded_len)
    *decoded_len = actual_decoded_len;
    return decoded_data;
 }
+
+int
+pgmoneta_send_file(SSL* ssl, int socket, char* username, char* source_path, char* target_path)
+{
+   return 1;
+}
+
+// static char*
+// encode_base64(char* buffer, int bytes_read)
+// {
+//    size_t encoded_len = 4 * ((bytes_read + 2) / 3);
+
+//    char* encoded_data = (char*)malloc(encoded_len + 1);
+//    if (encoded_data == NULL)
+//    {
+//       fprintf(stderr, "Memory allocation error\n");
+//       return NULL;
+//    }
+
+//    // Perform base64 encoding using OpenSSL
+//    EVP_EncodeBlock((unsigned char*)encoded_data, (const unsigned char*)buffer, bytes_read);
+
+//    encoded_data[encoded_len] = '\0';
+
+//    return encoded_data;
+// }
+// }
+// }
