@@ -143,7 +143,6 @@ typedef uint32_t command_id;
 #define XLH_TRUNCATE_CASCADE             (1 << 0)
 #define XLH_TRUNCATE_RESTART_SEQS        (1 << 1)
 
-
 #define SizeOfHeapPruneV17 (offsetof(struct xl_heap_prune_v17, flags) + sizeof(uint8_t))
 
 // Struct definitions
@@ -153,9 +152,10 @@ typedef uint32_t command_id;
  *
  * Contains the offset number for the inserted tuple and associated flags.
  */
-struct xl_heap_insert {
-    offset_number offnum;    /**< Inserted tuple's offset. */
-    uint8_t flags;           /**< Flags associated with the insert operation. */
+struct xl_heap_insert
+{
+   offset_number offnum;     /**< Inserted tuple's offset. */
+   uint8_t flags;            /**< Flags associated with the insert operation. */
 };
 
 /**
@@ -164,11 +164,12 @@ struct xl_heap_insert {
  *
  * Contains the transaction ID of the deleted tuple, offset number, and associated flags.
  */
-struct xl_heap_delete {
-    transaction_id xmax;             /**< Transaction ID of the deleted tuple. */
-    offset_number offnum;            /**< Deleted tuple's offset.              */
-    uint8_t infobits_set;            /**< Infomask bits.                       */
-    uint8_t flags;                   /**< Flags associated with the delete operation. */
+struct xl_heap_delete
+{
+   transaction_id xmax;              /**< Transaction ID of the deleted tuple. */
+   offset_number offnum;             /**< Deleted tuple's offset.              */
+   uint8_t infobits_set;             /**< Infomask bits.                       */
+   uint8_t flags;                    /**< Flags associated with the delete operation. */
 };
 
 /**
@@ -177,13 +178,14 @@ struct xl_heap_delete {
  *
  * Contains the transaction IDs and offsets for both the old and new tuples, along with associated flags.
  */
-struct xl_heap_update {
-    transaction_id old_xmax;         /**< Transaction ID of the old tuple. */
-    offset_number old_offnum;        /**< Old tuple's offset.              */
-    uint8_t old_infobits_set;        /**< Infomask bits to set on old tuple. */
-    uint8_t flags;                   /**< Flags associated with the update operation. */
-    transaction_id new_xmax;         /**< Transaction ID of the new tuple. */
-    offset_number new_offnum;        /**< New tuple's offset.              */
+struct xl_heap_update
+{
+   transaction_id old_xmax;          /**< Transaction ID of the old tuple. */
+   offset_number old_offnum;         /**< Old tuple's offset.              */
+   uint8_t old_infobits_set;         /**< Infomask bits to set on old tuple. */
+   uint8_t flags;                    /**< Flags associated with the update operation. */
+   transaction_id new_xmax;          /**< Transaction ID of the new tuple. */
+   offset_number new_offnum;         /**< New tuple's offset.              */
 };
 
 /**
@@ -192,13 +194,13 @@ struct xl_heap_update {
  *
  * Contains the database ID, number of relation IDs, associated flags, and the array of relation IDs.
  */
-struct xl_heap_truncate {
-    oid dbId;                          /**< Database ID. */
-    uint32_t nrelids;                  /**< Number of relation IDs. */
-    uint8_t flags;                     /**< Flags associated with the truncate operation. */
-    oid relids[FLEXIBLE_ARRAY_MEMBER]; /**< Array of relation IDs. */
+struct xl_heap_truncate
+{
+   oid dbId;                           /**< Database ID. */
+   uint32_t nrelids;                   /**< Number of relation IDs. */
+   uint8_t flags;                      /**< Flags associated with the truncate operation. */
+   oid relids[FLEXIBLE_ARRAY_MEMBER];  /**< Array of relation IDs. */
 };
-
 
 /**
  * @struct xl_heap_confirm
@@ -206,8 +208,9 @@ struct xl_heap_truncate {
  *
  * Contains the offset number for the confirmed tuple.
  */
-struct xl_heap_confirm {
-    offset_number offnum;    /**< Confirmed tuple's offset on page. */
+struct xl_heap_confirm
+{
+   offset_number offnum;     /**< Confirmed tuple's offset on page. */
 };
 
 /**
@@ -216,11 +219,12 @@ struct xl_heap_confirm {
  *
  * Contains the locking transaction ID, offset number, infomask bits, and associated flags.
  */
-struct xl_heap_lock {
-    transaction_id locking_xid;    /**< Transaction ID of the locking operation. */
-    offset_number offnum;          /**< Locked tuple's offset on page.           */
-    int8_t infobits_set;           /**< Infomask and infomask2 bits to set.     */
-    uint8_t flags;                 /**< Flags associated with the lock operation. */
+struct xl_heap_lock
+{
+   transaction_id locking_xid;     /**< Transaction ID of the locking operation. */
+   offset_number offnum;           /**< Locked tuple's offset on page.           */
+   int8_t infobits_set;            /**< Infomask and infomask2 bits to set.     */
+   uint8_t flags;                  /**< Flags associated with the lock operation. */
 };
 
 /**
@@ -229,9 +233,10 @@ struct xl_heap_lock {
  *
  * Contains the offset number for the updated tuple.
  */
-struct xl_heap_inplace {
-    offset_number offnum;    /**< Updated tuple's offset on page. */
-    /* TUPLE DATA FOLLOWS AT END OF STRUCT */
+struct xl_heap_inplace
+{
+   offset_number offnum;     /**< Updated tuple's offset on page. */
+   /* TUPLE DATA FOLLOWS AT END OF STRUCT */
 };
 
 /**
@@ -240,10 +245,11 @@ struct xl_heap_inplace {
  *
  * Contains reason and flags for the prune operation.
  */
-struct xl_heap_prune_v17 {
-    uint8_t reason;    /**< Reason for pruning. */
-    uint8_t flags;     /**< Flags for pruning operation. */
-    /* If XLHP_HAS_CONFLICT_HORIZON is set, the conflict horizon XID follows, unaligned */
+struct xl_heap_prune_v17
+{
+   uint8_t reason;     /**< Reason for pruning. */
+   uint8_t flags;      /**< Flags for pruning operation. */
+   /* If XLHP_HAS_CONFLICT_HORIZON is set, the conflict horizon XID follows, unaligned */
 };
 
 /**
@@ -252,12 +258,13 @@ struct xl_heap_prune_v17 {
  *
  * Contains transaction ID for snapshot conflict horizon, number of redirected and dead tuples, and a flag indicating if it's a catalog relation.
  */
-struct xl_heap_prune_v16 {
-    transaction_id snapshotConflictHorizon;      /**< Conflict horizon XID. */
-    uint16_t nredirected;                        /**< Number of redirected tuples. */
-    uint16_t ndead;                              /**< Number of dead tuples. */
-    bool is_catalog_rel;                         /**< Is this a catalog relation. */
-    /* OFFSET NUMBERS are in the block reference 0 */
+struct xl_heap_prune_v16
+{
+   transaction_id snapshotConflictHorizon;       /**< Conflict horizon XID. */
+   uint16_t nredirected;                         /**< Number of redirected tuples. */
+   uint16_t ndead;                               /**< Number of dead tuples. */
+   bool is_catalog_rel;                          /**< Is this a catalog relation. */
+   /* OFFSET NUMBERS are in the block reference 0 */
 };
 
 /**
@@ -266,11 +273,12 @@ struct xl_heap_prune_v16 {
  *
  * Contains transaction ID for the latest removed tuple, number of redirected and dead tuples.
  */
-struct xl_heap_prune_v15 {
-    transaction_id latestRemovedXid;    /**< Latest removed XID. */
-    uint16_t nredirected;               /**< Number of redirected tuples. */
-    uint16_t ndead;                     /**< Number of dead tuples. */
-    /* OFFSET NUMBERS are in the block reference 0 */
+struct xl_heap_prune_v15
+{
+   transaction_id latestRemovedXid;     /**< Latest removed XID. */
+   uint16_t nredirected;                /**< Number of redirected tuples. */
+   uint16_t ndead;                      /**< Number of dead tuples. */
+   /* OFFSET NUMBERS are in the block reference 0 */
 };
 
 /**
@@ -279,11 +287,12 @@ struct xl_heap_prune_v15 {
  *
  * Contains transaction ID for the latest removed tuple, number of redirected and dead tuples.
  */
-struct xl_heap_prune_v14 {
-    transaction_id latestRemovedXid;    /**< Latest removed XID. */
-    uint16_t nredirected;               /**< Number of redirected tuples. */
-    uint16_t ndead;                     /**< Number of dead tuples. */
-    /* OFFSET NUMBERS are in the block reference 0 */
+struct xl_heap_prune_v14
+{
+   transaction_id latestRemovedXid;     /**< Latest removed XID. */
+   uint16_t nredirected;                /**< Number of redirected tuples. */
+   uint16_t ndead;                      /**< Number of dead tuples. */
+   /* OFFSET NUMBERS are in the block reference 0 */
 };
 
 /**
@@ -293,11 +302,12 @@ struct xl_heap_prune_v14 {
  * Similar to prune but named differently.
  * Contains transaction ID for the latest removed tuple, number of redirected and dead tuples.
  */
-struct xl_heap_clean_v13 {
-    transaction_id latestRemovedXid;    /**< Latest removed XID. */
-    uint16_t nredirected;               /**< Number of redirected tuples. */
-    uint16_t ndead;                     /**< Number of dead tuples. */
-    /* OFFSET NUMBERS are in the block reference 0 */
+struct xl_heap_clean_v13
+{
+   transaction_id latestRemovedXid;     /**< Latest removed XID. */
+   uint16_t nredirected;                /**< Number of redirected tuples. */
+   uint16_t ndead;                      /**< Number of dead tuples. */
+   /* OFFSET NUMBERS are in the block reference 0 */
 };
 
 /**
@@ -306,17 +316,18 @@ struct xl_heap_clean_v13 {
  *
  * Contains a union for version-specific data and function pointers for parsing and formatting records.
  */
-struct xl_heap_prune {
-    void (*parse)(struct xl_heap_prune* wrapper, const void* rec);    /**< Function pointer to parse the record */
-    char* (*format)(struct xl_heap_prune* wrapper, char* buf);        /**< Function pointer to format the record */
-    union
-    {
-        struct xl_heap_prune_v17 v17;                                 /**< Prune operation for version 17 */
-        struct xl_heap_prune_v16 v16;                                 /**< Prune operation for version 16 */
-        struct xl_heap_prune_v15 v15;                                 /**< Prune operation for version 15 */
-        struct xl_heap_prune_v14 v14;                                 /**< Prune operation for version 14 */
-        struct xl_heap_clean_v13 v13;                                 /**< Prune operation for version 13 (named clean) */
-    } data;                                                           /**< Version-specific prune data */
+struct xl_heap_prune
+{
+   void (*parse)(struct xl_heap_prune* wrapper, const void* rec);     /**< Function pointer to parse the record */
+   char* (*format)(struct xl_heap_prune* wrapper, char* buf);         /**< Function pointer to format the record */
+   union
+   {
+      struct xl_heap_prune_v17 v17;                                   /**< Prune operation for version 17 */
+      struct xl_heap_prune_v16 v16;                                   /**< Prune operation for version 16 */
+      struct xl_heap_prune_v15 v15;                                   /**< Prune operation for version 15 */
+      struct xl_heap_prune_v14 v14;                                   /**< Prune operation for version 14 */
+      struct xl_heap_clean_v13 v13;                                   /**< Prune operation for version 13 (named clean) */
+   } data;                                                            /**< Version-specific prune data */
 };
 
 /**
@@ -325,8 +336,9 @@ struct xl_heap_prune {
  *
  * Contains the number of unused items.
  */
-struct xl_heap_vacuum {
-    uint16_t nunused;    /**< Number of unused items. */
+struct xl_heap_vacuum
+{
+   uint16_t nunused;     /**< Number of unused items. */
 };
 
 /**
@@ -335,9 +347,10 @@ struct xl_heap_vacuum {
  *
  * Contains the cutoff transaction ID and associated flags.
  */
-struct xl_heap_visible {
-    transaction_id cutoff_xid;    /**< Cutoff transaction ID. */
-    uint8_t flags;                /**< Flags associated with the visibility operation. */
+struct xl_heap_visible
+{
+   transaction_id cutoff_xid;     /**< Cutoff transaction ID. */
+   uint8_t flags;                 /**< Flags associated with the visibility operation. */
 };
 
 /**
@@ -346,9 +359,10 @@ struct xl_heap_visible {
  *
  * This structure is used in WAL records to describe freezing of tuples in heap pages for version 15.
  */
-struct xl_heap_freeze_page_v15 {
-    transaction_id cutoff_xid;  /**< Transaction ID cutoff for freezing tuples. */
-    uint16_t ntuples;           /**< Number of tuples to freeze. */
+struct xl_heap_freeze_page_v15
+{
+   transaction_id cutoff_xid;   /**< Transaction ID cutoff for freezing tuples. */
+   uint16_t ntuples;            /**< Number of tuples to freeze. */
 };
 
 /**
@@ -357,10 +371,11 @@ struct xl_heap_freeze_page_v15 {
  *
  * This structure is used in WAL records to describe freezing of tuples in heap pages for version 16.
  */
-struct xl_heap_freeze_page_v16 {
-    transaction_id snapshot_conflict_horizon;  /**< Transaction ID snapshot conflict horizon. */
-    uint16_t nplans;                           /**< Number of freeze plans. */
-    bool is_catalog_rel;                       /**< Indicates if the relation is a catalog relation. */
+struct xl_heap_freeze_page_v16
+{
+   transaction_id snapshot_conflict_horizon;   /**< Transaction ID snapshot conflict horizon. */
+   uint16_t nplans;                            /**< Number of freeze plans. */
+   bool is_catalog_rel;                        /**< Indicates if the relation is a catalog relation. */
 };
 
 /**
@@ -369,15 +384,16 @@ struct xl_heap_freeze_page_v16 {
  *
  * This structure allows for handling different versions of heap freeze operations using a union.
  */
-struct xl_heap_freeze_page {
-    void (*parse)(struct xl_heap_freeze_page* wrapper, const void* rec); /**< Parse function pointer.    */
-    char* (*format)(struct xl_heap_freeze_page* wrapper, char* buf);     /**< Format function pointer.  */
-    union {
-        struct xl_heap_freeze_page_v15 v15;                              /**< Version 15 heap freeze structure. */
-        struct xl_heap_freeze_page_v16 v16;                              /**< Version 16 heap freeze structure. */
-    } data;                                                              /**< Version-specific data.    */
+struct xl_heap_freeze_page
+{
+   void (*parse)(struct xl_heap_freeze_page* wrapper, const void* rec);  /**< Parse function pointer.    */
+   char* (*format)(struct xl_heap_freeze_page* wrapper, char* buf);      /**< Format function pointer.  */
+   union
+   {
+      struct xl_heap_freeze_page_v15 v15;                                /**< Version 15 heap freeze structure. */
+      struct xl_heap_freeze_page_v16 v16;                                /**< Version 16 heap freeze structure. */
+   } data;                                                               /**< Version-specific data.    */
 };
-
 
 /**
  * @struct xl_heap_new_cid
@@ -385,13 +401,14 @@ struct xl_heap_freeze_page {
  *
  * Contains the top-level transaction ID, command IDs, and the target relfilenode and ctid.
  */
-struct xl_heap_new_cid {
-    transaction_id             top_xid;     /**< Top-level transaction ID. */
-    command_id                 cmin;        /**< Minimum command ID. */
-    command_id                 cmax;        /**< Maximum command ID. */
-    command_id                 combocid;    /**< Combined command ID (for debugging).*/
-    struct rel_file_node       target_node; /**< Target relfilenode. */
-    struct item_pointer_data   target_tid;  /**< Target ctid. */
+struct xl_heap_new_cid
+{
+   transaction_id top_xid;                  /**< Top-level transaction ID. */
+   command_id cmin;                         /**< Minimum command ID. */
+   command_id cmax;                         /**< Maximum command ID. */
+   command_id combocid;                     /**< Combined command ID (for debugging).*/
+   struct rel_file_node target_node;        /**< Target relfilenode. */
+   struct item_pointer_data target_tid;     /**< Target ctid. */
 };
 
 /**
@@ -400,10 +417,11 @@ struct xl_heap_new_cid {
  *
  * Contains flags, number of tuples, and an array of offsets for the tuples.
  */
-struct xl_heap_multi_insert {
-    uint8_t flags;                                   /**< Flags associated with the multi-insert operation. */
-    uint16_t ntuples;                                /**< Number of tuples to insert. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];    /**< Array of tuple offsets. */
+struct xl_heap_multi_insert
+{
+   uint8_t flags;                                    /**< Flags associated with the multi-insert operation. */
+   uint16_t ntuples;                                 /**< Number of tuples to insert. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];     /**< Array of tuple offsets. */
 };
 
 /**
@@ -412,11 +430,12 @@ struct xl_heap_multi_insert {
  *
  * Contains the transaction ID, offset number, infomask bits, and associated flags.
  */
-struct xl_heap_lock_updated {
-    transaction_id xmax;           /**< Transaction ID of the locking operation. */
-    offset_number offnum;          /**< Offset of the locked tuple on page.      */
-    uint8_t infobits_set;          /**< Infomask bits to set.                    */
-    uint8_t flags;                 /**< Flags associated with the lock operation. */
+struct xl_heap_lock_updated
+{
+   transaction_id xmax;            /**< Transaction ID of the locking operation. */
+   offset_number offnum;           /**< Offset of the locked tuple on page.      */
+   uint8_t infobits_set;           /**< Infomask bits to set.                    */
+   uint8_t flags;                  /**< Flags associated with the lock operation. */
 };
 
 /**
@@ -425,12 +444,13 @@ struct xl_heap_lock_updated {
  *
  * Contains transaction ID, infomask, and associated flags for the freeze operation.
  */
-struct xlhp_freeze_plan {
-    transaction_id xmax;         /**< Transaction ID for freezing. */
-    uint16_t t_infomask2;        /**< Second infomask value. */
-    uint16_t t_infomask;         /**< First infomask value. */
-    uint8_t frzflags;            /**< Flags for freeze operation. */
-    uint16_t ntuples;            /**< Number of tuples affected. */
+struct xlhp_freeze_plan
+{
+   transaction_id xmax;          /**< Transaction ID for freezing. */
+   uint16_t t_infomask2;         /**< Second infomask value. */
+   uint16_t t_infomask;          /**< First infomask value. */
+   uint8_t frzflags;             /**< Flags for freeze operation. */
+   uint16_t ntuples;             /**< Number of tuples affected. */
 };
 
 /**
@@ -439,9 +459,10 @@ struct xlhp_freeze_plan {
  *
  * Contains the number of freeze plans and an array of freeze plans.
  */
-struct xlhp_freeze_plans {
-    uint16_t nplans;                                        /**< Number of freeze plans. */
-    struct xlhp_freeze_plan plans[FLEXIBLE_ARRAY_MEMBER];   /**< Array of freeze plans. */
+struct xlhp_freeze_plans
+{
+   uint16_t nplans;                                         /**< Number of freeze plans. */
+   struct xlhp_freeze_plan plans[FLEXIBLE_ARRAY_MEMBER];    /**< Array of freeze plans. */
 };
 
 /**
@@ -450,9 +471,10 @@ struct xlhp_freeze_plans {
  *
  * Contains the number of prune items and an array of offsets for the items.
  */
-struct xlhp_prune_items {
-    uint16_t ntargets;                           /**< Number of prune items. */
-    offset_number data[FLEXIBLE_ARRAY_MEMBER];   /**< Array of prune item offsets. */
+struct xlhp_prune_items
+{
+   uint16_t ntargets;                            /**< Number of prune items. */
+   offset_number data[FLEXIBLE_ARRAY_MEMBER];    /**< Array of prune item offsets. */
 };
 
 /**
@@ -461,9 +483,10 @@ struct xlhp_prune_items {
  *
  * Contains the latest removed transaction ID.
  */
-struct xl_heap_cleanup_info {
-    struct rel_file_node node;        /**< RelFileNode of the relation */
-    transaction_id latestRemovedXid;  /**< Latest removed transaction ID */
+struct xl_heap_cleanup_info
+{
+   struct rel_file_node node;         /**< RelFileNode of the relation */
+   transaction_id latestRemovedXid;   /**< Latest removed transaction ID */
 };
 
 // Function declarations

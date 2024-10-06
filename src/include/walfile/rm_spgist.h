@@ -47,7 +47,6 @@ extern "C" {
 #define XLOG_SPGIST_VACUUM_ROOT      0x70 /**< XLOG opcode for vacuuming root nodes in SPGiST. */
 #define XLOG_SPGIST_VACUUM_REDIRECT  0x80 /**< XLOG opcode for vacuuming redirect pointers in SPGiST. */
 
-
 /**
  * @struct spg_xlog_state
  * @brief Represents the state needed by some SPGiST redo functions.
@@ -56,8 +55,8 @@ extern "C" {
  */
 struct spg_xlog_state
 {
-    transaction_id my_xid;  /**< Transaction ID of the current operation. */
-    bool is_build;          /**< Indicates if the operation is during index build. */
+   transaction_id my_xid;   /**< Transaction ID of the current operation. */
+   bool is_build;           /**< Indicates if the operation is during index build. */
 };
 
 /**
@@ -69,13 +68,13 @@ struct spg_xlog_state
  */
 struct spg_xlog_add_leaf
 {
-    bool new_page;                   /**< Indicates if the destination page is new. */
-    bool stores_nulls;               /**< Indicates if the page is in the nulls tree. */
-    offset_number offnum_leaf;       /**< Offset where the leaf tuple is placed. */
-    offset_number offnum_head_leaf;  /**< Offset of the head tuple in the chain, if any. */
-    offset_number offnum_parent;     /**< Offset where the parent downlink is, if any. */
-    uint16_t node_i;                 /**< Index of the node in the parent. */
-    /* New leaf tuple follows (unaligned!). */
+   bool new_page;                    /**< Indicates if the destination page is new. */
+   bool stores_nulls;                /**< Indicates if the page is in the nulls tree. */
+   offset_number offnum_leaf;        /**< Offset where the leaf tuple is placed. */
+   offset_number offnum_head_leaf;   /**< Offset of the head tuple in the chain, if any. */
+   offset_number offnum_parent;      /**< Offset where the parent downlink is, if any. */
+   uint16_t node_i;                  /**< Index of the node in the parent. */
+   /* New leaf tuple follows (unaligned!). */
 };
 
 /**
@@ -87,14 +86,14 @@ struct spg_xlog_add_leaf
  */
 struct spg_xlog_move_leafs
 {
-    uint16_t n_moves;                              /**< Number of tuples moved from the source page. */
-    bool new_page;                                 /**< Indicates if the destination page is new. */
-    bool replace_dead;                             /**< Indicates if a dead source tuple is being replaced. */
-    bool stores_nulls;                             /**< Indicates if the pages are in the nulls tree. */
-    offset_number offnum_parent;                   /**< Offset where the parent downlink is. */
-    uint16_t node_i;                               /**< Index of the node in the parent. */
-    struct spg_xlog_state state_src;               /**< State of the source page. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Array of tuple offsets. */
+   uint16_t n_moves;                               /**< Number of tuples moved from the source page. */
+   bool new_page;                                  /**< Indicates if the destination page is new. */
+   bool replace_dead;                              /**< Indicates if a dead source tuple is being replaced. */
+   bool stores_nulls;                              /**< Indicates if the pages are in the nulls tree. */
+   offset_number offnum_parent;                    /**< Offset where the parent downlink is. */
+   uint16_t node_i;                                /**< Index of the node in the parent. */
+   struct spg_xlog_state state_src;                /**< State of the source page. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tuple offsets. */
 };
 
 /**
@@ -105,14 +104,14 @@ struct spg_xlog_move_leafs
  */
 struct spg_xlog_add_node
 {
-    offset_number offnum;              /**< Offset of the original inner tuple on the original page. */
-    offset_number offnum_new;          /**< Offset of the new tuple on the new page. */
-    bool new_page;                     /**< Indicates if the new page is initialized. */
-    int8_t parent_blk;                 /**< Indicates which page the parent downlink is on. */
-    offset_number offnum_parent;       /**< Offset within the parent page. */
-    uint16_t node_i;                   /**< Index of the node in the parent. */
-    struct spg_xlog_state state_src;   /**< State of the source page. */
-    /* Updated inner tuple follows (unaligned!). */
+   offset_number offnum;               /**< Offset of the original inner tuple on the original page. */
+   offset_number offnum_new;           /**< Offset of the new tuple on the new page. */
+   bool new_page;                      /**< Indicates if the new page is initialized. */
+   int8_t parent_blk;                  /**< Indicates which page the parent downlink is on. */
+   offset_number offnum_parent;        /**< Offset within the parent page. */
+   uint16_t node_i;                    /**< Index of the node in the parent. */
+   struct spg_xlog_state state_src;    /**< State of the source page. */
+   /* Updated inner tuple follows (unaligned!). */
 };
 
 /**
@@ -123,11 +122,11 @@ struct spg_xlog_add_node
  */
 struct spg_xlog_split_tuple
 {
-    offset_number offnum_prefix;   /**< Offset where the prefix tuple goes. */
-    offset_number offnum_postfix;  /**< Offset where the postfix tuple goes. */
-    bool new_page;                 /**< Indicates if the page is initialized. */
-    bool postfix_blk_same;         /**< Indicates if the postfix tuple is on the same page as the prefix. */
-    /* New prefix and postfix inner tuples follow (unaligned!). */
+   offset_number offnum_prefix;    /**< Offset where the prefix tuple goes. */
+   offset_number offnum_postfix;   /**< Offset where the postfix tuple goes. */
+   bool new_page;                  /**< Indicates if the page is initialized. */
+   bool postfix_blk_same;          /**< Indicates if the postfix tuple is on the same page as the prefix. */
+   /* New prefix and postfix inner tuples follow (unaligned!). */
 };
 
 /**
@@ -138,19 +137,19 @@ struct spg_xlog_split_tuple
  */
 struct spg_xlog_pick_split
 {
-    bool is_root_split;                            /**< Indicates if this is a root split. */
-    uint16_t n_delete;                             /**< Number of tuples to delete from the source. */
-    uint16_t n_insert;                             /**< Number of tuples to insert on the source and/or destination. */
-    bool init_src;                                 /**< Indicates if the source page is re-initialized. */
-    bool init_dest;                                /**< Indicates if the destination page is re-initialized. */
-    offset_number offnum_inner;                    /**< Offset where the new inner tuple goes. */
-    bool init_inner;                               /**< Indicates if the inner page is re-initialized. */
-    bool stores_nulls;                             /**< Indicates if the pages are in the nulls tree. */
-    bool inner_is_parent;                          /**< Indicates if the inner page is the parent page. */
-    offset_number offnum_parent;                   /**< Offset within the parent page. */
-    uint16_t node_i;                               /**< Index of the node in the parent. */
-    struct spg_xlog_state state_src;               /**< State of the source page. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Array of tuple offsets. */
+   bool is_root_split;                             /**< Indicates if this is a root split. */
+   uint16_t n_delete;                              /**< Number of tuples to delete from the source. */
+   uint16_t n_insert;                              /**< Number of tuples to insert on the source and/or destination. */
+   bool init_src;                                  /**< Indicates if the source page is re-initialized. */
+   bool init_dest;                                 /**< Indicates if the destination page is re-initialized. */
+   offset_number offnum_inner;                     /**< Offset where the new inner tuple goes. */
+   bool init_inner;                                /**< Indicates if the inner page is re-initialized. */
+   bool stores_nulls;                              /**< Indicates if the pages are in the nulls tree. */
+   bool inner_is_parent;                           /**< Indicates if the inner page is the parent page. */
+   offset_number offnum_parent;                    /**< Offset within the parent page. */
+   uint16_t node_i;                                /**< Index of the node in the parent. */
+   struct spg_xlog_state state_src;                /**< State of the source page. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tuple offsets. */
 };
 
 /**
@@ -161,12 +160,12 @@ struct spg_xlog_pick_split
  */
 struct spg_xlog_vacuum_leaf
 {
-    uint16_t n_dead;                               /**< Number of tuples to be marked as DEAD. */
-    uint16_t n_placeholder;                        /**< Number of tuples to be marked as PLACEHOLDER. */
-    uint16_t n_move;                               /**< Number of tuples to be moved. */
-    uint16_t n_chain;                              /**< Number of tuples to be re-chained. */
-    struct spg_xlog_state state_src;               /**< State of the source page. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Array of tuple offsets. */
+   uint16_t n_dead;                                /**< Number of tuples to be marked as DEAD. */
+   uint16_t n_placeholder;                         /**< Number of tuples to be marked as PLACEHOLDER. */
+   uint16_t n_move;                                /**< Number of tuples to be moved. */
+   uint16_t n_chain;                               /**< Number of tuples to be re-chained. */
+   struct spg_xlog_state state_src;                /**< State of the source page. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tuple offsets. */
 };
 
 /**
@@ -175,10 +174,11 @@ struct spg_xlog_vacuum_leaf
  *
  * Contains information about the tuples to be deleted.
  */
-struct spg_xlog_vacuum_root {
-    uint16_t n_delete;                             /**< Number of tuples to be deleted. */
-    struct spg_xlog_state state_src;               /**< State of the source page. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Array of tuple offsets. */
+struct spg_xlog_vacuum_root
+{
+   uint16_t n_delete;                              /**< Number of tuples to be deleted. */
+   struct spg_xlog_state state_src;                /**< State of the source page. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tuple offsets. */
 };
 
 /**
@@ -188,11 +188,12 @@ struct spg_xlog_vacuum_root {
  * This structure is used in XLOG records for vacuuming redirects in a
  * space-partitioned GiST (SP-GiST) index in version 15.
  */
-struct spg_xlog_vacuum_redirect_v15 {
-    uint16_t nToPlaceholder;                       /**< Number of redirects to make placeholders. */
-    offset_number firstPlaceholder;                /**< First placeholder tuple to remove. */
-    transaction_id newestRedirectXid;              /**< Newest XID of removed redirects. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Offsets of redirect tuples to make placeholders. */
+struct spg_xlog_vacuum_redirect_v15
+{
+   uint16_t nToPlaceholder;                        /**< Number of redirects to make placeholders. */
+   offset_number firstPlaceholder;                 /**< First placeholder tuple to remove. */
+   transaction_id newestRedirectXid;               /**< Newest XID of removed redirects. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Offsets of redirect tuples to make placeholders. */
 };
 
 /**
@@ -202,12 +203,13 @@ struct spg_xlog_vacuum_redirect_v15 {
  * This structure is used in XLOG records for vacuuming redirects in a
  * space-partitioned GiST (SP-GiST) index in version 16.
  */
-struct spg_xlog_vacuum_redirect_v16 {
-    uint16_t n_to_placeholder;                     /**< Number of redirects to make placeholders. */
-    offset_number first_placeholder;               /**< First placeholder tuple to remove. */
-    transaction_id snapshot_conflict_horizon;      /**< Newest XID of removed redirects. */
-    bool is_catalog_rel;                           /**< Handle recovery conflict during logical decoding on standby. */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Offsets of redirect tuples to make placeholders. */
+struct spg_xlog_vacuum_redirect_v16
+{
+   uint16_t n_to_placeholder;                      /**< Number of redirects to make placeholders. */
+   offset_number first_placeholder;                /**< First placeholder tuple to remove. */
+   transaction_id snapshot_conflict_horizon;       /**< Newest XID of removed redirects. */
+   bool is_catalog_rel;                            /**< Handle recovery conflict during logical decoding on standby. */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Offsets of redirect tuples to make placeholders. */
 };
 
 /**
@@ -217,14 +219,16 @@ struct spg_xlog_vacuum_redirect_v16 {
  * This structure wraps version-specific structures for easier handling of different
  * SP-GiST vacuum redirect versions.
  */
-struct spg_xlog_vacuum_redirect {
-    void (*parse)(struct spg_xlog_vacuum_redirect* wrapper, const void* rec); /**< Function pointer to parse the record. */
-    char* (*format)(struct spg_xlog_vacuum_redirect* wrapper, char* buf);     /**< Function pointer to format the record. */
+struct spg_xlog_vacuum_redirect
+{
+   void (*parse)(struct spg_xlog_vacuum_redirect* wrapper, const void* rec);  /**< Function pointer to parse the record. */
+   char* (*format)(struct spg_xlog_vacuum_redirect* wrapper, char* buf);      /**< Function pointer to format the record. */
 
-    union {
-        struct spg_xlog_vacuum_redirect_v15 v15;                              /**< Version 15 of the structure. */
-        struct spg_xlog_vacuum_redirect_v16 v16;                              /**< Version 16 of the structure. */
-    } data;                                                                   /**< Version-specific data. */
+   union
+   {
+      struct spg_xlog_vacuum_redirect_v15 v15;                                /**< Version 15 of the structure. */
+      struct spg_xlog_vacuum_redirect_v16 v16;                                /**< Version 16 of the structure. */
+   } data;                                                                    /**< Version-specific data. */
 };
 
 /* Functions */

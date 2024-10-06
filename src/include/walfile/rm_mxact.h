@@ -45,12 +45,12 @@
  */
 enum MULTI_XACT_STATUS
 {
-    MULTI_XACT_STATUS_FOR_KEY_SHARE    = 0x00,  /**< FOR KEY SHARE lock mode. */
-    MULTI_XACT_STATUS_FOR_SHARE        = 0x01,  /**< FOR SHARE lock mode. */
-    MULTI_XACT_STATUS_FOR_NO_KEY_UPDATE = 0x02, /**< FOR NO KEY UPDATE lock mode. */
-    MULTI_XACT_STATUS_FOR_UPDATE       = 0x03,  /**< FOR UPDATE lock mode. */
-    MULTI_XACT_STATUS_NO_KEY_UPDATE    = 0x04,  /**< Update that doesn't touch "key" columns. */
-    MULTI_XACT_STATUS_UPDATE           = 0x05   /**< Other updates and delete operations. */
+   MULTI_XACT_STATUS_FOR_KEY_SHARE    = 0x00,   /**< FOR KEY SHARE lock mode. */
+   MULTI_XACT_STATUS_FOR_SHARE        = 0x01,   /**< FOR SHARE lock mode. */
+   MULTI_XACT_STATUS_FOR_NO_KEY_UPDATE = 0x02,  /**< FOR NO KEY UPDATE lock mode. */
+   MULTI_XACT_STATUS_FOR_UPDATE       = 0x03,   /**< FOR UPDATE lock mode. */
+   MULTI_XACT_STATUS_NO_KEY_UPDATE    = 0x04,   /**< Update that doesn't touch "key" columns. */
+   MULTI_XACT_STATUS_UPDATE           = 0x05    /**< Other updates and delete operations. */
 };
 
 /**
@@ -61,8 +61,8 @@ enum MULTI_XACT_STATUS
  */
 struct multi_xact_member
 {
-    transaction_id xid;                /**< Transaction ID of the member. */
-    enum MULTI_XACT_STATUS status;     /**< Lock status of the member. */
+   transaction_id xid;                 /**< Transaction ID of the member. */
+   enum MULTI_XACT_STATUS status;      /**< Lock status of the member. */
 };
 
 /**
@@ -74,10 +74,10 @@ struct multi_xact_member
  */
 struct xl_multixact_create
 {
-    multi_xact_id mid;                                        /**< New MultiXact's ID. */
-    multi_xact_offset moff;                                   /**< Starting offset in the members file. */
-    int32_t nmembers;                                         /**< Number of member XIDs. */
-    struct multi_xact_member members[FLEXIBLE_ARRAY_MEMBER];  /**< Array of multixact members. */
+   multi_xact_id mid;                                         /**< New MultiXact's ID. */
+   multi_xact_offset moff;                                    /**< Starting offset in the members file. */
+   int32_t nmembers;                                          /**< Number of member XIDs. */
+   struct multi_xact_member members[FLEXIBLE_ARRAY_MEMBER];   /**< Array of multixact members. */
 };
 
 /**
@@ -89,11 +89,11 @@ struct xl_multixact_create
  */
 struct xl_multixact_truncate
 {
-    oid oldest_multi_db;                       /**< OID of the oldest database with active multixacts. */
-    multi_xact_id start_trunc_off;             /**< Starting offset for truncation (for completeness). */
-    multi_xact_id end_trunc_off;               /**< Ending offset for truncation. */
-    multi_xact_offset start_trunc_memb;        /**< Starting member offset for truncation. */
-    multi_xact_offset end_trunc_memb;          /**< Ending member offset for truncation. */
+   oid oldest_multi_db;                        /**< OID of the oldest database with active multixacts. */
+   multi_xact_id start_trunc_off;              /**< Starting offset for truncation (for completeness). */
+   multi_xact_id end_trunc_off;                /**< Ending offset for truncation. */
+   multi_xact_offset start_trunc_memb;         /**< Starting member offset for truncation. */
+   multi_xact_offset end_trunc_memb;           /**< Ending member offset for truncation. */
 };
 
 /**

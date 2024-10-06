@@ -76,22 +76,22 @@ typedef int64_t pg_time_t;
  */
 struct check_point_v16
 {
-    xlog_rec_ptr redo;                     /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
-    timeline_id this_timeline_id;          /**< Current timeline ID. */
-    timeline_id prev_timeline_id;          /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
-    bool full_page_writes;                 /**< Indicates the current full_page_writes setting. */
-    struct full_transaction_id next_xid;   /**< Next free transaction ID. */
-    oid next_oid;                          /**< Next free OID. */
-    multi_xact_id next_multi;              /**< Next free multi_xact_id. */
-    multi_xact_offset next_multi_offset;   /**< Next free MultiXact offset. */
-    transaction_id oldest_xid;             /**< Cluster-wide minimum datfrozenxid. */
-    oid oldest_xid_db;                     /**< Database with minimum datfrozenxid. */
-    multi_xact_id oldest_multi;            /**< Cluster-wide minimum datminmxid. */
-    oid oldest_multi_db;                   /**< Database with minimum datminmxid. */
-    pg_time_t time;                        /**< Timestamp of the checkpoint. */
-    transaction_id oldest_commit_ts_xid;   /**< Oldest XID with a valid commit timestamp. */
-    transaction_id newest_commit_ts_xid;   /**< Newest XID with a valid commit timestamp. */
-    transaction_id oldest_active_xid;      /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
+   xlog_rec_ptr redo;                      /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
+   timeline_id this_timeline_id;           /**< Current timeline ID. */
+   timeline_id prev_timeline_id;           /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
+   bool full_page_writes;                  /**< Indicates the current full_page_writes setting. */
+   struct full_transaction_id next_xid;    /**< Next free transaction ID. */
+   oid next_oid;                           /**< Next free OID. */
+   multi_xact_id next_multi;               /**< Next free multi_xact_id. */
+   multi_xact_offset next_multi_offset;    /**< Next free MultiXact offset. */
+   transaction_id oldest_xid;              /**< Cluster-wide minimum datfrozenxid. */
+   oid oldest_xid_db;                      /**< Database with minimum datfrozenxid. */
+   multi_xact_id oldest_multi;             /**< Cluster-wide minimum datminmxid. */
+   oid oldest_multi_db;                    /**< Database with minimum datminmxid. */
+   pg_time_t time;                         /**< Timestamp of the checkpoint. */
+   transaction_id oldest_commit_ts_xid;    /**< Oldest XID with a valid commit timestamp. */
+   transaction_id newest_commit_ts_xid;    /**< Newest XID with a valid commit timestamp. */
+   transaction_id oldest_active_xid;       /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
 };
 
 /**
@@ -119,23 +119,23 @@ struct check_point_v16
  */
 struct check_point_v17
 {
-    xlog_rec_ptr redo;                     /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
-    timeline_id this_timeline_id;          /**< Current timeline ID. */
-    timeline_id prev_timeline_id;          /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
-    bool full_page_writes;                 /**< Indicates the current full_page_writes setting. */
-    int wal_level;                         /**< Current wal_level. */
-    struct full_transaction_id next_xid;   /**< Next free transaction ID. */
-    oid next_oid;                          /**< Next free OID. */
-    multi_xact_id next_multi;              /**< Next free multi_xact_id. */
-    multi_xact_offset next_multi_offset;   /**< Next free MultiXact offset. */
-    transaction_id oldest_xid;             /**< Cluster-wide minimum datfrozenxid. */
-    oid oldest_xid_db;                     /**< Database with minimum datfrozenxid. */
-    multi_xact_id oldest_multi;            /**< Cluster-wide minimum datminmxid. */
-    oid oldest_multi_db;                   /**< Database with minimum datminmxid. */
-    pg_time_t time;                        /**< Timestamp of the checkpoint. */
-    transaction_id oldest_commit_ts_xid;   /**< Oldest XID with a valid commit timestamp. */
-    transaction_id newest_commit_ts_xid;   /**< Newest XID with a valid commit timestamp. */
-    transaction_id oldest_active_xid;      /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
+   xlog_rec_ptr redo;                      /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
+   timeline_id this_timeline_id;           /**< Current timeline ID. */
+   timeline_id prev_timeline_id;           /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
+   bool full_page_writes;                  /**< Indicates the current full_page_writes setting. */
+   int wal_level;                          /**< Current wal_level. */
+   struct full_transaction_id next_xid;    /**< Next free transaction ID. */
+   oid next_oid;                           /**< Next free OID. */
+   multi_xact_id next_multi;               /**< Next free multi_xact_id. */
+   multi_xact_offset next_multi_offset;    /**< Next free MultiXact offset. */
+   transaction_id oldest_xid;              /**< Cluster-wide minimum datfrozenxid. */
+   oid oldest_xid_db;                      /**< Database with minimum datfrozenxid. */
+   multi_xact_id oldest_multi;             /**< Cluster-wide minimum datminmxid. */
+   oid oldest_multi_db;                    /**< Database with minimum datminmxid. */
+   pg_time_t time;                         /**< Timestamp of the checkpoint. */
+   transaction_id oldest_commit_ts_xid;    /**< Oldest XID with a valid commit timestamp. */
+   transaction_id newest_commit_ts_xid;    /**< Newest XID with a valid commit timestamp. */
+   transaction_id oldest_active_xid;       /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
 };
 
 /**
@@ -149,12 +149,13 @@ struct check_point_v17
  */
 struct check_point
 {
-    void (*parse)(struct check_point* wrapper, const void* rec);    /**< Parse function pointer */
-    char* (*format)(struct check_point* wrapper, char* buf);         /**< Format function pointer */
-    union {
-        struct check_point_v16 v16;     /**< Version 16 data */
-        struct check_point_v17 v17;     /**< Version 17 data */
-    } data;  /**< Union holding version-specific checkpoint data */
+   void (*parse)(struct check_point* wrapper, const void* rec);     /**< Parse function pointer */
+   char* (*format)(struct check_point* wrapper, char* buf);          /**< Format function pointer */
+   union
+   {
+      struct check_point_v16 v16;       /**< Version 16 data */
+      struct check_point_v17 v17;       /**< Version 17 data */
+   } data;   /**< Union holding version-specific checkpoint data */
 };
 
 /**

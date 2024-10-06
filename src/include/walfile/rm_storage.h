@@ -46,8 +46,8 @@ extern "C" {
  */
 struct xl_smgr_create
 {
-    struct rel_file_node rnode;  /**< Relation file node information. */
-    enum fork_number forkNum;    /**< Fork number for the created file. */
+   struct rel_file_node rnode;   /**< Relation file node information. */
+   enum fork_number forkNum;     /**< Fork number for the created file. */
 };
 
 /**
@@ -58,9 +58,9 @@ struct xl_smgr_create
  */
 struct xl_smgr_truncate
 {
-    block_number blkno;          /**< Block number from where the truncation starts. */
-    struct rel_file_node rnode;  /**< Relation file node information. */
-    int flags;                   /**< Flags indicating which components are truncated. */
+   block_number blkno;           /**< Block number from where the truncation starts. */
+   struct rel_file_node rnode;   /**< Relation file node information. */
+   int flags;                    /**< Flags indicating which components are truncated. */
 };
 
 /**

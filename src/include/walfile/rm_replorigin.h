@@ -46,10 +46,11 @@ extern "C" {
  * Contains the remote LSN, replication origin ID, and a flag indicating
  * whether the operation should be forced.
  */
-struct xl_replorigin_set {
-    xlog_rec_ptr remote_lsn;  /**< Remote LSN associated with the replication origin. */
-    rep_origin_id node_id;    /**< Replication origin ID. */
-    bool force;               /**< Indicates if the operation should be forced. */
+struct xl_replorigin_set
+{
+   xlog_rec_ptr remote_lsn;   /**< Remote LSN associated with the replication origin. */
+   rep_origin_id node_id;     /**< Replication origin ID. */
+   bool force;                /**< Indicates if the operation should be forced. */
 };
 
 /**
@@ -58,8 +59,9 @@ struct xl_replorigin_set {
  *
  * Contains the replication origin ID of the node being dropped.
  */
-struct xl_replorigin_drop {
-    rep_origin_id node_id;  /**< Replication origin ID of the node being dropped. */
+struct xl_replorigin_drop
+{
+   rep_origin_id node_id;   /**< Replication origin ID of the node being dropped. */
 };
 
 /**

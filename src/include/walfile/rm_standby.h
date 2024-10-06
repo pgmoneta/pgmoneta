@@ -52,9 +52,9 @@ extern "C" {
  */
 struct xl_standby_lock
 {
-    transaction_id xid;   /**< Transaction ID of the holder of AccessExclusiveLock. */
-    oid db_oid;           /**< Database OID containing the table. */
-    oid rel_oid;          /**< OID of the locked table. */
+   transaction_id xid;    /**< Transaction ID of the holder of AccessExclusiveLock. */
+   oid db_oid;            /**< Database OID containing the table. */
+   oid rel_oid;           /**< OID of the locked table. */
 };
 
 /**
@@ -63,9 +63,10 @@ struct xl_standby_lock
  *
  * Contains an array of standby lock records.
  */
-struct xl_standby_locks {
-    int nlocks;                                           /**< Number of entries in the locks array. */
-    struct xl_standby_lock locks[FLEXIBLE_ARRAY_MEMBER];  /**< Array of standby lock records. */
+struct xl_standby_locks
+{
+   int nlocks;                                            /**< Number of entries in the locks array. */
+   struct xl_standby_lock locks[FLEXIBLE_ARRAY_MEMBER];   /**< Array of standby lock records. */
 };
 
 /**
@@ -76,14 +77,15 @@ struct xl_standby_locks {
  * including the next transaction ID, the oldest running transaction ID,
  * and the latest completed transaction ID.
  */
-struct xl_running_xacts {
-    int xcnt;                                    /**< Number of transaction IDs in xids[]. */
-    int subxcnt;                                 /**< Number of subtransaction IDs in xids[]. */
-    bool subxid_overflow;                        /**< Indicates if snapshot overflowed and subxids are missing. */
-    transaction_id next_xid;                     /**< Next transaction ID from TransamVariables->next_xid. */
-    transaction_id oldest_running_xid;           /**< Oldest running transaction ID (not oldestXmin). */
-    transaction_id latest_completed_xid;         /**< Latest completed transaction ID to set xmax. */
-    transaction_id xids[FLEXIBLE_ARRAY_MEMBER];  /**< Array of transaction IDs. */
+struct xl_running_xacts
+{
+   int xcnt;                                     /**< Number of transaction IDs in xids[]. */
+   int subxcnt;                                  /**< Number of subtransaction IDs in xids[]. */
+   bool subxid_overflow;                         /**< Indicates if snapshot overflowed and subxids are missing. */
+   transaction_id next_xid;                      /**< Next transaction ID from TransamVariables->next_xid. */
+   transaction_id oldest_running_xid;            /**< Oldest running transaction ID (not oldestXmin). */
+   transaction_id latest_completed_xid;          /**< Latest completed transaction ID to set xmax. */
+   transaction_id xids[FLEXIBLE_ARRAY_MEMBER];   /**< Array of transaction IDs. */
 };
 
 /**
@@ -94,12 +96,13 @@ struct xl_running_xacts {
  * including the database and tablespace IDs, and whether
  * to invalidate relcache init files.
  */
-struct xl_invalidations {
-    oid dbId;                                                       /**< Database ID. */
-    oid tsId;                                                       /**< Tablespace ID. */
-    bool relcacheInitFileInval;                                     /**< Indicates if relcache init files should be invalidated. */
-    int nmsgs;                                                      /**< Number of shared invalidation messages. */
-    union shared_invalidation_message msgs[FLEXIBLE_ARRAY_MEMBER];  /**< Array of invalidation messages. */
+struct xl_invalidations
+{
+   oid dbId;                                                        /**< Database ID. */
+   oid tsId;                                                        /**< Tablespace ID. */
+   bool relcacheInitFileInval;                                      /**< Indicates if relcache init files should be invalidated. */
+   int nmsgs;                                                       /**< Number of shared invalidation messages. */
+   union shared_invalidation_message msgs[FLEXIBLE_ARRAY_MEMBER];   /**< Array of invalidation messages. */
 };
 
 /**

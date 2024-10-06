@@ -56,14 +56,14 @@
  */
 struct xl_parameter_change
 {
-    int max_connections;             /**< Maximum number of connections */
-    int max_worker_processes;        /**< Maximum number of worker processes */
-    int max_wal_senders;             /**< Maximum number of WAL senders */
-    int max_prepared_xacts;          /**< Maximum number of prepared transactions */
-    int max_locks_per_xact;          /**< Maximum number of locks per transaction */
-    int wal_level;                   /**< WAL level */
-    bool wal_log_hints;              /**< WAL log hints */
-    bool track_commit_timestamp;     /**< Track commit timestamp */
+   int max_connections;              /**< Maximum number of connections */
+   int max_worker_processes;         /**< Maximum number of worker processes */
+   int max_wal_senders;              /**< Maximum number of WAL senders */
+   int max_prepared_xacts;           /**< Maximum number of prepared transactions */
+   int max_locks_per_xact;           /**< Maximum number of locks per transaction */
+   int wal_level;                    /**< WAL level */
+   bool wal_log_hints;               /**< WAL log hints */
+   bool track_commit_timestamp;      /**< Track commit timestamp */
 };
 
 /**
@@ -76,8 +76,8 @@ struct xl_parameter_change
  */
 struct xl_restore_point
 {
-    timestamp_tz rp_time;               /**< Restore point timestamp */
-    char rp_name[MAXFNAMELEN];          /**< Restore point name */
+   timestamp_tz rp_time;                /**< Restore point timestamp */
+   char rp_name[MAXFNAMELEN];           /**< Restore point name */
 };
 
 /**
@@ -90,8 +90,8 @@ struct xl_restore_point
  */
 struct xl_overwrite_contrecord
 {
-    xlog_rec_ptr overwritten_lsn;       /**< Overwritten Log Sequence Number (LSN) */
-    timestamp_tz overwrite_time;        /**< Time of overwrite */
+   xlog_rec_ptr overwritten_lsn;        /**< Overwritten Log Sequence Number (LSN) */
+   timestamp_tz overwrite_time;         /**< Time of overwrite */
 };
 
 /**
@@ -106,10 +106,10 @@ struct xl_overwrite_contrecord
  */
 struct xl_end_of_recovery_v17
 {
-    timestamp_tz end_time;               /**< End time of recovery */
-    timeline_id this_timeline_id;        /**< New timeline ID */
-    timeline_id prev_timeline_id;        /**< Previous timeline ID */
-    int wal_level;                       /**< WAL level */
+   timestamp_tz end_time;                /**< End time of recovery */
+   timeline_id this_timeline_id;         /**< New timeline ID */
+   timeline_id prev_timeline_id;         /**< Previous timeline ID */
+   int wal_level;                        /**< WAL level */
 };
 
 /**
@@ -123,9 +123,9 @@ struct xl_end_of_recovery_v17
  */
 struct xl_end_of_recovery_v16
 {
-    timestamp_tz end_time;               /**< End time of recovery */
-    timeline_id this_timeline_id;        /**< New timeline ID */
-    timeline_id prev_timeline_id;        /**< Previous timeline ID */
+   timestamp_tz end_time;                /**< End time of recovery */
+   timeline_id this_timeline_id;         /**< New timeline ID */
+   timeline_id prev_timeline_id;         /**< Previous timeline ID */
 };
 
 /**
@@ -139,12 +139,13 @@ struct xl_end_of_recovery_v16
  */
 struct xl_end_of_recovery
 {
-    void (*parse)(struct xl_end_of_recovery* wrapper, const void* rec);    /**< Function pointer to parse the record */
-    char* (*format)(struct xl_end_of_recovery* wrapper, char* buf);        /**< Function pointer to format the record */
-    union {
-        struct xl_end_of_recovery_v17 v17;                                 /**< End of recovery data for version 17 */
-        struct xl_end_of_recovery_v16 v16;                                 /**< End of recovery data for version 16 */
-    } data;                                                                /**< Version-specific recovery log data */
+   void (*parse)(struct xl_end_of_recovery* wrapper, const void* rec);     /**< Function pointer to parse the record */
+   char* (*format)(struct xl_end_of_recovery* wrapper, char* buf);         /**< Function pointer to format the record */
+   union
+   {
+      struct xl_end_of_recovery_v17 v17;                                   /**< End of recovery data for version 17 */
+      struct xl_end_of_recovery_v16 v16;                                   /**< End of recovery data for version 16 */
+   } data;                                                                 /**< Version-specific recovery log data */
 };
 
 /**
@@ -156,10 +157,11 @@ struct xl_end_of_recovery
  * - val: Value of the configuration entry.
  * - hidden: Indicates if the entry is hidden.
  */
-struct config_enum_entry {
-    const char* name;      /**< Name of the configuration entry */
-    int val;               /**< Value of the configuration entry */
-    bool hidden;           /**< Indicates if the entry is hidden */
+struct config_enum_entry
+{
+   const char* name;       /**< Name of the configuration entry */
+   int val;                /**< Value of the configuration entry */
+   bool hidden;            /**< Indicates if the entry is hidden */
 };
 
 /**

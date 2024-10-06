@@ -35,7 +35,6 @@ extern "C" {
 
 #include <stdint.h>
 
-
 typedef uint32_t block_number;
 typedef uint16_t offset_number;
 typedef struct block_id_data* block_id;
@@ -128,8 +127,8 @@ typedef struct block_id_data* block_id;
  */
 struct block_id_data
 {
-    uint16_t bi_hi;  /**< High part of the block identifier. */
-    uint16_t bi_lo;  /**< Low part of the block identifier. */
+   uint16_t bi_hi;   /**< High part of the block identifier. */
+   uint16_t bi_lo;   /**< Low part of the block identifier. */
 };
 
 /**
@@ -141,8 +140,8 @@ struct block_id_data
  */
 struct item_pointer_data
 {
-    struct block_id_data ip_blkid;  /**< Block identifier. */
-    offset_number ip_posid;         /**< Offset within the block. */
+   struct block_id_data ip_blkid;   /**< Block identifier. */
+   offset_number ip_posid;          /**< Offset within the block. */
 };
 
 #ifdef __cplusplus

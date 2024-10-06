@@ -56,8 +56,9 @@ typedef uint32_t multi_xact_offset;
  * Fields:
  * - value: The full 64-bit transaction ID value.
  */
-struct full_transaction_id {
-    uint64_t value;  /**< The full 64-bit transaction ID value */
+struct full_transaction_id
+{
+   uint64_t value;   /**< The full 64-bit transaction ID value */
 };
 
 #ifdef __cplusplus

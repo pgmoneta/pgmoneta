@@ -53,10 +53,10 @@ typedef xlog_rec_ptr gist_nsn;
  */
 struct gist_xlog_page_update
 {
-    uint16_t ntodelete;   /**< Number of deleted offsets. */
-    uint16_t ntoinsert;   /**< Number of tuples to insert. */
+   uint16_t ntodelete;    /**< Number of deleted offsets. */
+   uint16_t ntoinsert;    /**< Number of tuples to insert. */
 
-    /* In payload of blk 0: 1. todelete OffsetNumbers, 2. tuples to insert */
+   /* In payload of blk 0: 1. todelete OffsetNumbers, 2. tuples to insert */
 };
 
 /**
@@ -73,12 +73,12 @@ struct gist_xlog_page_update
  */
 struct gist_xlog_delete_v15
 {
-    transaction_id latestRemovedXid;     /**< ID of the latest removed transaction */
-    uint16_t ntodelete;                  /**< Number of offsets to delete */
+   transaction_id latestRemovedXid;      /**< ID of the latest removed transaction */
+   uint16_t ntodelete;                   /**< Number of offsets to delete */
 
-    /*
-     * The offsets to delete will be included in the payload of block 0
-     */
+   /*
+    * The offsets to delete will be included in the payload of block 0
+    */
 };
 
 /**
@@ -102,11 +102,11 @@ struct gist_xlog_delete_v15
  */
 struct gist_xlog_delete_v16
 {
-    transaction_id snapshotConflictHorizon;        /**< Horizon for conflict handling in snapshot */
-    uint16_t ntodelete;                            /**< Number of offsets to delete */
-    uint8_t is_catalog_rel;                        /**< Boolean to handle recovery conflict during logical decoding on standby */
+   transaction_id snapshotConflictHorizon;         /**< Horizon for conflict handling in snapshot */
+   uint16_t ntodelete;                             /**< Number of offsets to delete */
+   uint8_t is_catalog_rel;                         /**< Boolean to handle recovery conflict during logical decoding on standby */
 
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];  /**< Array of offset numbers to delete */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];   /**< Array of offset numbers to delete */
 };
 
 /**
@@ -117,14 +117,14 @@ struct gist_xlog_delete_v16
  */
 struct gist_xlog_delete
 {
-    void (*parse)(struct gist_xlog_delete* wrapper, const void* rec);    /**< Parsing function pointer */
-    char* (*format)(struct gist_xlog_delete* wrapper, char* buf);        /**< Formatting function pointer */
-    union {
-        struct gist_xlog_delete_v15 v15;                                 /**< Version 15 structure */
-        struct gist_xlog_delete_v16 v16;                                 /**< Version 16 structure */
-    } data;                                                              /**< Version-specific delete record data */
+   void (*parse)(struct gist_xlog_delete* wrapper, const void* rec);     /**< Parsing function pointer */
+   char* (*format)(struct gist_xlog_delete* wrapper, char* buf);         /**< Formatting function pointer */
+   union
+   {
+      struct gist_xlog_delete_v15 v15;                                   /**< Version 15 structure */
+      struct gist_xlog_delete_v16 v16;                                   /**< Version 16 structure */
+   } data;                                                               /**< Version-specific delete record data */
 };
-
 
 /**
  * @struct gist_xlog_page_split
@@ -142,13 +142,13 @@ struct gist_xlog_delete
  */
 struct gist_xlog_page_split
 {
-    block_number origrlink;          /**< Right link of the page before split. */
-    gist_nsn orignsn;                /**< NSN of the page before split. */
-    bool origleaf;                   /**< Was the split page a leaf page? */
-    uint16_t npage;                  /**< Number of pages in the split. */
-    bool markfollowright;            /**< Set F_FOLLOW_RIGHT flags. */
+   block_number origrlink;           /**< Right link of the page before split. */
+   gist_nsn orignsn;                 /**< NSN of the page before split. */
+   bool origleaf;                    /**< Was the split page a leaf page? */
+   uint16_t npage;                   /**< Number of pages in the split. */
+   bool markfollowright;             /**< Set F_FOLLOW_RIGHT flags. */
 
-    /* Follow: 1. gistxlogPage and array of IndexTupleData per page */
+   /* Follow: 1. gistxlogPage and array of IndexTupleData per page */
 };
 
 /**
@@ -163,8 +163,8 @@ struct gist_xlog_page_split
  */
 struct gist_xlog_page_delete
 {
-    struct full_transaction_id deleteXid;        /**< Last Xid which could see page in scan. */
-    offset_number downlinkOffset;                /**< Offset of downlink referencing this page. */
+   struct full_transaction_id deleteXid;         /**< Last Xid which could see page in scan. */
+   offset_number downlinkOffset;                 /**< Offset of downlink referencing this page. */
 };
 
 #define SIZE_OF_GISTXLOG_PAGE_DELETE (offsetof(struct gist_xlog_page_delete, downlinkOffset) + sizeof(OffsetNumber))
@@ -182,9 +182,9 @@ struct gist_xlog_page_delete
  */
 struct gist_xlog_page_reuse_v15
 {
-    struct rel_file_node node;                       /**< RelFileNode for the page. */
-    block_number block;                              /**< Block number being reused. */
-    struct full_transaction_id latestRemovedFullXid; /**< Latest removed full transaction ID. */
+   struct rel_file_node node;                        /**< RelFileNode for the page. */
+   block_number block;                               /**< Block number being reused. */
+   struct full_transaction_id latestRemovedFullXid;  /**< Latest removed full transaction ID. */
 };
 
 /**
@@ -201,11 +201,12 @@ struct gist_xlog_page_reuse_v15
  * - is_catalog_rel: A flag indicating whether the operation involves a catalog relation,
  *                 to handle recovery conflict during logical decoding on standby.
  */
-struct gist_xlog_page_reuse_v16 {
-    struct rel_file_locator locator;                         /**< RelFileLocator for the page. */
-    block_number block;                                      /**< Block number being reused. */
-    struct full_transaction_id snapshot_conflict_horizon;    /**< Horizon for conflict handling in snapshot */
-    bool is_catalog_rel;                                     /**< Boolean to handle recovery conflict during logical decoding on standby */
+struct gist_xlog_page_reuse_v16
+{
+   struct rel_file_locator locator;                          /**< RelFileLocator for the page. */
+   block_number block;                                       /**< Block number being reused. */
+   struct full_transaction_id snapshot_conflict_horizon;     /**< Horizon for conflict handling in snapshot */
+   bool is_catalog_rel;                                      /**< Boolean to handle recovery conflict during logical decoding on standby */
 };
 
 /**
@@ -214,15 +215,16 @@ struct gist_xlog_page_reuse_v16 {
  *
  * Contains version-specific page reuse record data and function pointers for parsing and formatting.
  */
-struct gist_xlog_page_reuse {
-    void (*parse)(struct gist_xlog_page_reuse* wrapper, const void* rec); /**< Parsing function pointer */
-    char* (*format)(struct gist_xlog_page_reuse* wrapper, char* buf);     /**< Formatting function pointer */
-    union {
-        struct gist_xlog_page_reuse_v15 v15;                              /**< Version 15 structure */
-        struct gist_xlog_page_reuse_v16 v16;                              /**< Version 16 structure */
-    } data;                                                               /**< Version-specific page reuse record data */
+struct gist_xlog_page_reuse
+{
+   void (*parse)(struct gist_xlog_page_reuse* wrapper, const void* rec);  /**< Parsing function pointer */
+   char* (*format)(struct gist_xlog_page_reuse* wrapper, char* buf);      /**< Formatting function pointer */
+   union
+   {
+      struct gist_xlog_page_reuse_v15 v15;                                /**< Version 15 structure */
+      struct gist_xlog_page_reuse_v16 v16;                                /**< Version 16 structure */
+   } data;                                                                /**< Version-specific page reuse record data */
 };
-
 
 /**
  * @brief Creates a new gist_xlog_delete structure.

@@ -41,9 +41,10 @@
  *
  * Contains the tablespace ID and the path to the tablespace.
  */
-struct xl_tblspc_create_rec {
-    oid ts_id;                            /**< ID of the tablespace. */
-    char ts_path[FLEXIBLE_ARRAY_MEMBER];  /**< Null-terminated string containing the path to the tablespace. */
+struct xl_tblspc_create_rec
+{
+   oid ts_id;                             /**< ID of the tablespace. */
+   char ts_path[FLEXIBLE_ARRAY_MEMBER];   /**< Null-terminated string containing the path to the tablespace. */
 };
 
 /**
@@ -52,8 +53,9 @@ struct xl_tblspc_create_rec {
  *
  * Contains the ID of the tablespace being dropped.
  */
-struct xl_tblspc_drop_rec {
-    oid ts_id;                            /**< ID of the tablespace being dropped. */
+struct xl_tblspc_drop_rec
+{
+   oid ts_id;                             /**< ID of the tablespace being dropped. */
 };
 
 /**
@@ -67,4 +69,3 @@ char*
 pgmoneta_wal_tablespace_desc(char* buf, struct decoded_xlog_record* record);
 
 #endif /* PGMONETA_RM_TABLESPACE_H */
-

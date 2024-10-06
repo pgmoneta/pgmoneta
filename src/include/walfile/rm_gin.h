@@ -62,8 +62,6 @@ extern "C" {
 #define GIN_SEGMENT_REPLACE             3  /**< A segment is replaced */
 #define GIN_SEGMENT_ADDITEMS            4  /**< Items are added to existing segment */
 
-
-
 #define SIZE_OF_GIN_POSTING_LIST(plist) \
         (offsetof(struct gin_posting_list, bytes) + SHORTALIGN((plist)->nbytes))
 
@@ -77,8 +75,8 @@ extern "C" {
  */
 struct index_tuple_data
 {
-    struct item_pointer_data t_tid;   /**< Reference TID to heap tuple */
-    unsigned short t_info;            /**< Various info about tuple */
+   struct item_pointer_data t_tid;    /**< Reference TID to heap tuple */
+   unsigned short t_info;             /**< Various info about tuple */
 };                                   /* MORE DATA FOLLOWS AT END OF STRUCT */
 
 /**
@@ -91,8 +89,8 @@ struct index_tuple_data
  */
 struct posting_item
 {
-    struct block_id_data child_blkno;   /**< Block ID for the child node */
-    struct item_pointer_data key;       /**< Key associated with this posting item */
+   struct block_id_data child_blkno;    /**< Block ID for the child node */
+   struct item_pointer_data key;        /**< Key associated with this posting item */
 };
 
 /**
@@ -104,7 +102,7 @@ struct posting_item
  */
 struct gin_xlog_create_posting_tree
 {
-    uint32_t size;   /**< Size of the posting list that follows */
+   uint32_t size;    /**< Size of the posting list that follows */
 };
 
 /**
@@ -116,7 +114,7 @@ struct gin_xlog_create_posting_tree
  */
 struct gin_xlog_insert
 {
-    uint16_t flags;   /**< GIN_INSERT_ISLEAF and/or GIN_INSERT_ISDATA flags */
+   uint16_t flags;    /**< GIN_INSERT_ISLEAF and/or GIN_INSERT_ISDATA flags */
 };
 
 /**
@@ -130,9 +128,9 @@ struct gin_xlog_insert
  */
 struct gin_xlog_insert_entry
 {
-    offset_number offset;                 /**< Offset number for the entry */
-    bool isDelete;                        /**< Flag indicating if the entry is a deletion */
-    struct index_tuple_data tuple;        /**< Index tuple data (variable length) */
+   offset_number offset;                  /**< Offset number for the entry */
+   bool isDelete;                         /**< Flag indicating if the entry is a deletion */
+   struct index_tuple_data tuple;         /**< Index tuple data (variable length) */
 };
 
 /**
@@ -144,7 +142,7 @@ struct gin_xlog_insert_entry
  */
 struct gin_xlog_recompress_data_leaf
 {
-    uint16_t nactions;   /**< Number of actions in the recompression */
+   uint16_t nactions;    /**< Number of actions in the recompression */
 };
 
 /**
@@ -157,8 +155,8 @@ struct gin_xlog_recompress_data_leaf
  */
 struct gin_xlog_insert_data_internal
 {
-    offset_number offset;                /**< Offset number for the new item */
-    struct posting_item newitem;         /**< New posting item to be inserted */
+   offset_number offset;                 /**< Offset number for the new item */
+   struct posting_item newitem;          /**< New posting item to be inserted */
 };
 
 /**
@@ -174,11 +172,11 @@ struct gin_xlog_insert_data_internal
  */
 struct gin_xlog_split
 {
-    struct rel_file_node node;          /**< The rel file node of the GIN index */
-    block_number rrlink;                /**< Right link or root's block number if root split */
-    block_number leftChildBlkno;        /**< Block number of the left child (non-leaf split) */
-    block_number rightChildBlkno;       /**< Block number of the right child (non-leaf split) */
-    uint16_t flags;                     /**< Flags associated with the split */
+   struct rel_file_node node;           /**< The rel file node of the GIN index */
+   block_number rrlink;                 /**< Right link or root's block number if root split */
+   block_number leftChildBlkno;         /**< Block number of the left child (non-leaf split) */
+   block_number rightChildBlkno;        /**< Block number of the right child (non-leaf split) */
+   uint16_t flags;                      /**< Flags associated with the split */
 };
 
 /**
@@ -190,7 +188,7 @@ struct gin_xlog_split
  */
 struct gin_xlog_vacuum_data_leaf_page
 {
-    struct gin_xlog_recompress_data_leaf data;   /**< Recompressed data leaf information */
+   struct gin_xlog_recompress_data_leaf data;    /**< Recompressed data leaf information */
 };
 
 /**
@@ -204,9 +202,9 @@ struct gin_xlog_vacuum_data_leaf_page
  */
 struct gin_xlog_delete_page
 {
-    offset_number parentOffset;     /**< Offset of the parent page */
-    block_number rightLink;         /**< Right link to the next page */
-    transaction_id deleteXid;       /**< Last Xid which could see this page in scan */
+   offset_number parentOffset;      /**< Offset of the parent page */
+   block_number rightLink;          /**< Right link to the next page */
+   transaction_id deleteXid;        /**< Last Xid which could see this page in scan */
 };
 
 /**
@@ -227,16 +225,16 @@ struct gin_xlog_delete_page
  */
 struct gin_meta_page_data
 {
-    block_number head;               /**< Head of the pending list */
-    block_number tail;               /**< Tail of the pending list */
-    uint32_t tailFreeSize;           /**< Free space in bytes in the tail page */
-    block_number nPendingPages;      /**< Number of pages in the pending list */
-    int64_t nPendingHeapTuples;      /**< Number of heap tuples in the pending list */
-    block_number nTotalPages;        /**< Total number of pages in the index */
-    block_number nEntryPages;        /**< Number of entry pages in the index */
-    block_number nDataPages;         /**< Number of data pages in the index */
-    int64_t nEntries;                /**< Number of entries in the index */
-    int32_t ginVersion;              /**< Version number of the GIN index */
+   block_number head;                /**< Head of the pending list */
+   block_number tail;                /**< Tail of the pending list */
+   uint32_t tailFreeSize;            /**< Free space in bytes in the tail page */
+   block_number nPendingPages;       /**< Number of pages in the pending list */
+   int64_t nPendingHeapTuples;       /**< Number of heap tuples in the pending list */
+   block_number nTotalPages;         /**< Total number of pages in the index */
+   block_number nEntryPages;         /**< Number of entry pages in the index */
+   block_number nDataPages;          /**< Number of data pages in the index */
+   int64_t nEntries;                 /**< Number of entries in the index */
+   int32_t ginVersion;               /**< Version number of the GIN index */
 };
 
 /**
@@ -252,11 +250,11 @@ struct gin_meta_page_data
  */
 struct gin_xlog_update_meta
 {
-    struct rel_file_node node;            /**< The rel file node of the GIN index */
-    struct gin_meta_page_data metadata;   /**< Updated metadata for the GIN index */
-    block_number prevTail;                /**< Previous tail of the pending list */
-    block_number newRightlink;            /**< New right link for the list page */
-    int32_t ntuples;                      /**< Number of tuples inserted or updated */
+   struct rel_file_node node;             /**< The rel file node of the GIN index */
+   struct gin_meta_page_data metadata;    /**< Updated metadata for the GIN index */
+   block_number prevTail;                 /**< Previous tail of the pending list */
+   block_number newRightlink;             /**< New right link for the list page */
+   int32_t ntuples;                       /**< Number of tuples inserted or updated */
 };
 
 /**
@@ -269,8 +267,8 @@ struct gin_xlog_update_meta
  */
 struct gin_xlog_insert_list_page
 {
-    block_number rightlink;     /**< Right link to the next page */
-    int32_t ntuples;            /**< Number of tuples inserted */
+   block_number rightlink;      /**< Right link to the next page */
+   int32_t ntuples;             /**< Number of tuples inserted */
 };
 
 /**
@@ -283,8 +281,8 @@ struct gin_xlog_insert_list_page
  */
 struct gin_xlog_delete_list_pages
 {
-    struct gin_meta_page_data metadata;   /**< Metadata after deletion */
-    int32_t ndeleted;                     /**< Number of pages deleted */
+   struct gin_meta_page_data metadata;    /**< Metadata after deletion */
+   int32_t ndeleted;                      /**< Number of pages deleted */
 };
 
 /**
@@ -298,9 +296,9 @@ struct gin_xlog_delete_list_pages
  */
 struct gin_posting_list
 {
-    struct item_pointer_data first;   /**< First item in the posting list (unpacked) */
-    uint16_t nbytes;                  /**< Number of bytes in the posting list */
-    unsigned char bytes[FLEXIBLE_ARRAY_MEMBER];   /**< Varbyte encoded items */
+   struct item_pointer_data first;    /**< First item in the posting list (unpacked) */
+   uint16_t nbytes;                   /**< Number of bytes in the posting list */
+   unsigned char bytes[FLEXIBLE_ARRAY_MEMBER];    /**< Varbyte encoded items */
 };
 
 /**

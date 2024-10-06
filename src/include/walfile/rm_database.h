@@ -53,11 +53,12 @@ extern "C" {
  * - src_db_id: Identifier for the source database.
  * - src_tablespace_id: Identifier for the source tablespace.
  */
-struct xl_dbase_create_rec {
-    oid db_id;                /**< Database ID */
-    oid tablespace_id;        /**< Tablespace ID */
-    oid src_db_id;            /**< Source Database ID */
-    oid src_tablespace_id;    /**< Source Tablespace ID */
+struct xl_dbase_create_rec
+{
+   oid db_id;                 /**< Database ID */
+   oid tablespace_id;         /**< Tablespace ID */
+   oid src_db_id;             /**< Source Database ID */
+   oid src_tablespace_id;     /**< Source Tablespace ID */
 };
 
 /**
@@ -69,10 +70,11 @@ struct xl_dbase_create_rec {
  * - ntablespaces: Number of tablespace IDs associated with the database.
  * - tablespace_ids: Array of tablespace IDs.
  */
-struct xl_dbase_drop_rec {
-    oid db_id;                         /**< Database ID */
-    int ntablespaces;                  /**< Number of tablespace IDs */
-    oid tablespace_ids[FLEXIBLE_ARRAY_MEMBER];  /**< Array of tablespace IDs */
+struct xl_dbase_drop_rec
+{
+   oid db_id;                          /**< Database ID */
+   int ntablespaces;                   /**< Number of tablespace IDs */
+   oid tablespace_ids[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tablespace IDs */
 };
 
 // Functions

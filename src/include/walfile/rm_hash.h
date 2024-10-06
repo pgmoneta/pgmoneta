@@ -38,7 +38,6 @@ extern "C" {
 
 typedef oid reg_procedure;
 
-
 /* XLOG records for hash operations */
 #define XLOG_HASH_INIT_META_PAGE               0x00  /**< Initialize the meta page. */
 #define XLOG_HASH_INIT_BITMAP_PAGE             0x10  /**< Initialize the bitmap page. */
@@ -65,7 +64,7 @@ typedef oid reg_procedure;
  */
 struct xl_hash_insert
 {
-    offset_number offnum;  /**< Offset where the tuple is inserted. */
+   offset_number offnum;   /**< Offset where the tuple is inserted. */
 };
 
 /**
@@ -76,8 +75,8 @@ struct xl_hash_insert
  */
 struct xl_hash_add_ovfl_page
 {
-    uint16_t bmsize;        /**< Size of the bitmap. */
-    bool bmpage_found;      /**< Indicates if a bitmap page was found. */
+   uint16_t bmsize;         /**< Size of the bitmap. */
+   bool bmpage_found;       /**< Indicates if a bitmap page was found. */
 };
 
 /**
@@ -88,10 +87,10 @@ struct xl_hash_add_ovfl_page
  */
 struct xl_hash_split_allocate_page
 {
-    uint32_t new_bucket;        /**< New bucket number. */
-    uint16_t old_bucket_flag;   /**< Flag for the old bucket. */
-    uint16_t new_bucket_flag;   /**< Flag for the new bucket. */
-    uint8_t flags;              /**< Additional flags for the split operation. */
+   uint32_t new_bucket;         /**< New bucket number. */
+   uint16_t old_bucket_flag;    /**< Flag for the old bucket. */
+   uint16_t new_bucket_flag;    /**< Flag for the new bucket. */
+   uint8_t flags;               /**< Additional flags for the split operation. */
 };
 
 /**
@@ -102,8 +101,8 @@ struct xl_hash_split_allocate_page
  */
 struct xl_hash_split_complete
 {
-    uint16_t old_bucket_flag;  /**< Flag for the old bucket. */
-    uint16_t new_bucket_flag;  /**< Flag for the new bucket. */
+   uint16_t old_bucket_flag;   /**< Flag for the old bucket. */
+   uint16_t new_bucket_flag;   /**< Flag for the new bucket. */
 };
 
 /**
@@ -114,8 +113,8 @@ struct xl_hash_split_complete
  */
 struct xl_hash_move_page_contents
 {
-    uint16_t ntups;                    /**< Number of tuples moved. */
-    bool is_prim_bucket_same_wrt;      /**< Indicates if the primary bucket page is the same as the page to which tuples are moved. */
+   uint16_t ntups;                     /**< Number of tuples moved. */
+   bool is_prim_bucket_same_wrt;       /**< Indicates if the primary bucket page is the same as the page to which tuples are moved. */
 };
 
 /**
@@ -126,11 +125,11 @@ struct xl_hash_move_page_contents
  */
 struct xl_hash_squeeze_page
 {
-    block_number prevblkno;             /**< Block number of the previous page. */
-    block_number nextblkno;             /**< Block number of the next page.     */
-    uint16_t ntups;                     /**< Number of tuples moved.            */
-    bool is_prim_bucket_same_wrt;       /**< Indicates if the primary bucket page is the same as the page to which tuples are moved. */
-    bool is_prev_bucket_same_wrt;       /**< Indicates if the previous page is the same as the page to which tuples are moved. */
+   block_number prevblkno;              /**< Block number of the previous page. */
+   block_number nextblkno;              /**< Block number of the next page.     */
+   uint16_t ntups;                      /**< Number of tuples moved.            */
+   bool is_prim_bucket_same_wrt;        /**< Indicates if the primary bucket page is the same as the page to which tuples are moved. */
+   bool is_prev_bucket_same_wrt;        /**< Indicates if the previous page is the same as the page to which tuples are moved. */
 };
 
 /**
@@ -141,8 +140,8 @@ struct xl_hash_squeeze_page
  */
 struct xl_hash_delete
 {
-    bool clear_dead_marking;      /**< Indicates if the LH_PAGE_HAS_DEAD_TUPLES flag is cleared. */
-    bool is_primary_bucket_page;  /**< Indicates if the operation is for the primary bucket page. */
+   bool clear_dead_marking;       /**< Indicates if the LH_PAGE_HAS_DEAD_TUPLES flag is cleared. */
+   bool is_primary_bucket_page;   /**< Indicates if the operation is for the primary bucket page. */
 };
 
 /**
@@ -153,7 +152,7 @@ struct xl_hash_delete
  */
 struct xl_hash_update_meta_page
 {
-    double ntuples;  /**< Number of tuples in the meta page. */
+   double ntuples;   /**< Number of tuples in the meta page. */
 };
 
 /**
@@ -164,9 +163,9 @@ struct xl_hash_update_meta_page
  */
 struct xl_hash_init_meta_page
 {
-    double num_tuples;         /**< Initial number of tuples. */
-    reg_procedure procid;      /**< Procedure ID. */
-    uint16_t ffactor;          /**< Fill factor. */
+   double num_tuples;          /**< Initial number of tuples. */
+   reg_procedure procid;       /**< Procedure ID. */
+   uint16_t ffactor;           /**< Fill factor. */
 };
 
 /**
@@ -177,7 +176,7 @@ struct xl_hash_init_meta_page
  */
 struct xl_hash_init_bitmap_page
 {
-    uint16_t bmsize;  /**< Size of the bitmap. */
+   uint16_t bmsize;   /**< Size of the bitmap. */
 };
 
 /**
@@ -188,9 +187,9 @@ struct xl_hash_init_bitmap_page
  */
 struct xl_hash_vacuum_one_page_v15
 {
-    transaction_id latestRemovedXid;   /**< Latest removed transaction ID. */
-    int ntuples;                       /**< Number of tuples to vacuum. */
-    /* TARGET OFFSET NUMBERS FOLLOW AT THE END */
+   transaction_id latestRemovedXid;    /**< Latest removed transaction ID. */
+   int ntuples;                        /**< Number of tuples to vacuum. */
+   /* TARGET OFFSET NUMBERS FOLLOW AT THE END */
 };
 
 /**
@@ -201,11 +200,11 @@ struct xl_hash_vacuum_one_page_v15
  */
 struct xl_hash_vacuum_one_page_v16
 {
-    transaction_id snaphost_conflict_horizon;         /**< Snapshot conflict horizon. */
-    uint16_t ntuples;                                 /**< Number of tuples to vacuum. */
-    bool is_catalog_rel;                              /**< Indicates if the relation is a catalog relation. */
-    /* TARGET OFFSET NUMBERS */
-    offset_number offsets[FLEXIBLE_ARRAY_MEMBER];     /**< Array of target offset numbers. */
+   transaction_id snaphost_conflict_horizon;          /**< Snapshot conflict horizon. */
+   uint16_t ntuples;                                  /**< Number of tuples to vacuum. */
+   bool is_catalog_rel;                               /**< Indicates if the relation is a catalog relation. */
+   /* TARGET OFFSET NUMBERS */
+   offset_number offsets[FLEXIBLE_ARRAY_MEMBER];      /**< Array of target offset numbers. */
 };
 
 /**
@@ -214,12 +213,13 @@ struct xl_hash_vacuum_one_page_v16
  */
 struct xl_hash_vacuum_one_page
 {
-    void (*parse)(struct xl_hash_vacuum_one_page* wrapper, const void* rec);  /**< Function pointer to parse the record */
-    char* (*format)(struct xl_hash_vacuum_one_page* wrapper, char* buf);      /**< Function pointer to format the record */
-    union {
-        struct xl_hash_vacuum_one_page_v15 v15;                               /**< Version 15 */
-        struct xl_hash_vacuum_one_page_v16 v16;                               /**< Version 16 */
-    } data;                                                                   /**< Version-specific data. */
+   void (*parse)(struct xl_hash_vacuum_one_page* wrapper, const void* rec);   /**< Function pointer to parse the record */
+   char* (*format)(struct xl_hash_vacuum_one_page* wrapper, char* buf);       /**< Function pointer to format the record */
+   union
+   {
+      struct xl_hash_vacuum_one_page_v15 v15;                                 /**< Version 15 */
+      struct xl_hash_vacuum_one_page_v16 v16;                                 /**< Version 16 */
+   } data;                                                                    /**< Version-specific data. */
 };
 
 /**

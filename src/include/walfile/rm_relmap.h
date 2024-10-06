@@ -46,10 +46,10 @@ extern "C" {
  */
 struct xl_relmap_update
 {
-    oid db_id;                         /**< Database ID, or 0 for shared map. */
-    oid ts_id;                         /**< Database's tablespace ID, or pg_global. */
-    int32_t nbytes;                    /**< Size of the relation map data. */
-    char data[FLEXIBLE_ARRAY_MEMBER];  /**< Relation map data. */
+   oid db_id;                          /**< Database ID, or 0 for shared map. */
+   oid ts_id;                          /**< Database's tablespace ID, or pg_global. */
+   int32_t nbytes;                     /**< Size of the relation map data. */
+   char data[FLEXIBLE_ARRAY_MEMBER];   /**< Relation map data. */
 };
 
 /**

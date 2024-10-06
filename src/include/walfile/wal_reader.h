@@ -112,7 +112,6 @@ typedef oid rel_file_number;
 #define XLOG_REC_GET_ORIGIN(record) (record->record_origin)
 #define XLOG_REC_GET_DATA_LEN(record) (record->main_data_len)
 
-
 /* Enums */
 
 /**
@@ -123,17 +122,17 @@ typedef oid rel_file_number;
  */
 enum fork_number
 {
-    InvalidForkNumber = -1,    /**< Invalid fork number. */
-    MAIN_FORKNUM = 0,          /**< Main fork. */
-    FSM_FORKNUM,               /**< Free space map fork. */
-    VISIBILITYMAP_FORKNUM,     /**< Visibility map fork. */
-    INIT_FORKNUM,              /**< Initialization fork. */
+   InvalidForkNumber = -1,     /**< Invalid fork number. */
+   MAIN_FORKNUM = 0,           /**< Main fork. */
+   FSM_FORKNUM,                /**< Free space map fork. */
+   VISIBILITYMAP_FORKNUM,      /**< Visibility map fork. */
+   INIT_FORKNUM,               /**< Initialization fork. */
 
-    /*
-     * NOTE: if you add a new fork, change MAX_FORKNUM and possibly
-     * FORKNAMECHARS below, and update the forkNames array in
-     * src/common/relpath.c
-     */
+   /*
+    * NOTE: if you add a new fork, change MAX_FORKNUM and possibly
+    * FORKNAMECHARS below, and update the forkNames array in
+    * src/common/relpath.c
+    */
 };
 
 /**
@@ -144,9 +143,9 @@ enum fork_number
  */
 enum wal_level
 {
-    WAL_LEVEL_MINIMAL = 0,    /**< Minimal WAL logging. */
-    WAL_LEVEL_REPLICA,        /**< WAL logging for replication. */
-    WAL_LEVEL_LOGICAL         /**< Logical WAL logging. */
+   WAL_LEVEL_MINIMAL = 0,     /**< Minimal WAL logging. */
+   WAL_LEVEL_REPLICA,         /**< WAL logging for replication. */
+   WAL_LEVEL_LOGICAL          /**< Logical WAL logging. */
 };
 
 /* Structs */
@@ -165,12 +164,13 @@ enum wal_level
  * - xlp_pageaddr: XLOG address of this page.
  * - xlp_rem_len: Remaining length of data for the record.
  */
-struct xlog_page_header_data {
-    uint16_t xlp_magic;         /**< Magic value for correctness checks. */
-    uint16_t xlp_info;          /**< Flag bits for the page. */
-    timeline_id xlp_tli;        /**< Timeline ID of the first record on the page. */
-    xlog_rec_ptr xlp_pageaddr;  /**< XLOG address of this page. */
-    uint32_t xlp_rem_len;       /**< Remaining length of data for the record. */
+struct xlog_page_header_data
+{
+   uint16_t xlp_magic;          /**< Magic value for correctness checks. */
+   uint16_t xlp_info;           /**< Flag bits for the page. */
+   timeline_id xlp_tli;         /**< Timeline ID of the first record on the page. */
+   xlog_rec_ptr xlp_pageaddr;   /**< XLOG address of this page. */
+   uint32_t xlp_rem_len;        /**< Remaining length of data for the record. */
 };
 
 /**
@@ -186,11 +186,12 @@ struct xlog_page_header_data {
  * - xlp_seg_size: Segment size for cross-checking.
  * - xlp_xlog_blcksz: XLOG block size for cross-checking.
  */
-struct xlog_long_page_header_data {
-    struct xlog_page_header_data std;    /**< Standard header fields. */
-    uint64_t xlp_sysid;                  /**< System identifier from pg_control. */
-    uint32_t xlp_seg_size;               /**< Segment size for cross-checking. */
-    uint32_t xlp_xlog_blcksz;            /**< XLOG block size for cross-checking. */
+struct xlog_long_page_header_data
+{
+   struct xlog_page_header_data std;     /**< Standard header fields. */
+   uint64_t xlp_sysid;                   /**< System identifier from pg_control. */
+   uint32_t xlp_seg_size;                /**< Segment size for cross-checking. */
+   uint32_t xlp_xlog_blcksz;             /**< XLOG block size for cross-checking. */
 };
 
 /**
@@ -208,13 +209,14 @@ struct xlog_long_page_header_data {
  * - xl_rmid: Resource manager ID for this record.
  * - xl_crc: CRC for this record.
  */
-struct xlog_record {
-    uint32_t xl_tot_len;        /**< Total length of the entire record. */
-    transaction_id xl_xid;      /**< Transaction ID associated with the record. */
-    xlog_rec_ptr xl_prev;       /**< Pointer to the previous record in the log. */
-    uint8_t xl_info;            /**< Flag bits for the record. */
-    rmgr_id xl_rmid;            /**< Resource manager ID for this record. */
-    pg_crc32c xl_crc;           /**< CRC for this record. */
+struct xlog_record
+{
+   uint32_t xl_tot_len;         /**< Total length of the entire record. */
+   transaction_id xl_xid;       /**< Transaction ID associated with the record. */
+   xlog_rec_ptr xl_prev;        /**< Pointer to the previous record in the log. */
+   uint8_t xl_info;             /**< Flag bits for the record. */
+   rmgr_id xl_rmid;             /**< Resource manager ID for this record. */
+   pg_crc32c xl_crc;            /**< CRC for this record. */
 };
 
 /**
@@ -228,10 +230,11 @@ struct xlog_record {
  * - dbOid: Database OID.
  * - relNumber: Relation file number.
  */
-struct rel_file_locator {
-    oid spcOid;                  /**< Tablespace OID. */
-    oid dbOid;                   /**< Database OID. */
-    rel_file_number relNumber;   /**< Relation file number. */
+struct rel_file_locator
+{
+   oid spcOid;                   /**< Tablespace OID. */
+   oid dbOid;                    /**< Database OID. */
+   rel_file_number relNumber;    /**< Relation file number. */
 };
 
 /**
@@ -260,24 +263,25 @@ struct rel_file_locator {
  * - data_len: Length of the data.
  * - data_bufsz: Buffer size for the data.
  */
-struct decoded_bkp_block {
-    bool in_use;                        /**< Indicates if this block reference is in use. */
-    struct rel_file_locator rlocator;   /**< Locator for the referenced block. */
-    enum fork_number forknum;           /**< Fork number of the block. */
-    block_number blkno;                 /**< Block number. */
-    buffer prefetch_buffer;             /**< Prefetching workspace. */
-    uint8_t flags;                      /**< Copy of the fork_flags field from the block header. */
-    bool has_image;                     /**< Indicates if the block has an image. */
-    bool apply_image;                   /**< Indicates if the image should be applied. */
-    char* bkp_image;                    /**< Backup image of the block. */
-    uint16_t hole_offset;               /**< Offset of the hole in the image. */
-    uint16_t hole_length;               /**< Length of the hole in the image. */
-    uint16_t bimg_len;                  /**< Length of the backup image. */
-    uint8_t bimg_info;                  /**< Additional information about the backup image. */
-    bool has_data;                      /**< Indicates if the block has associated data. */
-    char* data;                         /**< Data associated with the block. */
-    uint16_t data_len;                  /**< Length of the data. */
-    uint16_t data_bufsz;                /**< Buffer size for the data. */
+struct decoded_bkp_block
+{
+   bool in_use;                         /**< Indicates if this block reference is in use. */
+   struct rel_file_locator rlocator;    /**< Locator for the referenced block. */
+   enum fork_number forknum;            /**< Fork number of the block. */
+   block_number blkno;                  /**< Block number. */
+   buffer prefetch_buffer;              /**< Prefetching workspace. */
+   uint8_t flags;                       /**< Copy of the fork_flags field from the block header. */
+   bool has_image;                      /**< Indicates if the block has an image. */
+   bool apply_image;                    /**< Indicates if the image should be applied. */
+   char* bkp_image;                     /**< Backup image of the block. */
+   uint16_t hole_offset;                /**< Offset of the hole in the image. */
+   uint16_t hole_length;                /**< Length of the hole in the image. */
+   uint16_t bimg_len;                   /**< Length of the backup image. */
+   uint8_t bimg_info;                   /**< Additional information about the backup image. */
+   bool has_data;                       /**< Indicates if the block has associated data. */
+   char* data;                          /**< Data associated with the block. */
+   uint16_t data_len;                   /**< Length of the data. */
+   uint16_t data_bufsz;                 /**< Buffer size for the data. */
 };
 
 /**
@@ -301,19 +305,20 @@ struct decoded_bkp_block {
  * - max_block_id: Highest block ID in use (-1 if none).
  * - blocks: Array of decoded backup blocks.
  */
-struct decoded_xlog_record {
-    size_t size;                          /**< Total size of the decoded record. */
-    bool oversized;                       /**< Indicates if the record is outside the regular decode buffer. */
-    struct decoded_xlog_record* next;     /**< Link to the next decoded record in the queue. */
-    xlog_rec_ptr lsn;                     /**< Location of the record. */
-    xlog_rec_ptr next_lsn;                /**< Location of the next record. */
-    struct xlog_record header;            /**< Header of the record. */
-    rep_origin_id record_origin;          /**< Origin ID of the record. */
-    transaction_id toplevel_xid;          /**< Top-level transaction ID. */
-    char* main_data;                      /**< Main data portion of the record. */
-    uint32_t main_data_len;               /**< Length of the main data portion. */
-    int max_block_id;                     /**< Highest block ID in use (-1 if none). */
-    struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1];   /**< Array of decoded backup blocks. */
+struct decoded_xlog_record
+{
+   size_t size;                           /**< Total size of the decoded record. */
+   bool oversized;                        /**< Indicates if the record is outside the regular decode buffer. */
+   struct decoded_xlog_record* next;      /**< Link to the next decoded record in the queue. */
+   xlog_rec_ptr lsn;                      /**< Location of the record. */
+   xlog_rec_ptr next_lsn;                 /**< Location of the next record. */
+   struct xlog_record header;             /**< Header of the record. */
+   rep_origin_id record_origin;           /**< Origin ID of the record. */
+   transaction_id toplevel_xid;           /**< Top-level transaction ID. */
+   char* main_data;                       /**< Main data portion of the record. */
+   uint32_t main_data_len;                /**< Length of the main data portion. */
+   int max_block_id;                      /**< Highest block ID in use (-1 if none). */
+   struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1];    /**< Array of decoded backup blocks. */
 };
 
 /**
@@ -327,10 +332,11 @@ struct decoded_xlog_record {
  * - dbNode: Database OID.
  * - relNode: Relation OID.
  */
-struct rel_file_node {
-    oid spcNode;     /**< Tablespace OID. */
-    oid dbNode;      /**< Database OID. */
-    oid relNode;     /**< Relation OID. */
+struct rel_file_node
+{
+   oid spcNode;      /**< Tablespace OID. */
+   oid dbNode;       /**< Database OID. */
+   oid relNode;      /**< Relation OID. */
 };
 
 /* External variables */

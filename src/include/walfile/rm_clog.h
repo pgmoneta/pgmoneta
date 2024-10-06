@@ -57,9 +57,9 @@ extern "C" {
  */
 struct xl_clog_truncate_17
 {
-    int pageno;                     /**< The page number of the CLOG to truncate */
-    transaction_id oldestXact;      /**< The oldest transaction ID to retain */
-    oid oldestXactDb;               /**< The database ID of the oldest transaction */
+   int pageno;                      /**< The page number of the CLOG to truncate */
+   transaction_id oldestXact;       /**< The oldest transaction ID to retain */
+   oid oldestXactDb;                /**< The database ID of the oldest transaction */
 };
 
 /**
@@ -76,9 +76,9 @@ struct xl_clog_truncate_17
  */
 struct xl_clog_truncate_16
 {
-    int64_t pageno;                 /**< The page number of the CLOG to truncate */
-    transaction_id oldestXact;      /**< The oldest transaction ID to retain */
-    oid oldestXactDb;               /**< The database ID of the oldest transaction */
+   int64_t pageno;                  /**< The page number of the CLOG to truncate */
+   transaction_id oldestXact;       /**< The oldest transaction ID to retain */
+   oid oldestXactDb;                /**< The database ID of the oldest transaction */
 };
 
 /**
@@ -98,12 +98,13 @@ struct xl_clog_truncate_16
  */
 struct xl_clog_truncate
 {
-    void (*parse)(struct xl_clog_truncate* wrapper, char* rec);     /**< Function pointer to parse the record */
-    char* (*format)(struct xl_clog_truncate* wrapper, char* buf);   /**< Function pointer to format the record */
-    union {
-        struct xl_clog_truncate_16 v16;                             /**< Truncate record for version 16 */
-        struct xl_clog_truncate_17 v17;                             /**< Truncate record for version 17 */
-    } data;                                                         /**< Version-specific truncate record data */
+   void (*parse)(struct xl_clog_truncate* wrapper, char* rec);      /**< Function pointer to parse the record */
+   char* (*format)(struct xl_clog_truncate* wrapper, char* buf);    /**< Function pointer to format the record */
+   union
+   {
+      struct xl_clog_truncate_16 v16;                               /**< Truncate record for version 16 */
+      struct xl_clog_truncate_17 v17;                               /**< Truncate record for version 17 */
+   } data;                                                          /**< Version-specific truncate record data */
 };
 
 /**
