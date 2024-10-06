@@ -1212,6 +1212,26 @@ pgmoneta_append_double(char* orig, double d)
 }
 
 char*
+pgmoneta_append_double_precision(char* orig, double d, int precision)
+{
+   char number[21];
+
+   char* format = NULL;
+   format = pgmoneta_append_char(format, '%');
+   format = pgmoneta_append_char(format, '.');
+   format = pgmoneta_append_int(format, precision);
+   format = pgmoneta_append_char(format, 'f');
+
+   memset(&number[0], 0, sizeof(number));
+   snprintf(&number[0], 20, format, d);
+   orig = pgmoneta_append(orig, number);
+
+   free(format);
+
+   return orig;
+}
+
+char*
 pgmoneta_append_bool(char* orig, bool b)
 {
    if (b)

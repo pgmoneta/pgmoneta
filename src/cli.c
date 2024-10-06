@@ -61,6 +61,8 @@
 #define COMMAND_ARCHIVE "archive"
 #define COMMAND_DELETE "delete"
 #define COMMAND_RETAIN "retain"
+#define COMMAND_RESET "reset"
+#define COMMAND_RELOAD "reload"
 #define COMMAND_EXPUNGE "expunge"
 #define COMMAND_ENCRYPT "encrypt"
 #define COMMAND_DECRYPT "decrypt"
@@ -69,10 +71,14 @@
 #define COMMAND_PING "ping"
 #define COMMAND_STOP "stop"
 #define COMMAND_STATUS "status"
+#define COMMAND_STATUS_DETAILS "status-details"
 #define COMMAND_CONF "conf"
 #define COMMAND_CLEAR "clear"
 #define COMMAND_INFO "info"
 #define COMMAND_ANNOTATE "annotate"
+
+#define OUTPUT_FORMAT_JSON "json"
+#define OUTPUT_FORMAT_TEXT "text"
 
 static void help_backup(void);
 static void help_list_backup(void);
@@ -117,6 +123,17 @@ static int info(SSL* ssl, int socket, char* server, char* backup, int32_t output
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, int32_t output_format);
 
 static int  process_result(SSL* ssl, int socket, int32_t output_format);
+
+static char* translate_command(int32_t cmd_code);
+static char* translate_output_format(int32_t out_code);
+static char* translate_valid(int32_t valid);
+static char* translate_compression(int32_t compression_code);
+static char* translate_encryption(int32_t encryption_code);
+static char* translate_size(int64_t size);
+static void translate_backup_argument(struct json* j);
+static void translate_response_argument(struct json* j);
+static void translate_servers_argument(struct json* j);
+static void translate_json_object(struct json* j);
 
 static void
 version(void)
@@ -421,14 +438,9 @@ main(int argc, char** argv)
             {
                output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
             }
-            else if (!strncmp(optarg, "text", MISC_LENGTH))
-            {
-               output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
-            }
             else
             {
-               warnx("pgmoneta-cli: Format type is not correct");
-               exit(1);
+               output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
             }
             break;
          case '?':
@@ -1392,6 +1404,8 @@ process_result(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
+   translate_json_object(read);
+
    if (MANAGEMENT_OUTPUT_FORMAT_TEXT == output_format)
    {
       pgmoneta_json_print(read, FORMAT_TEXT);
@@ -1410,4 +1424,380 @@ error:
    pgmoneta_json_destroy(read);
 
    return 1;
+}
+
+static char*
+translate_command(int32_t cmd_code)
+{
+   char* command_output = NULL;
+   switch (cmd_code)
+   {
+      case MANAGEMENT_BACKUP:
+         command_output = pgmoneta_append(command_output, COMMAND_BACKUP);
+         break;
+      case MANAGEMENT_LIST_BACKUP:
+         command_output = pgmoneta_append(command_output, COMMAND_LIST_BACKUP);
+         break;
+      case MANAGEMENT_RESTORE:
+         command_output = pgmoneta_append(command_output, COMMAND_RESTORE);
+         break;
+      case MANAGEMENT_ARCHIVE:
+         command_output = pgmoneta_append(command_output, COMMAND_ARCHIVE);
+         break;
+      case MANAGEMENT_DELETE:
+         command_output = pgmoneta_append(command_output, COMMAND_DELETE);
+         break;
+      case MANAGEMENT_STOP:
+         command_output = pgmoneta_append(command_output, COMMAND_STOP);
+         break;
+      case MANAGEMENT_STATUS:
+         command_output = pgmoneta_append(command_output, COMMAND_STATUS);
+         break;
+      case MANAGEMENT_STATUS_DETAILS:
+         command_output = pgmoneta_append(command_output, COMMAND_STATUS_DETAILS);
+         break;
+      case MANAGEMENT_PING:
+         command_output = pgmoneta_append(command_output, COMMAND_PING);
+         break;
+      case MANAGEMENT_RESET:
+         command_output = pgmoneta_append(command_output, COMMAND_RESET);
+         break;
+      case MANAGEMENT_RELOAD:
+         command_output = pgmoneta_append(command_output, COMMAND_RELOAD);
+         break;
+      case MANAGEMENT_RETAIN:
+         command_output = pgmoneta_append(command_output, COMMAND_RETAIN);
+         break;
+      case MANAGEMENT_EXPUNGE:
+         command_output = pgmoneta_append(command_output, COMMAND_EXPUNGE);
+         break;
+      case MANAGEMENT_DECRYPT:
+         command_output = pgmoneta_append(command_output, COMMAND_DECRYPT);
+         break;
+      case MANAGEMENT_DECOMPRESS:
+         command_output = pgmoneta_append(command_output, COMMAND_DECOMPRESS);
+         break;
+      case MANAGEMENT_COMPRESS:
+         command_output = pgmoneta_append(command_output, COMMAND_COMPRESS);
+         break;
+      case MANAGEMENT_INFO:
+         command_output = pgmoneta_append(command_output, COMMAND_INFO);
+         break;
+      case MANAGEMENT_VERIFY:
+         command_output = pgmoneta_append(command_output, COMMAND_VERIFY);
+         break;
+      case MANAGEMENT_ANNOTATE:
+         command_output = pgmoneta_append(command_output, COMMAND_ANNOTATE);
+         break;
+      default:
+         break;
+   }
+   return command_output;
+}
+
+static char*
+translate_output_format(int32_t out_code)
+{
+   char* output_format_output = NULL;
+   switch (out_code)
+   {
+      case MANAGEMENT_OUTPUT_FORMAT_JSON:
+         output_format_output = pgmoneta_append(output_format_output, OUTPUT_FORMAT_JSON);
+         break;
+      case MANAGEMENT_OUTPUT_FORMAT_TEXT:
+         output_format_output = pgmoneta_append(output_format_output, OUTPUT_FORMAT_TEXT);
+         break;
+      default:
+         break;
+   }
+   return output_format_output;
+}
+
+static char*
+translate_valid(int32_t valid)
+{
+   char* valid_output = NULL;
+   switch (valid)
+   {
+      case VALID_TRUE:
+         valid_output = pgmoneta_append(valid_output, "yes");
+         break;
+      case VALID_FALSE:
+         valid_output = pgmoneta_append(valid_output, "no");
+         break;
+      default:
+         valid_output = pgmoneta_append(valid_output, "unknown");
+         break;
+   }
+   return valid_output;
+}
+
+static char*
+translate_compression(int32_t compression_code)
+{
+   char* compression_output = NULL;
+   switch (compression_code)
+   {
+      case COMPRESSION_CLIENT_GZIP:
+      case COMPRESSION_SERVER_GZIP:
+         compression_output = pgmoneta_append(compression_output, "gzip");
+         break;
+      case COMPRESSION_CLIENT_ZSTD:
+      case COMPRESSION_SERVER_ZSTD:
+         compression_output = pgmoneta_append(compression_output, "zstd");
+         break;
+      case COMPRESSION_CLIENT_LZ4:
+      case COMPRESSION_SERVER_LZ4:
+         compression_output = pgmoneta_append(compression_output, "lz4");
+         break;
+      case COMPRESSION_CLIENT_BZIP2:
+         compression_output = pgmoneta_append(compression_output, "bzip2");
+         break;
+      default:
+         compression_output = pgmoneta_append(compression_output, "none");
+         break;
+   }
+   return compression_output;
+}
+
+static char*
+translate_encryption(int32_t encryption_code)
+{
+   char* encryption_output = NULL;
+   switch (encryption_code)
+   {
+      case ENCRYPTION_AES_256_CBC:
+         encryption_output = pgmoneta_append(encryption_output, "aes-256-cbc");
+         break;
+      case ENCRYPTION_AES_192_CBC:
+         encryption_output = pgmoneta_append(encryption_output, "aes-192-cbc");
+         break;
+      case ENCRYPTION_AES_128_CBC:
+         encryption_output = pgmoneta_append(encryption_output, "aes-128-cbc");
+         break;
+      case ENCRYPTION_AES_256_CTR:
+         encryption_output = pgmoneta_append(encryption_output, "aes-256-ctr");
+         break;
+      case ENCRYPTION_AES_192_CTR:
+         encryption_output = pgmoneta_append(encryption_output, "aes-192-ctr");
+         break;
+      case ENCRYPTION_AES_128_CTR:
+         encryption_output = pgmoneta_append(encryption_output, "aes-128-ctr");
+         break;
+      default:
+         encryption_output = pgmoneta_append(encryption_output, "none");
+         break;
+   }
+   return encryption_output;
+}
+
+static char*
+translate_size(int64_t size)
+{
+   // If value of field not found
+   if (!size)
+   {
+      return NULL;
+   }
+
+   char* translated_size = NULL;
+   double sz = (double)size;
+
+   char* units[] = {"B", "kB", "MB", "GB", "TB", "PB"};
+   int i = 0;
+
+   while (sz >= 1024 && i < 5)
+   {
+      sz /= 1024.0;
+      i++;
+   }
+   
+   translated_size = pgmoneta_append_double_precision(translated_size, sz, 2);
+   translated_size = pgmoneta_append(translated_size, units[i]);
+
+   return translated_size;
+}
+
+static void
+translate_backup_argument(struct json* response)
+{
+   char* translated_valid = NULL;
+   char* translated_compression = NULL;
+   char* translated_encryption = NULL;
+   char* translated_backup_size = NULL;
+   char* translated_restore_size = NULL;
+
+   translated_backup_size = translate_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE));
+   if (translated_backup_size)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)translated_backup_size, ValueString);
+   }
+   translated_valid = translate_valid((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_VALID));
+   if (translated_valid)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)translated_valid, ValueString);
+   }
+   translated_compression = translate_compression((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_COMPRESSION));
+   if (translated_compression)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)translated_compression, ValueString);
+   }
+   translated_encryption = translate_encryption((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_ENCRYPTION));
+   if (translated_encryption)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)translated_encryption, ValueString);
+   }
+   translated_restore_size = translate_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE));
+   if (translated_restore_size)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)translated_restore_size, ValueString);
+   }
+
+   free(translated_valid);
+   free(translated_compression);
+   free(translated_encryption);
+   free(translated_backup_size);
+   free(translated_restore_size);
+}
+
+static void
+translate_response_argument(struct json* response)
+{
+   char* translated_total_space = NULL;
+   char* translated_free_space = NULL;
+   char* translated_used_space = NULL;
+
+   translated_total_space = translate_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE));
+   if (translated_total_space)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE, (uintptr_t)translated_total_space, ValueString);
+   }
+   translated_free_space = translate_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_FREE_SPACE));
+   if (translated_free_space)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FREE_SPACE, (uintptr_t)translated_free_space, ValueString);
+   }
+   translated_used_space = translate_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_USED_SPACE));
+   if (translated_used_space)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_USED_SPACE, (uintptr_t)translated_used_space, ValueString);
+   }
+
+   free(translated_total_space);
+   free(translated_free_space);
+   free(translated_used_space);
+}
+
+static void
+translate_servers_argument(struct json* response)
+{
+   char* translated_server_size = NULL;
+
+   translated_server_size = translate_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVER_SIZE));
+   if (translated_server_size)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_SIZE, (uintptr_t)translated_server_size, ValueString);
+   }
+
+   free(translated_server_size);
+}
+
+static void
+translate_json_object(struct json* j)
+{
+   struct json* header = NULL;
+   int32_t command = 0;
+   char* translated_command = NULL;
+   int32_t out_format = -1;
+   char* translated_out_format = NULL;
+   struct json* response = NULL;
+
+   struct json* backups = NULL;
+   struct json* backup = NULL;
+   struct json* servers = NULL;
+   struct json_iterator* server_it = NULL;
+   struct json_iterator* backup_it = NULL;
+
+   // Translate arguments of header
+   header = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_HEADER);
+
+   if (header)
+   {
+      command = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_COMMAND);
+      translated_command = translate_command(command);
+      if (translated_command)
+      {
+         pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_COMMAND, (uintptr_t)translated_command, ValueString);
+      }
+
+      out_format = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_OUTPUT);
+      translated_out_format = translate_output_format(out_format);
+      if (translated_out_format)
+      {
+         pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_OUTPUT, (uintptr_t)translated_out_format, ValueString);
+      }
+
+      free(translated_command);
+      free(translated_out_format);
+   }
+
+   // Translate the response
+   response = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_RESPONSE);
+
+   if (response && command)
+   {
+      switch (command)
+      {
+         case MANAGEMENT_BACKUP:
+         case MANAGEMENT_RESTORE:
+         case MANAGEMENT_RETAIN:
+         case MANAGEMENT_EXPUNGE:
+         case MANAGEMENT_INFO:
+         case MANAGEMENT_ANNOTATE:
+            translate_backup_argument(response);
+            break;
+         case MANAGEMENT_STATUS:
+            translate_response_argument(response);
+            servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+            pgmoneta_json_iterator_create(servers, &server_it);
+            while (pgmoneta_json_iterator_next(server_it))
+            {
+               translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
+            }
+            pgmoneta_json_iterator_destroy(server_it);
+            break;
+         case MANAGEMENT_LIST_BACKUP:
+            backups = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUPS);
+            pgmoneta_json_iterator_create(backups, &backup_it);
+            while (pgmoneta_json_iterator_next(backup_it))
+            {
+               backup = (struct json*)pgmoneta_value_data(backup_it->value);
+               translate_backup_argument(backup);
+            }
+            pgmoneta_json_iterator_destroy(backup_it);
+            break;
+         case MANAGEMENT_STATUS_DETAILS:
+            translate_response_argument(response);
+            servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+            pgmoneta_json_iterator_create(servers, &server_it);
+            while (pgmoneta_json_iterator_next(server_it))
+            {
+               backups = (struct json*)pgmoneta_json_get((struct json*)pgmoneta_value_data(server_it->value), MANAGEMENT_ARGUMENT_BACKUPS);
+               pgmoneta_json_iterator_create(backups, &backup_it);
+               while (pgmoneta_json_iterator_next(backup_it))
+               {
+                  backup = (struct json*)pgmoneta_value_data(backup_it->value);
+                  translate_backup_argument(backup);
+               }
+               pgmoneta_json_iterator_destroy(backup_it);
+
+               translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
+            }
+            pgmoneta_json_iterator_destroy(server_it);
+            break;
+         default:
+            break;
+      }
+   }
+
 }

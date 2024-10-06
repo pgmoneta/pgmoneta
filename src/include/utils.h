@@ -569,6 +569,16 @@ char*
 pgmoneta_append_double(char* orig, double d);
 
 /**
+ * Append a double with set precision
+ * @param orig The original string
+ * @param d The double
+ * @param precision The number of digits after decimal
+ * @return The resulting string
+ */
+char*
+pgmoneta_append_double_precision(char* orig, double d, int precision);
+
+/**
  * Append a bool
  * @param orig The original string
  * @param b The bool
