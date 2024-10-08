@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <io.h>
 #include <memory.h>
 #include <message.h>
 
@@ -184,7 +185,7 @@ pgmoneta_memory_stream_buffer_init(struct stream_buffer** buffer)
 
    b->size = DEFAULT_BUFFER_SIZE;
    b->start = b->end = b->cursor = 0;
-   b->buffer = malloc(DEFAULT_BUFFER_SIZE);
+   b->buffer = pgmoneta_aligned_malloc(DEFAULT_BUFFER_SIZE);
    *buffer = b;
 }
 
