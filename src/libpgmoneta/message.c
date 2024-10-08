@@ -2316,7 +2316,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
          }
       }
       pgmoneta_mkdir(directory);
-      file = open(file_path, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC | O_DIRECT, 0600);
+      file = open(file_path, O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT, 0600);
       if (file < 0)
       {
          pgmoneta_log_error("Could not create archive tar file");
@@ -2330,6 +2330,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
          {
             pgmoneta_log_copyfail_message(msg);
             pgmoneta_log_error_response_message(msg);
+            fsync(file);
             close(file);
             goto error;
          }
@@ -2342,6 +2343,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
          {
             pgmoneta_log_copyfail_message(msg);
             pgmoneta_log_error_response_message(msg);
+            fsync(file);
             close(file);
             goto error;
          }
@@ -2368,6 +2370,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
             if (pgmoneta_write_file(file, msg->data, msg->length) != msg->length)
             {
                pgmoneta_log_error("could not write to file %s", file_path);
+               fsync(file);
                close(file);
                goto error;
             }
@@ -2379,9 +2382,11 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       if (pgmoneta_write_file(file, null_buffer, 2 * 512) != 2 * 512)
       {
          pgmoneta_log_error("could not write to file %s", file_path);
+         fsync(file);
          close(file);
          goto error;
       }
+      fsync(file);
       close(file);
 
       // extract the file
@@ -2523,10 +2528,12 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   if ((!is_server_side_compression()) && pgmoneta_write_file(file, null_buffer, 2 * 512) != 2 * 512)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
+                     fsync(file);
                      close(file);
                      file = -1;
                      goto error;
                   }
+                  fsync(file);
                   close(file);
                   file = -1;
                   pgmoneta_extract_tar_file(file_path, directory);
@@ -2587,7 +2594,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   }
                }
                pgmoneta_mkdir(directory);
-               file = open(file_path, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC | O_DIRECT, 0600);
+               file = open(file_path, O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT, 0600);
                if (file < 0)
                {
                   pgmoneta_log_error("Could not create archive tar file");
@@ -2603,10 +2610,12 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   if ((!is_server_side_compression()) && pgmoneta_write_file(file, null_buffer, 2 * 512) != 2 * 512)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
+                     fsync(file);
                      close(file);
                      file = -1;
                      goto error;
                   }
+                  fsync(file);
                   close(file);
                   file = -1;
                   pgmoneta_extract_tar_file(file_path, directory);
@@ -2622,7 +2631,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
                   snprintf(tmp_manifest_file_path, sizeof(tmp_manifest_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
                   snprintf(manifest_file_path, sizeof(manifest_file_path), "%s/data/%s", basedir, "backup_manifest");
                }
-               file = open(tmp_manifest_file_path, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC | O_DIRECT, 0600);
+               file = open(tmp_manifest_file_path, O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT, 0600);
                break;
             }
             case 'd':
@@ -2734,6 +2743,7 @@ error:
    }
    if (file > 0)
    {
+      fsync(file);
       close(file);
    }
 
@@ -2772,7 +2782,7 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
       snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
    }
-   file = open(tmp_file_path, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC | O_DIRECT, 0600);
+   file = open(tmp_file_path, O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT, 0600);
 
    if (file < 0)
    {
@@ -2834,10 +2844,12 @@ pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffe
       pgmoneta_log_error("could not rename file %s to %s", tmp_file_path, file_path);
       goto error;
    }
+   fsync(file);
    close(file);
    return 0;
 
 error:
+   fsync(file);
    close(file);
    return 1;
 }

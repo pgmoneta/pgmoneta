@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include <fcntl.h>
 #include <pgmoneta.h>
 #include <io.h>
 #include <logging.h>
@@ -37,6 +38,7 @@
 #include <prometheus.h>
 #include <security.h>
 #include <server.h>
+#include <stddef.h>
 #include <wal.h>
 #include <workflow.h>
 #include <utils.h>
@@ -412,6 +414,9 @@ pgmoneta_wal(int srv, char** argv)
                   }
                   bytes_left = msg->length - hdrlen;
                   size_t bytes_written = 0;
+                  void* buf = msg->data + hdrlen;
+                  void* aligned_buf = pgmoneta_unaligned_to_aligned_buffer(buf, bytes_left);
+
                   // write to the wal file
                   while (bytes_left > 0)
                   {
@@ -425,11 +430,13 @@ pgmoneta_wal(int srv, char** argv)
                      {
                         bytes_to_write = bytes_left;
                      }
-                     if (bytes_to_write != pgmoneta_write_file(wal_fd, msg->data + hdrlen + bytes_written, bytes_to_write))
+                     if (bytes_to_write != pgmoneta_write_file(wal_fd, aligned_buf + bytes_written, bytes_to_write))
                      {
+                        free(aligned_buf);
                         pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
                      }
+                     free(aligned_buf);
                      if (sftp_wal_file != NULL)
                      {
                         sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_to_write);
@@ -926,7 +933,7 @@ wal_open(char* root, char* filename, int segsize)
       size_t size = pgmoneta_get_file_size(path);
       if (size == (size_t)segsize)
       {
-         fd = open(path, O_RDWR | O_SYNC | O_DIRECT, 0600);
+         fd = open(path, O_RDWR | O_DIRECT, 0600);
          if (fd < 0)
          {
             pgmoneta_log_error("WAL error: %s", strerror(errno));
@@ -946,7 +953,7 @@ wal_open(char* root, char* filename, int segsize)
       }
    }
 
-   fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC | O_DIRECT, 0600);
+   fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT, 0600);
 
    if (fd < 0)
    {
@@ -1007,6 +1014,7 @@ wal_close(char* root, char* filename, bool partial, int fd)
       goto error;
    }
 
+   fsync(fd);
    close(fd);
 
    return 0;

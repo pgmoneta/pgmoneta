@@ -46,6 +46,15 @@ extern "C" {
 #endif
 
 /**
+ * Returns an aligned buffer with same data as unaligned buffer
+ * @param buffer The unaligned buffer
+ * @param size The buffer size
+ * @return The aligned buffer
+ */
+void*
+pgmoneta_unaligned_to_aligned_buffer(void* buffer, size_t size);
+
+/**
  * Wrapper around write() libc call
  * @param fd The file descriptor
  * @param buffer The buffer to be written

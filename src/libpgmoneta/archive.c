@@ -474,7 +474,7 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
             return;
          }
 
-         fd = open(real_path, O_RDONLY | O_CREAT | O_SYNC | O_DIRECT, 0600);
+         fd = open(real_path, O_RDONLY | O_CREAT | O_DIRECT, 0600);
 
          if (fd > 0)
          {
