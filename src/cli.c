@@ -438,6 +438,10 @@ main(int argc, char** argv)
             {
                output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
             }
+            else if (!strncmp(optarg, "raw", MISC_LENGTH))
+            {
+               output_format = MANAGEMENT_OUTPUT_FORMAT_RAW;
+            }
             else
             {
                output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
@@ -1404,7 +1408,10 @@ process_result(SSL* ssl, int socket, int32_t output_format)
       goto error;
    }
 
-   translate_json_object(read);
+   if (MANAGEMENT_OUTPUT_FORMAT_RAW != output_format)
+   {
+      translate_json_object(read);
+   }
 
    if (MANAGEMENT_OUTPUT_FORMAT_TEXT == output_format)
    {
@@ -1611,7 +1618,7 @@ translate_size(int64_t size)
       sz /= 1024.0;
       i++;
    }
-   
+
    translated_size = pgmoneta_append_double_precision(translated_size, sz, 2);
    translated_size = pgmoneta_append(translated_size, units[i]);
 
@@ -1632,10 +1639,13 @@ translate_backup_argument(struct json* response)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)translated_backup_size, ValueString);
    }
-   translated_valid = translate_valid((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_VALID));
-   if (translated_valid)
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_VALID))
    {
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)translated_valid, ValueString);
+      translated_valid = translate_valid((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_VALID));
+      if (translated_valid)
+      {
+         pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)translated_valid, ValueString);
+      }
    }
    translated_compression = translate_compression((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_COMPRESSION));
    if (translated_compression)

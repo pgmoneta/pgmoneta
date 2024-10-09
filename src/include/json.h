@@ -143,6 +143,15 @@ uintptr_t
 pgmoneta_json_get(struct json* item, char* tag);
 
 /**
+ * Check if the json item contains the given key
+ * @param item The json item
+ * @param key The key
+ * @return True if the key exists, otherwise false
+ */
+bool
+pgmoneta_json_contains_key(struct json* item, char* key);
+
+/**
  * Navigate the reader to the target json object(array or item) according to the key prefix array,
  * it currently does not handle escape character
  * @param reader The json reader

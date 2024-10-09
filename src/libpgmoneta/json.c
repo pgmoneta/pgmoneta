@@ -448,6 +448,16 @@ pgmoneta_json_get(struct json* item, char* tag)
    return pgmoneta_art_search(item->elements, (unsigned char*)tag, strlen(tag) + 1);
 }
 
+bool
+pgmoneta_json_contains_key(struct json* item, char* key)
+{
+   if (item == NULL || item->type != JSONItem || key == NULL || strlen(key) == 0)
+   {
+      return false;
+   }
+   return pgmoneta_art_contains_key(item->elements, (unsigned char*)key, strlen(key) + 1);
+}
+
 int
 pgmoneta_json_iterator_create(struct json* object, struct json_iterator** iter)
 {

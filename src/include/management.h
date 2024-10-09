@@ -271,6 +271,7 @@ extern "C" {
  */
 #define MANAGEMENT_OUTPUT_FORMAT_TEXT 0
 #define MANAGEMENT_OUTPUT_FORMAT_JSON 1
+#define MANAGEMENT_OUTPUT_FORMAT_RAW  2
 
 /**
  * Create a backup request

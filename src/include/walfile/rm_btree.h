@@ -76,9 +76,9 @@ extern "C" {
  */
 struct item_id_data
 {
-   unsigned lp_off: 15;         /**< Offset to tuple (from start of page) */
-   unsigned lp_flags: 2;        /**< State of line pointer */
-   unsigned lp_len: 15;         /**< Byte length of tuple */
+   unsigned lp_off : 15;         /**< Offset to tuple (from start of page) */
+   unsigned lp_flags : 2;        /**< State of line pointer */
+   unsigned lp_len : 15;         /**< Byte length of tuple */
 };
 
 /**
