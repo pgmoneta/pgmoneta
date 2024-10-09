@@ -200,9 +200,10 @@ pgmoneta_get_number_of_valid_backups(int server);
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload);
+pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload, uint8_t compress_method);
 
 /**
  * Create an annotate request
@@ -210,9 +211,10 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, struct json* payload)
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payload);
+pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, struct json* payload, uint8_t compress_method);
 
 #ifdef __cplusplus
 }

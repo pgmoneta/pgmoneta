@@ -44,9 +44,10 @@ extern "C" {
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, struct json* payload);
+pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, struct json* payload, uint8_t compress_method);
 
 /**
  * Expunge the backup
@@ -54,9 +55,10 @@ pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, struct json* payload
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, struct json* payload);
+pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, struct json* payload, uint8_t compress_method);
 
 #ifdef __cplusplus
 }

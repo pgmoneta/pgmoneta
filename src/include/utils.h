@@ -1192,6 +1192,24 @@ pgmoneta_atoi(const char* input);
 char*
 pgmoneta_indent(char* str, char* tag, int indent);
 
+/**
+ * Decode Base64-encoded data to a binary string
+ * @param base64_data The Base64-encoded input data
+ * @param decoded_len The pointer to an integer that will store the length of the decoded data
+ * @return The pointer to the decoded data
+ */
+unsigned char*
+pgmoneta_decode_base64(const char* base64_data, int* decoded_len);
+
+/**
+ * Encode binary data to Base64.
+ * @param data The binary data to encode
+ * @param data_len The length of the binary data
+ * @return The pointer to the Base64-encoded string
+ */
+char*
+pgmoneta_encode_base64(const unsigned char* data, int data_len);
+
 #ifdef DEBUG
 
 /**

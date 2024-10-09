@@ -66,9 +66,10 @@ pgmoneta_zstandardc_wal(char* directory);
  * @param ssl The SSL
  * @param client_fd The client descriptor
  * @param payload The payload of the request
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_zstandardd_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_zstandardd_request(SSL* ssl, int client_fd, struct json* payload, uint8_t compress_method);
 
 /**
  * Decompress a Zstandard file
@@ -92,9 +93,10 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers);
  * @param ssl The SSL
  * @param client_fd The client descriptor
  * @param payload The payload of the request
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_zstandardc_request(SSL* ssl, int client_fd, struct json* payload);
+pgmoneta_zstandardc_request(SSL* ssl, int client_fd, struct json* payload, uint8_t compress_method);
 
 /**
  * Compress a file
@@ -104,6 +106,26 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, struct json* payload);
  */
 int
 pgmoneta_zstandardc_file(char* from, char* to);
+
+/**
+ * ZSTD compress a string
+ * @param s The original string
+ * @param buffer The point to the compressed data buffer
+ * @param buffer_size The size of the compressed buffer will be stored.
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_zstdc_string(char* s, unsigned char** buffer, size_t* buffer_size);
+
+/**
+ * ZSTD decompress a buffer to string
+ * @param compressed_buffer The buffer containing the GZIP compressed data
+ * @param compressed_size The size of the compressed buffer
+ * @param output_string The pointer to a string where the decompressed data will be stored
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_zstdd_string(unsigned char* compressed_buffer, size_t compressed_size, char** output_string);
 
 #ifdef __cplusplus
 }

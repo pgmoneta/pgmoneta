@@ -51,9 +51,10 @@ pgmoneta_get_restore_last_files_names(char*** output);
  * @param client_fd The client
  * @param server The server
  * @param request The request
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* request);
+pgmoneta_restore(SSL* ssl, int client_fd, int server, struct json* request, uint8_t compress_method);
 
 /**
  * Restore to a directory

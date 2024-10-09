@@ -51,6 +51,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
@@ -4022,6 +4023,65 @@ pgmoneta_indent(char* str, char* tag, int indent)
       str = pgmoneta_append(str, tag);
    }
    return str;
+}
+
+unsigned char*
+pgmoneta_decode_base64(const char* base64_data, int* decoded_len)
+{
+   size_t base64_len;
+   size_t max_decoded_len;
+   unsigned char* decoded_data;
+   int actual_decoded_len;
+
+   base64_len = strlen(base64_data);
+   max_decoded_len = (base64_len / 4) * 3;
+   decoded_data = (unsigned char*)malloc(max_decoded_len);
+
+   // Perform base64 decoding using OpenSSL
+   actual_decoded_len = EVP_DecodeBlock(decoded_data, (const unsigned char*)base64_data, base64_len);
+
+   // Handle padding
+   if (base64_data[base64_len - 1] == '=')
+   {
+      actual_decoded_len--;
+   }
+   if (base64_data[base64_len - 2] == '=')
+   {
+      actual_decoded_len--;
+   }
+
+   if (actual_decoded_len < 0)
+   {
+      pgmoneta_log_error("error decode: Base64 decoding failed");
+      free(decoded_data);
+      return NULL;
+   }
+
+   *decoded_len = actual_decoded_len;
+   return decoded_data;
+}
+
+char*
+pgmoneta_encode_base64(const unsigned char* data, int data_len)
+{
+   size_t base64_len;
+   char* base64_data;
+
+   base64_len = 4 * ((data_len + 2) / 3);
+
+   base64_data = (char*)malloc(base64_len + 1);
+   if (base64_data == NULL)
+   {
+      pgmoneta_log_error("error encode: Failed to allocate memory for Base64 encoding");
+      return NULL;
+   }
+
+   // Perform Base64 encoding using OpenSSL
+   EVP_EncodeBlock((unsigned char*)base64_data, data, data_len);
+
+   base64_data[base64_len] = '\0';
+
+   return base64_data;
 }
 
 #ifdef DEBUG

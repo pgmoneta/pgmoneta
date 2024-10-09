@@ -44,27 +44,30 @@ extern "C" {
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_backup(int client_fd, int server, struct json* payload);
+pgmoneta_backup(int client_fd, int server, struct json* payload, uint8_t compress_method);
 
 /**
  * List backups for a server
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_list_backup(int client_fd, int server, struct json* payload);
+pgmoneta_list_backup(int client_fd, int server, struct json* payload, uint8_t compress_method);
 
 /**
  * Delete a backup for a server
  * @param client_fd The client
  * @param server The server
  * @param payload The payload
+ * @param compress_method The compress method for json format
  */
 void
-pgmoneta_delete_backup(int client_fd, int srv, struct json* payload);
+pgmoneta_delete_backup(int client_fd, int srv, struct json* payload, uint8_t compress_method);
 
 /**
  * Get the backup max rate for a server

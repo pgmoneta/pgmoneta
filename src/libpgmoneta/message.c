@@ -60,7 +60,6 @@ static int get_column_name(struct message* msg, int index, char** name);
 
 static bool is_server_side_compression(void);
 
-static unsigned char* decode_base64(const char* base64_data, int* decoded_len);
 static char** get_paths(const char* data, int* count);
 static void extract_file_name(const char* path, char* file_name, char* file_path);
 
@@ -2922,7 +2921,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
                      int decoded_len;
                      unsigned char* decoded_data;
 
-                     decoded_data = decode_base64(current_tuple->data[0], &decoded_len);
+                     decoded_data = pgmoneta_decode_base64(current_tuple->data[0], &decoded_len);
                      if (decoded_data != NULL)
                      {
                         FILE* file = fopen(dest_path, "wb");
@@ -3101,40 +3100,4 @@ extract_file_name(const char* path, char* file_name, char* file_path)
       strcpy(file_name, path);
       file_path[0] = '\0';
    }
-}
-
-static unsigned char*
-decode_base64(const char* base64_data, int* decoded_len)
-{
-   size_t base64_len;
-   size_t max_decoded_len;
-   unsigned char* decoded_data;
-   int actual_decoded_len;
-
-   base64_len = strlen(base64_data);
-   max_decoded_len = (base64_len / 4) * 3;
-   decoded_data = (unsigned char*)malloc(max_decoded_len);
-
-   // Perform base64 decoding using OpenSSL
-   actual_decoded_len = EVP_DecodeBlock(decoded_data, (const unsigned char*)base64_data, base64_len);
-
-   // Handle padding
-   if (base64_data[base64_len - 1] == '=')
-   {
-      actual_decoded_len--;
-   }
-   if (base64_data[base64_len - 2] == '=')
-   {
-      actual_decoded_len--;
-   }
-
-   if (actual_decoded_len < 0)
-   {
-      pgmoneta_log_error("error decode: Base64 decoding failed");
-      free(decoded_data);
-      return NULL;
-   }
-
-   *decoded_len = actual_decoded_len;
-   return decoded_data;
 }

@@ -51,7 +51,7 @@
 static void write_tar_file(struct archive* a, char* current_real_path, char* current_save_path);
 
 void
-pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
+pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload, uint8_t compress_method)
 {
    char* backup_id = NULL;
    char* position = NULL;
@@ -131,7 +131,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
 
    if (id == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, payload, compress_method);
       pgmoneta_log_error("Archive: No identifier for %s/%s", config->servers[server].name, backup_id);
       goto error;
    }
@@ -197,7 +197,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
 
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, payload, compress_method);
 
          goto error;
       }
@@ -226,9 +226,9 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, struct json* payload)
 
       end_time = time(NULL);
 
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload))
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, payload, compress_method))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, payload, compress_method);
          pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, backup_id);
 
          goto error;
