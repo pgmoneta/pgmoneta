@@ -60,11 +60,11 @@
 #define XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG      (1U << 31)
 
 #define XACT_COMPLETION_APPLY_FEEDBACK(xinfo) \
-        ((xinfo &XACT_COMPLETION_APPLY_FEEDBACK_FLAG) != 0)
+        ((xinfo & XACT_COMPLETION_APPLY_FEEDBACK_FLAG) != 0)
 #define XACT_COMPLETION_RELCACHE_INIT_FILE_INVAL(xinfo) \
-        ((xinfo &XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG) != 0)
+        ((xinfo & XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG) != 0)
 #define XACT_COMPLETION_FORCE_SYNC_COMMIT(xinfo) \
-        ((xinfo &XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG) != 0)
+        ((xinfo & XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG) != 0)
 
 #define MIN_SIZE_OF_XACT_STATS_ITEMS    offsetof(struct xl_xact_stats_items, items)
 #define MIN_SIZE_OF_XACT_SUBXACTS       offsetof(struct xl_xact_subxacts, subxacts)
