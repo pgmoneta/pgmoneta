@@ -335,7 +335,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    struct message* sasl_final = NULL;
    struct message* msg = NULL;
 
-   pgmoneta_memory_size(DEFAULT_BUFFER_SIZE);
+   pgmoneta_memory_init();
 
    if (pgmoneta_get_home_directory() == NULL)
    {

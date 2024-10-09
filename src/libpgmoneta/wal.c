@@ -98,9 +98,6 @@ pgmoneta_wal(int srv, char** argv)
    char* filename = NULL;
    signed char type;
    int ret;
-   char date[128];
-   time_t current_time;
-   struct tm* time_info;
    FILE* wal_file = NULL;
    FILE* wal_shipping_file = NULL;
    sftp_file sftp_wal_file = NULL;
@@ -108,7 +105,7 @@ pgmoneta_wal(int srv, char** argv)
    struct query_response* identify_system_response = NULL;
    struct query_response* end_of_timeline_response = NULL;
    struct message* start_replication_msg = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct message* msg = (struct message*)malloc(sizeof (struct message));;
    struct configuration* config;
    struct stream_buffer* buffer = NULL;
    struct workflow* head = NULL;
@@ -117,27 +114,22 @@ pgmoneta_wal(int srv, char** argv)
 
    config = (struct configuration*) shmem;
 
-   if (msg == NULL)
-   {
-      goto error;
-   }
-
-   memset(msg, 0, sizeof (struct message));
-
    pgmoneta_start_logging();
    pgmoneta_memory_init();
 
    pgmoneta_set_proc_title(1, argv, "wal", config->servers[srv].name);
 
-   if (config->servers[srv].wal_streaming)
+   if (msg == NULL)
    {
       goto error;
    }
 
-   memset(&date[0], 0, sizeof(date));
-   time(&current_time);
-   time_info = localtime(&current_time);
-   strftime(&date[0], sizeof(date), "%Y%m%d%H%M%S", time_info);
+   memset(msg, 0, sizeof(struct message));
+
+   if (config->servers[srv].wal_streaming)
+   {
+      goto error;
+   }
 
    usr = -1;
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -170,7 +162,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->setup(srv, &date[0], nodes))
+      if (current->setup(srv, NULL, nodes))
       {
          goto error;
       }
@@ -180,7 +172,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->execute(srv, &date[0], nodes))
+      if (current->execute(srv, NULL, nodes))
       {
          goto error;
       }
@@ -581,7 +573,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      current->teardown(srv, &date[0], nodes);
+      current->teardown(srv, NULL, nodes);
 
       current = current->next;
    }
@@ -641,7 +633,7 @@ error:
    current = head;
    while (current != NULL)
    {
-      current->teardown(srv, &date[0], nodes);
+      current->teardown(srv, NULL, nodes);
 
       current = current->next;
    }

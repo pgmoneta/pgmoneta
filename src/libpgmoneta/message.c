@@ -48,6 +48,8 @@
 #include <sys/time.h>
 #include <stdio.h>
 
+static struct message* allocate_message(size_t size);
+
 static int read_message(int socket, bool block, int timeout, struct message** msg);
 static int write_message(int socket, struct message* msg);
 
@@ -114,11 +116,10 @@ pgmoneta_copy_message(struct message* msg)
    assert(msg->length > 0);
 #endif
 
-   copy = (struct message*)malloc(sizeof(struct message));
-   copy->data = malloc(msg->length);
+   copy = allocate_message(msg->length);
 
    copy->kind = msg->kind;
-   copy->length = msg->length;
+
    memcpy(copy->data, msg->data, msg->length);
 
    return copy;
@@ -403,13 +404,9 @@ pgmoneta_create_auth_password_response(char* password, struct message** msg)
 
    size = 6 + strlen(password);
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'p';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'p');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -428,13 +425,9 @@ pgmoneta_create_auth_md5_response(char* md5, struct message** msg)
 
    size = 1 + 4 + strlen(md5) + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'p';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'p');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -479,13 +472,9 @@ pgmoneta_create_auth_scram256_response(char* nounce, struct message** msg)
 
    size = 1 + 4 + 13 + 4 + 9 + strlen(nounce);
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'p';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'p');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -506,13 +495,9 @@ pgmoneta_create_auth_scram256_continue(char* cn, char* sn, char* salt, struct me
 
    size = 1 + 4 + 4 + 2 + strlen(cn) + strlen(sn) + 3 + strlen(salt) + 7;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'R';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'R');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -537,13 +522,9 @@ pgmoneta_create_auth_scram256_continue_response(char* wp, char* p, struct messag
 
    size = 1 + 4 + strlen(wp) + 3 + strlen(p);
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'p';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'p');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -564,13 +545,9 @@ pgmoneta_create_auth_scram256_final(char* ss, struct message** msg)
 
    size = 1 + 4 + 4 + 2 + strlen(ss);
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'R';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'R');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -616,13 +593,9 @@ pgmoneta_create_ssl_message(struct message** msg)
 
    size = 8;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 0;
-   m->length = size;
 
    pgmoneta_write_int32(m->data, size);
    pgmoneta_write_int32(m->data + 4, 80877103);
@@ -649,13 +622,9 @@ pgmoneta_create_startup_message(char* username, char* database, bool replication
       size += 14;
    }
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 0;
-   m->length = size;
 
    pgmoneta_write_int32(m->data, size);
    pgmoneta_write_int32(m->data + 4, 196608);
@@ -685,13 +654,9 @@ pgmoneta_create_identify_system_message(struct message** msg)
 
    size = 1 + 4 + 17;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -714,13 +679,9 @@ pgmoneta_create_timeline_history_message(int timeline, struct message** msg)
 
    size = 1 + 4 + 17 + strlen(tl) + 1 + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -741,13 +702,9 @@ pgmoneta_create_read_replication_slot_message(char* slot, struct message** msg)
 
    size = 1 + 4 + 22 + strlen(slot) + 1 + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -794,13 +751,9 @@ pgmoneta_create_start_replication_message(char* xlogpos, int timeline, char* slo
 
    size = 1 + 4 + strlen(cmd) + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -819,13 +772,9 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 
    size = 1 + 4 + 1 + 8 + 8 + 8 + 8 + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'd';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'd');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -981,13 +930,9 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
 
    size = 1 + 4 + strlen(cmd) + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -1018,13 +963,9 @@ pgmoneta_create_replication_slot_message(char* create_slot_name, struct message*
 
    size = 1 + 4 + strlen(cmd) + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -1048,13 +989,9 @@ pgmoneta_create_search_replication_slot_message(char* slot_name, struct message*
 
    size = 1 + 4 + strlen(cmd) + 1;
 
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
-
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -1071,13 +1008,9 @@ pgmoneta_send_copy_done_message(SSL* ssl, int socket)
    struct message* msg = NULL;
    int size = 1 + 4;
 
-   msg = (struct message*)malloc(sizeof(struct message));
-   msg->data = malloc(size);
-
-   memset(msg->data, 0, size);
+   msg = allocate_message(size);
 
    msg->kind = 'c';
-   msg->length = size;
 
    pgmoneta_write_byte(msg->data, 'c');
    pgmoneta_write_int32(msg->data + 1, size - 1);
@@ -1106,13 +1039,10 @@ pgmoneta_create_query_message(char* query, struct message** msg)
    memset(&cmd[0], 0, sizeof(cmd));
    strcpy(cmd, query);
    size = 1 + 4 + strlen(cmd) + 1;
-   m = (struct message*)malloc(sizeof(struct message));
-   m->data = malloc(size);
 
-   memset(m->data, 0, size);
+   m = allocate_message(size);
 
    m->kind = 'Q';
-   m->length = size;
 
    pgmoneta_write_byte(m->data, 'Q');
    pgmoneta_write_int32(m->data + 1, size - 1);
@@ -1366,6 +1296,37 @@ pgmoneta_query_response_debug(struct query_response* response)
    pgmoneta_log_trace("Tuples: %d", number_of_tuples);
 }
 
+static struct message*
+allocate_message(size_t size)
+{
+   struct message* m = NULL;
+
+   m = (struct message*)malloc(sizeof(struct message));
+
+   if (m == NULL)
+   {
+      goto error;
+   }
+
+   m->data = aligned_alloc((size_t)ALIGNMENT_SIZE, pgmoneta_get_aligned_size(size));
+
+   if (m->data == NULL)
+   {
+      free(m);
+      goto error;
+   }
+
+   m->kind = 0;
+   m->length = size;
+   memset(m->data, 0, size);
+
+   return m;
+
+error:
+
+   return NULL;
+}
+
 static bool
 is_server_side_compression(void)
 {
@@ -1487,7 +1448,7 @@ read_message(int socket, bool block, int timeout, struct message** msg)
    {
       m = pgmoneta_memory_message();
 
-      numbytes = read(socket, m->data, m->max_length);
+      numbytes = read(socket, m->data, DEFAULT_BUFFER_SIZE);
 
       if (likely(numbytes > 0))
       {
@@ -1631,7 +1592,7 @@ ssl_read_message(SSL* ssl, int timeout, struct message** msg)
    {
       m = pgmoneta_memory_message();
 
-      numbytes = SSL_read(ssl, m->data, m->max_length);
+      numbytes = SSL_read(ssl, m->data, DEFAULT_BUFFER_SIZE);
 
       if (likely(numbytes > 0))
       {

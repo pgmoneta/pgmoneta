@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <memory.h>
 #include <message.h>
+#include <utils.h>
 
 /* system */
 #ifdef DEBUG
@@ -41,53 +42,29 @@
 static struct message* message = NULL;
 static void* data = NULL;
 
-/**
- *
- */
 void
 pgmoneta_memory_init(void)
 {
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-   pgmoneta_memory_size(config->buffer_size);
-}
-
-/**
- *
- */
-void
-pgmoneta_memory_size(size_t size)
-{
-   pgmoneta_memory_destroy();
-
-   message = (struct message*)malloc(sizeof(struct message));
-
    if (message == NULL)
    {
-      return;
+      message = (struct message*)malloc(sizeof(struct message));
+
+      if (message == NULL)
+      {
+         return;
+      }
+
+      data = aligned_alloc((size_t)ALIGNMENT_SIZE, DEFAULT_BUFFER_SIZE);
+
+      if (data == NULL)
+      {
+         return;
+      }
    }
 
-   data = malloc(size);
-
-   if (data == NULL)
-   {
-      return;
-   }
-
-   memset(message, 0, sizeof(struct message));
-   memset(data, 0, size);
-
-   message->kind = 0;
-   message->length = 0;
-   message->max_length = size;
-   message->data = data;
+   pgmoneta_memory_free();
 }
 
-/**
- *
- */
 struct message*
 pgmoneta_memory_message(void)
 {
@@ -99,31 +76,22 @@ pgmoneta_memory_message(void)
    return message;
 }
 
-/**
- *
- */
 void
 pgmoneta_memory_free(void)
 {
-   size_t length = message->max_length;
-
 #ifdef DEBUG
    assert(message != NULL);
    assert(data != NULL);
 #endif
 
    memset(message, 0, sizeof(struct message));
-   memset(data, 0, length);
+   memset(data, 0, DEFAULT_BUFFER_SIZE);
 
    message->kind = 0;
    message->length = 0;
-   message->max_length = length;
    message->data = data;
 }
 
-/**
- *
- */
 void
 pgmoneta_memory_destroy(void)
 {
@@ -184,23 +152,33 @@ pgmoneta_memory_stream_buffer_init(struct stream_buffer** buffer)
 
    b->size = DEFAULT_BUFFER_SIZE;
    b->start = b->end = b->cursor = 0;
-   b->buffer = malloc(DEFAULT_BUFFER_SIZE);
+   b->buffer = aligned_alloc((size_t)ALIGNMENT_SIZE, DEFAULT_BUFFER_SIZE);
    *buffer = b;
 }
 
 int
 pgmoneta_memory_stream_buffer_enlarge(struct stream_buffer* buffer, int bytes_needed)
 {
-   char* new_buf = NULL;
-   // subtract the space we have left to avoid wasting space
-   bytes_needed -= (buffer->size - buffer->end);
-   buffer->size += bytes_needed;
-   new_buf = realloc(buffer->buffer, buffer->size);
-   if (new_buf == NULL)
+   size_t new_size = 0;
+   void* new_buffer = NULL;
+
+   new_size = pgmoneta_get_aligned_size(bytes_needed);
+
+   new_buffer = aligned_alloc((size_t)ALIGNMENT_SIZE, new_size);
+
+   if (new_buffer == NULL)
    {
       return 1;
    }
-   buffer->buffer = new_buf;
+
+   memset(new_buffer, 0, new_size);
+   memcpy(new_buffer, buffer->buffer, buffer->size);
+
+   free(buffer->buffer);
+
+   buffer->size = new_size;
+   buffer->buffer = new_buffer;
+
    return 0;
 }
 

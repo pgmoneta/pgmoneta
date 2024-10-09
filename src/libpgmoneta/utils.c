@@ -96,6 +96,23 @@ pgmoneta_get_request(struct message* msg)
    return pgmoneta_read_int32(msg->data + 4);
 }
 
+size_t
+pgmoneta_get_aligned_size(size_t size)
+{
+   size_t allocate = 0;
+
+   allocate = size / 512;
+
+   if (size % 512 != 0)
+   {
+      allocate += 1;
+   }
+
+   allocate *= 512;
+
+   return allocate;
+}
+
 int
 pgmoneta_extract_username_database(struct message* msg, char** username, char** database, char** appname)
 {
@@ -196,7 +213,6 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
 {
    int offset;
    int m_length;
-   void* data = NULL;
    struct message* result = NULL;
 
    offset = 0;
@@ -211,14 +227,12 @@ pgmoneta_extract_message(char type, struct message* msg, struct message** extrac
          m_length = pgmoneta_read_int32(msg->data + offset + 1);
 
          result = (struct message*)malloc(sizeof(struct message));
-         data = (void*)malloc(1 + m_length);
+         result->data = aligned_alloc((size_t)ALIGNMENT_SIZE, pgmoneta_get_aligned_size(1 + m_length));
 
-         memcpy(data, msg->data + offset, 1 + m_length);
+         memcpy(result->data, msg->data + offset, 1 + m_length);
 
-         result->kind = pgmoneta_read_byte(data);
+         result->kind = pgmoneta_read_byte(result->data);
          result->length = 1 + m_length;
-         result->max_length = 1 + m_length;
-         result->data = data;
 
          *extracted = result;
 
@@ -300,13 +314,12 @@ pgmoneta_extract_message_offset(size_t offset, void* data, struct message** extr
    m_length = pgmoneta_read_int32(data + offset + 1);
 
    result = (struct message*)malloc(sizeof(struct message));
-   m_data = malloc(1 + m_length);
+   m_data = aligned_alloc((size_t)ALIGNMENT_SIZE, pgmoneta_get_aligned_size(1 + m_length));
 
    memcpy(m_data, data + offset, 1 + m_length);
 
    result->kind = type;
    result->length = 1 + m_length;
-   result->max_length = 1 + m_length;
    result->data = m_data;
 
    *extracted = result;
@@ -334,13 +347,12 @@ pgmoneta_extract_message_from_data(char type, void* data, size_t data_size, stru
          m_length = pgmoneta_read_int32(data + offset + 1);
 
          result = (struct message*)malloc(sizeof(struct message));
-         m_data = (void*)malloc(1 + m_length);
+         m_data = aligned_alloc((size_t)ALIGNMENT_SIZE, pgmoneta_get_aligned_size(1 + m_length));
 
          memcpy(m_data, data + offset, 1 + m_length);
 
          result->kind = pgmoneta_read_byte(m_data);
          result->length = 1 + m_length;
-         result->max_length = 1 + m_length;
          result->data = m_data;
 
          *extracted = result;

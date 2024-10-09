@@ -153,6 +153,14 @@ int32_t
 pgmoneta_get_request(struct message* msg);
 
 /**
+ * Get a memory aligned size
+ * @param size The requested size
+ * @return The aligned size
+ */
+size_t
+pgmoneta_get_aligned_size(size_t size);
+
+/**
  * Extract the user name and database from a message
  * @param msg The message
  * @param username The resulting user name
