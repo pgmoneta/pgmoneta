@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <logging.h>
 #include <memory.h>
 #include <message.h>
 #include <utils.h>
@@ -162,7 +163,19 @@ pgmoneta_memory_stream_buffer_enlarge(struct stream_buffer* buffer, int bytes_ne
    size_t new_size = 0;
    void* new_buffer = NULL;
 
-   new_size = pgmoneta_get_aligned_size(bytes_needed);
+   if (buffer->size + bytes_needed < buffer->size + DEFAULT_BUFFER_SIZE)
+   {
+      new_size = pgmoneta_get_aligned_size(buffer->size + DEFAULT_BUFFER_SIZE);
+   }
+   else
+   {
+      new_size = pgmoneta_get_aligned_size(buffer->size + bytes_needed);
+   }
+
+   if (buffer->size > new_size)
+   {
+      return 0;
+   }
 
    new_buffer = aligned_alloc((size_t)ALIGNMENT_SIZE, new_size);
 
