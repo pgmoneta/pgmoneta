@@ -233,6 +233,7 @@ pgmoneta_connect(const char* hostname, int port, int* fd)
    struct addrinfo* servinfo = NULL;
    struct addrinfo* p = NULL;
    int yes = 1;
+   size_t buffer_size = DEFAULT_BUFFER_SIZE;
    socklen_t optlen = sizeof(int);
    int rv;
    char sport[5];
@@ -298,7 +299,7 @@ pgmoneta_connect(const char* hostname, int port, int* fd)
 
          if (config != NULL)
          {
-            if (setsockopt(*fd, SOL_SOCKET, SO_RCVBUF, &config->buffer_size, optlen) == -1)
+            if (setsockopt(*fd, SOL_SOCKET, SO_RCVBUF, &buffer_size, optlen) == -1)
             {
                error = errno;
                pgmoneta_disconnect(*fd);
@@ -307,7 +308,7 @@ pgmoneta_connect(const char* hostname, int port, int* fd)
                continue;
             }
 
-            if (setsockopt(*fd, SOL_SOCKET, SO_SNDBUF, &config->buffer_size, optlen) == -1)
+            if (setsockopt(*fd, SOL_SOCKET, SO_SNDBUF, &buffer_size, optlen) == -1)
             {
                error = errno;
                pgmoneta_disconnect(*fd);
@@ -535,19 +536,17 @@ pgmoneta_tcp_nodelay(int fd)
 int
 pgmoneta_socket_buffers(int fd)
 {
-   struct configuration* config;
    socklen_t optlen = sizeof(int);
+   size_t buffer_size = DEFAULT_BUFFER_SIZE;
 
-   config = (struct configuration*)shmem;
-
-   if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &config->buffer_size, optlen) == -1)
+   if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &buffer_size, optlen) == -1)
    {
       pgmoneta_log_warn("socket_buffers: SO_RCVBUF %d %s", fd, strerror(errno));
       errno = 0;
       return 1;
    }
 
-   if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &config->buffer_size, optlen) == -1)
+   if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &buffer_size, optlen) == -1)
    {
       pgmoneta_log_warn("socket_buffers: SO_SNDBUF %d %s", fd, strerror(errno));
       errno = 0;

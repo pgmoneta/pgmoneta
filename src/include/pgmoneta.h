@@ -365,7 +365,6 @@ struct configuration
    unsigned int update_process_title;  /**< Behaviour for updating the process title */
 
    char libev[MISC_LENGTH]; /**< Name of libev mode */
-   int buffer_size;         /**< Socket buffer size */
    bool keep_alive;         /**< Use keep alive */
    bool nodelay;            /**< Use NODELAY */
    bool non_blocking;       /**< Use non blocking */
