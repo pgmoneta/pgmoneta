@@ -312,7 +312,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    string_to_sign = pgmoneta_append(string_to_sign, azure_path);
 
    // Decode the Azure storage account shared key.
-   pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key), &signing_key, &signing_key_length);
+   pgmoneta_base64_decode(config->azure_shared_key, strlen(config->azure_shared_key), (void**)&signing_key, &signing_key_length);
 
    // Construct the signature.
    if (pgmoneta_generate_string_hmac_sha256_hash(signing_key, signing_key_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))

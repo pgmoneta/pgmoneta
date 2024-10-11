@@ -504,7 +504,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
       goto error;
    }
 
-   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), &salt, &salt_length);
+   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), (void**)&salt, &salt_length);
 
    iteration = atoi(iteration_string);
 
@@ -553,7 +553,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
 
    /* Get 'v' attribute */
    base64_server_signature = sasl_final->data + 11;
-   pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11, &server_signature_received, &server_signature_received_length);
+   pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11, (void**)&server_signature_received, &server_signature_received_length);
 
    if (server_signature(password_prep, salt, salt_length, iteration,
                         NULL, 0,
@@ -931,7 +931,7 @@ retry:
    }
 
    get_scram_attribute('p', (char*)msg->data + 5, msg->length - 5, &base64_client_proof);
-   pgmoneta_base64_decode(base64_client_proof, strlen(base64_client_proof), &client_proof_received, &client_proof_received_length);
+   pgmoneta_base64_decode(base64_client_proof, strlen(base64_client_proof), (void**)&client_proof_received, &client_proof_received_length);
 
    client_final_message_without_proof = malloc(58);
    memset(client_final_message_without_proof, 0, 58);
@@ -1569,7 +1569,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
       goto error;
    }
 
-   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), &salt, &salt_length);
+   pgmoneta_base64_decode(base64_salt, strlen(base64_salt), (void**)&salt, &salt_length);
 
    iteration = atoi(iteration_string);
 
@@ -1629,7 +1629,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    /* Get 'v' attribute */
    base64_server_signature = sasl_final->data + 11;
    pgmoneta_base64_decode(base64_server_signature, sasl_final->length - 11,
-                          &server_signature_received, &server_signature_received_length);
+                          (void**)&server_signature_received, &server_signature_received_length);
 
    if (server_signature(password_prep, salt, salt_length, iteration,
                         NULL, 0,
@@ -1796,7 +1796,7 @@ pgmoneta_get_master_key(char** masterkey)
       goto error;
    }
 
-   pgmoneta_base64_decode(&line[0], strlen(&line[0]), &mk, &mk_length);
+   pgmoneta_base64_decode(&line[0], strlen(&line[0]), (void**)&mk, &mk_length);
 
    *masterkey = mk;
 

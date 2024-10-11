@@ -440,26 +440,26 @@ char*
 pgmoneta_get_password(void);
 
 /**
- * BASE64 encode a string
- * @param raw The string
- * @param raw_length The length of the raw string
+ * BASE64 encode a data
+ * @param raw The data
+ * @param raw_length The length of the raw data
  * @param encoded The encoded string
  * @param encoded_length The length of the encoded string
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_base64_encode(char* raw, size_t raw_length, char** encoded, size_t* encoded_length);
+pgmoneta_base64_encode(void* raw, size_t raw_length, char** encoded, size_t* encoded_length);
 
 /**
  * BASE64 decode a string
  * @param encoded The encoded string
  * @param encoded_length The length of the encoded string
- * @param raw The raw string
- * @param raw_length The length of the raw string
+ * @param raw The raw data
+ * @param raw_length The length of the raw data
  * @return 0 if success, otherwise 1
  */
 int
-pgmoneta_base64_decode(char* encoded, size_t encoded_length, char** raw, size_t* raw_length);
+pgmoneta_base64_decode(char* encoded, size_t encoded_length, void** raw, size_t* raw_length);
 
 /**
  * Set process title.
