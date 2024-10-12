@@ -129,7 +129,12 @@ read_all_page_headers(FILE* file, struct xlog_long_page_header_data* long_header
       fseek(file, page_number * long_header->xlp_xlog_blcksz, SEEK_SET);
       struct xlog_page_header_data* page_header = NULL;
       page_header = malloc(SIZE_OF_XLOG_SHORT_PHD);
-      fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
+      size_t bytes_read = fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
+      if (bytes_read < 0)
+      {
+         pgmoneta_log_error("Error: Failed to read the complete data");
+         goto error;
+      }
       if (page_header->xlp_magic == 0)
       {
          free(page_header);
@@ -138,6 +143,10 @@ read_all_page_headers(FILE* file, struct xlog_long_page_header_data* long_header
       pgmoneta_deque_add(wal_file->page_headers, NULL, (uintptr_t) page_header, ValueRef);
       page_number++;
    }
+   return;
+error:
+   pgmoneta_log_fatal("Error: Could not read all page headers\n");
+   return;
 }
 
 int
@@ -166,7 +175,13 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfi
    }
 
    MALLOC(long_header, SIZE_OF_XLOG_LONG_PHD);
-   fread(long_header, SIZE_OF_XLOG_LONG_PHD, 1, file);
+   size_t bytes_read = fread(long_header, SIZE_OF_XLOG_LONG_PHD, 1, file);
+
+   if (bytes_read < 0)
+   {
+      pgmoneta_log_error("Error: Failed to read the complete data");
+      goto error;
+   }
 
    uint32_t next_record = ftell(file);
    int page_number = 0;
@@ -183,7 +198,12 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfi
          page_number++;
          fseek(file, page_number * long_header->xlp_xlog_blcksz, SEEK_SET);
          MALLOC(page_header, SIZE_OF_XLOG_SHORT_PHD);
-         fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
+         size_t bytes_read = fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
+         if (bytes_read < 0)
+         {
+            pgmoneta_log_error("Error: Failed to read the complete data");
+            goto error;
+         }
          next_record = MAXALIGN(ftell(file) + page_header->xlp_rem_len);
          free(page_header);
          continue;
@@ -208,7 +228,12 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfi
       else
       {
          MALLOC(record, SIZE_OF_XLOG_RECORD)
-         fread(record, SIZE_OF_XLOG_RECORD, 1, file);
+         size_t bytes_read = fread(record, SIZE_OF_XLOG_RECORD, 1, file);
+         if (bytes_read < 0)
+         {
+            pgmoneta_log_error("Error: Failed to read the complete data");
+            goto error;
+         }
       }
 
       if (record->xl_tot_len == 0)
@@ -245,7 +270,11 @@ pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfi
       {
          size_t bytes_read = fread(buffer, 1, data_length, file);
 
-         assert(bytes_read == data_length);
+         if (bytes_read != data_length)
+         {
+            pgmoneta_log_error("Error: Actual bytes read do not match the expected length");
+            goto error;
+         }
       }
 
       decoded = calloc(1, sizeof(struct decoded_xlog_record));
