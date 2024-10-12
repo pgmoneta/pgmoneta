@@ -52,8 +52,8 @@ through standard tools.
 
 The supported platforms are
 
-* [Fedora][fedora] 32+
-* [RHEL][rhel] 8 / RockyLinux 8
-* [RHEL][rhel] 9 / RockyLinux 9
+* [Fedora][fedora] 38+
+* [RHEL][rhel] 9
+* [RockyLinux][rocky] 9
 * [FreeBSD][freebsd]
 * [OpenBSD][openbsd]
