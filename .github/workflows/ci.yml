@@ -32,7 +32,7 @@ jobs:
     - name: Install libarchive
       run: sudo apt install -y libarchive-dev
     - name: Install libcurl
-      run: sudo apt install -y libcurl4-nss-dev
+      run: sudo apt install -y libcurl-dev
     - name: Install clang
       run: sudo apt install -y clang
     - name: Install graphviz
