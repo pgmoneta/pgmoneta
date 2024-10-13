@@ -26,41 +26,51 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_TRANSACTION_H
-#define PGMONETA_TRANSACTION_H
+#include <bzip2_compression.h>
+#include <compression.h>
+#include <gzip_compression.h>
+#include <logging.h>
+#include <lz4_compression.h>
+#include <utils.h>
+#include <zstandard_compression.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// Typedefs
-typedef uint32_t transaction_id;
-typedef transaction_id multi_xact_id;
-typedef uint32_t multi_xact_offset;
-
-// #define variables
-#define INVALID_TRANSACTION_ID              ((transaction_id) 0)
-
-// #define macros
-#define EPOCH_FROM_FULL_TRANSACTION_ID(x)   ((uint32_t) ((x).value >> 32))
-#define XID_FROM_FULL_TRANSACTION_ID(x)     ((uint32_t) (x).value)
-#define TRANSACTION_ID_IS_VALID(xid)        ((xid) != INVALID_TRANSACTION_ID)
-
-// Structs
-/**
- * @struct full_transaction_id
- * @brief Represents a full transaction identifier.
- *
- * Fields:
- * - value: The full 64-bit transaction ID value.
- */
-struct full_transaction_id
+static int
+pgmoneta_decompression_file_callback(char* path, compression_func* decompress_cb)
 {
-   uint64_t value;   /**< The full 64-bit transaction ID value */
-};
-
-#ifdef __cplusplus
+   // Determine the compression method based on file extension
+   if (pgmoneta_ends_with(path, ".gz"))
+   {
+      *decompress_cb = pgmoneta_gunzip_file;
+   }
+   else if (pgmoneta_ends_with(path, ".zstd"))
+   {
+      *decompress_cb = pgmoneta_zstandardd_file;
+   }
+   else if (pgmoneta_ends_with(path, ".lz4"))
+   {
+      *decompress_cb = pgmoneta_lz4d_file;
+   }
+   else if (pgmoneta_ends_with(path, ".bz2"))
+   {
+      *decompress_cb = pgmoneta_bunzip2_file;
+   }
+   else
+   {
+      return 1;
+   }
+   return 0;
 }
-#endif
 
-#endif // PGMONETA_TRANSACTION_H
+int
+pgmoneta_decompress(char* from, char* to)
+{
+   compression_func decompress_cb = NULL;
+   if (pgmoneta_decompression_file_callback(from, &decompress_cb))
+   {
+      pgmoneta_log_error("pgmoneta_decompress: no decompression callback found for file %s", from);
+      goto error;
+   }
+   return decompress_cb(from, to);
+error:
+   return 1;
+}

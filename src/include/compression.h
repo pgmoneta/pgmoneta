@@ -26,41 +26,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_TRANSACTION_H
-#define PGMONETA_TRANSACTION_H
+#ifndef PGMONETA_COMPRESSION_H
+#define PGMONETA_COMPRESSION_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef int (*compression_func)(char*, char*);
 
-// Typedefs
-typedef uint32_t transaction_id;
-typedef transaction_id multi_xact_id;
-typedef uint32_t multi_xact_offset;
-
-// #define variables
-#define INVALID_TRANSACTION_ID              ((transaction_id) 0)
-
-// #define macros
-#define EPOCH_FROM_FULL_TRANSACTION_ID(x)   ((uint32_t) ((x).value >> 32))
-#define XID_FROM_FULL_TRANSACTION_ID(x)     ((uint32_t) (x).value)
-#define TRANSACTION_ID_IS_VALID(xid)        ((xid) != INVALID_TRANSACTION_ID)
-
-// Structs
 /**
- * @struct full_transaction_id
- * @brief Represents a full transaction identifier.
+ * Decompress a file using the appropriate decompression method.
  *
- * Fields:
- * - value: The full 64-bit transaction ID value.
+ * This function determines the compression type of the input file by calling
+ * `pgmoneta_decompression_file_callback`, and then uses the resulting callback to
+ * decompress the file from the `from` path to the `to` path.
+ * If no appropriate decompression callback is found, an error is logged.
+ *
+ * @param from   The source file path, expected to be a compressed file.
+ * @param to     The destination file path where the decompressed output will be saved.
+ *
+ * @return 0 if decompression succeeds, 1 if no matching decompression callback is found or decompression fails.
  */
-struct full_transaction_id
-{
-   uint64_t value;   /**< The full 64-bit transaction ID value */
-};
+int
+pgmoneta_decompress(char* from, char* to);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif // PGMONETA_TRANSACTION_H
+#endif //PGMONETA_COMPRESSION_H

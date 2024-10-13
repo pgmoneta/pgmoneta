@@ -4037,6 +4037,22 @@ pgmoneta_indent(char* str, char* tag, int indent)
    return str;
 }
 
+char*
+pgmoneta_lsn_to_string(uint64_t lsn)
+{
+   char* result = NULL;
+   result = (char*)malloc(64 * sizeof(char));
+
+   if (result == NULL)
+   {
+      pgmoneta_log_fatal("pgmoneta_lsn_to_string: malloc failed");
+      return NULL;
+   }
+   memset(result, 0, 64);
+   snprintf(result, 64, "%X/%X", (uint32_t)(lsn >> 32), (uint32_t)lsn);
+   return result;
+}
+
 #ifdef DEBUG
 
 int
