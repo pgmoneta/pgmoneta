@@ -32,8 +32,6 @@
 #include <deque.h>
 #include <walfile/wal_reader.h>
 
-#include <stdint.h>
-
 /**
  * @struct xlog_long_page_header_data
  * @brief Extended XLOG page header.
@@ -49,10 +47,10 @@
  */
 struct xlog_long_page_header_data
 {
-   struct xlog_page_header_data std;      /**< Standard header fields. */
-   uint64_t xlp_sysid;                    /**< System identifier from pg_control. */
-   uint32_t xlp_seg_size;                 /**< Segment size for cross-checking. */
-   uint32_t xlp_xlog_blcksz;              /**< XLOG block size for cross-checking. */
+   struct xlog_page_header_data std;       /**< Standard header fields. */
+   uint64_t xlp_sysid;                     /**< System identifier from pg_control. */
+   uint32_t xlp_seg_size;                  /**< Segment size for cross-checking. */
+   uint32_t xlp_xlog_blcksz;               /**< XLOG block size for cross-checking. */
 };
 
 /**
@@ -113,5 +111,14 @@ pgmoneta_write_walfile(struct walfile* wf, int server, char* path);
  */
 void
 pgmoneta_destroy_walfile(struct walfile* wf);
+
+/**
+ * Describe a WAL file
+ * @param path The path to the WAL file
+ * @param type The type of output description
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_describe_walfile(char* path, enum value_type type);
 
 #endif //PGMONETA_WALFILE_H

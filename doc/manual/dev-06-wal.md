@@ -6,6 +6,53 @@
 
 This document provides an overview of the `wal_reader` tool, with a focus on the `parse_wal_file` function, which serves as the main entry point for parsing Write-Ahead Log (WAL) files. Currently, the function only parses the given WAL file and prints the description of each record. In the future, it will be integrated with other parts of the code.
 
+
+## pgmoneta-walinfo
+
+`pgmoneta-walinfo` is a command line utility designed to read and display information about PostgreSQL Write-Ahead Log (WAL) files. The tool provides output in either raw or JSON format, making it easy to analyze WAL files for debugging, auditing, or general information purposes.
+
+In addition to standard WAL files, `pgmoneta-walinfo` also supports compressed WAL files in the following formats: **zstd**, **gz**, **lz4**, and **bz2**.
+
+#### Usage
+
+```bash
+pgmoneta-walinfo [ -F FORMAT ] <file>
+
+-F, --format: Specify the output format ('raw' or 'json').
+<file>: The path to the WAL file to read.
+```
+
+#### Raw Output Format
+
+In `raw` format, the output is structured as follows:
+
+```
+Resource Manager | rec len | tot len | xid | prev lsn | description (data and backup)
+```
+
+- **Resource Manager**: The name of the resource manager handling the log record.
+- **rec len**: The length of the WAL record.
+- **tot len**: The total length of the WAL record, including the header.
+- **xid**: The transaction ID associated with the record.
+- **prev lsn**: The previous Log Sequence Number (LSN).
+- **description (data and backup)**: A detailed description of the operation, along with any related backup block information.
+
+Each part of the output is color-coded:
+
+- **Red**: Header information (resource manager, record length, transaction ID, etc.).
+- **Green**: Description of the WAL record.
+- **Blue**: Backup block references or additional data.
+
+This format makes it easy to visually distinguish different parts of the WAL file for quick analysis.
+
+#### Example
+
+To view WAL file details in JSON format:
+
+```bash
+pgmoneta-walinfo -F json /path/to/walfile
+```
+
 ## High-Level API Overview
 
 The following section provides a high-level overview of how users can interact with the functions and structures defined in the `walfile.h` file. These APIs allow you to read, write, and manage Write-Ahead Log (WAL) files.
