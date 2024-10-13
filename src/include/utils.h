@@ -46,6 +46,29 @@ extern "C" {
 #define LONG_TIME_LENGHT  16 + 1
 #define UTC_TIME_LENGTH   29 + 1
 
+/** Define Windows 20 palette colors as constants using ANSI codes **/
+#define COLOR_BLACK         "\033[30m"
+#define COLOR_DARK_RED      "\033[31m"
+#define COLOR_DARK_GREEN    "\033[32m"
+#define COLOR_DARK_YELLOW   "\033[33m"
+#define COLOR_DARK_BLUE     "\033[34m"
+#define COLOR_DARK_MAGENTA  "\033[35m"
+#define COLOR_DARK_CYAN     "\033[36m"
+#define COLOR_LIGHT_GREY    "\033[37m"
+#define COLOR_MONEY_GREEN   "\033[32m"   /* Close approximation */
+#define COLOR_SKY_BLUE      "\033[36m"   /* Close approximation */
+#define COLOR_CREAM         "\033[97m"   /* Close approximation */
+#define COLOR_MEDIUM_GREY   "\033[90m"
+#define COLOR_DARK_GREY     "\033[90m"
+#define COLOR_RED           "\033[31m"
+#define COLOR_GREEN         "\033[32m"
+#define COLOR_YELLOW        "\033[33m"
+#define COLOR_BLUE          "\033[34m"
+#define COLOR_MAGENTA       "\033[35m"
+#define COLOR_CYAN          "\033[36m"
+#define COLOR_WHITE         "\033[97m"
+#define COLOR_RESET         "\033[0m"    /* Reset to default color */
+
 /** @struct signal_info
  * Defines the signal structure
  */
@@ -1207,6 +1230,14 @@ pgmoneta_indent(char* str, char* tag, int indent);
  */
 char*
 pgmoneta_escape_string(char* str);
+
+/**
+ * Generate the lsn string in a %X/%X format given a lsn integer
+ * @param  lsn integer value
+ * @return The lsn string in the described format
+ */
+char*
+pgmoneta_lsn_to_string(uint64_t lsn);
 
 #ifdef DEBUG
 

@@ -30,11 +30,53 @@
 #include <walfile/rm.h>
 #include <utils.h>
 
+static char*
+database_desc_v17(char* buf, char* rec, uint8_t info)
+{
+
+   if (info == XLOG_DBASE_CREATE_FILE_COPY)
+   {
+      struct xl_dbase_create_file_copy_rec* xlrec =
+         (struct xl_dbase_create_file_copy_rec*) rec;
+
+      buf = pgmoneta_format_and_append(buf, "copy dir %u/%u to %u/%u",
+                                       xlrec->src_tablespace_id, xlrec->src_db_id,
+                                       xlrec->tablespace_id, xlrec->db_id);
+   }
+   else if (info == XLOG_DBASE_CREATE_WAL_LOG)
+   {
+      struct xl_dbase_create_wal_log_rec* xlrec =
+         (struct xl_dbase_create_wal_log_rec*) rec;
+
+      buf = pgmoneta_format_and_append(buf, "create dir %u/%u",
+                                       xlrec->tablespace_id, xlrec->db_id);
+   }
+   else if (info == XLOG_DBASE_DROP_V17)
+   {
+      struct xl_dbase_drop_rec* xlrec = (struct xl_dbase_drop_rec*) rec;
+      int i;
+
+      buf = pgmoneta_format_and_append(buf, "dir");
+      for (i = 0; i < xlrec->ntablespaces; i++)
+      {
+         buf = pgmoneta_format_and_append(buf, " %u/%u",
+                                          xlrec->tablespace_ids[i], xlrec->db_id);
+      }
+   }
+   return buf;
+}
+
 char*
 pgmoneta_wal_database_desc(char* buf, struct decoded_xlog_record* record)
 {
    char* rec = XLOG_REC_GET_DATA(record);
    uint8_t info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
+
+   if (server_config->version >= 17)
+   {
+      buf = database_desc_v17(buf, rec, info);
+      return buf;
+   }
 
    if (info == XLOG_DBASE_CREATE)
    {

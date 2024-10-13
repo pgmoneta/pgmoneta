@@ -39,6 +39,11 @@ extern "C" {
 #define XLOG_DBASE_CREATE                    0x00     /**< Create database log type */
 #define XLOG_DBASE_DROP                      0x10     /**< Drop database log type */
 
+// v17 and later
+#define XLOG_DBASE_CREATE_FILE_COPY         0x00     /**< Create database log type */
+#define XLOG_DBASE_CREATE_WAL_LOG           0x10     /**< Create database log type */
+#define XLOG_DBASE_DROP_V17                 0x20     /**< Drop database log type */
+
 // #define macros
 #define MIN_SIZE_OF_DBASE_DROP_REC           offsetof(xl_dbase_drop_rec, tablespace_ids) /**< Minimum size of xl_dbase_drop_rec */
 
@@ -75,6 +80,38 @@ struct xl_dbase_drop_rec
    oid db_id;                          /**< Database ID */
    int ntablespaces;                   /**< Number of tablespace IDs */
    oid tablespace_ids[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tablespace IDs */
+};
+
+/**
+ * @struct xl_dbase_create_file_copy_rec
+ * @brief Represents the record for copying a file during database creation, copying both the database and tablespace.
+ *
+ * Fields:
+ * - db_id: Identifier for the database being created.
+ * - tablespace_id: Identifier for the tablespace associated with the database being created.
+ * - src_db_id: Identifier for the source database being copied.
+ * - src_tablespace_id: Identifier for the source tablespace associated with the source database.
+ */
+struct xl_dbase_create_file_copy_rec
+{
+   oid db_id;                  /**< Database ID */
+   oid tablespace_id;          /**< Tablespace ID */
+   oid src_db_id;              /**< Source Database ID */
+   oid src_tablespace_id;      /**< Source Tablespace ID */
+};
+
+/**
+ * @struct xl_dbase_create_wal_log_rec
+ * @brief Represents a write-ahead log (WAL) record for creating a database and logging the new tablespace.
+ *
+ * Fields:
+ * - db_id: Identifier for the database being created.
+ * - tablespace_id: Identifier for the tablespace associated with the new database.
+ */
+struct xl_dbase_create_wal_log_rec
+{
+   oid db_id;                  /**< Database ID */
+   oid tablespace_id;          /**< Tablespace ID */
 };
 
 // Functions

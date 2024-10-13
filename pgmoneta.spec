@@ -77,16 +77,19 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-cli.1 %{buildroot}%{_mandir}/man1/pgmoneta-cli.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.conf.5 %{buildroot}%{_mandir}/man5/pgmoneta.conf.5
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-walinfo.1 %{buildroot}%{_mandir}/man5/pgmoneta-walinfo.1
 
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta %{buildroot}%{_bindir}/pgmoneta
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-cli %{buildroot}%{_bindir}/pgmoneta-cli
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-admin %{buildroot}%{_bindir}/pgmoneta-admin
+%{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-walinfo %{buildroot}%{_bindir}/pgmoneta-walinfo
 
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/libpgmoneta.so.%{version} %{buildroot}%{_libdir}/libpgmoneta.so.%{version}
 
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-cli
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-admin
+chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-walinfo
 
 cd %{buildroot}%{_libdir}/
 %{__ln_s} -f libpgmoneta.so.%{version} libpgmoneta.so.0
@@ -130,10 +133,12 @@ cd %{buildroot}%{_libdir}/
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
 %{_mandir}/man5/pgmoneta.conf.5*
+%{_mandir}/man5/pgmoneta-walinfo.1*
 %config %{_sysconfdir}/pgmoneta/pgmoneta.conf
 %{_bindir}/pgmoneta
 %{_bindir}/pgmoneta-cli
 %{_bindir}/pgmoneta-admin
+%{_bindir}/pgmoneta-walinfo
 %{_libdir}/libpgmoneta.so
 %{_libdir}/libpgmoneta.so.0
 %{_libdir}/libpgmoneta.so.%{version}
