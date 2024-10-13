@@ -26,23 +26,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <compression.h>
 #include <deque.h>
+#include <json.h>
 #include <logging.h>
+#include <utils.h>
 #include <walfile.h>
+#include <walfile/wal_reader.h>
 
-#include <assert.h>
+#include <libgen.h>
 #include <stdlib.h>
-
-static char*
-pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, struct server* server_info, char* buffer);
 
 int
 pgmoneta_read_walfile(int server, char* path, struct walfile** wf)
 {
    struct walfile* new_wf = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
 
    new_wf = malloc(sizeof(struct walfile));
    if (new_wf == NULL)
@@ -55,7 +53,7 @@ pgmoneta_read_walfile(int server, char* path, struct walfile** wf)
       goto error;
    }
 
-   if (pgmoneta_wal_parse_wal_file(path, &config->servers[server], new_wf))
+   if (pgmoneta_wal_parse_wal_file(path, server, new_wf))
    {
       goto error;
    }
@@ -75,9 +73,6 @@ pgmoneta_write_walfile(struct walfile* wf, int server, char* path)
    struct xlog_page_header_data* page_header = NULL;
    struct deque_iterator* page_header_iterator = NULL;
    FILE* file = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
 
    file = fopen(path, "wb");
    if (file == NULL)
@@ -110,7 +105,7 @@ pgmoneta_write_walfile(struct walfile* wf, int server, char* path)
    {
       char* encoded_record = NULL;
       struct decoded_xlog_record* record = (struct decoded_xlog_record*) record_iterator->value->data;
-      encoded_record = pgmoneta_wal_encode_xlog_record(record, &config->servers[server], encoded_record);
+      encoded_record = pgmoneta_wal_encode_xlog_record(record, wf->long_phd->std.xlp_magic, encoded_record);
 
       uint32_t total_length = record->header.xl_tot_len;
       uint32_t written = 0;
@@ -145,13 +140,6 @@ pgmoneta_write_walfile(struct walfile* wf, int server, char* path)
 
    pgmoneta_deque_iterator_destroy(record_iterator);
 
-   pgmoneta_log_trace("Done writing\n");
-   pgmoneta_log_trace("total pages: %d\n", page_number);
-   pgmoneta_log_trace("total records: %d\n", pgmoneta_deque_size(wf->records));
-   pgmoneta_log_trace("total page headers: %d\n", pgmoneta_deque_size(wf->page_headers) + 1);
-   pgmoneta_log_trace("xlp seg size: %d\n", wf->long_phd->xlp_seg_size);
-   pgmoneta_log_trace("xlp xlog blcksz: %d\n", wf->long_phd->xlp_xlog_blcksz);
-
    /* Fill the rest of the file until xlp_seg_size with zeros */
    long num_zeros = wf->long_phd->xlp_seg_size - ftell(file);
    char* zeros = (char*)calloc(num_zeros, sizeof(char));
@@ -165,183 +153,16 @@ error:
    return 1;
 }
 
-static char*
-pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, struct server* server_info, char* buffer)
-{
-   uint32_t total_length = 0;
-   uint8_t block_id;
-   char* ptr = NULL;
-   struct xlog_record record = decoded->header;
-
-   /* Compute total length required for the buffer */
-   total_length = record.xl_tot_len;
-
-   /* Allocate buffer */
-   buffer = malloc(total_length);
-   if (!buffer)
-   {
-      /* Handle allocation failure */
-      return NULL;
-   }
-   ptr = buffer;
-
-   /* Write header */
-   memcpy(ptr, &record, SIZE_OF_XLOG_RECORD);
-   ptr += SIZE_OF_XLOG_RECORD;
-
-   assert(ptr - buffer == SIZE_OF_XLOG_RECORD);
-
-   /* Write record_origin */
-   if (decoded->record_origin != INVALID_REP_ORIGIN_ID)
-   {
-      /* Write block_id */
-      *ptr = (uint8_t)XLR_BLOCK_ID_ORIGIN;
-      ptr += sizeof(uint8_t);
-
-      /* Write record_origin */
-      memcpy(ptr, &decoded->record_origin, sizeof(rep_origin_id));
-      ptr += sizeof(rep_origin_id);
-   }
-
-   /* Write toplevel_xid */
-   if (decoded->toplevel_xid != INVALID_TRANSACTION_ID)
-   {
-      /* Write block_id */
-      *ptr = (uint8_t)XLR_BLOCK_ID_TOPLEVEL_XID;
-      ptr += sizeof(uint8_t);
-
-      /* Write toplevel_xid */
-      memcpy(ptr, &decoded->toplevel_xid, sizeof(transaction_id));
-      ptr += sizeof(transaction_id);
-   }
-
-   /* Write blocks */
-   for (block_id = 0; block_id <= decoded->max_block_id; block_id++)
-   {
-      struct decoded_bkp_block* blk = &decoded->blocks[block_id];
-
-      if (!blk->in_use)
-      {
-         continue;
-      }
-
-      /* Write block_id */
-      memcpy(ptr, &block_id, sizeof(uint8_t));
-      ptr += sizeof(uint8_t);
-
-      /* Write fork_flags */
-      memcpy(ptr, &blk->flags, sizeof(uint8_t));
-      ptr += sizeof(uint8_t);
-
-      /* Write data_len */
-      uint16_t data_len = blk->data_len;
-      memcpy(ptr, &data_len, sizeof(uint16_t));
-      ptr += sizeof(uint16_t);
-
-      /* Write image data if present */
-      if (blk->has_image)
-      {
-         /* Write bimg_len */
-         uint16_t bimg_len = blk->bimg_len;
-         memcpy(ptr, &bimg_len, sizeof(uint16_t));
-         ptr += sizeof(uint16_t);
-
-         /* Write hole_offset */
-         uint16_t hole_offset = blk->hole_offset;
-         memcpy(ptr, &hole_offset, sizeof(uint16_t));
-         ptr += sizeof(uint16_t);
-
-         /* Write bimg_info */
-         uint8_t bimg_info = blk->bimg_info;
-         memcpy(ptr, &bimg_info, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-
-         if (pgmoneta_wal_is_bkp_image_compressed(server_info, blk->bimg_info))
-         {
-            if (blk->bimg_info & BKPIMAGE_HAS_HOLE)
-            {
-               uint16_t hole_length = blk->hole_length;
-               memcpy(ptr, &hole_length, sizeof(uint16_t));
-               ptr += sizeof(uint16_t);
-            }
-         }
-      }
-
-      /* Write rlocator if not SAME_REL */
-      if (!(blk->flags & BKPBLOCK_SAME_REL))
-      {
-         memcpy(ptr, &blk->rlocator, sizeof(struct rel_file_locator));
-         ptr += sizeof(struct rel_file_locator);
-
-      }
-
-      /* Write blkno */
-      memcpy(ptr, &blk->blkno, sizeof(block_number));
-      ptr += sizeof(block_number);
-   }
-
-   if (decoded->main_data_len > 0)
-   {
-      if (decoded->main_data_len <= UINT8_MAX)
-      {
-         /* Write block_id */
-         int block_data_short = XLR_BLOCK_ID_DATA_SHORT;
-         memcpy(ptr, &block_data_short, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-
-         /* Write main_data_len (uint8_t) */
-
-         uint8_t main_data_len = decoded->main_data_len;
-         memcpy(ptr, &main_data_len, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-      }
-      else
-      {
-         /* Write block_id */
-         int block_data_long = XLR_BLOCK_ID_DATA_LONG;
-         memcpy(ptr, &block_data_long, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-
-         /* Write main_data_len (uint32_t) */
-         uint32_t main_data_len = decoded->main_data_len;
-         memcpy(ptr, &main_data_len, sizeof(uint32_t));
-         ptr += sizeof(uint32_t);
-      }
-   }
-
-   for (block_id = 0; block_id <= decoded->max_block_id; block_id++)
-   {
-      struct decoded_bkp_block* blk = &decoded->blocks[block_id];
-      if (blk->has_data)
-      {
-         memcpy(ptr, blk->data, blk->data_len);
-         ptr += blk->data_len;
-      }
-      /* Write backup image if present */
-      if (blk->has_image)
-      {
-         memcpy(ptr, blk->bkp_image, blk->bimg_len);
-         ptr += blk->bimg_len;
-      }
-   }
-
-   if (decoded->main_data_len > 0)
-   {
-      memcpy(ptr, decoded->main_data, decoded->main_data_len);
-      ptr += decoded->main_data_len;
-   }
-
-   /* Ensure we've written the correct amount of data */
-   assert(ptr - buffer == total_length);
-
-   return buffer;
-}
-
 void
 pgmoneta_destroy_walfile(struct walfile* wf)
 {
    struct deque_iterator* record_iterator = NULL;
    struct deque_iterator* page_header_iterator = NULL;
+
+   if (wf == NULL)
+   {
+      return;
+   }
 
    if (pgmoneta_deque_iterator_create(wf->records, &record_iterator) || pgmoneta_deque_iterator_create(wf->page_headers, &page_header_iterator))
    {
@@ -351,6 +172,11 @@ pgmoneta_destroy_walfile(struct walfile* wf)
    while (pgmoneta_deque_iterator_next(record_iterator))
    {
       struct decoded_xlog_record* record = (struct decoded_xlog_record*) record_iterator->value->data;
+      if (record->partial)
+      {
+         free(record);
+         continue;
+      }
       if (record->main_data != NULL)
       {
          free(record->main_data);
@@ -381,4 +207,87 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 
    free(wf->long_phd);
    free(wf);
+}
+
+int
+pgmoneta_describe_walfile(char* path, enum value_type type)
+{
+   char* decompressed_wal_path = NULL;
+   char* tmp_compressed_wal = NULL;
+   struct walfile* wf = NULL;
+   struct deque_iterator* record_iterator = NULL;
+   struct decoded_xlog_record* record = NULL;
+
+   if (!pgmoneta_is_file(path))
+   {
+      pgmoneta_log_fatal("WAL file at %s does not exist", path);
+      goto error;
+   }
+
+   // Based on the file extension, if it's a compressed file, decompress it in /tmp
+   if (pgmoneta_is_file_archive(path))
+   {
+      tmp_compressed_wal = pgmoneta_format_and_append(tmp_compressed_wal, "/tmp/%s", basename(path));
+      // Temporarily copying the compressed WAL file, because the decompress functions delete the source file
+      pgmoneta_copy_file(path, tmp_compressed_wal, NULL);
+
+      decompressed_wal_path = "/tmp/decompressed_wal";
+      if (pgmoneta_decompress(tmp_compressed_wal, decompressed_wal_path))
+      {
+         pgmoneta_log_fatal("Failed to decompress WAL file at %s", path);
+         goto error;
+      }
+   }
+   else
+   {
+      decompressed_wal_path = path;
+   }
+
+   if (pgmoneta_read_walfile(-1, decompressed_wal_path, &wf))
+   {
+      pgmoneta_log_fatal("Failed to read WAL file at %s", path);
+      goto error;
+   }
+   if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
+   {
+      pgmoneta_log_fatal("Failed to create deque iterator");
+      goto error;
+   }
+
+   if (type == ValueJSON)
+   {
+      printf("{ \"WAL\": [\n");
+      int count = 0;
+      while (pgmoneta_deque_iterator_next(record_iterator))
+      {
+         printf("{\"Record\": ");
+         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type);
+         printf("}");
+         if (++count < pgmoneta_deque_size(wf->records))
+         {
+            printf(",\n");
+         }
+      }
+      printf("]\n}");
+   }
+   else
+   {
+      while (pgmoneta_deque_iterator_next(record_iterator))
+      {
+         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type);
+      }
+   }
+
+   free(tmp_compressed_wal);
+   pgmoneta_deque_iterator_destroy(record_iterator);
+   pgmoneta_destroy_walfile(wf);
+   return 0;
+
+error:
+   free(tmp_compressed_wal);
+   pgmoneta_destroy_walfile(wf);
+   pgmoneta_deque_iterator_destroy(record_iterator);
+   return 1;
 }

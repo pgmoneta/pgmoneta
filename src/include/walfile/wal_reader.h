@@ -34,14 +34,8 @@ extern "C" {
 
 /* pgmoneta-related includes */
 #include <pgmoneta.h>
+#include <value.h>
 #include <walfile/transaction.h>
-
-/* System includes */
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 /* Typedefs */
 typedef uint32_t timeline_id;
@@ -56,6 +50,9 @@ typedef int buffer;
 typedef uint32_t block_number;
 typedef unsigned int oid;
 typedef oid rel_file_number;
+
+/* Typedefs */
+typedef int64_t timestamp_tz;
 
 /* #define variables */
 #define MAXIMUM_ALIGNOF            8  // TODO: double check this value
@@ -149,7 +146,8 @@ enum wal_level
 
 /* Structs */
 
-struct walfile; // Forward declaration of walfile, defined in walfile.h
+struct walfile;                         /* Forward declaration of walfile, defined in walfile.h. */
+struct xlog_long_page_header_data;      /* Forward declaration of xlog_long_page_header_data, defined in walfile.h */
 
 /**
  * @struct xlog_page_header_data
@@ -284,21 +282,23 @@ struct decoded_bkp_block
  * - main_data_len: Length of the main data portion.
  * - max_block_id: Highest block ID in use (-1 if none).
  * - blocks: Array of decoded backup blocks.
+ * - partial: Indicates if the record is partial.
  */
 struct decoded_xlog_record
 {
-   size_t size;                           /**< Total size of the decoded record. */
-   bool oversized;                        /**< Indicates if the record is outside the regular decode buffer. */
-   struct decoded_xlog_record* next;      /**< Link to the next decoded record in the queue. */
-   xlog_rec_ptr lsn;                      /**< Location of the record. */
-   xlog_rec_ptr next_lsn;                 /**< Location of the next record. */
-   struct xlog_record header;             /**< Header of the record. */
-   rep_origin_id record_origin;           /**< Origin ID of the record. */
-   transaction_id toplevel_xid;           /**< Top-level transaction ID. */
-   char* main_data;                       /**< Main data portion of the record. */
-   uint32_t main_data_len;                /**< Length of the main data portion. */
-   int max_block_id;                      /**< Highest block ID in use (-1 if none). */
-   struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1];    /**< Array of decoded backup blocks. */
+   size_t size;                                               /**< Total size of the decoded record. */
+   bool oversized;                                            /**< Indicates if the record is outside the regular decode buffer. */
+   struct decoded_xlog_record* next;                          /**< Link to the next decoded record in the queue. */
+   xlog_rec_ptr lsn;                                          /**< Location of the record. */
+   xlog_rec_ptr next_lsn;                                     /**< Location of the next record. */
+   struct xlog_record header;                                 /**< Header of the record. */
+   rep_origin_id record_origin;                               /**< Origin ID of the record. */
+   transaction_id toplevel_xid;                               /**< Top-level transaction ID. */
+   char* main_data;                                           /**< Main data portion of the record. */
+   uint32_t main_data_len;                                    /**< Length of the main data portion. */
+   int max_block_id;                                          /**< Highest block ID in use (-1 if none). */
+   struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1];     /**< Array of decoded backup blocks. */
+   bool partial;                                              /**< Indicates if the record is partial. */
 };
 
 /**
@@ -328,59 +328,12 @@ extern struct server* server_config;
  * Parses a WAL file and populates server information.
  *
  * @param path The file path of the WAL file.
- * @param server_info The server structure to be populated with parsed data.
+ * @param server The index of the server structure, if -1, config.servers[0] will be initialized based on magic value.
  * @param wal_file The WAL file structure to be populated with parsed data.
  * @return 0 on success, otherwise 1.
  */
 int
-pgmoneta_wal_parse_wal_file(char* path, struct server* server_info, struct walfile* wal_file);
-
-/**
- * Decodes an XLOG record from a buffer.
- *
- * @param buffer The buffer containing the XLOG record data.
- * @param decoded The structure to hold the decoded XLOG record.
- * @param record The original XLOG record structure.
- * @param block_size The block size used for decoding.
- * @param server_info The server structure for context.
- * @return 0 if the decoding was successful, 1 otherwise.
- */
-int
-pgmoneta_wal_decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, struct server* server_info);
-
-/**
- * Retrieves the length of the XLOG record.
- *
- * @param record The decoded XLOG record.
- * @param rec_len Pointer to hold the record length.
- * @param fpi_len Pointer to hold the full-page image length.
- */
-void
-pgmoneta_wal_get_record_length(struct decoded_xlog_record* record, uint32_t* rec_len, uint32_t* fpi_len);
-
-/**
- * Displays the decoded XLOG record.
- *
- * @param record The decoded XLOG record to display.
- * @param count The count of records to display.
- * @param server_info The server structure for context.
- */
-void
-pgmoneta_wal_display_decoded_record(struct decoded_xlog_record* record, int count, struct server* server_info);
-
-/**
- * Retrieves block reference information from the decoded XLOG record.
- *
- * @param buf The buffer to store the block reference information.
- * @param record The decoded XLOG record.
- * @param pretty Format output in a more readable way if true.
- * @param detailed_format Use a detailed format if true.
- * @param fpi_len Pointer to store the full-page image length.
- * @param server_info The server structure for context.
- * @return The buffer containing the block reference information.
- */
-char*
-pgmoneta_wal_get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, struct server* server_info);
+pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file);
 
 /**
  * Retrieves block data from the decoded XLOG record.
@@ -394,21 +347,6 @@ char*
 pgmoneta_wal_get_record_block_data(struct decoded_xlog_record* record, uint8_t block_id, size_t* len);
 
 /**
- * Retrieves the block tag extended information from the decoded XLOG record.
- *
- * @param pRecord The decoded XLOG record.
- * @param id The block ID to retrieve the tag for.
- * @param pLocator The relation file locator structure to be filled.
- * @param pNumber The fork number structure to be filled.
- * @param pInt The block number structure to be filled.
- * @param pVoid The buffer structure to be filled.
- * @return true if the retrieval was successful, false otherwise.
- */
-bool
-pgmoneta_wal_get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struct rel_file_locator* pLocator, enum fork_number* pNumber,
-                                           block_number* pInt, buffer* pVoid);
-
-/**
  * Checks if the backup image is compressed.
  *
  * @param server_info The server structure for context.
@@ -416,18 +354,48 @@ pgmoneta_wal_get_record_block_tag_extended(struct decoded_xlog_record* pRecord, 
  * @return true if the image is compressed, false otherwise.
  */
 bool
-pgmoneta_wal_is_bkp_image_compressed(struct server* server_info, uint8_t bimg_info);
+pgmoneta_wal_is_bkp_image_compressed(uint16_t magic_value, uint8_t bimg_info);
 
+/**
+ * Describes an array in a formatted string.
+ *
+ * This function formats an array into a readable string description.
+ * It appends the description to the provided buffer.
+ *
+ * @param buf The buffer to append the array description to.
+ * @param array The array to describe.
+ * @param elem_size The size of each element in the array.
+ * @param count The number of elements in the array.
+ * @return A pointer to the updated buffer containing the array description.
+ */
 char*
 pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
 
 /**
- * Prints the record to the console.
+ * Displays the contents of a decoded WAL record.
  *
- * @param record The XLOG record to print.
+ * This function prints the contents of a decoded Write-Ahead Log (WAL) record
+ * for debugging or inspection purposes.
+ *
+ * @param record The decoded WAL record to display.
+ * @param magic_value The magic value associated with the WAL record.
+ * @param type The type of value to display.
  */
 void
-print_record(struct xlog_record* record);
+pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type);
+
+/**
+ * Encodes a WAL record into a buffer.
+ *
+ * This function encodes a WAL record into a buffer (reverse of decoding).
+ *
+ * @param decoded The decoded WAL record to encode.
+ * @param magic_value The magic value associated with the WAL record.
+ * @param buffer The buffer to store the encoded record.
+ * @return A pointer to the buffer containing the encoded record.
+ */
+char*
+pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t magic_value, char* buffer);
 
 #ifdef __cplusplus
 }
