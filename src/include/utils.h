@@ -1200,6 +1200,14 @@ pgmoneta_atoi(const char* input);
 char*
 pgmoneta_indent(char* str, char* tag, int indent);
 
+/**
+ * Translate a string into json format string
+ * @param str The original string
+ * @return The json formatted string
+ */
+char*
+pgmoneta_escape_string(char* str);
+
 #ifdef DEBUG
 
 /**

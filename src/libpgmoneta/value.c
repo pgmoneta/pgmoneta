@@ -431,6 +431,7 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    char* ret = NULL;
    char* str = (char*) data;
    char buf[MISC_LENGTH];
+   char* translated_string = NULL;
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
@@ -456,7 +457,9 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    {
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
-         snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+         translated_string = pgmoneta_escape_string(str);
+         snprintf(buf, MISC_LENGTH, "\"%s\"", translated_string);
+         free(translated_string);
       }
       else if (format == FORMAT_TEXT)
       {
