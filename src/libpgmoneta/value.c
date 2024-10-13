@@ -431,6 +431,10 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    char* ret = NULL;
    char* str = (char*) data;
    char buf[MISC_LENGTH];
+   char* translated_ec_string = NULL;
+   int len = 0;
+   int idx = 0;
+   size_t translated_len = 0;
 
    ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
@@ -456,7 +460,29 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    {
       if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
-         snprintf(buf, MISC_LENGTH, "\"%s\"", str);
+         len = strlen(str);
+         for (int i = 0; i < len; i++)
+         {
+            if (str[i] == '\'' || str[i] == '\"')
+            {
+               translated_len++;
+            }
+            translated_len++;
+         }
+         translated_ec_string = (char*)malloc(translated_len+1);
+
+         for (int i = 0; i < len; i++, idx++)
+         {
+            if (str[i] == '\'' || str[i] == '\"')
+            {
+               translated_ec_string[idx] = '\\';
+               idx++;
+            }
+            translated_ec_string[idx] = str[i];
+         }
+         translated_ec_string[idx] = '\0'; // terminator
+
+         snprintf(buf, MISC_LENGTH, "\"%s\"", translated_ec_string);
       }
       else if (format == FORMAT_TEXT)
       {
@@ -464,6 +490,8 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
       }
    }
    ret = pgmoneta_append(ret, buf);
+
+   free(translated_ec_string);
    return ret;
 }
 
@@ -473,7 +501,7 @@ bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    char* ret = NULL;
    bool val = (bool) data;
    ret = pgmoneta_indent(ret, tag, indent);
-   ret = pgmoneta_append(ret, val?"true":"false");
+   ret = pgmoneta_append(ret, val ? "true" : "false");
    return ret;
 }
 

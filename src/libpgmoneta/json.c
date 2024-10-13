@@ -52,6 +52,7 @@ static int parse_string(char* str, uint64_t* index, struct json** obj);
 static int json_add(struct json* obj, char* key, uintptr_t val, enum value_type type);
 static int fill_value(char* str, char* key, uint64_t* index, struct json* o);
 static bool value_start(char ch);
+static int handle_escape_char(char* str, uint64_t* index, uint64_t len, char* ch);
 
 int
 pgmoneta_json_reader_init(char* path, struct json_reader** reader)
@@ -620,6 +621,16 @@ parse_string(char* str, uint64_t* index, struct json** obj)
          // The key
          while (idx < len && str[idx] != '"')
          {
+            if (str[idx] == '\\')
+            {
+               char ch;
+               if(handle_escape_char(str, &idx, len, &ch))
+               {
+                  goto error;
+               }
+               key = pgmoneta_append_char(key, ch);
+               continue;
+            }
             key = pgmoneta_append_char(key, str[idx++]);
          }
          if (idx == len || key == NULL)
@@ -738,6 +749,16 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
       idx++;
       while (idx < len && str[idx] != '"')
       {
+         if (str[idx] == '\\')
+         {
+            char ch;
+            if(handle_escape_char(str, &idx, len, &ch))
+            {
+               goto error;
+            }
+            val = pgmoneta_append_char(val, ch);
+            continue;
+         }
          val = pgmoneta_append_char(val, str[idx++]);
       }
       if (idx == len)
@@ -842,6 +863,36 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
    return 0;
 error:
    return 1;
+}
+
+static int
+handle_escape_char(char* str, uint64_t* index, uint64_t len, char* ch)
+{
+   uint64_t idx = *index;
+   idx++;
+   if (idx == len) // security check
+   {
+      return 1;
+   }
+   switch (str[idx])
+   {
+      case '\'': // single quote
+         *ch = '\'';
+         break;
+      case '\"': // double quote
+         *ch = '\"';
+         break;
+      case '\n': // line feed
+         *ch = '\n';
+         break;
+      case '\t': // horizontal tab
+         *ch = '\t';
+         break;
+      default:
+         return 1;
+   }
+   *index = ++idx;
+   return 0;
 }
 
 static int
