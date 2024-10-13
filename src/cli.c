@@ -80,6 +80,8 @@
 #define OUTPUT_FORMAT_JSON "json"
 #define OUTPUT_FORMAT_TEXT "text"
 
+#define UNSPECIFIED "Unspecified"
+
 static void help_backup(void);
 static void help_list_backup(void);
 static void help_restore(void);
@@ -133,6 +135,7 @@ static char* translate_size(int64_t size);
 static void translate_backup_argument(struct json* j);
 static void translate_response_argument(struct json* j);
 static void translate_servers_argument(struct json* j);
+static void translate_server_retention_argument(struct json* j, char* tag);
 static void translate_json_object(struct json* j);
 
 static void
@@ -1734,6 +1737,16 @@ translate_response_argument(struct json* response)
 }
 
 static void
+translate_server_retention_argument(struct json* response, char* tag)
+{
+   if ((int32_t)pgmoneta_json_get(response, tag) < 0)
+   {
+      pgmoneta_json_put(response, tag, (uintptr_t)UNSPECIFIED, ValueString);
+   }
+}
+
+
+static void
 translate_servers_argument(struct json* response)
 {
    char* translated_server_size = NULL;
@@ -1744,6 +1757,10 @@ translate_servers_argument(struct json* response)
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_SIZE, (uintptr_t)translated_server_size, ValueString);
    }
 
+   translate_server_retention_argument(response, MANAGEMENT_ARGUMENT_RETENTION_DAYS);
+   translate_server_retention_argument(response, MANAGEMENT_ARGUMENT_RETENTION_WEEKS);
+   translate_server_retention_argument(response, MANAGEMENT_ARGUMENT_RETENTION_MONTHS);
+   translate_server_retention_argument(response, MANAGEMENT_ARGUMENT_RETENTION_YEARS);
    free(translated_server_size);
 }
 
