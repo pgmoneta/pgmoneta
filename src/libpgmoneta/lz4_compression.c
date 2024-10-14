@@ -326,7 +326,7 @@ do_lz4_decompress(void* arg)
 }
 
 void
-pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;
@@ -345,7 +345,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("LZ4: No file for %s", from);
       goto error;
    }
@@ -354,14 +354,14 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
    to = pgmoneta_remove_suffix(orig, ".lz4");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
 
    if (pgmoneta_lz4d_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error lz4 %s", from);
       goto error;
    }
@@ -370,7 +370,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
@@ -379,9 +379,9 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error sending response");
       goto error;
    }
@@ -431,7 +431,7 @@ error:
 }
 
 void
-pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -449,7 +449,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("LZ4: No file for %s", from);
       goto error;
    }
@@ -458,14 +458,14 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
    to = pgmoneta_append(to, ".lz4");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
 
    if (pgmoneta_lz4c_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error lz4 %s", from);
       goto error;
    }
@@ -474,7 +474,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
@@ -483,9 +483,9 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, struct json*
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error sending response");
       goto error;
    }

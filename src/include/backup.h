@@ -43,31 +43,34 @@ extern "C" {
  * Create a backup
  * @param client_fd The client
  * @param server The server
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload
  */
 void
-pgmoneta_backup(int client_fd, int server, uint8_t compression, struct json* payload);
+pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * List backups for a server
  * @param client_fd The client
  * @param server The server
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload
  */
 void
-pgmoneta_list_backup(int client_fd, int server, uint8_t compression, struct json* payload);
+pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Delete a backup for a server
  * @param client_fd The client
  * @param server The server
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload
  */
 void
-pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, struct json* payload);
+pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Get the backup max rate for a server

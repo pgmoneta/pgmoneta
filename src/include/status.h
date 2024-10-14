@@ -42,22 +42,24 @@ extern "C" {
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param offline Is the server running in offline mode
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload
  */
 void
-pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, struct json* payload);
+pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Create an status details
  * @param ssl The SSL connection
  * @param client_fd The client
  * @param offline Is the server running in offline mode
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload
  */
 void
-pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compression, struct json* payload);
+pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload);
 
 #ifdef __cplusplus
 }

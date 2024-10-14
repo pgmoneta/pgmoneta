@@ -91,11 +91,12 @@ pgmoneta_encrypt_wal(char* d);
  * Encrypt a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Encrypt a single file, also remove the original file
@@ -119,11 +120,38 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers);
  * Decrypt a single file, also remove encrypted file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
+ *
+ * Encrypt a buffer
+ * @param origin_buffer The original buffer
+ * @param origin_size The size of the buffer
+ * @param enc_buffer The result buffer
+ * @param enc_size The result buffer size
+ * @param mode The aes mode
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** enc_buffer, size_t* enc_size, int mode);
+
+/**
+ *
+ * Decrypt a buffer
+ * @param origin_buffer The original buffer
+ * @param origin_size The size of the buffer
+ * @param dec_buffer The result buffer
+ * @param dec_size The result buffer size
+ * @param mode The aes mode
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** dec_buffer, size_t* dec_size, int mode);
 
 #ifdef __cplusplus
 }

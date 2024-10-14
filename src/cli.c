@@ -103,26 +103,26 @@ static void help_info(void);
 static void help_annotate(void);
 static void display_helper(char* command);
 
-static int backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format);
-static int list_backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format);
-static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format);
-static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, int32_t output_format);
-static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format);
-static int delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
-static int stop(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
-static int status(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
-static int details(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
-static int ping(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
-static int reset(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
-static int reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
-static int retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
-static int expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
-static int decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
-static int encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
-static int decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
-static int compress_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
-static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, int32_t output_format);
-static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, int32_t output_format);
+static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int status(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int details(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int ping(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int reset(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 static int  process_result(SSL* ssl, int socket, int32_t output_format);
 
@@ -156,17 +156,18 @@ usage(void)
    printf("  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ] \n");
    printf("\n");
    printf("Options:\n");
-   printf("  -c, --config CONFIG_FILE              Set the path to the pgmoneta.conf file\n");
-   printf("  -h, --host HOST                       Set the host name\n");
-   printf("  -p, --port PORT                       Set the port number\n");
-   printf("  -U, --user USERNAME                   Set the user name\n");
-   printf("  -P, --password PASSWORD               Set the password\n");
-   printf("  -L, --logfile FILE                    Set the log file\n");
-   printf("  -v, --verbose                         Output text string of result\n");
-   printf("  -V, --version                         Display version information\n");
-   printf("  -F, --format text|json|raw            Set the output format\n");
-   printf("  -C, --compress none|gz|zstd|lz4|bz2   Compress the wire protocol\n");
-   printf("  -?, --help                            Display help\n");
+   printf("  -c, --config CONFIG_FILE                       Set the path to the pgmoneta.conf file\n");
+   printf("  -h, --host HOST                                Set the host name\n");
+   printf("  -p, --port PORT                                Set the port number\n");
+   printf("  -U, --user USERNAME                            Set the user name\n");
+   printf("  -P, --password PASSWORD                        Set the password\n");
+   printf("  -L, --logfile FILE                             Set the log file\n");
+   printf("  -v, --verbose                                  Output text string of result\n");
+   printf("  -V, --version                                  Display version information\n");
+   printf("  -F, --format text|json|raw                     Set the output format\n");
+   printf("  -C, --compress none|gz|zstd|lz4|bz2            Compress the wire protocol\n");
+   printf("  -E, --encrypt none|aes|aes256|aes192|aes128    Encrypt the wire protocol\n");
+   printf("  -?, --help                                     Display help\n");
    printf("\n");
    printf("Commands:\n");
    printf("  backup                   Backup a server\n");
@@ -382,6 +383,7 @@ main(int argc, char** argv)
    struct configuration* config = NULL;
    int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
    int32_t compression = MANAGEMENT_COMPRESSION_NONE;
+   int32_t encryption = MANAGEMENT_ENCRYPTION_NONE;
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
 
@@ -402,10 +404,11 @@ main(int argc, char** argv)
          {"version", no_argument, 0, 'V'},
          {"format", required_argument, 0, 'F'},
          {"help", no_argument, 0, '?'},
-         {"compress", required_argument, 0, 'C'}
+         {"compress", required_argument, 0, 'C'},
+         {"encrypt", required_argument, 0, 'E'}
       };
 
-      c = getopt_long(argc, argv, "vV?c:h:p:U:P:L:F:C:",
+      c = getopt_long(argc, argv, "vV?c:h:p:U:P:L:F:C:E:",
                       long_options, &option_index);
 
       if (c == -1)
@@ -482,6 +485,33 @@ main(int argc, char** argv)
             else
             {
                warnx("pgmoneta-cli: Compress method is not correct");
+               exit(1);
+            }
+            break;
+         case 'E':
+            if (!strncmp(optarg, "aes", MISC_LENGTH))
+            {
+               encryption = MANAGEMENT_ENCRYPTION_AES256;
+            }
+            else if (!strncmp(optarg, "aes256", MISC_LENGTH))
+            {
+               encryption = MANAGEMENT_ENCRYPTION_AES256;
+            }
+            else if (!strncmp(optarg, "aes192", MISC_LENGTH))
+            {
+               encryption = MANAGEMENT_ENCRYPTION_AES192;
+            }
+            else if (!strncmp(optarg, "aes128", MISC_LENGTH))
+            {
+               encryption = MANAGEMENT_ENCRYPTION_AES128;
+            }
+            else if (!strncmp(optarg, "none", MISC_LENGTH))
+            {
+               break;
+            }
+            else
+            {
+               warnx("pgmoneta-cli: Encrypt method is not correct");
                exit(1);
             }
             break;
@@ -670,104 +700,104 @@ password:
 
    if (parsed.cmd->action == MANAGEMENT_BACKUP)
    {
-      exit_code = backup(s_ssl, socket, parsed.args[0], compression, output_format);
+      exit_code = backup(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_LIST_BACKUP)
    {
-      exit_code = list_backup(s_ssl, socket, parsed.args[0], compression, output_format);
+      exit_code = list_backup(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
       {
-         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, output_format);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, encryption, output_format);
       }
       else
       {
-         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, output_format);
+         exit_code = restore(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, encryption, output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_VERIFY)
    {
       if (parsed.args[3])
       {
-         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, output_format);
+         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, encryption, output_format);
       }
       else
       {
-         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], "failed", compression, output_format);
+         exit_code = verify(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], "failed", compression, encryption, output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_ARCHIVE)
    {
       if (parsed.args[3])
       {
-         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, output_format);
+         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], compression, encryption, output_format);
       }
       else
       {
-         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, output_format);
+         exit_code = archive(s_ssl, socket, parsed.args[0], parsed.args[1], NULL, parsed.args[2], compression, encryption, output_format);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_DELETE)
    {
-      exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], compression, output_format);
+      exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_STOP)
    {
-      exit_code = stop(s_ssl, socket, compression, output_format);
+      exit_code = stop(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_STATUS)
    {
-      exit_code = status(s_ssl, socket, compression, output_format);
+      exit_code = status(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_STATUS_DETAILS)
    {
-      exit_code = details(s_ssl, socket, compression, output_format);
+      exit_code = details(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_PING)
    {
-      exit_code = ping(s_ssl, socket, compression, output_format);
+      exit_code = ping(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RESET)
    {
-      exit_code = reset(s_ssl, socket, compression, output_format);
+      exit_code = reset(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RELOAD)
    {
-      exit_code = reload(s_ssl, socket, compression, output_format);
+      exit_code = reload(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RETAIN)
    {
-      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1], compression, output_format);
+      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_EXPUNGE)
    {
-      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1], compression, output_format);
+      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_DECRYPT)
    {
-      exit_code = decrypt_data(s_ssl, socket, parsed.args[0], compression, output_format);
+      exit_code = decrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_ENCRYPT)
    {
-      exit_code = encrypt_data(s_ssl, socket, parsed.args[0], compression, output_format);
+      exit_code = encrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_DECOMPRESS)
    {
-      exit_code = decompress_data(s_ssl, socket, parsed.args[0], compression, output_format);
+      exit_code = decompress_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_COMPRESS)
    {
-      exit_code = compress_data(s_ssl, socket, parsed.args[0], compression, output_format);
+      exit_code = compress_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_INFO)
    {
-      exit_code = info(s_ssl, socket, parsed.args[0], parsed.args[1], compression, output_format);
+      exit_code = info(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_ANNOTATE)
    {
-      exit_code = annotate(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], parsed.args[4], compression, output_format);
+      exit_code = annotate(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], parsed.args[4], compression, encryption, output_format);
    }
 
 done:
@@ -1037,9 +1067,9 @@ display_helper(char* command)
 }
 
 static int
-backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format)
+backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_backup(ssl, socket, server, compression, output_format))
+   if (pgmoneta_management_request_backup(ssl, socket, server, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1057,9 +1087,9 @@ error:
 }
 
 static int
-list_backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format)
+list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_list_backup(ssl, socket, server, compression, output_format))
+   if (pgmoneta_management_request_list_backup(ssl, socket, server, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1077,9 +1107,9 @@ error:
 }
 
 static int
-restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format)
+restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_restore(ssl, socket, server, backup_id, position, directory, compression, output_format))
+   if (pgmoneta_management_request_restore(ssl, socket, server, backup_id, position, directory, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1097,9 +1127,9 @@ error:
 }
 
 static int
-verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, int32_t output_format)
+verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_verify(ssl, socket, server, backup_id, directory, files, compression, output_format))
+   if (pgmoneta_management_request_verify(ssl, socket, server, backup_id, directory, files, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1117,9 +1147,9 @@ error:
 }
 
 static int
-archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format)
+archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_archive(ssl, socket, server, backup_id, position, directory, compression, output_format))
+   if (pgmoneta_management_request_archive(ssl, socket, server, backup_id, position, directory, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1137,9 +1167,9 @@ error:
 }
 
 static int
-delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
+delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_delete(ssl, socket, server, backup_id, compression, output_format))
+   if (pgmoneta_management_request_delete(ssl, socket, server, backup_id, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1157,9 +1187,9 @@ error:
 }
 
 static int
-stop(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
+stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_stop(ssl, socket, compression, output_format))
+   if (pgmoneta_management_request_stop(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1177,9 +1207,9 @@ error:
 }
 
 static int
-status(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
+status(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_status(ssl, socket, compression, output_format))
+   if (pgmoneta_management_request_status(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1197,9 +1227,9 @@ error:
 }
 
 static int
-details(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
+details(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_status_details(ssl, socket, compression, output_format))
+   if (pgmoneta_management_request_status_details(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1217,9 +1247,9 @@ error:
 }
 
 static int
-ping(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
+ping(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_ping(ssl, socket, compression, output_format))
+   if (pgmoneta_management_request_ping(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1237,9 +1267,9 @@ error:
 }
 
 static int
-reset(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
+reset(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_reset(ssl, socket, compression, output_format))
+   if (pgmoneta_management_request_reset(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1257,9 +1287,9 @@ error:
 }
 
 static int
-reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
+reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_reload(ssl, socket, compression, output_format))
+   if (pgmoneta_management_request_reload(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1277,9 +1307,9 @@ error:
 }
 
 static int
-retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
+retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_retain(ssl, socket, server, backup_id, compression, output_format))
+   if (pgmoneta_management_request_retain(ssl, socket, server, backup_id, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1297,9 +1327,9 @@ error:
 }
 
 static int
-expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
+expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_expunge(ssl, socket, server, backup_id, compression, output_format))
+   if (pgmoneta_management_request_expunge(ssl, socket, server, backup_id, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1317,9 +1347,9 @@ error:
 }
 
 static int
-decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
+decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_decrypt(ssl, socket, path, compression, output_format))
+   if (pgmoneta_management_request_decrypt(ssl, socket, path, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1337,9 +1367,9 @@ error:
 }
 
 static int
-encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
+encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_encrypt(ssl, socket, path, compression, output_format))
+   if (pgmoneta_management_request_encrypt(ssl, socket, path, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1357,9 +1387,9 @@ error:
 }
 
 static int
-decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
+decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_decompress(ssl, socket, path, compression, output_format))
+   if (pgmoneta_management_request_decompress(ssl, socket, path, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1377,9 +1407,9 @@ error:
 }
 
 static int
-compress_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format)
+compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_compress(ssl, socket, path, compression, output_format))
+   if (pgmoneta_management_request_compress(ssl, socket, path, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1397,9 +1427,9 @@ error:
 }
 
 static int
-info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, int32_t output_format)
+info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_info(ssl, socket, server, backup, compression, output_format))
+   if (pgmoneta_management_request_info(ssl, socket, server, backup, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1417,9 +1447,9 @@ error:
 }
 
 static int
-annotate(SSL* ssl, int socket, char* server, char* backup, char* action, char* key, char* comment, uint8_t compression, int32_t output_format)
+annotate(SSL* ssl, int socket, char* server, char* backup, char* action, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_annotate(ssl, socket, server, backup, action, key, comment, compression, output_format))
+   if (pgmoneta_management_request_annotate(ssl, socket, server, backup, action, key, comment, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1441,7 +1471,7 @@ process_result(SSL* ssl, int socket, int32_t output_format)
 {
    struct json* read = NULL;
 
-   if (pgmoneta_management_read_json(ssl, socket, NULL, &read))
+   if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
    {
       goto error;
    }
@@ -1744,7 +1774,6 @@ translate_server_retention_argument(struct json* response, char* tag)
       pgmoneta_json_put(response, tag, (uintptr_t)UNSPECIFIED, ValueString);
    }
 }
-
 
 static void
 translate_servers_argument(struct json* response)

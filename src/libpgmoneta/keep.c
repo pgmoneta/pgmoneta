@@ -38,22 +38,22 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
-static void keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, struct json* payload);
+static void keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload);
 
 void
-pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, uint8_t compression, struct json* payload)
+pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   keep("Retain", ssl, client_fd, server, true, compression, payload);
+   keep("Retain", ssl, client_fd, server, true, compression, encryption, payload);
 }
 
 void
-pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, uint8_t compression, struct json* payload)
+pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   keep("Expunge", ssl, client_fd, server, false, compression, payload);
+   keep("Expunge", ssl, client_fd, server, false, compression, encryption, payload);
 }
 
 static void
-keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, struct json* payload)
+keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* elapsed = NULL;
    time_t start_time;
@@ -128,12 +128,12 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, compression, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, compression, encryption, payload);
          pgmoneta_log_error("Retain: No identifier for %s/%s", config->servers[srv].name, backup_id);
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, compression, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, compression, encryption, payload);
          pgmoneta_log_error("Expunge: No identifier for %s/%s", config->servers[srv].name, backup_id);
       }
 
@@ -159,16 +159,16 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_RETAIN_NETWORK, compression, payload);
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_RETAIN_NETWORK, compression, encryption, payload);
          pgmoneta_log_error("Retain: Error sending response");
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_EXPUNGE_NETWORK, compression, payload);
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_EXPUNGE_NETWORK, compression, encryption, payload);
          pgmoneta_log_error("Expunge: Error sending response");
       }
 

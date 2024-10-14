@@ -73,11 +73,12 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers);
  * BZip compress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * BZip a file
@@ -91,11 +92,12 @@ pgmoneta_bzip2_file(char* from, char* to);
  * BUNZip decompress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * BUNZip a file

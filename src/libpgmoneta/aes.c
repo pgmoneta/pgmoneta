@@ -44,9 +44,12 @@ static int derive_key_iv(char* password, unsigned char* key, unsigned char* iv, 
 static int aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphertext, int* ciphertext_length, int mode);
 static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext, int mode);
 static const EVP_CIPHER* (*get_cipher(int mode))(void);
+static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 
 static void do_encrypt_file(void* arg);
 static void do_decrypt_file(void* arg);
+
+static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
 int
 pgmoneta_encrypt_data(char* d, struct workers* workers)
@@ -248,7 +251,7 @@ pgmoneta_encrypt_wal(char* d)
 }
 
 void
-pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -266,7 +269,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NOFILE, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: No file for %s", from);
       goto error;
    }
@@ -276,7 +279,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    if (encrypt_file(from, to, 1))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Error encrypting %s", from);
       goto error;
    }
@@ -285,7 +288,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Allocation error");
       goto error;
    }
@@ -294,9 +297,9 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Error sending response");
       goto error;
    }
@@ -448,7 +451,7 @@ do_decrypt_file(void* arg)
 }
 
 void
-pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -466,7 +469,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NOFILE, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: No file for %s", from);
       goto error;
    }
@@ -474,7 +477,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
    to = malloc(strlen(from) - 3);
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
@@ -484,7 +487,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    if (encrypt_file(from, to, 0))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Error decrypting %s", from);
       goto error;
    }
@@ -493,7 +496,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
@@ -502,9 +505,9 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, struct js
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Error sending response");
       goto error;
    }
@@ -861,4 +864,138 @@ error:
    }
 
    return 1;
+}
+
+int
+pgmoneta_encrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** enc_buffer, size_t* enc_size, int mode)
+{
+   return encrypt_decrypt_buffer(origin_buffer, origin_size, enc_buffer, enc_size, 1, mode);
+}
+
+int
+pgmoneta_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** dec_buffer, size_t* dec_size, int mode)
+{
+   return encrypt_decrypt_buffer(origin_buffer, origin_size, dec_buffer, dec_size, 0, mode);
+}
+
+static int
+encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode)
+{
+   unsigned char key[EVP_MAX_KEY_LENGTH];
+   unsigned char iv[EVP_MAX_IV_LENGTH];
+   char* master_key = NULL;
+   EVP_CIPHER_CTX* ctx = NULL;
+   const EVP_CIPHER* (*cipher_fp)(void) = NULL;
+   size_t cipher_block_size = 0;
+   size_t outbuf_size = 0;
+   size_t outl = 0;
+   size_t f_len = 0;
+
+   cipher_fp = get_cipher_buffer(mode);
+   if (cipher_fp == NULL)
+   {
+      pgmoneta_log_error("Invalid encryption method specified");
+      goto error;
+   }
+
+   cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
+
+   if (enc == 1)
+   {
+      outbuf_size = origin_size + cipher_block_size;
+   }
+   else
+   {
+      outbuf_size = origin_size;
+   }
+
+   *res_buffer = (unsigned char*)malloc(outbuf_size + 1);
+   if (*res_buffer == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Allocation failure");
+      goto error;
+   }
+
+   if (pgmoneta_get_master_key(&master_key))
+   {
+      pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
+      goto error;
+   }
+
+   memset(&key, 0, sizeof(key));
+   memset(&iv, 0, sizeof(iv));
+
+   if (derive_key_iv(master_key, key, iv, mode) != 0)
+   {
+      pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
+      goto error;
+   }
+
+   if (!(ctx = EVP_CIPHER_CTX_new()))
+   {
+      pgmoneta_log_error("EVP_CIPHER_CTX_new: Failed to create context");
+      goto error;
+   }
+
+   if (EVP_CipherInit_ex(ctx, cipher_fp(), NULL, key, iv, enc) == 0)
+   {
+      pgmoneta_log_error("EVP_CipherInit_ex: Failed to initialize cipher context");
+      goto error;
+   }
+
+   if (EVP_CipherUpdate(ctx, *res_buffer, (int*)&outl, origin_buffer, origin_size) == 0)
+   {
+      pgmoneta_log_error("EVP_CipherUpdate: Failed to process data");
+      goto error;
+   }
+
+   *res_size = outl;
+
+   if (EVP_CipherFinal_ex(ctx, *res_buffer + outl, (int*)&f_len) == 0)
+   {
+      pgmoneta_log_error("EVP_CipherFinal_ex: Failed to finalize operation");
+      goto error;
+   }
+
+   *res_size += f_len;
+
+   if (enc == 0)
+   {
+      (*res_buffer)[*res_size] = '\0';
+   }
+
+   EVP_CIPHER_CTX_free(ctx);
+   free(master_key);
+
+   return 0;
+
+error:
+   if (ctx)
+   {
+      EVP_CIPHER_CTX_free(ctx);
+   }
+
+   if (master_key)
+   {
+      free(master_key);
+   }
+
+   return 1;
+}
+
+static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void)
+{
+   if (mode == ENCRYPTION_AES_256_CBC)
+   {
+      return &EVP_aes_256_cbc;
+   }
+   if (mode == ENCRYPTION_AES_192_CBC)
+   {
+      return &EVP_aes_192_cbc;
+   }
+   if (mode == ENCRYPTION_AES_128_CBC)
+   {
+      return &EVP_aes_128_cbc;
+   }
+   return &EVP_aes_256_cbc;
 }

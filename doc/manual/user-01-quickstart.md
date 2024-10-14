@@ -12,17 +12,18 @@ Usage:
   pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -d ]
 
 Options:
-  -c, --config CONFIG_FILE              Set the path to the pgmoneta.conf file
-  -h, --host HOST                       Set the host name
-  -p, --port PORT                       Set the port number
-  -U, --user USERNAME                   Set the user name
-  -P, --password PASSWORD               Set the password
-  -L, --logfile FILE                    Set the log file
-  -v, --verbose                         Output text string of result
-  -V, --version                         Display version information
-  -F, --format text|json|raw            Set the output format
-  -C, --compress none|gz|zstd|lz4|bz2   Compress the wire protocol
-  -?, --help                            Display help
+  -c, --config CONFIG_FILE                        Set the path to the pgmoneta.conf file
+  -h, --host HOST                                 Set the host name
+  -p, --port PORT                                 Set the port number
+  -U, --user USERNAME                             Set the user name
+  -P, --password PASSWORD                         Set the password
+  -L, --logfile FILE                              Set the log file
+  -v, --verbose                                   Output text string of result
+  -V, --version                                   Display version information
+  -F, --format text|json|raw                      Set the output format
+  -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
+  -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
+  -?, --help                                      Display help
 ```
 
 If you encounter any issues following the above steps, you can refer to the **Installation** chapter to see how to install or compile pgmoneta on your system.
@@ -123,17 +124,18 @@ Usage:
   pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 
 Options:
-  -c, --config CONFIG_FILE              Set the path to the pgmoneta.conf file
-  -h, --host HOST                       Set the host name
-  -p, --port PORT                       Set the port number
-  -U, --user USERNAME                   Set the user name
-  -P, --password PASSWORD               Set the password
-  -L, --logfile FILE                    Set the log file
-  -v, --verbose                         Output text string of result
-  -V, --version                         Display version information
-  -F, --format text|json|raw            Set the output format
-  -C, --compress none|gz|zstd|lz4|bz2   Compress the wire protocol
-  -?, --help                            Display help
+  -c, --config CONFIG_FILE                        Set the path to the pgmoneta.conf file
+  -h, --host HOST                                 Set the host name
+  -p, --port PORT                                 Set the port number
+  -U, --user USERNAME                             Set the user name
+  -P, --password PASSWORD                         Set the password
+  -L, --logfile FILE                              Set the log file
+  -v, --verbose                                   Output text string of result
+  -V, --version                                   Display version information
+  -F, --format text|json|raw                      Set the output format
+  -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
+  -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
+  -?, --help                                      Display help
 
 Commands:
   backup                   Backup a server

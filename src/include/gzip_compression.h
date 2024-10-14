@@ -65,11 +65,12 @@ pgmoneta_gzip_wal(char* directory);
  * GZip a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * GZip a file
@@ -83,11 +84,12 @@ pgmoneta_gzip_file(char* from, char* to);
  * GUNZip a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * GUNZip a file

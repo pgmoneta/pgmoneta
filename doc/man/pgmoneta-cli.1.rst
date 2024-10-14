@@ -51,6 +51,9 @@ OPTIONS
 -C, --compress none|gz|zstd|lz4|bz2
   Compress the wire protocol
 
+-E, --encrypt none|aes|aes256|aes192|aes128
+  Encrypt the wire protocol
+
 -?, --help
   Display help
 
