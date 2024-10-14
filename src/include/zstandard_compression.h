@@ -65,11 +65,12 @@ pgmoneta_zstandardc_wal(char* directory);
  * ZSTD decompress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Decompress a Zstandard file
@@ -92,11 +93,12 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers);
  * ZSTD compress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Compress a file

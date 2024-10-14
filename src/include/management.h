@@ -51,7 +51,10 @@ extern "C" {
 #define MANAGEMENT_COMPRESSION_LZ4      3
 #define MANAGEMENT_COMPRESSION_BZIP2    4
 
-#define MANAGEMENT_ENCRYPTION_NONE 0
+#define MANAGEMENT_ENCRYPTION_NONE      0
+#define MANAGEMENT_ENCRYPTION_AES256    1
+#define MANAGEMENT_ENCRYPTION_AES192    2
+#define MANAGEMENT_ENCRYPTION_AES128    3
 
 /**
  * Management commands
@@ -282,24 +285,26 @@ extern "C" {
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a list backup request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request
@@ -309,12 +314,13 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint
  * @param backup_id The backup
  * @param position The position parameters
  * @param directory The directory
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a verify request
@@ -324,12 +330,13 @@ pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* ba
  * @param backup_id The backup
  * @param directory The directory
  * @param files The files filter
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an archive request
@@ -339,12 +346,13 @@ pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* bac
  * @param backup_id The backup
  * @param position The position parameters
  * @param directory The directory
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a delete request
@@ -352,78 +360,85 @@ pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* ba
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a stop request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_stop(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a status payload
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_status(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_status(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a status details request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_status_details(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_status_details(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a ping request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_ping(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_ping(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a reset request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_reset(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_reset(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a reload request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a retain request
@@ -431,12 +446,13 @@ pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, in
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an expunge request
@@ -444,60 +460,65 @@ pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* bac
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a decrypt request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param path The file path
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an encrypt request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param path The file path
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a decompress request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param path The file path
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a compress request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param path The file path
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an info request
@@ -505,12 +526,13 @@ pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t c
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an annotate request
@@ -521,12 +543,13 @@ pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backu
  * @param action The action
  * @param key The key
  * @param comment The comment
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, uint8_t compression, int32_t output_format);
+pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an ok response
@@ -534,12 +557,13 @@ pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* b
  * @param socket The socket descriptor
  * @param start_time The start time
  * @param end_time The end time
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The full payload
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, uint8_t compression, struct json* payload);
+pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Create an error response
@@ -547,12 +571,13 @@ pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t 
  * @param socket The socket descriptor
  * @param server The server
  * @param error The error code
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The full payload
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, uint8_t compression, struct json* payload);
+pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Create a response
@@ -573,18 +598,19 @@ pgmoneta_management_create_response(struct json* json, int server, struct json**
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_read_json(SSL* ssl, int socket, uint8_t* compression, struct json** json);
+pgmoneta_management_read_json(SSL* ssl, int socket, uint8_t* compression, uint8_t* encryption, struct json** json);
 
 /**
  * Write the management JSON
  * @param ssl The SSL connection
  * @param socket The socket descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param json The JSON structure
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, struct json* json);
+pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, struct json* json);
 
 #ifdef __cplusplus
 }
