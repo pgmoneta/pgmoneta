@@ -60,6 +60,7 @@ static char* bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int in
 static char* deque_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* art_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 static char* json_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static char* mem_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
 
 int
 pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value)
@@ -125,6 +126,9 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
       case ValueART:
          val->to_string = art_to_string_cb;
          break;
+      case ValueMem:
+         val->to_string = mem_to_string_cb;
+         break;
       default:
          val->to_string = noop_to_string_cb;
          break;
@@ -143,6 +147,10 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
          val->destroy_data = free_destroy_cb;
          break;
       }
+      case ValueMem:
+         val->data = data;
+         val->destroy_data = free_destroy_cb;
+         break;
       case ValueJSON:
          val->data = data;
          val->destroy_data = json_destroy_cb;
@@ -486,4 +494,16 @@ static char*
 json_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    return pgmoneta_json_to_string((struct json*)data, format, tag, indent);
+}
+
+static char*
+mem_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
+{
+   char* ret = NULL;
+   ret = pgmoneta_indent(ret, tag, indent);
+   char buf[MISC_LENGTH];
+   memset(buf, 0, MISC_LENGTH);
+   snprintf(buf, MISC_LENGTH, "%p", (void*)data);
+   ret = pgmoneta_append(ret, buf);
+   return ret;
 }

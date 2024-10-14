@@ -58,6 +58,7 @@ enum value_type {
    ValueDeque,
    ValueART,
    ValueRef,
+   ValueMem,
 };
 
 /**
@@ -74,7 +75,9 @@ struct value
 
 /**
  * Create a value based on the data and value type
- * @param type The value type, use ValueRef if you are only storing pointers without the need to manage memory
+ * @param type The value type, use ValueRef if you are only storing pointers without the need to manage memory,
+ * use ValueMem if you are storing pointers to a chunk of memory that needs to and can be simply freed
+ * (meaning it can't have pointers to other malloced memories)
  * @param data The value data, type cast it to uintptr_t before passing into function
  * @param value [out] The value
  * @return 0 on success, 1 if otherwise
