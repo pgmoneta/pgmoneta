@@ -417,14 +417,14 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    memset(buf, 0, MISC_LENGTH);
    if (str == NULL)
    {
-      if (format == FORMAT_JSON)
+      if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
          snprintf(buf, MISC_LENGTH, "null");
       }
    }
    else if (strlen(str) == 0)
    {
-      if (format == FORMAT_JSON)
+      if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
          snprintf(buf, MISC_LENGTH, "\"%s\"", str);
       }
@@ -435,7 +435,7 @@ string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
    }
    else
    {
-      if (format == FORMAT_JSON)
+      if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
       {
          snprintf(buf, MISC_LENGTH, "\"%s\"", str);
       }
