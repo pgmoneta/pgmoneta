@@ -299,8 +299,9 @@ static char*
 int8_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRId8, (int8_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -311,8 +312,8 @@ static char*
 uint8_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRIu8, (uint8_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -323,8 +324,9 @@ static char*
 int16_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRId16, (int16_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -335,8 +337,9 @@ static char*
 uint16_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRIu16, (uint16_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -347,8 +350,9 @@ static char*
 int32_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRId32, (int32_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -359,8 +363,9 @@ static char*
 uint32_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRIu32, (uint32_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -371,8 +376,9 @@ static char*
 int64_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRId64, (int64_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -383,8 +389,9 @@ static char*
 uint64_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%" PRIu64, (uint64_t)data);
    ret = pgmoneta_append(ret, buf);
@@ -395,8 +402,9 @@ static char*
 float_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_float(data));
    ret = pgmoneta_append(ret, buf);
@@ -407,11 +415,13 @@ static char*
 double_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%f", pgmoneta_value_to_double(data));
    ret = pgmoneta_append(ret, buf);
+
    return ret;
 }
 
@@ -419,9 +429,10 @@ static char*
 string_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char* str = (char*) data;
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    if (str == NULL)
    {
@@ -460,8 +471,8 @@ static char*
 bool_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    bool val = (bool) data;
+   ret = pgmoneta_indent(ret, tag, indent);
    ret = pgmoneta_append(ret, val?"true":"false");
    return ret;
 }
@@ -470,11 +481,13 @@ static char*
 char_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "'%c'", (char)data);
    ret = pgmoneta_append(ret, buf);
+
    return ret;
 }
 
@@ -500,10 +513,12 @@ static char*
 mem_to_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
 {
    char* ret = NULL;
-   ret = pgmoneta_indent(ret, tag, indent);
    char buf[MISC_LENGTH];
+
+   ret = pgmoneta_indent(ret, tag, indent);
    memset(buf, 0, MISC_LENGTH);
    snprintf(buf, MISC_LENGTH, "%p", (void*)data);
    ret = pgmoneta_append(ret, buf);
+
    return ret;
 }
