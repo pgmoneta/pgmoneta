@@ -979,7 +979,7 @@ pgmoneta_management_write_json(SSL* ssl, int socket, uint8_t compression, struct
    char* encoded = NULL;
    size_t encoded_length = 0;
 
-   s = pgmoneta_json_to_string(json, FORMAT_JSON, NULL, 0);
+   s = pgmoneta_json_to_string(json, FORMAT_JSON_COMPACT, NULL, 0);
 
    if (write_uint8("pgmoneta-cli", ssl, socket, compression))
    {
