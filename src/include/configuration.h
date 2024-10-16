@@ -34,6 +34,9 @@ extern "C" {
 #endif
 
 #include <stdlib.h>
+#include "management.h"
+#include "network.h"
+#include "pgmoneta.h"
 
 /**
  * Initialize the configuration structure
@@ -101,6 +104,10 @@ pgmoneta_validate_admins_configuration(void* shmem);
  */
 int
 pgmoneta_reload_configuration(bool* restart);
+
+void 
+pgmoneta_conf_get_value(SSL* ssl, int client_fd, uint8_t compression,struct json* payload);
+
 
 #ifdef __cplusplus
 }

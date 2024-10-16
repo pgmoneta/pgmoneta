@@ -4037,6 +4037,66 @@ pgmoneta_indent(char* str, char* tag, int indent)
    return str;
 }
 
+char* 
+get_encryption_string(int encryption) {
+    switch (encryption) {
+        case ENCRYPTION_NONE: return "None";
+        case ENCRYPTION_AES_256_CBC: return "AES-256-CBC";
+        case ENCRYPTION_AES_192_CBC: return "AES-192-CBC";
+        case ENCRYPTION_AES_128_CBC: return "AES-128-CBC";
+        case ENCRYPTION_AES_256_CTR: return "AES-256-CTR";
+        case ENCRYPTION_AES_192_CTR: return "AES-192-CTR";
+        case ENCRYPTION_AES_128_CTR: return "AES-128-CTR";
+        default: return "Unknown Encryption Type";
+    }
+}
+
+char* 
+get_compression_string(int compression_type) {
+    switch (compression_type) {
+        case COMPRESSION_NONE: return "None";
+        case COMPRESSION_CLIENT_GZIP: return "Client GZIP";
+        case COMPRESSION_CLIENT_ZSTD: return "Client ZSTD";
+        case COMPRESSION_CLIENT_LZ4: return "Client LZ4";
+        case COMPRESSION_CLIENT_BZIP2: return "Client BZIP2";
+        case COMPRESSION_SERVER_GZIP: return "Server GZIP";
+        case COMPRESSION_SERVER_ZSTD: return "Server ZSTD";
+        case COMPRESSION_SERVER_LZ4: return "Server LZ4";
+        default: return "Unknown Compression Type";
+    }
+}
+
+char* 
+get_storage_engine_string(int storage_engine) {
+    switch (storage_engine) {
+        case STORAGE_ENGINE_LOCAL: return "Local";
+        case STORAGE_ENGINE_SSH: return "SSH";
+        case STORAGE_ENGINE_S3: return "S3";
+        case STORAGE_ENGINE_AZURE: return "Azure";
+        default: return "Unknown Storage Engine";
+    }
+}
+
+char* 
+get_create_slot_string(int create_slot) {
+    switch (create_slot) {
+        case CREATE_SLOT_UNDEFINED: return "Undefined";
+        case CREATE_SLOT_YES: return "Yes";
+        case CREATE_SLOT_NO: return "No";
+        default: return "Unknown Create Slot Value";
+    }
+}
+
+char* 
+get_hugepage_string(int hugepage) {
+    switch (hugepage) {
+        case HUGEPAGE_OFF: return "Off";
+        case HUGEPAGE_TRY: return "Try";
+        case HUGEPAGE_ON: return "On";
+        default: return "Unknown Hugepage Value";
+    }
+}
+
 #ifdef DEBUG
 
 int

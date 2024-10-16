@@ -464,6 +464,40 @@ error:
 }
 
 int
+pgmoneta_management_conf_get(SSL* ssl, int socket,char* config_key, uint8_t compression, int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (create_header(MANAGEMENT_CONFIG_GET, output_format, &j))
+   {
+      goto error;
+   }
+
+   if (create_request(j, &request))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(request,MANAGEMENT_ARGUMENT_CONFIG_KEY,(uintptr_t) config_key,ValueString);
+   
+   if (pgmoneta_management_write_json(ssl, socket, compression, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(j);
+
+   return 1;
+}
+
+int
 pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format)
 {
    struct json* j = NULL;
