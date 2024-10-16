@@ -620,6 +620,24 @@ parse_string(char* str, uint64_t* index, struct json** obj)
          // The key
          while (idx < len && str[idx] != '"')
          {
+            if (str[idx] == '\\')
+            {
+               idx++;
+               if (idx == len) // security check
+               {
+                  goto error;
+               }
+               switch (str[idx])
+               {
+                  case '\'': // single quote
+                  case '\"': // double quote
+                     key = pgmoneta_append_char(key, str[idx++]);
+                     break;
+                  default:
+                     goto error;
+               }
+               continue;
+            }
             key = pgmoneta_append_char(key, str[idx++]);
          }
          if (idx == len || key == NULL)
@@ -738,6 +756,25 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
       idx++;
       while (idx < len && str[idx] != '"')
       {
+         // check for escape characters in value
+         if (str[idx] == '\\')
+         {
+            idx++;
+            if (idx == len) // security check
+            {
+               goto error;
+            }
+            switch (str[idx])
+            {
+               case '\'': // single quote
+               case '\"': // double quote
+                  val = pgmoneta_append_char(val, str[idx++]);
+                  break;
+               default:
+                  goto error;
+            }
+            continue;
+         }
          val = pgmoneta_append_char(val, str[idx++]);
       }
       if (idx == len)
