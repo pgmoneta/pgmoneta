@@ -1200,6 +1200,22 @@ pgmoneta_atoi(const char* input);
 char*
 pgmoneta_indent(char* str, char* tag, int indent);
 
+char* 
+get_encryption_string(int encryption);
+
+char* 
+get_compression_string(int compression_type);
+
+char* 
+get_storage_engine_string(int storage_engine);
+
+char* 
+get_create_slot_string(int create_slot);
+
+char* 
+get_hugepage_string(int hugepage);
+
+
 #ifdef DEBUG
 
 /**

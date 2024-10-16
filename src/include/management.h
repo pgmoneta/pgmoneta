@@ -76,6 +76,9 @@ extern "C" {
 #define MANAGEMENT_INFO           18
 #define MANAGEMENT_VERIFY         19
 #define MANAGEMENT_ANNOTATE       20
+#define MANAGEMENT_CONFIG_GET     21
+#define MANAGEMENT_CONFIG_SET     22
+#define MANAGEMENT_CONFIG_LS      23
 
 /**
  * Management categories
@@ -152,6 +155,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_VALID                 "Valid"
 #define MANAGEMENT_ARGUMENT_WAL                   "WAL"
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
+#define MANAGEMENT_ARGUMENT_CONFIG_KEY            "ConfigKey"
 
 /**
  * Management error
@@ -269,6 +273,8 @@ extern "C" {
 #define MANAGEMENT_ERROR_ANNOTATE_FAILED   2003
 #define MANAGEMENT_ERROR_ANNOTATE_NETWORK  2004
 #define MANAGEMENT_ERROR_ANNOTATE_ERROR    2005
+
+#define MANAGEMENT_ERROR_CONF_NOFORK       2100
 
 /**
  * Output formats
@@ -424,6 +430,18 @@ pgmoneta_management_request_reset(SSL* ssl, int socket, uint8_t compression, int
  */
 int
 pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+
+/**
+ * Get a specific config key's value 
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param config_key The config key
+ * @param compression The compress method for json format
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_conf_get(SSL* ssl, int socket,char* config_key, uint8_t compression, int32_t output_format);
 
 /**
  * Create a retain request
