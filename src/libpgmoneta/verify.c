@@ -44,7 +44,7 @@
 #include <unistd.h>
 
 void
-pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, struct json* payload)
+pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* backup_id = NULL;
    char* directory = NULL;
@@ -182,14 +182,14 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, struct
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
 
       goto error;
    }
 
    if (pgmoneta_json_create(&filesj))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
 
       goto error;
    }
@@ -203,9 +203,9 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, struct
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Verify: Error sending response for %s/%s", config->servers[server].name, backup_id);
 
       goto error;

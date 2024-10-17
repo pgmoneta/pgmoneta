@@ -75,11 +75,12 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers);
  * LZ4 decompress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Decompress a Lz4 file
@@ -94,11 +95,12 @@ pgmoneta_lz4d_file(char* from, char* to);
  * LZ4 compress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor
- * @param compression The compress method for json format
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
  * @param payload The payload of the request
  */
 void
-pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload);
+pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Compress a file
