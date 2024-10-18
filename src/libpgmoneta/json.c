@@ -52,6 +52,7 @@ static int parse_string(char* str, uint64_t* index, struct json** obj);
 static int json_add(struct json* obj, char* key, uintptr_t val, enum value_type type);
 static int fill_value(char* str, char* key, uint64_t* index, struct json* o);
 static bool value_start(char ch);
+static int handle_escape_char(char* str, uint64_t* index, uint64_t len, char* key);
 
 int
 pgmoneta_json_reader_init(char* path, struct json_reader** reader)
@@ -620,6 +621,14 @@ parse_string(char* str, uint64_t* index, struct json** obj)
          // The key
          while (idx < len && str[idx] != '"')
          {
+            if (str[idx] == '\\')
+            {
+               if(handle_escape_char(str, &idx, len, key))
+               {
+                  goto error;
+               }
+               continue;
+            }
             key = pgmoneta_append_char(key, str[idx++]);
          }
          if (idx == len || key == NULL)
@@ -738,6 +747,14 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
       idx++;
       while (idx < len && str[idx] != '"')
       {
+         if (str[idx] == '\\')
+         {
+            if(handle_escape_char(str, &idx, len, val))
+            {
+               goto error;
+            }
+            continue;
+         }
          val = pgmoneta_append_char(val, str[idx++]);
       }
       if (idx == len)
@@ -842,6 +859,36 @@ fill_value(char* str, char* key, uint64_t* index, struct json* o)
    return 0;
 error:
    return 1;
+}
+
+static int
+handle_escape_char(char* str, uint64_t* index, uint64_t len, char* key)
+{
+   uint64_t idx = *index;
+   idx++;
+   if (idx == len) // security check
+   {
+      return 1;
+   }
+   switch (str[idx])
+   {
+      case '\'': // single quote
+         key = pgmoneta_append_char(key, '\'');
+         break;
+      case '\"': // double quote
+         key = pgmoneta_append_char(key, '\"');
+         break;
+      case '\n': // line feed
+         key = pgmoneta_append_char(key, '\n');
+         break;
+      case '\t': // horizontal tab
+         key = pgmoneta_append_char(key, '\t');
+         break;
+      default:
+         return 1;
+   }
+   *index = ++idx;
+   return 0;
 }
 
 static int
