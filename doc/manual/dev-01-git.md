@@ -1,5 +1,22 @@
 \newpage
 
+# C programming
+
+[**pgmoneta**](https://github.com/pgmoneta/pgmoneta) is developed using the [C programming language](https://en.wikipedia.org/wiki/C_(programming_language)) so it is a good
+idea to have some knowledge about the language before you begin to make changes.
+
+There are books like,
+
+* [C in a Nutshell](https://www.oreilly.com/library/view/c-in-a/9781491924174/)
+* [21st Century C](https://www.oreilly.com/library/view/21st-century-c/9781491904428/)
+
+that can help you
+
+## Debugging
+
+In order to debug problems in your code you can use [gdb](https://www.sourceware.org/gdb/), or add extra logging using
+the `pgmoneta_log_XYZ()` API
+
 # Git guide
 
 Here are some links that will help you

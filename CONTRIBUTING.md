@@ -133,7 +133,15 @@ git push -f origin mywork
 
 as all pull requests should be squashed and rebased.
 
-In your first pull request you need to add yourself to the `AUTHORS` file.
+In your first pull request you need to add yourself to the 
+
+```
+AUTHORS
+doc/manual/97-acknowledgement.md
+doc/manual/advanced/97-acknowledgement.md
+```
+
+files.
 
 ## Code Style
 
