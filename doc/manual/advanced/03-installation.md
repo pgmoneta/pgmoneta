@@ -33,7 +33,6 @@ and lets open the ports in the firewall that we will need
 ```
 firewall-cmd --permanent --zone=public --add-port=5001/tcp
 firewall-cmd --permanent --zone=public --add-port=5002/tcp
-firewall-cmd --permanent --zone=public --add-port=5003/tcp
 ```
 
 ## PostgreSQL 17

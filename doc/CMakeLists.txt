@@ -110,14 +110,14 @@ if(generation)
   add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf
     COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf --from markdown --template eisvogel --listings -N --toc ${AG}
-    DEPENDS ${UMDS}
+    DEPENDS ${AG}
     COMMENT "Generating Advanced PDF documentation"
   )
 
   add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html
     COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html -s -f markdown-smart -N --toc -t html5 ${AG}
-    DEPENDS ${UMDS}
+    DEPENDS ${AG}
     COMMENT "Generating Advanced HTML documentation"
   )
 

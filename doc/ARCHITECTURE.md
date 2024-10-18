@@ -68,7 +68,7 @@ uses its own protocol which uses JSON as its foundation.
 The client sends a single JSON string to the server,
 
 | Field         | Type   | Description                     |
-|---------------|--------|---------------------------------|
+| :------------ | :----- | :------------------------------ |
 | `compression` | uint8  | The compression type            |
 | `encryption`  | uint8  | The encryption type             |
 | `length`      | uint32 | The length of the JSON document |
@@ -77,7 +77,7 @@ The client sends a single JSON string to the server,
 The server sends a single JSON string to the client,
 
 | Field         | Type   | Description                     |
-|---------------|--------|---------------------------------|
+| :------------ | :----- | :------------------------------ |
 | `compression` | uint8  | The compression type            |
 | `encryption`  | uint8  | The encryption type             |
 | `length`      | uint32 | The length of the JSON document |
@@ -88,7 +88,7 @@ The server sends a single JSON string to the client,
 The server sends a single JSON string to the client,
 
 | Field         | Type   | Description                     |
-|---------------|--------|---------------------------------|
+| :------------ | :----- | :------------------------------ |
 | `compression` | uint8  | The compression type            |
 | `encryption`  | uint8  | The encryption type             |
 | `length`      | uint32 | The length of the JSON document |
@@ -97,7 +97,7 @@ The server sends a single JSON string to the client,
 The client sends to the server a single JSON documents,
 
 | Field         | Type   | Description                     |
-|---------------|--------|---------------------------------|
+| :------------ | :----- | :------------------------------ |
 | `compression` | uint8  | The compression type            |
 | `encryption`  | uint8  | The encryption type             |
 | `length`      | uint32 | The length of the JSON document |

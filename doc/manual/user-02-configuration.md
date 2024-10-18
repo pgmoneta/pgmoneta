@@ -21,7 +21,7 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 ## [pgmoneta]
 
 | Property              |Default|Unit  |Required| Description |
-|-----------------------|-------|------|--------|-------------|
+| :-------------------- | :---- | :--- | :----- | :---------- |
 | host                  |       |String|  Yes   | The bind address for pgmoneta |
 | unix_socket_dir       |       |String|  Yes   | The Unix Domain Socket location |
 | base_dir              |       |String|  Yes   | The base directory for the backup |
@@ -76,7 +76,7 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 ## Server section
 
 | Property       | Default | Unit | Required | Description |
-|----------------|---------|------|----------|-------------|
+| :------------- | :------ | :--- | :------- | :---------- |
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |

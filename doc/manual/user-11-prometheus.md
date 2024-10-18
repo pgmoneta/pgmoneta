@@ -51,7 +51,7 @@ The retention of pgmoneta in years
 The retention of a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |parameter 	| days weeks months years            |
 
@@ -138,7 +138,7 @@ The total disk space for the hot standby directory of a server
 The current timeline a server is on
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_server_parent_tli
@@ -146,7 +146,7 @@ The current timeline a server is on
 The parent timeline of a timeline on a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |tli 	    |The current/previous timeline ID in the server history|
 
@@ -155,7 +155,7 @@ The parent timeline of a timeline on a server
 The WAL switch position of a timeline on a server (showed in hex as a parameter)
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |tli  	    |The current/previous timeline ID in the server history|
 |walpos 	|The WAL switch position of this timeline |
@@ -165,7 +165,7 @@ The WAL switch position of a timeline on a server (showed in hex as a parameter)
 The number of workers for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_backup_oldest
@@ -173,7 +173,7 @@ The number of workers for a server
 The oldest backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_backup_newest
@@ -181,7 +181,7 @@ The oldest backup for a server
 The newest backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_backup_count
@@ -189,7 +189,7 @@ The newest backup for a server
 The number of valid backups for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_backup
@@ -197,7 +197,7 @@ The number of valid backups for a server
 Is the backup valid for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -206,7 +206,7 @@ Is the backup valid for a server
 The version of PostgreSQL for a backup
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 |major 	    |The backup PostgreSQL major version |
@@ -224,7 +224,7 @@ label 	The backup label
 The backup in seconds for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -233,7 +233,7 @@ The backup in seconds for a server
 The starting timeline of a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -242,7 +242,7 @@ The starting timeline of a backup for a server
 The ending timeline of a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -251,7 +251,7 @@ The ending timeline of a backup for a server
 The starting WAL position of a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 |walpos 	|The backup starting WAL position    |
@@ -261,7 +261,7 @@ The starting WAL position of a backup for a server
 The checkpoint WAL pos of a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 |walpos 	|The backup checkpoint WAL position  |
@@ -271,7 +271,7 @@ The checkpoint WAL pos of a backup for a server
 The ending WAL pos of a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 |walpos 	|The backup ending WAL position      |
@@ -281,7 +281,7 @@ The ending WAL pos of a backup for a server
 The size of the newest restore for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_backup_newest_size
@@ -289,7 +289,7 @@ The size of the newest restore for a server
 The size of the newest backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_restore_size
@@ -297,7 +297,7 @@ The size of the newest backup for a server
 The size of a restore for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -306,7 +306,7 @@ The size of a restore for a server
 The increment size of a restore for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -315,7 +315,7 @@ The increment size of a restore for a server
 The size of a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -324,7 +324,7 @@ The size of a backup for a server
 The ratio of backup size to restore size for each backup
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -333,7 +333,7 @@ The ratio of backup size to restore size for each backup
 Retain a backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |label 	    |The backup label                    |
 
@@ -342,7 +342,7 @@ Retain a backup for a server
 The total size of the backups for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_wal_total_size
@@ -350,7 +350,7 @@ The total size of the backups for a server
 The total size of the WAL for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_total_size
@@ -358,7 +358,7 @@ The total size of the WAL for a server
 The total size for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_active_backup
@@ -366,7 +366,7 @@ The total size for a server
 Is there an active backup for a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 
 ## pgmoneta_current_wal_file
@@ -374,7 +374,7 @@ Is there an active backup for a server
 The current streaming WAL filename of a server
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name 	    |The identifier for the server       |
 |file 	    |The current WAL filename for this server|
 
@@ -383,6 +383,6 @@ The current streaming WAL filename of a server
 The current WAL log sequence number
 
 | Attribute | Description |
-|-----------|------------------------------------|
+| :-------- | :--------------------------------- |
 |name       |The identifier for the server       |
 |lsn        |The current WAL log sequence number |
