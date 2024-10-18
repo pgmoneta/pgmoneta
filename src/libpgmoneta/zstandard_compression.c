@@ -321,7 +321,7 @@ error:
 }
 
 void
-pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;
@@ -340,7 +340,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, struct
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: No file for %s", from);
       goto error;
    }
@@ -349,14 +349,14 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, struct
    to = pgmoneta_remove_suffix(orig, ".zstd");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
 
    if (pgmoneta_zstandardd_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error ztsd %s", from);
       goto error;
    }
@@ -365,7 +365,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, struct
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
@@ -374,9 +374,9 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, struct
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error sending response");
       goto error;
    }
@@ -587,7 +587,7 @@ error:
 }
 
 void
-pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -605,7 +605,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, struct
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: No file for %s", from);
       goto error;
    }
@@ -614,14 +614,14 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, struct
    to = pgmoneta_append(to, ".zstd");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
 
    if (pgmoneta_zstandardc_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error ztsd %s", from);
       goto error;
    }
@@ -630,7 +630,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, struct
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
@@ -639,9 +639,9 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, struct
 
    end_time = time(NULL);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, compression, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error sending response");
       goto error;
    }
