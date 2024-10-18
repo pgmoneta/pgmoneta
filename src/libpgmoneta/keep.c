@@ -63,6 +63,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    char* d = NULL;
    int backup_index = -1;
    int number_of_backups = 0;
+   bool kr = false;
    struct backup** backups = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
@@ -139,19 +140,22 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backups[backup_index]->label, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backups[backup_index]->valid, ValueInt8);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[backup_index]->comments, ValueString);
-
    if (backups[backup_index]->valid == VALID_TRUE)
    {
       d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
 
       pgmoneta_update_info_bool(d, INFO_KEEP, k);
 
+      kr = k;
+
       free(d);
       d = NULL;
    }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backups[backup_index]->label, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backups[backup_index]->valid, ValueInt8);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[backup_index]->comments, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)kr, ValueBool);
 
    end_time = time(NULL);
 
