@@ -57,6 +57,10 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "gzip_compression.h"
+#include "zstandard_compression.h"
+#include "lz4_compression.h"
+#include "bzip2_compression.h"
 
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
@@ -4035,6 +4039,61 @@ pgmoneta_indent(char* str, char* tag, int indent)
       str = pgmoneta_append(str, tag);
    }
    return str;
+}
+
+static void
+pgmoneta_decompression_file_callback(char* path, compression_func* decompress_cb)
+{
+   // Determine the compression method based on file extension
+   if (pgmoneta_ends_with(path, ".gz"))
+   {
+      *decompress_cb = pgmoneta_gunzip_file;
+   }
+   else if (pgmoneta_ends_with(path, ".zstd"))
+   {
+      *decompress_cb = pgmoneta_zstandardd_file;
+   }
+   else if (pgmoneta_ends_with(path, ".lz4"))
+   {
+      *decompress_cb = pgmoneta_lz4d_file;
+   }
+   else if (pgmoneta_ends_with(path, ".bz2"))
+   {
+      *decompress_cb = pgmoneta_bunzip2_file;
+   }
+   else
+   {
+      *decompress_cb = NULL;
+   }
+}
+
+int
+pgmoneta_decompress(char* from, char* to)
+{
+   compression_func decompress_cb = NULL;
+   pgmoneta_decompression_file_callback(from, &decompress_cb);
+   if (decompress_cb == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_decompress: no decompression callback found for file %s", from);
+      return 1;
+   }
+   return decompress_cb(from, to);
+}
+
+char*
+pgmoneta_lsn_to_string(uint64_t lsn)
+{
+   char* result = NULL;
+   result = (char*)malloc(64 * sizeof(char));
+
+   if (result == NULL)
+   {
+      pgmoneta_log_fatal("pgmoneta_lsn_to_string: malloc failed");
+      return NULL;
+   }
+   memset(result, 0, 64);
+   snprintf(result, 64, "%X/%X", (uint32_t)(lsn >> 32), (uint32_t)lsn);
+   return result;
 }
 
 #ifdef DEBUG

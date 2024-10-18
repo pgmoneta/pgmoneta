@@ -1745,7 +1745,6 @@ translate_server_retention_argument(struct json* response, char* tag)
    }
 }
 
-
 static void
 translate_servers_argument(struct json* response)
 {
