@@ -127,7 +127,7 @@ jobs:
     - name: Cleanup
       run: |
         version=$(pg_config --version | grep -Eo "[0-9]{1,2}" | head -1)
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf stop
+        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf shutdown
         sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl stop -D /tmp/pgsql
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
 
@@ -235,5 +235,5 @@ jobs:
       working-directory: /Users/runner/work/pgmoneta/pgmoneta/
     - name: Cleanup
       run: |
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf stop
+        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf shutdown
         pg_ctl stop -D /tmp/pgsql

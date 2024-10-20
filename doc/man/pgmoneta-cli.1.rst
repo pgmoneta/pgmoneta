@@ -105,8 +105,8 @@ annotate
 ping
   Check if pgmoneta is alive
 
-stop
-  Stop pgmoneta
+shutdown
+  Shutdown pgmoneta
 
 status [details]
   Status of pgmoneta

@@ -69,7 +69,7 @@
 #define COMMAND_COMPRESS "compress"
 #define COMMAND_DECOMPRESS "decompress"
 #define COMMAND_PING "ping"
-#define COMMAND_STOP "stop"
+#define COMMAND_SHUTDOWN "shutdown"
 #define COMMAND_STATUS "status"
 #define COMMAND_STATUS_DETAILS "status-details"
 #define COMMAND_CONF "conf"
@@ -94,7 +94,7 @@ static void help_decrypt(void);
 static void help_encrypt(void);
 static void help_decompress(void);
 static void help_compress(void);
-static void help_stop(void);
+static void help_shutdown(void);
 static void help_ping(void);
 static void help_status_details(void);
 static void help_conf(void);
@@ -109,7 +109,7 @@ static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* po
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int pgmoneta_shutdown(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int status(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int details(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int ping(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -185,7 +185,7 @@ usage(void)
    printf("  info                     Information about a backup\n");
    printf("  annotate                 Annotate a backup with comments\n");
    printf("  ping                     Check if pgmoneta is alive\n");
-   printf("  stop                     Stop pgmoneta\n");
+   printf("  shutdown                 Shutdown pgmoneta\n");
    printf("  status [details]         Status of pgmoneta, with optional details\n");
    printf("  conf <action>            Manage the configuration, with one of subcommands:\n");
    printf("                           - 'reload' to reload the configuration\n");
@@ -302,12 +302,12 @@ const struct pgmoneta_command command_table[] = {
       .log_message = "<ping>"
    },
    {
-      .command = "stop",
+      .command = "shutdown",
       .subcommand = "",
       .accepted_argument_count = {0},
-      .action = MANAGEMENT_STOP,
+      .action = MANAGEMENT_SHUTDOWN,
       .deprecated = false,
-      .log_message = "<stop>"
+      .log_message = "<shutdown>"
    },
    {
       .command = "status",
@@ -743,9 +743,9 @@ password:
    {
       exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
-   else if (parsed.cmd->action == MANAGEMENT_STOP)
+   else if (parsed.cmd->action == MANAGEMENT_SHUTDOWN)
    {
-      exit_code = stop(s_ssl, socket, compression, encryption, output_format);
+      exit_code = pgmoneta_shutdown(s_ssl, socket, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_STATUS)
    {
@@ -933,10 +933,10 @@ help_compress(void)
 }
 
 static void
-help_stop(void)
+help_shutdown(void)
 {
-   printf("Stop pgmoneta\n");
-   printf("  pgmoneta-cli stop\n");
+   printf("Shutdown pgmoneta\n");
+   printf("  pgmoneta-cli shutdown\n");
 }
 
 static void
@@ -1036,9 +1036,9 @@ display_helper(char* command)
    {
       help_ping();
    }
-   else if (!strcmp(command, COMMAND_STOP))
+   else if (!strcmp(command, COMMAND_SHUTDOWN))
    {
-      help_stop();
+      help_shutdown();
    }
    else if (!strcmp(command, COMMAND_STATUS))
    {
@@ -1187,9 +1187,9 @@ error:
 }
 
 static int
-stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_shutdown(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_stop(ssl, socket, compression, encryption, output_format))
+   if (pgmoneta_management_request_shutdown(ssl, socket, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1522,8 +1522,8 @@ translate_command(int32_t cmd_code)
       case MANAGEMENT_DELETE:
          command_output = pgmoneta_append(command_output, COMMAND_DELETE);
          break;
-      case MANAGEMENT_STOP:
-         command_output = pgmoneta_append(command_output, COMMAND_STOP);
+      case MANAGEMENT_SHUTDOWN:
+         command_output = pgmoneta_append(command_output, COMMAND_SHUTDOWN);
          break;
       case MANAGEMENT_STATUS:
          command_output = pgmoneta_append(command_output, COMMAND_STATUS);

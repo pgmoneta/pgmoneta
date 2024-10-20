@@ -1097,7 +1097,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          goto error;
       }
    }
-   else if (id == MANAGEMENT_STOP)
+   else if (id == MANAGEMENT_SHUTDOWN)
    {
       start_time = time(NULL);
 

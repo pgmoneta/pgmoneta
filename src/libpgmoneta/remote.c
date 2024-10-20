@@ -89,7 +89,7 @@ pgmoneta_remote_management(int client_fd, char* address)
 
       switch (type)
       {
-         case MANAGEMENT_STOP:
+         case MANAGEMENT_SHUTDOWN:
          case MANAGEMENT_RESET:
          case MANAGEMENT_RELOAD:
             break;

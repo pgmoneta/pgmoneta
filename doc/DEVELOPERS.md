@@ -356,10 +356,10 @@ pgmoneta-cli -c pgmoneta.conf backup primary
 pgmoneta-cli -c pgmoneta.conf status details
 ```
 
-#### Stop pgmoneta
+#### Shutdown pgmoneta
 
 ``` sh
-pgmoneta-cli -c pgmoneta.conf stop
+pgmoneta-cli -c pgmoneta.conf shutdown
 ```
 
 ## End

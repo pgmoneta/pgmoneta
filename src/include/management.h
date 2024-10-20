@@ -64,7 +64,7 @@ extern "C" {
 #define MANAGEMENT_RESTORE         3
 #define MANAGEMENT_ARCHIVE         4
 #define MANAGEMENT_DELETE          5
-#define MANAGEMENT_STOP            6
+#define MANAGEMENT_SHUTDOWN        6
 #define MANAGEMENT_STATUS          7
 #define MANAGEMENT_STATUS_DETAILS  8
 #define MANAGEMENT_PING            9
@@ -369,7 +369,7 @@ int
 pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
- * Create a stop request
+ * Create a shutdown request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param compression The compress method for wire protocol
@@ -378,7 +378,7 @@ pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* bac
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_shutdown(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a status payload

@@ -45,7 +45,7 @@ Commands:
   info                     Information about a backup
   annotate                 Annotate a backup with comments
   ping                     Check if pgmoneta is alive
-  stop                     Stop pgmoneta
+  shutdown                 Shutdown pgmoneta
   status [details]         Status of pgmoneta, with optional details
   conf <action>            Manage the configuration, with one of subcommands:
                            - 'reload' to reload the configuration
@@ -250,20 +250,20 @@ Example
 pgmoneta-cli ping
 ```
 
-## stop
+## shutdown
 
-Stop [**pgmoneta**][pgmoneta]
+Shutdown [**pgmoneta**][pgmoneta]
 
 Command
 
 ``` sh
-pgmoneta-cli stop
+pgmoneta-cli shutdown
 ```
 
 Example
 
 ``` sh
-pgmoneta-cli stop
+pgmoneta-cli shutdown
 ```
 
 ## status

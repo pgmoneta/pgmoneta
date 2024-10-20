@@ -273,12 +273,12 @@ error:
 }
 
 int
-pgmoneta_management_request_stop(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_shutdown(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_STOP, output_format, &j))
+   if (create_header(MANAGEMENT_SHUTDOWN, output_format, &j))
    {
       goto error;
    }

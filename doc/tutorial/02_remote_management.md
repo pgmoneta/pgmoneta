@@ -37,10 +37,10 @@ pgmoneta-admin -f pgmoneta_admins.conf -U admin -P admin1234 user add
 
 ### Restart pgmoneta
 
-Stop pgmoneta and start it again with
+Shutdown pgmoneta and start it again with
 
 ```
-pgmoneta-cli -c pgmoneta.conf stop
+pgmoneta-cli -c pgmoneta.conf shutdown
 pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf -A pgmoneta_admins.conf
 ```
 

@@ -163,7 +163,7 @@ Commands:
   info                     Information about a backup
   annotate                 Annotate a backup with comments
   ping                     Check if pgmoneta is alive
-  stop                     Stop pgmoneta
+  shutdown                 Shutdown pgmoneta
   status [details]         Status of pgmoneta, with optional details
   conf <action>            Manage the configuration, with one of subcommands:
                            - 'reload' to reload the configuration
@@ -183,10 +183,10 @@ A restore would be
 pgmoneta-cli -c pgmoneta.conf restore primary <timestamp> /path/to/restore
 ```
 
-To stop pgmoneta you would use
+To shutdown pgmoneta you would use
 
 ```
-pgmoneta-cli -c pgmoneta.conf stop
+pgmoneta-cli -c pgmoneta.conf shutdown
 ```
 
 Check the outcome of the operations by verifying the exit code, like
