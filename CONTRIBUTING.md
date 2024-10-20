@@ -34,7 +34,7 @@ Don't forget to indicate your pgmoneta version.
 You can use the follow command, if you are using a [Fedora](https://getfedora.org/) based platform:
 
 ```
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic libcurl libcurl-devel bzip2 bzip2-devel libarchive libarchive-devel
+dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic libcurl libcurl-devel bzip2 bzip2-devel libarchive libarchive-devel
 ```
 
 in order to get the necessary dependencies.
@@ -48,7 +48,7 @@ git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
 make
 cd src
 cp ../../doc/etc/*.conf .

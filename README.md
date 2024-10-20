@@ -50,7 +50,7 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of **pgmoneta**.
 
 **pgmoneta** requires
 
-* [gcc 8+](https://gcc.gnu.org) (C17)
+* [clang](https://clang.llvm.org/)
 * [cmake](https://cmake.org)
 * [make](https://www.gnu.org/software/make/)
 * [libev](http://software.schmorp.de/pkg/libev.html)
@@ -68,10 +68,10 @@ See [Architecture](./doc/ARCHITECTURE.md) for the architecture of **pgmoneta**.
 * [texlive](https://www.tug.org/texlive/)
 
 ```sh
-dnf install git gcc cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel
+dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel
 ```
 
-Alternative [clang 8+](https://clang.llvm.org/) can be used.
+Alternative [gcc](https://gcc.gnu.org) can be used.
 
 ### Release build
 
@@ -98,7 +98,7 @@ git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
+cmake cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 

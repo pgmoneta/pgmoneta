@@ -49,7 +49,7 @@ We recommend using Fedora to test and run [**pgmoneta**][pgmoneta], but other Li
 
 [**pgmoneta**][pgmoneta] requires
 
-* [gcc 8+](https://gcc.gnu.org) (C17)
+* [clang](https://clang.llvm.org/)
 * [cmake](https://cmake.org)
 * [make](https://www.gnu.org/software/make/)
 * [libev](http://software.schmorp.de/pkg/libev.html)
@@ -65,7 +65,7 @@ We recommend using Fedora to test and run [**pgmoneta**][pgmoneta], but other Li
 * [libarchive](http://www.libarchive.org/)
 
 ```sh
-dnf install git gcc cmake make libev libev-devel \
+dnf install git gcc clang clang-analyzer cmake make libev libev-devel \
             openssl openssl-devel \
             systemd systemd-devel zlib zlib-devel \
             libzstd libzstd-devel \
@@ -76,7 +76,7 @@ dnf install git gcc cmake make libev libev-devel \
             libarchive libarchive-devel 
 ```
 
-Alternative [clang 8+](https://clang.llvm.org/) can be used.
+Alternative [gcc](https://gcc.gnu.org) can be used.
 
 
 ### RHEL / RockyLinux
@@ -152,7 +152,7 @@ git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
