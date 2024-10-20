@@ -1148,6 +1148,27 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, payload);
    }
+   else if(id == MANAGEMENT_CONFIG_GET)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_NOFORK, compression, payload);
+         pgmoneta_log_error("Conf get: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "conf get", NULL);
+         pgmoneta_conf_get_value(NULL, client_fd, compression, pyl);
+      }
+   }
    else if (id == MANAGEMENT_STATUS)
    {
       pid = fork();

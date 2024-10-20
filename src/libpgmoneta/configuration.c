@@ -2012,6 +2012,135 @@ error:
    return 1;
 }
 
+void
+pgmoneta_conf_get_value(SSL* ssl, int client_fd, uint8_t compression, struct json* payload)
+{
+   struct configuration* config = NULL;
+   struct json* request = NULL;
+   struct json* response = NULL;
+   char* config_value = NULL;
+   time_t start_time;
+   time_t end_time;
+   int total_seconds = 0;
+   char* elapsed = NULL;
+   char buffer[MISC_LENGTH]; 
+
+   pgmoneta_start_logging();
+
+   start_time = time(NULL);
+
+   config = (struct configuration*) shmem;
+
+   request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+
+   char* received_key = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_CONFIG_KEY);
+
+   if (received_key != NULL)
+   {
+      if (strcmp(received_key, "running") == 0)
+      {
+         config_value = config->running ? "true" : "false";
+      }
+      else if (strcmp(received_key, "configuration_path") == 0)
+      {
+         config_value = config->configuration_path;
+      }
+      else if (strcmp(received_key, "users_path") == 0)
+      {
+         config_value = config->users_path;
+      }
+      else if (strcmp(received_key, "admins_path") == 0)
+      {
+         config_value = config->admins_path;
+      }
+      else if (strcmp(received_key, "host") == 0)
+      {
+         config_value = config->host;
+      }
+      else if (strcmp(received_key, "metrics") == 0)
+      {
+         snprintf(buffer, MISC_LENGTH, "%d", config->metrics);
+         config_value = buffer;
+      }
+      else if (strcmp(received_key, "metrics_cache_max_age") == 0)
+      {
+         snprintf(buffer, MISC_LENGTH, "%d", config->metrics_cache_max_age);
+         config_value = buffer;
+      }
+      else if (strcmp(received_key, "metrics_cache_max_size") == 0)
+      {
+         snprintf(buffer, MISC_LENGTH, "%d", config->metrics_cache_max_size);
+         config_value = buffer;
+      }
+      else if (strcmp(received_key, "management") == 0)
+      {
+         snprintf(buffer, MISC_LENGTH, "%d", config->management);
+         config_value = buffer;
+      }
+      else if (strcmp(received_key, "base_dir") == 0)
+      {
+         config_value = config->base_dir;
+      }
+      else if (strcmp(received_key, "compression_type") == 0)
+      {
+         config_value = get_compression_string(config->compression_type); 
+      }
+      else if (strcmp(received_key, "compression_level") == 0)
+      {
+         snprintf(buffer, MISC_LENGTH, "%d", config->compression_level);
+         config_value = buffer;
+      }
+      else if (strcmp(received_key, "create_slot") == 0)
+      {
+         config_value = get_create_slot_string(config->create_slot);  
+      }
+      else if (strcmp(received_key, "storage_engine") == 0)
+      {
+         config_value = get_storage_engine_string(config->storage_engine);  
+      }
+      else if (strcmp(received_key, "encryption") == 0)
+      {
+         config_value = get_encryption_string(config->encryption);  
+      }
+      else
+      {
+         config_value = "Key not found";
+      }
+   }
+
+   if (pgmoneta_management_create_response(payload, -1, &response))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(response, received_key, (uintptr_t)config_value, ValueString);
+
+   end_time = time(NULL);
+
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_time, end_time, compression, payload))
+   {
+      pgmoneta_management_response_error(ssl, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, compression, payload);
+      pgmoneta_log_error("Conf Get Value: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   pgmoneta_log_info("Conf Get Value (Elapsed: %s)", elapsed);
+
+
+   pgmoneta_stop_logging();
+
+   return;
+
+error:
+
+   pgmoneta_stop_logging();
+   exit(1);
+}
+
+
+
+
 static void
 extract_key_value(char* str, char** key, char** value)
 {

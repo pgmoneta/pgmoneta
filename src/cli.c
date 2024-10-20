@@ -115,6 +115,7 @@ static int details(SSL* ssl, int socket, uint8_t compression, int32_t output_for
 static int ping(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
 static int reset(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
 static int reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format);
+static int config_get(SSL* ssl, int socket,char* config_key, uint8_t compression, int32_t output_format);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, int32_t output_format);
 static int decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, int32_t output_format);
@@ -331,6 +332,14 @@ const struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_RELOAD,
       .deprecated = false,
       .log_message = "<conf reload>"
+   },
+   {
+      .command = "conf",
+      .subcommand = "get",
+      .accepted_argument_count = {1},
+      .action = MANAGEMENT_CONFIG_GET,
+      .deprecated = false,
+      .log_message = "<conf get>"
    },
    {
       .command = "clear",
@@ -736,6 +745,10 @@ password:
    else if (parsed.cmd->action == MANAGEMENT_RELOAD)
    {
       exit_code = reload(s_ssl, socket, compression, output_format);
+   }
+   else if(parsed.cmd->action == MANAGEMENT_CONFIG_GET)
+   {
+      exit_code = config_get(s_ssl,socket,parsed.args[0],compression,output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RETAIN)
    {
@@ -1264,6 +1277,25 @@ reload(SSL* ssl, int socket, uint8_t compression, int32_t output_format)
       goto error;
    }
 
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+config_get(SSL* ssl, int socket,char* config_key, uint8_t compression, int32_t output_format)
+{
+   if (pgmoneta_management_conf_get(ssl, socket, config_key, compression, output_format))
+   {
+      goto error;
+   }
    if (process_result(ssl, socket, output_format))
    {
       goto error;
