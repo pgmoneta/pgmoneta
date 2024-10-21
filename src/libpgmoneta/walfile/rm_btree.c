@@ -136,19 +136,19 @@ pgmoneta_wal_create_xl_btree_delete(void)
 void
 pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v13, rec, sizeof(struct xl_btree_delete_v13));
+   wrapper->data.v13 = *(struct xl_btree_delete_v13*) rec;
 }
 
 void
 pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_btree_delete_v15));
+   wrapper->data.v15 = *(struct xl_btree_delete_v15*) rec;
 }
 
 void
 pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct xl_btree_delete_v16));
+   wrapper->data.v16 = *(struct xl_btree_delete_v16*) rec;
 }
 
 char*

@@ -362,6 +362,23 @@ pgmoneta-cli -c pgmoneta.conf status details
 pgmoneta-cli -c pgmoneta.conf shutdown
 ```
 
+## pgmoneta-walinfo
+
+Alongside pgmoneta, you can use the `pgmoneta-walinfo` tool to read and display PostgreSQL Write-Ahead Log (WAL) files. This utility supports output in either `raw` or `json` format, making it an essential tool for examining WAL file contents.
+
+In the `raw` format, the output is structured as:
+
+### Usage
+
+```sh
+pgmoneta-walinfo [ -F FORMAT ] <file>
+
+-F, --format: Specify the output format ('raw' or 'json').
+<file>: The path to the WAL file to read.
+```
+
+
+For more details, please refer to the [wal documentation](./manual/dev-06-wal.md).
 ## End
 
 Now that we've attempted our first backup, take a moment to relax. There are a few things we need to pay attention to:
