@@ -156,7 +156,7 @@ ssh_storage_setup(int server, char* identifier, struct deque* nodes)
    rc = ssh_connect(session);
    if (rc != SSH_OK)
    {
-      pgmoneta_log_error("Remote Backup: Error connecting to %s: %s\n",
+      pgmoneta_log_error("Remote Backup: Error connecting to %s: %s",
                          config->ssh_hostname, ssh_get_error(session));
       goto error;
    }
@@ -233,14 +233,14 @@ ssh_storage_setup(int server, char* identifier, struct deque* nodes)
 
    if (sftp == NULL)
    {
-      pgmoneta_log_error("Error: %s\n", ssh_get_error(session));
+      pgmoneta_log_error("Error: %s", ssh_get_error(session));
       goto error;
    }
 
    rc = sftp_init(sftp);
    if (rc != SSH_OK)
    {
-      pgmoneta_log_error("Error: %s\n", sftp_get_error(sftp));
+      pgmoneta_log_error("Error: %s", sftp_get_error(sftp));
       goto error;
    }
 

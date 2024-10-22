@@ -418,7 +418,7 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
    DIR* dir = opendir(current_real_path);
    if (!dir)
    {
-      pgmoneta_log_error("Could not open directory: %s\n", current_real_path);
+      pgmoneta_log_error("Could not open directory: %s", current_real_path);
       return;
    }
    while ((dent = readdir(dir)) != NULL)
@@ -469,7 +469,7 @@ write_tar_file(struct archive* a, char* current_real_path, char* current_save_pa
          int status = archive_write_header(a, entry);
          if (status != ARCHIVE_OK)
          {
-            pgmoneta_log_error("Could not write header: %s\n", archive_error_string(a));
+            pgmoneta_log_error("Could not write header: %s", archive_error_string(a));
             return;
          }
 

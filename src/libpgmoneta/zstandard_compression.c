@@ -753,7 +753,7 @@ pgmoneta_zstdc_string(char* s, unsigned char** buffer, size_t* buffer_size)
    compressed_size = ZSTD_compress(*buffer, max_compressed_size, s, input_size, 1);
    if (ZSTD_isError(compressed_size))
    {
-      pgmoneta_log_error("ZSTD: Compression error: %s\n", ZSTD_getErrorName(compressed_size));
+      pgmoneta_log_error("ZSTD: Compression error: %s", ZSTD_getErrorName(compressed_size));
       free(*buffer);
       return 1;
    }
@@ -792,7 +792,7 @@ pgmoneta_zstdd_string(unsigned char* compressed_buffer, size_t compressed_size, 
    result = ZSTD_decompress(*output_string, decompressed_size, compressed_buffer, compressed_size);
    if (ZSTD_isError(result))
    {
-      pgmoneta_log_error("ZSTD: Compression error: %s\n", ZSTD_getErrorName(result));
+      pgmoneta_log_error("ZSTD: Compression error: %s", ZSTD_getErrorName(result));
       free(*output_string);
       return 1;
    }
