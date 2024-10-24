@@ -303,3 +303,16 @@ endif()
 target_link_libraries(pgmoneta-admin-bin pgmoneta)
 
 install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+#
+# Build pgmoneta-walinfo
+#
+add_executable(pgmoneta-walinfo-bin walinfo.c ${RESOURCE_OBJECT})
+if (CMAKE_C_LINK_PIE_SUPPORTED)
+  set_target_properties(pgmoneta-walinfo-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walinfo POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set_target_properties(pgmoneta-walinfo-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walinfo POSITION_INDEPENDENT_CODE FALSE)
+endif()
+target_link_libraries(pgmoneta-walinfo-bin pgmoneta)
+
+install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
