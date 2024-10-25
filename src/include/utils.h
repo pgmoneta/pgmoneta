@@ -1201,9 +1201,9 @@ char*
 pgmoneta_indent(char* str, char* tag, int indent);
 
 /**
- * Translate a string into json format string
+ * Escape a string
  * @param str The original string
- * @return The json formatted string
+ * @return The escaped string
  */
 char*
 pgmoneta_escape_string(char* str);
