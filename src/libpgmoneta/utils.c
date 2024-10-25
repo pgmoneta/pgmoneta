@@ -4049,7 +4049,7 @@ pgmoneta_escape_string(char* str)
    int len = 0;
    int idx = 0;
    size_t translated_len = 0;
-   
+
    len = strlen(str);
    for (int i = 0; i < len; i++)
    {

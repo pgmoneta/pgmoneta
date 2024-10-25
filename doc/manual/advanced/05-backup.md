@@ -85,43 +85,42 @@ pgmoneta-cli -c pgmoneta.conf info primary newest
 and you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.15.0
-  Command: 18
-  Output: 0
-  Timestamp: 20240928065958
-Outcome: 
+  Command: info
+  Output: text
+  Timestamp: 20241025163541
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Backup: newest
   Server: primary
-Response: 
-  Backup: 20240928065644
-  BackupSize: 8531968
+Response:
+  Backup: 20241019163516
+  BackupSize: 6.54MB
   CheckpointHiLSN: 0
-  CheckpointLoLSN: 67108960
+  CheckpointLoLSN: 4F0000B8
   Comments: ''
-  Compression: 2
-  Elapsed: 20
-  Encryption: 0
+  Compression: zstd
+  Elapsed: 4
+  Encryption: none
   EndHiLSN: 0
-  EndLoLSN: 67109176
+  EndLoLSN: 4F000158
   EndTimeline: 1
-  Keep: false
+  Keep: true
   MajorVersion: 17
   MinorVersion: 0
   NumberOfTablespaces: 0
-  RestoreSize: 48799744
+  RestoreSize: 45.82MB
   Server: primary
   ServerVersion: 0.15.0
   StartHiLSN: 0
-  StartLoLSN: 67108904
+  StartLoLSN: 4F000060
   StartTimeline: 1
-  Tablespaces: 
-
-  Valid: 1
-  WAL: 000000010000000000000004
+  Tablespaces: {}
+  Valid: yes
+  WAL: 00000001000000000000004F
 ```
 
 ## Create a crontab

@@ -403,10 +403,7 @@ pgmoneta_json_to_string(struct json* object, int32_t format, char* tag, int inde
    if (object == NULL || (object->type == JSONUnknown || object->elements == NULL))
    {
       str = pgmoneta_indent(str, tag, indent);
-      if (format == FORMAT_JSON || format == FORMAT_JSON_COMPACT)
-      {
-         str = pgmoneta_append(str, "{}");
-      }
+      str = pgmoneta_append(str, "{}");
       return str;
    }
    if (object->type != JSONArray)

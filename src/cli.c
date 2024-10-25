@@ -132,6 +132,7 @@ static char* translate_valid(int32_t valid);
 static char* translate_compression(int32_t compression_code);
 static char* translate_encryption(int32_t encryption_code);
 static char* translate_size(int64_t size);
+static char* int_to_hex(uint32_t num);
 static void translate_backup_argument(struct json* j);
 static void translate_response_argument(struct json* j);
 static void translate_servers_argument(struct json* j);
@@ -1693,6 +1694,17 @@ translate_size(int64_t size)
    return translated_size;
 }
 
+static char*
+int_to_hex(uint32_t num)
+{
+   char buf[MISC_LENGTH];
+   char* ret = NULL;
+   memset(buf, 0, MISC_LENGTH);
+   snprintf(buf, MISC_LENGTH, "%X", num);
+   ret = pgmoneta_append(ret, buf);
+   return ret;
+}
+
 static void
 translate_backup_argument(struct json* response)
 {
@@ -1701,6 +1713,7 @@ translate_backup_argument(struct json* response)
    char* translated_encryption = NULL;
    char* translated_backup_size = NULL;
    char* translated_restore_size = NULL;
+   char* translated_lsn = NULL;
 
    translated_backup_size = translate_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE));
    if (translated_backup_size)
@@ -1731,7 +1744,56 @@ translate_backup_argument(struct json* response)
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)translated_restore_size, ValueString);
    }
 
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN))
+   {
+      translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN));
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN, (uintptr_t) translated_lsn, ValueString);
+      free(translated_lsn);
+      translated_lsn = NULL;
+   }
+
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN))
+   {
+      translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN));
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN, (uintptr_t) translated_lsn, ValueString);
+      free(translated_lsn);
+      translated_lsn = NULL;
+   }
+
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_START_HILSN))
+   {
+      translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_START_HILSN));
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_HILSN, (uintptr_t) translated_lsn, ValueString);
+      free(translated_lsn);
+      translated_lsn = NULL;
+   }
+
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_START_LOLSN))
+   {
+      translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_START_LOLSN));
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_LOLSN, (uintptr_t) translated_lsn, ValueString);
+      free(translated_lsn);
+      translated_lsn = NULL;
+   }
+
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_END_HILSN))
+   {
+      translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_END_HILSN));
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_HILSN, (uintptr_t) translated_lsn, ValueString);
+      free(translated_lsn);
+      translated_lsn = NULL;
+   }
+
+   if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_END_LOLSN))
+   {
+      translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_END_LOLSN));
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_LOLSN, (uintptr_t) translated_lsn, ValueString);
+      free(translated_lsn);
+      translated_lsn = NULL;
+   }
+
    free(translated_valid);
+   free(translated_lsn);
    free(translated_compression);
    free(translated_encryption);
    free(translated_backup_size);
