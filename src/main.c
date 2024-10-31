@@ -1688,8 +1688,6 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("wal (%p, %p, %d)", loop, w, revents);
-
    if (EV_ERROR & revents)
    {
       pgmoneta_log_trace("wal_cb: got invalid event: %s", strerror(errno));
@@ -1807,8 +1805,6 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
    struct configuration* config;
 
    config = (struct configuration*)shmem;
-
-   pgmoneta_log_debug("wal streaming (%p, %p, %d)", loop, w, revents);
 
    if (EV_ERROR & revents)
    {
