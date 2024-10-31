@@ -306,5 +306,6 @@ error:
 
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
    return 1;
 }
