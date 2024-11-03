@@ -297,7 +297,7 @@ You have to choose a password for the master key and it must be at least 8 chara
 then create vault
 
 ``` sh
-pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword add-user
+pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword user add
 ``` 
 
 Input the replication user and its password to grant [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) access to the database. Ensure that the information is correct.
