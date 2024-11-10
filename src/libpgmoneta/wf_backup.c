@@ -343,6 +343,8 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
+   goto error;
+
    pgmoneta_create_info(root, identifier, 1);
    pgmoneta_update_info_string(root, INFO_WAL, wal);
    pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
@@ -404,6 +406,17 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    return 0;
 
 error:
+
+   if (root == NULL)
+   {
+      root = pgmoneta_get_server_backup_identifier(server, identifier);
+   }
+
+   if (pgmoneta_exists(root))
+   {
+      pgmoneta_delete_directory(root);
+   }
+
    pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
