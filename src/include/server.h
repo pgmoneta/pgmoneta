@@ -43,16 +43,6 @@ void
 pgmoneta_server_info(int srv);
 
 /**
- * Get the WAL size for a server
- * @param ssl The SSL structure
- * @param socket The socket
- * @param ws The WAL size
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_server_get_wal_size(SSL* ssl, int socket, int* ws);
-
-/**
  * Get the version of a server
  * @param ssl The SSL structure
  * @param socket The socket

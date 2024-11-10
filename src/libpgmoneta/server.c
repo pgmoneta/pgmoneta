@@ -42,7 +42,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int get_wal_level(SSL* ssl, int socket, bool* replica);
+static int get_wal_level(SSL* ssl, int socket, int server, bool* replica);
+static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
+
+static bool is_valid_response(struct query_response* response);
 
 void
 pgmoneta_server_info(int srv)
@@ -81,7 +84,9 @@ pgmoneta_server_info(int srv)
       goto done;
    }
 
-   if (get_wal_level(ssl, socket, &replica))
+   pgmoneta_process_startup_message(ssl, socket, srv);
+
+   if (get_wal_level(ssl, socket, srv, &replica))
    {
       pgmoneta_log_error("Unable to get wal_level for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
@@ -92,7 +97,7 @@ pgmoneta_server_info(int srv)
       config->servers[srv].valid = replica;
    }
 
-   if (pgmoneta_server_get_wal_size(ssl, socket, &ws))
+   if (get_wal_size(ssl, socket, srv, &ws))
    {
       pgmoneta_log_error("Unable to get wal_segment_size for %s", config->servers[srv].name);
       config->servers[srv].valid = false;
@@ -119,163 +124,166 @@ done:
    }
 }
 
-int
-pgmoneta_server_get_wal_size(SSL* ssl, int socket, int* ws)
+static int
+get_wal_size(SSL* ssl, int socket, int server, int* ws)
 {
-   int status;
-   size_t size = 28;
-   char wal_segment_size[size];
-   int vlength;
-   char* value = NULL;
-   char* number = NULL;
-   struct message qmsg;
-   struct message* tmsg = NULL;
-   struct message* dmsg = NULL;
+   int q = 0;
+   bool mb = true;
+   int ret;
+   char wal_size[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+   struct configuration* config;
 
-   *ws = 0;
+   config = (struct configuration*)shmem;
 
-   memset(&qmsg, 0, sizeof(struct message));
-   memset(&wal_segment_size, 0, size);
-
-   pgmoneta_write_byte(&wal_segment_size, 'Q');
-   pgmoneta_write_int32(&(wal_segment_size[1]), size - 1);
-   pgmoneta_write_string(&(wal_segment_size[5]), "SHOW wal_segment_size;");
-
-   qmsg.kind = 'Q';
-   qmsg.length = size;
-   qmsg.data = &wal_segment_size;
-
-   status = pgmoneta_write_message(ssl, socket, &qmsg);
-   if (status != MESSAGE_STATUS_OK)
+   ret = pgmoneta_create_query_message("SHOW wal_segment_size;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, socket, &tmsg);
-   if (status != MESSAGE_STATUS_OK)
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
    {
-      goto error;
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
    }
 
-   pgmoneta_log_message(tmsg);
-   pgmoneta_extract_message('D', tmsg, &dmsg);
+   memset(&wal_size[0], 0, sizeof(wal_size));
 
-   if (dmsg == NULL)
+   snprintf(&wal_size[0], sizeof(wal_size), "%s", response->tuples->data[0]);
+
+   if (pgmoneta_ends_with(&wal_size[0], "MB"))
    {
-      goto error;
-   }
-
-   vlength = pgmoneta_read_int32(dmsg->data + 7);
-   value = (char*)malloc(vlength + 1);
-   memset(value, 0, vlength + 1);
-   memcpy(value, dmsg->data + 11, vlength);
-
-   number = (char*)malloc(strlen(value) - 2 + 1);
-   memset(number, 0, strlen(value) - 2 + 1);
-   memcpy(number, value, strlen(value) - 2);
-
-   if (pgmoneta_ends_with(value, "MB"))
-   {
-      *ws = atoi(number) * 1024 * 1024;
+      mb = true;
    }
    else
    {
-      *ws = atoi(number) * 1024 * 1024 * 1024;
+      mb = false;
    }
 
-   pgmoneta_free_message(dmsg);
-   pgmoneta_clear_message();
-   free(value);
-   free(number);
+   wal_size[strlen(wal_size)] = '\0';
+   wal_size[strlen(wal_size)] = '\0';
+
+   *ws = pgmoneta_atoi(wal_size);
+
+   if (mb)
+   {
+      *ws = *ws * 1024 * 1024;
+   }
+   else
+   {
+      *ws = *ws * 1024 * 1024 * 1024;
+   }
+
+   pgmoneta_log_debug("%s/wal_segment_size %d", config->servers[server].name, *ws);
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
 
    return 0;
-
 error:
-   pgmoneta_log_trace("pgmoneta_server_get_wal_size: socket %d status %d", socket, status);
 
-   pgmoneta_free_message(dmsg);
-   pgmoneta_clear_message();
-   free(value);
-   free(number);
+   pgmoneta_log_error("Error getting wal_segment_size");
 
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
    return 1;
 }
 
 static int
-get_wal_level(SSL* ssl, int socket, bool* replica)
+get_wal_level(SSL* ssl, int socket, int server, bool* replica)
 {
-   int status;
-   size_t size = 21;
-   char wal_level[size];
-   int vlength;
-   char* value = NULL;
-   struct message qmsg;
-   struct message* tmsg = NULL;
-   struct message* dmsg = NULL;
+   int q = 0;
+   int ret;
+   char wal_level[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    *replica = false;
 
-   memset(&qmsg, 0, sizeof(struct message));
-   memset(&wal_level, 0, size);
-
-   pgmoneta_write_byte(&wal_level, 'Q');
-   pgmoneta_write_int32(&(wal_level[1]), size - 1);
-   pgmoneta_write_string(&(wal_level[5]), "SHOW wal_level;");
-
-   qmsg.kind = 'Q';
-   qmsg.length = size;
-   qmsg.data = &wal_level;
-
-   status = pgmoneta_write_message(ssl, socket, &qmsg);
-   if (status != MESSAGE_STATUS_OK)
+   ret = pgmoneta_create_query_message("SHOW wal_level;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
    {
       goto error;
    }
 
-   status = pgmoneta_read_block_message(ssl, socket, &tmsg);
-   if (status != MESSAGE_STATUS_OK)
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
    {
-      goto error;
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
    }
 
-   pgmoneta_log_message(tmsg);
-   pgmoneta_extract_message('D', tmsg, &dmsg);
+   memset(&wal_level[0], 0, sizeof(wal_level));
 
-   if (dmsg == NULL)
-   {
-      goto error;
-   }
+   snprintf(&wal_level[0], sizeof(wal_level), "%s", response->tuples->data[0]);
 
-   vlength = pgmoneta_read_int32(dmsg->data + 7);
-   value = (char*)malloc(vlength + 1);
-   memset(value, 0, vlength + 1);
-   memcpy(value, dmsg->data + 11, vlength);
-
-   if (!strcmp("replica", value) || !strcmp("logical", value))
+   if (!strcmp("replica", wal_level) || !strcmp("logical", wal_level))
    {
       *replica = true;
    }
 
-   pgmoneta_free_message(dmsg);
-   pgmoneta_clear_message();
-   free(value);
+   pgmoneta_log_debug("%s/wal_level %s", config->servers[server].name, *replica ? "Yes" : "No");
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
 
    return 0;
-
 error:
-   pgmoneta_log_trace("get_wal_level: socket %d status %d", socket, status);
 
-   pgmoneta_free_message(dmsg);
-   pgmoneta_clear_message();
-   free(value);
+   pgmoneta_log_error("Error getting wal_level");
 
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
    return 1;
 }
 
 int
 pgmoneta_server_get_version(SSL* ssl, int socket, int server)
 {
+   int q = 0;
    int ret;
+   char major[3];
+   char minor[3];
    struct message* query_msg = NULL;
    struct query_response* response = NULL;
    struct configuration* config;
@@ -290,13 +298,39 @@ pgmoneta_server_get_version(SSL* ssl, int socket, int server)
       goto error;
    }
 
-   if (pgmoneta_query_execute(ssl, socket, query_msg, &response) || response == NULL)
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
    {
-      goto error;
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
    }
 
-   config->servers[server].version = pgmoneta_atoi(response->tuples->data[0]);
-   config->servers[server].minor_version = pgmoneta_atoi(response->tuples->data[1]);
+   memset(&major[0], 0, sizeof(major));
+   memset(&minor[0], 0, sizeof(minor));
+
+   snprintf(&major[0], sizeof(major), "%s", response->tuples->data[0]);
+   snprintf(&minor[0], sizeof(minor), "%s", response->tuples->data[1]);
+
+   config->servers[server].version = pgmoneta_atoi(major);
+   config->servers[server].minor_version = pgmoneta_atoi(minor);
+
+   pgmoneta_log_debug("%s %d.%d", config->servers[server].name, config->servers[server].version, config->servers[server].minor_version);
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
@@ -308,4 +342,35 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
    return 1;
+}
+
+static bool
+is_valid_response(struct query_response* response)
+{
+   struct tuple* tuple = NULL;
+
+   if (response == NULL)
+   {
+      return false;
+   }
+
+   if (response->number_of_columns == 0 || response->tuples == NULL)
+   {
+      return false;
+   }
+
+   tuple = response->tuples;
+   while (tuple != NULL)
+   {
+      for (int i = 0; i < response->number_of_columns; i++)
+      {
+         if (tuple->data[i] == NULL)
+         {
+            return false;
+         }
+      }
+      tuple = tuple->next;
+   }
+
+   return true;
 }

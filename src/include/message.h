@@ -307,6 +307,16 @@ int
 pgmoneta_create_startup_message(char* username, char* database, bool replication, struct message** msg);
 
 /**
+ * Process a startup message
+ * @param ssl The SSL
+ * @param socket The socket
+ * @param server The server
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_process_startup_message(SSL* ssl, int socket, int server);
+
+/**
  * Create an IDENTIFY SYSTEM message
  * @param msg The resulting message
  * @return 0 upon success, otherwise 1
