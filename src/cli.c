@@ -1863,6 +1863,10 @@ translate_json_object(struct json* j)
    char* translated_command = NULL;
    int32_t out_format = -1;
    char* translated_out_format = NULL;
+   int32_t out_compression = -1;
+   char* translated_compression = NULL;
+   int32_t out_encryption = -1;
+   char* translated_encryption = NULL;
    struct json* response = NULL;
 
    struct json* backups = NULL;
@@ -1890,8 +1894,24 @@ translate_json_object(struct json* j)
          pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_OUTPUT, (uintptr_t)translated_out_format, ValueString);
       }
 
+      out_compression = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_COMPRESSION);
+      translated_compression = translate_compression(out_compression);
+      if (translated_compression)
+      {
+         pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)translated_compression, ValueString);
+      }
+
+      out_encryption = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_ENCRYPTION);
+      translated_encryption = translate_encryption(out_encryption);
+      if (translated_encryption)
+      {
+         pgmoneta_json_put(header, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)translated_encryption, ValueString);
+      }
+
       free(translated_command);
       free(translated_out_format);
+      free(translated_compression);
+      free(translated_encryption);
    }
 
    // Translate the response
