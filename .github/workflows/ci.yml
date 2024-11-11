@@ -80,7 +80,7 @@ jobs:
     - name: Setup postgres
       run: |
         version=$(pg_config --version | grep -Eo "[0-9]{1,2}" | head -1)
-        sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl start -D /tmp/pgsql
+        sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl -D /tmp/pgsql -l /tmp/pgsql.log start
         sudo -u postgres /usr/lib/postgresql/${version}/bin/psql -U postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';"
     - name: Config pgmoneta
       run: |
@@ -101,7 +101,7 @@ jobs:
         retention = 7
 
         log_type = file
-        log_level = info
+        log_level = debug5
         log_path = /tmp/pgmoneta.log
 
         unix_socket_dir = /tmp/
@@ -128,8 +128,15 @@ jobs:
       run: |
         version=$(pg_config --version | grep -Eo "[0-9]{1,2}" | head -1)
         /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf shutdown
-        sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl stop -D /tmp/pgsql
+        sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl -D /tmp/pgsql -l /tmp/pgsql.log stop
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
+    - name: Upload artifact for failed workflow
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Logs
+        path: |
+          /tmp/*.log
 
   build-macos:
 
