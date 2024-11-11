@@ -11,7 +11,7 @@ Command line utility to read and display Write-Ahead Log (WAL) files
 SYNOPSIS
 ========
 
-pgmoneta-walinfo [ -F FORMAT ] <file>
+pgmoneta-walinfo <file>
 
 DESCRIPTION
 ===========
@@ -21,8 +21,26 @@ pgmoneta-walinfo is a command line utility to read and display information about
 OPTIONS
 =======
 
+-o, --output FILE
+  Output file
+
 -F, --format raw|json
   Set the output format. Default is `raw`.
+
+-L, --logfile FILE
+  Set the log file
+
+-q, --quiet
+  No output only result
+
+--color
+  Use colors (on, off)
+
+-v, --verbose
+  Output result
+
+-V, --version
+  Display version information
 
 -?, --help
   Display help and usage information.

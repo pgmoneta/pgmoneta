@@ -371,12 +371,22 @@ In the `raw` format, the output is structured as:
 ### Usage
 
 ```sh
-pgmoneta-walinfo [ -F FORMAT ] <file>
+pgmoneta-walinfo
+  Command line utility to read and display Write-Ahead Log (WAL) files
 
--F, --format: Specify the output format ('raw' or 'json').
-<file>: The path to the WAL file to read.
+Usage:
+  pgmoneta-walinfo <file>
+
+Options:
+  -o, --output FILE   Output file
+  -F, --format        Output format (raw, json)
+  -L, --logfile FILE  Set the log file
+  -q, --quiet         No output only result
+      --color         Use colors (on, off)
+  -v, --verbose       Output result
+  -V, --version       Display version information
+  -?, --help          Display help
 ```
-
 
 For more details, please refer to the [wal documentation](./manual/dev-06-wal.md).
 ## End

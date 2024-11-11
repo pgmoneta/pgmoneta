@@ -35,6 +35,7 @@
 #include <walfile/wal_reader.h>
 
 #include <libgen.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 int
@@ -210,8 +211,9 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 }
 
 int
-pgmoneta_describe_walfile(char* path, enum value_type type)
+pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color)
 {
+   FILE* out = NULL;
    char* decompressed_wal_path = NULL;
    char* tmp_compressed_wal = NULL;
    struct walfile* wf = NULL;
@@ -254,30 +256,62 @@ pgmoneta_describe_walfile(char* path, enum value_type type)
       goto error;
    }
 
+   if (output == NULL)
+   {
+      out = stdout;
+   }
+   else
+   {
+      out = fopen(output, "w");
+      color = false;
+   }
+
    if (type == ValueJSON)
    {
-      printf("{ \"WAL\": [\n");
       int count = 0;
+
+      if (!quiet)
+      {
+         fprintf(out, "{ \"WAL\": [\n");
+      }
+
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         printf("{\"Record\": ");
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type);
-         printf("}");
-         if (++count < pgmoneta_deque_size(wf->records))
+         if (!quiet)
          {
-            printf(",\n");
+            fprintf(out, "{\"Record\": ");
+         }
+         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color);
+
+         if (!quiet)
+         {
+            fprintf(out, "}");
+            if (++count < pgmoneta_deque_size(wf->records))
+            {
+               fprintf(out, ",\n");
+            }
          }
       }
-      printf("]\n}");
+
+      if (!quiet)
+      {
+         fprintf(out, "]\n}");
+      }
    }
    else
    {
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
          record = (struct decoded_xlog_record*) record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type);
+         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color);
       }
+   }
+
+   if (output != NULL)
+   {
+      fflush(out);
+      fclose(out);
    }
 
    free(tmp_compressed_wal);
@@ -286,6 +320,13 @@ pgmoneta_describe_walfile(char* path, enum value_type type)
    return 0;
 
 error:
+
+   if (output != NULL)
+   {
+      fflush(out);
+      fclose(out);
+   }
+
    free(tmp_compressed_wal);
    pgmoneta_destroy_walfile(wf);
    pgmoneta_deque_iterator_destroy(record_iterator);

@@ -16,15 +16,26 @@ In addition to standard WAL files, `pgmoneta-walinfo` also supports compressed W
 #### Usage
 
 ```bash
-pgmoneta-walinfo [ -F FORMAT ] <file>
+pgmoneta-walinfo
+  Command line utility to read and display Write-Ahead Log (WAL) files
 
--F, --format: Specify the output format ('raw' or 'json').
-<file>: The path to the WAL file to read.
+Usage:
+  pgmoneta-walinfo <file>
+
+Options:
+  -o, --output FILE   Output file
+  -F, --format        Output format (raw, json)
+  -L, --logfile FILE  Set the log file
+  -q, --quiet         No output only result
+      --color         Use colors (on, off)
+  -v, --verbose       Output result
+  -V, --version       Display version information
+  -?, --help          Display help
 ```
 
 #### Raw Output Format
 
-In `raw` format, the output is structured as follows:
+In `raw` format, the default, the output is structured as follows:
 
 ```
 Resource Manager | rec len | tot len | xid | prev lsn | description (data and backup)

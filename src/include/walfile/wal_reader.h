@@ -37,6 +37,9 @@ extern "C" {
 #include <value.h>
 #include <walfile/transaction.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+
 /* Typedefs */
 typedef uint32_t timeline_id;
 typedef uint64_t xlog_rec_ptr;
@@ -380,9 +383,12 @@ pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
  * @param record The decoded WAL record to display.
  * @param magic_value The magic value associated with the WAL record.
  * @param type The type of value to display.
+ * @param out The output descriptor
+ * @param quiet Is the WAL file printed
+ * @param color Are colors used
  */
 void
-pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type);
+pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color);
 
 /**
  * Encodes a WAL record into a buffer.

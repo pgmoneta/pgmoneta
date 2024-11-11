@@ -845,7 +845,7 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
 }
 
 void
-pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type)
+pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color)
 {
    char* header_str = NULL;
    char* rm_desc = NULL;
@@ -858,41 +858,74 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 
    if (type == ValueJSON)
    {
-      record_json(record, magic_value, &record_serialized);
-      value_str = pgmoneta_value_to_string(record_serialized, FORMAT_JSON_COMPACT, NULL, 0);
-      printf("%s", value_str);
-      pgmoneta_value_destroy(record_serialized);
-      free(value_str);
+      if (!quiet)
+      {
+         record_json(record, magic_value, &record_serialized);
+         value_str = pgmoneta_value_to_string(record_serialized, FORMAT_JSON_COMPACT, NULL, 0);
+         fprintf(out, "%s", value_str);
+         pgmoneta_value_destroy(record_serialized);
+         free(value_str);
+      }
    }
    else if (type == ValueString)
    {
-      if (record->partial)
+      if (!quiet)
       {
-         printf("%sIncomplete%s ||||| %sSkipped%s\n",
-                COLOR_RED, COLOR_WHITE, COLOR_GREEN, COLOR_RESET);
-         return;
+         if (record->partial)
+         {
+            if (color)
+            {
+               fprintf(out, "%sIncomplete%s | | | | | %sSkipped%s\n",
+                       COLOR_RED, COLOR_WHITE, COLOR_GREEN, COLOR_RESET);
+            }
+            else
+            {
+               fprintf(out, "Incomplete | | | | | Skipped\n");
+            }
+            return;
+         }
+         get_record_length(record, &rec_len, &fpi_len);
+         prev_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
+
+         if (color)
+         {
+            header_str = pgmoneta_format_and_append(header_str, "%s%s%s | %s%d%s | %s%d%s | %s%d%s | %s%s%s",
+                                                    COLOR_RED, RmgrTable[record->header.xl_rmid].name, COLOR_RESET,
+                                                    COLOR_BLUE, rec_len, COLOR_RESET,
+                                                    COLOR_YELLOW, record->header.xl_tot_len, COLOR_RESET,
+                                                    COLOR_CYAN, record->header.xl_xid, COLOR_RESET,
+                                                    COLOR_MAGENTA, prev_lsn_string, COLOR_RESET);
+         }
+         else
+         {
+            header_str = pgmoneta_format_and_append(header_str, "%s | %d | %d | %d | %s",
+                                                    RmgrTable[record->header.xl_rmid].name,
+                                                    rec_len,
+                                                    record->header.xl_tot_len,
+                                                    record->header.xl_xid,
+                                                    prev_lsn_string);
+         }
+
+         rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
+         backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+
+         if (color)
+         {
+            fprintf(out, "%s%s%s | %s%s %s%s\n",
+                    COLOR_RED, header_str, COLOR_WHITE,
+                    COLOR_GREEN, rm_desc,
+                    backup_str, COLOR_RESET);
+         }
+         else
+         {
+            fprintf(out, "%s | %s %s\n", header_str, rm_desc, backup_str);
+         }
+
+         free(header_str);
+         free(rm_desc);
+         free(backup_str);
+         free(prev_lsn_string);
       }
-      get_record_length(record, &rec_len, &fpi_len);
-      prev_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
-
-      header_str = pgmoneta_format_and_append(header_str, "%s%s%s | %s%d%s | %s%d%s | %s%d%s | %s%s%s",
-                                              COLOR_RED, RmgrTable[record->header.xl_rmid].name, COLOR_RESET,
-                                              COLOR_BLUE, rec_len, COLOR_RESET,
-                                              COLOR_YELLOW, record->header.xl_tot_len, COLOR_RESET,
-                                              COLOR_CYAN, record->header.xl_xid, COLOR_RESET,
-                                              COLOR_MAGENTA, prev_lsn_string, COLOR_RESET);
-
-      rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
-      backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
-
-      printf("%s%s%s | %s%s %s%s\n",
-             COLOR_RED, header_str, COLOR_WHITE,
-             COLOR_GREEN, rm_desc,
-             backup_str, COLOR_RESET);
-      free(header_str);
-      free(rm_desc);
-      free(backup_str);
-      free(prev_lsn_string);
    }
 }
 

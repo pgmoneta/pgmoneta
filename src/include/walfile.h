@@ -116,9 +116,12 @@ pgmoneta_destroy_walfile(struct walfile* wf);
  * Describe a WAL file
  * @param path The path to the WAL file
  * @param type The type of output description
+ * @param output The output descriptor
+ * @param quiet Is the WAL file printed
+ * @param color Are colors used
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_describe_walfile(char* path, enum value_type type);
+pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color);
 
 #endif //PGMONETA_WALFILE_H
