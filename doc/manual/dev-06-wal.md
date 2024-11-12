@@ -38,14 +38,15 @@ Options:
 In `raw` format, the default, the output is structured as follows:
 
 ```
-Resource Manager | rec len | tot len | xid | prev lsn | description (data and backup)
+Resource Manager | Start LSN | End LSN | rec len | tot len | xid | description (data and backup)
 ```
 
 - **Resource Manager**: The name of the resource manager handling the log record.
+- **Start LSN**: The start Log Sequence Number (LSN).
+- **End LSN**: The end Log Sequence Number (LSN).
 - **rec len**: The length of the WAL record.
 - **tot len**: The total length of the WAL record, including the header.
 - **xid**: The transaction ID associated with the record.
-- **prev lsn**: The previous Log Sequence Number (LSN).
 - **description (data and backup)**: A detailed description of the operation, along with any related backup block information.
 
 Each part of the output is color-coded:

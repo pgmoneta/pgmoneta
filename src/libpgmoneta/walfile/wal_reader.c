@@ -850,7 +850,8 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    char* header_str = NULL;
    char* rm_desc = NULL;
    char* backup_str = NULL;
-   char* prev_lsn_string = NULL;
+   char* start_lsn_string = NULL;
+   char* end_lsn_string = NULL;
    struct value* record_serialized = NULL;
    char* value_str = NULL;
    uint32_t rec_len;
@@ -885,25 +886,28 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
             return;
          }
          get_record_length(record, &rec_len, &fpi_len);
-         prev_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
+         start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
+         end_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev + rec_len);
 
          if (color)
          {
-            header_str = pgmoneta_format_and_append(header_str, "%s%s%s | %s%d%s | %s%d%s | %s%d%s | %s%s%s",
+            header_str = pgmoneta_format_and_append(header_str, "%s%s%s | %s%s%s | %s%s%s | %s%d%s | %s%d%s | %s%d%s",
                                                     COLOR_RED, RmgrTable[record->header.xl_rmid].name, COLOR_RESET,
+                                                    COLOR_MAGENTA, start_lsn_string, COLOR_RESET,
+                                                    COLOR_MAGENTA, end_lsn_string, COLOR_RESET,
                                                     COLOR_BLUE, rec_len, COLOR_RESET,
                                                     COLOR_YELLOW, record->header.xl_tot_len, COLOR_RESET,
-                                                    COLOR_CYAN, record->header.xl_xid, COLOR_RESET,
-                                                    COLOR_MAGENTA, prev_lsn_string, COLOR_RESET);
+                                                    COLOR_CYAN, record->header.xl_xid, COLOR_RESET);
          }
          else
          {
-            header_str = pgmoneta_format_and_append(header_str, "%s | %d | %d | %d | %s",
+            header_str = pgmoneta_format_and_append(header_str, "%s | %s | %s | %d | %d | %d",
                                                     RmgrTable[record->header.xl_rmid].name,
+                                                    start_lsn_string,
+                                                    end_lsn_string,
                                                     rec_len,
                                                     record->header.xl_tot_len,
-                                                    record->header.xl_xid,
-                                                    prev_lsn_string);
+                                                    record->header.xl_xid);
          }
 
          rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
@@ -924,7 +928,8 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          free(header_str);
          free(rm_desc);
          free(backup_str);
-         free(prev_lsn_string);
+         free(start_lsn_string);
+         free(end_lsn_string);
       }
    }
 }
@@ -958,7 +963,8 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct valu
    pgmoneta_json_put(record_json, "TotalLength", record->header.xl_tot_len, ValueUInt32);
    pgmoneta_json_put(record_json, "Xid", record->header.xl_xid, ValueUInt32);
    pgmoneta_json_put(record_json, "Info", record->header.xl_info, ValueUInt8);
-   pgmoneta_json_put(record_json, "PrevLSN", record->header.xl_prev, ValueUInt64);
+   pgmoneta_json_put(record_json, "StartLSN", record->header.xl_prev, ValueUInt64);
+   pgmoneta_json_put(record_json, "EndLSN", record->header.xl_prev + rec_len, ValueUInt64);
    pgmoneta_json_put(record_json, "ResourceManagerId", record->header.xl_rmid, ValueUInt8);
    pgmoneta_json_put(record_json, "Crc", record->header.xl_crc, ValueUInt32);
 
