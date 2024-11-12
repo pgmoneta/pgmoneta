@@ -343,8 +343,6 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   goto error;
-
    pgmoneta_create_info(root, identifier, 1);
    pgmoneta_update_info_string(root, INFO_WAL, wal);
    pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
