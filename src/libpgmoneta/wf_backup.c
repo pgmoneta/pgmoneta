@@ -169,9 +169,11 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   if (config->servers[server].version == 0)
+   if (!pgmoneta_server_valid(server))
    {
-      if (pgmoneta_server_get_version(ssl, socket, server))
+      pgmoneta_server_info(server);
+
+      if (!pgmoneta_server_valid(server))
       {
          goto error;
       }

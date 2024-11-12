@@ -44,6 +44,8 @@
 
 static int get_wal_level(SSL* ssl, int socket, int server, bool* replica);
 static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
+static int get_version(SSL* ssl, int socket, int server, int* major, int* minor);
+
 
 static bool is_valid_response(struct query_response* response);
 
@@ -54,6 +56,8 @@ pgmoneta_server_info(int srv)
    int auth;
    SSL* ssl = NULL;
    int socket = -1;
+   int major = 0;
+   int minor = 0;
    bool replica;
    int ws;
    struct configuration* config;
@@ -84,7 +88,19 @@ pgmoneta_server_info(int srv)
       goto done;
    }
 
-   //pgmoneta_process_startup_message(ssl, socket, srv);
+   if (get_version(ssl, socket, srv, &major, &minor))
+   {
+      pgmoneta_log_error("Unable to get version for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
+      goto done;
+   }
+   else
+   {
+      config->servers[srv].version = major;
+      config->servers[srv].minor_version = minor;
+   }
+
+   pgmoneta_log_debug("%s %d.%d", config->servers[srv].name, config->servers[srv].version, config->servers[srv].minor_version);
 
    if (get_wal_level(ssl, socket, srv, &replica))
    {
@@ -97,6 +113,8 @@ pgmoneta_server_info(int srv)
       config->servers[srv].valid = replica;
    }
 
+   pgmoneta_log_debug("%s/wal_level %s", config->servers[srv].name, config->servers[srv].valid ? "Yes" : "No");
+
    if (get_wal_size(ssl, socket, srv, &ws))
    {
       pgmoneta_log_error("Unable to get wal_segment_size for %s", config->servers[srv].name);
@@ -107,6 +125,8 @@ pgmoneta_server_info(int srv)
    {
       config->servers[srv].wal_size = ws;
    }
+
+   pgmoneta_log_debug("%s/wal_segment_size %d", config->servers[srv].name, config->servers[srv].wal_size);
 
    pgmoneta_write_terminate(ssl, socket);
 
@@ -124,6 +144,31 @@ done:
    }
 }
 
+bool
+pgmoneta_server_valid(int srv)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (!config->servers[srv].valid)
+   {
+      return false;
+   }
+
+   if (config->servers[srv].version == 0)
+   {
+      return false;
+   }
+
+   if (config->servers[srv].wal_size == 0)
+   {
+      return false;
+   }
+
+   return true;
+}
+
 static int
 get_wal_size(SSL* ssl, int socket, int server, int* ws)
 {
@@ -133,9 +178,6 @@ get_wal_size(SSL* ssl, int socket, int server, int* ws)
    char wal_size[MISC_LENGTH];
    struct message* query_msg = NULL;
    struct query_response* response = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
 
    ret = pgmoneta_create_query_message("SHOW wal_segment_size;", &query_msg);
    if (ret != MESSAGE_STATUS_OK)
@@ -193,8 +235,6 @@ q:
       *ws = *ws * 1024 * 1024 * 1024;
    }
 
-   pgmoneta_log_debug("%s/wal_segment_size %d", config->servers[server].name, *ws);
-
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
 
@@ -217,9 +257,6 @@ get_wal_level(SSL* ssl, int socket, int server, bool* replica)
    char wal_level[MISC_LENGTH];
    struct message* query_msg = NULL;
    struct query_response* response = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
 
    *replica = false;
 
@@ -261,8 +298,6 @@ q:
       *replica = true;
    }
 
-   pgmoneta_log_debug("%s/wal_level %s", config->servers[server].name, *replica ? "Yes" : "No");
-
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
 
@@ -277,18 +312,18 @@ error:
    return 1;
 }
 
-int
-pgmoneta_server_get_version(SSL* ssl, int socket, int server)
+static int
+get_version(SSL* ssl, int socket, int server, int* major, int* minor)
 {
    int q = 0;
    int ret;
-   char major[3];
-   char minor[3];
+   char maj[3];
+   char min[3];
    struct message* query_msg = NULL;
    struct query_response* response = NULL;
-   struct configuration* config;
 
-   config = (struct configuration*)shmem;
+   *major = 0;
+   *minor = 0;
 
    ret = pgmoneta_create_query_message("SELECT split_part(split_part(version(), ' ', 2), '.', 1) AS major, "
                                        "split_part(split_part(version(), ' ', 2), '.', 2) AS minor;",
@@ -321,16 +356,24 @@ q:
       }
    }
 
-   memset(&major[0], 0, sizeof(major));
-   memset(&minor[0], 0, sizeof(minor));
+   memset(&maj[0], 0, sizeof(maj));
+   memset(&min[0], 0, sizeof(min));
 
-   snprintf(&major[0], sizeof(major), "%s", response->tuples->data[0]);
-   snprintf(&minor[0], sizeof(minor), "%s", response->tuples->data[1]);
+   snprintf(&maj[0], sizeof(maj), "%s", response->tuples->data[0]);
+   if (response->tuples->data[1] != NULL && strlen(response->tuples->data[1]) > 0)
+   {
+      snprintf(&min[0], sizeof(min), "%s", response->tuples->data[1]);
+   }
 
-   config->servers[server].version = pgmoneta_atoi(major);
-   config->servers[server].minor_version = pgmoneta_atoi(minor);
-
-   pgmoneta_log_debug("%s %d.%d", config->servers[server].name, config->servers[server].version, config->servers[server].minor_version);
+   *major = pgmoneta_atoi(maj);
+   if (response->tuples->data[1] != NULL && strlen(response->tuples->data[1]) > 0)
+   {
+      *minor = pgmoneta_atoi(min);
+   }
+   else
+   {
+      *minor = 0;
+   }
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
@@ -364,7 +407,8 @@ is_valid_response(struct query_response* response)
    {
       for (int i = 0; i < response->number_of_columns; i++)
       {
-         if (tuple->data[i] == NULL)
+         /* First column must be defined */
+         if (tuple->data[0] == NULL)
          {
             return false;
          }

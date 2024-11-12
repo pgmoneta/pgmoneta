@@ -43,14 +43,11 @@ void
 pgmoneta_server_info(int srv);
 
 /**
- * Get the version of a server
- * @param ssl The SSL structure
- * @param socket The socket
- * @param server The server index
- * @return 0 upon success, otherwise 1
+ * Is the base settings for the server set
+ * @param srv The server index
  */
-int
-pgmoneta_server_get_version(SSL* ssl, int socket, int server);
+bool
+pgmoneta_server_valid(int srv);
 
 #ifdef __cplusplus
 }

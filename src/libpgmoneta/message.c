@@ -647,65 +647,6 @@ pgmoneta_create_startup_message(char* username, char* database, bool replication
 }
 
 int
-pgmoneta_process_startup_message(SSL* ssl, int socket, int server)
-{
-   int status;
-   bool cont = true;
-   struct message* reply = NULL;
-   size_t data_size;
-   void* data = pgmoneta_memory_dynamic_create(&data_size);
-
-   while (cont)
-   {
-      status = pgmoneta_read_block_message(ssl, socket, &reply);
-
-      if (status == MESSAGE_STATUS_OK)
-      {
-         data = pgmoneta_memory_dynamic_append(data, data_size, reply->data, reply->length, &data_size);
-
-         if (pgmoneta_has_message('Z', data, data_size))
-         {
-            cont = false;
-         }
-      }
-      else if (status == MESSAGE_STATUS_ZERO)
-      {
-         SLEEP(1000000L);
-      }
-      else
-      {
-         goto error;
-      }
-
-      pgmoneta_clear_message();
-      reply = NULL;
-   }
-
-   // TODO - Use server_version instead separate query
-
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      pgmoneta_log_debug("Startup response -- BEGIN");
-      pgmoneta_log_mem(data, data_size);
-      pgmoneta_log_debug("Startup response -- END");
-   }
-
-   pgmoneta_clear_message();
-   pgmoneta_memory_dynamic_destroy(data);
-
-   return 0;
-
-error:
-
-   pgmoneta_disconnect(socket);
-
-   pgmoneta_clear_message();
-   pgmoneta_memory_dynamic_destroy(data);
-
-   return 1;
-}
-
-int
 pgmoneta_create_identify_system_message(struct message** msg)
 {
    struct message* m = NULL;
