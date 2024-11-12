@@ -34,7 +34,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | workers | 0 | Int | No | The number of workers that each process can use for its work. Use 0 to disable |
 | storage_engine | local | String | No | The storage engine type (local, ssh, s3, azure) |
 | encryption | none | String | No | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes \| aes-256 \| aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192 \| aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128 \| aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length |
-| create_slot | yes | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
+| create_slot | no | Bool | No | Create a replication slot for all server. Valid values are: yes, no |
 | ssh_hostname | | String | Yes | Defines the hostname of the remote system for connection |
 | ssh_username | | String | Yes | Defines the username of the remote system for connection |
 | ssh_base_dir | | String | Yes | The base directory for the remote backup |

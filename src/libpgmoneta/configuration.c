@@ -100,8 +100,6 @@ pgmoneta_init_configuration(void* shm)
    config->compression_type = COMPRESSION_CLIENT_ZSTD;
    config->compression_level = 3;
 
-   config->create_slot = CREATE_SLOT_YES;
-
    config->encryption = ENCRYPTION_NONE;
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;

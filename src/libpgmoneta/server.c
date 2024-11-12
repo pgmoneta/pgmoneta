@@ -84,7 +84,7 @@ pgmoneta_server_info(int srv)
       goto done;
    }
 
-   pgmoneta_process_startup_message(ssl, socket, srv);
+   //pgmoneta_process_startup_message(ssl, socket, srv);
 
    if (get_wal_level(ssl, socket, srv, &replica))
    {

@@ -2054,7 +2054,7 @@ init_replication_slots(void)
 
          if (auth == AUTH_SUCCESS)
          {
-            pgmoneta_process_startup_message(ssl, socket, srv);
+            //pgmoneta_process_startup_message(ssl, socket, srv);
 
             if (pgmoneta_server_get_version(ssl, socket, srv))
             {
@@ -2117,7 +2117,7 @@ init_replication_slots(void)
             {
                pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, config->servers[srv].wal_slot);
 
-               pgmoneta_process_startup_message(ssl, socket, srv);
+               //pgmoneta_process_startup_message(ssl, socket, srv);
 
                pgmoneta_create_replication_slot_message(config->servers[srv].wal_slot, &slot_request_msg, config->servers[srv].version);
                if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
