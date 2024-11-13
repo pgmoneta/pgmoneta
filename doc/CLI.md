@@ -47,6 +47,9 @@ Commands:
   status [details]         Status of pgmoneta, with optional details
   conf <action>            Manage the configuration, with one of subcommands:
                            - 'reload' to reload the configuration
+                           - 'ls' to print the configurations used
+                           - 'get' to obtain information about a runtime configuration value
+                           - 'set' to modify a runtime configuration value
   clear <what>             Clear data, with:
                            - 'prometheus' to reset the Prometheus statistics
 ```
@@ -294,17 +297,23 @@ Manage the configuration
 Command
 
 ``` sh
-pgmoneta-cli conf [reload]
+pgmoneta-cli conf [reload | ls | get | set]
 ```
 
 Subcommand
 
 - `reload`: Reload configuration
+- `ls` : To print the configurations used
+- `get <config_key>` : To obtain information about a runtime configuration value
+- `set <config_key> <config_value>` : To modify the runtime configuration value
 
 Example
 
 ``` sh
 pgmoneta-cli conf reload
+pgmoneta-cli conf ls
+pgmoneta-cli conf get primary.host
+pgmoneta-cli conf set encryption aes-256-cbc
 ```
 
 ## clear

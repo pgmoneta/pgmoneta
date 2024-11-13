@@ -465,6 +465,105 @@ error:
 }
 
 int
+pgmoneta_management_request_conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (create_header(MANAGEMENT_CONF_LS, compression, encryption, output_format, &j))
+   {
+      goto error;
+   }
+
+   if (create_request(j, &request))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(j);
+
+   return 1;
+}
+
+int
+pgmoneta_management_request_conf_get(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (create_header(MANAGEMENT_CONF_GET, compression, encryption, output_format, &j))
+   {
+      goto error;
+   }
+
+   if (create_request(j, &request))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(j);
+
+   return 1;
+}
+
+int
+pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (create_header(MANAGEMENT_CONF_SET, compression, encryption, output_format, &j))
+   {
+      goto error;
+   }
+
+   if (create_request(j, &request))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_CONFIG_KEY, (uintptr_t)config_key, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_CONFIG_VALUE, (uintptr_t)config_value, ValueString);
+
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(j);
+
+   return 1;
+}
+
+int
 pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;

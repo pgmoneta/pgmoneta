@@ -114,6 +114,15 @@ status [details]
 conf [reload]
   Reload the configuration
 
+conf [ls]
+  To print the configurations used
+
+conf [get]
+  To obtain information about a runtime configuration value
+
+conf [set]
+  To modify the runtime configuration value
+
 clear [prometheus]
   Reset the Prometheus statistics
 

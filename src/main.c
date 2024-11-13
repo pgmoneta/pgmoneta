@@ -1149,6 +1149,64 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
    }
+   else if (id == MANAGEMENT_CONF_LS)
+   {
+      struct json* response = NULL;
+
+      start_time = time(NULL);
+
+      pgmoneta_management_create_response(payload, -1, &response);
+
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->configuration_path, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->users_path, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->admins_path, ValueString);
+
+      end_time = time(NULL);
+
+      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
+   }
+   else if (id == MANAGEMENT_CONF_GET)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, compression, encryption, payload);
+         pgmoneta_log_error("Conf Get: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_GET_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "conf get", NULL);
+         pgmoneta_conf_get(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_CONF_SET)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, compression, encryption, payload);
+         pgmoneta_log_error("Conf Set: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_SET_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+         
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "conf set", NULL);
+         pgmoneta_conf_set(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
    else if (id == MANAGEMENT_STATUS)
    {
       pid = fork();
