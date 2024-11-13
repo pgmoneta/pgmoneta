@@ -79,6 +79,9 @@ extern "C" {
 #define MANAGEMENT_INFO           18
 #define MANAGEMENT_VERIFY         19
 #define MANAGEMENT_ANNOTATE       20
+#define MANAGEMENT_CONF_LS        21
+#define MANAGEMENT_CONF_GET       22
+#define MANAGEMENT_CONF_SET       23
 
 /**
  * Management categories
@@ -106,6 +109,8 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_COMMENTS              "Comments"
 #define MANAGEMENT_ARGUMENT_COMPRESSION           "Compression"
 #define MANAGEMENT_ARGUMENT_COMPRESSION           "Compression"
+#define MANAGEMENT_ARGUMENT_CONFIG_KEY            "ConfigKey"
+#define MANAGEMENT_ARGUMENT_CONFIG_VALUE          "ConfigValue"
 #define MANAGEMENT_ARGUMENT_DELTA                 "Delta"
 #define MANAGEMENT_ARGUMENT_DESTINATION_FILE      "DestinationFile"
 #define MANAGEMENT_ARGUMENT_DIRECTORY             "Directory"
@@ -277,6 +282,20 @@ extern "C" {
 #define MANAGEMENT_ERROR_ANNOTATE_NETWORK  2004
 #define MANAGEMENT_ERROR_ANNOTATE_ERROR    2005
 
+#define MANAGEMENT_ERROR_CONF_GET_NOFORK  2100
+#define MANAGEMENT_ERROR_CONF_GET_NETWORK 2102
+#define MANAGEMENT_ERROR_CONF_GET_ERROR   2103
+
+#define MANAGEMENT_ERROR_CONF_SET_NOFORK                    2200
+#define MANAGEMENT_ERROR_CONF_SET_NOREQUEST                 2201
+#define MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE     2202
+#define MANAGEMENT_ERROR_CONF_SET_NORESPONSE                2203
+#define MANAGEMENT_ERROR_CONF_SET_UNKNOWN_CONFIGURATION_KEY 2204
+#define MANAGEMENT_ERROR_CONF_SET_UNKNOWN_SERVER            2205
+#define MANAGEMENT_ERROR_CONF_SET_NETWORK                   2206
+#define MANAGEMENT_ERROR_CONF_SET_ERROR                     2207
+
+
 /**
  * Output formats
  */
@@ -443,6 +462,44 @@ pgmoneta_management_request_reset(SSL* ssl, int socket, uint8_t compression, uin
  */
 int
 pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a conf ls request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a conf get request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_conf_get(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a conf get request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param config_key The configuration key
+ * @param config_value The configuration value
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a retain request

@@ -123,8 +123,17 @@ static int decompress_data(SSL* ssl, int socket, char* path, uint8_t compression
 static int compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int conf_get(SSL* ssl, int socket, char* config_key, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
 
-static int  process_result(SSL* ssl, int socket, int32_t output_format);
+static int process_result(SSL* ssl, int socket, int32_t output_format);
+static int process_get_result(SSL* ssl, int socket, char* param, int32_t output_format);
+static int process_ls_result(SSL* ssl, int socket, int32_t output_format);
+static int process_set_result(SSL* ssl, int socket, char* config_key, int32_t output_format);
+
+static int get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t output_format);
+static int get_conf_path_result(struct json* j, uintptr_t* r);
 
 static char* translate_command(int32_t cmd_code);
 static char* translate_output_format(int32_t out_code);
@@ -132,8 +141,15 @@ static char* translate_valid(int32_t valid);
 static char* translate_compression(int32_t compression_code);
 static char* translate_encryption(int32_t encryption_code);
 static char* translate_size(int64_t size);
+static char* translate_storage_engine(int32_t storage_engine);
+static char* translate_create_slot(int32_t create_slot);
+static char* translate_hugepage(int32_t hugepage);
+static char* translate_log_type(int32_t log_type);
+static char* translate_log_level(int32_t log_level);
+static char* translate_log_mode(int32_t log_mode);
 static char* int_to_hex(uint32_t num);
 static void translate_backup_argument(struct json* j);
+static void translate_configuration(struct json* j);
 static void translate_response_argument(struct json* j);
 static void translate_servers_argument(struct json* j);
 static void translate_server_retention_argument(struct json* j, char* tag);
@@ -190,6 +206,11 @@ usage(void)
    printf("  status [details]         Status of pgmoneta, with optional details\n");
    printf("  conf <action>            Manage the configuration, with one of subcommands:\n");
    printf("                           - 'reload' to reload the configuration\n");
+   printf("                           - 'ls' to print the configurations used\n");
+   printf("                           - 'get' to obtain information about a runtime configuration value\n");
+   printf("                             conf get <parameter_name>\n");
+   printf("                           - 'set' to modify a configuration value;\n");
+   printf("                             conf set <parameter_name> <parameter_value>;\n");
    printf("  clear <what>             Clear data, with:\n");
    printf("                           - 'prometheus' to reset the Prometheus statistics\n");
    printf("\n");
@@ -335,6 +356,30 @@ const struct pgmoneta_command command_table[] = {
       .log_message = "<conf reload>"
    },
    {
+      .command = "conf",
+      .subcommand = "ls",
+      .accepted_argument_count = {0},
+      .action = MANAGEMENT_CONF_LS,
+      .deprecated = false,
+      .log_message = "<conf ls>"
+   },
+   {
+      .command = "conf",
+      .subcommand = "get",
+      .accepted_argument_count = {0, 1},
+      .action = MANAGEMENT_CONF_GET,
+      .deprecated = false,
+      .log_message = "<conf get> [%s]"
+   },
+   {
+      .command = "conf",
+      .subcommand = "set",
+      .accepted_argument_count = {2},
+      .action = MANAGEMENT_CONF_SET,
+      .deprecated = false,
+      .log_message = "<conf set> [%s]"
+   },
+   {
       .command = "clear",
       .subcommand = "prometheus",
       .accepted_argument_count = {0},
@@ -378,7 +423,6 @@ main(int argc, char** argv)
    int c;
    int option_index = 0;
    /* Store the result from command parser*/
-   bool matched = false;
    size_t size;
    char un[MAX_USERNAME_LENGTH];
    struct configuration* config = NULL;
@@ -623,8 +667,6 @@ main(int argc, char** argv)
       goto done;
    }
 
-   matched = true;
-
    if (configuration_path != NULL)
    {
       /* Local connection */
@@ -800,6 +842,25 @@ password:
    {
       exit_code = annotate(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], parsed.args[4], compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_CONF_LS)
+   {
+      exit_code = conf_ls(s_ssl, socket, compression, encryption, output_format);
+   }
+   else if (parsed.cmd->action == MANAGEMENT_CONF_GET)
+   {
+      if (parsed.args[0])
+      {
+         exit_code = conf_get(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = conf_get(s_ssl, socket, NULL, compression, encryption, output_format);
+      }
+   }
+   else if (parsed.cmd->action == MANAGEMENT_CONF_SET)
+   {
+      exit_code = conf_set(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+   }
 
 done:
 
@@ -817,15 +878,6 @@ done:
    }
 
    pgmoneta_disconnect(socket);
-
-   if (configuration_path != NULL)
-   {
-      if (matched && exit_code != 0)
-      {
-         warnx("No connection to pgmoneta on %s", config->unix_socket_dir);
-      }
-   }
-
    pgmoneta_stop_logging();
    pgmoneta_destroy_shared_memory(shmem, size);
 
@@ -959,6 +1011,9 @@ help_conf(void)
 {
    printf("Manage the configuration\n");
    printf("  pgmoneta-cli conf [reload]\n");
+   printf("  pgmoneta-cli conf [ls]\n");
+   printf("  pgmoneta-cli conf [get] <parameter_name>\n");
+   printf("  pgmoneta-cli conf [set] <parameter_name> <parameter_value>\n");
 }
 
 static void
@@ -1468,6 +1523,66 @@ error:
 }
 
 static int
+conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_conf_ls(ssl, socket, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_ls_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+conf_get(SSL* ssl, int socket, char* config_key, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_conf_get(ssl, socket, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_get_result(ssl, socket, config_key, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_conf_set(ssl, socket, config_key, config_value, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_set_result(ssl, socket, config_key, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
 process_result(SSL* ssl, int socket, int32_t output_format)
 {
    struct json* read = NULL;
@@ -1498,6 +1613,393 @@ process_result(SSL* ssl, int socket, int32_t output_format)
 error:
 
    pgmoneta_json_destroy(read);
+
+   return 1;
+}
+
+static int
+process_get_result(SSL* ssl, int socket, char* config_key, int32_t output_format)
+{
+   struct json* read = NULL;
+   bool is_char = false;
+   char* char_res = NULL;
+   struct json* json_res = NULL;
+   uintptr_t res;
+
+   if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
+
+   if (get_config_key_result(config_key, read, &res, output_format))
+   {
+      if (MANAGEMENT_OUTPUT_FORMAT_JSON == output_format)
+      {
+         json_res = (struct json*)res;
+         pgmoneta_json_print(json_res, FORMAT_JSON_COMPACT);
+      }
+      else
+      {
+         is_char = true;
+         char_res = (char*)res;
+         printf("%s\n", char_res);
+      }
+      goto error;
+   }
+
+   if (!config_key)  // error response | complete configuration
+   {
+      json_res = (struct json*)res;
+
+      if (MANAGEMENT_OUTPUT_FORMAT_RAW != output_format)
+      {
+         translate_json_object(json_res);
+      }
+
+      if (MANAGEMENT_OUTPUT_FORMAT_TEXT == output_format)
+      {
+         pgmoneta_json_print(json_res, FORMAT_TEXT);
+      }
+      else
+      {
+         pgmoneta_json_print(json_res, FORMAT_JSON);
+      }
+   }
+   else
+   {
+      if (MANAGEMENT_OUTPUT_FORMAT_JSON == output_format)
+      {
+         json_res = (struct json*)res;
+         pgmoneta_json_print(json_res, FORMAT_JSON_COMPACT);
+      }
+      else
+      {
+         is_char = true;
+         char_res = (char*)res;
+         printf("%s\n", char_res);
+      }
+   }
+
+   pgmoneta_json_destroy(read);
+   if (config_key)
+   {
+      if (is_char)
+      {
+         free(char_res);
+      }
+      else
+      {
+         pgmoneta_json_destroy(json_res);
+      }
+   }
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(read);
+   if (config_key)
+   {
+      if (is_char)
+      {
+         free(char_res);
+      }
+      else
+      {
+         pgmoneta_json_destroy(json_res);
+      }
+   }
+
+   return 1;
+}
+
+static int
+process_set_result(SSL* ssl, int socket, char* config_key, int32_t output_format)
+{
+   struct json* read = NULL;
+   bool is_char = false;
+   char* char_res = NULL;
+   int status = 0;
+   struct json* json_res = NULL;
+   uintptr_t res;
+
+   if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
+
+   status = get_config_key_result(config_key, read, &res, output_format);
+   if (MANAGEMENT_OUTPUT_FORMAT_JSON == output_format)
+   {
+      json_res = (struct json*)res;
+      pgmoneta_json_print(json_res, FORMAT_JSON_COMPACT);
+   }
+   else
+   {
+      is_char = true;
+      char_res = (char*)res;
+      printf("%s\n", char_res);
+   }
+
+   if (status == 1)
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(read);
+   if (config_key)
+   {
+      if (is_char)
+      {
+         free(char_res);
+      }
+      else
+      {
+         pgmoneta_json_destroy(json_res);
+      }
+   }
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(read);
+   if (config_key)
+   {
+      if (is_char)
+      {
+         free(char_res);
+      }
+      else
+      {
+         pgmoneta_json_destroy(json_res);
+      }
+   }
+
+   return 1;
+}
+
+static int 
+process_ls_result(SSL* ssl, int socket, int32_t output_format)
+{
+   struct json* read = NULL;
+   struct json* json_res = NULL;
+   uintptr_t res;
+
+   if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
+
+   if (get_conf_path_result(read, &res))
+   {
+      goto error;
+   }
+
+   json_res = (struct json*)res;
+
+   if (MANAGEMENT_OUTPUT_FORMAT_JSON == output_format)
+   {
+      pgmoneta_json_print(json_res, FORMAT_JSON_COMPACT);
+   }
+   else
+   {
+      struct json_iterator* iter = NULL;
+      pgmoneta_json_iterator_create(json_res, &iter);
+      while (pgmoneta_json_iterator_next(iter))
+      { 
+         char* value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
+         printf("%s\n", value);
+         free(value);
+      }
+      pgmoneta_json_iterator_destroy(iter);
+   }
+
+   pgmoneta_json_destroy(read);
+   pgmoneta_json_destroy(json_res);
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(read);
+   pgmoneta_json_destroy(json_res);
+   return 1;
+}
+
+static int
+get_conf_path_result(struct json* j, uintptr_t* r)
+{
+   struct json* conf_path_response = NULL;
+   struct json* response = NULL;
+
+   response = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_RESPONSE);
+
+   if (!response)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_json_create(&conf_path_response))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH))
+   {
+      pgmoneta_json_put(conf_path_response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH), ValueString);
+   }
+      if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH))
+   {
+      pgmoneta_json_put(conf_path_response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH), ValueString);
+   }
+      if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH))
+   {
+      pgmoneta_json_put(conf_path_response, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH), ValueString);
+   }
+
+   *r = (uintptr_t)conf_path_response;
+
+   return 0;
+error:
+
+   return 1;
+
+}
+
+static int
+get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t output_format)
+{
+   char server[MISC_LENGTH];
+   char key[MISC_LENGTH];
+
+   struct json* configuration_js = NULL;
+   struct json* filtered_response = NULL;
+   struct json* response = NULL;
+   struct json* outcome = NULL;
+   struct json_iterator* iter;
+   char* config_value = NULL;
+   int begin = -1, end = -1;
+
+   if (!config_key)
+   {
+      *r = (uintptr_t)j;
+      return 0;
+   }
+
+   if (pgmoneta_json_create(&filtered_response))
+   {
+      goto error;
+   }
+
+   memset(server, 0, MISC_LENGTH);
+   memset(key, 0, MISC_LENGTH);
+
+   for (int i = 0; i < strlen(config_key); i++)
+   {
+      if (config_key[i] == '.')
+      {
+         if (!strlen(server))
+         {
+            memcpy(server, &config_key[begin], end - begin + 1);
+            server[end - begin + 1] = '\0';
+            begin = end = -1;
+            continue;
+         }
+      }
+
+      if (begin < 0)
+      {
+         begin = i;
+      }
+
+      end = i;
+
+   }
+
+   // if the key has not been found, since there is no ending dot,
+   // try to extract it from the string
+   if (!strlen(key))
+   {
+      memcpy(key, &config_key[begin], end - begin + 1);
+      key[end - begin + 1] = '\0';
+   }
+
+   response = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_RESPONSE);
+   outcome = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_OUTCOME);
+   if (!response || !outcome)
+   {
+      goto error;
+   }
+
+   // Check if error response
+   if (pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_ERROR))
+   {
+      goto error;
+   }
+
+   // translate the complete configuration in response
+   if (MANAGEMENT_OUTPUT_FORMAT_RAW != output_format)
+   {
+      translate_configuration(response);
+   }
+
+   if (strlen(server) > 0)
+   {
+      configuration_js = (struct json*)pgmoneta_json_get(response, server);
+      if (!configuration_js)
+      {
+         goto error;
+      }
+   }
+   else
+   {
+      configuration_js = response;
+   }
+
+   pgmoneta_json_iterator_create(configuration_js, &iter);
+   while (pgmoneta_json_iterator_next(iter))
+   {
+      if (!strcmp(key, iter->key))
+      {
+         config_value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
+         pgmoneta_json_put(filtered_response, key, (uintptr_t)iter->value->data, iter->value->type);
+      }
+   }
+   pgmoneta_json_iterator_destroy(iter);
+
+   if (!config_value)  // if key doesn't match with any field in configuration
+   {
+      goto error;
+   }
+
+   if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON || !config_key)
+   {
+      *r = (uintptr_t)filtered_response;
+      free(config_value);
+   }
+   else
+   {
+      *r = (uintptr_t)config_value;
+      pgmoneta_json_destroy(filtered_response);
+   }
+
+   return 0;
+
+error:
+
+   if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_put(filtered_response, "Outcome", (uintptr_t)false, ValueBool);
+      *r = (uintptr_t)filtered_response;
+      free(config_value);
+   }
+   else
+   {
+      config_value = (char*)malloc(6);
+      memcpy(config_value, "Error\0", 6);
+      *r = (uintptr_t)config_value;
+      pgmoneta_json_destroy(filtered_response);
+   }
 
    return 1;
 }
@@ -1565,6 +2067,21 @@ translate_command(int32_t cmd_code)
       case MANAGEMENT_ANNOTATE:
          command_output = pgmoneta_append(command_output, COMMAND_ANNOTATE);
          break;
+      case MANAGEMENT_CONF_LS:
+         command_output = pgmoneta_append(command_output, COMMAND_CONF);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "ls");
+         break;
+      case MANAGEMENT_CONF_GET:
+         command_output = pgmoneta_append(command_output, COMMAND_CONF);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "get");
+         break;
+      case MANAGEMENT_CONF_SET:
+         command_output = pgmoneta_append(command_output, COMMAND_CONF);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "set");
+         break;
       default:
          break;
    }
@@ -1629,9 +2146,11 @@ translate_compression(int32_t compression_code)
       case COMPRESSION_CLIENT_BZIP2:
          compression_output = pgmoneta_append(compression_output, "bzip2");
          break;
-      default:
+      case COMPRESSION_NONE:
          compression_output = pgmoneta_append(compression_output, "none");
          break;
+      default:
+         return  NULL;
    }
    return compression_output;
 }
@@ -1692,6 +2211,140 @@ translate_size(int64_t size)
    translated_size = pgmoneta_append(translated_size, units[i]);
 
    return translated_size;
+}
+
+static char*
+translate_storage_engine(int32_t storage_engine)
+{
+   char* storage_engine_output = NULL;
+   switch (storage_engine)
+   {
+      case STORAGE_ENGINE_LOCAL: 
+         storage_engine_output = pgmoneta_append(storage_engine_output, "local");
+         break;
+      case STORAGE_ENGINE_SSH:
+         storage_engine_output = pgmoneta_append(storage_engine_output, "ssh");
+         break;
+      case STORAGE_ENGINE_S3:
+         storage_engine_output = pgmoneta_append(storage_engine_output, "s3");
+         break;
+      case STORAGE_ENGINE_AZURE:
+         storage_engine_output = pgmoneta_append(storage_engine_output, "azure");
+         break;
+      default:
+         storage_engine_output = pgmoneta_append(storage_engine_output, "unknown");
+         break;
+   }
+   return storage_engine_output;
+}
+
+static char* 
+translate_create_slot(int32_t create_slot)
+{
+   char* create_slot_output = NULL;
+   switch (create_slot)
+   {
+      case CREATE_SLOT_UNDEFINED:
+         create_slot_output = pgmoneta_append(create_slot_output, "undefined");
+         break;
+      case CREATE_SLOT_YES:
+         create_slot_output = pgmoneta_append(create_slot_output, "yes");
+         break;
+      case CREATE_SLOT_NO:
+         create_slot_output = pgmoneta_append(create_slot_output, "no");
+         break;
+      default:
+         return NULL;
+   }
+   return create_slot_output;
+}
+
+static char* 
+translate_hugepage(int32_t hugepage)
+{
+   char* hugepage_output = NULL;
+   switch (hugepage)
+   {
+      case HUGEPAGE_OFF:
+         hugepage_output = pgmoneta_append(hugepage_output, "off");
+         break;
+      case HUGEPAGE_TRY:
+         hugepage_output = pgmoneta_append(hugepage_output, "try");
+         break;
+      case HUGEPAGE_ON:
+         hugepage_output = pgmoneta_append(hugepage_output, "on");
+         break;
+      default:
+         return NULL;
+   }
+   return hugepage_output;
+}
+
+static char* 
+translate_log_type(int32_t log_type)
+{
+   char* log_type_output = NULL;
+   switch (log_type)
+   {
+      case PGMONETA_LOGGING_TYPE_FILE:
+         log_type_output = pgmoneta_append(log_type_output, "file");
+         break;
+      case PGMONETA_LOGGING_TYPE_CONSOLE:
+         log_type_output = pgmoneta_append(log_type_output, "console");
+         break;
+      case PGMONETA_LOGGING_TYPE_SYSLOG:
+         log_type_output = pgmoneta_append(log_type_output, "syslog");
+         break;
+      default:
+         return NULL;
+   }
+   return log_type_output;
+}
+
+static char* 
+translate_log_level(int32_t log_level)
+{
+   char* log_level_output = NULL;
+   switch (log_level)
+   {
+      case PGMONETA_LOGGING_LEVEL_DEBUG1:
+      case PGMONETA_LOGGING_LEVEL_DEBUG2:
+         log_level_output = pgmoneta_append(log_level_output, "debug");
+         break;
+      case PGMONETA_LOGGING_LEVEL_INFO:
+         log_level_output = pgmoneta_append(log_level_output, "info");
+         break;
+      case PGMONETA_LOGGING_LEVEL_FATAL:
+         log_level_output = pgmoneta_append(log_level_output, "fatal");
+         break;
+      case PGMONETA_LOGGING_LEVEL_ERROR:
+         log_level_output = pgmoneta_append(log_level_output, "error");
+         break;
+      case PGMONETA_LOGGING_LEVEL_WARN:
+         log_level_output = pgmoneta_append(log_level_output, "warn");
+         break;
+      default:
+         return NULL;
+   }
+   return log_level_output;
+}
+
+static char* 
+translate_log_mode(int32_t log_mode)
+{
+   char* log_mode_output = NULL;
+   switch (log_mode)
+   {
+      case PGMONETA_LOGGING_MODE_CREATE:
+         log_mode_output = pgmoneta_append(log_mode_output, "create");
+         break;
+      case PGMONETA_LOGGING_MODE_APPEND:
+         log_mode_output = pgmoneta_append(log_mode_output, "append");
+         break;
+      default:
+         return NULL;
+   }
+   return log_mode_output;
 }
 
 static char*
@@ -1879,6 +2532,69 @@ translate_servers_argument(struct json* response)
 }
 
 static void
+translate_configuration(struct json* response)
+{
+   char* translated_compression = NULL;
+   char* translated_encryption = NULL;
+   char* translated_storage_engine = NULL;
+   char* translated_create_slot = NULL;
+   char* translated_hugepage = NULL;
+   char* translated_log_type = NULL;
+   char* translated_log_level = NULL;
+   char* translated_log_mode = NULL;
+
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_COMPRESSION))
+   {
+      translated_compression = translate_compression((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_COMPRESSION));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)translated_compression, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_ENCRYPTION))
+   {
+      translated_encryption = translate_encryption((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_ENCRYPTION));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)translated_encryption, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE))
+   {
+      translated_storage_engine = translate_storage_engine((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)translated_storage_engine, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_CREATE_SLOT))
+   {
+      translated_create_slot = translate_create_slot((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_CREATE_SLOT));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)translated_create_slot, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_HUGEPAGE))
+   {
+      translated_hugepage = translate_hugepage((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_HUGEPAGE));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_HUGEPAGE, (uintptr_t)translated_hugepage, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_LOG_TYPE))
+   {
+      translated_log_type = translate_log_type((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_TYPE));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)translated_log_type, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_LOG_LEVEL))
+   {
+      translated_log_level = translate_log_level((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_LEVEL));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)translated_log_level, ValueString);
+   }
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_LOG_MODE))
+   {
+      translated_log_mode = translate_log_mode((int32_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_LOG_MODE));
+      pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)translated_log_mode, ValueString);
+   }
+
+   free(translated_compression);
+   free(translated_encryption);
+   free(translated_storage_engine);
+   free(translated_create_slot);
+   free(translated_hugepage);
+   free(translated_log_type);
+   free(translated_log_level);
+   free(translated_log_mode);
+}
+
+static void
 translate_json_object(struct json* j)
 {
    struct json* header = NULL;
@@ -1990,6 +2706,9 @@ translate_json_object(struct json* j)
                translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
             }
             pgmoneta_json_iterator_destroy(server_it);
+            break;
+         case MANAGEMENT_CONF_GET:
+            translate_configuration(response);
             break;
          default:
             break;
