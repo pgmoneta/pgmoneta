@@ -147,6 +147,15 @@ pgmoneta_wal(int srv, char** argv)
    }
    pgmoneta_server_info(srv);
 
+   if (config->servers[srv].checksums)
+   {
+      pgmoneta_log_debug("Server %s has checksums enabled", config->servers[srv].name);
+   }
+   else
+   {
+      pgmoneta_log_warn("Server %s has checksums disabled. Use initdb -k or pg_checksums to enable", config->servers[srv].name);
+   }
+
    segsize = config->servers[srv].wal_size;
    d = pgmoneta_get_server_wal(srv);
    pgmoneta_mkdir(d);
