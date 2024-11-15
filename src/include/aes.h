@@ -45,6 +45,7 @@ extern "C" {
  * @param password The master password
  * @param ciphertext The ciphertext output
  * @param ciphertext_length The length of the ciphertext
+ * @param mode The encryption mode
  * @return 0 upon success, otherwise 1
  */
 int
@@ -56,6 +57,7 @@ pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* cipher
  * @param ciphertext_length The length of the ciphertext
  * @param password The master password
  * @param plaintext The plaintext output
+ * @param mode The decryption mode
  * @return 0 upon success, otherwise 1
  */
 int
