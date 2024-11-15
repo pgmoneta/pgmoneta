@@ -161,6 +161,8 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->servers[i].workers != -1 ? config->servers[i].workers : config->workers), ValueInt32);
 
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->servers[i].checksums, ValueBool);
+
       pgmoneta_json_append(servers, (uintptr_t)js, ValueJSON);
 
       for (int j = 0; j < number_of_backups; j++)
@@ -347,6 +349,8 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[i].name, ValueString);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->servers[i].workers != -1 ? config->servers[i].workers : config->workers), ValueInt32);
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->servers[i].checksums, ValueBool);
 
       free(d);
       d = NULL;

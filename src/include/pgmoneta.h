@@ -225,6 +225,7 @@ struct server
    atomic_bool wal;                         /**< Is there an active wal */
    int wal_size;                            /**< The size of the WAL files */
    bool wal_streaming;                      /**< Is WAL streaming active */
+   bool checksums;                          /**< Are checksums enabled */
    bool valid;                              /**< Is the server valid */
    int version;                             /**< The major version of the server*/
    int minor_version;                       /**< The minor version of the server*/

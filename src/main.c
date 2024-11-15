@@ -1814,7 +1814,7 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d", i, config->servers[i].valid, config->servers[i].wal_streaming);
+      pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d CHECKSUMS %d", i, config->servers[i].valid, config->servers[i].wal_streaming, config->servers[i].checksums);
 
       if (keep_running && !config->servers[i].wal_streaming)
       {

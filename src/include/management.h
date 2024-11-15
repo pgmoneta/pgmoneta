@@ -99,6 +99,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_CALCULATED            "Calculated"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN      "CheckpointHiLSN"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN      "CheckpointLoLSN"
+#define MANAGEMENT_ARGUMENT_CHECKSUMS             "Checksums"
 #define MANAGEMENT_ARGUMENT_CLIENT_VERSION        "ClientVersion"
 #define MANAGEMENT_ARGUMENT_COMMAND               "Command"
 #define MANAGEMENT_ARGUMENT_COMMENT               "Comment"

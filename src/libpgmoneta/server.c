@@ -44,6 +44,7 @@
 
 static int get_wal_level(SSL* ssl, int socket, int server, bool* replica);
 static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
+static int get_checksums(SSL* ssl, int socket, int server, bool* checksums);
 static int get_version(SSL* ssl, int socket, int server, int* major, int* minor);
 
 
@@ -59,12 +60,14 @@ pgmoneta_server_info(int srv)
    int major = 0;
    int minor = 0;
    bool replica;
+   bool checksums;
    int ws;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    config->servers[srv].valid = false;
+   config->servers[srv].checksums = false;
 
    usr = -1;
    for (int i = 0; usr == -1 && i < config->number_of_users; i++)
@@ -114,6 +117,19 @@ pgmoneta_server_info(int srv)
    }
 
    pgmoneta_log_debug("%s/wal_level %s", config->servers[srv].name, config->servers[srv].valid ? "Yes" : "No");
+
+   if (get_checksums(ssl, socket, srv, &checksums))
+   {
+      pgmoneta_log_error("Unable to get data_checksums for %s", config->servers[srv].name);
+      config->servers[srv].checksums = false;
+      goto done;
+   }
+   else
+   {
+      config->servers[srv].checksums = checksums;
+   }
+
+   pgmoneta_log_debug("%s/data_checksums %s", config->servers[srv].name, config->servers[srv].checksums ? "Yes" : "No");
 
    if (get_wal_size(ssl, socket, srv, &ws))
    {
@@ -305,6 +321,69 @@ q:
 error:
 
    pgmoneta_log_error("Error getting wal_level");
+
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_checksums(SSL* ssl, int socket, int server, bool* checksums)
+{
+   int q = 0;
+   int ret;
+   char data_checksums[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   *checksums = false;
+
+   ret = pgmoneta_create_query_message("SHOW data_checksums;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&data_checksums[0], 0, sizeof(data_checksums));
+
+   snprintf(&data_checksums[0], sizeof(data_checksums), "%s", response->tuples->data[0]);
+
+   if (!strcmp("on", data_checksums))
+   {
+      *checksums = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_log_error("Error getting data_checksums");
 
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
