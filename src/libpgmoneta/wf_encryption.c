@@ -47,7 +47,7 @@ static int decryption_execute(int, char*, struct deque*);
 static int encryption_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_encryption(bool encrypt)
+pgmoneta_encryption(bool encrypt)
 {
    struct workflow* wf = NULL;
 
@@ -93,8 +93,8 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
    char* enc_file = NULL;
-   char* root = NULL;
-   char* to = NULL;
+   char* backup_base = NULL;
+   char* backup_data = NULL;
    char* compress_suffix = NULL;
    char* tarfile = NULL;
    time_t encrypt_time;
@@ -112,7 +112,7 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Encryption (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
 
    encrypt_time = time(NULL);
 
@@ -124,12 +124,11 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = (char*)pgmoneta_deque_get(nodes, "root");
-      to = (char*)pgmoneta_deque_get(nodes, "to");
-      d = pgmoneta_append(d, to);
+      backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+      backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
 
-      pgmoneta_encrypt_data(d, workers);
-      pgmoneta_encrypt_tablespaces(root, workers);
+      pgmoneta_encrypt_data(backup_data, workers);
+      pgmoneta_encrypt_tablespaces(backup_base, workers);
 
       if (number_of_workers > 0)
       {
@@ -196,19 +195,15 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
 static int
 decryption_execute(int server, char* identifier, struct deque* nodes)
 {
-   char* d = NULL;
-   char* to = NULL;
-   char* id = NULL;
+   char* base = NULL;
    time_t decrypt_time;
    int total_seconds;
    int hours;
    int minutes;
    int seconds;
    char elapsed[128];
-   int number_of_backups = 0;
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct backup** backups = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -216,60 +211,14 @@ decryption_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Decryption (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   if (!strcmp(identifier, "oldest"))
+   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
+   if (base == NULL)
    {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-
-      free(d);
-      d = NULL;
+      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
    }
-   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+   if (base == NULL)
    {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-
-      free(d);
-      d = NULL;
-   }
-   else
-   {
-      id = identifier;
-   }
-
-   to = (char*)pgmoneta_deque_get(nodes, "to");
-
-   if (to != NULL)
-   {
-      d = pgmoneta_append(d, to);
-   }
-   else
-   {
-      d = pgmoneta_get_server_backup_identifier_data(server, id);
+      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
    }
 
    decrypt_time = time(NULL);
@@ -280,7 +229,7 @@ decryption_execute(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_decrypt_directory(d, workers);
+   pgmoneta_decrypt_directory(base, workers);
 
    if (number_of_workers > 0)
    {
@@ -296,28 +245,9 @@ decryption_execute(int server, char* identifier, struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, id, &elapsed[0]);
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(d);
+   pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
    return 0;
-
-error:
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(d);
-
-   return 1;
 }
 
 static int

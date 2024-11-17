@@ -60,37 +60,37 @@ pgmoneta_create_info(char* directory, char* label, int status)
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=%s", INFO_LABEL, label);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=", INFO_COMMENTS);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->compression_type);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s", &buffer[0]);
+   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->encryption);
 
    pgmoneta_permission(s, 6, 0, 0);
 
@@ -648,6 +648,133 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
    free(fn);
 
    return ret;
+}
+
+int
+pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
+{
+   char* d = NULL;
+   char* id = NULL;
+   char* root = NULL;
+   char* base = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct backup* bck = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   *backup = NULL;
+
+   if (!strcmp(identifier, "oldest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+   {
+      d = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
+      {
+         if (backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+   }
+   else
+   {
+      id = identifier;
+   }
+
+   if (id == NULL)
+   {
+      pgmoneta_log_error("No identifier for %s/%s", config->servers[server].name, identifier);
+      goto error;
+   }
+
+   root = pgmoneta_get_server_backup(server);
+
+   base = pgmoneta_get_server_backup_identifier(server, id);
+
+   // TODO - Why ?
+   if (!pgmoneta_exists(base))
+   {
+      if (pgmoneta_get_backups(root, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      bool prefix_found = false;
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (backups[i]->valid == VALID_TRUE && pgmoneta_starts_with(backups[i]->label, id))
+         {
+            prefix_found = true;
+            id = backups[i]->label;
+            break;
+         }
+      }
+
+      if (!prefix_found)
+      {
+         pgmoneta_log_error("Unknown identifier for %s/%s", config->servers[server].name, id);
+         goto error;
+      }
+   }
+
+   if (pgmoneta_get_backup(root, id, &bck))
+   {
+      pgmoneta_log_error("Unable to get backup for %s/%s", config->servers[server].name, id);
+      goto error;
+   }
+
+   *backup = bck;
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(root);
+   free(base);
+   free(d);
+
+   return 0;
+
+error:
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(root);
+   free(base);
+   free(d);
+
+   return 1;
 }
 
 int

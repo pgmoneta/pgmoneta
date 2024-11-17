@@ -43,7 +43,7 @@ static int permissions_execute_archive(int, char*, struct deque*);
 static int permissions_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_permissions(int type)
+pgmoneta_create_permissions(int type)
 {
    struct workflow* wf = NULL;
 
@@ -162,7 +162,7 @@ permissions_execute_restore(int server, char* identifier, struct deque* nodes)
       id = identifier;
    }
 
-   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, "directory"));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
@@ -253,7 +253,7 @@ permissions_execute_archive(int server, char* identifier, struct deque* nodes)
       id = identifier;
    }
 
-   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, "directory"));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");

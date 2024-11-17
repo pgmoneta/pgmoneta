@@ -53,7 +53,7 @@ static void write_tar_file(struct archive* a, char* current_real_path, char* cur
 void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   char* backup_id = NULL;
+   char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
    char* elapsed = NULL;
@@ -61,13 +61,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    time_t start_time;
    time_t end_time;
    int total_seconds;
-   char* to = NULL;
-   char* id = NULL;
-   char* d = NULL;
+   char* label = NULL;
    char* output = NULL;
    char* filename = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
+   struct backup* backup = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
@@ -85,90 +82,68 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    atomic_fetch_add(&config->servers[server].archiving, 1);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
-   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   // we used to get id after restore workflow, but now we need it first to create a wrapping directory, so...
-   if (!strcmp(backup_id, "oldest"))
+   if (pgmoneta_deque_create(false, &nodes))
    {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else if (!strcmp(backup_id, "latest") || !strcmp(backup_id, "newest"))
-   {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else
-   {
-      id = backup_id;
+      goto error;
    }
 
-   if (id == NULL)
+   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory, ValueString))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
+   if (backup == NULL)
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, compression, encryption, payload);
-      pgmoneta_log_error("Archive: No identifier for %s/%s", config->servers[server].name, backup_id);
+      pgmoneta_log_error("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
    memset(real_directory, 0, sizeof(real_directory));
-   snprintf(real_directory, sizeof(real_directory), "%s/archive-%s-%s", directory, config->servers[server].name, id);
+   snprintf(real_directory, sizeof(real_directory), "%s/archive-%s-%s", directory, config->servers[server].name, backup->label);
 
-   pgmoneta_deque_create(false, &nodes);
-
-   if (!pgmoneta_restore_backup(server, backup_id, position, real_directory, &output, &id))
+   if (!pgmoneta_restore_backup(server, identifier, position, real_directory, &output, &label))
    {
-      if (pgmoneta_deque_add(nodes, "directory", (uintptr_t)real_directory, ValueString))
+      if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)real_directory, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_add(nodes, "id", (uintptr_t)id, ValueString))
+      if (pgmoneta_deque_add(nodes, NODE_LABEL, (uintptr_t)label, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_add(nodes, "output", (uintptr_t)output, ValueString))
+      if (pgmoneta_deque_add(nodes, NODE_OUTPUT, (uintptr_t)output, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_add(nodes, "destination", (uintptr_t)directory, ValueString))
+      if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory, ValueString))
       {
          goto error;
       }
 
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
 
       current = workflow;
       while (current != NULL)
       {
-         if (current->setup(server, backup_id, nodes))
+         if (current->setup(server, identifier, nodes))
          {
             goto error;
          }
@@ -178,7 +153,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       current = workflow;
       while (current != NULL)
       {
-         if (current->execute(server, backup_id, nodes))
+         if (current->execute(server, identifier, nodes))
          {
             goto error;
          }
@@ -188,7 +163,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       current = workflow;
       while (current != NULL)
       {
-         if (current->teardown(server, backup_id, nodes))
+         if (current->teardown(server, identifier, nodes))
          {
             goto error;
          }
@@ -202,7 +177,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      filename = pgmoneta_append(filename, (char*)pgmoneta_deque_get(nodes, "tarfile"));
+      filename = pgmoneta_append(filename, (char*)pgmoneta_deque_get(nodes, NODE_TARFILE));
       if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
       {
          filename = pgmoneta_append(filename, ".gz");
@@ -221,7 +196,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       }
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)id, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
 
       end_time = time(NULL);
@@ -229,27 +204,21 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, compression, encryption, payload);
-         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, backup_id);
+         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, identifier);
 
          goto error;
       }
 
       elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
 
-      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, id, elapsed);
+      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
    }
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
 
    pgmoneta_deque_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_disconnect(client_fd);
 
@@ -258,26 +227,18 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_stop_logging();
 
-   free(id);
+   free(label);
    free(output);
-   free(to);
-   free(d);
 
    exit(0);
 
 error:
 
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
    pgmoneta_deque_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_disconnect(client_fd);
 
@@ -286,10 +247,8 @@ error:
 
    pgmoneta_stop_logging();
 
-   free(id);
+   free(label);
    free(output);
-   free(to);
-   free(d);
 
    exit(1);
 }

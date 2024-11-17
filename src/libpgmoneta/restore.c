@@ -73,7 +73,7 @@ pgmoneta_get_restore_last_files_names(char*** output)
 void
 pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   char* backup_id = NULL;
+   char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
    char* elapsed = NULL;
@@ -81,7 +81,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    time_t end_time;
    int total_seconds = 0;
    char* output = NULL;
-   char* id = NULL;
+   char* label = NULL;
    char* server_backup = NULL;
    struct backup* backup = NULL;
    struct json* req = NULL;
@@ -98,11 +98,11 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    atomic_fetch_add(&config->servers[server].restore, 1);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
-   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   if (!pgmoneta_restore_backup(server, backup_id, position, directory, &output, &id))
+   if (!pgmoneta_restore_backup(server, identifier, position, directory, &output, &label))
    {
       if (pgmoneta_management_create_response(payload, server, &response))
       {
@@ -113,7 +113,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       server_backup = pgmoneta_get_server_backup(server);
 
-      if (pgmoneta_get_backup(server_backup, id, &backup))
+      if (pgmoneta_get_backup(server_backup, label, &backup))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_ERROR, compression, encryption, payload);
 
@@ -121,7 +121,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       }
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)id, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backup->comments, ValueString);
@@ -139,7 +139,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       }
 
       elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
-      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, id, elapsed);
+      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, backup->label, elapsed);
    }
 
    pgmoneta_json_destroy(payload);
@@ -155,7 +155,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    free(elapsed);
    free(server_backup);
    free(output);
-   free(id);
 
    exit(0);
 
@@ -174,41 +173,45 @@ error:
    free(elapsed);
    free(server_backup);
    free(output);
-   free(id);
 
    exit(1);
 }
 
 int
-pgmoneta_restore_backup(int server, char* backup_id, char* position, char* directory, char** output, char** identifier)
+pgmoneta_restore_backup(int server, char* identifier, char* position, char* directory, char** output, char** label)
 {
    char* o = NULL;
-   char* ident = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
+   struct backup* backup = NULL;
 
    *output = NULL;
-   *identifier = NULL;
+   *label = NULL;
 
    pgmoneta_deque_create(false, &nodes);
 
-   if (pgmoneta_deque_add(nodes, "position", (uintptr_t)position, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, "directory", (uintptr_t)directory, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE);
+   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, backup);
 
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, backup_id, nodes))
+      if (current->setup(server, identifier, nodes))
       {
          goto error;
       }
@@ -218,7 +221,7 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, backup_id, nodes))
+      if (current->execute(server, identifier, nodes))
       {
          goto error;
       }
@@ -228,23 +231,16 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, backup_id, nodes))
+      if (current->teardown(server, identifier, nodes))
       {
          goto error;
       }
       current = current->next;
    }
 
-   o = (char*)pgmoneta_deque_get(nodes, "output");
+   o = (char*)pgmoneta_deque_get(nodes, NODE_OUTPUT);
 
    if (o == NULL)
-   {
-      goto error;
-   }
-
-   ident = (char*)pgmoneta_deque_get(nodes, "identifier");
-
-   if (ident == NULL)
    {
       goto error;
    }
@@ -259,24 +255,28 @@ pgmoneta_restore_backup(int server, char* backup_id, char* position, char* direc
    memset(*output, 0, strlen(o) + 1);
    memcpy(*output, o, strlen(o));
 
-   *identifier = malloc(strlen(ident) + 1);
+   *label = malloc(strlen(backup->label) + 1);
 
-   if (*identifier == NULL)
+   if (*label == NULL)
    {
       goto error;
    }
 
-   memset(*identifier, 0, strlen(ident) + 1);
-   memcpy(*identifier, ident, strlen(ident));
+   memset(*label, 0, strlen(backup->label) + 1);
+   memcpy(*label, backup->label, strlen(backup->label));
 
-   pgmoneta_workflow_delete(workflow);
+   free(backup);
+
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
 
    return 0;
 
 error:
-   pgmoneta_workflow_delete(workflow);
+   free(backup);
+
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
 

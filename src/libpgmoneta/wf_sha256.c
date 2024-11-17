@@ -46,7 +46,7 @@ static int write_backup_sha256(char* root, char* relative_path);
 static FILE* sha256_file = NULL;
 
 struct workflow*
-pgmoneta_workflow_create_sha256(void)
+pgmoneta_create_sha256(void)
 {
    struct workflow* wf = NULL;
 

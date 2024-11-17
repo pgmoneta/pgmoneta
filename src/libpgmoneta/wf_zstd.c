@@ -43,7 +43,7 @@ static int zstd_execute_uncompress(int, char*, struct deque*);
 static int zstd_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_zstd(bool compress)
+pgmoneta_create_zstd(bool compress)
 {
    struct workflow* wf = NULL;
 
@@ -88,8 +88,8 @@ static int
 zstd_execute_compress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
-   char* root = NULL;
-   char* to = NULL;
+   char* backup_base = NULL;
+   char* backup_data = NULL;
    char* tarfile = NULL;
    time_t compression_time;
    int total_seconds;
@@ -108,7 +108,7 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
 
    compression_time = time(NULL);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
 
    if (tarfile == NULL)
    {
@@ -118,13 +118,11 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = (char*)pgmoneta_deque_get(nodes, "root");
-      to = (char*)pgmoneta_deque_get(nodes, "to");
+      backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+      backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
 
-      d = pgmoneta_append(d, to);
-
-      pgmoneta_zstandardc_data(d, workers);
-      pgmoneta_zstandardc_tablespaces(root, workers);
+      pgmoneta_zstandardc_data(backup_data, workers);
+      pgmoneta_zstandardc_tablespaces(backup_base, workers);
 
       if (number_of_workers > 0)
       {
@@ -163,7 +161,7 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
 static int
 zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
-   char* root = NULL;
+   char* base = NULL;
    time_t decompress_time;
    int total_seconds;
    int hours;
@@ -179,10 +177,14 @@ zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("ZSTD (decompress): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   root = (char*)pgmoneta_deque_get(nodes, "root");
-   if (root == NULL)
+   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
+   if (base == NULL)
    {
-      root = (char*)pgmoneta_deque_get(nodes, "to");
+      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+   }
+   if (base == NULL)
+   {
+      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
    }
 
    decompress_time = time(NULL);
@@ -193,7 +195,7 @@ zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_zstandardd_directory(root, workers);
+   pgmoneta_zstandardd_directory(base, workers);
 
    if (number_of_workers > 0)
    {

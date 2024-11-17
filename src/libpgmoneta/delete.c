@@ -58,7 +58,7 @@ pgmoneta_delete(int srv, char* backup_id)
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, NULL);
 
    pgmoneta_deque_create(false, &nodes);
 
@@ -94,7 +94,7 @@ pgmoneta_delete(int srv, char* backup_id)
 
    pgmoneta_deque_destroy(nodes);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    return 0;
 
@@ -102,7 +102,7 @@ error:
 
    pgmoneta_deque_destroy(nodes);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    return 1;
 }

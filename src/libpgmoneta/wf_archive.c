@@ -56,7 +56,7 @@ static int archive_execute(int, char*, struct deque*);
 static int archive_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_archive(void)
+pgmoneta_create_archive(void)
 {
    struct workflow* wf = NULL;
 
@@ -78,9 +78,6 @@ pgmoneta_workflow_create_archive(void)
 static int
 archive_setup(int server, char* identifier, struct deque* nodes)
 {
-   char* tarfile = NULL;
-   char* destination = NULL;
-   char* id = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -88,40 +85,16 @@ archive_setup(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Archive (setup): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   destination = (char*)pgmoneta_deque_get(nodes, "destination");
-   id = (char*)pgmoneta_deque_get(nodes, "id");
-
-   tarfile = pgmoneta_append(tarfile, destination);
-   tarfile = pgmoneta_append(tarfile, "/archive-");
-   tarfile = pgmoneta_append(tarfile, config->servers[server].name);
-   tarfile = pgmoneta_append(tarfile, "-");
-   tarfile = pgmoneta_append(tarfile, id);
-   tarfile = pgmoneta_append(tarfile, ".tar");
-
-   if (pgmoneta_deque_add(nodes, "tarfile", (uintptr_t)tarfile, ValueString))
-   {
-      goto error;
-   }
-
-   free(tarfile);
-
    return 0;
-
-error:
-
-   free(tarfile);
-
-   return 1;
 }
 
 static int
 archive_execute(int server, char* identifier, struct deque* nodes)
 {
-   char* output = NULL;
    char* tarfile = NULL;
    char* save_path = NULL;
-   char* id = NULL;
-   char* destination = NULL;
+   char* label = NULL;
+   char* directory = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -129,29 +102,27 @@ archive_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   output = (char*)(pgmoneta_deque_get(nodes, "output"));
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   directory = (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY);
 
-   if (output == NULL)
-   {
-      goto error;
-   }
-
-   id = (char*)pgmoneta_deque_get(nodes, "id");
-   destination = (char*)pgmoneta_deque_get(nodes, "destination");
-
-   tarfile = pgmoneta_append(tarfile, destination);
+   tarfile = pgmoneta_append(tarfile, directory);
    tarfile = pgmoneta_append(tarfile, "/archive-");
    tarfile = pgmoneta_append(tarfile, config->servers[server].name);
    tarfile = pgmoneta_append(tarfile, "-");
-   tarfile = pgmoneta_append(tarfile, id);
+   tarfile = pgmoneta_append(tarfile, label);
    tarfile = pgmoneta_append(tarfile, ".tar");
 
    save_path = pgmoneta_append(save_path, "./archive-");
    save_path = pgmoneta_append(save_path, config->servers[server].name);
    save_path = pgmoneta_append(save_path, "-");
-   save_path = pgmoneta_append(save_path, id);
+   save_path = pgmoneta_append(save_path, label);
 
-   if (pgmoneta_tar_directory(output, tarfile, save_path))
+   if (pgmoneta_tar_directory(directory, tarfile, save_path))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_TARFILE, (uintptr_t)tarfile, ValueString))
    {
       goto error;
    }
@@ -180,7 +151,7 @@ archive_teardown(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   output = (char*)pgmoneta_deque_get(nodes, "output");
+   output = (char*)pgmoneta_deque_get(nodes, NODE_OUTPUT);
 
    if (output == NULL)
    {

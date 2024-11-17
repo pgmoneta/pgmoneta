@@ -1745,11 +1745,10 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 static void
 retention_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
-   pgmoneta_log_debug("retention (%p, %p, %d)", loop, w, revents);
-
    if (EV_ERROR & revents)
    {
       pgmoneta_log_trace("retention_cb: got invalid event: %s", strerror(errno));
+      errno = 0;
       return;
    }
 
@@ -1767,11 +1766,10 @@ valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("valid (%p, %p, %d)", loop, w, revents);
-
    if (EV_ERROR & revents)
    {
       pgmoneta_log_trace("valid_cb: got invalid event: %s", strerror(errno));
+      errno = 0;
       return;
    }
 

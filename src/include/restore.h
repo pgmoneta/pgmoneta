@@ -60,15 +60,15 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 /**
  * Restore to a directory
  * @param server The server
- * @param backup_id The backup identifier
+ * @param identifier The backup identifier
  * @param position The position
  * @param directory The base directory
  * @param output The output directory
- * @param identifier The identifier
+ * @param label The label
  * @return The result
  */
 int
-pgmoneta_restore_backup(int server, char* backup_id, char* position, char* directory, char** output, char** identifier);
+pgmoneta_restore_backup(int server, char* identifier, char* position, char* directory, char** output, char** label);
 
 #ifdef __cplusplus
 }

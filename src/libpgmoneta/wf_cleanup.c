@@ -41,7 +41,7 @@ static int cleanup_execute_restore(int, char*, struct deque*);
 static int cleanup_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_cleanup(int type)
+pgmoneta_create_cleanup(int type)
 {
    struct workflow* wf = NULL;
 
@@ -83,65 +83,27 @@ cleanup_setup(int server, char* identifier, struct deque* nodes)
 static int
 cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
 {
-   char* d = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
-   char* id = NULL;
+   char* label = NULL;
    char* path = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Cleanup (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_log_trace("Cleanup (execute): %s/%s", config->servers[server].name, identifier);
+
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Cleanup (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   if (!strcmp(identifier, "oldest"))
-   {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
-   {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else
-   {
-      id = identifier;
-   }
-
-   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, "directory"));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
    }
    path = pgmoneta_append(path, config->servers[server].name);
    path = pgmoneta_append(path, "-");
-   path = pgmoneta_append(path, id);
+   path = pgmoneta_append(path, label);
    path = pgmoneta_append(path, "/backup_label.old");
 
    if (pgmoneta_exists(path))
@@ -149,29 +111,9 @@ cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
       pgmoneta_delete_file(path, NULL);
    }
 
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
    free(path);
-   free(d);
 
    return 0;
-
-error:
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(path);
-   free(d);
-
-   return 1;
 }
 
 static int

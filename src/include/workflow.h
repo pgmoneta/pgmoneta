@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <deque.h>
+#include <info.h>
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -51,6 +52,23 @@ extern "C" {
 #define PERMISSION_TYPE_ARCHIVE 2
 
 #define CLEANUP_TYPE_RESTORE 0
+
+#define NODE_ALL           "all"
+#define NODE_BACKUP        "backup"
+#define NODE_BACKUP_BASE   "backup_base"
+#define NODE_BACKUP_DATA   "backup_data"
+#define NODE_DESTINATION   "destination"
+#define NODE_DIRECTORY     "directory"
+#define NODE_FAILED        "failed"
+#define NODE_FILES         "files"
+#define NODE_IDENTIFIER    "identifier"
+#define NODE_LABEL         "label"
+#define NODE_OUTPUT        "output"
+#define NODE_POSITION      "position"
+#define NODE_PRIMARY       "primary"
+#define NODE_RECOVERY_INFO "recovery_info"
+#define NODE_SERVER_BASE   "server_base"
+#define NODE_TARFILE       "tarfile"
 
 typedef int (* setup)(int, char*, struct deque*);
 typedef int (* execute)(int, char*, struct deque*);
@@ -71,158 +89,31 @@ struct workflow
 /**
  * Create a workflow
  * @param workflow_type The workflow type
+ * @param backup The backup
  * @return The workflow
  */
 struct workflow*
-pgmoneta_workflow_create(int workflow_type);
+pgmoneta_workflow_create(int workflow_type, struct backup* backup);
 
 /**
- * Delete the workflow
+ * Create standard workflow nodes
+ * @param server The server
+ * @param identifier The identifier
+ * @param nodes The nodes
+ * @param backup The backup
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struct backup** backup);
+
+/**
+ * Destroy the workflow
  * @param workflow The workflow
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_workflow_delete(struct workflow* workflow);
+pgmoneta_workflow_destroy(struct workflow* workflow);
 
-/**
- * Create a workflow for the base backup
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_basebackup(void);
-
-/**
- * Create a workflow for the restore
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_restore(void);
-
-/**
- * Create a workflow for the verify
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_verify(void);
-
-/**
- * Create a workflow for the archive
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_archive(void);
-
-/**
- * Create a workflow for the retention
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_retention(void);
-
-/**
- * Create a workflow for the SHA-256
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_sha256(void);
-
-/**
- * Create a workflow for the delete backups
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_delete_backup(void);
-
-/**
- * Create a workflow for GZIP
- * @param compress The compress
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_gzip(bool compress);
-
-/**
- * Create a workflow for Zstandard
- * @param compress The compress
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_zstd(bool compress);
-
-/**
- * Create a workflow for Lz4
- * @param compress The compress
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_lz4(bool compress);
-
-/**
- * Create a workflow for BZip2
- * @param compress The compress
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_bzip2(bool compress);
-
-/**
- * Create a workflow for symlinking
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_link(void);
-
-/**
- * Create a workflow for recovery info
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_recovery_info(void);
-
-/**
- * Create a workflow to restore the excluded files in the first round of restore
- * @return The workflow
- */
-struct workflow*
-pgmoneta_restore_excluded_files(void);
-
-/**
- * Create a workflow for permissions
- * @param type The type of operation
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_permissions(int type);
-
-/**
- * Create a workflow for cleanup
- * @param type The type of operation
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_cleanup(int type);
-
-/**
- * Create a workflow for encryption
- * @param encrypt true for encrypt and false for decrypt
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_encryption(bool encrypt);
-
-/**
- * Create a workflow for manifest building
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_manifest(void);
-
-/**
- * Create a workflow for extra files
- * @return The workflow
- */
-struct workflow*
-pgmoneta_workflow_create_extra(void);
 #ifdef __cplusplus
 }
 #endif

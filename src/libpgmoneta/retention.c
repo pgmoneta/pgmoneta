@@ -50,7 +50,7 @@ pgmoneta_retention(char** argv)
    if (atomic_load(&config->active_restores) == 0 &&
        atomic_load(&config->active_archives) == 0)
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, NULL);
 
       pgmoneta_deque_create(false, &nodes);
 
@@ -85,7 +85,7 @@ pgmoneta_retention(char** argv)
       }
    }
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
 
@@ -94,7 +94,7 @@ pgmoneta_retention(char** argv)
    exit(0);
 
 error:
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
 

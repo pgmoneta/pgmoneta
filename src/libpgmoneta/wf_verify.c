@@ -57,7 +57,7 @@ static int verify_teardown(int, char*, struct deque*);
 static void do_verify(void* arg);
 
 struct workflow*
-pgmoneta_workflow_create_verify(void)
+pgmoneta_create_verify(void)
 {
    struct workflow* wf = NULL;
 
@@ -110,7 +110,7 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Verify (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_deque_get(nodes, "identifier"));
+   base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_deque_get(nodes, NODE_LABEL));
 
    info_file = pgmoneta_append(info_file, base);
    if (!pgmoneta_ends_with(info_file, "/"))
@@ -133,7 +133,7 @@ verify_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   if (!strcasecmp((char*)pgmoneta_deque_get(nodes, "files"), "all"))
+   if (!strcasecmp((char*)pgmoneta_deque_get(nodes, NODE_FILES), NODE_ALL))
    {
       if (pgmoneta_deque_create(true, &all_deque))
       {
@@ -171,7 +171,7 @@ verify_execute(int server, char* identifier, struct deque* nodes)
          goto error;
       }
 
-      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_deque_get(nodes, "to"), ValueString);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA), ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)columns[0], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)columns[1], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)backup->hash_algoritm, ValueInt32);
@@ -202,8 +202,8 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_deque_list(failed_deque);
    pgmoneta_deque_list(all_deque);
 
-   pgmoneta_deque_add(nodes, "failed", (uintptr_t)failed_deque, ValueDeque);
-   pgmoneta_deque_add(nodes, "all", (uintptr_t)all_deque, ValueDeque);
+   pgmoneta_deque_add(nodes, NODE_FAILED, (uintptr_t)failed_deque, ValueDeque);
+   pgmoneta_deque_add(nodes, NODE_ALL, (uintptr_t)all_deque, ValueDeque);
 
    pgmoneta_csv_reader_destroy(csv);
 
@@ -217,8 +217,8 @@ verify_execute(int server, char* identifier, struct deque* nodes)
 
 error:
 
-   pgmoneta_deque_add(nodes, "failed", (uintptr_t)NULL, ValueDeque);
-   pgmoneta_deque_add(nodes, "all", (uintptr_t)NULL, ValueDeque);
+   pgmoneta_deque_add(nodes, NODE_FAILED, (uintptr_t)NULL, ValueDeque);
+   pgmoneta_deque_add(nodes, NODE_ALL, (uintptr_t)NULL, ValueDeque);
 
    pgmoneta_deque_destroy(failed_deque);
    pgmoneta_deque_destroy(all_deque);

@@ -49,7 +49,8 @@ void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
-   char date[128];
+   char date_str[128];
+   char* date = NULL;
    char* elapsed = NULL;
    struct tm* time_info;
    time_t start_time;
@@ -96,25 +97,27 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    start_time = time(NULL);
 
-   memset(&date[0], 0, sizeof(date));
+   memset(&date_str[0], 0, sizeof(date_str));
    time_info = localtime(&start_time);
-   strftime(&date[0], sizeof(date), "%Y%m%d%H%M%S", time_info);
+   strftime(&date_str[0], sizeof(date_str), "%Y%m%d%H%M%S", time_info);
+
+   date = pgmoneta_append(date, &date_str[0]);
 
    server_backup = pgmoneta_get_server_backup(server);
-   root = pgmoneta_get_server_backup_identifier(server, &date[0]);
+   root = pgmoneta_get_server_backup_identifier(server, date);
 
    pgmoneta_mkdir(root);
 
-   d = pgmoneta_get_server_backup_identifier_data(server, &date[0]);
+   d = pgmoneta_get_server_backup_identifier_data(server, date);
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_BACKUP);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_BACKUP, NULL);
 
    pgmoneta_deque_create(false, &nodes);
 
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, &date[0], nodes))
+      if (current->setup(server, date, nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_SETUP, compression, encryption, payload);
 
@@ -126,7 +129,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, &date[0], nodes))
+      if (current->execute(server, date, nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_EXECUTE, compression, encryption, payload);
 
@@ -138,7 +141,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, &date[0], nodes))
+      if (current->teardown(server, date, nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_TEARDOWN, compression, encryption, payload);
 
@@ -157,7 +160,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   if (pgmoneta_get_backup(server_backup, &date[0], &backup))
+   if (pgmoneta_get_backup(server_backup, date, &backup))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ERROR, compression, encryption, payload);
 
@@ -165,7 +168,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)&date[0], ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)date, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backup->compression, ValueInt32);
@@ -186,7 +189,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, &date[0], elapsed);
+   pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->servers[server].name, date, elapsed);
 
    atomic_store(&config->servers[server].backup, false);
 
@@ -194,10 +197,11 @@ done:
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
 
+   free(date);
    free(backup);
    free(elapsed);
    free(server_backup);
@@ -214,10 +218,11 @@ error:
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
 
+   free(date);
    free(backup);
    free(elapsed);
    free(server_backup);
@@ -443,13 +448,14 @@ error:
 void
 pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   char* backup_id = NULL;
+   char* identifier = NULL;
    char* elapsed = NULL;
    time_t start_time;
    time_t end_time;
    int total_seconds;
    struct json* req = NULL;
    struct json* response = NULL;
+   struct backup* backup = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
@@ -461,20 +467,25 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    start_time = time(NULL);
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP);
-
    if (pgmoneta_deque_create(false, &nodes))
    {
       goto error;
    }
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
-   backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+
+   if (pgmoneta_workflow_nodes(srv, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, NULL);
 
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(srv, backup_id, nodes))
+      if (current->setup(srv, identifier, nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_SETUP, compression, encryption, payload);
 
@@ -486,7 +497,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(srv, backup_id, nodes))
+      if (current->execute(srv, identifier, nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_EXECUTE, compression, encryption, payload);
 
@@ -498,7 +509,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(srv, backup_id, nodes))
+      if (current->teardown(srv, identifier, nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_TEARDOWN, compression, encryption, payload);
 
@@ -515,7 +526,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    }
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)pgmoneta_deque_get(nodes, "backup"), ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
 
    end_time = time(NULL);
 
@@ -529,15 +540,17 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
 
-   pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->servers[srv].name, backup_id, elapsed);
+   pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->servers[srv].name, backup->label, elapsed);
 
    pgmoneta_deque_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_disconnect(client_fd);
+
+   free(backup);
 
    pgmoneta_stop_logging();
 
@@ -546,15 +559,17 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_ERROR, compression, encryption, payload);
-   pgmoneta_log_error("Delete: %s/%s", config->servers[srv].name, backup_id);
+   pgmoneta_log_error("Delete: %s/%s", config->servers[srv].name, backup != NULL ? backup->label : identifier);
 
    pgmoneta_deque_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
-   pgmoneta_workflow_delete(workflow);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_disconnect(client_fd);
+
+   free(backup);
 
    pgmoneta_stop_logging();
 

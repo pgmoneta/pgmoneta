@@ -179,6 +179,16 @@ pgmoneta_get_backup(char* directory, char* label, struct backup** backup);
 
 /**
  * Get a backup
+ * @param server The server
+ * @param identifier The identifier
+ * @param backup The backup
+ * @return The result
+ */
+int
+pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup);
+
+/**
+ * Get a backup
  * @param fn The file name
  * @param backup The backup
  * @return The result

@@ -45,7 +45,7 @@ static int delete_backup_execute(int, char*, struct deque*);
 static int delete_backup_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_delete_backup(void)
+pgmoneta_create_delete_backup(void)
 {
    struct workflow* wf = NULL;
 
@@ -84,6 +84,7 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    int backup_index = -1;
    int prev_index = -1;
    int next_index = -1;
+   char* label = NULL;
    char* d = NULL;
    char* from = NULL;
    char* to = NULL;
@@ -116,34 +117,14 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    free(d);
    d = NULL;
 
-   if (!strcmp(identifier, "oldest"))
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   /* Find backup index */
+   for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
    {
-      for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
+      if (backups[i] != NULL && !strcmp(backups[i]->label, label))
       {
-         if (backups[i] != NULL)
-         {
-            backup_index = i;
-         }
-      }
-   }
-   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
-   {
-      for (int i = number_of_backups - 1; backup_index == -1 && i >= 0; i--)
-      {
-         if (backups[i] != NULL)
-         {
-            backup_index = i;
-         }
-      }
-   }
-   else
-   {
-      for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
-      {
-         if (backups[i] != NULL && !strcmp(backups[i]->label, identifier))
-         {
-            backup_index = i;
-         }
+         backup_index = i;
       }
    }
 
@@ -252,9 +233,7 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_destroy(workers);
    }
 
-   pgmoneta_deque_add(nodes, "backup", (uintptr_t)backups[backup_index]->label, ValueString);
-
-   pgmoneta_log_info("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);
+   pgmoneta_log_debug("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);
 
    for (int i = 0; i < number_of_backups; i++)
    {

@@ -972,7 +972,7 @@ static void
 help_info(void)
 {
    printf("Information about a backup\n");
-   printf("  pgmoneta-cli info <server> <backup>\n");
+   printf("  pgmoneta-cli info <server> <timestamp|oldest|newest>\n");
 }
 
 static void

@@ -42,7 +42,7 @@ static int extra_execute(int, char*, struct deque*);
 static int extra_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_extra(void)
+pgmoneta_create_extra(void)
 {
    struct workflow* wf = NULL;
 
@@ -96,7 +96,7 @@ extra_execute(int server, char* identifier, struct deque* nodes)
 
    if (config->servers[server].number_of_extra == 0)
    {
-      pgmoneta_log_info("No extra parameter are set for server: %s", config->servers[server].name);
+      pgmoneta_log_debug("No extra parameter are set for server: %s", config->servers[server].name);
       return 0;
    }
 
@@ -122,7 +122,7 @@ extra_execute(int server, char* identifier, struct deque* nodes)
 
    if (usr == -1)
    {
-      pgmoneta_log_info("User not found for server: %d", server);
+      pgmoneta_log_error("User not found for server: %d", server);
       goto error;
    }
 
@@ -146,7 +146,7 @@ extra_execute(int server, char* identifier, struct deque* nodes)
    {
       if (pgmoneta_receive_extra_files(ssl, socket, config->servers[server].name, config->servers[server].extra[i], root, &info_extra) != 0)
       {
-         pgmoneta_log_info("extra failed: Server %s failed to retrieve extra files %s", config->servers[server].name, config->servers[server].extra[i]);
+         pgmoneta_log_warn("extra failed: Server %s failed to retrieve extra files %s", config->servers[server].name, config->servers[server].extra[i]);
       }
    }
 

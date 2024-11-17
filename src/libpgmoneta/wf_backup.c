@@ -50,7 +50,7 @@ static int basebackup_execute(int, char*, struct deque*);
 static int basebackup_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_basebackup(void)
+pgmoneta_create_basebackup(void)
 {
    struct workflow* wf = NULL;
 
@@ -87,8 +87,8 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
 {
    time_t start_time;
    int status;
-   char* root = NULL;
-   char* d = NULL;
+   char* backup_base = NULL;
+   char* backup_data = NULL;
    unsigned long size = 0;
    int usr;
    SSL* ssl = NULL;
@@ -260,27 +260,27 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    }
 
    // create the root dir
-   root = pgmoneta_get_server_backup_identifier(server, identifier);
+   backup_base = pgmoneta_get_server_backup_identifier(server, identifier);
 
-   pgmoneta_mkdir(root);
+   pgmoneta_mkdir(backup_base);
    if (config->servers[server].version < 15)
    {
-      if (pgmoneta_receive_archive_files(ssl, socket, buffer, root, tablespaces, bucket, network_bucket))
+      if (pgmoneta_receive_archive_files(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
-         pgmoneta_create_info(root, identifier, 0);
+         pgmoneta_create_info(backup_base, identifier, 0);
 
          goto error;
       }
    }
    else
    {
-      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, root, tablespaces, bucket, network_bucket))
+      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
 
-         pgmoneta_create_info(root, identifier, 0);
+         pgmoneta_create_info(backup_base, identifier, 0);
 
          goto error;
       }
@@ -302,13 +302,13 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
 
    // remove backup_label.old if it exists
    memset(old_label_path, 0, MAX_PATH);
-   if (pgmoneta_ends_with(root, "/"))
+   if (pgmoneta_ends_with(backup_base, "/"))
    {
-      snprintf(old_label_path, MAX_PATH, "%sdata/%s", root, "backup_label.old");
+      snprintf(old_label_path, MAX_PATH, "%sdata/%s", backup_base, "backup_label.old");
    }
    else
    {
-      snprintf(old_label_path, MAX_PATH, "%s/data/%s", root, "backup_label.old");
+      snprintf(old_label_path, MAX_PATH, "%s/data/%s", backup_base, "backup_label.old");
    }
 
    if (pgmoneta_exists(old_label_path))
@@ -329,37 +329,37 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
 
    pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
-   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   backup_data = pgmoneta_get_server_backup_identifier_data(server, identifier);
 
-   size = pgmoneta_directory_size(d);
-   pgmoneta_read_wal(d, &wal);
-   pgmoneta_read_checkpoint_info(d, &chkptpos);
+   size = pgmoneta_directory_size(backup_data);
+   pgmoneta_read_wal(backup_data, &wal);
+   pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
 
-   if (pgmoneta_deque_add(nodes, "root", (uintptr_t)root, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, "to", (uintptr_t)d, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_BACKUP_DATA, (uintptr_t)backup_data, ValueString))
    {
       goto error;
    }
 
-   pgmoneta_create_info(root, identifier, 1);
-   pgmoneta_update_info_string(root, INFO_WAL, wal);
-   pgmoneta_update_info_unsigned_long(root, INFO_RESTORE, size);
-   pgmoneta_update_info_string(root, INFO_MAJOR_VERSION, version);
-   pgmoneta_update_info_string(root, INFO_MINOR_VERSION, minor_version);
-   pgmoneta_update_info_bool(root, INFO_KEEP, false);
-   pgmoneta_update_info_string(root, INFO_START_WALPOS, startpos);
-   pgmoneta_update_info_string(root, INFO_END_WALPOS, endpos);
-   pgmoneta_update_info_unsigned_long(root, INFO_START_TIMELINE, start_timeline);
-   pgmoneta_update_info_unsigned_long(root, INFO_END_TIMELINE, end_timeline);
-   pgmoneta_update_info_unsigned_long(root, INFO_HASH_ALGORITHM, hash);
+   pgmoneta_create_info(backup_base, identifier, 1);
+   pgmoneta_update_info_string(backup_base, INFO_WAL, wal);
+   pgmoneta_update_info_unsigned_long(backup_base, INFO_RESTORE, size);
+   pgmoneta_update_info_string(backup_base, INFO_MAJOR_VERSION, version);
+   pgmoneta_update_info_string(backup_base, INFO_MINOR_VERSION, minor_version);
+   pgmoneta_update_info_bool(backup_base, INFO_KEEP, false);
+   pgmoneta_update_info_string(backup_base, INFO_START_WALPOS, startpos);
+   pgmoneta_update_info_string(backup_base, INFO_END_WALPOS, endpos);
+   pgmoneta_update_info_unsigned_long(backup_base, INFO_START_TIMELINE, start_timeline);
+   pgmoneta_update_info_unsigned_long(backup_base, INFO_END_TIMELINE, end_timeline);
+   pgmoneta_update_info_unsigned_long(backup_base, INFO_HASH_ALGORITHM, hash);
    // in case of parsing error
    if (chkptpos != NULL)
    {
-      pgmoneta_update_info_string(root, INFO_CHKPT_WALPOS, chkptpos);
+      pgmoneta_update_info_string(backup_base, INFO_CHKPT_WALPOS, chkptpos);
    }
 
    current_tablespace = tablespaces;
@@ -371,16 +371,16 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       snprintf(&tblname[0], MAX_PATH, "tblspc_%s", current_tablespace->name);
 
       number_of_tablespaces++;
-      pgmoneta_update_info_unsigned_long(root, INFO_TABLESPACES, number_of_tablespaces);
+      pgmoneta_update_info_unsigned_long(backup_base, INFO_TABLESPACES, number_of_tablespaces);
 
       snprintf(key, sizeof(key) - 1, "TABLESPACE%d", number_of_tablespaces);
-      pgmoneta_update_info_string(root, key, tblname);
+      pgmoneta_update_info_string(backup_base, key, tblname);
 
       snprintf(key, sizeof(key) - 1, "TABLESPACE_OID%d", number_of_tablespaces);
-      pgmoneta_update_info_unsigned_long(root, key, current_tablespace->oid);
+      pgmoneta_update_info_unsigned_long(backup_base, key, current_tablespace->oid);
 
       snprintf(key, sizeof(key) - 1, "TABLESPACE_PATH%d", number_of_tablespaces);
-      pgmoneta_update_info_string(root, key, current_tablespace->path);
+      pgmoneta_update_info_string(backup_base, key, current_tablespace->path);
 
       current_tablespace = current_tablespace->next;
    }
@@ -397,24 +397,24 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
+   free(backup_base);
+   free(backup_data);
    free(chkptpos);
-   free(root);
    free(label);
-   free(d);
    free(wal);
 
    return 0;
 
 error:
 
-   if (root == NULL)
+   if (backup_base == NULL)
    {
-      root = pgmoneta_get_server_backup_identifier(server, identifier);
+      backup_base = pgmoneta_get_server_backup_identifier(server, identifier);
    }
 
-   if (pgmoneta_exists(root))
+   if (pgmoneta_exists(backup_base))
    {
-      pgmoneta_delete_directory(root);
+      pgmoneta_delete_directory(backup_base);
    }
 
    pgmoneta_close_ssl(ssl);
@@ -430,10 +430,10 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
+   free(backup_base);
+   free(backup_data);
    free(chkptpos);
-   free(root);
    free(label);
-   free(d);
    free(wal);
 
    return 1;

@@ -43,7 +43,7 @@ static int lz4_execute_uncompress(int, char*, struct deque*);
 static int lz4_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_lz4(bool compress)
+pgmoneta_create_lz4(bool compress)
 {
    struct workflow* wf = NULL;
 
@@ -88,8 +88,8 @@ static int
 lz4_execute_compress(int server, char* identifier, struct deque* nodes)
 {
    char* d = NULL;
-   char* root = NULL;
-   char* to = NULL;
+   char* backup_base = NULL;
+   char* backup_data = NULL;
    char* tarfile = NULL;
    time_t compression_time;
    int total_seconds;
@@ -108,7 +108,7 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
 
    compression_time = time(NULL);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, "tarfile");
+   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
 
    if (tarfile == NULL)
    {
@@ -118,12 +118,11 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      root = (char*)pgmoneta_deque_get(nodes, "root");
-      to = (char*)pgmoneta_deque_get(nodes, "to");
-      d = pgmoneta_append(d, to);
+      backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+      backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
 
-      pgmoneta_lz4c_data(d, workers);
-      pgmoneta_lz4c_tablespaces(root, workers);
+      pgmoneta_lz4c_data(backup_data, workers);
+      pgmoneta_lz4c_tablespaces(backup_base, workers);
 
       if (number_of_workers > 0)
       {
@@ -162,8 +161,7 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
 static int
 lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
-   char* d = NULL;
-   char* to = NULL;
+   char* base = NULL;
    time_t decompress_time;
    int total_seconds;
    int hours;
@@ -179,15 +177,14 @@ lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("LZ4 (uncompress): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   to = (char*)pgmoneta_deque_get(nodes, "to");
-
-   if (to != NULL)
+   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
+   if (base == NULL)
    {
-      d = pgmoneta_append(d, to);
+      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
    }
-   else
+   if (base == NULL)
    {
-      d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
    }
 
    decompress_time = time(NULL);
@@ -198,7 +195,7 @@ lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_lz4d_data(d, workers);
+   pgmoneta_lz4d_data(base, workers);
 
    if (number_of_workers > 0)
    {
@@ -215,8 +212,6 @@ lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
-
-   free(d);
 
    return 0;
 }

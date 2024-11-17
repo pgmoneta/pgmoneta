@@ -58,7 +58,7 @@ static char* get_user_password(char* username);
 static void create_standby_signal(char* basedir);
 
 struct workflow*
-pgmoneta_workflow_create_restore(void)
+pgmoneta_create_restore(void)
 {
    struct workflow* wf = NULL;
 
@@ -78,7 +78,7 @@ pgmoneta_workflow_create_restore(void)
 }
 
 struct workflow*
-pgmoneta_workflow_create_recovery_info(void)
+pgmoneta_create_recovery_info(void)
 {
    struct workflow* wf = NULL;
 
@@ -135,18 +135,11 @@ restore_execute(int server, char* identifier, struct deque* nodes)
 {
    char* position = NULL;
    char* directory = NULL;
-   char* o = NULL;
-   char* ident = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
    struct backup* backup = NULL;
-   struct backup* verify = NULL;
-   char* d = NULL;
-   char* root = NULL;
-   char* base = NULL;
+   char* label = NULL;
    char* from = NULL;
    char* to = NULL;
-   char* id = NULL;
+   char* o = NULL;
    char* origwal = NULL;
    char* waldir = NULL;
    char* waltarget = NULL;
@@ -156,105 +149,16 @@ restore_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Restore (execute): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_deque_list(nodes);
+   pgmoneta_log_trace("Restore (execute): %s/%s", config->servers[server].name, identifier);
 
-   position = (char*)pgmoneta_deque_get(nodes, "position");
-   directory = (char*)pgmoneta_deque_get(nodes, "directory");
+   position = (char*)pgmoneta_deque_get(nodes, NODE_POSITION);
+   directory = (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY);
+   backup = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
 
-   if (!strcmp(identifier, "oldest"))
-   {
-      d = pgmoneta_get_server_backup(server);
+   pgmoneta_log_debug("Restore (execute): %s/%s", config->servers[server].name, label);
 
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
-   {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (backups[i]->valid == VALID_TRUE)
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else
-   {
-      id = identifier;
-   }
-
-   if (id == NULL)
-   {
-      pgmoneta_log_error("Restore: No identifier for %s/%s", config->servers[server].name, identifier);
-      goto error;
-   }
-
-   root = pgmoneta_get_server_backup(server);
-
-   base = pgmoneta_get_server_backup_identifier(server, id);
-
-   if (!pgmoneta_exists(base))
-   {
-      if (pgmoneta_get_backups(root, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      bool prefix_found = false;
-
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         if (backups[i]->valid == VALID_TRUE && pgmoneta_starts_with(backups[i]->label, id))
-         {
-            prefix_found = true;
-            id = backups[i]->label;
-            break;
-         }
-      }
-
-      if (!prefix_found)
-      {
-         pgmoneta_log_error("Restore: Unknown identifier for %s/%s", config->servers[server].name, id);
-         goto error;
-      }
-   }
-
-   if (pgmoneta_get_backup(root, id, &verify))
-   {
-      pgmoneta_log_error("Restore: Unable to get backup for %s/%s", config->servers[server].name, id);
-      goto error;
-   }
-
-   if (!verify->valid)
-   {
-      pgmoneta_log_error("Restore: Invalid backup for %s/%s", config->servers[server].name, id);
-      goto error;
-   }
-
-   if (pgmoneta_deque_add(nodes, "root", (uintptr_t)directory, ValueString))
-   {
-      goto error;
-   }
-
-   from = pgmoneta_get_server_backup_identifier_data(server, id);
+   from = pgmoneta_get_server_backup_identifier_data(server, label);
 
    to = pgmoneta_append(to, directory);
    if (!pgmoneta_ends_with(to, "/"))
@@ -263,8 +167,15 @@ restore_execute(int server, char* identifier, struct deque* nodes)
    }
    to = pgmoneta_append(to, config->servers[server].name);
    to = pgmoneta_append(to, "-");
-   to = pgmoneta_append(to, id);
+   to = pgmoneta_append(to, label);
    to = pgmoneta_append(to, "/");
+
+   if (pgmoneta_deque_add(nodes, NODE_DESTINATION, (uintptr_t)to, ValueString))
+   {
+      goto error;
+   }
+
+   pgmoneta_deque_list(nodes);
 
    pgmoneta_delete_directory(to);
 
@@ -274,9 +185,9 @@ restore_execute(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->servers[server].name, id, verify, workers))
+   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->servers[server].name, label, backup, workers))
    {
-      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, id);
+      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, label);
       goto error;
    }
    else
@@ -286,7 +197,6 @@ restore_execute(int server, char* identifier, struct deque* nodes)
          char tokens[512];
          bool primary = true;
          bool copy_wal = false;
-         char ver[MISC_LENGTH] = {0};
          char* ptr = NULL;
 
          memset(&tokens[0], 0, sizeof(tokens));
@@ -340,34 +250,28 @@ restore_execute(int server, char* identifier, struct deque* nodes)
             ptr = strtok(NULL, ",");
          }
 
-         pgmoneta_get_backup(root, id, &backup);
+         pgmoneta_get_backup(directory, label, &backup);
 
-         if (pgmoneta_deque_add(nodes, "primary", primary, ValueBool))
+         if (pgmoneta_deque_add(nodes, NODE_PRIMARY, primary, ValueBool))
          {
             goto error;
          }
 
-         snprintf(&ver[0], sizeof(ver), "%d", backup->major_version);
-         if (pgmoneta_deque_add(nodes, "version", (uintptr_t)ver, ValueString))
-         {
-            goto error;
-         }
-
-         if (pgmoneta_deque_add(nodes, "recovery info", true, ValueBool))
+         if (pgmoneta_deque_add(nodes, NODE_RECOVERY_INFO, true, ValueBool))
          {
             goto error;
          }
 
          if (copy_wal)
          {
-            origwal = pgmoneta_get_server_backup_identifier_data_wal(server, id);
+            origwal = pgmoneta_get_server_backup_identifier_data_wal(server, label);
             waldir = pgmoneta_get_server_wal(server);
 
             waltarget = pgmoneta_append(waltarget, directory);
             waltarget = pgmoneta_append(waltarget, "/");
             waltarget = pgmoneta_append(waltarget, config->servers[server].name);
             waltarget = pgmoneta_append(waltarget, "-");
-            waltarget = pgmoneta_append(waltarget, id);
+            waltarget = pgmoneta_append(waltarget, label);
             waltarget = pgmoneta_append(waltarget, "/pg_wal/");
 
             pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
@@ -375,15 +279,10 @@ restore_execute(int server, char* identifier, struct deque* nodes)
       }
       else
       {
-         if (pgmoneta_deque_add(nodes, "recovery info", false, ValueBool))
+         if (pgmoneta_deque_add(nodes, NODE_RECOVERY_INFO, false, ValueBool))
          {
             goto error;
          }
-      }
-
-      if (pgmoneta_deque_add(nodes, "to", (uintptr_t)to, ValueString))
-      {
-         goto error;
       }
    }
 
@@ -396,33 +295,15 @@ restore_execute(int server, char* identifier, struct deque* nodes)
    o = pgmoneta_append(o, directory);
    o = pgmoneta_append(o, "/");
 
-   ident = pgmoneta_append(ident, id);
-
-   if (pgmoneta_deque_add(nodes, "output", (uintptr_t)o, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_OUTPUT, (uintptr_t)o, ValueString))
    {
       goto error;
    }
-
-   if (pgmoneta_deque_add(nodes, "identifier", (uintptr_t)ident, ValueString))
-   {
-      goto error;
-   }
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
 
    free(backup);
-   free(verify);
-   free(root);
-   free(base);
    free(from);
-   free(d);
    free(to);
    free(o);
-   free(ident);
    free(origwal);
    free(waldir);
    free(waltarget);
@@ -437,21 +318,10 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
    free(backup);
-   free(verify);
-   free(root);
-   free(base);
    free(from);
-   free(d);
    free(to);
    free(o);
-   free(ident);
    free(origwal);
    free(waldir);
    free(waltarget);
@@ -509,22 +379,22 @@ recovery_info_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   is_recovery_info = (bool)pgmoneta_deque_get(nodes, "recovery info");
+   is_recovery_info = (bool)pgmoneta_deque_get(nodes, NODE_RECOVERY_INFO);
 
    if (!is_recovery_info)
    {
       goto done;
    }
 
-   base = (char*)pgmoneta_deque_get(nodes, "to");
+   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
 
    if (base == NULL)
    {
       goto error;
    }
 
-   position = (char*)pgmoneta_deque_get(nodes, "position");
-   primary = (bool)pgmoneta_deque_get(nodes, "primary");
+   position = (char*)pgmoneta_deque_get(nodes, NODE_POSITION);
+   primary = (bool)pgmoneta_deque_get(nodes, NODE_PRIMARY);
 
    if (!primary)
    {
@@ -912,7 +782,7 @@ restore_excluded_files_execute(int server, char* identifier, struct deque* nodes
       id = identifier;
    }
 
-   directory = (char*)pgmoneta_deque_get(nodes, "directory");
+   directory = (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY);
 
    from = pgmoneta_get_server_backup_identifier_data(server, id);
 

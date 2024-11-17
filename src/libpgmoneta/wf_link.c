@@ -47,7 +47,7 @@ static int link_execute(int, char*, struct deque*);
 static int link_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_link(void)
+pgmoneta_create_link(void)
 {
    struct workflow* wf = NULL;
 

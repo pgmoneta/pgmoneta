@@ -49,7 +49,7 @@ static void mark_retention(bool** retention_flags, int retention_days, int reten
                            int retention_years, int number_of_backups, struct backup** backups);
 
 struct workflow*
-pgmoneta_workflow_create_retention(void)
+pgmoneta_create_retention(void)
 {
    struct workflow* wf = NULL;
 

@@ -41,7 +41,7 @@ static int manifest_execute_build(int, char*, struct deque*);
 static int manifest_teardown(int, char*, struct deque*);
 
 struct workflow*
-pgmoneta_workflow_create_manifest(void)
+pgmoneta_create_manifest(void)
 {
    struct workflow* wf = NULL;
 
@@ -76,17 +76,15 @@ manifest_setup(int server, char* identifier, struct deque* nodes)
 static int
 manifest_execute_build(int server, char* identifier, struct deque* nodes)
 {
-   char* root = NULL;
-   char* data = NULL;
+   char* backup_base = NULL;
+   char* backup_data = NULL;
    char* manifest_orig = NULL;
    char* manifest = NULL;
    char* key_path[1] = {"Files"};
-   char* backup_dir = NULL;
    struct backup* backup = NULL;
    struct json_reader* reader = NULL;
    struct json* entry = NULL;
    struct csv_writer* writer = NULL;
-   char* tblspc = NULL;
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
    struct configuration* config;
@@ -94,17 +92,30 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, identifier);
+
+   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
    pgmoneta_deque_list(nodes);
 
-   backup_dir = pgmoneta_get_server_backup(server);
-   root = pgmoneta_get_server_backup_identifier(server, identifier);
-   data = pgmoneta_get_server_backup_identifier_data(server, identifier);
-   manifest = pgmoneta_append(manifest, root);
-   manifest = pgmoneta_append(manifest, "backup.manifest");
-   manifest_orig = pgmoneta_append(manifest_orig, data);
-   manifest_orig = pgmoneta_append(manifest_orig, "backup_manifest");
+   backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+   backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
 
-   pgmoneta_get_backup(backup_dir, identifier, &backup);
+   manifest = pgmoneta_append(manifest, backup_base);
+   if (!pgmoneta_ends_with(manifest, "/"))
+   {
+      manifest = pgmoneta_append(manifest, "/");
+   }
+   manifest = pgmoneta_append(manifest, "backup.manifest");
+
+   manifest_orig = pgmoneta_append(manifest_orig, backup_data);
+   if (!pgmoneta_ends_with(manifest_orig, "/"))
+   {
+      manifest_orig = pgmoneta_append(manifest_orig, "/");
+   }
+   manifest_orig = pgmoneta_append(manifest_orig, "backup_manifest");
 
    if (pgmoneta_csv_writer_init(manifest, &writer))
    {
@@ -137,26 +148,20 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
-   free(root);
-   free(data);
+   free(backup);
    free(manifest);
    free(manifest_orig);
-   free(backup_dir);
-   free(backup);
-   free(tblspc);
+
    return 0;
 
 error:
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
-   free(root);
-   free(data);
+   free(backup);
    free(manifest);
    free(manifest_orig);
-   free(backup_dir);
-   free(backup);
-   free(tblspc);
+
    return 1;
 }
 

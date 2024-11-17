@@ -231,7 +231,7 @@ Information about a backup.
 Command
 
 ``` sh
-pgmoneta-cli info <server> <backup>
+pgmoneta-cli info <server> <timestamp|oldest|newest>
 ```
 
 ## ping
