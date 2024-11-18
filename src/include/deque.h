@@ -130,6 +130,15 @@ uintptr_t
 pgmoneta_deque_get(struct deque* deque, char* tag);
 
 /**
+ * Does the tag exists
+ * @param deque The deque
+ * @param tag The tag
+ * @return True if exists, otherwise false
+ */
+bool
+pgmoneta_deque_exists(struct deque* deque, char* tag);
+
+/**
  * Create a deque iterator
  * @param deque The deque
  * @param iter [out] The iterator

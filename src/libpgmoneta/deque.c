@@ -181,6 +181,25 @@ error:
 }
 
 bool
+pgmoneta_deque_exists(struct deque* deque, char* tag)
+{
+   bool ret = false;
+   struct deque_node* n = NULL;
+
+   deque_read_lock(deque);
+
+   n = deque_find(deque, tag);
+   if (n != NULL)
+   {
+      ret = true;
+   }
+
+   deque_unlock(deque);
+
+   return ret;
+}
+
+bool
 pgmoneta_deque_empty(struct deque* deque)
 {
    return pgmoneta_deque_size(deque) == 0;
