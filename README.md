@@ -82,7 +82,7 @@ git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_INSTALL_PREFIX=/usr/local ..
 make
 sudo make install
 ```
@@ -98,7 +98,7 @@ git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
 mkdir build
 cd build
-cmake cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
