@@ -832,6 +832,14 @@ char*
 pgmoneta_get_symlink(char* symlink);
 
 /**
+ * Is the symlink valid ?
+ * @param path The path
+ * @return The result
+ */
+bool
+pgmoneta_is_symlink_valid(char* path);
+
+/**
  * Copy WAL files
  * @param from The from directory
  * @param to The to directory

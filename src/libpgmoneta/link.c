@@ -194,6 +194,9 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
       {
          if (S_ISDIR(statbuf.st_mode))
          {
+#ifdef DEBUG
+            pgmoneta_log_trace("FILETRACKER | %s | %s | %s | %s |", from_entry, to_entry, "Dir ", "Dir ");
+#endif
             pgmoneta_relink(from_entry, to_entry, workers);
          }
          else
@@ -244,10 +247,29 @@ do_relink(void* arg)
 
    wi = (struct worker_input*)arg;
 
+#ifdef DEBUG
+   if (!pgmoneta_exists(wi->from))
+   {
+      pgmoneta_log_trace("FILETRACKER | Unk  | %s |", wi->from);
+   }
+
+   if (!pgmoneta_exists(wi->to))
+   {
+      pgmoneta_log_trace("FILETRACKER | Unk  | %s |", wi->to);
+   }
+#endif
+
    if (pgmoneta_is_symlink(wi->to))
    {
       if (pgmoneta_is_file(wi->from))
       {
+#ifdef DEBUG
+         pgmoneta_log_trace("FILETRACKER | %s | %s | %s | %s |", wi->from, wi->to,
+                            pgmoneta_is_symlink(wi->from) ? "Syml" : "File", pgmoneta_is_symlink(wi->to) ? "Syml" : "File");
+
+         pgmoneta_log_trace("FILETRACKER | Del  | %s |", wi->to);
+         pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", wi->from, wi->to);
+#endif
          pgmoneta_delete_file(wi->to, NULL);
          pgmoneta_copy_file(wi->from, wi->to, wi->workers);
       }
@@ -255,10 +277,16 @@ do_relink(void* arg)
       {
          link = pgmoneta_get_symlink(wi->from);
 
-         pgmoneta_delete_file(wi->to, NULL);
-         pgmoneta_symlink_file(wi->to, link);
-
-         free(link);
+         if (link != NULL)
+         {
+            pgmoneta_delete_file(wi->to, NULL);
+            pgmoneta_symlink_file(wi->to, link);
+#ifdef DEBUG
+            pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", wi->to, pgmoneta_is_symlink_valid(wi->to) ? "Yes " : "No  ");
+            pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", link, pgmoneta_is_symlink_valid(link) ? "Yes " : "No  ");
+#endif
+            free(link);
+         }
       }
    }
 

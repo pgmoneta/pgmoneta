@@ -2386,7 +2386,6 @@ copy_file(void* arg)
    int fd_to = -1;
    char buffer[8192];
    ssize_t nread = -1;
-   int saved_errno = -1;
    int permissions = -1;
    struct worker_input* fi = NULL;
 
@@ -2448,12 +2447,19 @@ copy_file(void* arg)
       close(fd_from);
    }
 
+#ifdef DEBUG
+   pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", fi->from, fi->to);
+#endif
+
    free(fi);
 
    return;
 
 error:
-   saved_errno = errno;
+
+#ifdef DEBUG
+   pgmoneta_log_trace("FILETRACKER | Fail | %s | %s | %s |", fi->from, fi->to, strerror(errno));
+#endif
 
    if (fd_from >= 0)
    {
@@ -2464,7 +2470,7 @@ error:
       close(fd_to);
    }
 
-   errno = saved_errno;
+   errno = 0;
 
    free(fi);
 }
@@ -2671,6 +2677,10 @@ pgmoneta_symlink_file(char* from, char* to)
 
    ret = symlink(to, from);
 
+#ifdef DEBUG
+   pgmoneta_log_trace("FILETRACKER | Link | %s | %s |", from, to);
+#endif
+
    if (ret != 0)
    {
       pgmoneta_log_debug("pgmoneta_symlink_file: %s -> %s (%s)", from, to, strerror(errno));
@@ -2757,29 +2767,58 @@ pgmoneta_get_symlink(char* symlink)
 {
    ssize_t size;
    char link[1024];
-   size_t alloc;
    char* result = NULL;
 
    memset(&link[0], 0, sizeof(link));
    size = readlink(symlink, &link[0], sizeof(link));
    link[size + 1] = '\0';
 
-   alloc = strlen(&link[0]) + 1;
-   result = malloc(alloc);
-
-   if (result == NULL)
+   if (strlen(&link[0]) == 0)
    {
       goto error;
    }
 
-   memset(result, 0, alloc);
-   memcpy(result, &link[0], strlen(&link[0]));
+   result = pgmoneta_append(result, &link[0]);
+
+#ifdef DEBUG
+   pgmoneta_log_trace("FILETRACKER | Get | %s | %s |", symlink, result);
+#endif
 
    return result;
 
 error:
 
+#ifdef DEBUG
+   pgmoneta_log_trace("FILETRACKER | Get | %s | NULL |", symlink);
+#endif
+
    return NULL;
+}
+
+bool
+pgmoneta_is_symlink_valid(char* path)
+{
+   char* link = NULL;
+   struct stat buf;
+   bool ret = false;
+
+    if (lstat(path, &buf) == 0)
+    {
+       link = malloc(buf.st_size + 1);
+       memset(link, 0, buf.st_size + 1);
+
+       readlink(path, link, buf.st_size + 1);
+       link[buf.st_size] = '\0';
+
+       if (stat(link, &buf) == 0)
+       {
+          ret = true;
+       }
+    }
+
+    free(link);
+
+    return ret;
 }
 
 int

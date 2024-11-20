@@ -170,6 +170,12 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 
          pgmoneta_relink(from, to, workers);
 
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_wait(workers);
+            pgmoneta_workers_destroy(workers);
+         }
+
          /* Delete from */
          pgmoneta_delete_directory(d);
          free(d);
@@ -199,6 +205,12 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 
          pgmoneta_relink(from, to, workers);
 
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_wait(workers);
+            pgmoneta_workers_destroy(workers);
+         }
+
          /* Delete from */
          pgmoneta_delete_directory(d);
          free(d);
@@ -225,12 +237,6 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    {
       /* Just delete */
       pgmoneta_delete_directory(d);
-   }
-
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_wait(workers);
-      pgmoneta_workers_destroy(workers);
    }
 
    pgmoneta_log_debug("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);
