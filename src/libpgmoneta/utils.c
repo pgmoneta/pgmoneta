@@ -2396,11 +2396,13 @@ copy_file(void* arg)
 
    if (fd_from < 0)
    {
+      pgmoneta_log_error("File doesn't exists: %s", fi->from);
       goto error;
    }
 
    if (get_permissions(fi->from, &permissions))
    {
+      pgmoneta_log_error("Unable to get file permissions: %s", fi->from);
       goto error;
    }
 
@@ -2408,6 +2410,7 @@ copy_file(void* arg)
 
    if (fd_to < 0)
    {
+      pgmoneta_log_error("Unable to create file: %s", fi->to);
       goto error;
    }
 
@@ -2452,7 +2455,10 @@ copy_file(void* arg)
 error:
    saved_errno = errno;
 
-   close(fd_from);
+   if (fd_from >= 0)
+   {
+      close(fd_from);
+   }
    if (fd_to >= 0)
    {
       close(fd_to);
