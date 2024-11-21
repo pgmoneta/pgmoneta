@@ -141,6 +141,12 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
       pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, backup->label, elapsed);
    }
+   else
+   {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, compression, encryption, payload);
+      pgmoneta_log_warn("Restore: No identifier for %s/%s", config->servers[server].name, identifier);
+      goto error;
+   }
 
    pgmoneta_json_destroy(payload);
 

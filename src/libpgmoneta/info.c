@@ -707,7 +707,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
    if (id == NULL)
    {
-      pgmoneta_log_error("No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_log_warn("No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 

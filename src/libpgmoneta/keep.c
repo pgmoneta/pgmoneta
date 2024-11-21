@@ -129,12 +129,12 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       if (k)
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, compression, encryption, payload);
-         pgmoneta_log_error("Retain: No identifier for %s/%s", config->servers[srv].name, backup_id);
+         pgmoneta_log_warn("Retain: No identifier for %s/%s", config->servers[srv].name, backup_id);
       }
       else
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, compression, encryption, payload);
-         pgmoneta_log_error("Expunge: No identifier for %s/%s", config->servers[srv].name, backup_id);
+         pgmoneta_log_warn("Expunge: No identifier for %s/%s", config->servers[srv].name, backup_id);
       }
 
       goto error;
