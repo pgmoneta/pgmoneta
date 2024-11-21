@@ -196,6 +196,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
             {
                from = pgmoneta_append_char(from, '/');
             }
+            from = pgmoneta_append(from, "data/");
             from = pgmoneta_append(from, (char*)changed_iter->key);
 
             to = pgmoneta_append(to, destination);
@@ -223,6 +224,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
             {
                from = pgmoneta_append_char(from, '/');
             }
+            from = pgmoneta_append(from, "data/");
             from = pgmoneta_append(from, (char*)added_iter->key);
 
             to = pgmoneta_append(to, destination);
