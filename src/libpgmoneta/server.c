@@ -47,7 +47,6 @@ static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
 static int get_checksums(SSL* ssl, int socket, int server, bool* checksums);
 static int get_version(SSL* ssl, int socket, int server, int* major, int* minor);
 
-
 static bool is_valid_response(struct query_response* response);
 
 void

@@ -2802,23 +2802,23 @@ pgmoneta_is_symlink_valid(char* path)
    struct stat buf;
    bool ret = false;
 
-    if (lstat(path, &buf) == 0)
-    {
-       link = malloc(buf.st_size + 1);
-       memset(link, 0, buf.st_size + 1);
+   if (lstat(path, &buf) == 0)
+   {
+      link = malloc(buf.st_size + 1);
+      memset(link, 0, buf.st_size + 1);
 
-       readlink(path, link, buf.st_size + 1);
-       link[buf.st_size] = '\0';
+      readlink(path, link, buf.st_size + 1);
+      link[buf.st_size] = '\0';
 
-       if (stat(link, &buf) == 0)
-       {
-          ret = true;
-       }
-    }
+      if (stat(link, &buf) == 0)
+      {
+         ret = true;
+      }
+   }
 
-    free(link);
+   free(link);
 
-    return ret;
+   return ret;
 }
 
 int

@@ -36,11 +36,11 @@
 
 // tag is copied if not NULL
 static void
-deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type);
+deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type, struct value_config* config);
 
 // tag is copied if not NULL
 static void
-deque_node_create(uintptr_t data, enum value_type type, char* tag, struct deque_node** node);
+deque_node_create(uintptr_t data, enum value_type type, char* tag, struct value_config* config, struct deque_node** node);
 
 // tag will always be freed
 static void
@@ -84,8 +84,8 @@ pgmoneta_deque_create(bool thread_safe, struct deque** deque)
    {
       pthread_rwlock_init(&q->mutex, NULL);
    }
-   deque_node_create(0, ValueInt32, NULL, &q->start);
-   deque_node_create(0, ValueInt32, NULL, &q->end);
+   deque_node_create(0, ValueInt32, NULL, NULL, &q->start);
+   deque_node_create(0, ValueInt32, NULL, NULL, &q->end);
    q->start->next = q->end;
    q->end->prev = q->start;
    *deque = q;
@@ -95,7 +95,14 @@ pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 int
 pgmoneta_deque_add(struct deque* deque, char* tag, uintptr_t data, enum value_type type)
 {
-   deque_offer(deque, tag, data, type);
+   deque_offer(deque, tag, data, type, NULL);
+   return 0;
+}
+
+int
+pgmoneta_deque_add_with_config(struct deque* deque, char* tag, uintptr_t data, struct value_config* config)
+{
+   deque_offer(deque, tag, data, ValueRef, config);
    return 0;
 }
 
@@ -337,11 +344,11 @@ pgmoneta_deque_iterator_next(struct deque_iterator* iter)
 }
 
 static void
-deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type)
+deque_offer(struct deque* deque, char* tag, uintptr_t data, struct value_config* config, enum value_type type)
 {
    struct deque_node* n = NULL;
    struct deque_node* last = NULL;
-   deque_node_create(data, type, tag, &n);
+   deque_node_create(data, type, tag, config, &n);
    deque_write_lock(deque);
    deque->size++;
    last = deque->end->prev;
@@ -353,16 +360,22 @@ deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type
 }
 
 static void
-deque_node_create(uintptr_t data, enum value_type type, char* tag, struct deque_node** node)
+deque_node_create(uintptr_t data, enum value_type type, char* tag, struct value_config* config, struct deque_node** node)
 {
    struct deque_node* n = NULL;
    n = malloc(sizeof(struct deque_node));
    memset(n, 0, sizeof(struct deque_node));
-   pgmoneta_value_create(type, data, &n->data);
+   if (config != NULL)
+   {
+      pgmoneta_value_create_with_config(data, config, &n->data);
+   }
+   else
+   {
+      pgmoneta_value_create(type, data, &n->data);
+   }
    if (tag != NULL)
    {
-      n->tag = malloc(strlen(tag) + 1);
-      strcpy(n->tag, tag);
+      n->tag = pgmoneta_append(NULL, tag);
    }
    else
    {

@@ -83,7 +83,7 @@ int
 pgmoneta_deque_create(bool thread_safe, struct deque** deque);
 
 /**
- * Add a node to deque's tail, the tag will be copied, but the data will not
+ * Add a node to deque's tail, the tag will be copied
  * This function is thread safe
  * @param deque The deque
  * @param tag The tag,optional
@@ -93,6 +93,18 @@ pgmoneta_deque_create(bool thread_safe, struct deque** deque);
  */
 int
 pgmoneta_deque_add(struct deque* deque, char* tag, uintptr_t data, enum value_type type);
+
+/**
+ * Add a node to deque's tail with custom to_string and data destroy callback,
+ * the type will be set to ValueRef
+ * This function is thread safe
+ * @param deque The deque
+ * @param tag The tag,optional
+ * @param data The data
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_deque_add_with_config(struct deque* deque, char* tag, uintptr_t data, struct value_config* config);
 
 /**
  * Retrieve value and remove the node from deque's head.

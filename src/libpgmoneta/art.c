@@ -133,7 +133,7 @@ static struct art_leaf*
 node_get_minimum(struct art_node* node);
 
 static void
-create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type);
+create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, struct value_config* config);
 
 static void
 create_art_node(struct art_node** node, enum art_node_type type);
@@ -213,11 +213,12 @@ find_index(unsigned char ch, const unsigned char* keys, int length);
  * @param key_len The length of the key
  * @param value The value data
  * @param type The value type
+ * @param config The config
  * @param new If the key value is newly inserted (not replaced)
  * @return Old value if the key exists, otherwise NULL
  */
 static struct value*
-art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, bool* new);
+art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, struct value_config* config, bool* new);
 
 /**
  * Delete a value from a node recursively.
@@ -351,7 +352,28 @@ pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr
       // c'mon, at least create a tree first...
       goto error;
    }
-   old_val = art_node_insert(t->root, &t->root, 0, key, key_len, value, type, &new);
+   old_val = art_node_insert(t->root, &t->root, 0, key, key_len, value, type, NULL, &new);
+   pgmoneta_value_destroy(old_val);
+   if (new)
+   {
+      t->size++;
+   }
+   return 0;
+error:
+   return 1;
+}
+
+int
+pgmoneta_art_insert_with_config(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, struct value_config* config)
+{
+   struct value* old_val = NULL;
+   bool new = false;
+   if (t == NULL)
+   {
+      // c'mon, at least create a tree first...
+      goto error;
+   }
+   old_val = art_node_insert(t->root, &t->root, 0, key, key_len, value, ValueRef, config, &new);
    pgmoneta_value_destroy(old_val);
    if (new)
    {
@@ -406,12 +428,20 @@ min(uint32_t a, uint32_t b)
 }
 
 static void
-create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type)
+create_art_leaf(struct art_leaf** leaf, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, struct value_config* config)
 {
    struct art_leaf* l = NULL;
    l = malloc(sizeof(struct art_leaf) + key_len);
    memset(l, 0, sizeof(struct art_leaf) + key_len);
-   pgmoneta_value_create(type, value, &l->value);
+   if (config != NULL)
+   {
+      pgmoneta_value_create_with_config(value, config, &l->value);
+   }
+   else
+   {
+      pgmoneta_value_create(type, value, &l->value);
+   }
+
    l->key_len = key_len;
    memcpy(l->key, key, key_len);
    *leaf = l;
@@ -601,7 +631,7 @@ error:
 }
 
 static struct value*
-art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, bool* new)
+art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t depth, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type, struct value_config* config, bool* new)
 {
    struct art_leaf* leaf = NULL;
    struct art_leaf* min_leaf = NULL;
@@ -615,7 +645,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
    {
       // Lazy expansion, skip creating an inner node since it currently will have only this one leaf.
       // We will compare keys when reach leaf anyway, the path doesn't need to 100% match the key along the way
-      create_art_leaf(&leaf, key, key_len, value, type);
+      create_art_leaf(&leaf, key, key_len, value, type, config);
       *node_ref = SET_LEAF(leaf);
       *new = true;
       return NULL;
@@ -638,7 +668,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
       // This way we inductively guarantee that all children to a parent share the same prefix even if it's only partially stored
       leaf_key = GET_LEAF(node)->key;
       create_art_node(&new_node, Node4);
-      create_art_leaf(&leaf, key, key_len, value, type);
+      create_art_leaf(&leaf, key, key_len, value, type, config);
       // Get the diverging index after point of depth
       for (idx = depth; idx < min(key_len, GET_LEAF(node)->key_len); idx++)
       {
@@ -680,7 +710,7 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
    {
       // case 2, split the node
       create_art_node(&new_node, Node4);
-      create_art_leaf(&leaf, key, key_len, value, type);
+      create_art_leaf(&leaf, key, key_len, value, type, config);
       new_node->prefix_len = diff_len;
       memcpy(new_node->prefix, node->prefix, min(MAX_PREFIX_LEN, diff_len));
       // We need to know if new bytes that were once outside the partial prefix range will now come into the range
@@ -726,12 +756,12 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
          {
             node->num_children++;
          }
-         return art_node_insert(*next, next, depth + 1, key, key_len, value, type, new);
+         return art_node_insert(*next, next, depth + 1, key, key_len, value, type, config, new);
       }
       else
       {
          // add a child to current node since the spot is available
-         create_art_leaf(&leaf, key, key_len, value, type);
+         create_art_leaf(&leaf, key, key_len, value, type, config);
          node_add_child(node, node_ref, key[depth], SET_LEAF(leaf));
          *new = true;
          return NULL;

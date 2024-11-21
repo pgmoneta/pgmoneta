@@ -164,7 +164,6 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
    {
       bck = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
    }
-   
    *backup = bck;
 
    free(server_base);
