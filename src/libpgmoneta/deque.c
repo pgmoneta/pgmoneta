@@ -344,7 +344,7 @@ pgmoneta_deque_iterator_next(struct deque_iterator* iter)
 }
 
 static void
-deque_offer(struct deque* deque, char* tag, uintptr_t data, struct value_config* config, enum value_type type)
+deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type, struct value_config* config)
 {
    struct deque_node* n = NULL;
    struct deque_node* last = NULL;

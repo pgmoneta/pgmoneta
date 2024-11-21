@@ -73,6 +73,10 @@ struct value
    data_to_string_cb to_string;   /**< The callback to convert data to string */
 };
 
+/**
+ * @struct value_config
+ * Defines configuration for managing a value
+ */
 struct value_config
 {
    data_destroy_cb destroy_data; /**< The callback to destroy data */
