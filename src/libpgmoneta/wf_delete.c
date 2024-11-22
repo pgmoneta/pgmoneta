@@ -92,12 +92,19 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    int number_of_backups = 0;
    int number_of_workers = 0;
    struct backup** backups = NULL;
+   struct backup* backup = NULL;
    struct workers* workers = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->servers[server].name, identifier);
+
+   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
    pgmoneta_deque_list(nodes);
 
    active = false;
@@ -119,10 +126,6 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    d = NULL;
 
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-   if (label == NULL)
-   {
-      label = identifier;
-   }
 
    /* Find backup index */
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
@@ -256,6 +259,8 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    }
    free(backups);
 
+   free(backup);
+
    if (strlen(config->servers[server].hot_standby) > 0)
    {
       char* srv = NULL;
@@ -308,6 +313,8 @@ error:
       free(backups[i]);
    }
    free(backups);
+
+   free(backup);
 
    free(d);
 
