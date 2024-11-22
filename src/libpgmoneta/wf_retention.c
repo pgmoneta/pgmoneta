@@ -96,8 +96,6 @@ retention_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_deque_list(nodes);
-
    for (int i = 0; i < config->number_of_servers; i++)
    {
       int retention_days = -1;
@@ -106,6 +104,7 @@ retention_execute(int server, char* identifier, struct deque* nodes)
       int retention_years = -1;
 
       pgmoneta_log_debug("Retention (execute): %s", config->servers[i].name);
+      pgmoneta_deque_list(nodes);
 
       retention_days = config->servers[i].retention_days;
       if (retention_days <= 0)

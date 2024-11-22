@@ -100,6 +100,20 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->servers[server].name, identifier);
 
+   backup = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
+   if (backup != NULL)
+   {
+      free(backup);
+      backup = NULL;
+   }
+
+   pgmoneta_deque_remove(nodes, NODE_IDENTIFIER);
+   pgmoneta_deque_remove(nodes, NODE_SERVER_BASE);
+   pgmoneta_deque_remove(nodes, NODE_BACKUP);
+   pgmoneta_deque_remove(nodes, NODE_BACKUP_BASE);
+   pgmoneta_deque_remove(nodes, NODE_BACKUP_DATA);
+   pgmoneta_deque_remove(nodes, NODE_LABEL);
+
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
       goto error;
