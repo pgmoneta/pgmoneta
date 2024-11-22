@@ -45,8 +45,8 @@
 static int retention_setup(int, char*, struct deque*);
 static int retention_execute(int, char*, struct deque*);
 static int retention_teardown(int, char*, struct deque*);
-static void mark_retention(bool** retention_flags, int retention_days, int retention_weeks, int retention_months,
-                           int retention_years, int number_of_backups, struct backup** backups);
+static void mark_retention(int server, int retention_days, int retention_weeks, int retention_months,
+                           int retention_years, int number_of_backups, struct backup** backups, bool** retention_flags);
 
 struct workflow*
 pgmoneta_create_retention(void)
@@ -137,8 +137,8 @@ retention_execute(int server, char* identifier, struct deque* nodes)
 
       if (number_of_backups > 0)
       {
-         mark_retention(&retention_flags, retention_days, retention_weeks, retention_months,
-                        retention_years, number_of_backups, backups);
+         mark_retention(server, retention_days, retention_weeks, retention_months,
+                        retention_years, number_of_backups, backups, &retention_flags);
          for (int j = 0; j < number_of_backups; j++)
          {
             if (!retention_flags[j])
@@ -228,13 +228,16 @@ retention_teardown(int server, char* identifier, struct deque* nodes)
 }
 
 static void
-mark_retention(bool** retention_flags, int retention_days, int retention_weeks, int retention_months,
-               int retention_years, int number_of_backups, struct backup** backups)
+mark_retention(int server, int retention_days, int retention_weeks, int retention_months,
+               int retention_years, int number_of_backups, struct backup** backups, bool** retention_flags)
 {
    bool* flags = NULL;
    time_t t;
    char check_date[128];
    struct tm* time_info;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    flags = (bool*) malloc(sizeof (bool*) * number_of_backups);
 
@@ -261,12 +264,12 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
    {
       if (strcmp(backups[j]->label, &check_date[0]) >= 0)
       {
-         pgmoneta_log_debug("Marked for deletion: %s", backups[j]->label);
+         pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[j]->label);
          flags[j] = true;
       }
       else
       {
-         pgmoneta_log_trace("Skipped for deletion: %s", backups[j]->label);
+         pgmoneta_log_trace("Skipped for deletion: %s/%s", config->servers[server].name, backups[j]->label);
          break;
       }
    }
@@ -297,7 +300,7 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
             if (time_info->tm_year == backup_time_info.tm_year &&
                 time_info->tm_yday == backup_time_info.tm_yday)
             {
-               pgmoneta_log_debug("Marked for deletion: %s", backups[k]->label);
+               pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[k]->label);
                flags[k--] = true;
                break;
             }
@@ -347,7 +350,7 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
                 cur_year == backup_time_info.tm_year &&
                 backup_time_info.tm_mday == 1)
             {
-               pgmoneta_log_debug("Marked for deletion: %s", backups[k]->label);
+               pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[k]->label);
                flags[k--] = true;
                break;
             }
@@ -383,7 +386,7 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
             // find the latest backup on the first day of that year
             if (cur_year == backup_time_info.tm_year && backup_time_info.tm_yday == 0)
             {
-               pgmoneta_log_debug("Marked for deletion: %s", backups[k]->label);
+               pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[k]->label);
                flags[k--] = true;
                break;
             }
