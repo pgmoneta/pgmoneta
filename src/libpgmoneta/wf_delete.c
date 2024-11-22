@@ -80,7 +80,7 @@ delete_backup_setup(int server, char* identifier, struct deque* nodes)
 static int
 delete_backup_execute(int server, char* identifier, struct deque* nodes)
 {
-   bool active;
+   bool active = false;
    int backup_index = -1;
    int prev_index = -1;
    int next_index = -1;
@@ -104,6 +104,7 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 
    if (!atomic_compare_exchange_strong(&config->servers[server].delete, &active, true))
    {
+      pgmoneta_log_debug("Delete is active for %s (Waiting for %s)", config->servers[server].name, identifier);
       goto error;
    }
 
@@ -118,6 +119,10 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    d = NULL;
 
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   if (label == NULL)
+   {
+      label = identifier;
+   }
 
    /* Find backup index */
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
@@ -140,8 +145,11 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       if (backups[i]->valid == VALID_TRUE)
       {
          prev_index = i;
+         pgmoneta_log_trace("Prev label: %s/%s", config->servers[server].name, backups[prev_index]->label);
       }
    }
+
+   pgmoneta_log_trace("Delete label: %s/%s", config->servers[server].name, backups[backup_index]->label);
 
    /* Find next valid backup */
    for (int i = backup_index + 1; next_index == -1 && i < number_of_backups; i++)
@@ -149,6 +157,7 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       if (backups[i]->valid == VALID_TRUE)
       {
          next_index = i;
+         pgmoneta_log_trace("Next label: %s/%s", config->servers[server].name, backups[prev_index]->label);
       }
    }
 
@@ -288,6 +297,7 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    free(d);
 
    atomic_store(&config->servers[server].delete, false);
+   pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
 
    return 0;
 
@@ -302,6 +312,7 @@ error:
    free(d);
 
    atomic_store(&config->servers[server].delete, false);
+   pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
 
    return 1;
 }
