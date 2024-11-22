@@ -148,11 +148,8 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       if (backups[i]->valid == VALID_TRUE)
       {
          prev_index = i;
-         pgmoneta_log_trace("Prev label: %s/%s", config->servers[server].name, backups[prev_index]->label);
       }
    }
-
-   pgmoneta_log_trace("Delete label: %s/%s", config->servers[server].name, backups[backup_index]->label);
 
    /* Find next valid backup */
    for (int i = backup_index + 1; next_index == -1 && i < number_of_backups; i++)
@@ -160,8 +157,19 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       if (backups[i]->valid == VALID_TRUE)
       {
          next_index = i;
-         pgmoneta_log_trace("Next label: %s/%s", config->servers[server].name, backups[prev_index]->label);
       }
+   }
+
+   if (prev_index != -1)
+   {
+      pgmoneta_log_trace("Prv label: %s/%s", config->servers[server].name, backups[prev_index]->label);
+   }
+
+   pgmoneta_log_trace("Del label: %s/%s", config->servers[server].name, backups[backup_index]->label);
+
+   if (next_index != -1)
+   {
+      pgmoneta_log_trace("Net label: %s/%s", config->servers[server].name, backups[next_index]->label);
    }
 
    d = pgmoneta_get_server_backup_identifier(server, backups[backup_index]->label);
