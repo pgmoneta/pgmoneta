@@ -145,20 +145,15 @@ retention_execute(int server, char* identifier, struct deque* nodes)
             {
                if (!backups[j]->keep)
                {
+                  pgmoneta_log_trace("Retention: %s/%s (%s)", config->servers[i].name, backups[j]->label, atomic_load(&config->servers[i].delete) ? "Active" : "Inactive");
+
                   if (!atomic_load(&config->servers[i].delete))
                   {
                      pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[j]->label);
                      pgmoneta_delete(i, backups[j]->label);
-                  }
-                  else
-                  {
-                     pgmoneta_log_trace("Retention: %s/%s (Waiting)", config->servers[i].name, backups[j]->label);
+                     break;
                   }
                }
-            }
-            else
-            {
-               break;
             }
          }
       }
@@ -274,7 +269,6 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
       else
       {
          pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[j]->label);
-         break;
       }
    }
    if (retention_weeks != -1)
