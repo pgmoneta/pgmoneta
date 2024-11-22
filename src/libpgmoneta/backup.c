@@ -370,6 +370,11 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
       goto error;
    }
 
+   if (pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS, (uintptr_t)number_of_backups, ValueUInt32))
+   {
+      goto json_error;
+   }
+
    if (pgmoneta_json_create(&bcks))
    {
       goto error;
