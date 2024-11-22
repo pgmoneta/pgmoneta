@@ -52,7 +52,7 @@ static void
 delete_wal_older_than(char* srv_wal, char* base, int backup_index);
 
 int
-pgmoneta_delete(int srv, char* backup_id)
+pgmoneta_delete(int srv, char* label)
 {
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
@@ -65,7 +65,7 @@ pgmoneta_delete(int srv, char* backup_id)
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(srv, backup_id, nodes))
+      if (current->setup(srv, label, nodes))
       {
          goto error;
       }
@@ -75,7 +75,7 @@ pgmoneta_delete(int srv, char* backup_id)
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(srv, backup_id, nodes))
+      if (current->execute(srv, label, nodes))
       {
          goto error;
       }
@@ -85,7 +85,7 @@ pgmoneta_delete(int srv, char* backup_id)
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(srv, backup_id, nodes))
+      if (current->teardown(srv, label, nodes))
       {
          goto error;
       }

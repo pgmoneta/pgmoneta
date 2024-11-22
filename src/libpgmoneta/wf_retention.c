@@ -91,7 +91,7 @@ retention_execute(int server, char* identifier, struct deque* nodes)
    char* d;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   bool* retention_flags = NULL;
+   bool* retention_keep = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -138,17 +138,21 @@ retention_execute(int server, char* identifier, struct deque* nodes)
       if (number_of_backups > 0)
       {
          mark_retention(server, retention_days, retention_weeks, retention_months,
-                        retention_years, number_of_backups, backups, &retention_flags);
+                        retention_years, number_of_backups, backups, &retention_keep);
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (!retention_flags[j])
+            if (!retention_keep[j])
             {
                if (!backups[j]->keep)
                {
                   if (!atomic_load(&config->servers[i].delete))
                   {
-                     pgmoneta_delete(i, backups[j]->label);
                      pgmoneta_log_info("Retention: %s/%s", config->servers[i].name, backups[j]->label);
+                     pgmoneta_delete(i, backups[j]->label);
+                  }
+                  else
+                  {
+                     pgmoneta_log_trace("Retention: %s/%s (Waiting)", config->servers[i].name, backups[j]->label);
                   }
                }
             }
@@ -203,7 +207,7 @@ retention_execute(int server, char* identifier, struct deque* nodes)
          free(hs);
       }
 
-      free(retention_flags);
+      free(retention_keep);
       free(d);
    }
 
