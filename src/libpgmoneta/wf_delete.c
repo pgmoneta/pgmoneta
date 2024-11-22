@@ -115,6 +115,12 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
+   if (atomic_load(&config->servers[server].backup))
+   {
+      pgmoneta_log_debug("Backup is active for %s", config->servers[server].name);
+      goto error;
+   }
+
    d = pgmoneta_get_server_backup(server);
 
    if (pgmoneta_get_backups(d, &number_of_backups, &backups))
