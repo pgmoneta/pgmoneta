@@ -229,9 +229,9 @@ retention_teardown(int server, char* identifier, struct deque* nodes)
 
 static void
 mark_retention(int server, int retention_days, int retention_weeks, int retention_months,
-               int retention_years, int number_of_backups, struct backup** backups, bool** retention_flags)
+               int retention_years, int number_of_backups, struct backup** backups, bool** retention_keep)
 {
-   bool* flags = NULL;
+   bool* keep = NULL;
    time_t t;
    char check_date[128];
    struct tm* time_info;
@@ -239,16 +239,16 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
 
    config = (struct configuration*)shmem;
 
-   flags = (bool*) malloc(sizeof (bool*) * number_of_backups);
+   keep = (bool*) malloc(sizeof (bool*) * number_of_backups);
 
-   if (flags == NULL)
+   if (keep == NULL)
    {
       return;
    }
 
    for (int i = 0; i < number_of_backups; i++)
    {
-      flags[i] = false;
+      keep[i] = false;
    }
    t = time(NULL);
    memset(&check_date[0], 0, sizeof(check_date));
@@ -264,12 +264,12 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
    {
       if (strcmp(backups[j]->label, &check_date[0]) >= 0)
       {
-         pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[j]->label);
-         flags[j] = true;
+         pgmoneta_log_trace("Skipped for deletion: %s/%s", config->servers[server].name, backups[j]->label);
+         keep[j] = true;
       }
       else
       {
-         pgmoneta_log_trace("Skipped for deletion: %s/%s", config->servers[server].name, backups[j]->label);
+         pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[j]->label);
          break;
       }
    }
@@ -300,8 +300,8 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
             if (time_info->tm_year == backup_time_info.tm_year &&
                 time_info->tm_yday == backup_time_info.tm_yday)
             {
-               pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[k]->label);
-               flags[k--] = true;
+               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->servers[server].name, backups[j]->label);
+               keep[k--] = true;
                break;
             }
             else if ((time_info->tm_year == backup_time_info.tm_year &&
@@ -350,8 +350,8 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
                 cur_year == backup_time_info.tm_year &&
                 backup_time_info.tm_mday == 1)
             {
-               pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[k]->label);
-               flags[k--] = true;
+               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->servers[server].name, backups[j]->label);
+               keep[k--] = true;
                break;
             }
             else if ((cur_year == backup_time_info.tm_year &&
@@ -386,8 +386,8 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
             // find the latest backup on the first day of that year
             if (cur_year == backup_time_info.tm_year && backup_time_info.tm_yday == 0)
             {
-               pgmoneta_log_debug("Marked for deletion: %s/%s", config->servers[server].name, backups[k]->label);
-               flags[k--] = true;
+               pgmoneta_log_trace("Skipped for deletion: %s/%s", config->servers[server].name, backups[j]->label);
+               keep[k--] = true;
                break;
             }
             else if (cur_year > backup_time_info.tm_year)
@@ -399,5 +399,5 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
          }
       }
    }
-   *retention_flags = flags;
+   *retention_keep = keep;
 }
