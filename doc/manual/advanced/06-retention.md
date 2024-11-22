@@ -30,3 +30,15 @@ to keep backups for 7 days, one backup each Monday for 4 weeks, one backup for e
 This is a very hard property to configure since it depends on the size of the database cluster and therefore how big your backups are.
 
 If you want to restore from the latest backup plus the Write-Ahead Log (WAL) then the default [**pgmoneta**](pgmoneta) policy maybe is enough.
+
+## Retention check
+
+The retention check runs every 5 minutes, and will delete one backup per run.
+
+You can change this to every 30 minutes by
+
+```
+retention_interval = 1800
+```
+
+under the `[pgmoneta]` configuration.

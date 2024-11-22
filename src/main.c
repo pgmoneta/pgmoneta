@@ -653,7 +653,7 @@ main(int argc, char** argv)
    }
 
    /* Start backup retention policy */
-   ev_periodic_init (&retention, retention_cb, 0., 300, 0);
+   ev_periodic_init (&retention, retention_cb, 0., config->retention_interval, 0);
    ev_periodic_start (main_loop, &retention);
 
    if (!offline)

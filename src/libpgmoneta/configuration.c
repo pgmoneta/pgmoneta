@@ -110,6 +110,7 @@ pgmoneta_init_configuration(void* shm)
    config->retention_weeks = -1;
    config->retention_months = -1;
    config->retention_years = -1;
+   config->retention_interval = 300;
 
    config->tls = false;
 
@@ -1200,6 +1201,20 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "retention_interval"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->retention_interval))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "encryption"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -1430,6 +1445,11 @@ pgmoneta_validate_configuration(void* shm)
    if (config->retention_days < 1)
    {
       pgmoneta_log_fatal("retention days should be at least 1");
+      return 1;
+   }
+   if (config->retention_interval < 1)
+   {
+      pgmoneta_log_fatal("retention interval should be at least 1");
       return 1;
    }
 
@@ -3064,6 +3084,10 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->retention_weeks = reload->retention_weeks;
    config->retention_months = reload->retention_months;
    config->retention_years = reload->retention_years;
+   if (restart_int("retention_interval", config->retention_interval, reload->retention_interval))
+   {
+      changed = true;
+   }
    if (restart_int("log_type", config->log_type, reload->log_type))
    {
       changed = true;

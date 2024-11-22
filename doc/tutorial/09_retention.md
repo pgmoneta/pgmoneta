@@ -35,3 +35,15 @@ Current validation rule is:
 3. If retention years is specified, then 1 <= months <= 12, otherwise months >= 1
 4. Retention years >= 1
 Please note that the rule above only checks specified parameters, except for days, which should always be specified
+
+## Retention check
+
+The retention check runs every 5 minutes, and will delete one backup per run.
+
+You can change this to every 30 minutes by
+
+```
+retention_interval = 1800
+```
+
+under the `[pgmoneta]` configuration.

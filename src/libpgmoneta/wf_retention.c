@@ -261,10 +261,12 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
    {
       if (strcmp(backups[j]->label, &check_date[0]) >= 0)
       {
+         pgmoneta_log_debug("Marked for deletion: %s", backups[j]->label);
          flags[j] = true;
       }
       else
       {
+         pgmoneta_log_trace("Skipped for deletion: %s", backups[j]->label);
          break;
       }
    }
@@ -295,6 +297,7 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
             if (time_info->tm_year == backup_time_info.tm_year &&
                 time_info->tm_yday == backup_time_info.tm_yday)
             {
+               pgmoneta_log_debug("Marked for deletion: %s", backups[k]->label);
                flags[k--] = true;
                break;
             }
@@ -344,6 +347,7 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
                 cur_year == backup_time_info.tm_year &&
                 backup_time_info.tm_mday == 1)
             {
+               pgmoneta_log_debug("Marked for deletion: %s", backups[k]->label);
                flags[k--] = true;
                break;
             }
@@ -379,6 +383,7 @@ mark_retention(bool** retention_flags, int retention_days, int retention_weeks, 
             // find the latest backup on the first day of that year
             if (cur_year == backup_time_info.tm_year && backup_time_info.tm_yday == 0)
             {
+               pgmoneta_log_debug("Marked for deletion: %s", backups[k]->label);
                flags[k--] = true;
                break;
             }

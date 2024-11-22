@@ -319,6 +319,7 @@ struct configuration
 
    int encryption; /**< The AES encryption mode */
 
+
    char ssh_hostname[MISC_LENGTH]; /**< The SSH hostname */
    char ssh_username[MISC_LENGTH]; /**< The SSH username */
    char ssh_base_dir[MAX_PATH];    /**< The SSH base directory */
@@ -339,6 +340,7 @@ struct configuration
    int retention_weeks;                 /**< The retention weeks for the server */
    int retention_months;                /**< The retention months for the server */
    int retention_years;                 /**< The retention years for the server */
+   int retention_interval;              /**< The retention interval */
 
    int log_type;                      /**< The logging type */
    int log_level;                     /**< The logging level */

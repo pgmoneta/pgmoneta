@@ -49,6 +49,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | azure_shared_key | | String | Yes | The Azure storage account key |
 | azure_base_dir | | String | Yes | The base directory for the Azure container |
 | retention | 7, - , - , - | Array | No | The retention time in days, weeks, months, years |
+| retention_interval | 300 | Int | No | The retention check interval |
 | log_type | console | String | No | The logging type (console, file, syslog) |
 | log_level | info | String | No | The logging level, any of the (case insensitive) strings `FATAL`, `ERROR`, `WARN`, `INFO` and `DEBUG` (that can be more specific as `DEBUG1` thru `DEBUG5`). Debug level greater than 5 will be set to `DEBUG5`. Not recognized values will make the log_level be `INFO` |
 | log_path | pgmoneta.log | String | No | The log file location. Can be a strftime(3) compatible string. |
