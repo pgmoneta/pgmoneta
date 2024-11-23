@@ -95,6 +95,15 @@ int
 pgmoneta_deque_add(struct deque* deque, char* tag, uintptr_t data, enum value_type type);
 
 /**
+ * Remove all the nodes with the given tag
+ * @param deque The deque
+ * @param tag The tag
+ * @return Number of nodes removed
+ */
+int
+pgmoneta_deque_remove(struct deque* deque, char* tag);
+
+/**
  * Add a node to deque's tail with custom to_string and data destroy callback,
  * the type will be set to ValueRef
  * This function is thread safe

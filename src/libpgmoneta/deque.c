@@ -100,6 +100,28 @@ pgmoneta_deque_add(struct deque* deque, char* tag, uintptr_t data, enum value_ty
 }
 
 int
+pgmoneta_deque_remove(struct deque* deque, char* tag)
+{
+   int cnt = 0;
+   struct deque_iterator* iter = NULL;
+   if (deque == NULL || tag == NULL)
+   {
+      return 0;
+   }
+   pgmoneta_deque_iterator_create(deque, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      if (pgmoneta_compare_string(iter->tag, tag))
+      {
+         pgmoneta_deque_iterator_remove(iter);
+         cnt++;
+      }
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+   return cnt;
+}
+
+int
 pgmoneta_deque_add_with_config(struct deque* deque, char* tag, uintptr_t data, struct value_config* config)
 {
    deque_offer(deque, tag, data, ValueRef, config);
