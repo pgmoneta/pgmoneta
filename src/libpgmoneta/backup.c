@@ -564,7 +564,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_ERROR, compression, encryption, payload);
-   pgmoneta_log_error("Delete: %s/%s", config->servers[srv].name, backup != NULL ? backup->label : identifier);
+   pgmoneta_log_warn("Delete: No identifier for %s/%s", config->servers[srv].name, backup != NULL ? backup->label : identifier);
 
    pgmoneta_deque_destroy(nodes);
 

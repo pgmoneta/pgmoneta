@@ -67,6 +67,7 @@ extern "C" {
 #define NODE_POSITION      "position"
 #define NODE_PRIMARY       "primary"
 #define NODE_RECOVERY_INFO "recovery_info"
+#define NODE_SERVER_BACKUP "server_backup"
 #define NODE_SERVER_BASE   "server_base"
 #define NODE_TARFILE       "tarfile"
 

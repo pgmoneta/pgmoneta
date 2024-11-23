@@ -80,6 +80,7 @@ int
 pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struct backup** backup)
 {
    char* server_base = NULL;
+   char* server_backup = NULL;
    char* backup_base = NULL;
    char* backup_data = NULL;
    struct backup* bck = NULL;
@@ -109,8 +110,27 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
 
       if (pgmoneta_deque_add(nodes, NODE_SERVER_BASE, (uintptr_t)server_base, ValueString))
       {
+         free(server_base);
          goto error;
       }
+
+      free(server_base);
+      server_base = NULL;
+   }
+
+   if (!pgmoneta_deque_exists(nodes, NODE_SERVER_BACKUP))
+   {
+      server_backup = pgmoneta_append(server_backup, (char*)pgmoneta_deque_get(nodes, NODE_SERVER_BASE));
+      server_backup = pgmoneta_append(server_backup, "backup/");
+
+      if (pgmoneta_deque_add(nodes, NODE_SERVER_BACKUP, (uintptr_t)server_backup, ValueString))
+      {
+         free(server_backup);
+         goto error;
+      }
+
+      free(server_backup);
+      server_backup = NULL;
    }
 
    if (identifier != NULL)
@@ -136,8 +156,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
          }
       }
 
-      backup_base = pgmoneta_append(backup_base, server_base);
-      backup_base = pgmoneta_append(backup_base, "/");
+      backup_base = pgmoneta_append(backup_base, (char*)pgmoneta_deque_get(nodes, NODE_SERVER_BACKUP));
       backup_base = pgmoneta_append(backup_base, bck->label);
       backup_base = pgmoneta_append(backup_base, "/");
 
@@ -159,6 +178,12 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
             goto error;
          }
       }
+
+      free(backup_base);
+      free(backup_data);
+
+      backup_base = NULL;
+      backup_data = NULL;
    }
    else
    {
@@ -166,17 +191,9 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
    }
    *backup = bck;
 
-   free(server_base);
-   free(backup_base);
-   free(backup_data);
-
    return 0;
 
 error:
-
-   free(server_base);
-   free(backup_base);
-   free(backup_data);
 
    return 1;
 }

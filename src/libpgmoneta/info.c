@@ -737,7 +737,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
       if (!prefix_found)
       {
-         pgmoneta_log_error("Unknown identifier for %s/%s", config->servers[server].name, id);
+         pgmoneta_log_debug("Unknown identifier for %s/%s", config->servers[server].name, id);
          goto error;
       }
    }
@@ -1000,7 +1000,7 @@ error:
 void
 pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   char* backup = NULL;
+   char* identifier = NULL;
    char* d = NULL;
    char* elapsed = NULL;
    time_t start_time;
@@ -1023,6 +1023,9 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
    number_of_backups = 0;
    backups = NULL;
 
+   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+
    pgmoneta_get_backups(d, &number_of_backups, &backups);
 
    if (number_of_backups == 0)
@@ -1033,14 +1036,11 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
       goto error;
    }
 
-   req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
-   backup = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
-
-   if (!strcmp("oldest", backup))
+   if (!strcmp("oldest", identifier))
    {
       bck = backups[0];
    }
-   else if (!strcmp("newest", backup) || !strcmp("latest", backup))
+   else if (!strcmp("newest", identifier) || !strcmp("latest", identifier))
    {
       bck = backups[number_of_backups - 1];
    }
@@ -1048,7 +1048,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
    {
       for (int i = 0; bck == NULL && i < number_of_backups; i++)
       {
-         if (!strcmp(backups[i]->label, backup))
+         if (!strcmp(backups[i]->label, identifier))
          {
             bck = backups[i];
          }
@@ -1058,8 +1058,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
    if (bck == NULL)
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, compression, encryption, payload);
-      pgmoneta_log_warn("Info: No backup (%s)", backup);
-
+      pgmoneta_log_warn("Info: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 

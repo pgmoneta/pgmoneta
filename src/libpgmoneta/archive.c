@@ -101,15 +101,12 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
-   {
-      goto error;
-   }
+   pgmoneta_workflow_nodes(server, identifier, nodes, &backup);
 
    if (backup == NULL)
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, compression, encryption, payload);
-      pgmoneta_log_error("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 

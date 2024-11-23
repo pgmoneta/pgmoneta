@@ -109,6 +109,7 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 
    pgmoneta_deque_remove(nodes, NODE_IDENTIFIER);
    pgmoneta_deque_remove(nodes, NODE_SERVER_BASE);
+   pgmoneta_deque_remove(nodes, NODE_SERVER_BACKUP);
    pgmoneta_deque_remove(nodes, NODE_BACKUP);
    pgmoneta_deque_remove(nodes, NODE_BACKUP_BASE);
    pgmoneta_deque_remove(nodes, NODE_BACKUP_DATA);
