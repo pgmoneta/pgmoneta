@@ -207,6 +207,8 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)filesj, ValueJSON);
 
+   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_DESTINATION));
+
    end_time = time(NULL);
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
@@ -241,6 +243,8 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    exit(0);
 
 error:
+
+   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_DESTINATION));
 
    pgmoneta_deque_iterator_destroy(fiter);
    pgmoneta_deque_iterator_destroy(aiter);

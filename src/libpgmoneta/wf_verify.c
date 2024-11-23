@@ -171,7 +171,7 @@ verify_execute(int server, char* identifier, struct deque* nodes)
          goto error;
       }
 
-      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA), ValueString);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_deque_get(nodes, NODE_DESTINATION), ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)columns[0], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)columns[1], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)backup->hash_algoritm, ValueInt32);
@@ -372,6 +372,10 @@ do_verify(void* arg)
       pgmoneta_json_destroy(j);
    }
 
+   p->data = NULL;
+   p->failed = NULL;
+   p->all = NULL;
+
    free(hash_cal);
    free(f);
    free(p);
@@ -380,6 +384,12 @@ do_verify(void* arg)
 
 error:
    pgmoneta_log_error("Unable to calculate hash for %s", f);
+
+   pgmoneta_json_destroy(p->data);
+
+   p->data = NULL;
+   p->failed = NULL;
+   p->all = NULL;
 
    free(hash_cal);
    free(f);
