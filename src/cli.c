@@ -1715,6 +1715,7 @@ translate_backup_argument(struct json* response)
    char* translated_restore_size = NULL;
    char* translated_lsn = NULL;
    char* translated_wal = NULL;
+   char* translated_delta = NULL;
 
    translated_backup_size = translate_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE));
    if (translated_backup_size)
@@ -1748,6 +1749,11 @@ translate_backup_argument(struct json* response)
    if (translated_wal)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)translated_wal, ValueString);
+   }
+   translated_delta = translate_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_DELTA));
+   if (translated_delta)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DELTA, (uintptr_t)translated_delta, ValueString);
    }
 
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN))
@@ -1805,6 +1811,7 @@ translate_backup_argument(struct json* response)
    free(translated_backup_size);
    free(translated_restore_size);
    free(translated_wal);
+   free(translated_delta);
 }
 
 static void
