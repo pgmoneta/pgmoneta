@@ -315,4 +315,4 @@ else()
 endif()
 target_link_libraries(pgmoneta-walinfo-bin pgmoneta)
 
-install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS pgmoneta-walinfo-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
