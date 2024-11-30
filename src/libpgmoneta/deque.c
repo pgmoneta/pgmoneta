@@ -73,6 +73,18 @@ to_text_string(struct deque* deque, char* tag, int indent);
 static struct deque_node*
 deque_remove(struct deque* deque, struct deque_node* node);
 
+static struct deque_node*
+get_middle(struct deque_node* node);
+
+struct deque_node*
+deque_sort(struct deque_node* node);
+
+struct deque_node*
+deque_merge(struct deque_node* node1, struct deque_node* node2);
+
+int
+tag_compare(char* tag1, char* tag2);
+
 int
 pgmoneta_deque_create(bool thread_safe, struct deque** deque)
 {
@@ -244,6 +256,35 @@ pgmoneta_deque_list(struct deque* deque)
       pgmoneta_log_trace("Deque: %s", str);
       free(str);
    }
+}
+
+void
+pgmoneta_deque_sort(struct deque* deque)
+{
+   deque_write_lock(deque);
+   if (deque == NULL || deque->start == NULL || deque->end == NULL || deque->size <= 1)
+   {
+      deque_unlock(deque);
+      return;
+   }
+   // break the connection to start and end node since we are going to move nodes around
+   struct deque_node* first = deque->start->next;
+   struct deque_node* last = deque->end->prev;
+   struct deque_node* node = NULL;
+   first->prev = NULL;
+   last->next = NULL;
+   deque->start->next = NULL;
+   deque->end->prev = NULL;
+   node = deque_sort(first);
+   deque->start->next = node;
+   node->prev = deque->start;
+   while (node->next != NULL)
+   {
+      node = node->next;
+   }
+   deque->end->prev = node;
+   node->next = deque->end;
+   deque_unlock(deque);
 }
 
 void
@@ -619,4 +660,126 @@ deque_remove(struct deque* deque, struct deque_node* node)
    deque_node_destroy(node);
    deque->size--;
    return prev;
+}
+
+static struct deque_node*
+get_middle(struct deque_node* node)
+{
+   struct deque_node* slow = node;
+   struct deque_node* fast = node;
+   while (fast != NULL && fast->next != NULL)
+   {
+      slow = slow->next;
+      fast = fast->next->next;
+   }
+   return slow;
+}
+
+struct deque_node*
+deque_sort(struct deque_node* node)
+{
+   struct deque_node* mid = NULL;
+   struct deque_node* prevmid = NULL;
+   struct deque_node* node1 = NULL;
+   struct deque_node* node2 = NULL;
+   if (node == NULL || node->next == NULL)
+   {
+      return node;
+   }
+   mid = get_middle(node);
+   prevmid = mid->prev;
+   mid->prev = NULL;
+   prevmid->next = NULL;
+   node1 = deque_sort(node);
+   node2 = deque_sort(mid);
+   return deque_merge(node1, node2);
+}
+
+struct deque_node*
+deque_merge(struct deque_node* node1, struct deque_node* node2)
+{
+   struct deque_node* node = NULL;
+   struct deque_node* left = node1;
+   struct deque_node* right = node2;
+   struct deque_node* next = NULL;
+   struct deque_node* start = NULL;
+   if (node1 == NULL)
+   {
+      return node2;
+   }
+   if (node2 == NULL)
+   {
+      return node1;
+   }
+   while (left != NULL && right != NULL)
+   {
+      if (tag_compare(left->tag, right->tag) <= 0)
+      {
+         next = left->next;
+         if (node == NULL)
+         {
+            start = left;
+            node = left;
+            node->prev = NULL;
+            node->next = NULL;
+         }
+         else
+         {
+            node->next = left;
+            left->prev = node;
+            left->next = NULL;
+            node = node->next;
+         }
+         left = next;
+      }
+      else
+      {
+         next = right->next;
+         if (node == NULL)
+         {
+            start = right;
+            node = right;
+            node->prev = NULL;
+            node->next = NULL;
+         }
+         else
+         {
+            node->next = right;
+            right->prev = node;
+            right->next = NULL;
+            node = node->next;
+         }
+         right = next;
+      }
+   }
+   while (left != NULL)
+   {
+      next = left->next;
+      node->next = left;
+      left->prev = node;
+      left = next;
+      node = node->next;
+   }
+   while (right != NULL)
+   {
+      next = right->next;
+      node->next = right;
+      right->prev = node;
+      right = next;
+      node = node->next;
+   }
+   return start;
+}
+int
+tag_compare(char* tag1, char* tag2)
+{
+   if (tag1 == NULL)
+   {
+      return tag2 == NULL ? 0 : 1;
+   }
+   if (tag2 == NULL)
+   {
+      return tag1 == NULL ? 0 : -1;
+   }
+   return strcmp(tag1, tag2);
 }

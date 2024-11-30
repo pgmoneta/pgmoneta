@@ -214,6 +214,13 @@ void
 pgmoneta_deque_list(struct deque* deque);
 
 /**
+ * Sort the deque
+ * @param deque The deque
+ */
+void
+pgmoneta_deque_sort(struct deque* deque);
+
+/**
  * Convert what's inside deque to string
  * @param deque The deque
  * @param format The format
