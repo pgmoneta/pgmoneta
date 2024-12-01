@@ -76,13 +76,13 @@ deque_remove(struct deque* deque, struct deque_node* node);
 static struct deque_node*
 get_middle(struct deque_node* node);
 
-struct deque_node*
+static struct deque_node*
 deque_sort(struct deque_node* node);
 
-struct deque_node*
+static struct deque_node*
 deque_merge(struct deque_node* node1, struct deque_node* node2);
 
-int
+static int
 tag_compare(char* tag1, char* tag2);
 
 int
@@ -675,7 +675,7 @@ get_middle(struct deque_node* node)
    return slow;
 }
 
-struct deque_node*
+static struct deque_node*
 deque_sort(struct deque_node* node)
 {
    struct deque_node* mid = NULL;
@@ -695,7 +695,7 @@ deque_sort(struct deque_node* node)
    return deque_merge(node1, node2);
 }
 
-struct deque_node*
+static struct deque_node*
 deque_merge(struct deque_node* node1, struct deque_node* node2)
 {
    struct deque_node* node = NULL;
@@ -770,7 +770,7 @@ deque_merge(struct deque_node* node1, struct deque_node* node2)
    }
    return start;
 }
-int
+static int
 tag_compare(char* tag1, char* tag2)
 {
    if (tag1 == NULL)
