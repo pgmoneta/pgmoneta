@@ -126,6 +126,16 @@ pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query
 int
 pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, const char* dest_path, char* base64_data, struct query_response** qr);
 
+/**
+ * Promote a standby (replica) server to become the primary server
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_promote(SSL* ssl, int socket, struct query_response** qr);
+
 #ifdef __cplusplus
 }
 #endif

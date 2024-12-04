@@ -94,6 +94,12 @@ pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, const char* dest_path, char* 
    return query_execute(ssl, socket, query, qr);
 }
 
+int
+pgmoneta_ext_promote(SSL* ssl, int socket, struct query_response** qr)
+{
+   return query_execute(ssl, socket, "SELECT pgmoneta_ext_promote();", qr);
+}
+
 static int
 query_execute(SSL* ssl, int socket, char* qs, struct query_response** qr)
 {
