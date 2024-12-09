@@ -33,6 +33,7 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <string.h>
 #include <utils.h>
 
 /* system */
@@ -666,15 +667,15 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
    *backup = NULL;
 
+   d = pgmoneta_get_server_backup(server);
+
+   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   {
+      goto error;
+   }
+
    if (!strcmp(identifier, "oldest"))
    {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
       for (int i = 0; id == NULL && i < number_of_backups; i++)
       {
          if (backups[i]->valid == VALID_TRUE)
@@ -685,13 +686,6 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    }
    else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
    {
-      d = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
       for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
       {
          if (backups[i]->valid == VALID_TRUE)
@@ -702,7 +696,26 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    }
    else
    {
-      id = identifier;
+      /* Explicit search */
+      for (int i = 0; id == NULL && i < number_of_backups; i++)
+      {
+         if (!strcmp(backups[i]->label, identifier) && backups[i]->valid == VALID_TRUE)
+         {
+            id = backups[i]->label;
+         }
+      }
+
+      if (id == NULL)
+      {
+         /* Prefix search */
+         for (int i = 0; id == NULL && i < number_of_backups; i++)
+         {
+            if (pgmoneta_starts_with(backups[i]->label, identifier) && backups[i]->valid == VALID_TRUE)
+            {
+               id = backups[i]->label;
+            }
+         }
+      }
    }
 
    if (id == NULL)
@@ -712,35 +725,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    }
 
    root = pgmoneta_get_server_backup(server);
-
    base = pgmoneta_get_server_backup_identifier(server, id);
-
-   // TODO - Why ?
-   if (!pgmoneta_exists(base))
-   {
-      if (pgmoneta_get_backups(root, &number_of_backups, &backups))
-      {
-         goto error;
-      }
-
-      bool prefix_found = false;
-
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         if (backups[i]->valid == VALID_TRUE && pgmoneta_starts_with(backups[i]->label, id))
-         {
-            prefix_found = true;
-            id = backups[i]->label;
-            break;
-         }
-      }
-
-      if (!prefix_found)
-      {
-         pgmoneta_log_debug("Unknown identifier for %s/%s", config->servers[server].name, id);
-         goto error;
-      }
-   }
 
    if (pgmoneta_get_backup(root, id, &bck))
    {

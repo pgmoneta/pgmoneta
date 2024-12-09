@@ -300,7 +300,6 @@ restore_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   free(backup);
    free(from);
    free(to);
    free(o);
@@ -318,7 +317,6 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
-   free(backup);
    free(from);
    free(to);
    free(o);
