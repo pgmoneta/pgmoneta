@@ -55,6 +55,10 @@ The retention of a server
 |name 	    |The identifier for the server       |
 |parameter 	| days weeks months years            |
 
+## pgmoneta_extension
+
+The version of pgmoneta extension
+
 ## pgmoneta_compression
 
 The compression used

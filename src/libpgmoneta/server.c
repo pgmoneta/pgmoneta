@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <extension.h>
 #include <logging.h>
 #include <message.h>
 #include <network.h>
@@ -46,6 +47,7 @@ static int get_wal_level(SSL* ssl, int socket, int server, bool* replica);
 static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
 static int get_checksums(SSL* ssl, int socket, int server, bool* checksums);
 static int get_version(SSL* ssl, int socket, int server, int* major, int* minor);
+static int get_ext_version(SSL* ssl, int socket, char** version);
 
 static bool is_valid_response(struct query_response* response);
 
@@ -62,6 +64,7 @@ pgmoneta_server_info(int srv)
    bool checksums;
    int ws;
    struct configuration* config;
+   char* ext_version = NULL;
 
    config = (struct configuration*)shmem;
 
@@ -142,6 +145,26 @@ pgmoneta_server_info(int srv)
    }
 
    pgmoneta_log_debug("%s/wal_segment_size %d", config->servers[srv].name, config->servers[srv].wal_size);
+
+   if (get_ext_version(ssl, socket, &ext_version))
+   {
+      pgmoneta_log_warn("Unable to get extionsion version for %s", config->servers[srv].name);
+      config->servers[srv].ext_valid = false;
+   }
+   else
+   {
+      config->servers[srv].ext_valid = true;
+      strcpy(config->servers[srv].ext_version, ext_version);
+   }
+   if (ext_version != NULL)
+   {
+      free(ext_version);
+   }
+
+   pgmoneta_log_debug("%s ext_valid: %s, ext_version: %s",
+                      config->servers[srv].name,
+                      config->servers[srv].ext_valid ? "true" : "false",
+                      config->servers[srv].ext_valid ? config->servers[srv].ext_version : "N/A");
 
    pgmoneta_write_terminate(ssl, socket);
 
@@ -462,6 +485,50 @@ error:
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_ext_version(SSL* ssl, int socket, char** version)
+{
+   struct query_response* qr = NULL;
+
+   if (version == NULL)
+   {
+      goto error;
+   }
+
+   *version = NULL;
+
+   pgmoneta_ext_version(ssl, socket, &qr);
+
+   if (qr != NULL && qr->tuples != NULL && qr->tuples->data[0] != NULL)
+   {
+      size_t len = strlen(qr->tuples->data[0]) + 1;
+      *version = (char*)malloc(len);
+
+      if (*version == NULL)
+      {
+         pgmoneta_log_warn("get_ext_version: Memory allocation failed");
+         goto error;
+      }
+
+      strcpy(*version, qr->tuples->data[0]);
+
+      pgmoneta_free_query_response(qr);
+      return 0;
+   }
+   else
+   {
+      pgmoneta_log_warn("get_ext_version: Query failed or invalid response");
+      goto error;
+   }
+
+error:
+   if (qr != NULL)
+   {
+      pgmoneta_free_query_response(qr);
+   }
    return 1;
 }
 

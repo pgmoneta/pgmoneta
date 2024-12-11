@@ -247,6 +247,8 @@ struct server
    int manifest;                            /**< The manifest hash algorithm */
    int number_of_extra;                     /**< The number of source directory*/
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];   /**< Source directory*/
+   bool ext_valid;                          /**< Is the extension valid */
+   char ext_version[MISC_LENGTH];           /**< The major version of the extension*/
 } __attribute__ ((aligned (64)));
 
 /** @struct user
@@ -318,7 +320,6 @@ struct configuration
    int storage_engine;  /**< The storage engine */
 
    int encryption; /**< The AES encryption mode */
-
 
    char ssh_hostname[MISC_LENGTH]; /**< The SSH hostname */
    char ssh_username[MISC_LENGTH]; /**< The SSH username */
