@@ -1962,7 +1962,16 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       if (!strcmp(key, iter->key))
       {
          config_value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
-         pgmoneta_json_put(filtered_response, key, (uintptr_t)iter->value->data, iter->value->type);
+         if (iter->value->type == ValueJSON)
+         {
+            struct json* server_data = NULL;
+            pgmoneta_json_clone((struct json*)iter->value->data, &server_data);
+            pgmoneta_json_put(filtered_response, key, (uintptr_t)server_data, iter->value->type);
+         }
+         else
+         {
+            pgmoneta_json_put(filtered_response, key, (uintptr_t)iter->value->data, iter->value->type);
+         }
       }
    }
    pgmoneta_json_iterator_destroy(iter);
