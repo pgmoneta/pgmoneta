@@ -308,6 +308,9 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_version</h2>\n");
    data = pgmoneta_append(data, "  The version of pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_extension</h2>\n");
+   data = pgmoneta_append(data, "  The version of pgmoneta extension\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_logging_info</h2>\n");
    data = pgmoneta_append(data, "  The number of INFO logging statements\n");
    data = pgmoneta_append(data, "  <p>\n");
@@ -1678,6 +1681,33 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       if (config->servers[i].checksums)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_extension The version of pgmoneta extension\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_extension gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_extension{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"");
+      data = pgmoneta_append(data, ", ");
+      data = pgmoneta_append(data, "version=\"");
+      data = pgmoneta_append(data, config->servers[i].ext_version);
+      data = pgmoneta_append(data, "\"");
+      data = pgmoneta_append(data, "} ");
+      if (config->servers[i].ext_valid)
       {
          data = pgmoneta_append_int(data, 1);
       }
