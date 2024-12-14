@@ -33,11 +33,13 @@
 #include <walfile/wal_reader.h>
 
 #include <assert.h>
+#include <libgen.h>
+#include <stdint.h>
 #include <string.h>
 
 struct server* server_config;
 
-static int decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value);
+static int decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn);
 static void record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value);
 static bool get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struct rel_file_locator* pLocator, enum fork_number* pNumber, block_number* pInt, buffer* pVoid);
 static char* get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint8_t magic_value);
@@ -85,6 +87,25 @@ pgmoneta_wal_is_bkp_image_compressed(uint16_t magic_value, uint8_t bimg_info)
    {
       return ((bimg_info & BKPIMAGE_IS_COMPRESSED) != 0);
    }
+}
+
+static inline int
+xlog_from_file_name(const char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
+{
+#define XLogSegmentsPerXLogId(wal_segsz_bytes) \
+        (0x100000000UL / (wal_segsz_bytes))
+   uint32_t log;
+   uint32_t seg;
+   int items_scanned;
+
+   items_scanned = sscanf(fname, "%08X%08X%08X", tli, &log, &seg);
+   if (items_scanned != 3)
+   {
+      return 1;
+   }
+
+   *logSegNo = (uint64_t) log * XLogSegmentsPerXLogId(wal_segsz_bytes) + seg;
+   return 0;
 }
 
 char*
@@ -155,6 +176,9 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    struct decoded_xlog_record* decoded = NULL;
    struct xlog_page_header_data* page_header = NULL;
    struct configuration* config = NULL;
+   timeline_id tli = 0;
+   xlog_seg_no logSegNo = 0;
+   xlog_rec_ptr base;
 
    config = (struct configuration*) shmem;
 
@@ -206,6 +230,13 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    read_all_page_headers(file, long_header, wal_file);
    fseek(file, next_record, SEEK_SET);
+
+   if (xlog_from_file_name(basename(path), &tli, &logSegNo, DEFAULT_WAL_SEGZ_BYTES))
+   {
+      pgmoneta_log_fatal("Failed to extract LSN from the filename");
+      goto error;
+   }
+   XLOG_SEG_NO_OFFEST_TO_REC_PTR(logSegNo, 0, DEFAULT_WAL_SEGZ_BYTES, base);
 
    while (true)
    {
@@ -282,6 +313,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          break;
       }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
+      xlog_rec_ptr lsn = ftell(file) + base - SIZE_OF_XLOG_RECORD;
       next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
       uint32_t end_of_page = (page_number + 1) * long_header->xlp_xlog_blcksz;
 
@@ -331,7 +363,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
       decoded = calloc(1, sizeof(struct decoded_xlog_record));
 
-      if (decode_xlog_record(buffer, decoded, record, long_header->xlp_xlog_blcksz, long_header->std.xlp_magic))
+      if (decode_xlog_record(buffer, decoded, record, long_header->xlp_xlog_blcksz, long_header->std.xlp_magic, lsn))
       {
          goto error;
       }
@@ -356,7 +388,7 @@ error:
 }
 
 static int
-decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value)
+decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn)
 {
 #define COPY_HEADER_FIELD(_dst, _size)          \
         do {                                        \
@@ -368,7 +400,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
         } while (0)
 
    decoded->header = *record;
-//      decoded->lsn = lsn;
+   decoded->lsn = lsn;
    decoded->next = NULL;
    decoded->record_origin = INVALID_REP_ORIGIN_ID;
    decoded->toplevel_xid = INVALID_TRANSACTION_ID;
@@ -887,7 +919,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          }
          get_record_length(record, &rec_len, &fpi_len);
          start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
-         end_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev + rec_len);
+         end_lsn_string = pgmoneta_lsn_to_string(record->lsn);
 
          if (color)
          {
@@ -964,7 +996,7 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct valu
    pgmoneta_json_put(record_json, "Xid", record->header.xl_xid, ValueUInt32);
    pgmoneta_json_put(record_json, "Info", record->header.xl_info, ValueUInt8);
    pgmoneta_json_put(record_json, "StartLSN", record->header.xl_prev, ValueUInt64);
-   pgmoneta_json_put(record_json, "EndLSN", record->header.xl_prev + rec_len, ValueUInt64);
+   pgmoneta_json_put(record_json, "EndLSN", record->lsn, ValueUInt64);
    pgmoneta_json_put(record_json, "ResourceManagerId", record->header.xl_rmid, ValueUInt8);
    pgmoneta_json_put(record_json, "Crc", record->header.xl_crc, ValueUInt32);
 

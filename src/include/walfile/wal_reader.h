@@ -87,6 +87,8 @@ typedef int64_t timestamp_tz;
 #define SIZE_OF_XLOG_SHORT_PHD     MAXALIGN(sizeof(struct xlog_page_header_data))
 #define SIZE_OF_XLOG_RECORD        (offsetof(struct xlog_record, xl_crc) + sizeof(pg_crc32c))
 
+#define DEFAULT_WAL_SEGZ_BYTES     16 * 1024 * 1024
+
 /* #define macros */
 #define MAXALIGN(x)                (((x) + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1))
 #define TYPEALIGN(ALIGNVAL, LEN)   (((uintptr_t)(LEN) + ((ALIGNVAL) -1)) & ~((uintptr_t)((ALIGNVAL) -1)))
@@ -110,6 +112,9 @@ typedef int64_t timestamp_tz;
 #define XLOG_REC_BLOCK_IMAGE_APPLY(record, block_id) (record->blocks[block_id].apply_image)
 #define XLOG_REC_GET_ORIGIN(record) (record->record_origin)
 #define XLOG_REC_GET_DATA_LEN(record) (record->main_data_len)
+
+#define XLOG_SEG_NO_OFFEST_TO_REC_PTR(segno, offset, wal_segsz_bytes, dest) \
+        (dest) = (segno) * (wal_segsz_bytes) + (offset)
 
 /* Enums */
 
