@@ -363,7 +363,6 @@ int pgmoneta_decrypt_file(char *from, char *to)
       flag = 1;
    }
 
-   pgmoneta_log_info("D: %s -> %s", from, to);
    encrypt_file(from, to, 0);
    pgmoneta_delete_file(from, true, NULL);
 

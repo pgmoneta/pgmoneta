@@ -372,7 +372,7 @@ In the `raw` format, the output is structured as:
 
 ```sh
 pgmoneta-walinfo
-  Command line utility to read and display Write-Ahead Log (WAL) files\n
+  Command line utility to read and display Write-Ahead Log (WAL) files
 
 Usage:
   pgmoneta-walinfo <file>
