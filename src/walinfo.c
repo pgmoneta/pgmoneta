@@ -100,6 +100,7 @@ main(int argc, char** argv)
    {
       static struct option long_options[] =
       {
+         {"configuration", required_argument, 0, 'c'},
          {"output", required_argument, 0, 'o'},
          {"format", required_argument, 0, 'F'},
          {"logfile", required_argument, 0, 'L'},
