@@ -662,7 +662,7 @@ recovery_info_execute(int server, char* identifier, struct deque* nodes)
 
       if (pgmoneta_exists(path))
       {
-         pgmoneta_delete_file(path, NULL);
+         pgmoneta_delete_file(path, true, NULL);
       }
    }
 
@@ -937,7 +937,7 @@ restore_excluded_files_teardown(int server, char* identifier, struct deque* node
       to_file = pgmoneta_append(to_file, restore_last_files_names[i]);
       to_file = pgmoneta_append(to_file, suffix);
 
-      pgmoneta_delete_file(to_file, NULL);
+      pgmoneta_delete_file(to_file, true, NULL);
 
       free(to_file);
       to_file = NULL;

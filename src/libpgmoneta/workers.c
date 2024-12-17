@@ -217,7 +217,8 @@ pgmoneta_get_number_of_workers(int server)
 }
 
 int
-pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, struct workers* workers, struct worker_input** wi)
+pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, bool force,
+                             struct workers* workers, struct worker_input** wi)
 {
    struct worker_input* w = NULL;
 
@@ -248,6 +249,7 @@ pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, s
    }
 
    w->level = level;
+   w->force = force;
    w->workers = workers;
 
    *wi = w;

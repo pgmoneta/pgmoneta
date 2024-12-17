@@ -100,7 +100,7 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
          to = pgmoneta_append(to, entry->d_name);
          to = pgmoneta_append(to, ".lz4");
 
-         if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+         if (!pgmoneta_create_worker_input(directory, from, to, 0, true, workers, &wi))
          {
             if (workers != NULL)
             {
@@ -135,7 +135,7 @@ do_lz4_compress(void* arg)
       }
       else
       {
-         pgmoneta_delete_file(wi->from, NULL);
+         pgmoneta_delete_file(wi->from, true, NULL);
       }
    }
 
@@ -181,7 +181,7 @@ pgmoneta_lz4c_wal(char* directory)
 
          lz4_compress(from, to);
 
-         pgmoneta_delete_file(from, NULL);
+         pgmoneta_delete_file(from, true, NULL);
          pgmoneta_permission(to, 6, 0, 0);
 
          free(from);
@@ -277,7 +277,7 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
          to = pgmoneta_append(to, "/");
          to = pgmoneta_append(to, name);
 
-         if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+         if (!pgmoneta_create_worker_input(directory, from, to, 0, true, workers, &wi))
          {
             if (workers != NULL)
             {
@@ -319,7 +319,7 @@ do_lz4_decompress(void* arg)
    }
    else
    {
-      pgmoneta_delete_file(wi->from, NULL);
+      pgmoneta_delete_file(wi->from, true, NULL);
    }
 
    free(wi);
@@ -366,7 +366,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
       goto error;
    }
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -416,7 +416,7 @@ pgmoneta_lz4d_file(char* from, char* to)
          goto error;
       }
 
-      pgmoneta_delete_file(from, NULL);
+      pgmoneta_delete_file(from, true, NULL);
    }
    else
    {
@@ -470,7 +470,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
       goto error;
    }
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -512,7 +512,7 @@ pgmoneta_lz4c_file(char* from, char* to)
 {
    lz4_compress(from, to);
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    return 0;
 }

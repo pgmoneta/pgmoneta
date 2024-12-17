@@ -35,6 +35,7 @@
 #include <workflow.h>
 
 /* system */
+#include <stdbool.h>
 #include <stdlib.h>
 
 static int zstd_setup(int, char*, struct deque*);
@@ -137,7 +138,7 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
 
       if (pgmoneta_exists(d))
       {
-         pgmoneta_delete_file(d, NULL);
+         pgmoneta_delete_file(d, true, NULL);
       }
 
       pgmoneta_zstandardc_file(tarfile, d);

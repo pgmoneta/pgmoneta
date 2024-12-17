@@ -119,7 +119,7 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
             to = pgmoneta_append(to, entry->d_name);
             to = pgmoneta_append(to, ".bz2");
 
-            if (!pgmoneta_create_worker_input(directory, from, to, level, workers, &wi))
+            if (!pgmoneta_create_worker_input(directory, from, to, level, true, workers, &wi))
             {
                if (workers != NULL)
                {
@@ -155,7 +155,7 @@ do_bzip2_compress(void* arg)
       }
       else
       {
-         pgmoneta_delete_file(wi->from, NULL);
+         pgmoneta_delete_file(wi->from, true, NULL);
       }
    }
 
@@ -319,7 +319,7 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+            if (!pgmoneta_create_worker_input(directory, from, to, 0, true, workers, &wi))
             {
                if (workers != NULL)
                {
@@ -390,7 +390,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
       goto error;
    }
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -442,7 +442,7 @@ do_bzip2_decompress(void* arg)
    }
    else
    {
-      pgmoneta_delete_file(wi->from, NULL);
+      pgmoneta_delete_file(wi->from, true, NULL);
    }
 
    free(wi);
@@ -488,7 +488,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
       goto error;
    }
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -549,7 +549,7 @@ pgmoneta_bzip2_file(char* from, char* to)
    }
    else
    {
-      pgmoneta_delete_file(from, NULL);
+      pgmoneta_delete_file(from, true, NULL);
    }
 
    return 0;
@@ -788,7 +788,7 @@ pgmoneta_bunzip2_file(char* from, char* to)
          goto error;
       }
 
-      pgmoneta_delete_file(from, NULL);
+      pgmoneta_delete_file(from, true, NULL);
    }
    else
    {

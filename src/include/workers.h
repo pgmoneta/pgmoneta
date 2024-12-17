@@ -102,7 +102,8 @@ struct worker_input
    char from[MAX_PATH];      /**< The from directory */
    char to[MAX_PATH];        /**< The to directory */
    int level;                /**< The compression level */
-   struct workers* workers;  /**< The root structure */
+   bool force;               /**< Force the operation */
+   struct workers *workers;  /**< The root structure */
 };
 
 /**
@@ -151,12 +152,14 @@ pgmoneta_get_number_of_workers(int server);
  * @param from The from file path
  * @param to The to file path
  * @param level The level
+ * @param force Force the operation
  * @param workers The workers
  * @param j The resulting worker input
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, struct workers* workers, struct worker_input** wi);
+pgmoneta_create_worker_input(char* directory, char* from, char* to, int level, bool force,
+                             struct workers* workers, struct worker_input** wi);
 
 #ifdef __cplusplus
 }

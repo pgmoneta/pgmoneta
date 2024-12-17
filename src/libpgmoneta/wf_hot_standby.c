@@ -182,7 +182,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
             if (pgmoneta_exists(f))
             {
                pgmoneta_log_trace("hot_standby delete: %s", f);
-               pgmoneta_delete_file(f, workers);
+               pgmoneta_delete_file(f, true, workers);
             }
 
             free(f);

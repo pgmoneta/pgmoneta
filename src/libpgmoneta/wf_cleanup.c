@@ -108,7 +108,7 @@ cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
 
    if (pgmoneta_exists(path))
    {
-      pgmoneta_delete_file(path, NULL);
+      pgmoneta_delete_file(path, true, NULL);
    }
 
    free(path);

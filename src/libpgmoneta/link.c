@@ -97,7 +97,7 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                   to_entry = pgmoneta_append(to_entry, "/");
                }
                to_entry = pgmoneta_append(to_entry, from_file);
-               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
+               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
                {
                   goto done;
                }
@@ -142,7 +142,7 @@ do_link(void* arg)
 
    if (pgmoneta_exists(wi->to))
    {
-      pgmoneta_delete_file(wi->from, NULL);
+      pgmoneta_delete_file(wi->from, true, NULL);
       pgmoneta_symlink_file(wi->from, wi->to);
    }
 
@@ -203,7 +203,7 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
          {
             struct worker_input* wi = NULL;
 
-            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
+            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
             {
                goto done;
             }
@@ -270,7 +270,7 @@ do_relink(void* arg)
          pgmoneta_log_trace("FILETRACKER | Del  | %s |", wi->to);
          pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", wi->from, wi->to);
 #endif
-         pgmoneta_delete_file(wi->to, NULL);
+         pgmoneta_delete_file(wi->to, true, NULL);
          pgmoneta_copy_file(wi->from, wi->to, wi->workers);
       }
       else
@@ -279,7 +279,7 @@ do_relink(void* arg)
 
          if (link != NULL)
          {
-            pgmoneta_delete_file(wi->to, NULL);
+            pgmoneta_delete_file(wi->to, true, NULL);
             pgmoneta_symlink_file(wi->to, link);
 #ifdef DEBUG
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", wi->to, pgmoneta_is_symlink_valid(wi->to) ? "Yes " : "No  ");
@@ -338,7 +338,7 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
          {
             struct worker_input* wi = NULL;
 
-            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
+            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
             {
                goto done;
             }
@@ -380,7 +380,7 @@ do_comparefiles(void* arg)
 
    if (equal)
    {
-      pgmoneta_delete_file(wi->from, NULL);
+      pgmoneta_delete_file(wi->from, true, NULL);
       pgmoneta_symlink_file(wi->from, wi->to);
    }
 

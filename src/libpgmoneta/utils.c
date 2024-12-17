@@ -1767,11 +1767,11 @@ error:
 }
 
 int
-pgmoneta_delete_file(char* file, struct workers* workers)
+pgmoneta_delete_file(char* file, bool force, struct workers* workers)
 {
    struct worker_input* fi = NULL;
 
-   if (pgmoneta_create_worker_input(NULL, file, NULL, 0, workers, &fi))
+   if (pgmoneta_create_worker_input(NULL, file, NULL, 0, true, workers, &fi))
    {
       return 1;
    }
@@ -1800,7 +1800,10 @@ delete_file(void* arg)
 
    if (ret != 0)
    {
-      pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
+      if (!fi->force)
+      {
+         pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
+      }
       errno = 0;
    }
 
@@ -2362,7 +2365,7 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
 {
    struct worker_input* fi = NULL;
 
-   if (pgmoneta_create_worker_input(NULL, from, to, 0, workers, &fi))
+   if (pgmoneta_create_worker_input(NULL, from, to, 0, false, workers, &fi))
    {
       return 1;
    }
@@ -2395,13 +2398,19 @@ copy_file(void* arg)
 
    if (fd_from < 0)
    {
-      pgmoneta_log_error("File doesn't exists: %s", fi->from);
+      if (!fi->force)
+      {
+         pgmoneta_log_error("File doesn't exists: %s", fi->from);
+      }
       goto error;
    }
 
    if (get_permissions(fi->from, &permissions))
    {
-      pgmoneta_log_error("Unable to get file permissions: %s", fi->from);
+      if (!fi->force)
+      {
+         pgmoneta_log_error("Unable to get file permissions: %s", fi->from);
+      }
       goto error;
    }
 
@@ -2409,7 +2418,10 @@ copy_file(void* arg)
 
    if (fd_to < 0)
    {
-      pgmoneta_log_error("Unable to create file: %s", fi->to);
+      if (!fi->force)
+      {
+         pgmoneta_log_error("Unable to create file: %s", fi->to);
+      }
       goto error;
    }
 

@@ -104,7 +104,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
             {
                struct worker_input* wi = NULL;
 
-               if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+               if (!pgmoneta_create_worker_input(NULL, from, to, 0, true, workers, &wi))
                {
                   if (workers != NULL)
                   {
@@ -135,7 +135,7 @@ do_encrypt_file(void* arg)
    wi = (struct worker_input*)arg;
 
    encrypt_file(wi->from, wi->to, 1);
-   pgmoneta_delete_file(wi->from, NULL);
+   pgmoneta_delete_file(wi->from, true, NULL);
 
    free(wi);
 }
@@ -237,7 +237,7 @@ pgmoneta_encrypt_wal(char* d)
          if (pgmoneta_exists(from))
          {
             encrypt_file(from, to, 1);
-            pgmoneta_delete_file(from, NULL);
+            pgmoneta_delete_file(from, true, NULL);
             pgmoneta_permission(to, 6, 0, 0);
          }
 
@@ -284,7 +284,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
       goto error;
    }
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -339,7 +339,7 @@ pgmoneta_encrypt_file(char* from, char* to)
    }
 
    encrypt_file(from, to, 1);
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
    if (flag)
    {
       free(to);
@@ -405,7 +405,7 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
+            if (!pgmoneta_create_worker_input(NULL, from, to, 0, true, workers, &wi))
             {
                if (workers != NULL)
                {
@@ -445,7 +445,7 @@ do_decrypt_file(void* arg)
    wi = (struct worker_input*)arg;
 
    encrypt_file(wi->from, wi->to, 0);
-   pgmoneta_delete_file(wi->from, NULL);
+   pgmoneta_delete_file(wi->from, true, NULL);
 
    free(wi);
 }
@@ -492,7 +492,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
       goto error;
    }
 
-   pgmoneta_delete_file(from, NULL);
+   pgmoneta_delete_file(from, true, NULL);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
