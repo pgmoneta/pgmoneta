@@ -28,11 +28,13 @@
 
 #include <pgmoneta.h>
 #include <configuration.h>
+#include <deque.h>
 #include <logging.h>
 #include <shmem.h>
 #include <utils.h>
 #include <walfile.h>
 
+#include <inttypes.h>
 #include <err.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -65,6 +67,11 @@ usage(void)
    printf("  -L, --logfile FILE       Set the log file\n");
    printf("  -q, --quiet              No output only result\n");
    printf("      --color              Use colors (on, off)\n");
+   printf("  -r, --rmgr               Filter on a resource manager\n");
+   printf("  -s, --start              Filter on a start LSN\n");
+   printf("  -e, --end                Filter on an end LSN\n");
+   printf("  -x, --xid                Filter on an XID\n");
+   printf("  -l, --limit              Limit number of outputs\n");
    printf("  -v, --verbose            Output result\n");
    printf("  -V, --version            Display version information\n");
    printf("  -?, --help               Display help\n");
@@ -85,6 +92,15 @@ main(int argc, char** argv)
    char* logfile = NULL;
    bool quiet = false;
    bool color = true;
+   struct deque* rms = NULL;
+   uint64_t start_lsn = 0;
+   uint64_t end_lsn = 0;
+   uint64_t start_lsn_high = 0;
+   uint64_t start_lsn_low = 0;
+   uint64_t end_lsn_high = 0;
+   uint64_t end_lsn_low = 0;
+   struct deque* xids = NULL;
+   uint32_t limit = 0;
    bool verbose = false;
    enum value_type type = ValueString;
    size_t size;
@@ -106,13 +122,18 @@ main(int argc, char** argv)
          {"logfile", required_argument, 0, 'L'},
          {"quiet", no_argument, 0, 'q'},
          {"color", required_argument, 0, OPT_COLOR},
+         {"rmgr", required_argument, 0, 'r'},
+         {"start", required_argument, 0, 's'},
+         {"end", required_argument, 0, 'e'},
+         {"xid", required_argument, 0, 'x'},
+         {"limit", required_argument, 0, 'l'},
          {"verbose", no_argument, 0, 'v'},
          {"version", no_argument, 0, 'V'},
          {"help", no_argument, 0, '?'},
          {0, 0, 0, 0}
       };
 
-      c = getopt_long(argc, argv, "c:qvV?:o:F:L:",
+      c = getopt_long(argc, argv, "c:qvV?:o:F:L:r:s:e:x:l:",
                       long_options, &option_index);
 
       if (c == -1)
@@ -156,6 +177,59 @@ main(int argc, char** argv)
             {
                color = true;
             }
+            break;
+         case 'r':
+            if (rms == NULL)
+            {
+               if (pgmoneta_deque_create(false, &rms))
+               {
+                  exit(1);
+               }
+            }
+
+            pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
+
+            break;
+          case 's':
+              if (strchr(optarg, '/')) {
+                  // Assuming optarg is a string like "16/B374D848"
+                  if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &start_lsn_high, &start_lsn_low) == 2) {
+                      start_lsn = (start_lsn_high << 32) + start_lsn_low;
+                  } else {
+                      fprintf(stderr, "Invalid start LSN format\n");
+                      exit(1);
+                  }
+              } else {
+                  start_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
+              }
+              break;
+          case 'e':
+              if (strchr(optarg, '/')) {
+                  // Assuming optarg is a string like "16/B374D848"
+                  if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2) {
+                      end_lsn = (end_lsn_high << 32) + end_lsn_low;
+                  } else {
+                      fprintf(stderr, "Invalid end LSN format\n");
+                      exit(1);
+                  }
+              } else {
+                  end_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
+              }
+            break;
+         case 'x':
+            if (xids == NULL)
+            {
+               if (pgmoneta_deque_create(false, &xids))
+               {
+                  exit(1);
+               }
+            }
+
+            pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
+
+            break;
+         case 'l':
+            limit = pgmoneta_atoi(optarg);
             break;
          case 'v':
             verbose = true;
@@ -236,7 +310,8 @@ main(int argc, char** argv)
    {
       char* file_path = argv[optind];
 
-      if (pgmoneta_describe_walfile(file_path, type, output, quiet, color))
+      if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
+                                    rms, start_lsn, end_lsn, xids, limit))
       {
          fprintf(stderr, "Error while reading/describing WAL file\n");
          goto error;
@@ -260,6 +335,9 @@ main(int argc, char** argv)
       printf("Success\n");
    }
 
+   pgmoneta_deque_destroy(rms);
+   pgmoneta_deque_destroy(xids);
+
    return 0;
 
 error:
@@ -267,6 +345,9 @@ error:
    {
       pgmoneta_stop_logging();
    }
+
+   pgmoneta_deque_destroy(rms);
+   pgmoneta_deque_destroy(xids);
 
    if (shmem != NULL)
    {

@@ -45,6 +45,11 @@ static bool get_record_block_tag_extended(struct decoded_xlog_record* pRecord, i
 static char* get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint8_t magic_value);
 static int magic_value_to_postgres_version(uint16_t magic_value);
 
+static bool is_included(char* rm, struct deque* rms,
+                        uint64_t s_lsn, uint64_t start_lsn,
+                        uint64_t e_lsn, uint64_t end_lsn,
+                        uint32_t xid, struct deque* xids);
+
 bool
 is_bimg_apply(uint8_t bimg_info)
 {
@@ -878,7 +883,8 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
 }
 
 void
-pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color)
+pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
+                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, uint32_t cur_limit)
 {
    char* header_str = NULL;
    char* rm_desc = NULL;
@@ -887,8 +893,21 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    char* end_lsn_string = NULL;
    struct value* record_serialized = NULL;
    char* value_str = NULL;
-   uint32_t rec_len;
-   uint32_t fpi_len;
+   uint32_t rec_len = 0;
+   uint32_t fpi_len = 0;
+
+   if (limit > 0 && cur_limit > limit)
+   {
+      return;
+   }
+
+   if (!is_included(RmgrTable[record->header.xl_rmid].name, rms,
+                    record->header.xl_prev, start_lsn,
+                    record->lsn, end_lsn,
+                    record->header.xl_xid, xids))
+   {
+      return;
+   }
 
    if (type == ValueJSON)
    {
@@ -965,6 +984,93 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          free(end_lsn_string);
       }
    }
+}
+
+static bool is_included(char* rm, struct deque* rms,
+                        uint64_t s_lsn, uint64_t start_lsn,
+                        uint64_t e_lsn, uint64_t end_lsn,
+                        uint32_t xid, struct deque* xids)
+{
+   struct deque_iterator* rms_iter = NULL;
+   struct deque_iterator* xids_iter = NULL;
+
+   if (start_lsn > 0 && s_lsn < start_lsn)
+   {
+      goto no;
+   }
+
+   if (end_lsn > 0 && e_lsn > end_lsn)
+   {
+      goto no;
+   }
+
+   if (rms != NULL && rm != NULL)
+   {
+      bool found = false;
+
+      if (pgmoneta_deque_iterator_create(rms, &rms_iter))
+      {
+         pgmoneta_log_error("Failed to create RMS deque iterator");
+         goto no;
+      }
+
+      while (!found && pgmoneta_deque_iterator_next(rms_iter))
+      {
+         char* v = NULL;
+
+         v = (char*)pgmoneta_value_data(rms_iter->value);
+
+         if (!strcmp(rm, v))
+         {
+            found = true;
+         }
+      }
+
+      if (!found)
+      {
+         goto no;
+      }
+   }
+
+   if (xids != NULL)
+   {
+      bool found = false;
+
+      if (pgmoneta_deque_iterator_create(xids, &xids_iter))
+      {
+         pgmoneta_log_error("Failed to create XID deque iterator");
+         goto no;
+      }
+
+      while (!found && pgmoneta_deque_iterator_next(xids_iter))
+      {
+         uint32_t v;
+
+         v = (uint32_t)pgmoneta_value_data(xids_iter->value);
+
+         if (xid == v)
+         {
+            found = true;
+         }
+      }
+
+      if (!found)
+      {
+         goto no;
+      }
+   }
+
+   pgmoneta_deque_iterator_destroy(rms_iter);
+   pgmoneta_deque_iterator_destroy(xids_iter);
+
+   return true;
+   
+no:
+
+   pgmoneta_deque_iterator_destroy(rms_iter);
+   pgmoneta_deque_iterator_destroy(xids_iter);
+
+   return false;
 }
 
 static void

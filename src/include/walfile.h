@@ -119,9 +119,16 @@ pgmoneta_destroy_walfile(struct walfile* wf);
  * @param output The output descriptor
  * @param quiet Is the WAL file printed
  * @param color Are colors used
+ * @param rms The resource managers
+ * @param start_lsn The start LSN
+ * @param end_lsn The end LSN
+ * @param xids The XIDs
+ * @param limit The limit
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color);
+pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
+                          struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                          uint32_t limit);
 
 #endif //PGMONETA_WALFILE_H

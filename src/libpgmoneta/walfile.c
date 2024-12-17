@@ -212,7 +212,9 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 }
 
 int
-pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color)
+pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
+                          struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                          uint32_t limit)
 {
    FILE* out = NULL;
    char* tmp_wal = NULL;
@@ -223,6 +225,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
    char* decrypted_file_name = NULL;
    char* wal_path = NULL;
    bool copy = true;
+   uint32_t cur_limit = 0;
 
    if (!pgmoneta_is_file(path))
    {
@@ -321,13 +324,14 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
+         cur_limit++;
          if (!quiet)
          {
             fprintf(out, "{\"Record\": ");
          }
-         record = (struct decoded_xlog_record *)record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color);
-
+         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                     rms, start_lsn, end_lsn, xids, limit, cur_limit);
          if (!quiet)
          {
             fprintf(out, "}");
@@ -347,8 +351,10 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
    {
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         record = (struct decoded_xlog_record *)record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color);
+         cur_limit++;
+         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                     rms, start_lsn, end_lsn, xids, limit, cur_limit);
       }
    }
 
