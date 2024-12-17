@@ -21,6 +21,9 @@ pgmoneta-walinfo is a command line utility to read and display information about
 OPTIONS
 =======
 
+-c, --config CONFIG_FILE
+  Set the path to the pgmoneta.conf file
+
 -o, --output FILE
   Output file
 

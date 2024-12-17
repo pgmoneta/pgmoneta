@@ -3773,10 +3773,20 @@ pgmoneta_get_file_size(char* file_path)
 }
 
 bool
-pgmoneta_is_file_archive(char* file_path)
+pgmoneta_is_encrypted_archive(char* file_path)
 {
-   if (pgmoneta_ends_with(file_path, ".aes") ||
-       pgmoneta_ends_with(file_path, ".zstd") ||
+   if (pgmoneta_ends_with(file_path, ".aes"))
+   {
+      return true;
+   }
+
+   return false;
+}
+
+bool
+pgmoneta_is_compressed_archive(char *file_path)
+{
+   if (pgmoneta_ends_with(file_path, ".zstd") ||
        pgmoneta_ends_with(file_path, ".lz4") ||
        pgmoneta_ends_with(file_path, ".bz2") ||
        pgmoneta_ends_with(file_path, ".gz"))

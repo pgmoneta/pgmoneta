@@ -110,6 +110,15 @@ int
 pgmoneta_encrypt_file(char* from, char* to);
 
 /**
+ * Decrypt a single file, also remove the original file
+ * @param from The from file
+ * @param to The to file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_decrypt_file(char *from, char *to);
+
+/**
  * Decrypt the files under the directory in place, also remove encrypted files.
  * @param d wal directory
  * @param workers The optional workers

@@ -372,23 +372,25 @@ In the `raw` format, the output is structured as:
 
 ```sh
 pgmoneta-walinfo
-  Command line utility to read and display Write-Ahead Log (WAL) files
+  Command line utility to read and display Write-Ahead Log (WAL) files\n
 
 Usage:
   pgmoneta-walinfo <file>
 
 Options:
-  -o, --output FILE   Output file
-  -F, --format        Output format (raw, json)
-  -L, --logfile FILE  Set the log file
-  -q, --quiet         No output only result
-      --color         Use colors (on, off)
-  -v, --verbose       Output result
-  -V, --version       Display version information
-  -?, --help          Display help
+  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
+  -o, --output FILE        Output file
+  -F, --format             Output format (raw, json)
+  -L, --logfile FILE       Set the log file
+  -q, --quiet              No output only result
+      --color              Use colors (on, off)
+  -v, --verbose            Output result
+  -V, --version            Display version information
+  -?, --help               Display help
 ```
 
 For more details, please refer to the [wal documentation](./manual/dev-06-wal.md).
+
 ## End
 
 Now that we've attempted our first backup, take a moment to relax. There are a few things we need to pay attention to:

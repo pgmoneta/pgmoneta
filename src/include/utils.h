@@ -1155,12 +1155,20 @@ size_t
 pgmoneta_get_file_size(char* file_path);
 
 /**
- * Is the file is compressed and/or encrypted
+ * Is the file encrypted
  * @param file_path The file path
  * @return True if archive, otherwise false
  */
 bool
-pgmoneta_is_file_archive(char* file_path);
+pgmoneta_is_encrypted_archive(char* file_path);
+
+/**
+ * Is the file compressed
+ * @param file_path The file path
+ * @return True if archive, otherwise false
+ */
+bool
+pgmoneta_is_compressed_archive(char *file_path);
 
 /**
  * Init a token bucket

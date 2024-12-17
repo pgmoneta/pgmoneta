@@ -11,7 +11,7 @@ This document provides an overview of the `wal_reader` tool, with a focus on the
 
 `pgmoneta-walinfo` is a command line utility designed to read and display information about PostgreSQL Write-Ahead Log (WAL) files. The tool provides output in either raw or JSON format, making it easy to analyze WAL files for debugging, auditing, or general information purposes.
 
-In addition to standard WAL files, `pgmoneta-walinfo` also supports compressed WAL files in the following formats: **zstd**, **gz**, **lz4**, and **bz2**.
+In addition to standard WAL files, `pgmoneta-walinfo` also supports encrypted (**aes**) and compressed WAL files in the following formats: **zstd**, **gz**, **lz4**, and **bz2**.
 
 #### Usage
 
@@ -23,14 +23,15 @@ Usage:
   pgmoneta-walinfo <file>
 
 Options:
-  -o, --output FILE   Output file
-  -F, --format        Output format (raw, json)
-  -L, --logfile FILE  Set the log file
-  -q, --quiet         No output only result
-      --color         Use colors (on, off)
-  -v, --verbose       Output result
-  -V, --version       Display version information
-  -?, --help          Display help
+  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
+  -o, --output FILE        Output file
+  -F, --format             Output format (raw, json)
+  -L, --logfile FILE       Set the log file
+  -q, --quiet              No output only result
+      --color              Use colors (on, off)
+  -v, --verbose            Output result
+  -V, --version            Display version information
+  -?, --help               Display help
 ```
 
 #### Raw Output Format

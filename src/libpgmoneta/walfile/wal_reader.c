@@ -186,6 +186,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    if (file == NULL)
    {
       pgmoneta_log_fatal("Error: Could not open file %s", path);
+      goto error;
    }
 
    MALLOC(long_header, SIZE_OF_XLOG_LONG_PHD);

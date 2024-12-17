@@ -347,9 +347,34 @@ pgmoneta_encrypt_file(char* from, char* to)
    return 0;
 }
 
-int
-pgmoneta_decrypt_directory(char* d, struct workers* workers)
+int pgmoneta_decrypt_file(char *from, char *to)
 {
+   int flag = 0;
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_log_error("pgmoneta_decrypt_file: file not exist: %s", from);
+      return 1;
+   }
+
+   if (!to)
+   {
+      pgmoneta_basename_file(from, &to);
+      flag = 1;
+   }
+
+   pgmoneta_log_info("D: %s -> %s", from, to);
+   encrypt_file(from, to, 0);
+   pgmoneta_delete_file(from, true, NULL);
+
+   if (flag)
+   {
+      free(to);
+   }
+   return 0;
+}
+
+int pgmoneta_decrypt_directory(char *d, struct workers *workers) {
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;

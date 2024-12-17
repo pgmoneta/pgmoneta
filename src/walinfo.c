@@ -59,14 +59,15 @@ usage(void)
    printf("  pgmoneta-walinfo <file>\n");
    printf("\n");
    printf("Options:\n");
-   printf("  -o, --output FILE   Output file\n");
-   printf("  -F, --format        Output format (raw, json)\n");
-   printf("  -L, --logfile FILE  Set the log file\n");
-   printf("  -q, --quiet         No output only result\n");
-   printf("      --color         Use colors (on, off)\n");
-   printf("  -v, --verbose       Output result\n");
-   printf("  -V, --version       Display version information\n");
-   printf("  -?, --help          Display help\n");
+   printf("  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file\n");
+   printf("  -o, --output FILE        Output file\n");
+   printf("  -F, --format             Output format (raw, json)\n");
+   printf("  -L, --logfile FILE       Set the log file\n");
+   printf("  -q, --quiet              No output only result\n");
+   printf("      --color              Use colors (on, off)\n");
+   printf("  -v, --verbose            Output result\n");
+   printf("  -V, --version            Display version information\n");
+   printf("  -?, --help               Display help\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
@@ -77,7 +78,9 @@ main(int argc, char** argv)
 {
    int c;
    int option_index = 0;
-   char* output = NULL;
+   int ret;
+   char *configuration_path = NULL;
+   char *output = NULL;
    char* format = NULL;
    char* logfile = NULL;
    bool quiet = false;
@@ -108,7 +111,7 @@ main(int argc, char** argv)
          {0, 0, 0, 0}
       };
 
-      c = getopt_long(argc, argv, "qvV?:o:F:L:",
+      c = getopt_long(argc, argv, "c:qvV?:o:F:L:",
                       long_options, &option_index);
 
       if (c == -1)
@@ -118,6 +121,9 @@ main(int argc, char** argv)
 
       switch (c)
       {
+         case 'c':
+            configuration_path = optarg;
+            break;
          case 'o':
             output = optarg;
             break;
@@ -167,22 +173,61 @@ main(int argc, char** argv)
    size = sizeof(struct configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
-      warnx("pgmoneta-cli: Error creating shared memory");
+      warnx("Error creating shared memory");
       goto error;
    }
    pgmoneta_init_configuration(shmem);
 
-   if (logfile)
+   if (configuration_path != NULL)
    {
-      config = (struct configuration*)shmem;
+      ret = pgmoneta_read_configuration(shmem, configuration_path);
+      if (ret)
+      {
+         warnx("Configuration not found: %s", configuration_path);
+         exit(1);
+      }
 
-      config->log_type = PGMONETA_LOGGING_TYPE_FILE;
-      memset(&config->log_path[0], 0, MISC_LENGTH);
-      memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+      if (logfile)
+      {
+         config = (struct configuration*)shmem;
+
+         config->log_type = PGMONETA_LOGGING_TYPE_FILE;
+         memset(&config->log_path[0], 0, MISC_LENGTH);
+         memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+      }
 
       if (pgmoneta_start_logging())
       {
          exit(1);
+      }
+
+      config = (struct configuration*)shmem;
+   }
+   else
+   {
+      ret = pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
+      if (ret)
+      {
+         warnx("Configuration must be specified");
+         exit(1);
+      }
+      else
+      {
+         configuration_path = "/etc/pgmoneta/pgmoneta.conf";
+
+         if (logfile)
+         {
+            config = (struct configuration*)shmem;
+
+            config->log_type = PGMONETA_LOGGING_TYPE_FILE;
+            memset(&config->log_path[0], 0, MISC_LENGTH);
+            memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+         }
+
+         if (pgmoneta_start_logging())
+         {
+            exit(1);
+         }
       }
    }
 

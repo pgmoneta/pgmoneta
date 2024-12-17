@@ -26,6 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <aes.h>
 #include <compression.h>
 #include <deque.h>
 #include <json.h>
@@ -214,12 +215,14 @@ int
 pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color)
 {
    FILE* out = NULL;
-   char* decompressed_wal_path = NULL;
-   char* tmp_compressed_wal = NULL;
-   struct walfile* wf = NULL;
+   char* tmp_wal = NULL;
+   struct walfile *wf = NULL;
    struct deque_iterator* record_iterator = NULL;
    struct decoded_xlog_record* record = NULL;
    char* decompressed_file_name = NULL;
+   char* decrypted_file_name = NULL;
+   char* wal_path = NULL;
+   bool copy = true;
 
    if (!pgmoneta_is_file(path))
    {
@@ -227,33 +230,70 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       goto error;
    }
 
-   // Based on the file extension, if it's a compressed file, decompress it in /tmp
-   if (pgmoneta_is_file_archive(path))
-   {
-      tmp_compressed_wal = pgmoneta_format_and_append(tmp_compressed_wal, "/tmp/%s", basename(path));
-      // Temporarily copying the compressed WAL file, because the decompress functions delete the source file
-      pgmoneta_copy_file(path, tmp_compressed_wal, NULL);
+   wal_path = pgmoneta_append(wal_path, path);
 
-      pgmoneta_basename_file(basename(path), &decompressed_file_name);
-      decompressed_wal_path = pgmoneta_format_and_append(decompressed_wal_path, "/tmp/%s", decompressed_file_name);
+   // Based on the file extension, if it's an encrypted file, decrypt it in /tmp
+   if (pgmoneta_is_encrypted_archive(wal_path))
+   {
+      tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
+
+      // Temporarily copying the encrypted WAL file, because the decrypt
+      // functions delete the source file
+      pgmoneta_copy_file(wal_path, tmp_wal, NULL);
+      copy = false;
+
+      pgmoneta_basename_file(basename(wal_path), &decrypted_file_name);
+
+      free(wal_path);
+      wal_path = NULL;
+
+      wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decrypted_file_name);
+      free(decrypted_file_name);
+
+      if (pgmoneta_decrypt_file(tmp_wal, wal_path))
+      {
+         pgmoneta_log_fatal("Failed to decrypt WAL file at %s", path);
+         goto error;
+      }
+   }
+
+   // Based on the file extension, if it's a compressed file, decompress it
+   // in /tmp
+   if (pgmoneta_is_compressed_archive(wal_path))
+   {
+      free(tmp_wal);
+      tmp_wal = NULL;
+
+      tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
+
+      if (copy)
+      {
+         // Temporarily copying the compressed WAL file, because the decompress
+         // functions delete the source file
+         pgmoneta_copy_file(wal_path, tmp_wal, NULL);
+      }
+
+      pgmoneta_basename_file(basename(wal_path), &decompressed_file_name);
+
+      free(wal_path);
+      wal_path = NULL;
+
+      wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decompressed_file_name);
       free(decompressed_file_name);
 
-      if (pgmoneta_decompress(tmp_compressed_wal, decompressed_wal_path))
+      if (pgmoneta_decompress(tmp_wal, wal_path))
       {
          pgmoneta_log_fatal("Failed to decompress WAL file at %s", path);
          goto error;
       }
    }
-   else
-   {
-      decompressed_wal_path = pgmoneta_append(decompressed_wal_path, path);
-   }
 
-   if (pgmoneta_read_walfile(-1, decompressed_wal_path, &wf))
+   if (pgmoneta_read_walfile(-1, wal_path, &wf))
    {
       pgmoneta_log_fatal("Failed to read WAL file at %s", path);
       goto error;
    }
+
    if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
    {
       pgmoneta_log_fatal("Failed to create deque iterator");
@@ -285,7 +325,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
          {
             fprintf(out, "{\"Record\": ");
          }
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         record = (struct decoded_xlog_record *)record_iterator->value->data;
          pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color);
 
          if (!quiet)
@@ -307,7 +347,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
    {
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         record = (struct decoded_xlog_record *)record_iterator->value->data;
          pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color);
       }
    }
@@ -318,8 +358,8 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       fclose(out);
    }
 
-   free(tmp_compressed_wal);
-   free(decompressed_wal_path);
+   free(tmp_wal);
+   free(wal_path);
    pgmoneta_deque_iterator_destroy(record_iterator);
    pgmoneta_destroy_walfile(wf);
    return 0;
@@ -332,7 +372,8 @@ error:
       fclose(out);
    }
 
-   free(tmp_compressed_wal);
+   free(tmp_wal);
+   free(wal_path);
    pgmoneta_destroy_walfile(wf);
    pgmoneta_deque_iterator_destroy(record_iterator);
    return 1;

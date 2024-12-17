@@ -104,7 +104,7 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
          {
             continue;
          }
-         if (!pgmoneta_is_file_archive(entry->d_name))
+         if (!pgmoneta_is_compressed_archive(entry->d_name) && !pgmoneta_is_encrypted_archive(entry->d_name))
          {
             from = NULL;
 
@@ -226,10 +226,10 @@ pgmoneta_bzip2_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_file_archive(entry->d_name) ||
+         if (pgmoneta_is_compressed_archive(entry->d_name) ||
+             pgmoneta_is_encrypted_archive(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
-             pgmoneta_ends_with(entry->d_name, ".history"))
-         {
+             pgmoneta_ends_with(entry->d_name, ".history")) {
             continue;
          }
 
