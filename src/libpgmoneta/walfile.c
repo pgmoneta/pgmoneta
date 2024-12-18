@@ -360,8 +360,11 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 
    if (output != NULL)
    {
-      fflush(out);
-      fclose(out);
+      if (out != NULL)
+      {
+         fflush(out);
+         fclose(out);
+      }
    }
 
    free(tmp_wal);
@@ -374,8 +377,11 @@ error:
 
    if (output != NULL)
    {
-      fflush(out);
-      fclose(out);
+      if (out != NULL)
+      {
+         fflush(out);
+         fclose(out);
+      }
    }
 
    free(tmp_wal);
