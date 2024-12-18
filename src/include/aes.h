@@ -116,7 +116,7 @@ pgmoneta_encrypt_file(char* from, char* to);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_file(char *from, char *to);
+pgmoneta_decrypt_file(char* from, char* to);
 
 /**
  * Decrypt the files under the directory in place, also remove encrypted files.

@@ -347,7 +347,8 @@ pgmoneta_encrypt_file(char* from, char* to)
    return 0;
 }
 
-int pgmoneta_decrypt_file(char *from, char *to)
+int
+pgmoneta_decrypt_file(char* from, char* to)
 {
    int flag = 0;
 
@@ -373,7 +374,9 @@ int pgmoneta_decrypt_file(char *from, char *to)
    return 0;
 }
 
-int pgmoneta_decrypt_directory(char *d, struct workers *workers) {
+int
+pgmoneta_decrypt_directory(char* d, struct workers* workers)
+{
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;

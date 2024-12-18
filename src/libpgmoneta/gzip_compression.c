@@ -225,7 +225,8 @@ pgmoneta_gzip_wal(char* directory)
          if (pgmoneta_is_compressed_archive(entry->d_name) ||
              pgmoneta_is_encrypted_archive(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
-             pgmoneta_ends_with(entry->d_name, ".history")) {
+             pgmoneta_ends_with(entry->d_name, ".history"))
+         {
             continue;
          }
 

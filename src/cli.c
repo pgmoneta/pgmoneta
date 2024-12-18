@@ -1779,7 +1779,7 @@ error:
    return 1;
 }
 
-static int 
+static int
 process_ls_result(SSL* ssl, int socket, int32_t output_format)
 {
    struct json* read = NULL;
@@ -1807,7 +1807,7 @@ process_ls_result(SSL* ssl, int socket, int32_t output_format)
       struct json_iterator* iter = NULL;
       pgmoneta_json_iterator_create(json_res, &iter);
       while (pgmoneta_json_iterator_next(iter))
-      { 
+      {
          char* value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
          printf("%s\n", value);
          free(value);
@@ -1848,11 +1848,11 @@ get_conf_path_result(struct json* j, uintptr_t* r)
    {
       pgmoneta_json_put(conf_path_response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH), ValueString);
    }
-      if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH))
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH))
    {
       pgmoneta_json_put(conf_path_response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH), ValueString);
    }
-      if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH))
+   if (pgmoneta_json_contains_key(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH))
    {
       pgmoneta_json_put(conf_path_response, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)pgmoneta_json_get(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH), ValueString);
    }
@@ -2159,7 +2159,7 @@ translate_compression(int32_t compression_code)
          compression_output = pgmoneta_append(compression_output, "none");
          break;
       default:
-         return  NULL;
+         return NULL;
    }
    return compression_output;
 }
@@ -2228,7 +2228,7 @@ translate_storage_engine(int32_t storage_engine)
    char* storage_engine_output = NULL;
    switch (storage_engine)
    {
-      case STORAGE_ENGINE_LOCAL: 
+      case STORAGE_ENGINE_LOCAL:
          storage_engine_output = pgmoneta_append(storage_engine_output, "local");
          break;
       case STORAGE_ENGINE_SSH:
@@ -2247,7 +2247,7 @@ translate_storage_engine(int32_t storage_engine)
    return storage_engine_output;
 }
 
-static char* 
+static char*
 translate_create_slot(int32_t create_slot)
 {
    char* create_slot_output = NULL;
@@ -2268,7 +2268,7 @@ translate_create_slot(int32_t create_slot)
    return create_slot_output;
 }
 
-static char* 
+static char*
 translate_hugepage(int32_t hugepage)
 {
    char* hugepage_output = NULL;
@@ -2289,7 +2289,7 @@ translate_hugepage(int32_t hugepage)
    return hugepage_output;
 }
 
-static char* 
+static char*
 translate_log_type(int32_t log_type)
 {
    char* log_type_output = NULL;
@@ -2310,7 +2310,7 @@ translate_log_type(int32_t log_type)
    return log_type_output;
 }
 
-static char* 
+static char*
 translate_log_level(int32_t log_level)
 {
    char* log_level_output = NULL;
@@ -2338,7 +2338,7 @@ translate_log_level(int32_t log_level)
    return log_level_output;
 }
 
-static char* 
+static char*
 translate_log_mode(int32_t log_mode)
 {
    char* log_mode_output = NULL;

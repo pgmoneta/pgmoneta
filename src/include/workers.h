@@ -103,7 +103,7 @@ struct worker_input
    char to[MAX_PATH];        /**< The to directory */
    int level;                /**< The compression level */
    bool force;               /**< Force the operation */
-   struct workers *workers;  /**< The root structure */
+   struct workers* workers;  /**< The root structure */
 };
 
 /**

@@ -86,8 +86,8 @@ main(int argc, char** argv)
    int c;
    int option_index = 0;
    int ret;
-   char *configuration_path = NULL;
-   char *output = NULL;
+   char* configuration_path = NULL;
+   char* output = NULL;
    char* format = NULL;
    char* logfile = NULL;
    bool quiet = false;
@@ -190,31 +190,43 @@ main(int argc, char** argv)
             pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
 
             break;
-          case 's':
-              if (strchr(optarg, '/')) {
-                  // Assuming optarg is a string like "16/B374D848"
-                  if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &start_lsn_high, &start_lsn_low) == 2) {
-                      start_lsn = (start_lsn_high << 32) + start_lsn_low;
-                  } else {
-                      fprintf(stderr, "Invalid start LSN format\n");
-                      exit(1);
-                  }
-              } else {
-                  start_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
-              }
-              break;
-          case 'e':
-              if (strchr(optarg, '/')) {
-                  // Assuming optarg is a string like "16/B374D848"
-                  if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2) {
-                      end_lsn = (end_lsn_high << 32) + end_lsn_low;
-                  } else {
-                      fprintf(stderr, "Invalid end LSN format\n");
-                      exit(1);
-                  }
-              } else {
-                  end_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
-              }
+         case 's':
+            if (strchr(optarg, '/'))
+            {
+               // Assuming optarg is a string like "16/B374D848"
+               if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &start_lsn_high, &start_lsn_low) == 2)
+               {
+                  start_lsn = (start_lsn_high << 32) + start_lsn_low;
+               }
+               else
+               {
+                  fprintf(stderr, "Invalid start LSN format\n");
+                  exit(1);
+               }
+            }
+            else
+            {
+               start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+            }
+            break;
+         case 'e':
+            if (strchr(optarg, '/'))
+            {
+               // Assuming optarg is a string like "16/B374D848"
+               if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2)
+               {
+                  end_lsn = (end_lsn_high << 32) + end_lsn_low;
+               }
+               else
+               {
+                  fprintf(stderr, "Invalid end LSN format\n");
+                  exit(1);
+               }
+            }
+            else
+            {
+               end_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+            }
             break;
          case 'x':
             if (xids == NULL)

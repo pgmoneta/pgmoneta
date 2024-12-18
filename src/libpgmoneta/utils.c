@@ -3784,7 +3784,7 @@ pgmoneta_is_encrypted_archive(char* file_path)
 }
 
 bool
-pgmoneta_is_compressed_archive(char *file_path)
+pgmoneta_is_compressed_archive(char* file_path)
 {
    if (pgmoneta_ends_with(file_path, ".zstd") ||
        pgmoneta_ends_with(file_path, ".lz4") ||

@@ -295,7 +295,6 @@ extern "C" {
 #define MANAGEMENT_ERROR_CONF_SET_NETWORK                   2206
 #define MANAGEMENT_ERROR_CONF_SET_ERROR                     2207
 
-
 /**
  * Output formats
  */

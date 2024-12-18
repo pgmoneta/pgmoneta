@@ -986,10 +986,11 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    }
 }
 
-static bool is_included(char* rm, struct deque* rms,
-                        uint64_t s_lsn, uint64_t start_lsn,
-                        uint64_t e_lsn, uint64_t end_lsn,
-                        uint32_t xid, struct deque* xids)
+static bool
+is_included(char* rm, struct deque* rms,
+            uint64_t s_lsn, uint64_t start_lsn,
+            uint64_t e_lsn, uint64_t end_lsn,
+            uint32_t xid, struct deque* xids)
 {
    struct deque_iterator* rms_iter = NULL;
    struct deque_iterator* xids_iter = NULL;
@@ -1064,7 +1065,7 @@ static bool is_included(char* rm, struct deque* rms,
    pgmoneta_deque_iterator_destroy(xids_iter);
 
    return true;
-   
+
 no:
 
    pgmoneta_deque_iterator_destroy(rms_iter);

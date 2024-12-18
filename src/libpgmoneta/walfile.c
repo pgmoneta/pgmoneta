@@ -218,7 +218,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 {
    FILE* out = NULL;
    char* tmp_wal = NULL;
-   struct walfile *wf = NULL;
+   struct walfile* wf = NULL;
    struct deque_iterator* record_iterator = NULL;
    struct decoded_xlog_record* record = NULL;
    char* decompressed_file_name = NULL;

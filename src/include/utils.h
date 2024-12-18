@@ -1168,7 +1168,7 @@ pgmoneta_is_encrypted_archive(char* file_path);
  * @return True if archive, otherwise false
  */
 bool
-pgmoneta_is_compressed_archive(char *file_path);
+pgmoneta_is_compressed_archive(char* file_path);
 
 /**
  * Init a token bucket
