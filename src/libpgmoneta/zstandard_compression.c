@@ -101,6 +101,11 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+      {
+         continue;
+      }
+
       if (entry->d_type == DT_DIR)
       {
          char path[1024];
