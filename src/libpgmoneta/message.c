@@ -791,7 +791,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 }
 
 int
-pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, int checksum_algorithm,
+pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal, int checksum_algorithm,
                                     int compression, int compression_level,
                                     struct message** msg)
 {
@@ -805,6 +805,10 @@ pgmoneta_create_base_backup_message(int server_version, char* label, bool includ
    // other options are
    if (use_new_format)
    {
+      if (incremental)
+      {
+         options = pgmoneta_append(options, "INCREMENTAL, ");
+      }
       options = pgmoneta_append(options, "LABEL '");
       options = pgmoneta_append(options, label);
       options = pgmoneta_append(options, "', ");
@@ -1051,6 +1055,32 @@ pgmoneta_create_query_message(char* query, struct message** msg)
    *msg = m;
 
    return MESSAGE_STATUS_OK;
+}
+
+int
+pgmoneta_send_copy_data(SSL* ssl, int socket, const char* buffer, size_t nbytes)
+{
+   struct message* msg = NULL;
+   size_t size = 1 + 4 + nbytes;
+   msg = allocate_message(size);
+   msg->kind = 'd';
+
+   pgmoneta_write_byte(msg->data, 'd');
+   pgmoneta_write_int32(msg->data + 1, size - 1);
+   memcpy(msg->data + 5, &buffer[0], nbytes);
+
+   if (pgmoneta_write_message(ssl, socket, msg) != MESSAGE_STATUS_OK)
+   {
+      pgmoneta_log_error("Could not send CopyData message");
+      goto error;
+   }
+
+   pgmoneta_free_message(msg);
+   return 0;
+
+error:
+   pgmoneta_free_message(msg);
+   return 1;
 }
 
 int
@@ -2160,7 +2190,6 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
    while (config->running && (msg == NULL || msg->kind != 'C'))
    {
       status = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
-
       if (status != MESSAGE_STATUS_OK)
       {
          goto error;
@@ -2225,13 +2254,16 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
       pgmoneta_consume_copy_stream_end(buffer, msg);
    }
    *response = r;
-   pgmoneta_free_message(msg);
+   // msg is reusable, it doesn't actually hold data,
+   // but merely points to somewhere in the stream buffer
+   // So no need for pgmoneta_free_message :)
+   free(msg);
    msg = NULL;
 
    return 0;
 error:
    pgmoneta_close_ssl(ssl);
-   pgmoneta_free_message(msg);
+   free(msg);
    pgmoneta_disconnect(socket);
    pgmoneta_free_query_response(r);
    return 1;

@@ -58,7 +58,7 @@ Commands:
 
 Backup a server
 
-Command
+The command for a full backup is
 
 ``` sh
 pgmoneta-cli backup <server>
@@ -68,6 +68,20 @@ Example
 
 ``` sh
 pgmoneta-cli backup primary
+```
+
+The command for an incremental backup is
+
+``` sh
+pgmoneta-cli backup <server> <identifier>
+```
+
+where the `identifier` is the identifier for a backup.
+
+Example
+
+``` sh
+pgmoneta-cli backup primary 20250101120000
 ```
 
 ## list-backup

@@ -17,6 +17,9 @@ all the backups within the nearest 7 days, the latest backup on each Monday with
 the latest backup on the first day of each month in the last 12 months and the latest backup on the first
 day of each year in the last 5 years. If you input more than 4 values, [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will only read the first 4.
 
+Note that currently if a backup has an incremental backup child that depends on it, it will be kept even if it doesn't
+fall under retention policy. We will support incremental backup deletion in later releases.
+
 There are a lot of ways to leave a parameter unspecified. For trailing parameters, you can simply omit them. 
 And for parameters in between, you can use placeholders. Currently, placeholders we allow are: `-`, `X`, `x`, `0` 
 or whitespaces (spaces or tabs). 

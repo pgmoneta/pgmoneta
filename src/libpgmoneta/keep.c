@@ -140,7 +140,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
-   if (backups[backup_index]->valid == VALID_TRUE)
+   if (backups[backup_index]->valid == VALID_TRUE && backups[backup_index]->type == TYPE_FULL)
    {
       d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
 

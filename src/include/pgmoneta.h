@@ -131,6 +131,8 @@ extern "C" {
 #define FORMAT_JSON_COMPACT   2
 #define BULLET_POINT          "- "
 
+#define INCREMENTAL_PREFIX "INCREMENTAL."
+
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 

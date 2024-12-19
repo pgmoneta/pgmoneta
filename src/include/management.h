@@ -135,6 +135,8 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_FREE_SPACE            "FreeSpace"
 #define MANAGEMENT_ARGUMENT_HASH_ALGORITHM        "HashAlgorithm"
 #define MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE      "HotStandbySize"
+#define MANAGEMENT_ARGUMENT_INCREMENTAL           "Incremental"
+#define MANAGEMENT_ARGUMENT_INCREMENTAL_PARENT    "IncrementalParent"
 #define MANAGEMENT_ARGUMENT_KEEP                  "Keep"
 #define MANAGEMENT_ARGUMENT_KEY                   "Key"
 #define MANAGEMENT_ARGUMENT_MAJOR_VERSION         "MajorVersion"
@@ -180,17 +182,20 @@ extern "C" {
 #define MANAGEMENT_ERROR_UNKNOWN_COMMAND 2
 #define MANAGEMENT_ERROR_ALLOCATION      3
 
-#define MANAGEMENT_ERROR_BACKUP_INVALID  100
-#define MANAGEMENT_ERROR_BACKUP_WAL      101
-#define MANAGEMENT_ERROR_BACKUP_ACTIVE   102
-#define MANAGEMENT_ERROR_BACKUP_SETUP    103
-#define MANAGEMENT_ERROR_BACKUP_EXECUTE  104
-#define MANAGEMENT_ERROR_BACKUP_TEARDOWN 105
-#define MANAGEMENT_ERROR_BACKUP_NETWORK  106
-#define MANAGEMENT_ERROR_BACKUP_OFFLINE  107
-#define MANAGEMENT_ERROR_BACKUP_NOSERVER 108
-#define MANAGEMENT_ERROR_BACKUP_NOFORK   109
-#define MANAGEMENT_ERROR_BACKUP_ERROR    110
+#define MANAGEMENT_ERROR_BACKUP_INVALID      100
+#define MANAGEMENT_ERROR_BACKUP_WAL          101
+#define MANAGEMENT_ERROR_BACKUP_ACTIVE       102
+#define MANAGEMENT_ERROR_BACKUP_NOBACKUPS    103
+#define MANAGEMENT_ERROR_BACKUP_NOCHILD      104
+#define MANAGEMENT_ERROR_BACKUP_ALREADYCHILD 105
+#define MANAGEMENT_ERROR_BACKUP_SETUP        106
+#define MANAGEMENT_ERROR_BACKUP_EXECUTE      107
+#define MANAGEMENT_ERROR_BACKUP_TEARDOWN     108
+#define MANAGEMENT_ERROR_BACKUP_NETWORK      109
+#define MANAGEMENT_ERROR_BACKUP_OFFLINE      110
+#define MANAGEMENT_ERROR_BACKUP_NOSERVER     111
+#define MANAGEMENT_ERROR_BACKUP_NOFORK       111
+#define MANAGEMENT_ERROR_BACKUP_ERROR        112
 
 #define MANAGEMENT_ERROR_LIST_BACKUP_DEQUE_CREATE 200
 #define MANAGEMENT_ERROR_LIST_BACKUP_BACKUPS      201
@@ -361,11 +366,12 @@ pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, str
  * @param server The server
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param incremental The base of incremental backup
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
 
 /**
  * Create a list backup request

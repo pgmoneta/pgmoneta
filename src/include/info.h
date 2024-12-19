@@ -73,6 +73,11 @@ extern "C" {
 #define INFO_STATUS                    "STATUS"
 #define INFO_TABLESPACES               "TABLESPACES"
 #define INFO_WAL                       "WAL"
+#define INFO_TYPE                      "TYPE"
+#define INFO_PARENT                    "PARENT"
+
+#define TYPE_FULL        0
+#define TYPE_INCREMENTAL 1
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -121,6 +126,8 @@ struct backup
    int encryption;                                                /**< The encryption type */
    char comments[MAX_COMMENT];                                    /**< The comments */
    char extra[MAX_EXTRA_PATH];                                    /**< The extra directory */
+   int type;                                                      /**< The backup type */
+   char parent_label[MISC_LENGTH];                                /**< The label of backup's parent, only used when backup is incremental */
 } __attribute__ ((aligned (64)));
 
 /**
@@ -236,6 +243,36 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup);
  */
 int
 pgmoneta_get_number_of_valid_backups(int server);
+
+/**
+ * Get the parent for a backup
+ * @param server The server
+ * @param backup The backup
+ * @param parent The parent
+ * @return The result
+ */
+int
+pgmoneta_get_backup_parent(int server, struct backup* backup, struct backup** parent);
+
+/**
+ * Get the root for a backup
+ * @param server The server
+ * @param backup The backup
+ * @param root The root
+ * @return The result
+ */
+int
+pgmoneta_get_backup_root(int server, struct backup* backup, struct backup** root);
+
+/**
+ * Get the child for a backup
+ * @param server The server
+ * @param backup The backup
+ * @param child The child
+ * @return The result
+ */
+int
+pgmoneta_get_backup_child(int server, struct backup* backup, struct backup** child);
 
 /**
  * Create an info request

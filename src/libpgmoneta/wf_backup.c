@@ -31,6 +31,7 @@
 #include <backup.h>
 #include <info.h>
 #include <logging.h>
+#include <management.h>
 #include <memory.h>
 #include <message.h>
 #include <network.h>
@@ -49,6 +50,9 @@
 static int basebackup_setup(int, char*, struct deque*);
 static int basebackup_execute(int, char*, struct deque*);
 static int basebackup_teardown(int, char*, struct deque*);
+
+static int send_upload_manifest(SSL* ssl, int socket);
+static int upload_manifest(SSL* ssl, int socket, char* path);
 
 struct workflow*
 pgmoneta_create_basebackup(void)
@@ -102,6 +106,9 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    char elapsed[128];
    int number_of_tablespaces = 0;
    char* label = NULL;
+   char* incremental = NULL;
+   char* incremental_label = NULL;
+   char* manifest_path = NULL;
    char version[10];
    char minor_version[10];
    char* wal = NULL;
@@ -132,6 +139,15 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+   incremental = (char*)pgmoneta_deque_get(nodes, "IncrementalBase");
+   incremental_label = (char*)pgmoneta_deque_get(nodes, "IncrementalLabel");
+
+   if ((incremental != NULL && incremental_label == NULL) ||
+       (incremental == NULL && incremental_label != NULL))
+   {
+      pgmoneta_log_error("base and label for incremental should either be both NULL or both non-NULL\n");
+      goto error;
+   }
 
    pgmoneta_memory_init();
 
@@ -228,6 +244,32 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
+   pgmoneta_memory_stream_buffer_init(&buffer);
+
+   if (incremental != NULL)
+   {
+      // send UPLOAD_MANIFEST
+      if (send_upload_manifest(ssl, socket))
+      {
+         pgmoneta_log_error("Fail to send UPLOAD_MANIFEST to server %s", config->servers[server].name);
+         goto error;
+      }
+      manifest_path = pgmoneta_append(NULL, incremental);
+      manifest_path = pgmoneta_append(manifest_path, "data/backup_manifest");
+      if (upload_manifest(ssl, socket, manifest_path))
+      {
+         pgmoneta_log_error("Fail to upload manifest to server %s", config->servers[server].name);
+         goto error;
+      }
+      // receive and ignore the result set for UPLOAD_MANIFEST
+      if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+      {
+         goto error;
+      }
+      pgmoneta_free_query_response(response);
+      response = NULL;
+   }
+
    label = pgmoneta_append(label, "pgmoneta_");
    label = pgmoneta_append(label, identifier);
 
@@ -237,7 +279,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       hash = config->manifest;
    }
 
-   pgmoneta_create_base_backup_message(config->servers[server].version, label, true, hash,
+   pgmoneta_create_base_backup_message(config->servers[server].version, incremental != NULL, label, true, hash,
                                        config->compression_type, config->compression_level,
                                        &basebackup_msg);
 
@@ -247,20 +289,16 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   pgmoneta_memory_stream_buffer_init(&buffer);
    // Receive the first result set, which contains the WAL starting point
    if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
    {
       goto error;
    }
-   else
-   {
-      memset(startpos, 0, sizeof(startpos));
-      memcpy(startpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
-      start_timeline = atoi(response->tuples[0].data[1]);
-      pgmoneta_free_query_response(response);
-      response = NULL;
-   }
+   memset(startpos, 0, sizeof(startpos));
+   memcpy(startpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
+   start_timeline = atoi(response->tuples[0].data[1]);
+   pgmoneta_free_query_response(response);
+   response = NULL;
 
    // create the root dir
    backup_base = pgmoneta_get_server_backup_identifier(server, identifier);
@@ -294,14 +332,11 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    {
       goto error;
    }
-   else
-   {
-      memset(endpos, 0, sizeof(endpos));
-      memcpy(endpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
-      end_timeline = atoi(response->tuples[0].data[1]);
-      pgmoneta_free_query_response(response);
-      response = NULL;
-   }
+   memset(endpos, 0, sizeof(endpos));
+   memcpy(endpos, response->tuples[0].data[0], strlen(response->tuples[0].data[0]));
+   end_timeline = atoi(response->tuples[0].data[1]);
+   pgmoneta_free_query_response(response);
+   response = NULL;
 
    // remove backup_label.old if it exists
    memset(old_label_path, 0, MAX_PATH);
@@ -372,6 +407,15 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_update_info_unsigned_long(backup_base, INFO_HASH_ALGORITHM, hash);
    pgmoneta_update_info_double(backup_base, INFO_BASEBACKUP_ELAPSED, basebackup_elapsed_time);
 
+   if (incremental != NULL)
+   {
+      pgmoneta_update_info_unsigned_long(backup_base, INFO_TYPE, TYPE_INCREMENTAL);
+      pgmoneta_update_info_string(backup_base, INFO_PARENT, incremental_label);
+   }
+   else
+   {
+      pgmoneta_update_info_unsigned_long(backup_base, INFO_TYPE, TYPE_FULL);
+   }
    // in case of parsing error
    if (chkptpos != NULL)
    {
@@ -415,6 +459,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_token_bucket_destroy(network_bucket);
    free(backup_base);
    free(backup_data);
+   free(manifest_path);
    free(chkptpos);
    free(label);
    free(wal);
@@ -440,6 +485,7 @@ error:
    }
    pgmoneta_memory_destroy();
    pgmoneta_memory_stream_buffer_free(buffer);
+   pgmoneta_free_message(tablespace_msg);
    pgmoneta_free_tablespaces(tablespaces);
    pgmoneta_free_message(basebackup_msg);
    pgmoneta_free_message(tablespace_msg);
@@ -448,6 +494,7 @@ error:
    pgmoneta_token_bucket_destroy(network_bucket);
    free(backup_base);
    free(backup_data);
+   free(manifest_path);
    free(chkptpos);
    free(label);
    free(wal);
@@ -466,4 +513,64 @@ basebackup_teardown(int server, char* identifier, struct deque* nodes)
    pgmoneta_deque_list(nodes);
 
    return 0;
+}
+
+static int
+send_upload_manifest(SSL* ssl, int socket)
+{
+   struct message* msg = NULL;
+   int status;
+   pgmoneta_create_query_message("UPLOAD_MANIFEST", &msg);
+   status = pgmoneta_write_message(ssl, socket, msg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   pgmoneta_free_message(msg);
+   return 0;
+
+error:
+   pgmoneta_free_message(msg);
+   return 1;
+}
+
+static int
+upload_manifest(SSL* ssl, int socket, char* path)
+{
+   FILE* manifest = NULL;
+   size_t nbytes = 0;
+   char buffer[65536];
+
+   manifest = fopen(path, "r");
+   if (manifest == NULL)
+   {
+      pgmoneta_log_error("Upload manifest: failed to open manifest file at %s", path);
+      goto error;
+   }
+   while ((nbytes = fread(buffer, 1, sizeof(buffer), manifest)) > 0)
+   {
+      if (pgmoneta_send_copy_data(ssl, socket, buffer, nbytes))
+      {
+         pgmoneta_log_error("Upload manifest: failed to send copy data");
+         goto error;
+      }
+   }
+   if (pgmoneta_send_copy_done_message(ssl, socket))
+   {
+      goto error;
+   }
+
+   if (manifest != NULL)
+   {
+      fclose(manifest);
+   }
+   return 0;
+
+error:
+   if (manifest != NULL)
+   {
+      fclose(manifest);
+   }
+   return 1;
 }

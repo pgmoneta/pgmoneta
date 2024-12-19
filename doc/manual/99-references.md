@@ -62,6 +62,8 @@
   [t_tls]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_tls.md
   [t_hot_standby]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/13_hot_standby.md
   [t_annotate]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/14_annotate.md
+  [t_extra]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/15_extra.md
+  [t_incremental]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/16_incremental_backup_restore.md
 <!-- doc/etc -->
   [sample]: https://github.com/pgmoneta/pgmoneta/blob/main/doc/etc/pgmoneta.conf
 

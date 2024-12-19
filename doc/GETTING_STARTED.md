@@ -274,6 +274,8 @@ There are a few short tutorials available to help you better understand and conf
 - [Working with Transport Level Security](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/12_tls.md)
 - [Hot standby](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/13_hot_standby.md)
 - [Annotate](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/14_annotate.md)
+- [Extra files](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/15_extra.md)
+- [Incremental backup and restore](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/16_incremental_backup_restore.md)
 
 ## Closing
 

@@ -1,21 +1,42 @@
-## Backup and restore
+## Incremental backup and restore
 
-This tutorial will show you how to do a backup and a restore using [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
+This tutorial will show you how to do an incremental backup and a restore using [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 ### Preface
 
-This tutorial assumes that you have an installation of PostgreSQL 13+ and [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
+This tutorial assumes that you have an installation of PostgreSQL 17+ and [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 See [Install pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md)
 for more detail.
 
-### Backup
+### Full backup
 
 ```
 pgmoneta-cli -c pgmoneta.conf backup primary
 ```
 
-will take a backup of the `[primary]` host.
+will take a full backup of the `[primary]` host.
+
+(`pgmoneta` user)
+
+### List backups
+
+```
+pgmoneta-cli -c pgmoneta.conf list-backup primary
+```
+
+(`pgmoneta` user)
+
+### Incremental backup
+
+```
+pgmoneta-cli -c pgmoneta.conf backup primary newest
+```
+
+will take an incremental backup of the `[primary]` host.
+
+Note that currently branching is not allowed for incremental 
+backup -- a backup can have at most 1 incremental backup child.
 
 (`pgmoneta` user)
 
@@ -30,7 +51,7 @@ pgmoneta-cli -c pgmoneta.conf list-backup primary
 ### Restore
 
 ```
-pgmoneta-cli -c pgmoneta.conf restore primary newest current /tmp/ 
+pgmoneta-cli -c pgmoneta.conf restore primary newest current /tmp/
 ```
 
 will take the latest backup and all Write-Ahead Log (WAL) segments and restore it

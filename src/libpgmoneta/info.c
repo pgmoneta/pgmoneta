@@ -1051,6 +1051,14 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          {
             bck->encryption = atoi(&value[0]);
          }
+         else if (pgmoneta_starts_with(&key[0], INFO_TYPE))
+         {
+            bck->type = atoi(&value[0]);
+         }
+         else if (pgmoneta_starts_with(&key[0], INFO_PARENT))
+         {
+            memcpy(&bck->parent_label[0], &value[0], strlen(&value[0]));
+         }
       }
    }
 
@@ -1119,8 +1127,162 @@ error:
    return 0;
 }
 
+int
+pgmoneta_get_backup_parent(int server, struct backup* backup, struct backup** parent)
+{
+   char* d = NULL;
+   struct backup* p = NULL;
+
+   *parent = NULL;
+
+   if (backup == NULL)
+   {
+      goto error;
+   }
+
+   if (backup->type == TYPE_FULL || strlen(backup->parent_label) == 0)
+   {
+      goto error;
+   }
+
+   d = pgmoneta_get_server_backup(server);
+
+   if (pgmoneta_get_backup(d, backup->parent_label, &p))
+   {
+      goto error;
+   }
+
+   if (p == NULL)
+   {
+      goto error;
+   }
+
+   *parent = p;
+
+   free(d);
+
+   return 0;
+
+error:
+
+   free(d);
+
+   return 1;
+}
+
+int
+pgmoneta_get_backup_root(int server, struct backup* backup, struct backup** root)
+{
+   struct backup* p = NULL;
+   struct backup* bck = NULL;
+
+   *root = NULL;
+
+   if (backup == NULL)
+   {
+      goto error;
+   }
+
+   if (backup->type == TYPE_FULL || strlen(backup->parent_label) == 0)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_backup_parent(server, backup, &p))
+   {
+      goto error;
+   }
+
+   while (p->type != TYPE_FULL)
+   {
+      if (pgmoneta_get_backup_parent(server, p, &bck))
+      {
+         goto error;
+      }
+      free(p);
+      p = bck;
+   }
+
+   *root = p;
+
+   return 0;
+
+error:
+   free(p);
+
+   return 1;
+}
+
+int
+pgmoneta_get_backup_child(int server, struct backup* backup, struct backup** child)
+{
+   char* d = NULL;
+   char* c_identifier = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct backup* c = NULL;
+
+   *child = NULL;
+
+   if (backup == NULL)
+   {
+      goto error;
+   }
+
+   d = pgmoneta_get_server_backup(server);
+
+   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   {
+      goto error;
+   }
+
+   for (int j = 0; c_identifier == NULL && j < number_of_backups; j++)
+   {
+      if (!strcmp(backup->label, backups[j]->parent_label))
+      {
+         c_identifier = pgmoneta_append(c_identifier, backups[j]->parent_label);
+      }
+   }
+
+   if (c_identifier != NULL)
+   {
+      if (pgmoneta_get_backup_server(server, c_identifier, &c))
+      {
+         goto error;
+      }
+
+      *child = c;
+   }
+
+   free(d);
+   free(c_identifier);
+
+   for (int j = 0; j < number_of_backups; j++)
+   {
+      free(backups[j]);
+   }
+   free(backups);
+
+   return 0;
+
+error:
+
+   free(d);
+   free(c_identifier);
+
+   for (int j = 0; j < number_of_backups; j++)
+   {
+      free(backups[j]);
+   }
+   free(backups);
+
+   return 1;
+}
+
 void
-pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_info_request(SSL* ssl, int client_fd, int server,
+                      uint8_t compression, uint8_t encryption,
+                      struct json* payload)
 {
    char* identifier = NULL;
    char* d = NULL;

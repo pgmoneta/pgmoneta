@@ -3114,6 +3114,10 @@ error:
 bool
 pgmoneta_starts_with(char* str, char* prefix)
 {
+   if (str == NULL)
+   {
+      return false;
+   }
    return strncmp(prefix, str, strlen(prefix)) == 0;
 }
 
@@ -4374,6 +4378,30 @@ pgmoneta_lsn_to_string(uint64_t lsn)
    memset(result, 0, 64);
    snprintf(result, 64, "%X/%X", (uint32_t)(lsn >> 32), (uint32_t)lsn);
    return result;
+}
+
+bool
+pgmoneta_is_incremental_path(char* path)
+{
+   char* name;
+   int len = 0;
+   int seglen = 0;
+   if (path == NULL)
+   {
+      return false;
+   }
+   len = strlen(path);
+   // extract the last segment
+   for (int i = len - 1; i >= 0; i--)
+   {
+      if (path[i] == '/')
+      {
+         break;
+      }
+      seglen++;
+   }
+   name = path + (len - seglen);
+   return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
 }
 
 #ifdef DEBUG

@@ -17,4 +17,7 @@ pgmoneta-cli -c pgmoneta.conf delete primary oldest
 
 will delete the oldest backup on `[primary]`.
 
+Note that currently delete will fail if the backup has an incremental backup child that depends on it.
+We will support incremental backup deletion in later releases.
+
 (`pgmoneta` user)

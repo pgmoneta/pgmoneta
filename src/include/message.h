@@ -357,6 +357,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 /**
  * Create a base backup message
  * @param server_version The version of the PostgreSQL server to backup
+ * @param incremental If the backup is incremental
  * @param label The label of the backup
  * @param include_wal The indication of whether to also include WAL
  * @param checksum_algorithm The checksum algorithm to be applied to backup manifest
@@ -366,7 +367,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_base_backup_message(int server_version, char* label, bool include_wal, int checksum_algorithm,
+pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal, int checksum_algorithm,
                                     int compression, int compression_level,
                                     struct message** msg);
 
@@ -406,6 +407,17 @@ pgmoneta_send_copy_done_message(SSL* ssl, int socket);
  */
 int
 pgmoneta_create_query_message(char* query, struct message** msg);
+
+/**
+ * Create and send a copy data message with the given content
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param buffer The content buffer
+ * @param nbytes The number of bytes
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_send_copy_data(SSL* ssl, int socket, const char* buffer, size_t nbytes);
 
 /**
  * Has a message

@@ -2,9 +2,9 @@
 
 # Backup
 
-## Create backup
+## Create a full backup
 
-We can take a backup from the primary with the following command
+We can take a full backup from the primary with the following command
 
 ```
 pgmoneta-cli backup primary
@@ -63,6 +63,85 @@ Response:
       Comments: ''
       Compression: 2
       Encryption: 0
+      Incremental: false
+      Keep: false
+      RestoreSize: 48799744
+      Server: primary
+      Valid: 1
+      WAL: 0
+  MajorVersion: 17
+  MinorVersion: 0
+  Server: primary
+  ServerVersion: 0.16.0
+```
+
+## Create an incremental backup
+
+We can take an incremental backup from the primary with the following command
+
+```
+pgmoneta-cli backup primary 20240928065644
+```
+
+and you will get output like
+
+```
+Header: 
+  ClientVersion: 0.16.0
+  Command: 1
+  Output: 0
+  Timestamp: 20240928065730
+Outcome: 
+  Status: true
+  Time: 00:00:20
+Request: 
+  Server: primary
+Response: 
+  Backup: 20240928065750
+  BackupSize: 124312
+  Compression: 2
+  Encryption: 0
+  Incremental: true
+  MajorVersion: 17
+  MinorVersion: 0
+  RestoreSize: 48799744
+  Server: primary
+  ServerVersion: 0.16.0
+```
+
+Incremental backups are supported when using [PostgreSQL 17+](https://www.postgresql.org). Note that currently
+branching is not allowed for incremental backup -- a backup can have at most 1
+incremental backup child.
+
+## View backups
+
+We can list all backups for a server with the following command
+
+```
+pgmoneta-cli list-backup primary
+```
+
+and you will get output like
+
+```
+Header: 
+  ClientVersion: 0.16.0
+  Command: 2
+  Output: 0
+  Timestamp: 20240928065812
+Outcome: 
+  Status: true
+  Time: 00:00:00
+Request: 
+  Server: primary
+Response: 
+  Backups: 
+    - Backup: 20240928065644
+      BackupSize: 8531968
+      Comments: ''
+      Compression: 2
+      Encryption: 0
+      Incremental: false
       Keep: false
       RestoreSize: 48799744
       Server: primary
@@ -108,6 +187,7 @@ Response:
   EndHiLSN: 0
   EndLoLSN: 4F000158
   EndTimeline: 1
+  Incremental: false
   Keep: true
   MajorVersion: 17
   MinorVersion: 0

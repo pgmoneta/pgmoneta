@@ -91,6 +91,7 @@ retention_execute(int server, char* identifier, struct deque* nodes)
    char* d;
    int number_of_backups = 0;
    struct backup** backups = NULL;
+   struct backup* child = NULL;
    bool* retention_keep = NULL;
    struct configuration* config;
 
@@ -142,7 +143,9 @@ retention_execute(int server, char* identifier, struct deque* nodes)
          {
             if (!retention_keep[j])
             {
-               if (!backups[j]->keep)
+               pgmoneta_get_backup_child(server, backups[j], &child);
+               // a backup can only be deleted if it has no child
+               if (!backups[j]->keep && child == NULL)
                {
                   pgmoneta_log_trace("Retention: %s/%s (%s)", config->servers[i].name, backups[j]->label, atomic_load(&config->servers[i].delete) ? "Active" : "Inactive");
 
@@ -153,6 +156,8 @@ retention_execute(int server, char* identifier, struct deque* nodes)
                      break;
                   }
                }
+               free(child);
+               child = NULL;
             }
          }
       }

@@ -89,8 +89,6 @@ cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_trace("Cleanup (execute): %s/%s", config->servers[server].name, identifier);
-
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Cleanup (execute): %s/%s", config->servers[server].name, label);

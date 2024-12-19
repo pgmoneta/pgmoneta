@@ -39,10 +39,14 @@
 /* system */
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <strings.h>
 
 static int delete_backup_setup(int, char*, struct deque*);
 static int delete_backup_execute(int, char*, struct deque*);
 static int delete_backup_teardown(int, char*, struct deque*);
+
+static int delete_full_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
+static int delete_incremental_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
 
 struct workflow*
 pgmoneta_create_delete_backup(void)
@@ -82,18 +86,12 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 {
    bool active = false;
    int backup_index = -1;
-   int prev_index = -1;
-   int next_index = -1;
    char* label = NULL;
    char* d = NULL;
-   char* from = NULL;
-   char* to = NULL;
-   unsigned long size;
    int number_of_backups = 0;
-   int number_of_workers = 0;
    struct backup** backups = NULL;
    struct backup* backup = NULL;
-   struct workers* workers = NULL;
+   struct backup* child = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
@@ -170,130 +168,28 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   /* Find previous valid backup */
-   for (int i = backup_index - 1; prev_index == -1 && i >= 0; i--)
+   pgmoneta_get_backup_child(server, backups[backup_index], &child);
+   if (child != NULL)
    {
-      if (backups[i]->valid == VALID_TRUE)
-      {
-         prev_index = i;
-      }
+      pgmoneta_log_error("Delete: Backup has a child incremental backup %s", child->label);
+      goto error;
    }
 
-   /* Find next valid backup */
-   for (int i = backup_index + 1; next_index == -1 && i < number_of_backups; i++)
+   if (backups[backup_index]->type == TYPE_FULL)
    {
-      if (backups[i]->valid == VALID_TRUE)
+      if (delete_full_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
       {
-         next_index = i;
-      }
-   }
-
-   if (prev_index != -1)
-   {
-      pgmoneta_log_trace("Prv label: %s/%s", config->servers[server].name, backups[prev_index]->label);
-   }
-
-   pgmoneta_log_trace("Del label: %s/%s", config->servers[server].name, backups[backup_index]->label);
-
-   if (next_index != -1)
-   {
-      pgmoneta_log_trace("Net label: %s/%s", config->servers[server].name, backups[next_index]->label);
-   }
-
-   d = pgmoneta_get_server_backup_identifier(server, backups[backup_index]->label);
-
-   number_of_workers = pgmoneta_get_number_of_workers(server);
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
-   }
-
-   if (backups[backup_index]->valid == VALID_TRUE)
-   {
-      if (prev_index != -1 && next_index != -1)
-      {
-         /* In-between valid backup */
-         from = pgmoneta_get_server_backup_identifier_data(server, backups[backup_index]->label);
-         to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
-
-         pgmoneta_relink(from, to, workers);
-
-         if (number_of_workers > 0)
-         {
-            pgmoneta_workers_wait(workers);
-            if (!workers->outcome)
-            {
-               goto error;
-            }
-            pgmoneta_workers_destroy(workers);
-            workers = NULL;
-         }
-
-         /* Delete from */
-         pgmoneta_delete_directory(d);
-         free(d);
-         d = NULL;
-
-         /* Recalculate to */
-         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
-
-         size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
-
-         free(from);
-         free(to);
-         from = NULL;
-         to = NULL;
-      }
-      else if (prev_index != -1)
-      {
-         /* Latest valid backup */
-         pgmoneta_delete_directory(d);
-      }
-      else if (next_index != -1)
-      {
-         /* Oldest valid backup */
-         from = pgmoneta_get_server_backup_identifier_data(server, backups[backup_index]->label);
-         to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
-
-         pgmoneta_relink(from, to, workers);
-
-         if (number_of_workers > 0)
-         {
-            pgmoneta_workers_wait(workers);
-            if (!workers->outcome)
-            {
-               goto error;
-            }
-            pgmoneta_workers_destroy(workers);
-         }
-
-         /* Delete from */
-         pgmoneta_delete_directory(d);
-         free(d);
-         d = NULL;
-
-         /* Recalculate to */
-         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
-
-         size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
-
-         free(from);
-         free(to);
-         from = NULL;
-         to = NULL;
-      }
-      else
-      {
-         /* Only valid backup */
-         pgmoneta_delete_directory(d);
+         pgmoneta_log_error("Delete: Full backup error for %s/%s", config->servers[server].name, label);
+         goto error;
       }
    }
    else
    {
-      /* Just delete */
-      pgmoneta_delete_directory(d);
+      if (delete_incremental_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
+      {
+         pgmoneta_log_error("Delete: Incremental backup error for %s/%s", config->servers[server].name, label);
+         goto error;
+      }
    }
 
    pgmoneta_log_debug("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);
@@ -346,18 +242,14 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
 
    free(d);
 
+   free(child);
+
    atomic_store(&config->servers[server].delete, false);
    pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
 
    return 0;
 
 error:
-
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_destroy(workers);
-   }
-
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
@@ -367,6 +259,8 @@ error:
    free(backup);
 
    free(d);
+
+   free(child);
 
    atomic_store(&config->servers[server].delete, false);
    pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
@@ -385,4 +279,204 @@ delete_backup_teardown(int server, char* identifier, struct deque* nodes)
    pgmoneta_deque_list(nodes);
 
    return 0;
+}
+
+static int
+delete_full_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups)
+{
+   int prev_index = -1;
+   int next_index = -1;
+   char* from = NULL;
+   char* to = NULL;
+   char* d = NULL;
+   unsigned long size;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   /* Find previous valid backup */
+   for (int i = index - 1; prev_index == -1 && i >= 0; i--)
+   {
+      if (backups[i]->valid == VALID_TRUE)
+      {
+         prev_index = i;
+      }
+   }
+
+   /* Find next valid backup */
+   for (int i = index + 1; next_index == -1 && i < number_of_backups; i++)
+   {
+      if (backups[i]->valid == VALID_TRUE)
+      {
+         next_index = i;
+      }
+   }
+
+   if (prev_index != -1)
+   {
+      pgmoneta_log_trace("Prev label: %s/%s", config->servers[server].name, backups[prev_index]->label);
+   }
+
+   pgmoneta_log_trace("Delt label: %s/%s", config->servers[server].name, backups[index]->label);
+
+   if (next_index != -1)
+   {
+      pgmoneta_log_trace("Next label: %s/%s", config->servers[server].name, backups[next_index]->label);
+   }
+
+   d = pgmoneta_get_server_backup_identifier(server, backups[index]->label);
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   if (backups[index]->valid == VALID_TRUE)
+   {
+      if (prev_index != -1 && next_index != -1)
+      {
+         /* In-between valid backup */
+         from = pgmoneta_get_server_backup_identifier_data(server, backups[index]->label);
+         to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
+
+         pgmoneta_relink(from, to, workers);
+
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_wait(workers);
+            if (!workers->outcome)
+            {
+               goto error;
+            }
+            pgmoneta_workers_destroy(workers);
+         }
+
+         /* Delete from */
+         pgmoneta_delete_directory(d);
+         free(d);
+         d = NULL;
+
+         /* Recalculate to */
+         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+
+         size = pgmoneta_directory_size(d);
+         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+
+         free(from);
+         free(to);
+         from = NULL;
+         to = NULL;
+      }
+      else if (prev_index != -1)
+      {
+         /* Latest valid backup */
+         pgmoneta_delete_directory(d);
+      }
+      else if (next_index != -1)
+      {
+         /* Oldest valid backup */
+         from = pgmoneta_get_server_backup_identifier_data(server, backups[index]->label);
+         to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
+
+         pgmoneta_relink(from, to, workers);
+
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_wait(workers);
+            if (!workers->outcome)
+            {
+               goto error;
+            }
+            pgmoneta_workers_destroy(workers);
+         }
+
+         /* Delete from */
+         pgmoneta_delete_directory(d);
+         free(d);
+         d = NULL;
+
+         /* Recalculate to */
+         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+
+         size = pgmoneta_directory_size(d);
+         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+
+         free(from);
+         free(to);
+         from = NULL;
+         to = NULL;
+      }
+      else
+      {
+         /* Only valid backup */
+         pgmoneta_delete_directory(d);
+      }
+   }
+   else
+   {
+      /* Just delete */
+      pgmoneta_delete_directory(d);
+   }
+
+   free(d);
+   free(from);
+   free(to);
+
+   return 0;
+
+error:
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(d);
+   free(from);
+   free(to);
+   return 1;
+}
+
+static int
+delete_incremental_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups)
+{
+   struct backup* parent = NULL;
+   struct backup* child = NULL;
+
+   if (pgmoneta_get_backup_parent(server, backup, &parent))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_backup_child(server, backup, &child))
+   {
+      goto error;
+   }
+
+   if (child != NULL)
+   {
+      pgmoneta_log_error("Incremental backup %s has a child %s", backup->label, child->label);
+      goto error;
+   }
+
+   // TODO: For now it'll behave just like deleting full backup because we don't allow deleting backup with a child
+   // We will later implement backup rollup to address this
+   if (delete_full_backup(server, index, backup, number_of_backups, backups))
+   {
+      goto error;
+   }
+
+   free(parent);
+   free(child);
+
+   return 0;
+
+error:
+
+   free(parent);
+   free(child);
+
+   return 1;
 }

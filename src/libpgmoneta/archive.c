@@ -135,7 +135,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, server, backup);
 
       current = workflow;
       while (current != NULL)

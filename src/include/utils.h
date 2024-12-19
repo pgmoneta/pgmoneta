@@ -1288,6 +1288,14 @@ pgmoneta_escape_string(char* str);
 char*
 pgmoneta_lsn_to_string(uint64_t lsn);
 
+/**
+ * Check if the path to a file is an incremental path
+ * @param path The file path
+ * @return true if the file is an incremental path, false if otherwise
+ */
+bool
+pgmoneta_is_incremental_path(char* path);
+
 #ifdef DEBUG
 
 /**

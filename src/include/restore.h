@@ -70,6 +70,21 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 int
 pgmoneta_restore_backup(int server, char* identifier, char* position, char* directory, char** output, char** label);
 
+/**
+ * Combine the provided backups
+ * @param server The server
+ * @param base The base directory that contains data and tablespaces
+ * @param input_dir The base directory of the current input incremental backup
+ * @param output_dir The base directory of the output incremental backup
+ * (the last level of directory should not be followed by back slash)
+ * @param prior_backup_dirs The root directory of prior incremental/full backups, from newest to oldest
+ * @param bck The backup to be restored
+ * @param manifest The manifest of the incremental backup to be combined
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_combine_backups(int server, char* base, char* input_dir, char* output_dir, struct deque* prior_backup_dirs, struct backup* bck, struct json* manifest);
+
 #ifdef __cplusplus
 }
 #endif
