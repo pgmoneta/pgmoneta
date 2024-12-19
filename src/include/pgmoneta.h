@@ -224,6 +224,9 @@ struct server
    atomic_bool delete;                      /**< Is there an active delete */
    atomic_bool wal;                         /**< Is there an active wal */
    int wal_size;                            /**< The size of the WAL files */
+   size_t block_size;                       /**< The size of a block in relation files*/
+   size_t segment_size;                     /**< The max size of a relation file segment*/
+   size_t relseg_size;                      /**< The max number of blocks in a relation file segment */
    bool wal_streaming;                      /**< Is WAL streaming active */
    bool checksums;                          /**< Are checksums enabled */
    bool valid;                              /**< Is the server valid */

@@ -48,6 +48,8 @@ static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
 static int get_checksums(SSL* ssl, int socket, int server, bool* checksums);
 static int get_version(SSL* ssl, int socket, int server, int* major, int* minor);
 static int get_ext_version(SSL* ssl, int socket, char** version);
+static int get_segment_size(SSL* ssl, int socket, int server, size_t* segsz);
+static int get_block_size(SSL* ssl, int socket, int server, size_t* blocksz);
 
 static bool is_valid_response(struct query_response* response);
 
@@ -63,6 +65,8 @@ pgmoneta_server_info(int srv)
    bool replica;
    bool checksums;
    int ws;
+   size_t blocksz = 0;
+   size_t segsz = 0;
    struct configuration* config;
    char* ext_version = NULL;
 
@@ -143,7 +147,6 @@ pgmoneta_server_info(int srv)
    {
       config->servers[srv].wal_size = ws;
    }
-
    pgmoneta_log_debug("%s/wal_segment_size %d", config->servers[srv].name, config->servers[srv].wal_size);
 
    if (get_ext_version(ssl, socket, &ext_version))
@@ -165,6 +168,31 @@ pgmoneta_server_info(int srv)
                       config->servers[srv].name,
                       config->servers[srv].ext_valid ? "true" : "false",
                       config->servers[srv].ext_valid ? config->servers[srv].ext_version : "N/A");
+   if (get_segment_size(ssl, socket, srv, &segsz))
+   {
+      pgmoneta_log_error("Unable to get segment_size for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
+      goto done;
+   }
+   else
+   {
+      config->servers[srv].segment_size = segsz;
+   }
+   pgmoneta_log_debug("%s/segment_size %d", config->servers[srv].name, config->servers[srv].segment_size);
+
+   if (get_block_size(ssl, socket, srv, &blocksz))
+   {
+      pgmoneta_log_error("Unable to get block_size for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
+      goto done;
+   }
+   else
+   {
+      config->servers[srv].block_size = blocksz;
+   }
+   pgmoneta_log_debug("%s/block_size %d", config->servers[srv].name, config->servers[srv].block_size);
+
+   config->servers[srv].relseg_size = config->servers[srv].segment_size / config->servers[srv].block_size;
 
    pgmoneta_write_terminate(ssl, socket);
 
@@ -200,6 +228,11 @@ pgmoneta_server_valid(int srv)
    }
 
    if (config->servers[srv].wal_size == 0)
+   {
+      return false;
+   }
+
+   if (config->servers[srv].segment_size == 0 || config->servers[srv].block_size == 0)
    {
       return false;
    }
@@ -497,7 +530,6 @@ get_ext_version(SSL* ssl, int socket, char** version)
    {
       goto error;
    }
-
    *version = NULL;
 
    pgmoneta_ext_version(ssl, socket, &qr);
@@ -529,6 +561,143 @@ error:
    {
       pgmoneta_free_query_response(qr);
    }
+   return 1;
+}
+
+static int
+get_segment_size(SSL * ssl, int socket, int server, size_t* segsz)
+{
+   int q = 0;
+   bool mb = true;
+   int ret;
+   char seg_size[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   ret = pgmoneta_create_query_message("SHOW segment_size;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&seg_size[0], 0, sizeof(seg_size));
+
+   snprintf(&seg_size[0], sizeof(seg_size), "%s", response->tuples->data[0]);
+
+   if (pgmoneta_ends_with(&seg_size[0], "MB"))
+   {
+      mb = true;
+   }
+   else
+   {
+      mb = false;
+   }
+
+   seg_size[strlen(seg_size) - 2] = '\0';
+
+   *segsz = pgmoneta_atoi(seg_size);
+
+   if (mb)
+   {
+      *segsz = *segsz * 1024 * 1024;
+   }
+   else
+   {
+      *segsz = *segsz * 1024 * 1024 * 1024;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_log_error("Error getting segment_size");
+
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_block_size(SSL* ssl, int socket, int server, size_t* blocksz)
+{
+   int q = 0;
+   int ret;
+   char block_size[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   ret = pgmoneta_create_query_message("SHOW block_size;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&block_size[0], 0, sizeof(block_size));
+
+   snprintf(&block_size[0], sizeof(block_size), "%s", response->tuples->data[0]);
+
+   *blocksz = pgmoneta_atoi(block_size);
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_log_error("Error getting block_size");
+
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
    return 1;
 }
 
