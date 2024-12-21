@@ -37,6 +37,7 @@
 #include <message.h>
 #include <network.h>
 #include <utils.h>
+#include <value.h>
 #include <workflow.h>
 
 /* system */
@@ -460,7 +461,6 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    int total_seconds;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct backup* backup = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
@@ -479,11 +479,6 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
-
-   if (pgmoneta_workflow_nodes(srv, identifier, nodes, &backup))
-   {
-      goto error;
-   }
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, NULL);
 
@@ -531,7 +526,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    }
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL), ValueString);
 
    end_time = time(NULL);
 
@@ -545,7 +540,8 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
 
-   pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->servers[srv].name, backup->label, elapsed);
+   pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->servers[srv].name,
+                     (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL), elapsed);
 
    pgmoneta_deque_destroy(nodes);
 
@@ -554,8 +550,6 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_disconnect(client_fd);
-
-   free(backup);
 
    pgmoneta_stop_logging();
 
@@ -564,7 +558,8 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_ERROR, compression, encryption, payload);
-   pgmoneta_log_warn("Delete: No identifier for %s/%s", config->servers[srv].name, backup != NULL ? backup->label : identifier);
+   pgmoneta_log_warn("Delete: Failed for %s/%s", config->servers[srv].name,
+                     (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL));
 
    pgmoneta_deque_destroy(nodes);
 
@@ -573,8 +568,6 @@ error:
    pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_disconnect(client_fd);
-
-   free(backup);
 
    pgmoneta_stop_logging();
 
