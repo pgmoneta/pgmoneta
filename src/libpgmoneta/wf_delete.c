@@ -163,6 +163,13 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
+   if (backups[backup_index]->keep)
+   {
+      pgmoneta_log_error("Delete: Backup is retained for %s/%s",
+                         config->servers[server].name, label);
+      goto error;
+   }
+
    /* Find previous valid backup */
    for (int i = backup_index - 1; prev_index == -1 && i >= 0; i--)
    {
