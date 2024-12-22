@@ -229,6 +229,7 @@ struct server
    size_t relseg_size;                      /**< The max number of blocks in a relation file segment */
    bool wal_streaming;                      /**< Is WAL streaming active */
    bool checksums;                          /**< Are checksums enabled */
+   bool summarize_wal;                      /**< Is summarize_wal enabled */
    bool valid;                              /**< Is the server valid */
    int version;                             /**< The major version of the server*/
    int minor_version;                       /**< The minor version of the server*/

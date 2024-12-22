@@ -1870,7 +1870,9 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
-      pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d CHECKSUMS %d", i, config->servers[i].valid, config->servers[i].wal_streaming, config->servers[i].checksums);
+      pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d CHECKSUMS %d SUMMARIZE_WAL %d",
+                         i, config->servers[i].valid, config->servers[i].wal_streaming,
+                         config->servers[i].checksums, config->servers[i].summarize_wal);
 
       if (keep_running && !config->servers[i].wal_streaming)
       {
@@ -2131,6 +2133,14 @@ init_replication_slots(void)
                                                       config->compression_type == COMPRESSION_SERVER_LZ4))
             {
                pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->servers[srv].name);
+               ret = 1;
+               goto server_done;
+            }
+
+            if (config->servers[srv].version >= 17 && !config->servers[srv].summarize_wal)
+            {
+               pgmoneta_log_fatal("PostgreSQL %d or higher requires summarize_wal for server %s",
+                                  config->servers[srv].version, config->servers[srv].name);
                ret = 1;
                goto server_done;
             }

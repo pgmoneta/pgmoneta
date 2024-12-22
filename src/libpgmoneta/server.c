@@ -50,6 +50,7 @@ static int get_version(SSL* ssl, int socket, int server, int* major, int* minor)
 static int get_ext_version(SSL* ssl, int socket, char** version);
 static int get_segment_size(SSL* ssl, int socket, int server, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, int server, size_t* blocksz);
+static int get_summarize_wal(SSL *ssl, int socket, int server, bool* sw);
 
 static bool is_valid_response(struct query_response* response);
 
@@ -67,6 +68,7 @@ pgmoneta_server_info(int srv)
    int ws;
    size_t blocksz = 0;
    size_t segsz = 0;
+   bool sw = false;
    struct configuration* config;
    char* ext_version = NULL;
 
@@ -193,6 +195,21 @@ pgmoneta_server_info(int srv)
    pgmoneta_log_debug("%s/block_size %d", config->servers[srv].name, config->servers[srv].block_size);
 
    config->servers[srv].relseg_size = config->servers[srv].segment_size / config->servers[srv].block_size;
+
+   if (config->servers[srv].version >= 17)
+   {
+      if (get_summarize_wal(ssl, socket, srv, &sw))
+      {
+         pgmoneta_log_error("Unable to get summarize_wal for %s", config->servers[srv].name);
+         config->servers[srv].summarize_wal = false;
+         goto done;
+      }
+      else
+      {
+         config->servers[srv].summarize_wal = sw;
+      }
+   }
+   pgmoneta_log_debug("%s/summarize_wal %d", config->servers[srv].name, config->servers[srv].summarize_wal);
 
    pgmoneta_write_terminate(ssl, socket);
 
@@ -694,6 +711,70 @@ q:
 error:
 
    pgmoneta_log_error("Error getting block_size");
+
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_summarize_wal(SSL *ssl, int socket, int server, bool *sw)
+{
+   int q = 0;
+   int ret;
+   char summarize_wal[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   *sw = false;
+
+   ret = pgmoneta_create_query_message("SHOW summarize_wal;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&summarize_wal[0], 0, sizeof(summarize_wal));
+
+   snprintf(&summarize_wal[0], sizeof(summarize_wal), "%s", response->tuples->data[0]);
+
+   if (!strcmp("on", summarize_wal))
+   {
+      *sw = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+
+error:
+
+   pgmoneta_log_error("Error getting summarize_wal");
 
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);

@@ -472,6 +472,17 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_summarize_wal</h2>\n");
+   data = pgmoneta_append(data, "  Are summarize_wal enabled for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_backup_oldest</h2>\n");
    data = pgmoneta_append(data, "  The oldest backup for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
@@ -1681,6 +1692,29 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       if (config->servers[i].checksums)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_summarize_wal Is summarize_wal enabled\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_summarize_wal gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_summarize_wal{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      if (config->servers[i].summarize_wal)
       {
          data = pgmoneta_append_int(data, 1);
       }
