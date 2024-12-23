@@ -136,6 +136,7 @@ restore_execute(int server, char* identifier, struct deque* nodes)
    char* position = NULL;
    char* directory = NULL;
    struct backup* backup = NULL;
+   struct backup* bck = NULL;
    char* label = NULL;
    char* from = NULL;
    char* to = NULL;
@@ -250,7 +251,7 @@ restore_execute(int server, char* identifier, struct deque* nodes)
             ptr = strtok(NULL, ",");
          }
 
-         pgmoneta_get_backup(directory, label, &backup);
+         pgmoneta_get_backup(directory, label, &bck);
 
          if (pgmoneta_deque_add(nodes, NODE_PRIMARY, primary, ValueBool))
          {
@@ -274,7 +275,7 @@ restore_execute(int server, char* identifier, struct deque* nodes)
             waltarget = pgmoneta_append(waltarget, label);
             waltarget = pgmoneta_append(waltarget, "/pg_wal/");
 
-            pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
+            pgmoneta_copy_wal_files(waldir, waltarget, &bck->wal[0], workers);
          }
       }
       else
@@ -300,6 +301,7 @@ restore_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
+   free(bck);
    free(from);
    free(to);
    free(o);
@@ -317,6 +319,7 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
+   free(bck);
    free(from);
    free(to);
    free(o);
