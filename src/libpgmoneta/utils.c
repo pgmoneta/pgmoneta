@@ -1328,6 +1328,10 @@ char*
 pgmoneta_remove_suffix(char* orig, char* suffix)
 {
    char* new_str = NULL;
+   if (orig == NULL)
+   {
+      return new_str;
+   }
 
    if (pgmoneta_ends_with(orig, suffix))
    {
@@ -1338,6 +1342,10 @@ pgmoneta_remove_suffix(char* orig, char* suffix)
          memset(new_str, 0, strlen(orig) - strlen(suffix) + 1);
          memcpy(new_str, orig, strlen(orig) - strlen(suffix));
       }
+   }
+   else
+   {
+      new_str = pgmoneta_append(new_str, orig);
    }
 
    return new_str;

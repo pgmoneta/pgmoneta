@@ -636,7 +636,7 @@ char*
 pgmoneta_remove_prefix(char* orig, char* prefix);
 
 /**
- * Remove the prefix from orig
+ * Remove the suffix from orig, it makes a copy of orig if the suffix doesn't exist
  * @param orig The original string
  * @param suffix The suffix string
  * @return The resulting string
