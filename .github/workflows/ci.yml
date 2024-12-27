@@ -29,6 +29,8 @@ jobs:
       run: sudo apt install -y libzstd-dev
     - name: Install lz4
       run: sudo apt install -y liblz4-dev
+    - name: Install bzip2
+      run: sudo apt install -y libbz2-dev
     - name: Install libssh
       run: sudo apt install -y libssh-dev
     - name: Install libarchive
