@@ -91,17 +91,18 @@ encryption_setup(int server, char* identifier, struct deque* nodes)
 static int
 encryption_execute(int server, char* identifier, struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double encryption_elapsed_time;
    char* d = NULL;
    char* enc_file = NULL;
    char* backup_base = NULL;
    char* backup_data = NULL;
    char* compress_suffix = NULL;
    char* tarfile = NULL;
-   time_t encrypt_time;
-   int total_seconds;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
@@ -114,7 +115,7 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
 
    tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
 
-   encrypt_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (tarfile == NULL)
    {
@@ -176,15 +177,19 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
       pgmoneta_encrypt_file(enc_file, d);
    }
 
-   total_seconds = (int)difftime(time(NULL), encrypt_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   encryption_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   hours = encryption_elapsed_time / 3600;
+   minutes = ((int)encryption_elapsed_time % 3600) / 60;
+   seconds = (int)encryption_elapsed_time % 60 + (encryption_elapsed_time - ((long)encryption_elapsed_time));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Encryption: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+
+   pgmoneta_update_info_double(backup_base, INFO_ENCRYPTION_ELAPSED, encryption_elapsed_time);
 
    free(d);
    free(enc_file);

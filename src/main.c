@@ -777,8 +777,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    int srv;
    pid_t pid;
    char* str = NULL;
-   time_t start_time;
-   time_t end_time;
+   struct timespec start_t;
+   struct timespec end_t;
    struct accept_io* ai;
    struct json* payload = NULL;
    struct json* header = NULL;
@@ -1099,11 +1099,11 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_SHUTDOWN)
    {
-      start_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
+      pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
 
       ev_break(loop, EVBREAK_ALL);
       keep_running = 0;
@@ -1114,30 +1114,30 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    {
       struct json* response = NULL;
 
-      start_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
       pgmoneta_management_create_response(payload, -1, &response);
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
+      pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
    else if (id == MANAGEMENT_RESET)
    {
-      start_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
       pgmoneta_prometheus_reset();
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
+      pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
    else if (id == MANAGEMENT_RELOAD)
    {
       bool restart = false;
       struct json* response = NULL;
 
-      start_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
       restart = reload_configuration();
 
@@ -1145,15 +1145,15 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTART, (uintptr_t)restart, ValueBool);
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
+      pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
    else if (id == MANAGEMENT_CONF_LS)
    {
       struct json* response = NULL;
 
-      start_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
       pgmoneta_management_create_response(payload, -1, &response);
 
@@ -1161,9 +1161,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->users_path, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->admins_path, ValueString);
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload);
+      pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
    else if (id == MANAGEMENT_CONF_GET)
    {

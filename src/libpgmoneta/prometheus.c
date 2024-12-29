@@ -543,8 +543,8 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_throughput</h2>\n");
-   data = pgmoneta_append(data, "  The throughput of the backup for a server (bytes/s)\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_total_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The backup in seconds for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -558,8 +558,308 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_elapsed_time</h2>\n");
-   data = pgmoneta_append(data, "  The backup in seconds for a server\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_basebackup_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for basebackup in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_manifest_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for manifest in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_zstd_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for zstd compression in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_gzip_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for gzip compression in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_bzip2_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for bzip2 compression in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_lz4_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for lz4 compression in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_encryption_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for encryption in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_linking_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for linking in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_remote_ssh_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for remote ssh in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_remote_s3_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for remote s3 in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_remote_azure_elapsed_time</h2>\n");
+   data = pgmoneta_append(data, "  The duration for remote azure in seconds for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_throughput</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the backup for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_basebackup_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the basebackup for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_manifest_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the manifest for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_zstd_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the zstd compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_gzip_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the gzip compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_bzip2_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the bzip2 compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_compression_lz4_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the lz4 compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_encryption_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the encryption for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_linking_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the linking for a server (MB/s)\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>label</td>\n");
+   data = pgmoneta_append(data, "        <td>The backup label</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_remote_mbs</h2>\n");
+   data = pgmoneta_append(data, "  The throughput of the remote for a server (MB/s)\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -2008,8 +2308,8 @@ backup_information(int client_fd)
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_elapsed_time The backup in seconds for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_elapsed_time gauge\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_total_elapsed_time The backup in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_total_elapsed_time gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
@@ -2025,7 +2325,7 @@ backup_information(int client_fd)
          {
             if (backups[j]->valid == VALID_TRUE)
             {
-               data = pgmoneta_append(data, "pgmoneta_backup_elapsed_time{");
+               data = pgmoneta_append(data, "pgmoneta_backup_total_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->servers[i].name);
@@ -2033,7 +2333,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, backups[j]->elapsed_time);
+               data = pgmoneta_append_double_precision(data, backups[j]->total_elapsed_time, 4);
 
                data = pgmoneta_append(data, "\n");
             }
@@ -2041,7 +2341,7 @@ backup_information(int client_fd)
       }
       else
       {
-         data = pgmoneta_append(data, "pgmoneta_backup_elapsed_time{");
+         data = pgmoneta_append(data, "pgmoneta_backup_total_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->servers[i].name);
@@ -2058,6 +2358,581 @@ backup_information(int client_fd)
 
       free(d);
    }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_basebackup_elapsed_time The duration for basebackup in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_basebackup_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_basebackup_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->basebackup_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_basebackup_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_manifest_elapsed_time The duration for manifest in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_manifest_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_manifest_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->manifest_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_manifest_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_zstd_elapsed_time The duration for zstd compression in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_zstd_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->compression_zstd_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_gzip_elapsed_time The duration for gzip compression in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_gzip_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->compression_gzip_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_bzip2_elapsed_time The duration for bzip2 compression in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_bzip2_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->compression_bzip2_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_lz4_elapsed_time The duration for lz4 compression in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_lz4_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->compression_lz4_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_encryption_elapsed_time The duration for encryption in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_encryption_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_encryption_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->encryption_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_encryption_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_linking_elapsed_time The duration for linking in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_linking_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_linking_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->linking_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_linking_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_ssh_elapsed_time The duration for remote ssh in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_ssh_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->remote_ssh_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_s3_elapsed_time The duration for remote_s3 in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_s3_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->remote_s3_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_azure_elapsed_time The duration for remote_azure in seconds for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_azure_elapsed_time gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j]->valid == VALID_TRUE)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_elapsed_time{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               data = pgmoneta_append_double_precision(data, backups[j]->remote_azure_elapsed_time, 4);
+
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_elapsed_time{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+
    data = pgmoneta_append(data, "\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_timeline The starting timeline of a backup for a server\n");
@@ -2723,7 +3598,7 @@ size_information(int client_fd)
       data = NULL;
    }
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_throughput The throughput of the backup for a server (bytes/s)\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_throughput The throughput of the backup for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_throughput gauge\n");
    for (int i = 0; i < config->number_of_servers; i++)
    {
@@ -2748,9 +3623,9 @@ size_information(int client_fd)
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
-               if (backups[j]->elapsed_time)
+               if (backups[j]->total_elapsed_time)
                {
-                  data = pgmoneta_append_double(data, 1.0 * backups[j]->backup_size / backups[j]->elapsed_time);
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->total_elapsed_time) / (1e6), 4);
                }
                else
                {
@@ -2763,6 +3638,732 @@ size_information(int client_fd)
       else
       {
          data = pgmoneta_append(data, "pgmoneta_backup_throughput{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_basebackup_mbs The throughput of the basebackup for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_basebackup_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_basebackup_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->basebackup_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->basebackup_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_basebackup_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_manifest_mbs The throughput of the manifest for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_manifest_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_manifest_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->manifest_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->manifest_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_manifest_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_zstd_mbs The throughput of the zstd compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_zstd_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->compression_zstd_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->compression_zstd_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_gzip_mbs The throughput of the gzip compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_gzip_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->compression_gzip_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->compression_gzip_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_bzip2_mbs The throughput of the bzip2 compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_bzip2_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->compression_bzip2_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->compression_bzip2_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_lz4_mbs The throughput of the lz4 compression for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_lz4_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->compression_lz4_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->compression_lz4_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_encryption_mbs The throughput of the encryption for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_encryption_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_encryption_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->encryption_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->encryption_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_encryption_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_linking_mbs The throughput of the linking for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_linking_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_linking_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->linking_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->linking_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_linking_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_ssh_mbs The throughput of the remote_ssh for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_ssh_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->remote_ssh_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->remote_ssh_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_s3_mbs The throughput of the remote_s3 for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_s3_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->remote_s3_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->remote_s3_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_mbs{");
+
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+
+         data = pgmoneta_append(data, "\n");
+      }
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_azure_mbs The throughput of the remote_azure for a server (MB/s)\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_azure_mbs gauge\n");
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      if (number_of_backups > 0)
+      {
+         for (int j = 0; j < number_of_backups; j++)
+         {
+            if (backups[j] != NULL)
+            {
+               data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_mbs{");
+
+               data = pgmoneta_append(data, "name=\"");
+               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, "\"} ");
+
+               if (backups[j]->remote_azure_elapsed_time)
+               {
+                  data = pgmoneta_append_double_precision(data, (1.0 * backups[j]->backup_size / backups[j]->remote_azure_elapsed_time) / (1e6), 4);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, 0);
+               }
+               data = pgmoneta_append(data, "\n");
+            }
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->servers[i].name);

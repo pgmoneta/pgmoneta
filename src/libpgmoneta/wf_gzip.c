@@ -89,15 +89,16 @@ gzip_setup(int server, char* identifier, struct deque* nodes)
 static int
 gzip_execute_compress(int server, char* identifier, struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double compression_gzip_elapsed_time;
    char* d = NULL;
    char* backup_base = NULL;
    char* backup_data = NULL;
    char* tarfile = NULL;
-   time_t compression_time;
-   int total_seconds;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
@@ -108,7 +109,7 @@ gzip_execute_compress(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("GZip (compress): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   compression_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
 
@@ -145,15 +146,19 @@ gzip_execute_compress(int server, char* identifier, struct deque* nodes)
       pgmoneta_gzip_file(tarfile, d);
    }
 
-   total_seconds = (int)difftime(time(NULL), compression_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   compression_gzip_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   hours = compression_gzip_elapsed_time / 3600;
+   minutes = ((int)compression_gzip_elapsed_time % 3600) / 60;
+   seconds = (int)compression_gzip_elapsed_time % 60 + (compression_gzip_elapsed_time - ((long)compression_gzip_elapsed_time));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+
+   pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_GZIP_ELAPSED, compression_gzip_elapsed_time);
 
    free(d);
 

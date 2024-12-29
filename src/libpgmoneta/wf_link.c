@@ -82,6 +82,9 @@ link_setup(int server, char* identifier, struct deque* nodes)
 static int
 link_execute(int server, char* identifier, struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double linking_elapsed_time;
    char* server_path = NULL;
    char* from = NULL;
    char* to = NULL;
@@ -89,14 +92,13 @@ link_execute(int server, char* identifier, struct deque* nodes)
    char* to_manifest = NULL;
    char* from_tablespaces = NULL;
    char* to_tablespaces = NULL;
+   char* backup_base = NULL;
    int next_newest = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   time_t link_time;
-   int total_seconds;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
@@ -110,7 +112,7 @@ link_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Link (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   link_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    server_path = pgmoneta_get_server_backup(server);
 
@@ -160,15 +162,20 @@ link_execute(int server, char* identifier, struct deque* nodes)
             pgmoneta_workers_destroy(workers);
          }
 
-         total_seconds = (int)difftime(time(NULL), link_time);
-         hours = total_seconds / 3600;
-         minutes = (total_seconds % 3600) / 60;
-         seconds = total_seconds % 60;
+         clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+         linking_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+         hours = linking_elapsed_time / 3600;
+         minutes = ((int)linking_elapsed_time % 3600) / 60;
+         seconds = (int)linking_elapsed_time % 60 + (linking_elapsed_time - ((long)linking_elapsed_time));
 
          memset(&elapsed[0], 0, sizeof(elapsed));
-         sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+         sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
          pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+
+         backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+         pgmoneta_update_info_double(backup_base, INFO_LINKING_ELAPSED, linking_elapsed_time);
       }
    }
 

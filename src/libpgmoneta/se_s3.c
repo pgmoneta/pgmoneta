@@ -93,9 +93,14 @@ error:
 static int
 s3_storage_execute(int server, char* identifier, struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double remote_s3_elapsed_time;
    char* local_root = NULL;
    char* s3_root = NULL;
    struct configuration* config;
+
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    config = (struct configuration*)shmem;
 
@@ -109,6 +114,11 @@ s3_storage_execute(int server, char* identifier, struct deque* nodes)
    {
       goto error;
    }
+
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   remote_s3_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   pgmoneta_update_info_double(local_root, INFO_REMOTE_S3_ELAPSED, remote_s3_elapsed_time);
 
    free(local_root);
    free(s3_root);

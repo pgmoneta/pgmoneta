@@ -89,15 +89,16 @@ bzip2_setup(int server, char* identifier, struct deque* nodes)
 static int
 bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double compression_bzip2_elapsed_time;
    char* d = NULL;
    char* backup_base = NULL;
    char* backup_data = NULL;
    char* tarfile = NULL;
-   time_t compression_time;
-   int total_seconds;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
@@ -108,7 +109,7 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("BZip2 (compress): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   compression_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
 
@@ -145,15 +146,19 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
       pgmoneta_bzip2_file(tarfile, d);
    }
 
-   total_seconds = (int)difftime(time(NULL), compression_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   compression_bzip2_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   hours = compression_bzip2_elapsed_time / 3600;
+   minutes = ((int)compression_bzip2_elapsed_time % 3600) / 60;
+   seconds = (int)compression_bzip2_elapsed_time % 60 + (compression_bzip2_elapsed_time - ((long)compression_bzip2_elapsed_time));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+
+   pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_BZIP2_ELAPSED, compression_bzip2_elapsed_time);
 
    free(d);
 
@@ -164,11 +169,12 @@ static int
 bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
    char* base = NULL;
-   time_t decompress_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double decompression_bzip2_elapsed_time;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
@@ -189,7 +195,7 @@ bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
       base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
    }
 
-   decompress_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
@@ -205,13 +211,15 @@ bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_destroy(workers);
    }
 
-   total_seconds = (int)difftime(time(NULL), decompress_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   decompression_bzip2_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   hours = decompression_bzip2_elapsed_time / 3600;
+   minutes = ((int)decompression_bzip2_elapsed_time % 3600) / 60;
+   seconds = (int)decompression_bzip2_elapsed_time % 60 + (decompression_bzip2_elapsed_time - ((long)decompression_bzip2_elapsed_time));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 

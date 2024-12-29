@@ -79,15 +79,16 @@ extra_execute(int server, char* identifier, struct deque* nodes)
 {
    int usr;
    int socket = -1;
-   int seconds;
+   double seconds;
    int minutes;
    int hours;
-   int total_seconds;
+   double extra_elapsed_time;
    char elapsed[128];
    char* root = NULL;
    char* info_root = NULL;
    char* info_extra = NULL;
-   time_t start_time;
+   struct timespec start_t;
+   struct timespec end_t;
    SSL* ssl = NULL;
    struct configuration* config;
    struct query_response* qr = NULL;
@@ -106,7 +107,7 @@ extra_execute(int server, char* identifier, struct deque* nodes)
    // Create the root directory
    root = pgmoneta_get_server_extra_identifier(server, identifier);
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    pgmoneta_memory_init();
 
@@ -150,13 +151,15 @@ extra_execute(int server, char* identifier, struct deque* nodes)
       }
    }
 
-   total_seconds = (int) difftime(time(NULL), start_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+
+   extra_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+   hours = (int)extra_elapsed_time / 3600;
+   minutes = ((int)extra_elapsed_time % 3600) / 60;
+   seconds = (int)extra_elapsed_time % 60 + (extra_elapsed_time - ((long)extra_elapsed_time));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
