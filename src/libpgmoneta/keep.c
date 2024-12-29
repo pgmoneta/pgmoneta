@@ -56,9 +56,9 @@ static void
 keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    char* backup_id = NULL;
    char* d = NULL;
    int backup_index = -1;
@@ -71,7 +71,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    d = pgmoneta_get_server_backup(srv);
 
@@ -157,9 +157,9 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[backup_index]->comments, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)kr, ValueBool);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       if (k)
       {
@@ -175,7 +175,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("%s: %s/%s (Elapsed: %s)", prefix, config->servers[srv].name, backups[backup_index]->label, elapsed);
 

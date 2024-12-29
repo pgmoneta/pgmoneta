@@ -40,27 +40,38 @@ extern "C" {
 /* system */
 #include <stdlib.h>
 
-#define INFO_PGMONETA_VERSION "PGMONETA_VERSION"
-#define INFO_BACKUP           "BACKUP"
-#define INFO_CHKPT_WALPOS     "CHKPT_WALPOS"
-#define INFO_COMMENTS         "COMMENTS"
-#define INFO_COMPRESSION      "COMPRESSION"
-#define INFO_ELAPSED          "ELAPSED"
-#define INFO_ENCRYPTION       "ENCRYPTION"
-#define INFO_END_TIMELINE     "END_TIMELINE"
-#define INFO_END_WALPOS       "END_WALPOS"
-#define INFO_EXTRA            "EXTRA"
-#define INFO_HASH_ALGORITHM   "HASH_ALGORITM"
-#define INFO_KEEP             "KEEP"
-#define INFO_LABEL            "LABEL"
-#define INFO_MAJOR_VERSION    "MAJOR_VERSION"
-#define INFO_MINOR_VERSION    "MINOR_VERSION"
-#define INFO_RESTORE          "RESTORE"
-#define INFO_START_TIMELINE   "START_TIMELINE"
-#define INFO_START_WALPOS     "START_WALPOS"
-#define INFO_STATUS           "STATUS"
-#define INFO_TABLESPACES      "TABLESPACES"
-#define INFO_WAL              "WAL"
+#define INFO_PGMONETA_VERSION          "PGMONETA_VERSION"
+#define INFO_BACKUP                    "BACKUP"
+#define INFO_CHKPT_WALPOS              "CHKPT_WALPOS"
+#define INFO_COMMENTS                  "COMMENTS"
+#define INFO_COMPRESSION               "COMPRESSION"
+#define INFO_ELAPSED                   "ELAPSED"
+#define INFO_BASEBACKUP_ELAPSED        "BASEBACKUP_ELAPSED"
+#define INFO_MANIFEST_ELAPSED          "MANIFEST_ELAPSED"
+#define INFO_COMPRESSION_ZSTD_ELAPSED  "COMPRESSION_ZSTD_ELAPSED"
+#define INFO_COMPRESSION_GZIP_ELAPSED  "COMPRESSION_GZIP_ELAPSED"
+#define INFO_COMPRESSION_BZIP2_ELAPSED "COMPRESSION_BZIP2_ELAPSED"
+#define INFO_COMPRESSION_LZ4_ELAPSED   "COMPRESSION_LZ4_ELAPSED"
+#define INFO_ENCRYPTION_ELAPSED        "ENCRYPTION_ELAPSED"
+#define INFO_LINKING_ELAPSED           "LINKING_ELAPSED"
+#define INFO_REMOTE_SSH_ELAPSED        "REMOTE_SSH_ELAPSED"
+#define INFO_REMOTE_S3_ELAPSED         "REMOTE_S3_ELAPSED"
+#define INFO_REMOTE_AZURE_ELAPSED      "REMOTE_AZURE_ELAPSED"
+#define INFO_ENCRYPTION                "ENCRYPTION"
+#define INFO_END_TIMELINE              "END_TIMELINE"
+#define INFO_END_WALPOS                "END_WALPOS"
+#define INFO_EXTRA                     "EXTRA"
+#define INFO_HASH_ALGORITHM            "HASH_ALGORITM"
+#define INFO_KEEP                      "KEEP"
+#define INFO_LABEL                     "LABEL"
+#define INFO_MAJOR_VERSION             "MAJOR_VERSION"
+#define INFO_MINOR_VERSION             "MINOR_VERSION"
+#define INFO_RESTORE                   "RESTORE"
+#define INFO_START_TIMELINE            "START_TIMELINE"
+#define INFO_START_WALPOS              "START_WALPOS"
+#define INFO_STATUS                    "STATUS"
+#define INFO_TABLESPACES               "TABLESPACES"
+#define INFO_WAL                       "WAL"
 
 #define VALID_UNKNOWN -1
 #define VALID_FALSE    0
@@ -75,7 +86,18 @@ struct backup
    char wal[MISC_LENGTH];                                         /**< The name of the WAL file */
    uint64_t backup_size;                                          /**< The backup size */
    uint64_t restore_size;                                         /**< The restore size */
-   int32_t elapsed_time;                                          /**< The elapsed time in seconds */
+   double total_elapsed_time;                                     /**< The total elapsed time in seconds */
+   double basebackup_elapsed_time;                                /**< The basebackup elapsed time in seconds */
+   double manifest_elapsed_time;                                  /**< The manifest elapsed time in seconds */
+   double compression_gzip_elapsed_time;                          /**< The compression elapsed time in seconds */
+   double compression_zstd_elapsed_time;                          /**< The compression elapsed time in seconds */
+   double compression_lz4_elapsed_time;                           /**< The compression elapsed time in seconds */
+   double compression_bzip2_elapsed_time;                         /**< The compression elapsed time in seconds */
+   double encryption_elapsed_time;                                /**< The encryption elapsed time in seconds */
+   double linking_elapsed_time;                                   /**< The linking elapsed time in seconds */
+   double remote_ssh_elapsed_time;                                /**< The remote ssh elapsed time in seconds */
+   double remote_s3_elapsed_time;                                 /**< The remote s3 elapsed time in seconds */
+   double remote_azure_elapsed_time;                              /**< The remote azure elapsed time in seconds */
    int32_t major_version;                                         /**< The major version */
    int32_t minor_version;                                         /**< The minor version */
    bool keep;                                                     /**< Keep the backup */
@@ -116,6 +138,15 @@ pgmoneta_create_info(char* directory, char* label, int status);
  */
 void
 pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long value);
+
+/**
+ * Update backup information: float
+ * @param directory The backup directory
+ * @param key The key
+ * @param value The value
+ */
+void
+pgmoneta_update_info_double(char* directory, char* key, double value);
 
 /**
  * Update backup information: string

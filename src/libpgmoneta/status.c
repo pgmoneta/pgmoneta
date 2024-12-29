@@ -51,9 +51,9 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
    char** array = NULL;
    uint64_t server_size;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    int32_t number_of_backups = 0;
    struct backup** backups = NULL;
    struct json* response = NULL;
@@ -64,7 +64,7 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -185,9 +185,9 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVERS, (uintptr_t)servers, ValueJSON);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Status: Error sending response");
@@ -195,7 +195,7 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Status (Elapsed: %s)", elapsed);
 
@@ -242,9 +242,9 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
    char** array = NULL;
    uint64_t server_size;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    uint64_t wal;
    uint64_t delta;
    int32_t number_of_backups = 0;
@@ -258,7 +258,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -431,9 +431,9 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVERS, (uintptr_t)servers, ValueJSON);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Status details: Error sending response");
@@ -441,7 +441,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Status details (Elapsed: %s)", elapsed);
 

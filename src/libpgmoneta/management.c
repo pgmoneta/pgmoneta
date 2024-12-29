@@ -46,7 +46,7 @@
 
 static int create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, struct json** json);
 static int create_request(struct json* json, struct json** request);
-static int create_outcome_success(struct json* json, time_t start_time, time_t end_time, struct json** outcome);
+static int create_outcome_success(struct json* json, struct timespec start_t, struct timespec end_t, struct json** outcome);
 static int create_outcome_failure(struct json* json, int32_t error, struct json** outcome);
 
 static int read_uint8(char* prefix, SSL* ssl, int socket, uint8_t* i);
@@ -880,7 +880,7 @@ error:
 }
 
 int
-pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_management_response_ok(SSL* ssl, int socket, struct timespec start_time, struct timespec end_time, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    struct json* outcome = NULL;
 
@@ -1723,9 +1723,9 @@ error:
 }
 
 static int
-create_outcome_success(struct json* json, time_t start_time, time_t end_time, struct json** outcome)
+create_outcome_success(struct json* json, struct timespec start_t, struct timespec end_t, struct json** outcome)
 {
-   int32_t total_seconds = 0;
+   double total_seconds = 0;
    char* elapsed = NULL;
    struct json* r = NULL;
 
@@ -1736,7 +1736,7 @@ create_outcome_success(struct json* json, time_t start_time, time_t end_time, st
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)true, ValueBool);
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_TIME, (uintptr_t)elapsed, ValueString);

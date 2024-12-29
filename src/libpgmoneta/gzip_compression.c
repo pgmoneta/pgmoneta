@@ -274,13 +274,13 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    char* from = NULL;
    char* to = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    struct json* req = NULL;
    struct json* response = NULL;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
@@ -319,16 +319,16 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("GZip: %s (Elapsed: %s)", from, elapsed);
 
@@ -386,13 +386,13 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
    char* orig = NULL;
    char* to = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    struct json* req = NULL;
    struct json* response = NULL;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    from = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_SOURCE_FILE);
@@ -431,16 +431,16 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DESTINATION_FILE, (uintptr_t)to, ValueString);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("GZip: %s (Elapsed: %s)", from, elapsed);
 

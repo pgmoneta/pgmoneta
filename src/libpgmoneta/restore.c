@@ -77,9 +77,9 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    char* position = NULL;
    char* directory = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds = 0;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds = 0;
    char* output = NULL;
    char* label = NULL;
    char* server_backup = NULL;
@@ -92,7 +92,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    atomic_fetch_add(&config->active_restores, 1);
    atomic_fetch_add(&config->servers[server].restore, 1);
@@ -128,9 +128,9 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backup->compression, ValueInt32);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backup->encryption, ValueInt32);
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, compression, encryption, payload);
          pgmoneta_log_error("Restore: Error sending response for %s", config->servers[server].name);
@@ -138,7 +138,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+      elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
       pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, backup->label, elapsed);
    }
    else

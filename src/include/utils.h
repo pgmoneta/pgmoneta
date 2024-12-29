@@ -1127,6 +1127,15 @@ int64_t
 pgmoneta_get_y2000_timestamp(void);
 
 /**
+ * Get the duration between two points of time
+ * @param start_time The start time
+ * @param end_time The end time
+ * @return The duration in seconds
+ */
+double
+pgmoneta_compute_duration(struct timespec start_time, struct timespec end_time);
+
+/**
  * Get the timestramp difference as a string
  * @param start_time The start time
  * @param end_time The end time
@@ -1134,7 +1143,7 @@ pgmoneta_get_y2000_timestamp(void);
  * @return The timestamp string
  */
 char*
-pgmoneta_get_timestamp_string(time_t start_time, time_t end_time, int32_t* seconds);
+pgmoneta_get_timestamp_string(struct timespec start_time, struct timespec end_time, double* seconds);
 
 /**
  * Convert base32 to hexadecimal.

@@ -58,9 +58,9 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    char* directory = NULL;
    char* elapsed = NULL;
    char real_directory[MAX_PATH];
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    char* label = NULL;
    char* output = NULL;
    char* filename = NULL;
@@ -76,7 +76,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    atomic_fetch_add(&config->active_archives, 1);
    atomic_fetch_add(&config->servers[server].archiving, 1);
@@ -196,9 +196,9 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
 
-      end_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-      if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+      if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, compression, encryption, payload);
          pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, identifier);
@@ -206,7 +206,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+      elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
    }

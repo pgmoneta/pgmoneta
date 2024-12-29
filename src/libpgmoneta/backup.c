@@ -54,9 +54,10 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    char* date = NULL;
    char* elapsed = NULL;
    struct tm* time_info;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   time_t curr_t;
+   double total_seconds;
    char* server_backup = NULL;
    char* root = NULL;
    char* d = NULL;
@@ -96,10 +97,11 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto done;
    }
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
+   curr_t = time(NULL);
    memset(&date_str[0], 0, sizeof(date_str));
-   time_info = localtime(&start_time);
+   time_info = localtime(&curr_t);
    strftime(&date_str[0], sizeof(date_str), "%Y%m%d%H%M%S", time_info);
 
    date = pgmoneta_append(date, &date_str[0]);
@@ -176,13 +178,13 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backup->encryption, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backup->valid, ValueInt8);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_update_info_unsigned_long(root, INFO_ELAPSED, total_seconds);
+   pgmoneta_update_info_double(root, INFO_ELAPSED, total_seconds);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Backup: Error sending response for %s", config->servers[server].name);
@@ -243,9 +245,9 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
    char* d = NULL;
    char* wal_dir = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    int32_t number_of_backups = 0;
    struct backup** backups = NULL;
    uint64_t wal = 0;
@@ -259,7 +261,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (pgmoneta_deque_create(false, &jl))
    {
@@ -394,9 +396,9 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUPS, (uintptr_t)bcks, ValueJSON);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("List backup: Error sending response for %s", config->servers[server].name);
@@ -404,7 +406,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
    pgmoneta_log_info("List backup: %s (Elapsed: %s)", config->servers[server].name, elapsed);
 
    pgmoneta_json_destroy(payload);
@@ -456,9 +458,9 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 {
    char* identifier = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    struct json* req = NULL;
    struct json* response = NULL;
    struct workflow* workflow = NULL;
@@ -470,7 +472,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (pgmoneta_deque_create(false, &nodes))
    {
@@ -528,9 +530,9 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL), ValueString);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Delete: Error sending response for %s", config->servers[srv].name);
@@ -538,7 +540,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->servers[srv].name,
                      (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL), elapsed);

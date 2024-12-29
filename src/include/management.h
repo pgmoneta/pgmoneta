@@ -623,7 +623,7 @@ pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* b
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_response_ok(SSL* ssl, int socket, time_t start_time, time_t end_time, uint8_t compression, uint8_t encryption, struct json* payload);
+pgmoneta_management_response_ok(SSL* ssl, int socket, struct timespec start_time, struct timespec end_time, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
  * Create an error response

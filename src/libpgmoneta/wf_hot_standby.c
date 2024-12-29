@@ -84,11 +84,12 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
    char* destination = NULL;
    char* old_manifest = NULL;
    char* new_manifest = NULL;
-   time_t start_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double hot_standby_elapsed_time;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_workers = 0;
    char* f = NULL;
@@ -118,7 +119,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      start_time = time(NULL);
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
       base = pgmoneta_get_server_backup(server);
 
@@ -290,13 +291,15 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
          pgmoneta_workers_destroy(workers);
       }
 
-      total_seconds = (int)difftime(time(NULL), start_time);
-      hours = total_seconds / 3600;
-      minutes = (total_seconds % 3600) / 60;
-      seconds = total_seconds % 60;
+      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+
+      hot_standby_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+      hours = (int)hot_standby_elapsed_time / 3600;
+      minutes = ((int)hot_standby_elapsed_time % 3600) / 60;
+      seconds = (int)hot_standby_elapsed_time % 60 + (hot_standby_elapsed_time - ((long)hot_standby_elapsed_time));
 
       memset(&elapsed[0], 0, sizeof(elapsed));
-      sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+      sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
       pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
    }

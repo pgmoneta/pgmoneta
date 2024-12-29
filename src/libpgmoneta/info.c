@@ -183,6 +183,84 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
 }
 
 void
+pgmoneta_update_info_double(char* directory, char* key, double value)
+{
+   char buffer[INFO_BUFFER_SIZE];
+   char line[INFO_BUFFER_SIZE];
+   bool found = false;
+   char* s = NULL;
+   FILE* sfile = NULL;
+   char* d = NULL;
+   FILE* dfile = NULL;
+
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, "/backup.info");
+
+   d = pgmoneta_append(d, directory);
+   d = pgmoneta_append(d, "/backup.info.tmp");
+
+   sfile = fopen(s, "r");
+   dfile = fopen(d, "w");
+
+   while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
+   {
+      char k[INFO_BUFFER_SIZE];
+      char v[INFO_BUFFER_SIZE];
+      char* ptr = NULL;
+
+      memset(&k[0], 0, sizeof(k));
+      memset(&v[0], 0, sizeof(v));
+
+      memset(&line[0], 0, sizeof(line));
+      memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
+
+      ptr = strtok(&buffer[0], "=");
+      memcpy(&k[0], ptr, strlen(ptr));
+
+      ptr = strtok(NULL, "=");
+      memcpy(&v[0], ptr, strlen(ptr) - 1);
+
+      if (!strcmp(key, &k[0]))
+      {
+         memset(&line[0], 0, sizeof(line));
+         snprintf(&line[0], sizeof(line), "%s=%.4f\n", key, value);
+         fputs(&line[0], dfile);
+         found = true;
+      }
+      else
+      {
+         fputs(&line[0], dfile);
+      }
+   }
+
+   if (!found)
+   {
+      memset(&line[0], 0, sizeof(line));
+      pgmoneta_log_trace("%s=%.4f", key, value);
+      snprintf(&line[0], sizeof(line), "%s=%.4f\n", key, value);
+      fputs(&line[0], dfile);
+   }
+
+   if (sfile != NULL)
+   {
+      fsync(fileno(sfile));
+      fclose(sfile);
+   }
+
+   if (dfile != NULL)
+   {
+      fsync(fileno(dfile));
+      fclose(dfile);
+   }
+
+   pgmoneta_move_file(d, s);
+   pgmoneta_permission(s, 6, 0, 0);
+
+   free(s);
+   free(d);
+}
+
+void
 pgmoneta_update_info_string(char* directory, char* key, char* value)
 {
    char buffer[INFO_BUFFER_SIZE];
@@ -783,6 +861,17 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
 
    memset(bck, 0, sizeof(struct backup));
    bck->valid = VALID_UNKNOWN;
+   bck->basebackup_elapsed_time = 0;
+   bck->manifest_elapsed_time = 0;
+   bck->compression_zstd_elapsed_time = 0;
+   bck->compression_bzip2_elapsed_time = 0;
+   bck->compression_lz4_elapsed_time = 0;
+   bck->compression_gzip_elapsed_time = 0;
+   bck->encryption_elapsed_time = 0;
+   bck->linking_elapsed_time = 0;
+   bck->remote_ssh_elapsed_time = 0;
+   bck->remote_azure_elapsed_time = 0;
+   bck->remote_s3_elapsed_time = 0;
 
    if (file != NULL)
    {
@@ -842,7 +931,51 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          }
          else if (!strcmp(INFO_ELAPSED, &key[0]))
          {
-            bck->elapsed_time = atoi(&value[0]);
+            bck->total_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_BASEBACKUP_ELAPSED, &key[0]))
+         {
+            bck->basebackup_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_MANIFEST_ELAPSED, &key[0]))
+         {
+            bck->manifest_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_COMPRESSION_ZSTD_ELAPSED, &key[0]))
+         {
+            bck->compression_zstd_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_COMPRESSION_BZIP2_ELAPSED, &key[0]))
+         {
+            bck->compression_bzip2_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_COMPRESSION_GZIP_ELAPSED, &key[0]))
+         {
+            bck->compression_gzip_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_COMPRESSION_LZ4_ELAPSED, &key[0]))
+         {
+            bck->compression_lz4_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_ENCRYPTION_ELAPSED, &key[0]))
+         {
+            bck->encryption_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_LINKING_ELAPSED, &key[0]))
+         {
+            bck->linking_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_REMOTE_SSH_ELAPSED, &key[0]))
+         {
+            bck->remote_ssh_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_REMOTE_AZURE_ELAPSED, &key[0]))
+         {
+            bck->remote_azure_elapsed_time = atof(&value[0]);
+         }
+         else if (!strcmp(INFO_REMOTE_S3_ELAPSED, &key[0]))
+         {
+            bck->remote_s3_elapsed_time = atof(&value[0]);
          }
          else if (!strcmp(INFO_MAJOR_VERSION, &key[0]))
          {
@@ -988,9 +1121,9 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
    char* identifier = NULL;
    char* d = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    int32_t number_of_backups = 0;
    struct backup** backups = NULL;
    struct backup* bck = NULL;
@@ -1001,7 +1134,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    d = pgmoneta_get_server_backup(server);
 
@@ -1059,7 +1192,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)bck->wal, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)bck->backup_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)bck->restore_size, ValueUInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->elapsed_time, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->total_elapsed_time, ValueFloat);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)bck->major_version, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)bck->minor_version, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)bck->keep, ValueBool);
@@ -1107,9 +1240,9 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)bck->comments, ValueString);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Info: Error sending response");
@@ -1117,7 +1250,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Info: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
 
@@ -1168,9 +1301,9 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    char* comment = NULL;
    char* d = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    int32_t number_of_backups = 0;
    struct backup** backups = NULL;
    struct backup* bck = NULL;
@@ -1181,7 +1314,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    d = pgmoneta_get_server_backup(server);
 
@@ -1251,7 +1384,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)bck->wal, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)bck->backup_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)bck->restore_size, ValueUInt64);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->elapsed_time, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->total_elapsed_time, ValueFloat);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)bck->major_version, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)bck->minor_version, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)bck->keep, ValueBool);
@@ -1299,9 +1432,9 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)bck->comments, ValueString);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Annotate: Error sending response");
@@ -1309,7 +1442,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Annotate: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
 

@@ -281,6 +281,9 @@ static int
 ssh_storage_backup_execute(int server, char* identifier,
                            struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double remote_ssh_elapsed_time;
    char* server_path = NULL;
    char* local_root = NULL;
    char* remote_root = NULL;
@@ -289,6 +292,8 @@ ssh_storage_backup_execute(int server, char* identifier,
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct configuration* config;
+
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    config = (struct configuration*)shmem;
 
@@ -365,6 +370,11 @@ ssh_storage_backup_execute(int server, char* identifier,
    {
       free(latest_backup_sha256);
    }
+
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   remote_ssh_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   pgmoneta_update_info_double(local_root, INFO_REMOTE_SSH_ELAPSED, remote_ssh_elapsed_time);
 
    free(server_path);
    free(remote_root);

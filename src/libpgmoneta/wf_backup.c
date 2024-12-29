@@ -85,7 +85,8 @@ basebackup_setup(int server, char* identifier, struct deque* nodes)
 static int
 basebackup_execute(int server, char* identifier, struct deque* nodes)
 {
-   time_t start_time;
+   struct timespec start_t;
+   struct timespec end_t;
    int status;
    char* backup_base = NULL;
    char* backup_data = NULL;
@@ -93,10 +94,10 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    int usr;
    SSL* ssl = NULL;
    int socket = -1;
-   int total_seconds;
+   double basebackup_elapsed_time;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    int number_of_tablespaces = 0;
    char* label = NULL;
@@ -128,7 +129,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Basebackup (execute): %s/%s", config->servers[server].name, identifier);
    pgmoneta_deque_list(nodes);
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    pgmoneta_memory_init();
 
@@ -319,13 +320,15 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    // receive and ignore the last result set, it's just a summary
    pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response);
 
-   total_seconds = (int) difftime(time(NULL), start_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+
+   basebackup_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+   hours = (int)basebackup_elapsed_time / 3600;
+   minutes = ((int)basebackup_elapsed_time % 3600) / 60;
+   seconds = (int)basebackup_elapsed_time % 60 + (basebackup_elapsed_time - ((long)basebackup_elapsed_time));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
@@ -356,6 +359,8 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_update_info_unsigned_long(backup_base, INFO_START_TIMELINE, start_timeline);
    pgmoneta_update_info_unsigned_long(backup_base, INFO_END_TIMELINE, end_timeline);
    pgmoneta_update_info_unsigned_long(backup_base, INFO_HASH_ALGORITHM, hash);
+   pgmoneta_update_info_double(backup_base, INFO_BASEBACKUP_ELAPSED, basebackup_elapsed_time);
+
    // in case of parsing error
    if (chkptpos != NULL)
    {

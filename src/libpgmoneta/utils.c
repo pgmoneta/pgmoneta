@@ -3702,28 +3702,37 @@ pgmoneta_get_y2000_timestamp(void)
    return y2000 * (int64_t)1000000;
 }
 
-char*
-pgmoneta_get_timestamp_string(time_t start_time, time_t end_time, int32_t* seconds)
+double
+pgmoneta_compute_duration(struct timespec start_time, struct timespec end_time)
 {
-   int32_t total_seconds;
+   double nano = (double)(end_time.tv_nsec - start_time.tv_nsec);
+   double sec = (double)((end_time.tv_sec - start_time.tv_sec) * 1E9);
+   return (sec + nano) / (1E9);
+}
+
+char*
+pgmoneta_get_timestamp_string(struct timespec start_time, struct timespec end_time, double* seconds)
+{
+   double total_seconds;
    int hours;
    int minutes;
-   int sec;
+   double sec;
    char elapsed[128];
    char* result = NULL;
 
    *seconds = 0;
 
-   total_seconds = (int32_t)difftime(end_time, start_time);
+   // total_seconds = (int32_t)difftime(end_time, start_time);
+   total_seconds = pgmoneta_compute_duration(start_time, end_time);
 
    *seconds = total_seconds;
 
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   sec = total_seconds % 60;
+   hours = (int)total_seconds / 3600;
+   minutes = ((int)total_seconds % 3600) / 60;
+   sec = (int)total_seconds % 60 + (total_seconds - ((long)total_seconds));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, sec);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, sec);
 
    result = pgmoneta_append(result, &elapsed[0]);
 

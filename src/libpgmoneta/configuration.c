@@ -2153,13 +2153,13 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 {
    struct json* response = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
 
    pgmoneta_start_logging();
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -2171,9 +2171,9 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    add_configuration_response(response);
    add_servers_configuration_response(response);
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_GET_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Conf Get: Error sending response");
@@ -2181,7 +2181,7 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Conf Get (Elapsed: %s)", elapsed);
 
@@ -2212,11 +2212,11 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    char* config_key = NULL;
    char* config_value = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    char section[MISC_LENGTH];
    char key[MISC_LENGTH];
-   int total_seconds;
    struct configuration* config = NULL;
    struct json* server_j = NULL;
    size_t max;
@@ -2225,7 +2225,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
    pgmoneta_start_logging();
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    config = (struct configuration*)shmem;
    // Extract config_key and config_value from request
@@ -3069,16 +3069,16 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       }
    }
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Conf Set: Error sending response");
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Conf Set (Elapsed: %s)", elapsed);
 

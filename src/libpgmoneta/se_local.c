@@ -31,6 +31,7 @@
 #include <info.h>
 #include <logging.h>
 #include <storage.h>
+#include <utils.h>
 
 /* system */
 #include <stdlib.h>
@@ -75,24 +76,26 @@ local_storage_setup(int server, char* identifier, struct deque* nodes)
 static int
 local_storage_execute(int server, char* identifier, struct deque* nodes)
 {
-   time_t start_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    int hours;
    int minutes;
-   int seconds;
+   double seconds;
    char elapsed[128];
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
-   total_seconds = (int)difftime(time(NULL), start_time);
-   hours = total_seconds / 3600;
-   minutes = (total_seconds % 3600) / 60;
-   seconds = total_seconds % 60;
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   total_seconds = pgmoneta_compute_duration(start_t, end_t);
+   hours = (int)total_seconds / 3600;
+   minutes = ((int)total_seconds % 3600) / 60;
+   seconds = (int)total_seconds % 60 + (total_seconds - ((long)total_seconds));
 
    memset(&elapsed[0], 0, sizeof(elapsed));
-   sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
+   sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
    pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
    pgmoneta_deque_list(nodes);

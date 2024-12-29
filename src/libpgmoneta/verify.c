@@ -50,9 +50,9 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    char* directory = NULL;
    char* files = NULL;
    char* elapsed = NULL;
-   time_t start_time;
-   time_t end_time;
-   int total_seconds;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
    char* label = NULL;
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
@@ -73,7 +73,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    config = (struct configuration*)shmem;
 
-   start_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -209,9 +209,9 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_DESTINATION));
 
-   end_time = time(NULL);
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_time, end_time, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Verify: Error sending response for %s/%s", config->servers[server].name, identifier);
@@ -219,7 +219,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       goto error;
    }
 
-   elapsed = pgmoneta_get_timestamp_string(start_time, end_time, &total_seconds);
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Verify: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
 

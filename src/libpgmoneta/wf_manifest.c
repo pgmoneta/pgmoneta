@@ -76,6 +76,9 @@ manifest_setup(int server, char* identifier, struct deque* nodes)
 static int
 manifest_execute_build(int server, char* identifier, struct deque* nodes)
 {
+   struct timespec start_t;
+   struct timespec end_t;
+   double manifest_elapsed_time;
    char* backup_base = NULL;
    char* backup_data = NULL;
    char* manifest_orig = NULL;
@@ -88,6 +91,8 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
    struct configuration* config;
+
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    config = (struct configuration*)shmem;
 
@@ -152,6 +157,10 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
    free(manifest);
    free(manifest_orig);
 
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+   manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   pgmoneta_update_info_double(backup_base, INFO_MANIFEST_ELAPSED, manifest_elapsed_time);
    return 0;
 
 error:

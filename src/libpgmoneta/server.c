@@ -582,7 +582,7 @@ error:
 }
 
 static int
-get_segment_size(SSL * ssl, int socket, int server, size_t* segsz)
+get_segment_size(SSL* ssl, int socket, int server, size_t* segsz)
 {
    int q = 0;
    bool mb = true;
