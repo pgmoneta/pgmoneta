@@ -501,7 +501,7 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR)
+      if (entry->d_type == DT_DIR || entry->d_type == DT_LNK)
       {
          char path[1024];
 

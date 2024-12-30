@@ -476,10 +476,6 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
    DIR* dir;
    struct dirent* entry;
 
-   if (pgmoneta_ends_with(directory, "pg_tblspc"))
-   {
-      return;
-   }
 
    if (!(dir = opendir(directory)))
    {
@@ -510,7 +506,7 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR)
+      if (entry->d_type == DT_DIR || entry->d_type == DT_LNK)
       {
          char path[1024];
 
