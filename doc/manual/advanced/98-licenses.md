@@ -3,7 +3,7 @@
 # License
 
 ```
-Copyright (C) 2024 The pgmoneta community
+Copyright (C) 2025 The pgmoneta community
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
