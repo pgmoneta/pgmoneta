@@ -39,7 +39,7 @@
 
 #define ENC_BUF_SIZE (1024 * 1024)
 
-static int encrypt_file(char* from, char* to, int enc);
+static int encrypt_file(char* from, char* to, int encryption_type, int enc);
 static int derive_key_iv(char* password, unsigned char* key, unsigned char* iv, int mode);
 static int aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphertext, int* ciphertext_length, int mode);
 static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigned char* iv, char** plaintext, int mode);
@@ -131,10 +131,13 @@ static void
 do_encrypt_file(void* arg)
 {
    struct worker_input* wi = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    wi = (struct worker_input*)arg;
 
-   encrypt_file(wi->from, wi->to, 1);
+   encrypt_file(wi->from, wi->to, config->compression_type, 1);
    pgmoneta_delete_file(wi->from, true, NULL);
 
    free(wi);
@@ -236,7 +239,7 @@ pgmoneta_encrypt_wal(char* d)
 
          if (pgmoneta_exists(from))
          {
-            encrypt_file(from, to, 1);
+            encrypt_file(from, to, config->compression_type, 1);
             pgmoneta_delete_file(from, true, NULL);
             pgmoneta_permission(to, 6, 0, 0);
          }
@@ -251,7 +254,7 @@ pgmoneta_encrypt_wal(char* d)
 }
 
 void
-pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, int32_t encryption_type, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -277,7 +280,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
    to = pgmoneta_append(to, from);
    to = pgmoneta_append(to, ".aes");
 
-   if (encrypt_file(from, to, 1))
+   if (encrypt_file(from, to, encryption_type, 1))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Error encrypting %s", from);
@@ -322,7 +325,7 @@ error:
 }
 
 int
-pgmoneta_encrypt_file(char* from, char* to)
+pgmoneta_encrypt_file(char* from, char* to, int encryption_type)
 {
    int flag = 0;
    if (!pgmoneta_exists(from))
@@ -338,7 +341,7 @@ pgmoneta_encrypt_file(char* from, char* to)
       flag = 1;
    }
 
-   encrypt_file(from, to, 1);
+   encrypt_file(from, to, encryption_type, 1);
    pgmoneta_delete_file(from, true, NULL);
    if (flag)
    {
@@ -348,7 +351,7 @@ pgmoneta_encrypt_file(char* from, char* to)
 }
 
 int
-pgmoneta_decrypt_file(char* from, char* to)
+pgmoneta_decrypt_file(char* from, char* to, int encryption_type)
 {
    int flag = 0;
 
@@ -364,7 +367,7 @@ pgmoneta_decrypt_file(char* from, char* to)
       flag = 1;
    }
 
-   encrypt_file(from, to, 0);
+   encrypt_file(from, to, encryption_type, 0);
    pgmoneta_delete_file(from, true, NULL);
 
    if (flag)
@@ -468,17 +471,20 @@ static void
 do_decrypt_file(void* arg)
 {
    struct worker_input* wi = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    wi = (struct worker_input*)arg;
 
-   encrypt_file(wi->from, wi->to, 0);
+   encrypt_file(wi->from, wi->to, config->encryption, 0);
    pgmoneta_delete_file(wi->from, true, NULL);
 
    free(wi);
 }
 
 void
-pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, int encryption_type, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -512,7 +518,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
    memset(to, 0, strlen(from) - 3);
    memcpy(to, from, strlen(from) - 4);
 
-   if (encrypt_file(from, to, 0))
+   if (encrypt_file(from, to, encryption_type, 0))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Error decrypting %s", from);
@@ -764,13 +770,12 @@ static const EVP_CIPHER* (*get_cipher(int mode))(void)
 
 // enc: 1 for encrypt, 0 for decrypt
 static int
-encrypt_file(char* from, char* to, int enc)
+encrypt_file(char* from, char* to, int32_t encryption_type, int enc)
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
-   struct configuration* config;
    const EVP_CIPHER* (* cipher_fp)(void) = NULL;
    int cipher_block_size = 0;
    int inbuf_size = 0;
@@ -781,8 +786,7 @@ encrypt_file(char* from, char* to, int enc)
    int outl = 0;
    int f_len = 0;
 
-   config = (struct configuration*)shmem;
-   cipher_fp = get_cipher(config->encryption);
+   cipher_fp = get_cipher(encryption_type);
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
    inbuf_size = ENC_BUF_SIZE;
    outbuf_size = inbuf_size + cipher_block_size - 1;
@@ -796,7 +800,7 @@ encrypt_file(char* from, char* to, int enc)
    }
    memset(&key, 0, sizeof(key));
    memset(&iv, 0, sizeof(iv));
-   if (derive_key_iv(master_key, key, iv, config->encryption) != 0)
+   if (derive_key_iv(master_key, key, iv, encryption_type) != 0)
    {
       pgmoneta_log_fatal("derive_key_iv: Failed to derive key and iv");
       goto error;

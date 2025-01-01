@@ -535,11 +535,12 @@ pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* ba
  * @param path The file path
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param encryption_type The encrypt method for file decryption
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format);
 
 /**
  * Create an encrypt request
@@ -548,11 +549,12 @@ pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t co
  * @param path The file path
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param encryption_type The encrypt method for file encryption
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format);
 
 /**
  * Create a decompress request
@@ -561,11 +563,12 @@ pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t co
  * @param path The file path
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param compression_type The compress method for file decompression 
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format);
 
 /**
  * Create a compress request
@@ -574,11 +577,12 @@ pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t
  * @param path The file path
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param compression_type The compress method for file compression 
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format);
 
 /**
  * Create an info request

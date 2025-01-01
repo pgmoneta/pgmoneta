@@ -226,6 +226,9 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
    char* wal_path = NULL;
    bool copy = true;
    uint32_t cur_limit = 0;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    if (!pgmoneta_is_file(path))
    {
@@ -253,7 +256,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decrypted_file_name);
       free(decrypted_file_name);
 
-      if (pgmoneta_decrypt_file(tmp_wal, wal_path))
+      if (pgmoneta_decrypt_file(tmp_wal, wal_path, config->encryption))
       {
          pgmoneta_log_fatal("Failed to decrypt WAL file at %s", path);
          goto error;

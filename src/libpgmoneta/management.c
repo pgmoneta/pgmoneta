@@ -634,12 +634,12 @@ error:
 }
 
 int
-pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_DECRYPT, compression, encryption, output_format, &j))
+   if (create_header(MANAGEMENT_DECRYPT, compression, encryption_type, output_format, &j))
    {
       goto error;
    }
@@ -668,12 +668,12 @@ error:
 }
 
 int
-pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_ENCRYPT, compression, encryption, output_format, &j))
+   if (create_header(MANAGEMENT_ENCRYPT, compression, encryption_type, output_format, &j))
    {
       goto error;
    }
@@ -702,12 +702,12 @@ error:
 }
 
 int
-pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_DECOMPRESS, compression, encryption, output_format, &j))
+   if (create_header(MANAGEMENT_DECOMPRESS, compression_type, encryption, output_format, &j))
    {
       goto error;
    }
@@ -736,12 +736,12 @@ error:
 }
 
 int
-pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_COMPRESS, compression, encryption, output_format, &j))
+   if (create_header(MANAGEMENT_COMPRESS, compression_type, encryption, output_format, &j))
    {
       goto error;
    }

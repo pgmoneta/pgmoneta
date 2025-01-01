@@ -624,7 +624,12 @@ lz4_decompress(char* from, char* to)
 
       //If return value 1,read bytes == sizeof(int)
       //If return value 0,read bytes  < sizeof(int)
-      if ((read = fread(&compression, sizeof(compression), 1, fin) < sizeof(compression)))
+      read = fread(&compression, 1, sizeof(compression), fin);
+      if (read == 0)
+      {
+         break;
+      }
+      if (read < sizeof(compression))
       {
          pgmoneta_log_error("lz4_decompression from file compression bytes < sizeof(int)");
          goto error;

@@ -117,10 +117,10 @@ static int reset(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, 
 static int reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format);
+static int encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format);
+static int decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format);
+static int compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format);
 static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -429,6 +429,8 @@ main(int argc, char** argv)
    int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
    int32_t compression = MANAGEMENT_COMPRESSION_NONE;
    int32_t encryption = MANAGEMENT_ENCRYPTION_NONE;
+   int32_t compression_type = MANAGEMENT_COMPRESSION_NONE;
+   int32_t encryption_type = MANAGEMENT_ENCRYPTION_NONE;
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
 
@@ -509,19 +511,19 @@ main(int argc, char** argv)
          case 'C':
             if (!strncmp(optarg, "gz", MISC_LENGTH))
             {
-               compression = MANAGEMENT_COMPRESSION_GZIP;
+               compression_type = MANAGEMENT_COMPRESSION_GZIP;
             }
             else if (!strncmp(optarg, "zstd", MISC_LENGTH))
             {
-               compression = MANAGEMENT_COMPRESSION_ZSTD;
+               compression_type = MANAGEMENT_COMPRESSION_ZSTD;
             }
             else if (!strncmp(optarg, "lz4", MISC_LENGTH))
             {
-               compression = MANAGEMENT_COMPRESSION_LZ4;
+               compression_type = MANAGEMENT_COMPRESSION_LZ4;
             }
             else if (!strncmp(optarg, "bz2", MISC_LENGTH))
             {
-               compression = MANAGEMENT_COMPRESSION_BZIP2;
+               compression_type = MANAGEMENT_COMPRESSION_BZIP2;
             }
             else if (!strncmp(optarg, "none", MISC_LENGTH))
             {
@@ -536,19 +538,19 @@ main(int argc, char** argv)
          case 'E':
             if (!strncmp(optarg, "aes", MISC_LENGTH))
             {
-               encryption = MANAGEMENT_ENCRYPTION_AES256;
+               encryption_type = MANAGEMENT_ENCRYPTION_AES256;
             }
             else if (!strncmp(optarg, "aes256", MISC_LENGTH))
             {
-               encryption = MANAGEMENT_ENCRYPTION_AES256;
+               encryption_type = MANAGEMENT_ENCRYPTION_AES256;
             }
             else if (!strncmp(optarg, "aes192", MISC_LENGTH))
             {
-               encryption = MANAGEMENT_ENCRYPTION_AES192;
+               encryption_type = MANAGEMENT_ENCRYPTION_AES192;
             }
             else if (!strncmp(optarg, "aes128", MISC_LENGTH))
             {
-               encryption = MANAGEMENT_ENCRYPTION_AES128;
+               encryption_type = MANAGEMENT_ENCRYPTION_AES128;
             }
             else if (!strncmp(optarg, "none", MISC_LENGTH))
             {
@@ -619,6 +621,9 @@ main(int argc, char** argv)
       }
 
       config = (struct configuration*)shmem;
+
+      compression = config->compression_type;
+      encryption = config->encryption;
    }
    else
    {
@@ -820,19 +825,35 @@ password:
    }
    else if (parsed.cmd->action == MANAGEMENT_DECRYPT)
    {
-      exit_code = decrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      exit_code = decrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, encryption_type, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_ENCRYPT)
    {
-      exit_code = encrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      exit_code = encrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, encryption_type, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_DECOMPRESS)
    {
-      exit_code = decompress_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      if (pgmoneta_ends_with(parsed.args[0], ".zstd"))
+      {
+         compression_type = MANAGEMENT_COMPRESSION_ZSTD;
+      }
+      else if (pgmoneta_ends_with(parsed.args[0], ".gz"))
+      {
+         compression_type = MANAGEMENT_COMPRESSION_GZIP;
+      }
+      else if (pgmoneta_ends_with(parsed.args[0], ".lz4"))
+      {
+         compression_type = MANAGEMENT_COMPRESSION_LZ4;
+      }
+      else if (pgmoneta_ends_with(parsed.args[0], ".bzip2"))
+      {
+         compression_type = MANAGEMENT_COMPRESSION_BZIP2;
+      }
+      exit_code = decompress_data(s_ssl, socket, parsed.args[0], compression, encryption, compression_type, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_COMPRESS)
    {
-      exit_code = compress_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      exit_code = compress_data(s_ssl, socket, parsed.args[0], compression, encryption, compression_type, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_INFO)
    {
@@ -1403,9 +1424,9 @@ error:
 }
 
 static int
-decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format)
 {
-   if (pgmoneta_management_request_decrypt(ssl, socket, path, compression, encryption, output_format))
+   if (pgmoneta_management_request_decrypt(ssl, socket, path, compression, encryption, encryption_type, output_format))
    {
       goto error;
    }
@@ -1423,9 +1444,9 @@ error:
 }
 
 static int
-encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t encryption_type, int32_t output_format)
 {
-   if (pgmoneta_management_request_encrypt(ssl, socket, path, compression, encryption, output_format))
+   if (pgmoneta_management_request_encrypt(ssl, socket, path, compression, encryption, encryption_type, output_format))
    {
       goto error;
    }
@@ -1443,9 +1464,9 @@ error:
 }
 
 static int
-decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format)
 {
-   if (pgmoneta_management_request_decompress(ssl, socket, path, compression, encryption, output_format))
+   if (pgmoneta_management_request_decompress(ssl, socket, path, compression, encryption, compression_type, output_format))
    {
       goto error;
    }
@@ -1463,9 +1484,9 @@ error:
 }
 
 static int
-compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t compression_type, int32_t output_format)
 {
-   if (pgmoneta_management_request_compress(ssl, socket, path, compression, encryption, output_format))
+   if (pgmoneta_management_request_compress(ssl, socket, path, compression, encryption, compression_type, output_format))
    {
       goto error;
    }

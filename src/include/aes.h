@@ -95,28 +95,31 @@ pgmoneta_encrypt_wal(char* d);
  * @param client_fd The client descriptor
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param encryption_type The encrypt method for file encryption 
  * @param payload The payload of the request
  */
 void
-pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, int encryption_type, struct json* payload);
 
 /**
  * Encrypt a single file, also remove the original file
  * @param from The from file
  * @param to The to file
+ * @param encryption_type The encrypt method for file encryption 
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_encrypt_file(char* from, char* to);
+pgmoneta_encrypt_file(char* from, char* to, int encryption_type);
 
 /**
  * Decrypt a single file, also remove the original file
  * @param from The from file
  * @param to The to file
+ * @param encryption_type The encrypt method for file decryption 
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_decrypt_file(char* from, char* to);
+pgmoneta_decrypt_file(char* from, char* to, int encryption_type);
 
 /**
  * Decrypt the files under the directory in place, also remove encrypted files.
@@ -133,10 +136,11 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers);
  * @param client_fd The client descriptor
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
+ * @param encryption_type The encrypt method for file decryption 
  * @param payload The payload of the request
  */
 void
-pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, int encryption_type, struct json* payload);
 
 /**
  *

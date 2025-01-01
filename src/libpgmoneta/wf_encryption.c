@@ -174,7 +174,7 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
 
       enc_file = pgmoneta_append(enc_file, tarfile);
       enc_file = pgmoneta_append(enc_file, compress_suffix);
-      pgmoneta_encrypt_file(enc_file, d);
+      pgmoneta_encrypt_file(enc_file, d, config->encryption);
    }
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);

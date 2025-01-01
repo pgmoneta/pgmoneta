@@ -796,6 +796,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    config = (struct configuration*)shmem;
    ai = (struct accept_io*)watcher;
 
+   compression = config->compression_type;
+   encryption = config->encryption;
+
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
    if (client_fd == -1)
@@ -825,7 +828,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
 
    /* Process internal management request */
-   if (pgmoneta_management_read_json(NULL, client_fd, &compression, &encryption, &payload))
+   if (pgmoneta_management_read_json(NULL, client_fd, NULL, NULL, &payload))
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, compression, encryption, NULL);
       pgmoneta_log_error("Management: Bad payload (%d)", MANAGEMENT_ERROR_BAD_PAYLOAD);
@@ -1343,13 +1346,15 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       else if (pid == 0)
       {
          struct json* pyl = NULL;
+         int32_t encryption_type;
 
          shutdown_ports();
 
          pgmoneta_json_clone(payload, &pyl);
+         encryption_type = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_ENCRYPTION);
 
          pgmoneta_set_proc_title(1, ai->argv, "decrypt", NULL);
-         pgmoneta_decrypt_request(NULL, client_fd, compression, encryption, pyl);
+         pgmoneta_decrypt_request(NULL, client_fd, compression, encryption, encryption_type, pyl);
       }
    }
    else if (id == MANAGEMENT_ENCRYPT)
@@ -1364,13 +1369,15 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       else if (pid == 0)
       {
          struct json* pyl = NULL;
+         int32_t encryption_type;
 
          shutdown_ports();
 
          pgmoneta_json_clone(payload, &pyl);
+         encryption_type = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_ENCRYPTION);
 
          pgmoneta_set_proc_title(1, ai->argv, "encrypt", NULL);
-         pgmoneta_encrypt_request(NULL, client_fd, compression, encryption, pyl);
+         pgmoneta_encrypt_request(NULL, client_fd, compression, encryption, encryption_type, pyl);
       }
    }
    else if (id == MANAGEMENT_DECOMPRESS)
@@ -1385,27 +1392,30 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       else if (pid == 0)
       {
          struct json* pyl = NULL;
+         int32_t compression_type;
 
          shutdown_ports();
 
          pgmoneta_json_clone(payload, &pyl);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         compression_type = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_COMPRESSION);
+
+         if (compression_type == COMPRESSION_CLIENT_GZIP || compression_type == COMPRESSION_SERVER_GZIP)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/gzip", NULL);
             pgmoneta_gunzip_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+         else if (compression_type == COMPRESSION_CLIENT_ZSTD || compression_type == COMPRESSION_SERVER_ZSTD)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/zstd", NULL);
             pgmoneta_zstandardd_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         else if (compression_type == COMPRESSION_CLIENT_LZ4 || compression_type == COMPRESSION_SERVER_LZ4)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/lz4", NULL);
             pgmoneta_lz4d_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         else if (compression_type == COMPRESSION_CLIENT_BZIP2)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/bz2", NULL);
             pgmoneta_bunzip2_request(NULL, client_fd, compression, encryption, pyl);
@@ -1429,27 +1439,30 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       else if (pid == 0)
       {
          struct json* pyl = NULL;
+         int32_t compression_type;
 
          shutdown_ports();
 
          pgmoneta_json_clone(payload, &pyl);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         compression_type = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_COMPRESSION);
+
+         if (compression_type == COMPRESSION_CLIENT_GZIP || compression_type == COMPRESSION_SERVER_GZIP)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/gzip", NULL);
             pgmoneta_gzip_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+         else if (compression_type == COMPRESSION_CLIENT_ZSTD || compression_type == COMPRESSION_SERVER_ZSTD)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/zstd", NULL);
             pgmoneta_zstandardc_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         else if (compression_type == COMPRESSION_CLIENT_LZ4 || compression_type == COMPRESSION_SERVER_LZ4)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/lz4", NULL);
             pgmoneta_lz4c_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         else if (compression_type == COMPRESSION_CLIENT_BZIP2)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/bz2", NULL);
             pgmoneta_bzip2_request(NULL, client_fd, compression, encryption, pyl);
