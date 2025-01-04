@@ -69,28 +69,22 @@ if(NOT COMPILER_SUPPORTS_SSE42)
   message(NOTICE "The compiler ${CMAKE_C_COMPILER} has no SSE4.2 support.")
 endif()
 
-if(COMPILER_SUPPORTS_SSE42)
-  set(CMAKE_C_FLAGS "-msse4.2")
-  check_c_source_compiles("
-  #if defined(_MSC_VER)
-  #include <intrin.h>
-  #else  // !defined(_MSC_VER)
-  #include <cpuid.h>
-  #include <x86intrin.h>
-  #endif  // defined(_MSC_VER)
-  
-  int main() {
-    _mm_crc32_u8(0, 0); _mm_crc32_u32(0, 0);
-  #if defined(_M_X64) || defined(__x86_64__)
-     _mm_crc32_u64(0, 0);
-  #endif // defined(_M_X64) || defined(__x86_64__)
-    return 0;
-  }
-  "  HAVE_SSE42)
-endif()
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+  CHECK_C_COMPILER_FLAG(-msse4.2 HAVE_CRC32_HARDWARE)
+  if (${HAVE_CRC32_HARDWARE})
+    message(STATUS "CPU have -msse4.2, defined HAVE_CRC32C")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_CRC32C -msse4.2")
+  endif ()
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+  CHECK_C_COMPILER_FLAG(-march=armv8.1-a HAVE_CRC32_HARDWARE)
+  if (${HAVE_CRC32_HARDWARE})
+    message(STATUS "CPU have -march=armv8.1-a, defined HAVE_CRC32C")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_CRC32C -march=armv8.1-a")
+  endif ()
+endif ()
 
-if(NOT HAVE_SSE42)
-  unset(CMAKE_C_FLAGS)
+if(NOT HAVE_CRC32_HARDWARE)
+  message(STATUS "CRC32C implementation will use the software version")
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

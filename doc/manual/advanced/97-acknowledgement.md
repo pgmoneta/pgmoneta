@@ -27,6 +27,7 @@ Joan Jeremiah J <joanjeremiah04@gmail.com>
 Iury Santos <iuryroberto@gmail.com>
 Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 Jakub Jirutka <jakub@jirutka.cz>
+Mario Rodas
 ```
 
 ## Committers
