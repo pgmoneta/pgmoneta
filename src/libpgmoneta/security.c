@@ -57,8 +57,24 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#ifdef HAVE_SSE42
+#ifdef HAVE_CRC32C
+#ifdef __aarch64__
+static inline uint32_t
+_mm_crc32_u64(uint32_t crc, uint64_t value)
+{
+   __asm__ ("crc32cx %w[c], %w[c], %x[v]" : [c] "+r" (crc) : [v] "r" (value));
+   return crc;
+}
+
+static inline uint32_t
+_mm_crc32_u8(uint32_t crc, uint8_t value)
+{
+   __asm__ ("crc32cb %w[c], %w[c], %w[v]" : [c] "+r" (crc) : [v] "r" (value));
+   return crc;
+}
+#else
 #include <immintrin.h>
+#endif
 #endif
 
 #define SECURITY_INVALID  -2
@@ -2945,7 +2961,7 @@ pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc)
       return 1;
    }
 
-   #ifdef HAVE_SSE42
+   #ifdef HAVE_CRC32C
 
    uint64_t crc_long = (uint64_t) ~(*crc);
 
