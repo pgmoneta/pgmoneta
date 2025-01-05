@@ -382,7 +382,6 @@ pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd)
 
    if (connect(*fd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
    {
-      pgmoneta_log_trace("pgmoneta_connect_unix_socket: connect: %s/%s %s", directory, file, strerror(errno));
       errno = 0;
       return 1;
    }
