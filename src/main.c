@@ -645,16 +645,23 @@ main(int argc, char** argv)
       ev_periodic_start (main_loop, &wal_streaming);
    }
 
-   /* Start WAL compression */
-   if (config->compression_type != COMPRESSION_NONE)
+   if (!offline)
    {
-      ev_periodic_init (&wal, wal_cb, 0., 60, 0);
-      ev_periodic_start (main_loop, &wal);
+      /* Start WAL compression */
+      if (config->compression_type != COMPRESSION_NONE ||
+          config->encryption != ENCRYPTION_NONE)
+      {
+         ev_periodic_init(&wal, wal_cb, 0., 60, 0);
+         ev_periodic_start(main_loop, &wal);
+      }
    }
 
-   /* Start backup retention policy */
-   ev_periodic_init (&retention, retention_cb, 0., config->retention_interval, 0);
-   ev_periodic_start (main_loop, &retention);
+   if (!offline)
+   {
+      /* Start backup retention policy */
+      ev_periodic_init(&retention, retention_cb, 0., config->retention_interval, 0);
+      ev_periodic_start(main_loop, &retention);
+   }
 
    if (!offline)
    {
@@ -1785,7 +1792,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
                pgmoneta_bzip2_wal(d);
             }
 
-            if (config->encryption != 0)
+            if (config->encryption != ENCRYPTION_NONE)
             {
                pgmoneta_encrypt_wal(d);
             }
