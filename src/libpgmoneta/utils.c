@@ -2791,6 +2791,10 @@ pgmoneta_get_symlink(char* symlink)
 
    memset(&link[0], 0, sizeof(link));
    size = readlink(symlink, &link[0], sizeof(link));
+   if (size == -1)
+   {
+      goto error;
+   }
    link[size + 1] = '\0';
 
    if (strlen(&link[0]) == 0)
@@ -2820,6 +2824,7 @@ pgmoneta_is_symlink_valid(char* path)
 {
    char* link = NULL;
    struct stat buf;
+   ssize_t size;
    bool ret = false;
 
    if (lstat(path, &buf) == 0)
@@ -2827,7 +2832,11 @@ pgmoneta_is_symlink_valid(char* path)
       link = malloc(buf.st_size + 1);
       memset(link, 0, buf.st_size + 1);
 
-      readlink(path, link, buf.st_size + 1);
+      size = readlink(path, link, buf.st_size + 1);
+      if (size == -1)
+      {
+         goto error;
+      }
       link[buf.st_size] = '\0';
 
       if (stat(link, &buf) == 0)
@@ -2839,6 +2848,12 @@ pgmoneta_is_symlink_valid(char* path)
    free(link);
 
    return ret;
+
+error:
+
+   free(link);
+
+   return false;
 }
 
 int
