@@ -50,7 +50,7 @@ static int get_version(SSL* ssl, int socket, int server, int* major, int* minor)
 static int get_ext_version(SSL* ssl, int socket, char** version);
 static int get_segment_size(SSL* ssl, int socket, int server, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, int server, size_t* blocksz);
-static int get_summarize_wal(SSL *ssl, int socket, int server, bool* sw);
+static int get_summarize_wal(SSL* ssl, int socket, int server, bool* sw);
 
 static bool is_valid_response(struct query_response* response);
 
@@ -719,7 +719,7 @@ error:
 }
 
 static int
-get_summarize_wal(SSL *ssl, int socket, int server, bool *sw)
+get_summarize_wal(SSL* ssl, int socket, int server, bool* sw)
 {
    int q = 0;
    int ret;

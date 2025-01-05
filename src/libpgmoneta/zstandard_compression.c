@@ -476,7 +476,6 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
    DIR* dir;
    struct dirent* entry;
 
-
    if (!(dir = opendir(directory)))
    {
       return;

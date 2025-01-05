@@ -128,16 +128,16 @@ pgmoneta_deque_add_with_config(struct deque* deque, char* tag, uintptr_t data, s
 uintptr_t
 pgmoneta_deque_poll(struct deque* deque, char** tag);
 
- /**
-  * Retrieve value and remove the node from deque's tail.
-  * Note that if the value was copied into node,
-  * this function will return the original value and tag
-  * rather than making a copy of it.
-  * This function is thread safe, but the returned value is not protected
-  * @param deque The deque
-  * @param tag [out] Optional, tag will be returned through if not NULL
-  * @return The value data if deque's not empty, otherwise 0
-  */
+/**
+ * Retrieve value and remove the node from deque's tail.
+ * Note that if the value was copied into node,
+ * this function will return the original value and tag
+ * rather than making a copy of it.
+ * This function is thread safe, but the returned value is not protected
+ * @param deque The deque
+ * @param tag [out] Optional, tag will be returned through if not NULL
+ * @return The value data if deque's not empty, otherwise 0
+ */
 uintptr_t
 pgmoneta_deque_poll_last(struct deque* deque, char** tag);
 
@@ -154,7 +154,7 @@ pgmoneta_deque_poll_last(struct deque* deque, char** tag);
 uintptr_t
 pgmoneta_deque_peek(struct deque* deque, char** tag);
 
- /**
+/**
  * Retrieve value without removing the node from deque's tail.
  * Note that if the value was copied into node,
  * this function will return the original value and tag
