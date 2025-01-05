@@ -9,7 +9,7 @@ The **pgmoneta-cli** command line interface controls your interaction with **pgm
 Using other commands on the backup directory could cause problems.
 
 ``` sh
-pgmoneta-cli 0.15.1
+pgmoneta-cli 0.15.2
   Command line utility for pgmoneta
 
 Usage:

@@ -127,7 +127,7 @@ the `SIGTERM` signal to the process using `kill <pid>`.
 You can see the commands it supports by using `pgmoneta-cli -?` which will give
 
 ```
-pgmoneta-cli 0.15.1
+pgmoneta-cli 0.15.2
   Command line utility for pgmoneta
 
 Usage:
@@ -209,7 +209,7 @@ registration with `pgmoneta`.
 You can see the commands it supports by using `pgmoneta-admin -?` which will give
 
 ```
-pgmoneta-admin 0.15.1
+pgmoneta-admin 0.15.2
   Administration utility for pgmoneta
 
 Usage:
