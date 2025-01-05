@@ -28,9 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
+#include <bzip2_compression.h>
 #include <configuration.h>
+#include <gzip_compression.h>
 #include <json.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <management.h>
 #include <network.h>
 #include <security.h>
@@ -38,6 +42,7 @@
 #include <utils.h>
 #include <value.h>
 #include <verify.h>
+#include <zstandard_compression.h>
 
 /* system */
 #include <err.h>
@@ -117,10 +122,14 @@ static int reset(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, 
 static int reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int decrypt_data_client(char* from);
+static int encrypt_data_client(char* from);
+static int decompress_data_client(char* from);
+static int compress_data_client(char* from, uint8_t compression);
+static int decrypt_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int encrypt_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int decompress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int compress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -422,6 +431,8 @@ main(int argc, char** argv)
    bool do_free = true;
    int c;
    int option_index = 0;
+   int need_server_conn = 1;
+   int is_server_conn = 0;
    /* Store the result from command parser*/
    size_t size;
    char un[MAX_USERNAME_LENGTH];
@@ -667,22 +678,39 @@ main(int argc, char** argv)
       goto done;
    }
 
+   need_server_conn = parsed.cmd->action != MANAGEMENT_COMPRESS && parsed.cmd->action != MANAGEMENT_DECOMPRESS && parsed.cmd->action != MANAGEMENT_ENCRYPT && parsed.cmd->action != MANAGEMENT_DECRYPT;
+
    if (configuration_path != NULL)
    {
       /* Local connection */
       if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
       {
-         exit_code = 1;
-         goto done;
+         if (need_server_conn)
+         {
+            exit_code = 1;
+            goto done;
+         }
+         else
+         {
+            goto execute;
+         }
       }
+      is_server_conn = 1;
    }
    else
    {
       /* Remote connection */
       if (pgmoneta_connect(host, atoi(port), &socket))
       {
-         warnx("pgmoneta-cli: No route to host: %s:%s", host, port);
-         goto done;
+         if (need_server_conn)
+         {
+            warnx("pgmoneta-cli: No route to host: %s:%s", host, port);
+            goto done;
+         }
+         else
+         {
+            goto execute;
+         }
       }
 
       /* User name */
@@ -736,11 +764,21 @@ password:
       /* Authenticate */
       if (pgmoneta_remote_management_scram_sha256(username, password, socket, &s_ssl) != AUTH_SUCCESS)
       {
-         warnx("pgmoneta-cli: Bad credentials for %s", username);
-         goto done;
+         if (need_server_conn)
+         {
+            warnx("pgmoneta-cli: Bad credentials for %s", username);
+            goto done;
+         }
+         else
+         {
+            goto  execute;
+         }
       }
+
+      is_server_conn = 1;
    }
 
+execute:
    if (parsed.cmd->action == MANAGEMENT_BACKUP)
    {
       exit_code = backup(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
@@ -820,19 +858,47 @@ password:
    }
    else if (parsed.cmd->action == MANAGEMENT_DECRYPT)
    {
-      exit_code = decrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      if (is_server_conn)
+      {
+         exit_code = decrypt_data_server(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = decrypt_data_client(parsed.args[0]);
+      }
    }
    else if (parsed.cmd->action == MANAGEMENT_ENCRYPT)
    {
-      exit_code = encrypt_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      if (is_server_conn)
+      {
+         exit_code = encrypt_data_server(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = encrypt_data_client(parsed.args[0]);
+      }
    }
    else if (parsed.cmd->action == MANAGEMENT_DECOMPRESS)
    {
-      exit_code = decompress_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      if (is_server_conn)
+      {
+         exit_code = decompress_data_server(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = decompress_data_client(parsed.args[0]);
+      }
    }
    else if (parsed.cmd->action == MANAGEMENT_COMPRESS)
    {
-      exit_code = compress_data(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      if (is_server_conn)
+      {
+         exit_code = compress_data_server(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = compress_data_client(parsed.args[0], config->compression_type);
+      }
    }
    else if (parsed.cmd->action == MANAGEMENT_INFO)
    {
@@ -1403,7 +1469,192 @@ error:
 }
 
 static int
-decrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+decrypt_data_client(char* from)
+{
+   char* to = NULL;
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_log_error("Decryption: File doesn't exist: %s", from);
+      goto error;
+   }
+
+   if (!pgmoneta_ends_with(from, ".aes"))
+   {
+      pgmoneta_log_error("Decryption: Unknown file type: %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_remove_suffix(from, ".aes");
+
+   if (pgmoneta_decrypt_file(from, to))
+   {
+      pgmoneta_log_error("Decryption: File encryption failed: %s", from);
+      goto error;
+   }
+
+   free(to);
+   return 0;
+
+error:
+   free(to);
+   return 1;
+}
+
+static int
+encrypt_data_client(char* from)
+{
+   char* to = NULL;
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_log_error("Encryption: File doesn't exist: %s", from);
+      return 1;
+   }
+
+   to = pgmoneta_append(to, from);
+   to = pgmoneta_append(to, ".aes");
+
+   if (pgmoneta_encrypt_file(from, to))
+   {
+      pgmoneta_log_error("Encryption: File encryption failed: %s", from);
+      goto error;
+   }
+
+   free(to);
+   return 0;
+
+error:
+   free(to);
+   return 1;
+}
+
+static int
+decompress_data_client(char* from)
+{
+   char* to = NULL;
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_log_error("Decompress: File doesn't exist: %s", from);
+      goto error;
+   }
+
+   if (pgmoneta_ends_with(from, ".gz"))
+   {
+      to = pgmoneta_remove_suffix(from, ".gz");
+      if (pgmoneta_gunzip_file(from, to))
+      {
+         pgmoneta_log_error("Decompress: GZIP decompression failed");
+         goto error;
+      }
+   }
+   else if (pgmoneta_ends_with(from, ".zstd"))
+   {
+      to = pgmoneta_remove_suffix(from, ".zstd");
+      if (pgmoneta_zstandardd_file(from, to))
+      {
+         pgmoneta_log_error("Decompress: ZSTD decompression failed");
+         goto error;
+      }
+   }
+   else if (pgmoneta_ends_with(from, ".lz4"))
+   {
+      to = pgmoneta_remove_suffix(from, ".lz4");
+      if (pgmoneta_lz4d_file(from, to))
+      {
+         pgmoneta_log_error("Decompress: LZ4 decompression failed");
+         goto error;
+      }
+   }
+   else if (pgmoneta_ends_with(from, ".bz2"))
+   {
+      to = pgmoneta_remove_suffix(from, ".bz2");
+      if (pgmoneta_bunzip2_file(from, to))
+      {
+         pgmoneta_log_error("Decompress: BZIP2 decompression failed");
+         goto error;
+      }
+   }
+   else
+   {
+      pgmoneta_log_error("Decompress: Unknown file type");
+      goto error;
+   }
+
+   free(to);
+   return 0;
+
+error:
+   free(to);
+   return 1;
+}
+
+static int
+compress_data_client(char* from, uint8_t compression)
+{
+   char* to = NULL;
+
+   if (!pgmoneta_exists(from))
+   {
+      pgmoneta_log_error("Compress: File doesn't exist: %s", from);
+      goto error;
+   }
+
+   to = pgmoneta_append(to, from);
+
+   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
+   {
+      to = pgmoneta_append(to, ".gz");
+      if (pgmoneta_gzip_file(from, to))
+      {
+         pgmoneta_log_error("Compress: GZIP compression failed");
+         goto error;
+      }
+   }
+   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
+   {
+      to = pgmoneta_append(to, ".zstd");
+      if (pgmoneta_zstandardc_file(from, to))
+      {
+         pgmoneta_log_error("Compress: ZSTD compression failed");
+         goto error;
+      }
+   }
+   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
+   {
+      to = pgmoneta_append(to, ".lz4");
+      if (pgmoneta_lz4c_file(from, to))
+      {
+         pgmoneta_log_error("Compress: LZ4 compression failed");
+         goto error;
+      }
+   }
+   else if (compression == COMPRESSION_CLIENT_BZIP2)
+   {
+      to = pgmoneta_append(to, ".bz2");
+      if (pgmoneta_bzip2_file(from, to))
+      {
+         pgmoneta_log_error("Compress: BZIP2 compression failed");
+         goto error;
+      }
+   }
+   else
+   {
+      pgmoneta_log_error("Compress: Unknown compression type: %d", compression);
+      goto error;
+   }
+
+   free(to);
+   return 0;
+
+error:
+   free(to);
+   return 1;
+}
+
+static int
+decrypt_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_decrypt(ssl, socket, path, compression, encryption, output_format))
    {
@@ -1423,7 +1674,7 @@ error:
 }
 
 static int
-encrypt_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+encrypt_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_encrypt(ssl, socket, path, compression, encryption, output_format))
    {
@@ -1443,7 +1694,7 @@ error:
 }
 
 static int
-decompress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+decompress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_decompress(ssl, socket, path, compression, encryption, output_format))
    {
@@ -1463,7 +1714,7 @@ error:
 }
 
 static int
-compress_data(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
+compress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_compress(ssl, socket, path, compression, encryption, output_format))
    {
