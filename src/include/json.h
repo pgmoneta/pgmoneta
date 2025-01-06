@@ -278,7 +278,7 @@ pgmoneta_json_destroy(struct json* object);
  * @return 0 if success, 1 if otherwise
  */
 int
-pgmoneta_read_json_file(char* path, struct json** obj);
+pgmoneta_json_read_file(char* path, struct json** obj);
 
 /**
  * Write a json file to disk
@@ -287,7 +287,7 @@ pgmoneta_read_json_file(char* path, struct json** obj);
  * @return 0 if success, 1 if otherwise
  */
 int
-pgmoneta_write_json_file(char* path, struct json* obj);
+pgmoneta_json_write_file(char* path, struct json* obj);
 
 #ifdef __cplusplus
 }

@@ -1330,53 +1330,65 @@ error:
 }
 
 int
-pgmoneta_read_json_file(char* path, struct json** obj)
+pgmoneta_json_read_file(char* path, struct json** obj)
 {
    FILE* file = NULL;
-   char buf[MISC_LENGTH];
+   char buf[DEFAULT_BUFFER_SIZE];
    char* str = NULL;
+   struct json* j = NULL;
+
+   *obj = NULL;
 
    if (path == NULL)
    {
       goto error;
    }
+
    file = fopen(path, "r");
+
    if (file == NULL)
    {
       pgmoneta_log_error("Failed to open json file %s", path);
       goto error;
    }
-   *obj = NULL;
-   memset(buf, 0, MISC_LENGTH);
+
+   memset(buf, 0, sizeof(buf));
 
    // save the last one for ending so that we get to use append
-   while (fread(buf, 1, MISC_LENGTH - 1, file) > 0)
+   while (fread(buf, 1, DEFAULT_BUFFER_SIZE - 1, file) > 0)
    {
       str = pgmoneta_append(str, buf);
-      memset(buf, 0, MISC_LENGTH);
+      memset(buf, 0, sizeof(buf));
    }
 
-   if (pgmoneta_json_parse_string(str, obj))
+   if (pgmoneta_json_parse_string(str, &j))
    {
       pgmoneta_log_error("Failed to parse json file %s", path);
       goto error;
    }
+
+   *obj = j;
 
    fclose(file);
    free(str);
    return 0;
 
 error:
+
+   pgmoneta_json_destroy(j);
+
    if (file != NULL)
    {
       fclose(file);
    }
+
    free(str);
+
    return 1;
 }
 
 int
-pgmoneta_write_json_file(char* path, struct json* obj)
+pgmoneta_json_write_file(char* path, struct json* obj)
 {
    FILE* file = NULL;
    char* str = NULL;
