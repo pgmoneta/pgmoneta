@@ -1295,6 +1295,95 @@ error:
    return 1;
 }
 
+int
+pgmoneta_read_json_file(char* path, struct json** obj)
+{
+   FILE* file = NULL;
+   char buf[MISC_LENGTH];
+   char* str = NULL;
+
+   if (path == NULL)
+   {
+      goto error;
+   }
+   file = fopen(path, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Failed to open json file %s", path);
+      goto error;
+   }
+   *obj = NULL;
+   memset(buf, 0, MISC_LENGTH);
+
+   // save the last one for ending so that we get to use append
+   while (fread(buf, 1, MISC_LENGTH - 1, file) > 0)
+   {
+      str = pgmoneta_append(str, buf);
+      memset(buf, 0, MISC_LENGTH);
+   }
+
+   if (pgmoneta_json_parse_string(str, obj))
+   {
+      pgmoneta_log_error("Failed to parse json file %s", path);
+      goto error;
+   }
+
+   fclose(file);
+   free(str);
+   return 0;
+
+error:
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   free(str);
+   return 1;
+}
+
+int
+pgmoneta_write_json_file(char* path, struct json* obj)
+{
+   FILE* file = NULL;
+   char* str = NULL;
+
+   if (path == NULL || obj == NULL)
+   {
+      goto error;
+   }
+
+   file = fopen(path, "wb");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Failed to create json file %s", path);
+      goto error;
+   }
+
+   str = pgmoneta_json_to_string(obj, FORMAT_JSON, NULL, 0);
+   if (str == NULL)
+   {
+      goto error;
+   }
+
+   if (fputs(str, file) == EOF)
+   {
+      pgmoneta_log_error("Failed to write json file %s", path);
+      goto error;
+   }
+
+   free(str);
+   fclose(file);
+   return 0;
+
+error:
+   free(str);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+   return 1;
+}
+
 static bool
 type_allowed(enum value_type type)
 {

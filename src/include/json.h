@@ -261,6 +261,24 @@ pgmoneta_json_print(struct json* object, int32_t format);
 int
 pgmoneta_json_destroy(struct json* object);
 
+/**
+ * Read a json from disk
+ * @param path The path
+ * @param obj [out] The json object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_read_json_file(char* path, struct json** obj);
+
+/**
+ * Write a json file to disk
+ * @param path The path
+ * @param obj The json object
+ * @return 0 if success, 1 if otherwise
+ */
+int
+pgmoneta_write_json_file(char* path, struct json* obj);
+
 #ifdef __cplusplus
 }
 #endif
