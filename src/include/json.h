@@ -134,6 +134,16 @@ int
 pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type type);
 
 /**
+ * Remove a key and destroy the associated value within the json item.
+ * If the key does not exist or the json object is an array, the function will be noop.
+ * @param item The json item
+ * @param key The key
+ * @return 0 on success or key not found, otherwise 1
+ */
+int
+pgmoneta_json_remove(struct json* item, char* key);
+
+/**
  * Get the value data from json item
  * @param item The item
  * @param tag The tag

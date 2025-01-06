@@ -368,6 +368,40 @@ error:
 }
 
 int
+pgmoneta_json_remove(struct json* item, char* key)
+{
+   struct art* tree = NULL;
+   if (item == NULL || key == NULL || strlen(key) == 0 || item->type != JSONItem)
+   {
+      goto error;
+   }
+
+   tree = (struct art*)item->elements;
+   if (tree->size == 0)
+   {
+      // no need to delete from an empty map
+      return 0;
+   }
+   if (pgmoneta_art_delete(tree, (unsigned char*)key, strlen(key) + 1))
+   {
+      goto error;
+   }
+
+   if (tree->size == 0)
+   {
+      // reset json object status, so that it may become an array in the future
+      item->type = JSONUnknown;
+      pgmoneta_art_destroy(tree);
+      item->elements = NULL;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+int
 pgmoneta_json_create(struct json** object)
 {
    struct json* o = malloc(sizeof(struct json));
