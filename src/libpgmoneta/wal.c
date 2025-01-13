@@ -985,7 +985,7 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
 
    if (partial)
    {
-      pgmoneta_log_warn("Not renaming %s.partial, this segment is incomplete", filename);
+      pgmoneta_log_info("Not renaming %s.partial, this segment is incomplete", filename);
       fclose(file);
       return 0;
    }
