@@ -251,7 +251,6 @@ main(int argc, char** argv)
    struct configuration* config = NULL;
    int ret;
    int c;
-   int exit_code = 0;
 
    argv_ptr = argv;
 
@@ -322,7 +321,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Error in creating shared memory");
 #endif
-      exit(1);
+      goto error;
    }
 
    pgmoneta_init_configuration(shmem);
@@ -336,7 +335,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Configuration not found: %s", configuration_path);
 #endif
-         exit(1);
+         goto error;
       }
    }
    else
@@ -347,7 +346,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #endif
-         exit(1);
+         goto error;
       }
       configuration_path = "/etc/pgmoneta/pgmoneta.conf";
    }
@@ -362,7 +361,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
 #endif
-         exit(1);
+         goto error;
       }
       else if (ret == 2)
       {
@@ -370,7 +369,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
-         exit(1);
+         goto error;
       }
       else if (ret == 3)
       {
@@ -378,7 +377,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
 #endif
-         exit(1);
+         goto error;
       }
       memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
    }
@@ -401,7 +400,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=ADMINS configuration not found: %s", admins_path);
 #endif
-         exit(1);
+         goto error;
       }
       else if (ret == 2)
       {
@@ -409,7 +408,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
-         exit(1);
+         goto error;
       }
       else if (ret == 3)
       {
@@ -417,7 +416,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
 #endif
-         exit(1);
+         goto error;
       }
       memcpy(&config->admins_path[0], admins_path, MIN(strlen(admins_path), MAX_PATH - 1));
    }
@@ -436,7 +435,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Failed to init logging");
 #endif
-      exit(1);
+      goto error;
    }
 
    if (pgmoneta_start_logging())
@@ -444,7 +443,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Failed to start logging");
 #endif
-      exit(1);
+      goto error;
    }
 
    if (pgmoneta_validate_configuration(shmem))
@@ -452,21 +451,21 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid configuration");
 #endif
-      exit(1);
+      goto error;
    }
    if (pgmoneta_validate_users_configuration(shmem))
    {
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid USERS configuration");
 #endif
-      exit(1);
+      goto error;
    }
    if (pgmoneta_validate_admins_configuration(shmem))
    {
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid ADMINS configuration");
 #endif
-      exit(1);
+      goto error;
    }
 
    config = (struct configuration*)shmem;
@@ -479,7 +478,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Daemon mode can't be used with console logging");
 #endif
-         exit(1);
+         goto error;
       }
 
       pid = fork();
@@ -490,7 +489,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Daemon mode failed");
 #endif
-         exit(1);
+         goto error;
       }
 
       if (pid > 0)
@@ -514,7 +513,7 @@ main(int argc, char** argv)
 
    if (create_pidfile())
    {
-      exit(1);
+      goto error;
    }
    pid_file_created = true;
 
@@ -535,7 +534,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
 #endif
-      exit(1);
+      goto error;
    }
 
    /* libev */
@@ -547,7 +546,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=No loop implementation (%x) (%x)", pgmoneta_libev(config->libev), ev_supported_backends());
 #endif
-      exit(1);
+      goto error;
    }
 
    ev_signal_init((struct ev_signal*)&signal_watcher[0], shutdown_cb, SIGTERM);
@@ -568,7 +567,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid TLS configuration");
 #endif
-      exit(1);
+      goto error;
    }
 
    start_mgt();
@@ -583,7 +582,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->metrics);
 #endif
-         exit(1);
+         goto error;
       }
 
       if (metrics_fds_length > MAX_FDS)
@@ -592,7 +591,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Too many descriptors %d", metrics_fds_length);
 #endif
-         exit(1);
+         goto error;
       }
 
       start_metrics();
@@ -608,7 +607,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->management);
 #endif
-         exit(1);
+         goto error;
       }
 
       if (management_fds_length > MAX_FDS)
@@ -617,7 +616,7 @@ main(int argc, char** argv)
 #ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Too many descriptors %d", management_fds_length);
 #endif
-         exit(1);
+         goto error;
       }
 
       start_management();
@@ -627,7 +626,6 @@ main(int argc, char** argv)
    /* Create and/or validate replication slots */
    if (!offline && init_replication_slots())
    {
-      exit_code = 1;
       goto error;
    }
 
@@ -768,7 +766,7 @@ error:
       kill(0, SIGTERM);
    }
 
-   exit(exit_code);
+   exit(1);
 
    return 1;
 }
