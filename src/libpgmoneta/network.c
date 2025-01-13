@@ -236,7 +236,7 @@ pgmoneta_connect(const char* hostname, int port, int* fd)
    size_t buffer_size = DEFAULT_BUFFER_SIZE;
    socklen_t optlen = sizeof(int);
    int rv;
-   char sport[5];
+   char sport[6];
    int error = 0;
    struct configuration* config;
 
@@ -575,14 +575,14 @@ bind_host(const char* hostname, int port, int** fds, int* length)
    index = 0;
    size = 0;
 
-   sport = malloc(5);
+   sport = malloc(6);
 
    if (sport == NULL)
    {
       goto error;
    }
 
-   memset(sport, 0, 5);
+   memset(sport, 0, 6);
    sprintf(sport, "%d", port);
 
    /* Find all SOCK_STREAM addresses */
