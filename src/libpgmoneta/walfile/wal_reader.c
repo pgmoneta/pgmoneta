@@ -184,6 +184,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    timeline_id tli = 0;
    xlog_seg_no logSegNo = 0;
    xlog_rec_ptr base;
+   int wal_segz_bytes = DEFAULT_WAL_SEGZ_BYTES;
 
    config = (struct configuration*) shmem;
 
@@ -193,6 +194,11 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       pgmoneta_log_fatal("Error: Could not open file %s", path);
       goto error;
    }
+
+   // calculate the size of the file
+   fseek(file, 0, SEEK_END);
+   wal_segz_bytes = ftell(file);
+   fseek(file, 0, SEEK_SET);
 
    MALLOC(long_header, SIZE_OF_XLOG_LONG_PHD);
    size_t bytes_read = fread(long_header, SIZE_OF_XLOG_LONG_PHD, 1, file);
@@ -237,12 +243,12 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    read_all_page_headers(file, long_header, wal_file);
    fseek(file, next_record, SEEK_SET);
 
-   if (xlog_from_file_name(basename(path), &tli, &logSegNo, DEFAULT_WAL_SEGZ_BYTES))
+   if (xlog_from_file_name(basename(path), &tli, &logSegNo, wal_segz_bytes))
    {
       pgmoneta_log_fatal("Failed to extract LSN from the filename");
       goto error;
    }
-   XLOG_SEG_NO_OFFEST_TO_REC_PTR(logSegNo, 0, DEFAULT_WAL_SEGZ_BYTES, base);
+   XLOG_SEG_NO_OFFEST_TO_REC_PTR(logSegNo, 0, wal_segz_bytes, base);
 
    while (true)
    {
