@@ -59,6 +59,7 @@ extern "C" {
 /**
  * Management commands
  */
+#define MANAGEMENT_UNKNOWN         0
 #define MANAGEMENT_BACKUP          1
 #define MANAGEMENT_LIST_BACKUP     2
 #define MANAGEMENT_RESTORE         3
@@ -82,6 +83,12 @@ extern "C" {
 #define MANAGEMENT_CONF_LS        21
 #define MANAGEMENT_CONF_GET       22
 #define MANAGEMENT_CONF_SET       23
+
+#define MANAGEMENT_MASTER_KEY     24
+#define MANAGEMENT_ADD_USER       25
+#define MANAGEMENT_UPDATE_USER    26
+#define MANAGEMENT_REMOVE_USER    27
+#define MANAGEMENT_LIST_USERS     28
 
 /**
  * Management categories
@@ -301,6 +308,48 @@ extern "C" {
 #define MANAGEMENT_OUTPUT_FORMAT_TEXT 0
 #define MANAGEMENT_OUTPUT_FORMAT_JSON 1
 #define MANAGEMENT_OUTPUT_FORMAT_RAW  2
+
+/**
+ * Create header for management command
+ * @param command The command
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @param json The target json
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, struct json** json);
+
+/**
+ * Create request for management command
+ * @param json The target json
+ * @param json The request json
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_create_request(struct json* json, struct json** request);
+
+/**
+ * Create success outcome for management command
+ * @param json The target json
+ * @param start_t The start time of the command
+ * @param end_t The end time of the command
+ * @param outcome The outcome json
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_create_outcome_success(struct json* json, struct timespec start_t, struct timespec end_t, struct json** outcome);
+
+/**
+ * Create success outcome for management command
+ * @param json The target json
+ * @param error The error code
+ * @param outcome The outcome json
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, struct json** outcome);
 
 /**
  * Create a backup request
