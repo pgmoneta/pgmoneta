@@ -44,11 +44,6 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-static int create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, struct json** json);
-static int create_request(struct json* json, struct json** request);
-static int create_outcome_success(struct json* json, struct timespec start_t, struct timespec end_t, struct json** outcome);
-static int create_outcome_failure(struct json* json, int32_t error, struct json** outcome);
-
 static int read_uint8(char* prefix, SSL* ssl, int socket, uint8_t* i);
 static int read_string(char* prefix, SSL* ssl, int socket, char** str);
 static int write_uint8(char* prefix, SSL* ssl, int socket, uint8_t i);
@@ -64,12 +59,12 @@ pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t c
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_BACKUP, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_BACKUP, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -98,12 +93,12 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_LIST_BACKUP, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_LIST_BACKUP, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -132,12 +127,12 @@ pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* ba
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_RESTORE, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_RESTORE, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -169,12 +164,12 @@ pgmoneta_management_request_verify(SSL* ssl, int socket, char* server, char* bac
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_VERIFY, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_VERIFY, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -206,12 +201,12 @@ pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* ba
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_ARCHIVE, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_ARCHIVE, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -243,12 +238,12 @@ pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* bac
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_DELETE, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_DELETE, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -278,12 +273,12 @@ pgmoneta_management_request_shutdown(SSL* ssl, int socket, uint8_t compression, 
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_SHUTDOWN, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_SHUTDOWN, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -310,12 +305,12 @@ pgmoneta_management_request_status(SSL* ssl, int socket, uint8_t compression, ui
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_STATUS, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_STATUS, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -342,12 +337,12 @@ pgmoneta_management_request_status_details(SSL* ssl, int socket, uint8_t compres
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_STATUS_DETAILS, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_STATUS_DETAILS, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -374,12 +369,12 @@ pgmoneta_management_request_ping(SSL* ssl, int socket, uint8_t compression, uint
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_PING, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_PING, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -406,12 +401,12 @@ pgmoneta_management_request_reset(SSL* ssl, int socket, uint8_t compression, uin
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_RESET, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_RESET, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -438,12 +433,12 @@ pgmoneta_management_request_reload(SSL* ssl, int socket, uint8_t compression, ui
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_RELOAD, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_RELOAD, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -470,12 +465,12 @@ pgmoneta_management_request_conf_ls(SSL* ssl, int socket, uint8_t compression, u
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_CONF_LS, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_CONF_LS, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -502,12 +497,12 @@ pgmoneta_management_request_conf_get(SSL* ssl, int socket, uint8_t compression, 
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_CONF_GET, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_CONF_GET, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -534,12 +529,12 @@ pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, cha
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_CONF_SET, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_CONF_SET, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -569,12 +564,12 @@ pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* bac
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_RETAIN, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_RETAIN, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -604,12 +599,12 @@ pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* ba
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_EXPUNGE, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_EXPUNGE, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -639,12 +634,12 @@ pgmoneta_management_request_decrypt(SSL* ssl, int socket, char* path, uint8_t co
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_DECRYPT, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_DECRYPT, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -673,12 +668,12 @@ pgmoneta_management_request_encrypt(SSL* ssl, int socket, char* path, uint8_t co
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_ENCRYPT, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_ENCRYPT, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -707,12 +702,12 @@ pgmoneta_management_request_decompress(SSL* ssl, int socket, char* path, uint8_t
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_DECOMPRESS, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_DECOMPRESS, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -741,12 +736,12 @@ pgmoneta_management_request_compress(SSL* ssl, int socket, char* path, uint8_t c
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_COMPRESS, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_COMPRESS, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -775,12 +770,12 @@ pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backu
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_INFO, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_INFO, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -810,12 +805,12 @@ pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* b
    struct json* j = NULL;
    struct json* request = NULL;
 
-   if (create_header(MANAGEMENT_ANNOTATE, compression, encryption, output_format, &j))
+   if (pgmoneta_management_create_header(MANAGEMENT_ANNOTATE, compression, encryption, output_format, &j))
    {
       goto error;
    }
 
-   if (create_request(j, &request))
+   if (pgmoneta_management_create_request(j, &request))
    {
       goto error;
    }
@@ -884,7 +879,7 @@ pgmoneta_management_response_ok(SSL* ssl, int socket, struct timespec start_time
 {
    struct json* outcome = NULL;
 
-   if (create_outcome_success(payload, start_time, end_time, &outcome))
+   if (pgmoneta_management_create_outcome_success(payload, start_time, end_time, &outcome))
    {
       goto error;
    }
@@ -911,7 +906,7 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
 
    config = (struct configuration*)shmem;
 
-   if (create_outcome_failure(payload, error, &outcome))
+   if (pgmoneta_management_create_outcome_failure(payload, error, &outcome))
    {
       goto error;
    }
@@ -1649,8 +1644,8 @@ write_ssl(SSL* ssl, void* buf, size_t size)
    return 1;
 }
 
-static int
-create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, struct json** json)
+int
+pgmoneta_management_create_header(int32_t command, uint8_t compression, uint8_t encryption, int32_t output_format, struct json** json)
 {
    time_t t;
    char timestamp[128];
@@ -1697,8 +1692,8 @@ error:
    return 1;
 }
 
-static int
-create_request(struct json* json, struct json** request)
+int
+pgmoneta_management_create_request(struct json* json, struct json** request)
 {
    struct json* r = NULL;
 
@@ -1722,8 +1717,8 @@ error:
    return 1;
 }
 
-static int
-create_outcome_success(struct json* json, struct timespec start_t, struct timespec end_t, struct json** outcome)
+int
+pgmoneta_management_create_outcome_success(struct json* json, struct timespec start_t, struct timespec end_t, struct json** outcome)
 {
    double total_seconds = 0;
    char* elapsed = NULL;
@@ -1758,8 +1753,8 @@ error:
    return 1;
 }
 
-static int
-create_outcome_failure(struct json* json, int32_t error, struct json** outcome)
+int
+pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, struct json** outcome)
 {
    struct json* r = NULL;
 

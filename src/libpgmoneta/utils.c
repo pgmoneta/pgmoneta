@@ -3737,7 +3737,6 @@ pgmoneta_get_timestamp_string(struct timespec start_time, struct timespec end_ti
 
    *seconds = 0;
 
-   // total_seconds = (int32_t)difftime(end_time, start_time);
    total_seconds = pgmoneta_compute_duration(start_time, end_time);
 
    *seconds = total_seconds;
