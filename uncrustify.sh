@@ -11,5 +11,7 @@ function indent()
 indent "src/*.c"
 indent "src/include/*.h"
 indent "src/include/walfile/*.h"
+indent "test/testcases/*.h"
 indent "src/libpgmoneta/*.c"
 indent "src/libpgmoneta/walfile/*.c"
+indent "test/testcases/*.c"

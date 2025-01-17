@@ -27,8 +27,8 @@
  *
  */
 
-#ifndef PGMONETA_TEST_H
-#define PGMONETA_TEST_H
+#ifndef PGMONETA_TEST1_H
+#define PGMONETA_TEST1_H
 
 #include <check.h>
 #include <stdio.h>
@@ -40,6 +40,6 @@
  * @return The result
  */
 Suite*
-pgmoneta_suite(void);
+pgmoneta_test1_suite(char* dir);
 
-#endif // PGMONETA_TEST_H
+#endif // PGMONETA_TEST1_H

@@ -2,83 +2,91 @@
 
 # Test
 
-## Container Environment
+## Local Environment
 
-### Docker
+To ensure the test suite works well, please make sure you have installed PostgreSQL 17.x version installed
 
-First, ensure your system is up to date.
+For RPM based distributions such as Fedora and RHEL you can add the
+[PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
 
-```sh
-dnf update
+```
+dnf -qy module disable postgresql
+dnf install -y postgresql17 postgresql17-server pgmoneta
 ```
 
-Install the necessary packages for Docker.
+also make sure that the `initdb`, `pg_ctl` and `psql` are in PATH variable.
 
-```sh
-dnf -y install dnf-plugins-core
+### Add Path variable
+
+Add the `initdb`, `pg_ctl` and `psql` binaries into the environment path.
+
+```
+export PATH=$PATH:$(dirname $(which initdb))
+export PATH=$PATH:$(dirname $(which psql))
 ```
 
-Add the Docker repository to your system.
+**Note:** `initdb` and `pg_ctl` belongs to same binary directory
+
+### Install check library
+
+Before you test, you need to install the `check` library. If there is no package for `check`, the `CMakeLists.txt` will not compile the test suite. Only after you have installed `check` will it compile the test suite.
 
 ``` sh
-sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+dnf install -y check check-devel check-static
 ```
 
-Install Docker Engine, Docker CLI, and Containerd.
+### Build the project
 
-```sh
-sudo dnf install docker-ce docker-ce-cli containerd.io
+Make sure to execute the test script inside the project build. Run the following commands if project is not already built.
+
+```
+git clone https://github.com/pgmoneta/pgmoneta.git
+cd pgmoneta
+mkdir build
+cd build
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
+make
 ```
 
-Start the Docker service and enable it to start on boot.
+### Run test suites
 
-```sh
-sudo systemctl start docker
-sudo systemctl enable docker
+To run the testsuites get inside your build and just execute -
+
+```
+./testsuite.sh
 ```
 
-Verify that Docker is installed correctly.
+The script creates the PostgreSQL and pgmoneta environment inside the build itself for example -
+- the PostgreSQL related files like the data directory and PostgreSQL configuration will be stored in `pgmoneta-postgres`
+- the pgmoneta related files like pgmoneta configuration and users file will be stored in `pgmoneta-testsiute`
 
-```sh
-docker --version
+
+It will be the responsibility of the script to clean up the setup environment.
+
+**Note:** You can however view the PostgreSQL and pgmoneta server logs in a separate `log` directory inside build.
+
+In case you see those setup directories like `pgmoneta-postgres` and `pgmoneta-testsiute` in build after successfully executing the script, you should probably run 
+
+```
+./testsuite clean
 ```
 
-If you see the Docker version, then you have successfully installed Docker on Fedora.
+before running the script again to avoid any inconsistency or errors. The clean subcommand will however clean the logs as well.
 
-### Podman
 
-Install Podman and the Docker alias package.
+### Add testcases
 
-```sh
-dnf install podman podman-docker.noarch
+To add an additional testcase go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
+
+Create a `.c` file that contains the test suite and its corresponding `.h` file (see [pgmoneta_test_1.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/pgmoneta_test_1.c) or [pgmoneta_test_2.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/pgmoneta_test_2.c) for reference). Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/runner.c)
+
+Also remember to link the new test suite in [CMakeLists](https://github.com/pgmoneta/pgmoneta/blob/main/test/CMakeLists.txt) file inside test directory 
+
 ```
-
-Verify that Podman is installed correctly.
-
-```sh
-podman --version
+30:  set(SOURCES
+31:    testcases/common.c
+32:    testcases/pgmoneta_test_1.c
+33:    testcases/pgmoneta_test_2.c
+34:    testcases/runner.c
+35:  )
 ```
-
-If you see the Podman version, then you have successfully installed Podman on Fedora.
-
-The `podman-docker.noarch` package simplifies the use of `Podman` for users accustomed to Docker.
-
-## Test suite
-
-You can simply use `CTest` to test all PostgreSQL versions from 13 to 16. It will automatically run `testsuite.sh` to test `pgmoneta` and `pgmoneta_ext` for each version. The script will automatically create the Docker container, run it, and then use the `check` framework to test their functions inside it. After that, it will automatically clean up everything for you.
-
-Go to the directory `/pgmoneta/test`, and give permission to `testsuite.sh` using:
-
-``` sh
-chmod +x testsuite.sh
-```
-
-After you follow the [DEVELOPERS.md][developers] to install `pgmoneta`, go to the directory `/pgmoneta/build` and run the test.
-
-``` sh
-make test
-```
-
-`CTest` will output logs into `/pgmoneta/build/Testing/Temporary/LastTest.log`. If you want to check the specific process, you can review that log file.
-
-`testsuite.sh` accepts three variables. The first one is `dir`, which specifies the `/test` directory location, with a default value of `./`. The second one is `dockerfile`, with a default value of `Dockerfile.rocky8`. The third one is the PostgreSQL `version`, with a default value of `13`.

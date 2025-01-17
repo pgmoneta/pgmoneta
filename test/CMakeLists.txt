@@ -26,10 +26,12 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 if (check)
+
   set(SOURCES
-    lib/pgmoneta_test.c
-    lib/pgmoneta_ext_test.c
-    lib/runner.c
+    testcases/common.c
+    testcases/pgmoneta_test_1.c
+    testcases/pgmoneta_test_2.c
+    testcases/runner.c
   )
 
   add_executable(pgmoneta_test ${SOURCES})
@@ -68,3 +70,9 @@ if(container)
   set_property (TEST test_version_16_rocky9
                 PROPERTY FAIL_REGULAR_EXPRESSION "${failRegex}")
 endif()
+
+configure_file(
+  "${CMAKE_SOURCE_DIR}/test/testsuite.sh"
+  "${CMAKE_BINARY_DIR}/testsuite.sh"
+  COPYONLY
+)

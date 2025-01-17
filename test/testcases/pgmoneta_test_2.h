@@ -27,27 +27,19 @@
  *
  */
 
-#include "pgmoneta_test.h"
-#include "pgmoneta_ext_test.h"
+#ifndef PGMONETA_TEST2_H
+#define PGMONETA_TEST2_H
 
-int
-main(void)
-{
-   int number_failed;
-   Suite* s1;
-   Suite* s2;
-   SRunner* sr;
+#include <check.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-   s1 = pgmoneta_suite();
-   s2 = pgmoneta_ext_suite();
+/**
+ * Set up a suite of test cases for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test2_suite(char* dir);
 
-   sr = srunner_create(s1);
-   srunner_add_suite(sr, s2);
-
-   // Run the tests in verbose mode
-   srunner_run_all(sr, CK_VERBOSE);
-   number_failed = srunner_ntests_failed(sr);
-   srunner_free(sr);
-
-   return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+#endif // PGMONETA_TEST2_H

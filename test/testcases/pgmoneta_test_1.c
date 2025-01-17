@@ -27,77 +27,99 @@
  *
  */
 
-#include "pgmoneta_test.h"
-
-#define BUFFER_SIZE 8192
-
-#define PGMONETA_LOG_FILE_PATH     "/tmp/pgmoneta.log"
-#define PGMONETA_BACKUP_LOG     "INFO  backup.c:140 Backup: primary/"
-#define PGMONETA_RESTORE_LOG     "INFO  restore.c:106 Restore: primary/"
+#include "pgmoneta_test_1.h"
+#include "common.h"
 
 // test backup
 START_TEST(test_pgmoneta_backup)
 {
-   FILE* log_file;
-   char log_entry[BUFFER_SIZE];
    int found = 0;
+   char command[BUFFER_SIZE];
+   char* executable_path = NULL;
+   char* configuration_path = NULL;
+   char* log_path = NULL;
+   char command_output[BUFFER_SIZE];
+   FILE* fp;
 
-   int result = system("su - pgmoneta -c '/pgmoneta/build/src/pgmoneta-cli -c /pgmoneta/pgmoneta.conf backup primary'");
-   ck_assert_int_eq(result, 0);
+   executable_path = get_executable_path();
+   configuration_path = get_configuration_path();
+   log_path = get_log_path();
 
-   log_file = fopen(PGMONETA_LOG_FILE_PATH, "r");
-   ck_assert_msg(log_file != NULL, "Log file could not be opened");
+   snprintf(command, sizeof(command), "%s -c %s backup primary", executable_path, configuration_path);
 
-   while (fgets(log_entry, sizeof(log_entry), log_file) != NULL)
+   fp = popen(command, "r");
+   if (fp == NULL)
    {
-      if (strstr(log_entry, PGMONETA_BACKUP_LOG) != NULL)
-      {
-         found = 1;
-         break;
-      }
+      ck_assert_msg(0, "couldn't execute the command");
    }
-   fclose(log_file);
 
-   ck_assert_msg(found, "Expected log entry not found in the log file");
+   fread(command_output, sizeof(char), BUFFER_SIZE - 1, fp);
+
+   pclose(fp);
+
+   if (strstr(command_output, SUCCESS_STATUS) != NULL)
+   {
+      found = 1;
+   }
+   ck_assert_msg(found, "success status not found");
+
+done:
+   free(executable_path);
+   free(configuration_path);
+   free(log_path);
 }
 END_TEST
 // test restore
 START_TEST(test_pgmoneta_restore)
 {
-   FILE* log_file;
-   char log_entry[BUFFER_SIZE];
    int found = 0;
+   char command[BUFFER_SIZE];
+   char* executable_path = NULL;
+   char* configuration_path = NULL;
+   char* restore_path = NULL;
+   char* log_path = NULL;
+   FILE* fp;
+   char command_output[BUFFER_SIZE];
 
-   int result = system("su - pgmoneta -c '/pgmoneta/build/src/pgmoneta-cli -c /pgmoneta/pgmoneta.conf restore primary newest current /pgmoneta/'");
-   ck_assert_int_eq(result, 0);
+   executable_path = get_executable_path();
+   configuration_path = get_configuration_path();
+   restore_path = get_restore_path();
+   log_path = get_log_path();
 
-   log_file = fopen(PGMONETA_LOG_FILE_PATH, "r");
-   ck_assert_msg(log_file != NULL, "Log file could not be opened");
+   snprintf(command, sizeof(command), "%s -c %s restore primary newest current %s", executable_path, configuration_path, restore_path);
 
-   while (fgets(log_entry, sizeof(log_entry), log_file) != NULL)
+   fp = popen(command, "r");
+   if (fp == NULL)
    {
-      if (strstr(log_entry, PGMONETA_RESTORE_LOG) != NULL)
-      {
-         found = 1;
-         break;
-      }
+      ck_assert_msg(0, "couldn't execute the command");
    }
-   fclose(log_file);
 
-   ck_assert_msg(found, "Expected log entry not found in the log file");
+   fread(command_output, sizeof(char), BUFFER_SIZE - 1, fp);
+
+   pclose(fp);
+
+done:
+   free(executable_path);
+   free(configuration_path);
+   free(restore_path);
+   free(log_path);
 }
 END_TEST
 
 Suite*
-pgmoneta_suite(void)
+pgmoneta_test1_suite(char* dir)
 {
    Suite* s;
    TCase* tc_core;
 
-   s = suite_create("pgmoneta");
+   memset(project_directory, 0, sizeof(project_directory));
+   memcpy(project_directory, dir, strlen(dir));
+
+   s = suite_create("pgmoneta_test1");
 
    tc_core = tcase_create("Core");
 
+   tcase_set_timeout(tc_core, 60);
    tcase_add_test(tc_core, test_pgmoneta_backup);
    tcase_add_test(tc_core, test_pgmoneta_restore);
    suite_add_tcase(s, tc_core);

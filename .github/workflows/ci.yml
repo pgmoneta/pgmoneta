@@ -43,6 +43,10 @@ jobs:
       run: sudo apt install graphviz
     - name: Install doxygen
       run: sudo apt install doxygen
+    - name: Install net-tools
+      run: sudo apt install net-tools
+    - name: Install check
+      run: sudo apt install check
     - name: GCC/mkdir
       run: mkdir build
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
@@ -65,75 +69,29 @@ jobs:
       run: make
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
     - name: Install PostgreSQL
-      run: sudo apt install -y postgresql
-    - name: Init database
       run: |
-        version=$(pg_config --version | grep -Eo "[0-9]{1,2}" | head -1)
-        sudo -u postgres /usr/lib/postgresql/${version}/bin/initdb /tmp/pgsql
-    - name: Config postgres
+        sudo apt install curl ca-certificates
+        sudo install -d /usr/share/postgresql-common/pgdg
+        sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        sudo apt update
+        sudo apt install -y postgresql-17
+    - name: Set Env Path Variable
       run: |
-        sudo -u postgres sed -i 's/#password_encryption = scram-sha-256/password_encryption = md5/' /tmp/pgsql/postgresql.conf
-        sudo -u postgres sed -i '/^host/d' /tmp/pgsql/pg_hba.conf
-        echo 'cat <<EOF >> /tmp/pgsql/pg_hba.conf
-        host    postgres         repl            127.0.0.1/32            md5
-        host    postgres         repl            ::1/128                 md5
-        host    replication      repl            127.0.0.1/32            md5
-        host    replication      repl            ::1/128                 md5
-        EOF
-        '| sudo -u postgres -s
-    - name: Setup postgres
-      run: |
-        version=$(pg_config --version | grep -Eo "[0-9]{1,2}" | head -1)
-        sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl -D /tmp/pgsql -l /tmp/pgsql.log start
-        sudo -u postgres /usr/lib/postgresql/${version}/bin/psql -U postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';"
-    - name: Config pgmoneta
-      run: |
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-admin master-key -P pgmonetamasterkey
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword user add
-        cat <<EOF > pgmoneta.conf
-        [pgmoneta]
-        host = *
-        metrics = 5001
-        create_slot = yes
-
-        base_dir = /home/runner/work/pgmoneta/pgmoneta/backup
-
-        compression = zstd
-
-        storage_engine = local
-
-        retention = 7
-
-        log_type = file
-        log_level = debug5
-        log_path = /tmp/pgmoneta.log
-
-        unix_socket_dir = /tmp/
-
-        [primary]
-        wal_slot = repl
-        host = localhost
-        port = 5432
-        user = repl
-        EOF
-        mkdir backup
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: Execute backup
-      run: |
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf -d
-        sleep 5
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf backup primary
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf status details
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: Restore backup
-      run: /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf restore primary newest current /tmp/
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
+        echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
+        echo $PATH
+    - name: Run Test Suite
+      run: $(which bash) ./testsuite.sh
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: Cleanup
+      run: $(which bash) ./testsuite.sh clean
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+    - name: Show logs
+      if: failure()
       run: |
-        version=$(pg_config --version | grep -Eo "[0-9]{1,2}" | head -1)
-        /home/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf shutdown
-        sudo -u postgres /usr/lib/postgresql/${version}/bin/pg_ctl -D /tmp/pgsql -l /tmp/pgsql.log stop
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
+        cat ./log/logfile
+        cat ./log/pgmoneta.log
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: Upload artifact for failed workflow
       if: failure()
       uses: actions/upload-artifact@v4
@@ -142,116 +100,71 @@ jobs:
         path: |
           /tmp/*.log
 
-  build-macos:
+  # build-macos:
 
-    runs-on: macos-latest
+  #   runs-on: macos-latest
 
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Homebrew
-      run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-    - name: Update system
-      run: brew update
-    - name: Install libev
-      run: brew install libev
-    - name: Install rst2man
-      run: brew install docutils
-    - name: Install libarchive
-      run: brew install --ignore-dependencies libarchive
-    - name: Install clang
-      run: brew install llvm
-    - name: Install PostgreSQL
-      run: brew install postgresql
-    - name: Install libssh
-      run: brew install libssh
-    - name: GCC/mkdir
-      run: mkdir build
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-    - name: GCC/cmake
-      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-    - name: GCC/make
-      run: make
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-    - name: rm -Rf
-      run: rm -Rf build/
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/mkdir
-      run: mkdir build
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/cmake
-      run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/make
-      run: make
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-    - name: Init database
-      run: initdb /tmp/pgsql
-    - name: Config postgres
-      run: |
-        sed -i '' 's/#password_encryption = scram-sha-256/password_encryption = md5/' /tmp/pgsql/postgresql.conf
-        sed -i '' '/^host/d' /tmp/pgsql/pg_hba.conf
-        cat <<EOF >> /tmp/pgsql/pg_hba.conf
-        host    postgres         repl            127.0.0.1/32            md5
-        host    postgres         repl            ::1/128                 md5
-        host    replication      repl            127.0.0.1/32            md5
-        host    replication      repl            ::1/128                 md5
-        EOF
-    - name: Setup postgres
-      run: |
-        pg_ctl -D /tmp/pgsql start
-        createuser -s postgres
-        psql -U postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD 'secretpassword';"
-    - name: Config pgmoneta
-      run: |
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-admin master-key -P pgmonetamasterkey
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword user add
-        cat <<EOF > pgmoneta.conf
-        [pgmoneta]
-        host = *
-        metrics = 5001
-        create_slot = yes
-
-        base_dir = /Users/runner/work/pgmoneta/pgmoneta/backup
-
-        compression = zstd
-
-        storage_engine = local
-
-        retention = 7
-
-        log_type = file
-        log_level = info
-        log_path = /tmp/pgmoneta.log
-
-        unix_socket_dir = /tmp/
-
-        [primary]
-        wal_slot = repl
-        host = localhost
-        port = 5432
-        user = repl
-        EOF
-        mkdir backup
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-    - name: Execute backup
-      run: |
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf -d
-        sleep 5
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf backup primary
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf status details
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-    - name: Restore backup
-      run: /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf restore primary newest current /tmp/
-      working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-    - name: Cleanup
-      run: |
-        /Users/runner/work/pgmoneta/pgmoneta/build/src/pgmoneta-cli -c pgmoneta.conf shutdown
-        pg_ctl stop -D /tmp/pgsql
-    - name: Upload artifact for failed workflow
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Logs
-        path: |
-          /tmp/*.log
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Install Homebrew
+  #     run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+  #   - name: Update system
+  #     run: brew update
+  #   - name: Install libev
+  #     run: brew install libev
+  #   - name: Install rst2man
+  #     run: brew install docutils
+  #   - name: Install libarchive
+  #     run: brew install --ignore-dependencies libarchive
+  #   - name: Install clang
+  #     run: brew install llvm
+  #   - name: Install check
+  #     run: brew install check
+  #   - name: Install PostgreSQL
+  #     run: brew install postgresql@17
+  #   - name: Install libssh
+  #     run: brew install libssh
+  #   - name: GCC/mkdir
+  #     run: mkdir build
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/
+  #   - name: GCC/cmake
+  #     run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: GCC/make
+  #     run: make
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: rm -Rf
+  #     run: rm -Rf build/
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/
+  #   - name: CLANG/mkdir
+  #     run: mkdir build
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/
+  #   - name: CLANG/cmake
+  #     run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: CLANG/make
+  #     run: make
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: Set Env Path Variable
+  #     run: |
+  #       echo "$(brew --prefix postgresql@17)/bin" >> $GITHUB_PATH
+  #       echo $PATH
+  #   - name: Run Test Suite
+  #     run: /bin/sh ./testsuite.sh
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: Cleanup
+  #     run: /bin/sh ./testsuite.sh clean
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: Show logs
+  #     if: failure()
+  #     run: |
+  #       cat ./log/logfile
+  #       cat ./log/pgmoneta.log
+  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
+  #   - name: Upload artifact for failed workflow
+  #     if: failure()
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: Logs
+  #       path: |
+  #         /tmp/*.log

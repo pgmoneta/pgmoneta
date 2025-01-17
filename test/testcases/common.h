@@ -27,29 +27,63 @@
  *
  */
 
-#ifndef PGMONETA_EXT_TEST_H
-#define PGMONETA_EXT_TEST_H
-
-#include <check.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/**
- * Execute a shell command and capture its output
- * @param command The shell command to execute
- * @param output A buffer to store the command's output
- * @param output_size The size of the output buffer
- * @return 0 on success, -1 on error
- */
-static int
-execute_command(const char* command, char* output, size_t output_size);
+#ifndef PGMONETA_TEST_COMMON_H
+#define PGMONETA_TEST_COMMON_H
+
+#define BUFFER_SIZE 8192
+
+#define PGMONETA_LOG_FILE_TRAIL      "/log/pgmoneta.log"
+#define PGMONETA_EXECUTABLE_TRAIL    "/src/pgmoneta-cli"
+#define PGMONETA_CONFIGURATION_TRAIL "/pgmoneta-testsuite/conf/pgmoneta.conf"
+#define PGMONETA_RESTORE_TRAIL       "/pgmoneta-testsuite/restore/"
+
+#define PGMONETA_BACKUP_LOG      "INFO  backup.c:195 Backup: primary/"
+#define PGMONETA_RESTORE_LOG     "INFO  restore.c:142 Restore: primary/"
+#define PGMONETA_DELETE_LOG      "INFO  backup.c:545 Delete: primary/"
+
+#define SUCCESS_STATUS  "Status: true"
+
+extern char project_directory[BUFFER_SIZE];
 
 /**
- * Set up a suite of test cases for pgmoneta_ext
- * @return The result
+ * get the executable path from the project directory and its corresponding trail
+ * @return executable path
  */
-Suite*
-pgmoneta_ext_suite(void);
+char*
+get_executable_path();
 
-#endif // PGMONETA_EXT_TEST_H
+/**
+ * get the configuration path from the project directory and its corresponding trail
+ * @return configuration path
+ */
+char*
+get_configuration_path();
+
+/**
+ * get the restore path from the project directory and its corresponding trail
+ * @return restore path
+ */
+char*
+get_restore_path();
+
+/**
+ * get the log path from the project directory and its corresponding trail
+ * @return log path
+ */
+char*
+get_log_path();
+
+/**
+ * get the last entry of a log file (remember to free the buffer)
+ * @param log_path The path of log file
+ * @param buffer The buffer to store the last entry of the log file
+ * @return 0 for success otherwise 1
+ */
+int
+get_last_log_entry(char* log_path, char** buffer);
+
+#endif
