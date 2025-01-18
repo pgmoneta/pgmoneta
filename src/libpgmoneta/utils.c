@@ -424,9 +424,9 @@ pgmoneta_read_int32(void* data)
                             *((unsigned char*)(data + 3))};
 
    int32_t res = (int32_t)(((uint32_t)bytes[0] << 24)) |
-                 ((bytes[1] << 16)) |
-                 ((bytes[2] << 8)) |
-                 ((bytes[3]));
+                 (((uint32_t)bytes[1] << 16)) |
+                 (((uint32_t)bytes[2] << 8)) |
+                 (((uint32_t)bytes[3]));
 
    return res;
 }
@@ -434,10 +434,10 @@ pgmoneta_read_int32(void* data)
 uint32_t
 pgmoneta_read_uint32(void* data)
 {
-   uint8_t bytes[] = {*((uint8_t*)data),
-                      *((uint8_t*)(data + 1)),
-                      *((uint8_t*)(data + 2)),
-                      *((uint8_t*)(data + 3))};
+   unsigned char bytes[] = {*((unsigned char*)data),
+                            *((unsigned char*)(data + 1)),
+                            *((unsigned char*)(data + 2)),
+                            *((unsigned char*)(data + 3))};
 
    uint32_t res = (uint32_t)(((uint32_t)bytes[0] << 24)) |
                   (((uint32_t)bytes[1] << 16)) |
@@ -450,49 +450,49 @@ pgmoneta_read_uint32(void* data)
 int64_t
 pgmoneta_read_int64(void* data)
 {
-   int64_t i0 = *((unsigned char*)data);
-   int64_t i1 = *((unsigned char*)data + 1);
-   int64_t i2 = *((unsigned char*)data + 2);
-   int64_t i3 = *((unsigned char*)data + 3);
-   int64_t i4 = *((unsigned char*)data + 4);
-   int64_t i5 = *((unsigned char*)data + 5);
-   int64_t i6 = *((unsigned char*)data + 6);
-   int64_t i7 = *((unsigned char*)data + 7);
+   unsigned char bytes[] = {*((unsigned char*)data),
+                            *((unsigned char*)(data + 1)),
+                            *((unsigned char*)(data + 2)),
+                            *((unsigned char*)(data + 3)),
+                            *((unsigned char*)(data + 4)),
+                            *((unsigned char*)(data + 5)),
+                            *((unsigned char*)(data + 6)),
+                            *((unsigned char*)(data + 7))};
 
-   i0 = i0 << 56;
-   i1 = i1 << 48;
-   i2 = i2 << 40;
-   i3 = i3 << 32;
-   i4 = i4 << 24;
-   i5 = i5 << 16;
-   i6 = i6 << 8;
-   /* i7 = i7; */
+   int64_t res = (int64_t)(((uint64_t)bytes[0] << 56)) |
+                 (((uint64_t)bytes[1] << 48)) |
+                 (((uint64_t)bytes[2] << 40)) |
+                 (((uint64_t)bytes[3] << 32)) |
+                 (((uint64_t)bytes[4] << 24)) |
+                 (((uint64_t)bytes[5] << 16)) |
+                 (((uint64_t)bytes[6] << 8)) |
+                 (((uint64_t)bytes[7]));
 
-   return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
+   return res;
 }
 
 uint64_t
 pgmoneta_read_uint64(void* data)
 {
-   uint64_t i0 = *((uint8_t*)data);
-   uint64_t i1 = *((uint8_t*)data + 1);
-   uint64_t i2 = *((uint8_t*)data + 2);
-   uint64_t i3 = *((uint8_t*)data + 3);
-   uint64_t i4 = *((uint8_t*)data + 4);
-   uint64_t i5 = *((uint8_t*)data + 5);
-   uint64_t i6 = *((uint8_t*)data + 6);
-   uint64_t i7 = *((uint8_t*)data + 7);
+   unsigned char bytes[] = {*((unsigned char*)data),
+                            *((unsigned char*)(data + 1)),
+                            *((unsigned char*)(data + 2)),
+                            *((unsigned char*)(data + 3)),
+                            *((unsigned char*)(data + 4)),
+                            *((unsigned char*)(data + 5)),
+                            *((unsigned char*)(data + 6)),
+                            *((unsigned char*)(data + 7))};
 
-   i0 = i0 << 56;
-   i1 = i1 << 48;
-   i2 = i2 << 40;
-   i3 = i3 << 32;
-   i4 = i4 << 24;
-   i5 = i5 << 16;
-   i6 = i6 << 8;
-   /* i7 = i7; */
+   uint64_t res = (uint64_t)(((uint64_t)bytes[0] << 56)) |
+                  (((uint64_t)bytes[1] << 48)) |
+                  (((uint64_t)bytes[2] << 40)) |
+                  (((uint64_t)bytes[3] << 32)) |
+                  (((uint64_t)bytes[4] << 24)) |
+                  (((uint64_t)bytes[5] << 16)) |
+                  (((uint64_t)bytes[6] << 8)) |
+                  (((uint64_t)bytes[7]));
 
-   return i0 | i1 | i2 | i3 | i4 | i5 | i6 | i7;
+   return res;
 }
 
 bool
