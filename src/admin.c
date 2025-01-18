@@ -476,6 +476,19 @@ error:
       file = NULL;
    }
 
+   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
+
+   if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_print(j, FORMAT_JSON);
+   }
+   else
+   {
+      pgmoneta_json_print(j, FORMAT_TEXT);
+   }
+
+   pgmoneta_json_destroy(j);
+
    return 1;
 }
 
