@@ -28,6 +28,7 @@ Iury Santos <iuryroberto@gmail.com>
 Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 Jakub Jirutka <jakub@jirutka.cz>
 Mario Rodas
+Annupamaa <annu242005@gmail.com>
 ```
 
 ## Committers

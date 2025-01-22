@@ -36,6 +36,8 @@ if (check)
 
   if(EXISTS "/etc/debian_version")
     target_link_libraries(pgmoneta_test Check::check subunit pthread rt m)
+  elseif(APPLE)
+    target_link_libraries(pgmoneta_test Check::check m)
   else()
     target_link_libraries(pgmoneta_test Check::check pthread rt m)
   endif()
