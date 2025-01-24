@@ -1029,7 +1029,7 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          }
          else if (pgmoneta_starts_with(&key[0], INFO_HASH_ALGORITHM))
          {
-            bck->hash_algoritm = atoi(&value[0]);
+            bck->hash_algorithm = atoi(&value[0]);
          }
          else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
          {

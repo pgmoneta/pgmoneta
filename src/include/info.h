@@ -61,7 +61,7 @@ extern "C" {
 #define INFO_END_TIMELINE              "END_TIMELINE"
 #define INFO_END_WALPOS                "END_WALPOS"
 #define INFO_EXTRA                     "EXTRA"
-#define INFO_HASH_ALGORITHM            "HASH_ALGORITM"
+#define INFO_HASH_ALGORITHM            "HASH_ALGORITHM"
 #define INFO_KEEP                      "KEEP"
 #define INFO_LABEL                     "LABEL"
 #define INFO_MAJOR_VERSION             "MAJOR_VERSION"
@@ -114,7 +114,7 @@ struct backup
    uint32_t checkpoint_lsn_lo32;                                  /**< The low 32 bits of WAL checkpoint position of the backup */
    uint32_t start_timeline;                                       /**< The starting timeline of the backup */
    uint32_t end_timeline;                                         /**< The ending timeline of the backup */
-   int hash_algoritm;                                             /**< The hash algoritm for the manifest */
+   int hash_algorithm;                                            /**< The hash algorithm for the manifest */
    int compression;                                               /**< The compression type */
    int encryption;                                                /**< The encryption type */
    char comments[MAX_COMMENT];                                    /**< The comments */
