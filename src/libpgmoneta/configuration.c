@@ -788,7 +788,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_logging_rotation_age(value, &config->log_rotation_size))
+                     if (as_logging_rotation_age(value, &config->log_rotation_age))
                      {
                         unknown = true;
                      }
@@ -2729,7 +2729,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       }
       else if (!strcmp(key, "log_rotation_age"))
       {
-         if (as_logging_rotation_age(config_value, &config->log_rotation_size))
+         if (as_logging_rotation_age(config_value, &config->log_rotation_age))
          {
             unknown = true;
          }
