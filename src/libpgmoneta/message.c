@@ -1548,10 +1548,16 @@ write_message(int socket, struct message* msg)
 
    do
    {
+      keep_write = false;
+
       write_size = MIN(remaining, DEFAULT_BUFFER_SIZE);
 
       numbytes = write(socket, msg->data + offset, write_size);
-      totalbytes += numbytes;
+
+      if (numbytes >= 0)
+      {
+         totalbytes += numbytes;
+      }
 
       if (likely(totalbytes == msg->length))
       {
