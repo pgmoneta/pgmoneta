@@ -1535,6 +1535,7 @@ write_message(int socket, struct message* msg)
    int offset;
    ssize_t totalbytes;
    ssize_t remaining;
+   ssize_t write_size;
 
 #ifdef DEBUG
    assert(msg != NULL);
@@ -1547,16 +1548,18 @@ write_message(int socket, struct message* msg)
 
    do
    {
-      numbytes = write(socket, msg->data + offset, remaining);
+      write_size = MIN(remaining, DEFAULT_BUFFER_SIZE);
 
-      if (likely(numbytes == msg->length))
+      numbytes = write(socket, msg->data + offset, write_size);
+      totalbytes += numbytes;
+
+      if (likely(totalbytes == msg->length))
       {
          return MESSAGE_STATUS_OK;
       }
       else if (numbytes != -1)
       {
          offset += numbytes;
-         totalbytes += numbytes;
          remaining -= numbytes;
 
          if (totalbytes == msg->length)
@@ -1564,22 +1567,26 @@ write_message(int socket, struct message* msg)
             return MESSAGE_STATUS_OK;
          }
 
-         pgmoneta_log_debug("Write %d - %zd/%zd vs %zd", socket, numbytes, totalbytes, msg->length);
          keep_write = true;
          errno = 0;
       }
       else
       {
+         pgmoneta_log_debug("Error %d - %zd/%zd (%zd) - %d/%s",
+                              socket,
+                              numbytes, totalbytes, msg->length,
+                              errno, strerror(errno));
+
          switch (errno)
          {
             case EAGAIN:
                keep_write = true;
-               errno = 0;
                break;
             default:
                keep_write = false;
                break;
          }
+         errno = 0;
       }
    }
    while (keep_write);
