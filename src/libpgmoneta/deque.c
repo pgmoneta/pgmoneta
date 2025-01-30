@@ -468,6 +468,16 @@ pgmoneta_deque_iterator_next(struct deque_iterator* iter)
    return true;
 }
 
+bool
+pgmoneta_deque_iterator_has_next(struct deque_iterator* iter)
+{
+   if (iter == NULL)
+   {
+      return false;
+   }
+   return deque_next(iter->deque, iter->cur) != NULL;
+}
+
 static void
 deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type, struct value_config* config)
 {

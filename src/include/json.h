@@ -219,6 +219,14 @@ bool
 pgmoneta_json_iterator_next(struct json_iterator* iter);
 
 /**
+ * Check if the JSON object has next kv pair/entry
+ * @param iter The iterator
+ * @return true if has next, false if otherwise
+ */
+bool
+pgmoneta_json_iterator_has_next(struct json_iterator* iter);
+
+/**
  * Destroy a iterator
  * @param iter The iterator
  */

@@ -136,6 +136,14 @@ bool
 pgmoneta_art_iterator_next(struct art_iterator* iter);
 
 /**
+ * Check if the iterator has next value without advancing it
+ * @param iter The iterator
+ * @return true if iterator has next, otherwise false
+ */
+bool
+pgmoneta_art_iterator_has_next(struct art_iterator* iter);
+
+/**
  * Create an art iterator
  * @param t The tree
  * @param iter [out] The iterator
