@@ -112,18 +112,21 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
          val->to_string = char_to_string_cb;
          break;
       case ValueString:
-         val->to_string = string_to_string_cb;
-         break;
       case ValueBASE64:
+      case ValueStringRef:
+      case ValueBASE64Ref:
          val->to_string = string_to_string_cb;
          break;
       case ValueJSON:
+      case ValueJSONRef:
          val->to_string = json_to_string_cb;
          break;
       case ValueDeque:
+      case ValueDequeRef:
          val->to_string = deque_to_string_cb;
          break;
       case ValueART:
+      case ValueARTRef:
          val->to_string = art_to_string_cb;
          break;
       case ValueMem:
