@@ -1579,9 +1579,9 @@ write_message(int socket, struct message* msg)
       else
       {
          pgmoneta_log_debug("Error %d - %zd/%zd (%zd) - %d/%s",
-                              socket,
-                              numbytes, totalbytes, msg->length,
-                              errno, strerror(errno));
+                            socket,
+                            numbytes, totalbytes, msg->length,
+                            errno, strerror(errno));
 
          switch (errno)
          {
