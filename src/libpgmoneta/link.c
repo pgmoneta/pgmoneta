@@ -101,15 +101,15 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                {
                   goto done;
                }
-            }
 
-            if (workers != NULL)
-            {
-               pgmoneta_workers_add(workers, do_link, (void*)wi);
-            }
-            else
-            {
-               do_link(wi);
+               if (workers != NULL)
+               {
+                  pgmoneta_workers_add(workers, do_link, (void*)wi);
+               }
+               else
+               {
+                  do_link(wi);
+               }
             }
          }
       }
