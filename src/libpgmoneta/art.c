@@ -798,6 +798,10 @@ art_node_delete(struct art_node* node, struct art_node** node_ref, uint32_t dept
    else
    {
       depth += node->prefix_len;
+      if (depth > key_len)
+      {
+         return NULL;
+      }
       child = node_get_child(node, key[depth]);
       if (child == NULL)
       {
@@ -1484,6 +1488,10 @@ art_search(struct art* t, unsigned char* key, uint32_t key_len)
          return NULL;
       }
       depth += node->prefix_len;
+      if (depth > key_len)
+      {
+         return NULL;
+      }
       // you can't dereference what the function returns directly since it could be null
       child = node_get_child(node, key[depth]);
       node = child != NULL ? *child : NULL;
