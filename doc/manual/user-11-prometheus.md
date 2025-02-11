@@ -125,6 +125,18 @@ The free disk space for the WAL shipping directory of a server
 
 The total disk space for the WAL shipping directory of a server
 
+## pgmoneta_workspace
+
+The disk space used for workspace for a server
+
+## pgmoneta_workspace_free_space
+
+The free disk space for the workspace directory of a server
+
+## pgmoneta_workspace_total_space
+
+The total disk space for the workspace directory of a server
+
 ## pgmoneta_hot_standby
 
 The disk space used for hot standby for a server

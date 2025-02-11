@@ -33,8 +33,9 @@
 extern "C" {
 #endif
 
-#include <stdlib.h>
 #include <json.h>
+
+#include <stdlib.h>
 
 /* Main configuration fields */
 #define CONFIGURATION_ARGUMENT_HOST                   "host"
@@ -92,6 +93,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_WAL_SLOT                "wal_slot"
 #define CONFIGURATION_ARGUMENT_FOLLOW                  "follow"
 #define CONFIGURATION_ARGUMENT_WAL_SHIPPING            "wal_shipping"
+#define CONFIGURATION_ARGUMENT_WORKSPACE               "workspace"
 #define CONFIGURATION_ARGUMENT_HOT_STANDBY             "hot_standby"
 #define CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES   "hot_standby_overrides"
 #define CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES "hot_standby_tablespaces"

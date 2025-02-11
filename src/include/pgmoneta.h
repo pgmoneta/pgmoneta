@@ -213,6 +213,7 @@ struct server
    char current_wal_filename[MISC_LENGTH];  /**< The current WAL filename*/
    char current_wal_lsn[MISC_LENGTH];       /**< The current WAL log sequence number*/
    char follow[MISC_LENGTH];                /**< Follow a server */
+   char workspace[MAX_PATH];                /**< A workspace for combining incremental backups */
    int retention_days;                      /**< The retention days for the server */
    int retention_weeks;                     /**< The retention weeks for the server */
    int retention_months;                    /**< The retention months for the server */
@@ -346,6 +347,8 @@ struct configuration
    int retention_months;                /**< The retention months for the server */
    int retention_years;                 /**< The retention years for the server */
    int retention_interval;              /**< The retention interval */
+
+   char workspace[MAX_PATH]; /**< A workspace for combining incremental backups */
 
    int log_type;                      /**< The logging type */
    int log_level;                     /**< The logging level */

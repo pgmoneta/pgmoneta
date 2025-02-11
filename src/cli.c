@@ -2767,8 +2767,16 @@ translate_server_retention_argument(struct json* response, char* tag)
 static void
 translate_servers_argument(struct json* response)
 {
+   char* translated_workspace_size = NULL;
    char* translated_hotstandby_size = NULL;
    char* translated_server_size = NULL;
+
+   translated_workspace_size = translate_size((int64_t)pgmoneta_json_get(response,
+                                                                         MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE));
+   if (translated_workspace_size)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)translated_workspace_size, ValueString);
+   }
 
    translated_hotstandby_size = translate_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE));
    if (translated_hotstandby_size)
@@ -2789,6 +2797,7 @@ translate_servers_argument(struct json* response)
 
    free(translated_server_size);
    free(translated_hotstandby_size);
+   free(translated_workspace_size);
 }
 
 static void
