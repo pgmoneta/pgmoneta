@@ -390,6 +390,10 @@ struct configuration
 
    int manifest;  /**< The manifest hash algorithm */
 
+#ifdef DEBUG
+   bool link; /**< Do linking */
+#endif
+
    struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
    struct user users[NUMBER_OF_USERS];             /**< The users */
    struct user admins[NUMBER_OF_ADMINS];           /**< The admins */

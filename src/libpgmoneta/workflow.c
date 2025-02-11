@@ -272,8 +272,16 @@ wf_backup(struct backup* backup)
       current = current->next;
    }
 
+#ifdef DEBUG
+   if (config->link)
+   {
+      current->next = pgmoneta_create_link();
+      current = current->next;
+   }
+#else
    current->next = pgmoneta_create_link();
    current = current->next;
+#endif
 
    current->next = pgmoneta_create_permissions(PERMISSION_TYPE_BACKUP);
    current = current->next;
