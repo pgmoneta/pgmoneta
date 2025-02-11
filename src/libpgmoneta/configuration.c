@@ -144,6 +144,10 @@ pgmoneta_init_configuration(void* shm)
 
    config->manifest = HASH_ALGORITHM_SHA256;
 
+#ifdef DEBUG
+   config->link = true;
+#endif
+
    return 0;
 }
 
@@ -1301,6 +1305,22 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+#ifdef DEBUG
+               else if (!strcmp(key, "link"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_bool(value, &config->link))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+#endif
                else
                {
                   unknown = true;

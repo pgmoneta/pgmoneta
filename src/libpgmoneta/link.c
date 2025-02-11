@@ -400,25 +400,30 @@ trim_suffix(char* str)
       return NULL;
    }
    len = strlen(str) + 1;
-   switch (config->compression_type)
+
+   if (!pgmoneta_compare_string(str, "backup_label") &&
+       !pgmoneta_compare_string(str, "backup_manifest"))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
-         len -= 3;
-         break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
-         len -= 5;
-         break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
-      case COMPRESSION_CLIENT_BZIP2:
+      switch (config->compression_type)
+      {
+         case COMPRESSION_CLIENT_GZIP:
+         case COMPRESSION_SERVER_GZIP:
+            len -= 3;
+            break;
+         case COMPRESSION_CLIENT_ZSTD:
+         case COMPRESSION_SERVER_ZSTD:
+            len -= 5;
+            break;
+         case COMPRESSION_CLIENT_LZ4:
+         case COMPRESSION_SERVER_LZ4:
+         case COMPRESSION_CLIENT_BZIP2:
+            len -= 4;
+            break;
+      }
+      if (config->encryption != ENCRYPTION_NONE)
+      {
          len -= 4;
-         break;
-   }
-   if (config->encryption != ENCRYPTION_NONE)
-   {
-      len -= 4;
+      }
    }
 
    res = malloc(len);
