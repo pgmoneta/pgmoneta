@@ -128,6 +128,10 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
          pgmoneta_workers_destroy(workers);
       }
    }
@@ -141,7 +145,10 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
          pgmoneta_delete_file(d, true, NULL);
       }
 
-      pgmoneta_lz4c_file(tarfile, d);
+      if (pgmoneta_lz4c_file(tarfile, d))
+      {
+         goto error;
+      }
    }
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
@@ -161,6 +168,17 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
    free(d);
 
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(d);
+
+   return 1;
 }
 
 static int

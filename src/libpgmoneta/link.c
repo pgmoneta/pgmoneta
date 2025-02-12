@@ -42,12 +42,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-static void do_link(void* arg);
-static void do_relink(void* arg);
-static void do_comparefiles(void* arg);
+static void do_link(struct worker_input* wi);
+static void do_relink(struct worker_input* wi);
+static void do_comparefiles(struct worker_input* wi);
 static char* trim_suffix(char* str);
 
-void
+int
 pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
@@ -60,8 +60,9 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
 
    if (from_dir == NULL)
    {
-      goto done;
+      goto error;
    }
+
    while ((entry = readdir(from_dir)))
    {
       if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
@@ -99,12 +100,15 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                to_entry = pgmoneta_append(to_entry, from_file);
                if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
                {
-                  goto done;
+                  goto error;
                }
 
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_link, (void*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_link, wi);
+                  }
                }
                else
                {
@@ -125,31 +129,42 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
       from_file_trimmed = NULL;
    }
 
-done:
+   closedir(from_dir);
+
+   return 0;
+
+error:
 
    if (from_dir != NULL)
    {
       closedir(from_dir);
    }
+
+   free(from_entry);
+   free(from_file_trimmed);
+   free(from_file);
+   free(to_entry);
+
+   return 1;
 }
 
 static void
-do_link(void* arg)
+do_link(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
    if (pgmoneta_exists(wi->to))
    {
       pgmoneta_delete_file(wi->from, true, NULL);
       pgmoneta_symlink_file(wi->from, wi->to);
    }
+   else
+   {
+      wi->workers->outcome = false;
+   }
 
    free(wi);
 }
 
-void
+int
 pgmoneta_relink(char* from, char* to, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
@@ -161,12 +176,12 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
 
    if (from_dir == NULL)
    {
-      goto done;
+      goto error;
    }
 
    if (to_dir == NULL)
    {
-      goto done;
+      goto error;
    }
 
    while ((entry = readdir(from_dir)))
@@ -205,12 +220,15 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
 
             if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
             {
-               goto done;
+               goto error;
             }
 
             if (workers != NULL)
             {
-               pgmoneta_workers_add(workers, do_relink, (void*)wi);
+               if (workers->outcome)
+               {
+                  pgmoneta_workers_add(workers, do_relink, wi);
+               }
             }
             else
             {
@@ -226,7 +244,9 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
       to_entry = NULL;
    }
 
-done:
+   return 0;
+
+error:
 
    if (from_dir != NULL)
    {
@@ -237,15 +257,17 @@ done:
    {
       closedir(to_dir);
    }
+
+   free(from_entry);
+   free(to_entry);
+
+   return 1;
 }
 
 static void
-do_relink(void* arg)
+do_relink(struct worker_input* wi)
 {
    char* link = NULL;
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
 
 #ifdef DEBUG
    if (!pgmoneta_exists(wi->from))
@@ -285,15 +307,24 @@ do_relink(void* arg)
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", wi->to, pgmoneta_is_symlink_valid(wi->to) ? "Yes " : "No  ");
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", link, pgmoneta_is_symlink_valid(link) ? "Yes " : "No  ");
 #endif
+
             free(link);
          }
+         else
+         {
+            wi->workers->outcome = false;
+         }
       }
+   }
+   else
+   {
+      wi->workers->outcome = false;
    }
 
    free(wi);
 }
 
-void
+int
 pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
 {
    DIR* from_dir = opendir(from);
@@ -304,7 +335,7 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
 
    if (from_dir == NULL)
    {
-      goto done;
+      goto error;
    }
 
    while ((entry = readdir(from_dir)))
@@ -340,12 +371,15 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
 
             if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
             {
-               goto done;
+               goto error;
             }
 
             if (workers != NULL)
             {
-               pgmoneta_workers_add(workers, do_comparefiles, (void*)wi);
+               if (workers->outcome)
+               {
+                  pgmoneta_workers_add(workers, do_comparefiles, wi);
+               }
             }
             else
             {
@@ -361,21 +395,28 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
       to_entry = NULL;
    }
 
-done:
+   closedir(from_dir);
+
+   return 0;
+
+error:
 
    if (from_dir != NULL)
    {
       closedir(from_dir);
    }
+
+   free(from_entry);
+   free(to_entry);
+
+   return 1;
 }
 
 static void
-do_comparefiles(void* arg)
+do_comparefiles(struct worker_input* wi)
 {
    bool equal;
-   struct worker_input* wi = NULL;
 
-   wi = (struct worker_input*)arg;
    equal = pgmoneta_compare_files(wi->from, wi->to);
 
    if (equal)

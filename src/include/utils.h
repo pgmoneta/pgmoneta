@@ -766,6 +766,14 @@ int
 pgmoneta_basename_file(char* s, char** basename);
 
 /**
+ * Get the translated size of a file
+ * @param size The size
+ * @return The result
+ */
+char*
+pgmoneta_translate_file_size(uint64_t size);
+
+/**
  * File/directory exists
  * @param f The file/directory
  * @return The result
@@ -876,6 +884,14 @@ pgmoneta_free_space(char* path);
  */
 unsigned long
 pgmoneta_total_space(char* path);
+
+/**
+ * Get the biggest file size
+ * @param directory The directory
+ * @return The result
+ */
+unsigned long
+pgmoneta_biggest_file(char* directory);
 
 /**
  * Does a string start with another string

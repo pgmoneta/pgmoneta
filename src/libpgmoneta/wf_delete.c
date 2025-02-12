@@ -221,7 +221,12 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
          if (number_of_workers > 0)
          {
             pgmoneta_workers_wait(workers);
+            if (!workers->outcome)
+            {
+               goto error;
+            }
             pgmoneta_workers_destroy(workers);
+            workers = NULL;
          }
 
          /* Delete from */
@@ -256,6 +261,10 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
          if (number_of_workers > 0)
          {
             pgmoneta_workers_wait(workers);
+            if (!workers->outcome)
+            {
+               goto error;
+            }
             pgmoneta_workers_destroy(workers);
          }
 
@@ -343,6 +352,11 @@ delete_backup_execute(int server, char* identifier, struct deque* nodes)
    return 0;
 
 error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
 
    for (int i = 0; i < number_of_backups; i++)
    {

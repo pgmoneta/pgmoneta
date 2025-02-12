@@ -51,10 +51,10 @@ static int bzip2_compress(char* from, int level, char* to);
 static int bzip2_decompress(char* from, char* to);
 static int bzip2_decompress_file(char* from, char* to);
 
-static void do_bzip2_compress(void* arg);
-static void do_bzip2_decompress(void* arg);
+static void do_bzip2_compress(struct worker_input* wi);
+static void do_bzip2_decompress(struct worker_input* wi);
 
-void
+int
 pgmoneta_bzip2_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
@@ -70,7 +70,7 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
 
    if (!(dir = opendir(directory)))
    {
-      return;
+      goto error;
    }
 
    level = config->compression_level;
@@ -111,13 +111,9 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
          }
          if (!pgmoneta_is_compressed_archive(entry->d_name) && !pgmoneta_is_encrypted_archive(entry->d_name))
          {
-            from = NULL;
-
             from = pgmoneta_append(from, directory);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
-
-            to = NULL;
 
             to = pgmoneta_append(to, directory);
             to = pgmoneta_append(to, "/");
@@ -128,35 +124,59 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_bzip2_compress, (void*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_bzip2_compress, wi);
+                  }
                }
                else
                {
                   do_bzip2_compress(wi);
                }
             }
+            else
+            {
+               goto error;
+            }
 
             free(from);
             free(to);
+
+            from = NULL;
+            to = NULL;
          }
       }
    }
 
    closedir(dir);
+
+   free(from);
+   free(to);
+
+   return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   free(from);
+   free(to);
+
+   return 1;
 }
 
 static void
-do_bzip2_compress(void* arg)
+do_bzip2_compress(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
    if (pgmoneta_exists(wi->from))
    {
       if (bzip2_compress(wi->from, wi->level, wi->to))
       {
          pgmoneta_log_error("Bzip2: Could not compress %s", wi->from);
+         wi->workers->outcome = false;
       }
       else
       {
@@ -263,13 +283,19 @@ pgmoneta_bzip2_wal(char* directory)
 
          free(from);
          free(to);
+
+         from = NULL;
+         to = NULL;
       }
    }
 
    closedir(dir);
+
+   free(from);
+   free(to);
 }
 
-void
+int
 pgmoneta_bunzip2_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
@@ -281,7 +307,7 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
 
    if (!(dir = opendir(directory)))
    {
-      return;
+      goto error;
    }
 
    while ((entry = readdir(dir)) != NULL)
@@ -303,8 +329,6 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
       {
          if (pgmoneta_ends_with(entry->d_name, ".bz2"))
          {
-            from = NULL;
-
             from = pgmoneta_append(from, entry->d_name);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
@@ -318,8 +342,6 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
 
             memset(name, 0, strlen(entry->d_name) - 2);
             memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
-
-            to = NULL;
 
             to = pgmoneta_append(to, directory);
             to = pgmoneta_append(to, "/");
@@ -336,16 +358,29 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
                   do_bzip2_decompress(wi);
                }
             }
+            else
+            {
+               goto error;
+            }
 
             free(name);
             free(from);
             free(to);
+
+            name = NULL;
+            from = NULL;
+            to = NULL;
          }
       }
    }
 
    closedir(dir);
-   return;
+
+   free(name);
+   free(from);
+   free(to);
+
+   return 0;
 
 error:
 
@@ -353,6 +388,12 @@ error:
    {
       closedir(dir);
    }
+
+   free(name);
+   free(from);
+   free(to);
+
+   return 1;
 }
 
 void
@@ -436,15 +477,12 @@ error:
 }
 
 static void
-do_bzip2_decompress(void* arg)
+do_bzip2_decompress(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
    if (bzip2_decompress(wi->from, wi->to))
    {
       pgmoneta_log_error("Bzip2: Could not decompress %s", wi->from);
+      wi->workers->outcome = false;
    }
    else
    {

@@ -42,8 +42,9 @@ extern "C" {
  * GZip a data directory
  * @param directory The directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1.
  */
-void
+int
 pgmoneta_gzip_data(char* directory, struct workers* workers);
 
 /**
@@ -104,8 +105,9 @@ pgmoneta_gunzip_file(char* from, char* to);
  * GUNZip a directory
  * @param directory The directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1.
  */
-void
+int
 pgmoneta_gunzip_data(char* directory, struct workers* workers);
 
 /**

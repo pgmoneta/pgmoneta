@@ -34,6 +34,7 @@
 #include <management.h>
 #include <network.h>
 #include <restore.h>
+#include <stdint.h>
 #include <string.h>
 #include <utils.h>
 #include <value.h>
@@ -42,6 +43,10 @@
 /* system */
 #include <stdlib.h>
 #include <unistd.h>
+
+#define RESTORE_OK            0
+#define RESTORE_MISSING_LABEL 1
+#define RESTORE_NO_DISK_SPACE 2
 
 static char* restore_last_files_names[] = {"/global/pg_control"};
 
@@ -73,6 +78,7 @@ pgmoneta_get_restore_last_files_names(char*** output)
 void
 pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
+   int ret = RESTORE_OK;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
@@ -102,7 +108,8 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   if (!pgmoneta_restore_backup(server, identifier, position, directory, &output, &label))
+   ret = pgmoneta_restore_backup(server, identifier, position, directory, &output, &label);
+   if (ret == RESTORE_OK)
    {
       if (pgmoneta_management_create_response(payload, server, &response))
       {
@@ -124,6 +131,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)backup->biggest_file_size, ValueUInt64);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backup->comments, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backup->compression, ValueInt32);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backup->encryption, ValueInt32);
@@ -141,10 +149,16 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
       pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, backup->label, elapsed);
    }
-   else
+   else if (ret == RESTORE_MISSING_LABEL)
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, compression, encryption, payload);
       pgmoneta_log_warn("Restore: No identifier for %s/%s", config->servers[server].name, identifier);
+      goto error;
+   }
+   else
+   {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NODISK,
+                                         compression, encryption, payload);
       goto error;
    }
 
@@ -186,11 +200,17 @@ error:
 int
 pgmoneta_restore_backup(int server, char* identifier, char* position, char* directory, char** output, char** label)
 {
+   int ret = RESTORE_OK;
+   uint64_t free_space = 0;
+   uint64_t required_space = 0;
    char* o = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
    struct backup* backup = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
 
    *output = NULL;
    *label = NULL;
@@ -199,16 +219,48 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
 
    if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
    if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory, ValueString))
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
+      ret = RESTORE_MISSING_LABEL;
+      goto error;
+   }
+
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
+   {
+      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(directory), directory);
+      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(directory), directory);
+      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(directory), directory);
+   }
+
+   free_space = pgmoneta_free_space(directory);
+   required_space =
+      backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+
+   if (free_space < required_space)
+   {
+      char* f = NULL;
+      char* r = NULL;
+
+      f = pgmoneta_translate_file_size(free_space);
+      r = pgmoneta_translate_file_size(required_space);
+
+      pgmoneta_log_error("Restore: Not enough disk space for %s/%s (Available: %s, Required: %s)",
+                         config->servers[server].name, backup->label, f, r);
+
+      free(f);
+      free(r);
+
+      ret = RESTORE_NO_DISK_SPACE;
       goto error;
    }
 
@@ -219,6 +271,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
    {
       if (current->setup(server, identifier, nodes))
       {
+         ret = RESTORE_MISSING_LABEL;
          goto error;
       }
       current = current->next;
@@ -229,6 +282,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
    {
       if (current->execute(server, identifier, nodes))
       {
+         ret = RESTORE_MISSING_LABEL;
          goto error;
       }
       current = current->next;
@@ -239,6 +293,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
    {
       if (current->teardown(server, identifier, nodes))
       {
+         ret = RESTORE_MISSING_LABEL;
          goto error;
       }
       current = current->next;
@@ -248,6 +303,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
 
    if (o == NULL)
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
@@ -255,6 +311,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
 
    if (*output == NULL)
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
@@ -265,6 +322,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
 
    if (*label == NULL)
    {
+      ret = RESTORE_MISSING_LABEL;
       goto error;
    }
 
@@ -277,7 +335,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
 
    pgmoneta_deque_destroy(nodes);
 
-   return 0;
+   return RESTORE_OK;
 
 error:
    free(backup);
@@ -286,5 +344,5 @@ error:
 
    pgmoneta_deque_destroy(nodes);
 
-   return 1;
+   return ret;
 }

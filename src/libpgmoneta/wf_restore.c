@@ -290,6 +290,10 @@ restore_execute(int server, char* identifier, struct deque* nodes)
    if (number_of_workers > 0)
    {
       pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
       pgmoneta_workers_destroy(workers);
    }
 
@@ -315,7 +319,6 @@ error:
 
    if (number_of_workers > 0)
    {
-      pgmoneta_workers_wait(workers);
       pgmoneta_workers_destroy(workers);
    }
 
@@ -832,6 +835,10 @@ restore_excluded_files_execute(int server, char* identifier, struct deque* nodes
    if (number_of_workers > 0)
    {
       pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
       pgmoneta_workers_destroy(workers);
    }
 
@@ -847,6 +854,11 @@ restore_excluded_files_execute(int server, char* identifier, struct deque* nodes
    return 0;
 
 error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
 
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
    {

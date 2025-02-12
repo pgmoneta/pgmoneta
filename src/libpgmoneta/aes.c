@@ -46,8 +46,8 @@ static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* k
 static const EVP_CIPHER* (*get_cipher(int mode))(void);
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 
-static void do_encrypt_file(void* arg);
-static void do_decrypt_file(void* arg);
+static void do_encrypt_file(struct worker_input* wi);
+static void do_decrypt_file(struct worker_input* wi);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
@@ -61,7 +61,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
 
    if (!(dir = opendir(d)))
    {
-      return 1;
+      goto error;
    }
 
    while ((entry = readdir(dir)) != NULL)
@@ -87,13 +87,9 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
              !pgmoneta_ends_with(entry->d_name, "backup_label") &&
              !pgmoneta_ends_with(entry->d_name, "backup_manifest"))
          {
-            from = NULL;
-
             from = pgmoneta_append(from, d);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
-
-            to = NULL;
 
             to = pgmoneta_append(to, d);
             to = pgmoneta_append(to, "/");
@@ -108,7 +104,10 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
                {
                   if (workers != NULL)
                   {
-                     pgmoneta_workers_add(workers, do_encrypt_file, (void*)wi);
+                     if (workers->outcome)
+                     {
+                        pgmoneta_workers_add(workers, do_encrypt_file, wi);
+                     }
                   }
                   else
                   {
@@ -119,23 +118,38 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
 
             free(from);
             free(to);
+
+            from = NULL;
+            to = NULL;
          }
       }
    }
 
    closedir(dir);
+
    return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   return 1;
 }
 
 static void
-do_encrypt_file(void* arg)
+do_encrypt_file(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
-   encrypt_file(wi->from, wi->to, 1);
-   pgmoneta_delete_file(wi->from, true, NULL);
+   if (!encrypt_file(wi->from, wi->to, 1))
+   {
+      pgmoneta_delete_file(wi->from, true, NULL);
+   }
+   else
+   {
+      wi->workers->outcome = false;
+   }
 
    free(wi);
 }
@@ -410,8 +424,6 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
          {
             struct worker_input* wi = NULL;
 
-            from = NULL;
-
             from = pgmoneta_append(from, d);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
@@ -426,8 +438,6 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             memset(name, 0, strlen(entry->d_name) - 3);
             memcpy(name, entry->d_name, strlen(entry->d_name) - 4);
 
-            to = NULL;
-
             to = pgmoneta_append(to, d);
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
@@ -436,17 +446,28 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_decrypt_file, (void*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_decrypt_file, wi);
+                  }
                }
                else
                {
                   do_decrypt_file(wi);
                }
             }
+            else
+            {
+               goto error;
+            }
 
             free(name);
             free(from);
             free(to);
+
+            name = NULL;
+            from = NULL;
+            to = NULL;
          }
       }
    }
@@ -465,14 +486,16 @@ error:
 }
 
 static void
-do_decrypt_file(void* arg)
+do_decrypt_file(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
-   encrypt_file(wi->from, wi->to, 0);
-   pgmoneta_delete_file(wi->from, true, NULL);
+   if (!encrypt_file(wi->from, wi->to, 0))
+   {
+      pgmoneta_delete_file(wi->from, true, NULL);
+   }
+   else
+   {
+      wi->workers->outcome = false;
+   }
 
    free(wi);
 }

@@ -270,6 +270,10 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
       }
 
       if (strlen(config->servers[server].hot_standby_overrides) > 0 &&
@@ -288,6 +292,10 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
          pgmoneta_workers_destroy(workers);
       }
 
@@ -327,6 +335,32 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
    free(destination);
 
    return 0;
+
+error:
+
+   free(old_manifest);
+   free(new_manifest);
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   pgmoneta_art_iterator_destroy(deleted_iter);
+   pgmoneta_art_iterator_destroy(changed_iter);
+   pgmoneta_art_iterator_destroy(added_iter);
+
+   pgmoneta_art_destroy(deleted_files);
+   pgmoneta_art_destroy(changed_files);
+   pgmoneta_art_destroy(added_files);
+
+   free(root);
+   free(base);
+   free(source);
+   free(destination);
+
+   return 1;
 }
 
 static int

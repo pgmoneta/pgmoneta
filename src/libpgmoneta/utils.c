@@ -83,8 +83,8 @@ static int copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappin
 
 static int get_permissions(char* from, int* permissions);
 
-static void copy_file(void* arg);
-static void delete_file(void* arg);
+static void do_copy_file(struct worker_input* wi);
+static void do_delete_file(struct worker_input* wi);
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -1781,28 +1781,32 @@ pgmoneta_delete_file(char* file, bool force, struct workers* workers)
 
    if (pgmoneta_create_worker_input(NULL, file, NULL, 0, true, workers, &fi))
    {
-      return 1;
+      goto error;
    }
 
    if (workers != NULL)
    {
-      pgmoneta_workers_add(workers, delete_file, (void*)fi);
+      if (workers->outcome)
+      {
+         pgmoneta_workers_add(workers, do_delete_file, fi);
+      }
    }
    else
    {
-      delete_file(fi);
+      do_delete_file(fi);
    }
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 static void
-delete_file(void* arg)
+do_delete_file(struct worker_input* fi)
 {
    int ret;
-   struct worker_input* fi = NULL;
-
-   fi = (struct worker_input*)arg;
 
    ret = unlink(fi->from);
 
@@ -1813,6 +1817,7 @@ delete_file(void* arg)
          pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
       }
       errno = 0;
+      fi->workers->outcome = false;
    }
 
    free(fi);
@@ -2375,32 +2380,36 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
 
    if (pgmoneta_create_worker_input(NULL, from, to, 0, false, workers, &fi))
    {
-      return 1;
+      goto error;
    }
 
    if (workers != NULL)
    {
-      pgmoneta_workers_add(workers, copy_file, (void*)fi);
+      if (workers->outcome)
+      {
+         pgmoneta_workers_add(workers, do_copy_file, fi);
+      }
    }
    else
    {
-      copy_file(fi);
+      do_copy_file(fi);
    }
 
    return 0;
+
+error:
+
+   return 1;
 }
 
 static void
-copy_file(void* arg)
+do_copy_file(struct worker_input* fi)
 {
    int fd_from = -1;
    int fd_to = -1;
    char buffer[8192];
    ssize_t nread = -1;
    int permissions = -1;
-   struct worker_input* fi = NULL;
-
-   fi = (struct worker_input*)arg;
 
    fd_from = open(fi->from, O_RDONLY);
 
@@ -2492,6 +2501,8 @@ error:
 
    errno = 0;
 
+   fi->workers->outcome = false;
+
    free(fi);
 }
 
@@ -2554,6 +2565,26 @@ pgmoneta_basename_file(char* s, char** basename)
 
 error:
    return 1;
+}
+
+char*
+pgmoneta_translate_file_size(uint64_t size)
+{
+   char* translated_size = NULL;
+   double sz = (double)size;
+   char* units[] = {"B", "kB", "MB", "GB", "TB", "PB"};
+   int i = 0;
+
+   while (sz >= 1024 && i < 6)
+   {
+      sz /= 1024.0;
+      i++;
+   }
+
+   translated_size = pgmoneta_append_double_precision(translated_size, sz, 2);
+   translated_size = pgmoneta_append(translated_size, units[i]);
+
+   return translated_size;
 }
 
 bool
@@ -2990,6 +3021,108 @@ pgmoneta_total_space(char* path)
    }
 
    return buf.f_frsize * buf.f_blocks;
+}
+
+unsigned long
+pgmoneta_biggest_file(char* directory)
+{
+   unsigned long biggest_size = 0;
+   DIR* dir;
+   char* p;
+   unsigned long l;
+   unsigned long size = 0;
+   struct dirent* entry;
+   struct stat st;
+
+   if (!(dir = opendir(directory)))
+   {
+      goto error;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[MAX_PATH];
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         {
+            continue;
+         }
+
+         memset(&path[0], 0, sizeof(path));
+         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+
+         size = pgmoneta_biggest_file(path);
+
+         if (size > biggest_size)
+         {
+            biggest_size = size;
+         }
+      }
+      else if (entry->d_type == DT_REG)
+      {
+         p = NULL;
+
+         p = pgmoneta_append(p, directory);
+         p = pgmoneta_append(p, "/");
+         p = pgmoneta_append(p, entry->d_name);
+
+         memset(&st, 0, sizeof(struct stat));
+
+         stat(p, &st);
+
+         l = st.st_size / st.st_blksize;
+
+         if (st.st_size % st.st_blksize != 0)
+         {
+            l += 1;
+         }
+
+         size = (l * st.st_blksize);
+
+         if (size > biggest_size)
+         {
+            biggest_size = size;
+         }
+
+         free(p);
+      }
+      else if (entry->d_type == DT_LNK)
+      {
+         p = NULL;
+
+         p = pgmoneta_append(p, directory);
+         p = pgmoneta_append(p, "/");
+         p = pgmoneta_append(p, entry->d_name);
+
+         memset(&st, 0, sizeof(struct stat));
+
+         stat(p, &st);
+
+         size = st.st_blksize;
+
+         if (size > biggest_size)
+         {
+            biggest_size = size;
+         }
+
+         free(p);
+      }
+   }
+
+   closedir(dir);
+
+   return biggest_size;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   return 1024 * 1024 * 1024;
 }
 
 bool

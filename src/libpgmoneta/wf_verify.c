@@ -43,18 +43,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-struct payload
-{
-   struct json* data;
-   struct deque* failed;
-   struct deque* all;
-};
-
 static int verify_setup(int, char*, struct deque*);
 static int verify_execute(int, char*, struct deque*);
 static int verify_teardown(int, char*, struct deque*);
 
-static void do_verify(void* arg);
+static void do_verify(struct worker_input* wi);
 
 struct workflow*
 pgmoneta_create_verify(void)
@@ -154,17 +147,13 @@ verify_execute(int server, char* identifier, struct deque* nodes)
 
    while (pgmoneta_csv_next_row(csv, &number_of_columns, &columns))
    {
-      struct payload* payload = NULL;
+      struct worker_input* payload = NULL;
       struct json* j = NULL;
 
-      payload = (struct payload*)malloc(sizeof(struct payload));
-
-      if (payload == NULL)
+      if (pgmoneta_create_worker_input(NULL, NULL, NULL, -1, false, workers, &payload))
       {
          goto error;
       }
-
-      memset(payload, 0, sizeof(struct payload));
 
       if (pgmoneta_json_create(&j))
       {
@@ -182,11 +171,14 @@ verify_execute(int server, char* identifier, struct deque* nodes)
 
       if (number_of_workers > 0)
       {
-         pgmoneta_workers_add(workers, do_verify, (void*)payload);
+         if (workers->outcome)
+         {
+            pgmoneta_workers_add(workers, do_verify, payload);
+         }
       }
       else
       {
-         do_verify((void*)payload);
+         do_verify(payload);
       }
 
       free(columns);
@@ -196,6 +188,10 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    if (number_of_workers > 0)
    {
       pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
       pgmoneta_workers_destroy(workers);
    }
 
@@ -216,6 +212,11 @@ verify_execute(int server, char* identifier, struct deque* nodes)
    return 0;
 
 error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
 
    pgmoneta_deque_add(nodes, NODE_FAILED, (uintptr_t)NULL, ValueDeque);
    pgmoneta_deque_add(nodes, NODE_ALL, (uintptr_t)NULL, ValueDeque);
@@ -248,18 +249,15 @@ verify_teardown(int server, char* identifier, struct deque* nodes)
 }
 
 static void
-do_verify(void* arg)
+do_verify(struct worker_input* wi)
 {
    char* f = NULL;
    char* hash_cal = NULL;
    bool failed = false;
    int ha = 0;
-   struct payload* p = NULL;
    struct json* j = NULL;
 
-   p = (struct payload*)arg;
-
-   j = p->data;
+   j = wi->data;
 
    f = pgmoneta_append(f, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_DIRECTORY));
    if (!pgmoneta_ends_with(f, "/"))
@@ -361,37 +359,37 @@ do_verify(void* arg)
          pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_CALCULATED, (uintptr_t)"Unknown", ValueString);
       }
 
-      pgmoneta_deque_add(p->failed, f, (uintptr_t)j, ValueJSON);
+      pgmoneta_deque_add(wi->failed, f, (uintptr_t)j, ValueJSON);
    }
-   else if (p->all != NULL)
+   else if (wi->all != NULL)
    {
-      pgmoneta_deque_add(p->all, f, (uintptr_t)j, ValueJSON);
+      pgmoneta_deque_add(wi->all, f, (uintptr_t)j, ValueJSON);
    }
    else
    {
       pgmoneta_json_destroy(j);
    }
 
-   p->data = NULL;
-   p->failed = NULL;
-   p->all = NULL;
+   wi->data = NULL;
+   wi->failed = NULL;
+   wi->all = NULL;
 
    free(hash_cal);
    free(f);
-   free(p);
+   free(wi);
 
    return;
 
 error:
    pgmoneta_log_error("Unable to calculate hash for %s", f);
 
-   pgmoneta_json_destroy(p->data);
+   pgmoneta_json_destroy(wi->data);
 
-   p->data = NULL;
-   p->failed = NULL;
-   p->all = NULL;
+   wi->data = NULL;
+   wi->failed = NULL;
+   wi->all = NULL;
 
    free(hash_cal);
    free(f);
-   free(p);
+   free(wi);
 }

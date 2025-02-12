@@ -929,6 +929,10 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          {
             bck->restore_size = strtoul(&value[0], &ptr, 10);
          }
+         else if (!strcmp(INFO_BIGGEST_FILE, &key[0]))
+         {
+            bck->biggest_file_size = strtoul(&value[0], &ptr, 10);
+         }
          else if (!strcmp(INFO_ELAPSED, &key[0]))
          {
             bck->total_elapsed_time = atof(&value[0]);
@@ -1192,6 +1196,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)bck->wal, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)bck->backup_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)bck->restore_size, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)bck->biggest_file_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->total_elapsed_time, ValueFloat);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)bck->major_version, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)bck->minor_version, ValueInt32);
@@ -1384,6 +1389,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)bck->wal, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)bck->backup_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)bck->restore_size, ValueUInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)bck->biggest_file_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)bck->total_elapsed_time, ValueFloat);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)bck->major_version, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)bck->minor_version, ValueInt32);

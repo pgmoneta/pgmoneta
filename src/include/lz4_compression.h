@@ -44,8 +44,9 @@ extern "C" {
  * Compress a data directory with Lz4
  * @param directory The directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1
  */
-void
+int
 pgmoneta_lz4c_data(char* directory, struct workers* workers);
 
 /**
@@ -67,8 +68,9 @@ pgmoneta_lz4c_wal(char* directory);
  * Decompress a Lz4 directory
  * @param directory The directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1
  */
-void
+int
 pgmoneta_lz4d_data(char* directory, struct workers* workers);
 
 /**

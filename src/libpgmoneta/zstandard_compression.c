@@ -157,6 +157,9 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 
             free(from);
             free(to);
+
+            from = NULL;
+            to = NULL;
          }
       }
    }
@@ -167,6 +170,9 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 
    free(zin);
    free(zout);
+
+   free(from);
+   free(to);
 
    return;
 
@@ -179,6 +185,9 @@ error:
 
    free(zin);
    free(zout);
+
+   free(from);
+   free(to);
 }
 
 void
@@ -304,6 +313,9 @@ pgmoneta_zstandardc_wal(char* directory)
 
          free(from);
          free(to);
+
+         from = NULL;
+         to = NULL;
       }
    }
 
@@ -313,6 +325,9 @@ pgmoneta_zstandardc_wal(char* directory)
 
    free(zin);
    free(zout);
+
+   free(from);
+   free(to);
 
    return;
 
@@ -325,6 +340,9 @@ error:
 
    free(zin);
    free(zout);
+
+   free(from);
+   free(to);
 }
 
 void
@@ -564,6 +582,10 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
             free(name);
             free(from);
             free(to);
+
+            name = NULL;
+            from = NULL;
+            to = NULL;
          }
       }
    }
@@ -574,6 +596,10 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 
    free(zin);
    free(zout);
+
+   free(from);
+   free(to);
+   free(name);
 
    return;
 
@@ -586,6 +612,10 @@ error:
 
    free(zin);
    free(zout);
+
+   free(name);
+   free(from);
+   free(to);
 }
 
 void

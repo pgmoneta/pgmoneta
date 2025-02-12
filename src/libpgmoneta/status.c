@@ -398,6 +398,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backups[j]->valid, ValueInt8);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backups[j]->backup_size, ValueUInt64);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backups[j]->restore_size, ValueUInt64);
+            pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)backups[j]->biggest_file_size, ValueUInt64);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[j]->comments, ValueString);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_COMPRESSION, (uintptr_t)backups[j]->compression, ValueInt32);
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backups[j]->encryption, ValueInt32);

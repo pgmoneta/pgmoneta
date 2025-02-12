@@ -46,8 +46,9 @@ extern "C" {
  * @param changed The changed files
  * @param added The added files
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1
  */
-void
+int
 pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* changed, struct art* added, struct workers* workers);
 
 /**
@@ -55,8 +56,9 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
  * @param from The from directory
  * @param to The to directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1
  */
-void
+int
 pgmoneta_relink(char* from, char* to, struct workers* workers);
 
 /**
@@ -64,8 +66,9 @@ pgmoneta_relink(char* from, char* to, struct workers* workers);
  * @param from The from directory
  * @param to The to directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1
  */
-void
+int
 pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers);
 
 #ifdef __cplusplus

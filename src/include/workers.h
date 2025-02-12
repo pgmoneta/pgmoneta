@@ -39,6 +39,8 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
+struct worker_input;
+
 /** @struct semaphore
  * Defines a semaphore
  */
@@ -54,9 +56,9 @@ struct semaphore
  */
 struct task
 {
-   struct task* previous;       /**< The previous task */
-   void (*function)(void* arg); /**< The task */
-   void* arg;                   /**< The arguments */
+   struct task* previous;                  /**< The previous task */
+   void (*function)(struct worker_input*); /**< The task */
+   struct worker_input* wi;                /**< The input */
 };
 
 /** @struct queue
@@ -90,6 +92,7 @@ struct workers
    volatile int number_of_working; /**< The number of workers */
    pthread_mutex_t worker_lock;    /**< The worker lock */
    pthread_cond_t worker_all_idle; /**< Are workers idle */
+   bool outcome;                   /**< Outcome of the workers */
    struct queue queue;             /**< The queue */
 };
 
@@ -103,6 +106,9 @@ struct worker_input
    char to[MAX_PATH];        /**< The to directory */
    int level;                /**< The compression level */
    bool force;               /**< Force the operation */
+   struct json* data;        /**< JSON data */
+   struct deque* failed;     /**< Failed files */
+   struct deque* all;        /**< All files */
    struct workers* workers;  /**< The root structure */
 };
 
@@ -119,11 +125,11 @@ pgmoneta_workers_initialize(int num, struct workers** workers);
  * Add work to the queue
  * @param workers The workers
  * @param function The function pointer
- * @param ap The arguments
+ * @param wi The argument
  * @return 0 upon success, otherwise 1.
  */
 int
-pgmoneta_workers_add(struct workers* workers, void (*function)(void*), void* ap);
+pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_input*), struct worker_input* wi);
 
 /**
  * Wait for all queued work units to finish

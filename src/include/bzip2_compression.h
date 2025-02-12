@@ -42,8 +42,9 @@ extern "C" {
  * BZip a data directory
  * @param directory The directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1.
  */
-void
+int
 pgmoneta_bzip2_data(char* directory, struct workers* workers);
 
 /**
@@ -65,8 +66,9 @@ pgmoneta_bzip2_wal(char* directory);
  * BUNZip a directory
  * @param directory The directory
  * @param workers The optional workers
+ * @return 0 upon success, otherwise 1.
  */
-void
+int
 pgmoneta_bunzip2_data(char* directory, struct workers* workers);
 
 /**
@@ -84,6 +86,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
  * BZip a file
  * @param from The from name
  * @param to The to name
+ * @return 0 upon success, otherwise 1.
  */
 int
 pgmoneta_bzip2_file(char* from, char* to);

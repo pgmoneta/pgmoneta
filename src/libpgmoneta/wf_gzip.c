@@ -124,12 +124,20 @@ gzip_execute_compress(int server, char* identifier, struct deque* nodes)
       backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
       backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
 
-      pgmoneta_gzip_data(backup_data, workers);
+      if (pgmoneta_gzip_data(backup_data, workers))
+      {
+         goto error;
+      }
+
       pgmoneta_gzip_tablespaces(backup_base, workers);
 
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
          pgmoneta_workers_destroy(workers);
       }
    }
@@ -163,6 +171,17 @@ gzip_execute_compress(int server, char* identifier, struct deque* nodes)
    free(d);
 
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(d);
+
+   return 1;
 }
 
 static int

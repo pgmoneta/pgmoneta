@@ -89,6 +89,7 @@ bzip2_setup(int server, char* identifier, struct deque* nodes)
 static int
 bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
 {
+   int ret = 0;
    struct timespec start_t;
    struct timespec end_t;
    double compression_bzip2_elapsed_time;
@@ -130,6 +131,10 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            ret = 1;
+         }
          pgmoneta_workers_destroy(workers);
       }
    }
@@ -143,7 +148,7 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
          pgmoneta_delete_file(d, true, NULL);
       }
 
-      pgmoneta_bzip2_file(tarfile, d);
+      ret = pgmoneta_bzip2_file(tarfile, d);
    }
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
@@ -162,12 +167,13 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
 
    free(d);
 
-   return 0;
+   return ret;
 }
 
 static int
 bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
 {
+   int ret = 0;
    char* base = NULL;
    struct timespec start_t;
    struct timespec end_t;
@@ -203,11 +209,15 @@ bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   pgmoneta_bunzip2_data(base, workers);
+   ret = pgmoneta_bunzip2_data(base, workers);
 
    if (number_of_workers > 0)
    {
       pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         ret = 1;
+      }
       pgmoneta_workers_destroy(workers);
    }
 
@@ -223,7 +233,7 @@ bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
 
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
-   return 0;
+   return ret;
 }
 
 static int

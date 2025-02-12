@@ -159,6 +159,10 @@ link_execute(int server, char* identifier, struct deque* nodes)
          if (number_of_workers > 0)
          {
             pgmoneta_workers_wait(workers);
+            if (!workers->outcome)
+            {
+               goto error;
+            }
             pgmoneta_workers_destroy(workers);
          }
 
@@ -195,7 +199,34 @@ link_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_art_destroy(changed_files);
    pgmoneta_art_destroy(added_files);
    pgmoneta_art_destroy(deleted_files);
+
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(server_path);
+   free(from);
+   free(to);
+   free(from_manifest);
+   free(to_manifest);
+   free(from_tablespaces);
+   free(to_tablespaces);
+   pgmoneta_art_destroy(changed_files);
+   pgmoneta_art_destroy(added_files);
+   pgmoneta_art_destroy(deleted_files);
+
+   return 1;
 }
 
 static int

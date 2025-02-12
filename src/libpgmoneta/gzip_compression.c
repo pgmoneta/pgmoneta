@@ -50,10 +50,10 @@
 static int gz_compress(char* from, int level, char* to);
 static int gz_decompress(char* from, char* to);
 
-static void do_gz_compress(void* arg);
-static void do_gz_decompress(void* arg);
+static void do_gz_compress(struct worker_input* wi);
+static void do_gz_decompress(struct worker_input* wi);
 
-void
+int
 pgmoneta_gzip_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
@@ -68,7 +68,7 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
 
    if (!(dir = opendir(directory)))
    {
-      return;
+      goto error;
    }
 
    level = config->compression_level;
@@ -105,13 +105,9 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
       {
          if (!pgmoneta_is_compressed_archive(entry->d_name) && !pgmoneta_is_encrypted_archive(entry->d_name))
          {
-            from = NULL;
-
             from = pgmoneta_append(from, directory);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
-
-            to = NULL;
 
             to = pgmoneta_append(to, directory);
             to = pgmoneta_append(to, "/");
@@ -122,35 +118,59 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_gz_compress, (void*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_gz_compress, wi);
+                  }
                }
                else
                {
                   do_gz_compress(wi);
                }
             }
+            else
+            {
+               goto error;
+            }
 
             free(from);
             free(to);
+
+            from = NULL;
+            to = NULL;
          }
       }
    }
 
    closedir(dir);
+
+   free(from);
+   free(to);
+
+   return 0;
+
+error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
+   free(from);
+   free(to);
+
+   return 1;
 }
 
 static void
-do_gz_compress(void* arg)
+do_gz_compress(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
    if (pgmoneta_exists(wi->from))
    {
       if (gz_compress(wi->from, wi->level, wi->to))
       {
          pgmoneta_log_error("Gzip: Could not compress %s", wi->from);
+         wi->workers->outcome = false;
       }
       else
       {
@@ -262,10 +282,16 @@ pgmoneta_gzip_wal(char* directory)
 
          free(from);
          free(to);
+
+         from = NULL;
+         to = NULL;
       }
    }
 
    closedir(dir);
+
+   free(from);
+   free(to);
 }
 
 void
@@ -484,7 +510,7 @@ error:
    return 1;
 }
 
-void
+int
 pgmoneta_gunzip_data(char* directory, struct workers* workers)
 {
    char* from = NULL;
@@ -496,7 +522,7 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
 
    if (!(dir = opendir(directory)))
    {
-      return;
+      goto error;
    }
 
    while ((entry = readdir(dir)) != NULL)
@@ -518,8 +544,6 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
       {
          if (pgmoneta_ends_with(entry->d_name, ".gz"))
          {
-            from = NULL;
-
             from = pgmoneta_append(from, directory);
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
@@ -534,8 +558,6 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
             memset(name, 0, strlen(entry->d_name) - 2);
             memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
 
-            to = NULL;
-
             to = pgmoneta_append(to, directory);
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
@@ -544,23 +566,39 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_gz_decompress, (void*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_gz_decompress, wi);
+                  }
                }
                else
                {
                   do_gz_decompress(wi);
                }
             }
+            else
+            {
+               goto error;
+            }
 
             free(name);
             free(from);
             free(to);
+
+            name = NULL;
+            from = NULL;
+            to = NULL;
          }
       }
    }
 
    closedir(dir);
-   return;
+
+   free(name);
+   free(from);
+   free(to);
+
+   return 0;
 
 error:
 
@@ -568,6 +606,12 @@ error:
    {
       closedir(dir);
    }
+
+   free(name);
+   free(from);
+   free(to);
+
+   return 1;
 }
 
 int
@@ -734,15 +778,12 @@ pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size,
 }
 
 static void
-do_gz_decompress(void* arg)
+do_gz_decompress(struct worker_input* wi)
 {
-   struct worker_input* wi = NULL;
-
-   wi = (struct worker_input*)arg;
-
    if (gz_decompress(wi->from, wi->to))
    {
       pgmoneta_log_error("Gzip: Could not decompress %s", wi->from);
+      wi->workers->outcome = false;
    }
    else
    {

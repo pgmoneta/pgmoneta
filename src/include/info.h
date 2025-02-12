@@ -42,6 +42,7 @@ extern "C" {
 
 #define INFO_PGMONETA_VERSION          "PGMONETA_VERSION"
 #define INFO_BACKUP                    "BACKUP"
+#define INFO_BIGGEST_FILE              "BIGGEST_FILE"
 #define INFO_CHKPT_WALPOS              "CHKPT_WALPOS"
 #define INFO_COMMENTS                  "COMMENTS"
 #define INFO_COMPRESSION               "COMPRESSION"
@@ -86,6 +87,7 @@ struct backup
    char wal[MISC_LENGTH];                                         /**< The name of the WAL file */
    uint64_t backup_size;                                          /**< The backup size */
    uint64_t restore_size;                                         /**< The restore size */
+   uint64_t biggest_file_size;                                    /**< The biggest file */
    double total_elapsed_time;                                     /**< The total elapsed time in seconds */
    double basebackup_elapsed_time;                                /**< The basebackup elapsed time in seconds */
    double manifest_elapsed_time;                                  /**< The manifest elapsed time in seconds */

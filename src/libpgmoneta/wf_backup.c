@@ -36,6 +36,7 @@
 #include <network.h>
 #include <security.h>
 #include <server.h>
+#include <stdint.h>
 #include <tablespace.h>
 #include <utils.h>
 #include <workflow.h>
@@ -113,6 +114,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    int backup_max_rate;
    int network_max_rate;
    int hash;
+   uint64_t biggest_file_size;
    struct configuration* config;
    struct message* basebackup_msg = NULL;
    struct message* tablespace_msg = NULL;
@@ -337,6 +339,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    size = pgmoneta_directory_size(backup_data);
    pgmoneta_read_wal(backup_data, &wal);
    pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
+   biggest_file_size = pgmoneta_biggest_file(backup_data);
 
    if (pgmoneta_deque_add(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
    {
@@ -351,6 +354,7 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
    pgmoneta_create_info(backup_base, identifier, 1);
    pgmoneta_update_info_string(backup_base, INFO_WAL, wal);
    pgmoneta_update_info_unsigned_long(backup_base, INFO_RESTORE, size);
+   pgmoneta_update_info_unsigned_long(backup_base, INFO_BIGGEST_FILE, biggest_file_size);
    pgmoneta_update_info_string(backup_base, INFO_MAJOR_VERSION, version);
    pgmoneta_update_info_string(backup_base, INFO_MINOR_VERSION, minor_version);
    pgmoneta_update_info_bool(backup_base, INFO_KEEP, false);

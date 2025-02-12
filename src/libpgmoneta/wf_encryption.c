@@ -128,12 +128,22 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
       backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
       backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
 
-      pgmoneta_encrypt_data(backup_data, workers);
-      pgmoneta_encrypt_tablespaces(backup_base, workers);
+      if (pgmoneta_encrypt_data(backup_data, workers))
+      {
+         goto error;
+      }
+      if (pgmoneta_encrypt_tablespaces(backup_base, workers))
+      {
+         goto error;
+      }
 
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
          pgmoneta_workers_destroy(workers);
       }
    }
@@ -174,7 +184,10 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
 
       enc_file = pgmoneta_append(enc_file, tarfile);
       enc_file = pgmoneta_append(enc_file, compress_suffix);
-      pgmoneta_encrypt_file(enc_file, d);
+      if (pgmoneta_encrypt_file(enc_file, d))
+      {
+         goto error;
+      }
    }
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
@@ -195,6 +208,18 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
    free(enc_file);
 
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(d);
+   free(enc_file);
+
+   return 1;
 }
 
 static int

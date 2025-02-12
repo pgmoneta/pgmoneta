@@ -129,6 +129,10 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
       if (number_of_workers > 0)
       {
          pgmoneta_workers_wait(workers);
+         if (!workers->outcome)
+         {
+            goto error;
+         }
          pgmoneta_workers_destroy(workers);
       }
    }
@@ -161,6 +165,17 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
    free(d);
 
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(d);
+
+   return 1;
 }
 
 static int
@@ -205,6 +220,10 @@ zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
    if (number_of_workers > 0)
    {
       pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
       pgmoneta_workers_destroy(workers);
    }
 
@@ -219,6 +238,15 @@ zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
 
    return 0;
+
+error:
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+
+   return 1;
 }
 
 static int
