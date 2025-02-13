@@ -61,7 +61,7 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| workers | 0 | Int | No | The number of workers that each process can use for its work. Use 0 to disable |
+| workers | 0 | Int | No | The number of workers that each process can use for its work. Use 0 to disable. Maximum is CPU count |
 
 #### Workspace
 
@@ -209,7 +209,7 @@ have access to the `postgres` database in order to get the necessary configurati
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting |
+| workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Maximum is CPU count |
 
 #### Transport Level Security
 
