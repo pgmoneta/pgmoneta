@@ -34,6 +34,7 @@
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/sysinfo.h>
 
 static volatile int worker_keepalive;
 
@@ -204,16 +205,23 @@ pgmoneta_workers_destroy(struct workers* workers)
 int
 pgmoneta_get_number_of_workers(int server)
 {
+   int nw = 0;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
    if (config->servers[server].workers != -1)
    {
-      return config->servers[server].workers;
+      nw = config->servers[server].workers;
+   }
+   else
+   {
+      nw = config->workers;
    }
 
-   return config->workers;
+   nw = MIN(nw, get_nprocs());
+
+   return nw;
 }
 
 int

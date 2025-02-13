@@ -62,7 +62,8 @@ compression_level
   The compression level. Default is 3
 
 workers
-  The number of workers that each process can use for its work. Use 0 to disable. Default is 0
+  The number of workers that each process can use for its work.
+  Use 0 to disable. Maximum is CPU count. Default is 0
 
 storage_engine
   The storage engine type (local, ssh, s3, azure). Default is local
@@ -268,7 +269,9 @@ hot_standby_tablespaces
   Tablespace mappings for the hot standby. Syntax is [from -> to,?]+
 
 workers
-  The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Default is -1
+  The number of workers that each process can use for its work.
+  Use 0 to disable, -1 means use the global settting.  Maximum is CPU count.
+  Default is -1
 
 backup_max_rate
   The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
