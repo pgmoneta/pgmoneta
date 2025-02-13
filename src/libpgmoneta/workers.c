@@ -34,7 +34,9 @@
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef HAVE_LINUX
 #include <sys/sysinfo.h>
+#endif
 
 static volatile int worker_keepalive;
 
@@ -219,7 +221,11 @@ pgmoneta_get_number_of_workers(int server)
       nw = config->workers;
    }
 
+#ifdef HAVE_LINUX
    nw = MIN(nw, get_nprocs());
+#else
+   nw = MIN(nw, 16);
+#endif
 
    return nw;
 }
