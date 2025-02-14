@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define OPT_COLOR 1000
 
@@ -85,7 +86,7 @@ main(int argc, char** argv)
 {
    int c;
    int option_index = 0;
-   int ret;
+   int loaded = 1;
    char* configuration_path = NULL;
    char* output = NULL;
    char* format = NULL;
@@ -116,7 +117,7 @@ main(int argc, char** argv)
    {
       static struct option long_options[] =
       {
-         {"config", required_argument, 0, 'c'},
+         {"config", optional_argument, 0, 'c'},
          {"output", required_argument, 0, 'o'},
          {"format", required_argument, 0, 'F'},
          {"logfile", required_argument, 0, 'L'},
@@ -263,59 +264,45 @@ main(int argc, char** argv)
       warnx("Error creating shared memory");
       goto error;
    }
+
    pgmoneta_init_configuration(shmem);
+   config = (struct configuration*)shmem;
 
    if (configuration_path != NULL)
    {
-      ret = pgmoneta_read_configuration(shmem, configuration_path);
-      if (ret)
+      if (pgmoneta_exists(configuration_path))
       {
-         warnx("Configuration not found: %s", configuration_path);
-         exit(1);
+         loaded = pgmoneta_read_configuration(shmem, configuration_path);
       }
 
+      if (loaded)
+      {
+         warnx("Configuration not found: %s", configuration_path);
+      }
+   }
+
+   if (loaded && pgmoneta_exists(PGMONETA_MAIN_CONFIG_FILE_PATH))
+   {
+      loaded = pgmoneta_read_configuration(shmem, PGMONETA_MAIN_CONFIG_FILE_PATH);
+   }
+
+   if (loaded)
+   {
+      config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+   }
+   else
+   {
       if (logfile)
       {
-         config = (struct configuration*)shmem;
-
          config->log_type = PGMONETA_LOGGING_TYPE_FILE;
          memset(&config->log_path[0], 0, MISC_LENGTH);
          memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
       }
-
-      if (pgmoneta_start_logging())
-      {
-         exit(1);
-      }
-
-      config = (struct configuration*)shmem;
    }
-   else
+
+   if (pgmoneta_start_logging())
    {
-      ret = pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
-      if (ret)
-      {
-         warnx("Configuration must be specified");
-         exit(1);
-      }
-      else
-      {
-         configuration_path = "/etc/pgmoneta/pgmoneta.conf";
-
-         if (logfile)
-         {
-            config = (struct configuration*)shmem;
-
-            config->log_type = PGMONETA_LOGGING_TYPE_FILE;
-            memset(&config->log_path[0], 0, MISC_LENGTH);
-            memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
-         }
-
-         if (pgmoneta_start_logging())
-         {
-            exit(1);
-         }
-      }
+      exit(1);
    }
 
    if (optind < argc)
