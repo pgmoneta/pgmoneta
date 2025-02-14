@@ -28,6 +28,9 @@ Iury Santos <iuryroberto@gmail.com>
 Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 Jakub Jirutka <jakub@jirutka.cz>
 Mario Rodas
+Annupamaa <annu242005@gmail.com>
+Ashutosh Sharma <ash2003sharma@gmail.com>
+Mohab Yaser <mohabyaserofficial2003@gmail.com>
 ```
 
 ## Committers

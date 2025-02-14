@@ -36,6 +36,9 @@ extern "C" {
 #include <stdlib.h>
 #include <json.h>
 
+/* The path of pgmoneta's main configuration file */
+#define PGMONETA_MAIN_CONFIG_FILE_PATH                "/etc/pgmoneta/pgmoneta.conf"
+
 /* Main configuration fields */
 #define CONFIGURATION_ARGUMENT_HOST                   "host"
 #define CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR        "unix_socket_dir"
