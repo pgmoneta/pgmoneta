@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define OPT_COLOR 1000
 
@@ -116,7 +117,7 @@ main(int argc, char** argv)
    {
       static struct option long_options[] =
       {
-         {"config", required_argument, 0, 'c'},
+         {"config", optional_argument, 0, 'c'},
          {"output", required_argument, 0, 'o'},
          {"format", required_argument, 0, 'F'},
          {"logfile", required_argument, 0, 'L'},
@@ -265,15 +266,19 @@ main(int argc, char** argv)
    }
    pgmoneta_init_configuration(shmem);
 
-   if (configuration_path != NULL)
+   if (configuration_path == NULL)
    {
-      ret = pgmoneta_read_configuration(shmem, configuration_path);
-      if (ret)
-      {
-         warnx("Configuration not found: %s", configuration_path);
-         exit(1);
-      }
+      warnx("Configuration file is not specified");
+      configuration_path = PGMONETA_MAIN_CONFIG_FILE_PATH;
+   }
 
+   ret = pgmoneta_read_configuration(shmem, configuration_path);
+   if (ret)
+   {
+      config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+   }
+   else
+   {
       if (logfile)
       {
          config = (struct configuration*)shmem;
@@ -289,33 +294,6 @@ main(int argc, char** argv)
       }
 
       config = (struct configuration*)shmem;
-   }
-   else
-   {
-      ret = pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
-      if (ret)
-      {
-         warnx("Configuration must be specified");
-         exit(1);
-      }
-      else
-      {
-         configuration_path = "/etc/pgmoneta/pgmoneta.conf";
-
-         if (logfile)
-         {
-            config = (struct configuration*)shmem;
-
-            config->log_type = PGMONETA_LOGGING_TYPE_FILE;
-            memset(&config->log_path[0], 0, MISC_LENGTH);
-            memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
-         }
-
-         if (pgmoneta_start_logging())
-         {
-            exit(1);
-         }
-      }
    }
 
    if (optind < argc)
