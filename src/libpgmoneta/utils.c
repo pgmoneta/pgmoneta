@@ -1817,7 +1817,10 @@ do_delete_file(struct worker_input* fi)
          pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
       }
       errno = 0;
-      fi->workers->outcome = false;
+      if (fi->workers != NULL)
+      {
+         fi->workers->outcome = false;
+      }
    }
 
    free(fi);
@@ -2501,7 +2504,10 @@ error:
 
    errno = 0;
 
-   fi->workers->outcome = false;
+   if (fi->workers != NULL)
+   {
+      fi->workers->outcome = false;
+   }
 
    free(fi);
 }
