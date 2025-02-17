@@ -217,6 +217,11 @@ done:
 
 error:
 
+   if (pgmoneta_exists(root))
+   {
+      pgmoneta_delete_directory(root);
+   }
+
    pgmoneta_json_destroy(payload);
 
    pgmoneta_workflow_destroy(workflow);

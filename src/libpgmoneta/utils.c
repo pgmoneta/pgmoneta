@@ -2551,9 +2551,12 @@ error:
 bool
 pgmoneta_exists(char* f)
 {
-   if (access(f, F_OK) == 0)
+   if (f != NULL)
    {
-      return true;
+      if (access(f, F_OK) == 0)
+      {
+         return true;
+      }
    }
 
    return false;
