@@ -1112,7 +1112,7 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       reply = NULL;
    }
 
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
       if (data == NULL)
       {
@@ -1120,9 +1120,9 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       }
       else
       {
-         pgmoneta_log_debug("Query response -- BEGIN");
+         pgmoneta_log_trace("Query response -- BEGIN");
          pgmoneta_log_mem(data, data_size);
-         pgmoneta_log_debug("Query response -- END");
+         pgmoneta_log_trace("Query response -- END");
       }
    }
 
