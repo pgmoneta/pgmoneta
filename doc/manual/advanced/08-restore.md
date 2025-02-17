@@ -29,7 +29,7 @@ And, you will get output like
 
 ```
 Header: 
-  ClientVersion: 0.15.2
+  ClientVersion: 0.15.3
   Command: 3
   Output: 0
   Timestamp: 20240928130406
@@ -51,7 +51,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.15.2
+  ServerVersion: 0.15.3
 ```
 
 
