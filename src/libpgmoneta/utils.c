@@ -1806,20 +1806,36 @@ error:
 static void
 do_delete_file(struct worker_input* fi)
 {
-   int ret;
+   int ret = 0;
 
-   ret = unlink(fi->from);
-
-   if (ret != 0)
+   if (pgmoneta_exists(fi->from))
    {
-      if (!fi->force)
+      ret = unlink(fi->from);
+
+      if (ret != 0)
       {
-         pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
+         if (!fi->force)
+         {
+            pgmoneta_log_warn("pgmoneta_delete_file: %s (%s)", fi->from, strerror(errno));
+         }
+         errno = 0;
+         if (fi->workers != NULL)
+         {
+            fi->workers->outcome = false;
+         }
       }
-      errno = 0;
-      if (fi->workers != NULL)
+
+   }
+   else
+   {
+      if (fi->force)
       {
-         fi->workers->outcome = false;
+         pgmoneta_log_warn("pgmoneta_delete_file: %s doesn't exists", fi->from);
+
+         if (fi->workers != NULL)
+         {
+            fi->workers->outcome = false;
+         }
       }
    }
 
