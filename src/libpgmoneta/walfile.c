@@ -225,7 +225,6 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
    char* decrypted_file_name = NULL;
    char* wal_path = NULL;
    bool copy = true;
-   uint32_t cur_limit = 0;
 
    if (!pgmoneta_is_file(path))
    {
@@ -315,8 +314,6 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 
    if (type == ValueJSON)
    {
-      int count = 0;
-
       if (!quiet)
       {
          fprintf(out, "{ \"WAL\": [\n");
@@ -324,37 +321,23 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         cur_limit++;
-         if (!quiet)
-         {
-            fprintf(out, "{\"Record\": ");
-         }
          record = (struct decoded_xlog_record*) record_iterator->value->data;
          pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit, cur_limit);
-         if (!quiet)
-         {
-            fprintf(out, "}");
-            if (++count < pgmoneta_deque_size(wf->records))
-            {
-               fprintf(out, ",\n");
-            }
-         }
+                                     rms, start_lsn, end_lsn, xids, limit);
       }
 
       if (!quiet)
       {
-         fprintf(out, "]\n}");
+         fprintf(out, "\n]}");
       }
    }
    else
    {
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         cur_limit++;
          record = (struct decoded_xlog_record*) record_iterator->value->data;
          pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit, cur_limit);
+                                     rms, start_lsn, end_lsn, xids, limit);
       }
    }
 

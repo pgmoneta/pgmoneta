@@ -890,8 +890,9 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
 
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
-                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, uint32_t cur_limit)
+                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit)
 {
+   static uint32_t current_limit = 0;
    char* header_str = NULL;
    char* rm_desc = NULL;
    char* backup_str = NULL;
@@ -902,11 +903,6 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    uint32_t rec_len = 0;
    uint32_t fpi_len = 0;
 
-   if (limit > 0 && cur_limit > limit)
-   {
-      return;
-   }
-
    if (!is_included(RmgrTable[record->header.xl_rmid].name, rms,
                     record->header.xl_prev, start_lsn,
                     record->lsn, end_lsn,
@@ -915,13 +911,27 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
       return;
    }
 
+   current_limit++;
+   if (limit > 0 && current_limit > limit)
+   {
+      return;
+   }
+
    if (type == ValueJSON)
    {
       if (!quiet)
       {
+         if (current_limit == 1)
+         {
+            fprintf(out, "{\"Record\": ");
+         }
+         else
+         {
+            fprintf(out, ",\n{\"Record\": ");
+         }
          record_json(record, magic_value, &record_serialized);
          value_str = pgmoneta_value_to_string(record_serialized, FORMAT_JSON_COMPACT, NULL, 0);
-         fprintf(out, "%s", value_str);
+         fprintf(out, "%s}", value_str);
          pgmoneta_value_destroy(record_serialized);
          free(value_str);
       }
