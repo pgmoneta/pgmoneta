@@ -397,11 +397,10 @@ pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
  * @param end_lsn The end LSN
  * @param xids The XIDs
  * @param limit The limit
- * @param cur_limit The current number of records
  */
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
-                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, uint32_t cur_limit);
+                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit);
 
 /**
  * Encodes a WAL record into a buffer.
