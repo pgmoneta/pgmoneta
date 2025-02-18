@@ -156,10 +156,6 @@ do_link(struct worker_input* wi)
       pgmoneta_delete_file(wi->from, true, NULL);
       pgmoneta_symlink_file(wi->from, wi->to);
    }
-   else
-   {
-      wi->workers->outcome = false;
-   }
 
    free(wi);
 }
