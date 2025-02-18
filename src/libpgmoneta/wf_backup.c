@@ -316,7 +316,14 @@ basebackup_execute(int server, char* identifier, struct deque* nodes)
 
    if (pgmoneta_exists(old_label_path))
    {
-      pgmoneta_delete_file(old_label_path, true, NULL);
+      if (pgmoneta_exists(old_label_path))
+      {
+         pgmoneta_delete_file(old_label_path, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", old_label_path);
+      }
    }
 
    // receive and ignore the last result set, it's just a summary

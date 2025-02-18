@@ -98,7 +98,7 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                   to_entry = pgmoneta_append(to_entry, "/");
                }
                to_entry = pgmoneta_append(to_entry, from_file);
-               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
+               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
                {
                   goto error;
                }
@@ -153,8 +153,19 @@ do_link(struct worker_input* wi)
 {
    if (pgmoneta_exists(wi->to))
    {
-      pgmoneta_delete_file(wi->from, true, NULL);
+      if (pgmoneta_exists(wi->from))
+      {
+         pgmoneta_delete_file(wi->from, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", wi->from);
+      }
       pgmoneta_symlink_file(wi->from, wi->to);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", wi->to);
    }
 
    free(wi);
@@ -214,7 +225,7 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
          {
             struct worker_input* wi = NULL;
 
-            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
+            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
             {
                goto error;
             }
@@ -288,7 +299,14 @@ do_relink(struct worker_input* wi)
          pgmoneta_log_trace("FILETRACKER | Del  | %s |", wi->to);
          pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", wi->from, wi->to);
 #endif
-         pgmoneta_delete_file(wi->to, true, NULL);
+         if (pgmoneta_exists(wi->to))
+         {
+            pgmoneta_delete_file(wi->to, NULL);
+         }
+         else
+         {
+            pgmoneta_log_debug("%s doesn't exists", wi->to);
+         }
          pgmoneta_copy_file(wi->from, wi->to, wi->workers);
       }
       else
@@ -297,7 +315,14 @@ do_relink(struct worker_input* wi)
 
          if (link != NULL)
          {
-            pgmoneta_delete_file(wi->to, true, NULL);
+            if (pgmoneta_exists(wi->to))
+            {
+               pgmoneta_delete_file(wi->to, NULL);
+            }
+            else
+            {
+               pgmoneta_log_debug("%s doesn't exists", wi->to);
+            }
             pgmoneta_symlink_file(wi->to, link);
 #ifdef DEBUG
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", wi->to, pgmoneta_is_symlink_valid(wi->to) ? "Yes " : "No  ");
@@ -308,13 +333,13 @@ do_relink(struct worker_input* wi)
          }
          else
          {
-            wi->workers->outcome = false;
+            pgmoneta_log_debug("%s -> %s", wi->from, wi->to);
          }
       }
    }
    else
    {
-      wi->workers->outcome = false;
+      pgmoneta_log_debug("do_relink: %s -> %s", wi->from, wi->to);
    }
 
    free(wi);
@@ -365,7 +390,7 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
          {
             struct worker_input* wi = NULL;
 
-            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, true, workers, &wi))
+            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
             {
                goto error;
             }
@@ -417,7 +442,14 @@ do_comparefiles(struct worker_input* wi)
 
    if (equal)
    {
-      pgmoneta_delete_file(wi->from, true, NULL);
+      if (pgmoneta_exists(wi->from))
+      {
+         pgmoneta_delete_file(wi->from, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", wi->from);
+      }
       pgmoneta_symlink_file(wi->from, wi->to);
    }
 

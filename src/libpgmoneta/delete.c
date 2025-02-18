@@ -253,7 +253,14 @@ delete_wal_older_than(char* srv_wal, char* base, int backup_index)
          }
 
          pgmoneta_log_trace("WAL: Deleting %s", wal_address);
-         pgmoneta_delete_file(wal_address, true, NULL);
+         if (pgmoneta_exists(wal_address))
+         {
+            pgmoneta_delete_file(wal_address, NULL);
+         }
+         else
+         {
+            pgmoneta_log_debug("%s doesn't exists", wal_address);
+         }
       }
       else
       {

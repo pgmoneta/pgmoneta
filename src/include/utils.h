@@ -691,14 +691,13 @@ int
 pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files);
 
 /**
- * Remove a file
+ * Delete a file
  * @param file The file
- * @param force Force the operation
  * @param workers The optional workers
  * @return The result
  */
 int
-pgmoneta_delete_file(char* file, bool force, struct workers* workers);
+pgmoneta_delete_file(char* file, struct workers* workers);
 
 /**
  * Copy a PostgreSQL installation

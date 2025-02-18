@@ -100,7 +100,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
             {
                struct worker_input* wi = NULL;
 
-               if (!pgmoneta_create_worker_input(NULL, from, to, 0, true, workers, &wi))
+               if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
                {
                   if (workers != NULL)
                   {
@@ -144,11 +144,18 @@ do_encrypt_file(struct worker_input* wi)
 {
    if (!encrypt_file(wi->from, wi->to, 1))
    {
-      pgmoneta_delete_file(wi->from, true, NULL);
+      if (pgmoneta_exists(wi->from))
+      {
+         pgmoneta_delete_file(wi->from, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", wi->from);
+      }
    }
    else
    {
-      wi->workers->outcome = false;
+      pgmoneta_log_warn("do_encrypt_file: %s -> %s", wi->from, wi->to);
    }
 
    free(wi);
@@ -251,8 +258,12 @@ pgmoneta_encrypt_wal(char* d)
          if (pgmoneta_exists(from))
          {
             encrypt_file(from, to, 1);
-            pgmoneta_delete_file(from, true, NULL);
+            pgmoneta_delete_file(from, NULL);
             pgmoneta_permission(to, 6, 0, 0);
+         }
+         else
+         {
+            pgmoneta_log_debug("%s doesn't exists", from);
          }
 
          free(from);
@@ -298,7 +309,14 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
       goto error;
    }
 
-   pgmoneta_delete_file(from, true, NULL);
+   if (pgmoneta_exists(from))
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -353,7 +371,16 @@ pgmoneta_encrypt_file(char* from, char* to)
    }
 
    encrypt_file(from, to, 1);
-   pgmoneta_delete_file(from, true, NULL);
+
+   if (pgmoneta_exists(from))
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
+
    if (flag)
    {
       free(to);
@@ -379,7 +406,14 @@ pgmoneta_decrypt_file(char* from, char* to)
    }
 
    encrypt_file(from, to, 0);
-   pgmoneta_delete_file(from, true, NULL);
+   if (pgmoneta_exists(from))
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
 
    if (flag)
    {
@@ -442,7 +476,7 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            if (!pgmoneta_create_worker_input(NULL, from, to, 0, true, workers, &wi))
+            if (!pgmoneta_create_worker_input(NULL, from, to, 0, workers, &wi))
             {
                if (workers != NULL)
                {
@@ -490,11 +524,18 @@ do_decrypt_file(struct worker_input* wi)
 {
    if (!encrypt_file(wi->from, wi->to, 0))
    {
-      pgmoneta_delete_file(wi->from, true, NULL);
+      if (pgmoneta_exists(wi->from))
+      {
+         pgmoneta_delete_file(wi->from, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", wi->from);
+      }
    }
    else
    {
-      wi->workers->outcome = false;
+      pgmoneta_log_warn("do_decrypt_file: %s -> %s", wi->from, wi->to);
    }
 
    free(wi);
@@ -542,7 +583,14 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
       goto error;
    }
 
-   pgmoneta_delete_file(from, true, NULL);
+   if (pgmoneta_exists(from))
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {

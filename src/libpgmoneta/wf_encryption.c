@@ -179,7 +179,11 @@ encryption_execute(int server, char* identifier, struct deque* nodes)
       d = pgmoneta_append(d, ".aes");
       if (pgmoneta_exists(d))
       {
-         pgmoneta_delete_file(d, true, NULL);
+         pgmoneta_delete_file(d, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", d);
       }
 
       enc_file = pgmoneta_append(enc_file, tarfile);

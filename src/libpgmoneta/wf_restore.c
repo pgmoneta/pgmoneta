@@ -668,7 +668,11 @@ recovery_info_execute(int server, char* identifier, struct deque* nodes)
 
       if (pgmoneta_exists(path))
       {
-         pgmoneta_delete_file(path, true, NULL);
+         pgmoneta_delete_file(path, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", path);
       }
    }
 
@@ -952,7 +956,14 @@ restore_excluded_files_teardown(int server, char* identifier, struct deque* node
       to_file = pgmoneta_append(to_file, restore_last_files_names[i]);
       to_file = pgmoneta_append(to_file, suffix);
 
-      pgmoneta_delete_file(to_file, true, NULL);
+      if (pgmoneta_exists(to_file))
+      {
+         pgmoneta_delete_file(to_file, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", to_file);
+      }
 
       free(to_file);
       to_file = NULL;

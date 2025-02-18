@@ -114,7 +114,7 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
             to = pgmoneta_append(to, entry->d_name);
             to = pgmoneta_append(to, ".gz");
 
-            if (!pgmoneta_create_worker_input(directory, from, to, level, true, workers, &wi))
+            if (!pgmoneta_create_worker_input(directory, from, to, level, workers, &wi))
             {
                if (workers != NULL)
                {
@@ -170,11 +170,10 @@ do_gz_compress(struct worker_input* wi)
       if (gz_compress(wi->from, wi->level, wi->to))
       {
          pgmoneta_log_error("Gzip: Could not compress %s", wi->from);
-         wi->workers->outcome = false;
       }
       else
       {
-         pgmoneta_delete_file(wi->from, true, NULL);
+         pgmoneta_delete_file(wi->from, NULL);
       }
    }
 
@@ -276,7 +275,14 @@ pgmoneta_gzip_wal(char* directory)
                break;
             }
 
-            pgmoneta_delete_file(from, true, NULL);
+            if (pgmoneta_exists(from))
+            {
+               pgmoneta_delete_file(from, NULL);
+            }
+            else
+            {
+               pgmoneta_log_debug("%s doesn't exists", from);
+            }
             pgmoneta_permission(to, 6, 0, 0);
          }
 
@@ -334,7 +340,14 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
       goto error;
    }
 
-   pgmoneta_delete_file(from, true, NULL);
+   if (pgmoneta_exists(from))
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -395,7 +408,14 @@ pgmoneta_gzip_file(char* from, char* to)
    }
    else
    {
-      pgmoneta_delete_file(from, true, NULL);
+      if (pgmoneta_exists(from))
+      {
+         pgmoneta_delete_file(from, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", from);
+      }
    }
 
    return 0;
@@ -446,7 +466,14 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
       goto error;
    }
 
-   pgmoneta_delete_file(from, true, NULL);
+   if (pgmoneta_exists(from))
+   {
+      pgmoneta_delete_file(from, NULL);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -496,7 +523,14 @@ pgmoneta_gunzip_file(char* from, char* to)
          goto error;
       }
 
-      pgmoneta_delete_file(from, true, NULL);
+      if (pgmoneta_exists(from))
+      {
+         pgmoneta_delete_file(from, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", from);
+      }
    }
    else
    {
@@ -562,7 +596,7 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
             to = pgmoneta_append(to, "/");
             to = pgmoneta_append(to, name);
 
-            if (!pgmoneta_create_worker_input(directory, from, to, 0, true, workers, &wi))
+            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
             {
                if (workers != NULL)
                {
@@ -780,14 +814,16 @@ pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size,
 static void
 do_gz_decompress(struct worker_input* wi)
 {
-   if (gz_decompress(wi->from, wi->to))
+   if (pgmoneta_exists(wi->from))
    {
-      pgmoneta_log_error("Gzip: Could not decompress %s", wi->from);
-      wi->workers->outcome = false;
-   }
-   else
-   {
-      pgmoneta_delete_file(wi->from, true, NULL);
+      if (gz_decompress(wi->from, wi->to))
+      {
+         pgmoneta_log_error("Gzip: Could not decompress %s", wi->from);
+      }
+      else
+      {
+         pgmoneta_delete_file(wi->from, NULL);
+      }
    }
 
    free(wi);

@@ -148,7 +148,11 @@ gzip_execute_compress(int server, char* identifier, struct deque* nodes)
 
       if (pgmoneta_exists(d))
       {
-         pgmoneta_delete_file(d, true, NULL);
+         pgmoneta_delete_file(d, NULL);
+      }
+      else
+      {
+         pgmoneta_log_debug("%s doesn't exists", d);
       }
 
       pgmoneta_gzip_file(tarfile, d);

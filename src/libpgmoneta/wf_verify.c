@@ -150,7 +150,7 @@ verify_execute(int server, char* identifier, struct deque* nodes)
       struct worker_input* payload = NULL;
       struct json* j = NULL;
 
-      if (pgmoneta_create_worker_input(NULL, NULL, NULL, -1, false, workers, &payload))
+      if (pgmoneta_create_worker_input(NULL, NULL, NULL, -1, workers, &payload))
       {
          goto error;
       }
