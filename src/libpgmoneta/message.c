@@ -1078,11 +1078,11 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       goto error;
    }
 
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
-      pgmoneta_log_debug("Query request -- BEGIN");
+      pgmoneta_log_trace("Query request -- BEGIN");
       pgmoneta_log_message(msg);
-      pgmoneta_log_debug("Query request -- END");
+      pgmoneta_log_trace("Query request -- END");
    }
 
    cont = true;
