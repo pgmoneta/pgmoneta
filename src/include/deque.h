@@ -104,6 +104,14 @@ int
 pgmoneta_deque_remove(struct deque* deque, char* tag);
 
 /**
+ * Remove all the nodes inside a deque
+ * @param deque The deque
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_deque_clear(struct deque* deque);
+
+/**
  * Add a node to deque's tail with custom to_string and data destroy callback,
  * the type will be set to ValueRef
  * This function is thread safe

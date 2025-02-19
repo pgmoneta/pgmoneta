@@ -134,6 +134,23 @@ pgmoneta_deque_remove(struct deque* deque, char* tag)
 }
 
 int
+pgmoneta_deque_clear(struct deque* deque)
+{
+   struct deque_iterator* iter = NULL;
+   if (deque == NULL)
+   {
+      return 0;
+   }
+   pgmoneta_deque_iterator_create(deque, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      pgmoneta_deque_iterator_remove(iter);
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+   return 0;
+}
+
+int
 pgmoneta_deque_add_with_config(struct deque* deque, char* tag, uintptr_t data, struct value_config* config)
 {
    deque_offer(deque, tag, data, ValueRef, config);

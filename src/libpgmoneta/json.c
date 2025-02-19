@@ -402,6 +402,27 @@ error:
 }
 
 int
+pgmoneta_json_clear(struct json* obj)
+{
+   if (obj == NULL || obj->elements == NULL)
+   {
+      return 0;
+   }
+   switch (obj->type)
+   {
+      case JSONArray:
+         pgmoneta_deque_clear((struct deque*)obj->elements);
+         break;
+      case JSONItem:
+         pgmoneta_art_clear((struct art*)obj->elements);
+         break;
+      case JSONUnknown:
+         return 1;
+   }
+   return 0;
+}
+
+int
 pgmoneta_json_create(struct json** object)
 {
    struct json* o = malloc(sizeof(struct json));

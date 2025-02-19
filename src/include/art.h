@@ -128,6 +128,14 @@ int
 pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
 
 /**
+ * Remove all the key value pairs in the ART tree
+ * @param t The tree
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_art_clear(struct art* t);
+
+/**
  * Get the next key value pair into iterator
  * @param iter The iterator
  * @return true if iterator has next, otherwise false

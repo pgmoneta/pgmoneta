@@ -399,6 +399,19 @@ pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len)
    return 0;
 }
 
+int
+pgmoneta_art_clear(struct art* t)
+{
+   if (t == NULL)
+   {
+      return 0;
+   }
+   destroy_art_node(t->root);
+   t->root = NULL;
+   t->size = 0;
+   return 0;
+}
+
 char*
 pgmoneta_art_to_string(struct art* t, int32_t format, char* tag, int indent)
 {

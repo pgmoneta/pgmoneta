@@ -144,6 +144,14 @@ int
 pgmoneta_json_remove(struct json* item, char* key);
 
 /**
+ * Clear all the entries or key value pairs inside a json object
+ * @param obj The json object
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_json_clear(struct json* obj);
+
+/**
  * Get the value data from json item
  * @param item The item
  * @param tag The tag
