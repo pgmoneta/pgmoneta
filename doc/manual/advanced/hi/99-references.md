@@ -1,0 +1,21 @@
+[rocky]: https://www.rockylinux.org
+[fedora]: https://getfedora.org/
+[rhel]: https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux
+[appstram]: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/installing_managing_and_removing_user-space_components/using-appstream_using-appstream
+[freebsd]: https://www.freebsd.org/
+[openbsd]: http://www.openbsd.org/
+[postgresql]: https://www.postgresql.org
+[pgmoneta]: https://pgmoneta.github.io/
+[prometheus]: https://prometheus.io/
+[grafana]: https://grafana.com/  
+
+[yum]: https://yum.postgresql.org/
+[ask]: https://github.com/pgmoneta/pgmoneta/discussions
+[issue]: https://github.com/pgmoneta/pgmoneta/issues
+[request]: https://github.com/pgmoneta/pgmoneta/issues
+[submission]: https://github.com/pgmoneta/pgmoneta/pulls
+[conduct]: https://github.com/pgmoneta/pgmoneta/blob/main/CODE_OF_CONDUCT.md
+[star]: https://github.com/pgmoneta/pgmoneta/stargazers
+[twitter]: https://twitter.com/pgmoneta/
+[license]: https://opensource.org/licenses/BSD-3-Clause
+[ART_paper]: http://www-db.in.tum.de/~leis/papers/ART.pdf
