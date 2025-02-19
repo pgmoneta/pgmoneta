@@ -14,6 +14,7 @@ if(PDFLATEX_FOUND)
 
   # check for kpsewhich
   find_program(KPSEWHICH kpsewhich)
+
   if(NOT KPSEWHICH)
     set(generation FALSE)
     message(STATUS "kpsewhich not found. The generation process will be skipped.")

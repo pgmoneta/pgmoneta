@@ -139,7 +139,7 @@ jobs:
         if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
-          name: generated-docs
+          name: linux-generated-docs
           path: /home/runner/work/pgmoneta/pgmoneta/build/doc
           retention-days: 90
 
@@ -164,7 +164,23 @@ jobs:
             libarchive \
             check \
             postgresql${POSTGRESQL_VERSION} \
-            libssh
+            libssh \
+            doxygen \
+            pandoc
+      - name: Install pdflatex
+        run: |
+          curl -LO https://mirror.ctan.org/systems/mac/mactex/MacTeX.pkg && sudo installer -pkg MacTeX.pkg -target /
+          echo "/Library/TeX/texbin" >> $GITHUB_PATH
+      - name: Install eisvogel template for Pandoc
+        run: |
+          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.2.0/Eisvogel-3.2.0.tar.gz
+          tar -xzf Eisvogel-3.2.0.tar.gz
+          mkdir -p ~/.local/share/pandoc/templates
+          mv Eisvogel-3.2.0/eisvogel.latex ~/.local/share/pandoc/templates/
+      - name: Install Devanagari font for Hindi Documentation
+        run: |
+          brew install --cask font-noto-sans-devanagari
+          fc-list | grep "Noto Sans Devanagari"
       - name: Add PostgreSQL to PATH
         run: |
           echo "$(brew --prefix postgresql${POSTGRESQL_VERSION})/bin" >> $GITHUB_PATH
@@ -198,6 +214,13 @@ jobs:
           path: |
             ${{ env.BUILD_DIR }}/log/
             /tmp/*.log
+          retention-days: 7
+      
+      - name: Upload Generated Documentation Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-generated-docs
+          path: ${{ env.BUILD_DIR }}/doc/
           retention-days: 7
 
   build-freebsd:
@@ -289,3 +312,12 @@ jobs:
             $GITHUB_WORKSPACE/build/log/*
             /tmp/*.log
           retention-days: 7
+      
+      - name: Upload Generated Documentation Artifacts
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-generated-docs
+          path: $GITHUB_WORKSPACE/build/doc/*
+          retention-days: 7
+        

@@ -176,7 +176,8 @@ dnf install pandoc texlive-scheme-basic \
             'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' \
             'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' \
             'tex(titling.sty)' 'tex(csquotes.sty)' \
-            'tex(zref-abspage.sty)' 'tex(needspace.sty)'
+            'tex(zref-abspage.sty)' 'tex(needspace.sty)' \
+            'tex(selnolig.sty)'
 
 ```
 
