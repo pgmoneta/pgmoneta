@@ -252,6 +252,16 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
       to_entry = NULL;
    }
 
+   if (from_dir != NULL)
+   {
+      closedir(from_dir);
+   }
+
+   if (to_dir != NULL)
+   {
+      closedir(to_dir);
+   }
+
    return 0;
 
 error:
