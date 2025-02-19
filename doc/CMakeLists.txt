@@ -68,7 +68,8 @@ if(generation)
   FILE(GLOB UMDS_PRE "manual/user-0?-*.md")
   FILE(GLOB UMDS_POST "manual/user-1?-*.md")
   FILE(GLOB DMDS "manual/dev-??-*.md")
-  FILE(GLOB AG "manual/advanced/??-*.md")
+  FILE(GLOB AG_EN "manual/advanced/en/??-*.md")
+  FILE(GLOB AG_HI "manual/advanced/hi/??-*.md")
 
   # Manuals definitions
   set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
@@ -108,30 +109,47 @@ if(generation)
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf --from markdown --template eisvogel --listings -N --toc ${AG}
-    DEPENDS ${AG}
-    COMMENT "Generating Advanced PDF documentation"
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf --from markdown --template eisvogel --listings -N --toc ${AG_EN}
+    DEPENDS ${AG_EN}
+    COMMENT "Generating Advanced English PDF documentation"
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html -s -f markdown-smart -N --toc -t html5 ${AG}
-    DEPENDS ${AG}
-    COMMENT "Generating Advanced HTML documentation"
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf --pdf-engine=xelatex --template eisvogel --listings -N --toc ${AG_HI}
+    DEPENDS ${AG_HI}
+    COMMENT "Generating Advanced Hindi PDF documentation"
+  )
+
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html -s -f markdown-smart -N --toc -t html5 ${AG_EN}
+    DEPENDS ${AG_EN}
+    COMMENT "Generating Advanced English HTML documentation"
+  )
+
+  add_custom_command(
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html -s -f markdown-smart -N --toc -t html5 ${AG_HI}
+    DEPENDS ${AG_HI}
+    COMMENT "Generating Advanced Hindi HTML documentation"
   )
 
   add_custom_target(
     all_docs ALL
-    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html
+    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html
+    ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf  ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html
   )
 
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html DESTINATION share/doc/pgmoneta/manual)
 
 endif()
 
