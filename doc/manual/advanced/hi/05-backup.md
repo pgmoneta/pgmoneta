@@ -1,16 +1,14 @@
-\newpage
+### बैकअप (Backup)
 
-# Backup
+#### बैकअप बनाना (Create backup)
 
-## Create backup
-
-We can take a backup from the primary with the following command
+हम निम्नलिखित कमांड के साथ प्राइमरी से बैकअप ले सकते हैं:
 
 ```
 pgmoneta-cli backup primary
 ```
 
-and you will get output like
+और आपको कुछ इस प्रकार का आउटपुट मिलेगा:
 
 ```
 Header: 
@@ -35,15 +33,15 @@ Response:
   ServerVersion: 0.16.0
 ```
 
-## View backups
+#### बैकअप देखना (View backups)
 
-We can list all backups for a server with the following command
+हम निम्नलिखित कमांड के साथ एक सर्वर के सभी बैकअप्स को सूचीबद्ध कर सकते हैं:
 
 ```
 pgmoneta-cli list-backup primary
 ```
 
-and you will get output like
+और आपको कुछ इस प्रकार का आउटपुट मिलेगा:
 
 ```
 Header: 
@@ -74,15 +72,15 @@ Response:
   ServerVersion: 0.16.0
 ```
 
-## Backup information
+#### बैकअप जानकारी (Backup information)
 
-You can list the information about a backup
+आप बैकअप के बारे में जानकारी सूचीबद्ध कर सकते हैं:
 
 ```
 pgmoneta-cli -c pgmoneta.conf info primary newest
 ```
 
-and you will get output like
+और आपको कुछ इस प्रकार का आउटपुट मिलेगा:
 
 ```
 Header:
@@ -123,18 +121,18 @@ Response:
   WAL: 00000001000000000000004F
 ```
 
-## Create a crontab
+#### क्रॉन्टैब बनाना (Create a crontab)
 
-Lets create a `crontab` such that a backup is made every day,
+आइए हम एक `crontab` बनाते हैं ताकि हर दिन बैकअप लिया जा सके:
 
 ```
 crontab -e
 ```
 
-and insert
+और निम्नलिखित को जोड़ें:
 
 ```
 0 6 * * * pgmoneta-cli backup primary
 ```
 
-for taking a backup every day at 6 am.
+यह हर दिन सुबह 6 बजे बैकअप लेने के लिए है।
