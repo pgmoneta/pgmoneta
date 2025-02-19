@@ -2863,6 +2863,7 @@ translate_json_object(struct json* j)
    int32_t out_encryption = -1;
    char* translated_encryption = NULL;
    struct json* response = NULL;
+   struct json* outcome = NULL;
 
    struct json* backups = NULL;
    struct json* backup = NULL;
@@ -2909,48 +2910,38 @@ translate_json_object(struct json* j)
       free(translated_encryption);
    }
 
-   // Translate the response
-   response = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_RESPONSE);
+   // Outcome
+   outcome = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_OUTCOME);
 
-   if (response && command)
+   if ((bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS))
    {
-      switch (command)
+      // Translate the response
+      response = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_RESPONSE);
+
+      if (response && command)
       {
-         case MANAGEMENT_BACKUP:
-         case MANAGEMENT_RESTORE:
-         case MANAGEMENT_RETAIN:
-         case MANAGEMENT_EXPUNGE:
-         case MANAGEMENT_INFO:
-         case MANAGEMENT_ANNOTATE:
-            translate_backup_argument(response);
-            break;
-         case MANAGEMENT_STATUS:
-            translate_response_argument(response);
-            servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
-            pgmoneta_json_iterator_create(servers, &server_it);
-            while (pgmoneta_json_iterator_next(server_it))
-            {
-               translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
-            }
-            pgmoneta_json_iterator_destroy(server_it);
-            break;
-         case MANAGEMENT_LIST_BACKUP:
-            backups = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUPS);
-            pgmoneta_json_iterator_create(backups, &backup_it);
-            while (pgmoneta_json_iterator_next(backup_it))
-            {
-               backup = (struct json*)pgmoneta_value_data(backup_it->value);
-               translate_backup_argument(backup);
-            }
-            pgmoneta_json_iterator_destroy(backup_it);
-            break;
-         case MANAGEMENT_STATUS_DETAILS:
-            translate_response_argument(response);
-            servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
-            pgmoneta_json_iterator_create(servers, &server_it);
-            while (pgmoneta_json_iterator_next(server_it))
-            {
-               backups = (struct json*)pgmoneta_json_get((struct json*)pgmoneta_value_data(server_it->value), MANAGEMENT_ARGUMENT_BACKUPS);
+         switch (command)
+         {
+            case MANAGEMENT_BACKUP:
+            case MANAGEMENT_RESTORE:
+            case MANAGEMENT_RETAIN:
+            case MANAGEMENT_EXPUNGE:
+            case MANAGEMENT_INFO:
+            case MANAGEMENT_ANNOTATE:
+               translate_backup_argument(response);
+               break;
+            case MANAGEMENT_STATUS:
+               translate_response_argument(response);
+               servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+               pgmoneta_json_iterator_create(servers, &server_it);
+               while (pgmoneta_json_iterator_next(server_it))
+               {
+                  translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
+               }
+               pgmoneta_json_iterator_destroy(server_it);
+               break;
+            case MANAGEMENT_LIST_BACKUP:
+               backups = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUPS);
                pgmoneta_json_iterator_create(backups, &backup_it);
                while (pgmoneta_json_iterator_next(backup_it))
                {
@@ -2958,17 +2949,32 @@ translate_json_object(struct json* j)
                   translate_backup_argument(backup);
                }
                pgmoneta_json_iterator_destroy(backup_it);
+               break;
+            case MANAGEMENT_STATUS_DETAILS:
+               translate_response_argument(response);
+               servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+               pgmoneta_json_iterator_create(servers, &server_it);
+               while (pgmoneta_json_iterator_next(server_it))
+               {
+                  backups = (struct json*)pgmoneta_json_get((struct json*)pgmoneta_value_data(server_it->value), MANAGEMENT_ARGUMENT_BACKUPS);
+                  pgmoneta_json_iterator_create(backups, &backup_it);
+                  while (pgmoneta_json_iterator_next(backup_it))
+                  {
+                     backup = (struct json*)pgmoneta_value_data(backup_it->value);
+                     translate_backup_argument(backup);
+                  }
+                  pgmoneta_json_iterator_destroy(backup_it);
 
-               translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
-            }
-            pgmoneta_json_iterator_destroy(server_it);
-            break;
-         case MANAGEMENT_CONF_GET:
-            translate_configuration(response);
-            break;
-         default:
-            break;
+                  translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
+               }
+               pgmoneta_json_iterator_destroy(server_it);
+               break;
+            case MANAGEMENT_CONF_GET:
+               translate_configuration(response);
+               break;
+            default:
+               break;
+         }
       }
    }
-
 }

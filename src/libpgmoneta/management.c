@@ -912,6 +912,14 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
       goto error;
    }
 
+   for (int i = 0; i < config->number_of_servers; i++)
+   {
+      if (!strcmp(server, config->servers[i].name))
+      {
+         srv = i;
+      }
+   }
+
    if (server != NULL && strlen(server) > 0)
    {
       if (pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE) != 0)
@@ -920,22 +928,17 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
       }
       else
       {
-         for (int i = 0; i < config->number_of_servers; i++)
-         {
-            if (!strcmp(server, config->servers[i].name))
-            {
-               srv = i;
-            }
-         }
-
          if (pgmoneta_management_create_response(payload, srv, &response))
          {
             goto error;
          }
-
-         pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
       }
    }
+
+   pgmoneta_json_clear(response);
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, payload))
    {
