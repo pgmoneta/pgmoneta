@@ -157,6 +157,10 @@ First, we will need to create a master security key for the [**pgmoneta**][pgmon
 pgmoneta-admin -g master-key
 ```
 
+By default, this will ask for a key interactively. Alternatively, a key can be provided using either the
+`--password` command line argument, or the `PGMONETA_PASSWORD` environment variable. Note that passing the
+key using the command line might not be secure.
+
 Then we will create the configuration for [**pgmoneta**][pgmoneta],
 
 ```

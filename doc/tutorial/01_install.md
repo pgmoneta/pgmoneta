@@ -154,9 +154,12 @@ Add the master key and create vault
 
 ```
 pgmoneta-admin master-key
-pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword user add
+pgmoneta-admin -f pgmoneta_users.conf -U repl user add
 ```
+
 You have to choose a password for the master key - remember it !
+
+For scripted use, the master key and user password can be provided using the `PGMONETA_PASSWORD` environment variable.
 
 If you see an error saying `error while loading shared libraries: libpgmoneta.so.0: cannot open shared object` running 
 the above command. you may need to locate where your `libpgmoneta.so.0` is. It could be in `/usr/local/lib` or `/usr/local/lib64`
