@@ -12,7 +12,7 @@ for more detail.
 ### Creating an archive
 
 ```
-pgmoneta-cli -c pgmoneta.conf archive primary newest current /tmp/ 
+pgmoneta-cli -c pgmoneta.conf archive primary newest current /tmp/
 ```
 
 will take the latest backup and all Write-Ahead Log (WAL) segments and create

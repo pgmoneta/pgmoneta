@@ -41,7 +41,7 @@ To create a blob container with the Azure portal:
 
 2. Within the Containers pane, select the `+ Container` button to open the New container pane.
 
-3. Within the New Container pane, provide a Name for your new container. 
+3. Within the New Container pane, provide a Name for your new container.
 
 4. Select Create to create the container.
 

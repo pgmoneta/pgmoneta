@@ -20,13 +20,13 @@ day of each year in the last 5 years. If you input more than 4 values, [**pgmone
 Note that currently if a backup has an incremental backup child that depends on it, it will be kept even if it doesn't
 fall under retention policy. We will support incremental backup deletion in later releases.
 
-There are a lot of ways to leave a parameter unspecified. For trailing parameters, you can simply omit them. 
-And for parameters in between, you can use placeholders. Currently, placeholders we allow are: `-`, `X`, `x`, `0` 
-or whitespaces (spaces or tabs). 
+There are a lot of ways to leave a parameter unspecified. For trailing parameters, you can simply omit them.
+And for parameters in between, you can use placeholders. Currently, placeholders we allow are: `-`, `X`, `x`, `0`
+or whitespaces (spaces or tabs).
 
 Please note that you should always configure `days` to retain the nearest backups.
-If you don't configure retention, by default [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) keeps backups within the nearest 7 days and other parameters 
-(weeks, months, years) are unspecified. 
+If you don't configure retention, by default [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) keeps backups within the nearest 7 days and other parameters
+(weeks, months, years) are unspecified.
 Additionally, if you are using prometheus, unspecified values will be shown as `0`.
 
 ### Retention Validation Rule

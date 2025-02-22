@@ -13,18 +13,18 @@ pgmoneta-cli list-backup primary
 you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: list-backup
   Output: text
   Timestamp: 20241018092853
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Server: primary
-Response: 
-  Backups: 
+Response:
+  Backups:
     - Backup: 20241012091219
       BackupSize: 6.11MB
       Comments: ''
@@ -55,18 +55,18 @@ pgmoneta-cli retain primary 20241012091219
 and get output like,
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: retain
   Output: text
   Timestamp: 20241018094129
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Backup: 20241012091219
   Server: primary
-Response: 
+Response:
   Backup: 20241012091219
   Comments: ''
   Compression: none
@@ -89,18 +89,18 @@ support keeping incremental backups in later releases.
 Now, you may want to add a description to your backup, and as you can see
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: retain
   Output: text
   Timestamp: 20241018094129
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Backup: 20241012091219
   Server: primary
-Response: 
+Response:
   Backup: 20241012091219
   Comments: ''
   Compression: none
@@ -124,21 +124,21 @@ pgmoneta-cli annotate primary 20241012091219 add Type "Main fall backup"
 which will give
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: annotate
   Output: text
   Timestamp: 20241018095906
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Action: add
   Backup: 20241012091219
   Comment: Main fall backup
   Key: Type
   Server: primary
-Response: 
+Response:
   Backup: 20241012091219
   BackupSize: 6.11MB
   CheckpointHiLSN: 0
@@ -160,7 +160,7 @@ Response:
   StartHiLSN: 0
   StartLoLSN: 33554472
   StartTimeline: 1
-  Tablespaces: 
+  Tablespaces:
 
   Valid: yes
   WAL: 000000010000000000000002
@@ -181,18 +181,18 @@ pgmoneta-cli expunge primary 20241012091219
 will give,
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: expunge
   Output: text
   Timestamp: 20241018101839
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Backup: 20241012091219
   Server: primary
-Response: 
+Response:
   Backup: 20241012091219
   Comments: Type|Main fall backup
   Compression: none

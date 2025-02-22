@@ -1,6 +1,6 @@
 # Contributing guide
 
-**Want to contribute? Great!** 
+**Want to contribute? Great!**
 
 All contributions are more than welcome ! This includes bug reports, bug fixes, enhancements, features, questions, ideas,
 and documentation.
@@ -27,7 +27,7 @@ All contributions to pgmoneta are licensed under the [The 3-Clause BSD License](
 This project uses GitHub issues to manage the issues. Open an issue directly in GitHub.
 
 If you believe you found a bug, and it's likely possible, please indicate a way to reproduce it, what you are seeing and what you would expect to see.
-Don't forget to indicate your pgmoneta version. 
+Don't forget to indicate your pgmoneta version.
 
 ## Setup your build environment
 
@@ -133,7 +133,7 @@ git push -f origin mywork
 
 as all pull requests should be squashed and rebased.
 
-In your first pull request you need to add yourself to the 
+In your first pull request you need to add yourself to the
 
 ```
 AUTHORS

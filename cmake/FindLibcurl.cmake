@@ -1,12 +1,12 @@
 #
 # Libcurl support
 #
-  
+
 find_path(CURL_INCLUDE_DIR
-  NAMES 
+  NAMES
     curl/curl.h
 )
-find_library(CURL_LIBRARY 
+find_library(CURL_LIBRARY
   NAMES
     curl
 )

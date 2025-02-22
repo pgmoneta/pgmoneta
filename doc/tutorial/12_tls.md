@@ -16,7 +16,7 @@ for more detail.
 Generate the server key
 
 ```
-openssl genrsa -aes256 8192 > server.key 
+openssl genrsa -aes256 8192 > server.key
 ```
 
 Remove the passphase
@@ -34,7 +34,7 @@ chmod 400 server.key
 Generate the server certificate
 
 ```
-openssl req -new -key server.key -days 3650 -out server.crt -x509 
+openssl req -new -key server.key -days 3650 -out server.crt -x509
 ```
 
 Use the server certificate as the root certificate (self-signed)

@@ -298,7 +298,7 @@ then create vault
 
 ``` sh
 pgmoneta-admin -f pgmoneta_users.conf -U repl -P secretpassword user add
-``` 
+```
 
 Input the replication user and its password to grant [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) access to the database. Ensure that the information is correct.
 
@@ -501,9 +501,9 @@ Based on feedback keep making changes, squashing, rebasing and force pushing
 
 ### Undo
 
-Normally you can reset to an earlier commit using `git reset <commit hash> --hard`. 
-But if you accidentally squashed two or more commits, and you want to undo that, 
-you need to know where to reset to, and the commit seems to have lost after you rebased. 
+Normally you can reset to an earlier commit using `git reset <commit hash> --hard`.
+But if you accidentally squashed two or more commits, and you want to undo that,
+you need to know where to reset to, and the commit seems to have lost after you rebased.
 
 But they are not actually lost - using `git reflog`, you can find every commit the HEAD pointer
 has ever pointed to. Find the commit you want to reset to, and do `git reset --hard`.

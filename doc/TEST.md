@@ -63,7 +63,7 @@ It will be the responsibility of the script to clean up the setup environment.
 
 **Note:** You can however view the PostgreSQL and pgmoneta server logs in a separate `log` directory inside build.
 
-In case you see those setup directories like `pgmoneta-postgres` and `pgmoneta-testsiute` in build after successfully executing the script, you should probably run 
+In case you see those setup directories like `pgmoneta-postgres` and `pgmoneta-testsiute` in build after successfully executing the script, you should probably run
 
 ```
 ./testsuite clean
@@ -78,7 +78,7 @@ To add an additional testcase go to [testcases](https://github.com/pgmoneta/pgmo
 
 Create a `.c` file that contains the test suite and its corresponding `.h` file (see [pgmoneta_test_1.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/pgmoneta_test_1.c) or [pgmoneta_test_2.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/pgmoneta_test_2.c) for reference). Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/runner.c)
 
-Also remember to link the new test suite in [CMakeLists](https://github.com/pgmoneta/pgmoneta/blob/main/test/CMakeLists.txt) file inside test directory 
+Also remember to link the new test suite in [CMakeLists](https://github.com/pgmoneta/pgmoneta/blob/main/test/CMakeLists.txt) file inside test directory
 
 ```
 30:  set(SOURCES

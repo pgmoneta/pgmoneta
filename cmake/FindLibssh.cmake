@@ -1,12 +1,12 @@
 #
 # LibSSH support
 #
-  
+
 find_path(LIBSSH_INCLUDE_DIR
-  NAMES 
+  NAMES
     libssh/libssh.h
 )
-find_library(LIBSSH_LIBRARY 
+find_library(LIBSSH_LIBRARY
   NAMES
     ssh
     libssh

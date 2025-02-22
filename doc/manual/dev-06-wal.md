@@ -211,10 +211,10 @@ The WAL structure has evolved across PostgreSQL versions 13 to 17, requiring dif
 
 Below are the commit hashes for the officially supported magic values in each PostgreSQL version:
 
-1. PostgreSQL 13 - 0xD106: [https://github.com/postgres/postgres/commit/c6b92041d38512a4176ed76ad06f713d2e6c01a8](https://github.com/postgres/postgres/commit/c6b92041d38512a4176ed76ad06f713d2e6c01a8)  
-2. PostgreSQL 14 - 0xD10D: [https://github.com/postgres/postgres/commit/08aa89b326261b669648df97d4f2a6edba22d26a](https://github.com/postgres/postgres/commit/08aa89b326261b669648df97d4f2a6edba22d26a)  
-3. PostgreSQL 15 - 0xD110: [https://github.com/postgres/postgres/commit/8b1dccd37c71ed2ff016294d8f9053a32b02b19e](https://github.com/postgres/postgres/commit/8b1dccd37c71ed2ff016294d8f9053a32b02b19e)  
-4. PostgreSQL 16 - 0xD113: [https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179](https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179)  
+1. PostgreSQL 13 - 0xD106: [https://github.com/postgres/postgres/commit/c6b92041d38512a4176ed76ad06f713d2e6c01a8](https://github.com/postgres/postgres/commit/c6b92041d38512a4176ed76ad06f713d2e6c01a8)
+2. PostgreSQL 14 - 0xD10D: [https://github.com/postgres/postgres/commit/08aa89b326261b669648df97d4f2a6edba22d26a](https://github.com/postgres/postgres/commit/08aa89b326261b669648df97d4f2a6edba22d26a)
+3. PostgreSQL 15 - 0xD110: [https://github.com/postgres/postgres/commit/8b1dccd37c71ed2ff016294d8f9053a32b02b19e](https://github.com/postgres/postgres/commit/8b1dccd37c71ed2ff016294d8f9053a32b02b19e)
+4. PostgreSQL 16 - 0xD113: [https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179](https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179)
 5. PostgreSQL 17 - 0xD116: [https://github.com/postgres/postgres/commit/402b586d0a9caae9412d25fcf1b91dae45375833](https://github.com/postgres/postgres/commit/402b586d0a9caae9412d25fcf1b91dae45375833)
 
 
@@ -247,7 +247,7 @@ struct xl_end_of_recovery {
 xl_end_of_recovery* create_xl_end_of_recovery(int pg_version) {
     xl_end_of_recovery* wrapper = malloc(sizeof(xl_end_of_recovery));
     wrapper->pg_version = pg_version;
-    
+
     if (pg_version >= 17) {
         wrapper->parse = parse_v17;
         wrapper->format = format_v17;
@@ -255,7 +255,7 @@ xl_end_of_recovery* create_xl_end_of_recovery(int pg_version) {
         wrapper->parse = parse_v16;
         wrapper->format = format_v16;
     }
-    
+
     return wrapper;
 }
 
@@ -282,7 +282,6 @@ char* format_v17(xl_end_of_recovery* wrapper, char* buf) {
                                       xlrec->wal_level);
 }
 ```
-
 
 
 ## WAL Change List
@@ -935,7 +934,7 @@ typedef struct xl_xact_parsed_abort
 #define	BKPIMAGE_COMPRESSED(info) \
 	((info & (BKPIMAGE_COMPRESS_PGLZ | BKPIMAGE_COMPRESS_LZ4 | \
 			  BKPIMAGE_COMPRESS_ZSTD)) != 0)
-			  
+
 ```
 
 14:
@@ -944,7 +943,6 @@ typedef struct xl_xact_parsed_abort
 #define BKPIMAGE_IS_COMPRESSED		0x02	/* page image is compressed */
 #define BKPIMAGE_APPLY		0x04	/* page image should be restored during
 									 * replay */
-
 ```
 
 ---
@@ -1054,7 +1052,6 @@ typedef struct xl_btree_reuse_page
 	BlockNumber block;
 	TransactionId latestRemovedXid;
 } xl_btree_reuse_page;
-
 ```
 
 ### xl_btree_delete

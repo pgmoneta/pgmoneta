@@ -1581,7 +1581,7 @@ art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, s
    p->cnt++;
    bool has_next = p->cnt < p->t->size;
    tag = pgmoneta_append(tag, (char*)key);
-   tag = pgmoneta_append(tag, ": ");
+   tag = pgmoneta_append(tag, ":");
    if (value->type == ValueJSON && ((struct json*) value->data)->type != JSONUnknown)
    {
       tag = pgmoneta_append(tag, "\n");

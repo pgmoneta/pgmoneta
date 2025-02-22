@@ -1,11 +1,11 @@
 #
 # LZ4 Support
 #
-  
-find_path(LZ4_INCLUDE_DIR 
+
+find_path(LZ4_INCLUDE_DIR
   NAMES lz4.h
 )
-find_library(LZ4_LIBRARY 
+find_library(LZ4_LIBRARY
   NAMES lz4
 )
 

@@ -28,20 +28,20 @@ where
 And, you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: 3
   Output: 0
   Timestamp: 20240928130406
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Backup: newest
   Directory: /tmp
   Position: current
   Server: primary
-Response: 
+Response:
   Backup: 20240928065644
   BackupSize: 8531968
   Comments: ''

@@ -110,16 +110,16 @@ Vendor ID:               GenuineIntel
                          efetch invpcid_single pti ssbd ibrs ibpb stibp tpr_shadow vnmi ept vpid ept_ad fsgsbase bmi1 avx2 s
                          mep bmi2 erms invpcid rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 xsaves flush_l1d arch_capa
                          bilities
-Virtualization features: 
+Virtualization features:
   Virtualization:        VT-x
   Hypervisor vendor:     Microsoft
   Virtualization type:   full
-Caches (sum of all):     
+Caches (sum of all):
   L1d:                   192 KiB (6 instances)
   L1i:                   192 KiB (6 instances)
   L2:                    1.5 MiB (6 instances)
   L3:                    12 MiB (1 instance)
-Vulnerabilities:         
+Vulnerabilities:
   Itlb multihit:         KVM: Mitigation: VMX disabled
   L1tf:                  Mitigation; PTE Inversion; VMX conditional cache flushes, SMT vulnerable
   Mds:                   Vulnerable: Clear CPU buffers attempted, no microcode; SMT Host state unknown

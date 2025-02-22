@@ -21,7 +21,7 @@ In order to use WAL shipping, simply add
 wal_shipping = your/local/wal/shipping/directory
 ```
 
-to the corresponding server section of `pgmoneta.conf`, [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will create the directory if it doesn't exist, 
+to the corresponding server section of `pgmoneta.conf`, [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will create the directory if it doesn't exist,
 and ship a copy of WAL segments under the subdirectory `your/local/wal/shipping/directory/server_name/wal`.
 
 ### Prometheus

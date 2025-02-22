@@ -13,17 +13,17 @@ pgmoneta-cli backup primary
 and you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: 1
   Output: 0
   Timestamp: 20240928065644
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:20
-Request: 
+Request:
   Server: primary
-Response: 
+Response:
   Backup: 20240928065644
   BackupSize: 8531968
   Compression: 2
@@ -46,18 +46,18 @@ pgmoneta-cli list-backup primary
 and you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: 2
   Output: 0
   Timestamp: 20240928065812
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Server: primary
-Response: 
-  Backups: 
+Response:
+  Backups:
     - Backup: 20240928065644
       BackupSize: 8531968
       Comments: ''
@@ -86,17 +86,17 @@ pgmoneta-cli backup primary 20240928065644
 and you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: 1
   Output: 0
   Timestamp: 20240928065730
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:20
-Request: 
+Request:
   Server: primary
-Response: 
+Response:
   Backup: 20240928065750
   BackupSize: 124312
   Compression: 2
@@ -124,18 +124,18 @@ pgmoneta-cli list-backup primary
 and you will get output like
 
 ```
-Header: 
+Header:
   ClientVersion: 0.16.0
   Command: 2
   Output: 0
   Timestamp: 20240928065812
-Outcome: 
+Outcome:
   Status: true
   Time: 00:00:00
-Request: 
+Request:
   Server: primary
-Response: 
-  Backups: 
+Response:
+  Backups:
     - Backup: 20240928065644
       BackupSize: 8531968
       Comments: ''

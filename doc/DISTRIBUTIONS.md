@@ -37,7 +37,7 @@ Then
 dnf config-manager --set-enabled crb
 ```
 It is OK to disregard the registration and subscription warning.
-You can verify the repos using 
+You can verify the repos using
 ```
 dnf repolist
 ```
@@ -49,7 +49,7 @@ First you will still need to install EPEL, use
 ```
 dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 ```
-Then for the CodeReady Linux Builder repository, 
+Then for the CodeReady Linux Builder repository,
 ```
 dnf install subscription-manager
 dnf config-manager --set-enabled codeready-builder-for-rhel-9-rhui-rpms
@@ -69,7 +69,7 @@ dnf repolist
 ```
 Install required packages after the previous steps.
 
-On FreeBSD, `pkg` is used instead of `dnf` or `yum`. 
+On FreeBSD, `pkg` is used instead of `dnf` or `yum`.
 
 Use `pkg install <package name>` to install the following packages
 ```

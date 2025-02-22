@@ -30,7 +30,7 @@ pgmoneta-cli -c pgmoneta.conf list-backup primary
 ### Restore
 
 ```
-pgmoneta-cli -c pgmoneta.conf restore primary newest current /tmp/ 
+pgmoneta-cli -c pgmoneta.conf restore primary newest current /tmp/
 ```
 
 will take the latest backup and all Write-Ahead Log (WAL) segments and restore it

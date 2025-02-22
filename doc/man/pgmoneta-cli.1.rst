@@ -45,7 +45,7 @@ OPTIONS
 -V, --version
   Display version information
 
--F, --format text|json|raw    
+-F, --format text|json|raw
   Set the output format
 
 -C, --compress none|gz|zstd|lz4|bz2

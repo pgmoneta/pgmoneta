@@ -13,7 +13,7 @@ pgmoneta-cli 0.16.0
   Command line utility for pgmoneta
 
 Usage:
-  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ] 
+  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 
 Options:
   -c, --config CONFIG_FILE                        Set the path to the pgmoneta.conf file

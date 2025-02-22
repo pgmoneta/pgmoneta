@@ -73,7 +73,7 @@ dnf install git gcc clang clang-analyzer cmake make libev libev-devel \
             libcurl libcurl-devel \
             python3-docutils libatomic \
             bzip2 bzip2-devel \
-            libarchive libarchive-devel 
+            libarchive libarchive-devel
 ```
 
 Alternative [gcc](https://gcc.gnu.org) can be used.
@@ -254,7 +254,7 @@ You can use the `postgres` role to test.
 You should see
 
 ``` console
- pgmoneta_ext_version 
+ pgmoneta_ext_version
 ----------------------
  0.1.0
 (1 row)

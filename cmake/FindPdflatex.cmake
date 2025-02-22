@@ -2,7 +2,7 @@
 # pdflatex Support
 #
 
-find_program(PDFLATEX_EXECUTABLE 
+find_program(PDFLATEX_EXECUTABLE
   NAMES pdflatex
 )
 
@@ -52,7 +52,7 @@ if(PDFLATEX_FOUND)
   check_latex_package("csquotes.sty")
   check_latex_package("zref-abspage.sty")
   check_latex_package("needspace.sty")
-  
+
 endif()
 
 mark_as_advanced(PDFLATEX_EXECUTABLE)

@@ -111,7 +111,7 @@
   [lz4_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/lz4_compression.c
   [zstandard_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/zstandard_compression.c
   [bzip2_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/bzip2_compression.c
-  
+
 <!-- Contributing -->
   [ask]: https://github.com/pgmoneta/pgmoneta/discussions
   [issue]: https://github.com/pgmoneta/pgmoneta/issues

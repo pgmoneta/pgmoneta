@@ -35,7 +35,7 @@ pgmoneta-cli -c pgmoneta.conf backup primary newest
 
 will take an incremental backup of the `[primary]` host.
 
-Note that currently branching is not allowed for incremental 
+Note that currently branching is not allowed for incremental
 backup -- a backup can have at most 1 incremental backup child.
 
 (`pgmoneta` user)

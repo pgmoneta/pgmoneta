@@ -92,7 +92,7 @@ like
 SELECT pg_create_physical_replication_slot('repl', true, false);
 ```
 
-Alternatively, configure automatically slot creation by adding `create_slot = yes` to `[pgmoneta]` 
+Alternatively, configure automatically slot creation by adding `create_slot = yes` to `[pgmoneta]`
 or corresponding server section
 
 We will need a user vault for the `repl` account, so the following commands will add

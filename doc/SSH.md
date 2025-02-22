@@ -31,7 +31,7 @@ $ mkdir .ssh && chmod 700 .ssh
 $ touch .ssh/authorized_keys && chmod 600 .ssh/authorized_keys
 ```
 
-6. Retrieve the public key for the key pair in your local computer: 
+6. Retrieve the public key for the key pair in your local computer:
 
 ```
 cat ~/.ssh/id_rsa.pub
@@ -47,7 +47,7 @@ $ cat >> .ssh/authorized_keys
 
 9. Press and hold Ctrl+d to exit cat and return to the command line session prompt.
 
-To verify that the new user can use SSH to connect to the EC2 instance, run the following command from a command line prompt on your local computer: 
+To verify that the new user can use SSH to connect to the EC2 instance, run the following command from a command line prompt on your local computer:
 
 ```
 ssh new_user@public_dns_name_of_EC2_instance

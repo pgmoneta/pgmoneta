@@ -3,7 +3,7 @@
 This tutorial will show you how to do a simple installation of [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 At the end of this tutorial you will have a backup of a PostgreSQL cluster,
-and will be streaming Write-Ahead Log (WAL) to [**pgmoneta**](https://github.com/pgmoneta/pgmoneta). 
+and will be streaming Write-Ahead Log (WAL) to [**pgmoneta**](https://github.com/pgmoneta/pgmoneta).
 
 Please note that inside the brackets at the end of each step it's the user account
 you should be using, switch the account when needed.
@@ -161,7 +161,7 @@ You have to choose a password for the master key - remember it !
 
 For scripted use, the master key and user password can be provided using the `PGMONETA_PASSWORD` environment variable.
 
-If you see an error saying `error while loading shared libraries: libpgmoneta.so.0: cannot open shared object` running 
+If you see an error saying `error while loading shared libraries: libpgmoneta.so.0: cannot open shared object` running
 the above command. you may need to locate where your `libpgmoneta.so.0` is. It could be in `/usr/local/lib` or `/usr/local/lib64`
 depending on your environment. Add the corresponding directory into `/etc/ld.so.conf`, or alternatively, create a file
 called `pgmoneta_shared_library.conf` under `/etc/ld.so.conf.d/`, and add your directory into it. Remember to run `ldconfig` to make the change effective

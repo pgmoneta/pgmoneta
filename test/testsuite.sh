@@ -504,7 +504,7 @@ run_tests() {
         pgmoneta_initialize_configuration
         # execute_pgmoneta_ext_suite Uncomment when pgmoneta_ext is enabled
         execute_testcases
-        
+
         # clean cluster
         clean
     else
