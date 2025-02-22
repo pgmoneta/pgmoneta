@@ -31,6 +31,7 @@ Mario Rodas
 Annupamaa <annu242005@gmail.com>
 Ashutosh Sharma <ash2003sharma@gmail.com>
 Mohab Yaser <mohabyaserofficial2003@gmail.com>
+Georg Pfuetzenreuter <mail@georg-pfuetzenreuter.net>
 ```
 
 ## Committers

@@ -94,6 +94,8 @@ pgmoneta-admin master-key
 pgmoneta-admin -f pgmoneta_users.conf user add
 ```
 
+For scripted use, the master key and user password can be provided using the `PGMONETA_PASSWORD` environment variable.
+
 We are now ready to run [**pgmoneta**][pgmoneta].
 
 See the **Configuration** charpter for all configuration options.

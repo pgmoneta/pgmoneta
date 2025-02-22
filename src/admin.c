@@ -396,25 +396,34 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
 
    if (password == NULL)
    {
-      if (!generate_pwd)
-      {
-         while (!is_valid_key(password))
-         {
-            if (password != NULL)
-            {
-               free(password);
-               password = NULL;
-            }
-
-            printf("Master key: ");
-            password = pgmoneta_get_password();
-            printf("\n");
-         }
-      }
-      else
+      if (generate_pwd)
       {
          password = generate_password(pwd_length);
          do_free = false;
+      }
+      else
+      {
+         password = secure_getenv("PGMONETA_PASSWORD");
+
+         if (password == NULL)
+         {
+            while (!is_valid_key(password))
+            {
+               if (password != NULL)
+               {
+                  free(password);
+                  password = NULL;
+               }
+
+               printf("Master key: ");
+               password = pgmoneta_get_password();
+               printf("\n");
+            }
+         }
+         else
+         {
+            do_free = false;
+         }
       }
    }
    else
@@ -623,15 +632,25 @@ password:
       }
       else
       {
-         printf("Password : ");
+         password = secure_getenv("PGMONETA_PASSWORD");
 
-         if (password != NULL)
+         if (password == NULL)
          {
-            free(password);
-            password = NULL;
-         }
+            printf("Password : ");
 
-         password = pgmoneta_get_password();
+            if (password != NULL)
+            {
+               free(password);
+               password = NULL;
+            }
+
+            password = pgmoneta_get_password();
+         }
+         else
+         {
+            do_free = false;
+            do_verify = false;
+         }
       }
       printf("\n");
    }
@@ -848,15 +867,25 @@ password:
             }
             else
             {
-               printf("Password : ");
+               password = secure_getenv("PGMONETA_PASSWORD");
 
-               if (password != NULL)
+               if (password == NULL)
                {
-                  free(password);
-                  password = NULL;
-               }
+                  printf("Password : ");
 
-               password = pgmoneta_get_password();
+                  if (password != NULL)
+                  {
+                     free(password);
+                     password = NULL;
+                  }
+
+                  password = pgmoneta_get_password();
+               }
+               else
+               {
+                  do_free = false;
+                  do_verify = false;
+               }
             }
             printf("\n");
          }
