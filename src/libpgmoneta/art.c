@@ -1586,6 +1586,10 @@ art_to_text_string_cb(void* param, const unsigned char* key, uint32_t key_len, s
    {
       tag = pgmoneta_append(tag, "\n");
    }
+   else
+   {
+      tag = pgmoneta_append(tag, " ");
+   }
    if (pgmoneta_compare_string(p->tag, BULLET_POINT))
    {
       if (p->cnt == 1)
