@@ -1461,6 +1461,20 @@ pgmoneta_art_iterator_has_next(struct art_iterator* iter)
 }
 
 void
+pgmoneta_art_iterator_remove(struct art_iterator* iter)
+{
+   if (iter == NULL || iter->tree == NULL || iter->key == NULL)
+   {
+      return;
+   }
+
+   pgmoneta_art_delete(iter->tree, iter->key, strlen((char*)iter->key) + 1);
+   iter->key = NULL;
+   iter->value = NULL;
+   iter->count--;
+}
+
+void
 pgmoneta_art_iterator_destroy(struct art_iterator* iter)
 {
    if (iter == NULL)

@@ -152,6 +152,14 @@ bool
 pgmoneta_art_iterator_has_next(struct art_iterator* iter);
 
 /**
+ * Remove the current key value pair the iterator points to.
+ * The key and value will be set to NULL afterward.
+ * @param iter The iterator
+ */
+void
+pgmoneta_art_iterator_remove(struct art_iterator* iter);
+
+/**
  * Create an art iterator
  * @param t The tree
  * @param iter [out] The iterator
