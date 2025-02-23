@@ -811,7 +811,7 @@ art_node_delete(struct art_node* node, struct art_node** node_ref, uint32_t dept
    else
    {
       depth += node->prefix_len;
-      if (depth > key_len)
+      if (depth >= key_len)
       {
          return NULL;
       }
@@ -1525,7 +1525,7 @@ art_search(struct art* t, unsigned char* key, uint32_t key_len)
          return NULL;
       }
       depth += node->prefix_len;
-      if (depth > key_len)
+      if (depth >= key_len)
       {
          return NULL;
       }
