@@ -52,13 +52,22 @@ create_xl_clog_truncate(void)
 void
 xl_clog_truncate_parse_v16(struct xl_clog_truncate* wrapper, char* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct xl_clog_truncate_16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.pageno, ptr, sizeof(int64_t));
+   ptr += sizeof(int64_t);
+   memcpy(&wrapper->data.v16.oldestXact, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.oldestXactDb, ptr, sizeof(oid));
 }
-
 void
 xl_clog_truncate_parse_v17(struct xl_clog_truncate* wrapper, char* rec)
 {
-   memcpy(&wrapper->data.v17, rec, sizeof(struct xl_clog_truncate_17));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v17.pageno, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v17.oldestXact, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v17.oldestXactDb, ptr, sizeof(oid));
 }
 
 char*

@@ -63,7 +63,34 @@ void parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct 
 void
 pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v14, rec, sizeof(struct xl_xact_prepare_v14));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v14.magic, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v14.total_len, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v14.xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v14.database, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v14.prepared_at, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v14.owner, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v14.nsubxacts, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v14.ncommitrels, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v14.nabortrels, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v14.ninvalmsgs, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v14.initfileinval, ptr, sizeof(bool));
+   ptr += sizeof(bool);
+   memcpy(&wrapper->data.v14.gidlen, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v14.origin_lsn, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v14.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
 /**
@@ -72,7 +99,38 @@ pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, const vo
 void
 pgmoneta_wal_parse_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_xact_prepare_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.magic, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v15.total_len, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v15.xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.database, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v15.prepared_at, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v15.owner, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v15.nsubxacts, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v15.ncommitrels, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v15.nabortrels, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v15.ncommitstats, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v15.nabortstats, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v15.ninvalmsgs, ptr, sizeof(int32_t));
+   ptr += sizeof(int32_t);
+   memcpy(&wrapper->data.v15.initfileinval, ptr, sizeof(bool));
+   ptr += sizeof(bool);
+   memcpy(&wrapper->data.v15.gidlen, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v15.origin_lsn, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v15.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
 /**
@@ -139,14 +197,84 @@ pgmoneta_wal_create_xact_parsed_commit(void)
 void
 pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v14, rec, sizeof(struct xl_xact_parsed_commit_v14));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v14.xact_time, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v14.xinfo, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v14.db_id, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v14.ts_id, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v14.nsubxacts, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v14.subxacts, ptr, sizeof(transaction_id*));
+   ptr += sizeof(transaction_id*);
+   memcpy(&wrapper->data.v14.nrels, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v14.xnodes, ptr, sizeof(struct rel_file_node*));
+   ptr += sizeof(struct rel_file_node*);
+   memcpy(&wrapper->data.v14.nmsgs, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v14.msgs, ptr, sizeof(union shared_invalidation_message*));
+   ptr += sizeof(union shared_invalidation_message*);
+   memcpy(&wrapper->data.v14.twophase_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v14.twophase_gid, ptr, GIDSIZE);
+   ptr += GIDSIZE;
+   memcpy(&wrapper->data.v14.nabortrels, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v14.abortnodes, ptr, sizeof(struct rel_file_node*));
+   ptr += sizeof(struct rel_file_node*);
+   memcpy(&wrapper->data.v14.origin_lsn, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v14.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
 /* Parse commit record for version 15 */
 void
 pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_xact_parsed_commit_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.xact_time, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v15.xinfo, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v15.db_id, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v15.ts_id, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v15.nsubxacts, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.subxacts, ptr, sizeof(transaction_id*));
+   ptr += sizeof(transaction_id*);
+   memcpy(&wrapper->data.v15.nrels, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.xnodes, ptr, sizeof(struct rel_file_node*));
+   ptr += sizeof(struct rel_file_node*);
+   memcpy(&wrapper->data.v15.nstats, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.stats, ptr, sizeof(struct xl_xact_stats_item*));
+   ptr += sizeof(struct xl_xact_stats_item*);
+   memcpy(&wrapper->data.v15.nmsgs, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.msgs, ptr, sizeof(union shared_invalidation_message*));
+   ptr += sizeof(union shared_invalidation_message*);
+   memcpy(&wrapper->data.v15.twophase_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.twophase_gid, ptr, GIDSIZE);
+   ptr += GIDSIZE;
+   memcpy(&wrapper->data.v15.nabortrels, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.abortnodes, ptr, sizeof(struct rel_file_node*));
+   ptr += sizeof(struct rel_file_node*);
+   memcpy(&wrapper->data.v15.nabortstats, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.abortstats, ptr, sizeof(struct xl_xact_stats_item*));
+   ptr += sizeof(struct xl_xact_stats_item*);
+   memcpy(&wrapper->data.v15.origin_lsn, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v15.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
 /* Format commit record for version 14 */
@@ -185,13 +313,63 @@ pgmoneta_wal_create_xl_xact_parsed_abort(void)
 void
 pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v14, rec, sizeof(struct xl_xact_parsed_abort_v14));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v14.xact_time, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v14.xinfo, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v14.dbId, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v14.tsId, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v14.nsubxacts, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v14.subxacts, ptr, sizeof(transaction_id*));
+   ptr += sizeof(transaction_id*);
+   memcpy(&wrapper->data.v14.nrels, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v14.xnodes, ptr, sizeof(struct rel_file_node*));
+   ptr += sizeof(struct rel_file_node*);
+   memcpy(&wrapper->data.v14.twophase_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v14.twophase_gid, ptr, GIDSIZE);
+   ptr += GIDSIZE;
+   memcpy(&wrapper->data.v14.origin_lsn, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v14.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
 void
 pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_xact_parsed_abort_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.xact_time, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v15.xinfo, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v15.db_id, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v15.ts_id, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v15.nsubxacts, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.subxacts, ptr, sizeof(transaction_id*));
+   ptr += sizeof(transaction_id*);
+   memcpy(&wrapper->data.v15.nrels, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.xnodes, ptr, sizeof(struct rel_file_node*));
+   ptr += sizeof(struct rel_file_node*);
+   memcpy(&wrapper->data.v15.nstats, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v15.stats, ptr, sizeof(struct xl_xact_stats_item*));
+   ptr += sizeof(struct xl_xact_stats_item*);
+   memcpy(&wrapper->data.v15.twophase_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.twophase_gid, ptr, GIDSIZE);
+   ptr += GIDSIZE;
+   memcpy(&wrapper->data.v15.origin_lsn, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v15.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
 char*

@@ -52,13 +52,37 @@ create_spg_xlog_vacuum_redirect(void)
 void
 pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct spg_xlog_vacuum_redirect_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.nToPlaceholder, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v15.firstPlaceholder, ptr, sizeof(offset_number));
+   ptr += sizeof(offset_number);
+   memcpy(&wrapper->data.v15.newestRedirectXid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   if (wrapper->data.v15.nToPlaceholder > 0)
+   {
+      memcpy(wrapper->data.v15.offsets, ptr,
+             wrapper->data.v15.nToPlaceholder * sizeof(offset_number));
+   }
 }
 
 void
 pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v16(struct spg_xlog_vacuum_redirect* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct spg_xlog_vacuum_redirect_v16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.n_to_placeholder, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.first_placeholder, ptr, sizeof(offset_number));
+   ptr += sizeof(offset_number);
+   memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.is_catalog_rel, ptr, sizeof(bool));
+   ptr += sizeof(bool);
+   if (wrapper->data.v16.n_to_placeholder > 0)
+   {
+      memcpy(wrapper->data.v16.offsets, ptr,
+             wrapper->data.v16.n_to_placeholder * sizeof(offset_number));
+   }
 }
 
 char*
