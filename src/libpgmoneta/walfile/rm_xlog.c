@@ -33,6 +33,7 @@
 #include <walfile/rm.h>
 #include <walfile/rm_xlog.h>
 #include <walfile/wal_reader.h>
+#include <walfile/transaction.h>
 
 const struct config_enum_entry wal_level_options[] = {
    {"minimal", WAL_LEVEL_MINIMAL, false},
@@ -159,31 +160,97 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
 void
 check_point_parse_v16(struct check_point* wrapper, const void* rec)
 {
-   struct check_point_v16* checkpoint = (struct check_point_v16*) rec;
-   wrapper->data.v16 = *checkpoint;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.redo, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v16.this_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v16.prev_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v16.full_page_writes, ptr, sizeof(bool));
+   ptr += sizeof(bool);
+   memcpy(&wrapper->data.v16.next_xid, ptr, sizeof(struct full_transaction_id));
+   ptr += sizeof(struct full_transaction_id);
+   memcpy(&wrapper->data.v16.next_oid, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v16.next_multi, ptr, sizeof(multi_xact_id));
+   ptr += sizeof(multi_xact_id);
+   memcpy(&wrapper->data.v16.next_multi_offset, ptr, sizeof(multi_xact_offset));
+   ptr += sizeof(multi_xact_offset);
+   memcpy(&wrapper->data.v16.oldest_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.oldest_xid_db, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v16.oldest_multi, ptr, sizeof(multi_xact_id));
+   ptr += sizeof(multi_xact_id);
+   memcpy(&wrapper->data.v16.oldest_multi_db, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v16.oldest_commit_ts_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.newest_commit_ts_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.oldest_active_xid, ptr, sizeof(transaction_id));
 }
 
 void
 check_point_parse_v17(struct check_point* wrapper, const void* rec)
 {
-   struct check_point_v17* checkpoint = (struct check_point_v17*) rec;
-   wrapper->data.v17 = *checkpoint;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v17.redo, ptr, sizeof(xlog_rec_ptr));
+   ptr += sizeof(xlog_rec_ptr);
+   memcpy(&wrapper->data.v17.this_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v17.prev_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v17.full_page_writes, ptr, sizeof(bool));
+   ptr += sizeof(bool);
+   memcpy(&wrapper->data.v17.wal_level, ptr, sizeof(int));
+   ptr += sizeof(int);
+   memcpy(&wrapper->data.v17.next_xid, ptr, sizeof(struct full_transaction_id));
+   ptr += sizeof(struct full_transaction_id);
+   memcpy(&wrapper->data.v17.next_oid, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v17.next_multi, ptr, sizeof(multi_xact_id));
+   ptr += sizeof(multi_xact_id);
+   memcpy(&wrapper->data.v17.next_multi_offset, ptr, sizeof(multi_xact_offset));
+   ptr += sizeof(multi_xact_offset);
+   memcpy(&wrapper->data.v17.oldest_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v17.oldest_xid_db, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v17.oldest_multi, ptr, sizeof(multi_xact_id));
+   ptr += sizeof(multi_xact_id);
+   memcpy(&wrapper->data.v17.oldest_multi_db, ptr, sizeof(oid));
+   ptr += sizeof(oid);
+   memcpy(&wrapper->data.v17.oldest_commit_ts_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v17.newest_commit_ts_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v17.oldest_active_xid, ptr, sizeof(transaction_id));
 }
 
 void
 xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, const void* rec)
 {
-   struct xl_end_of_recovery_v17 xlrec;
-   memcpy(&xlrec, rec, sizeof(struct xl_end_of_recovery_v17));
-   wrapper->data.v17 = xlrec;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v17.this_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v17.prev_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v17.end_time, ptr, sizeof(timestamp_tz));
+   ptr += sizeof(timestamp_tz);
+   memcpy(&wrapper->data.v17.wal_level, ptr, sizeof(int));
 }
 
 void
 xl_end_of_recovery_parse_v16(struct xl_end_of_recovery* wrapper, const void* rec)
 {
-   struct xl_end_of_recovery_v16 xlrec;
-   memcpy(&xlrec, rec, sizeof(struct xl_end_of_recovery_v16));
-   wrapper->data.v16 = xlrec;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.this_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v16.prev_timeline_id, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint32_t);
+   memcpy(&wrapper->data.v16.end_time, ptr, sizeof(timestamp_tz));
 }
 
 char*

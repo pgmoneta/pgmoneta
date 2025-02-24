@@ -28,6 +28,7 @@
 
 #include <walfile/rm_btree.h>
 #include <walfile/wal_reader.h>
+#include <walfile/transaction.h>
 #include <utils.h>
 
 #include <assert.h>
@@ -60,19 +61,36 @@ pgmoneta_wal_create_xl_btree_reuse_page(void)
 void
 pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v13, rec, sizeof(struct xl_btree_reuse_page_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v13.node, ptr, sizeof(struct rel_file_node));
+   ptr += sizeof(struct rel_file_node);
+   memcpy(&wrapper->data.v13.block, ptr, sizeof(block_number));
+   ptr += sizeof(block_number);
+   memcpy(&wrapper->data.v13.latest_removed_xid, ptr, sizeof(transaction_id));
 }
 
 void
 pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_btree_reuse_page_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.node, ptr, sizeof(struct rel_file_node));
+   ptr += sizeof(struct rel_file_node);
+   memcpy(&wrapper->data.v15.block, ptr, sizeof(block_number));
+   ptr += sizeof(block_number);
+   memcpy(&wrapper->data.v15.latest_removed_full_xid, ptr, sizeof(struct full_transaction_id));
 }
 
 void
 pgmoneta_wal_parse_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct xl_btree_reuse_page_v16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.locator, ptr, sizeof(struct rel_file_locator));
+   ptr += sizeof(struct rel_file_locator);
+   memcpy(&wrapper->data.v16.block, ptr, sizeof(block_number));
+   ptr += sizeof(block_number);
+   memcpy(&wrapper->data.v16.snapshot_conflict_horizon_id, ptr, sizeof(struct full_transaction_id));
+   ptr += sizeof(struct full_transaction_id);
+   memcpy(&wrapper->data.v16.is_catalog_rel, ptr, sizeof(bool));
 }
 
 char*
@@ -136,19 +154,35 @@ pgmoneta_wal_create_xl_btree_delete(void)
 void
 pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, const void* rec)
 {
-   wrapper->data.v13 = *(struct xl_btree_delete_v13*) rec;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v13.latest_removed_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v13.ndeleted, ptr, sizeof(uint32_t));
 }
 
 void
 pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, const void* rec)
 {
-   wrapper->data.v15 = *(struct xl_btree_delete_v15*) rec;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.latestRemovedXid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.ndeleted, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v15.nupdated, ptr, sizeof(uint16_t));
 }
 
 void
 pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, const void* rec)
 {
-   wrapper->data.v16 = *(struct xl_btree_delete_v16*) rec;
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr,
+          sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.ndeleted, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.nupdated, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.is_catalog_rel, ptr, sizeof(bool));
 }
 
 char*

@@ -52,13 +52,27 @@ pgmoneta_wal_create_xl_hash_vacuum_one_page(void)
 void
 pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_hash_vacuum_one_page_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.latestRemovedXid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.ntuples, ptr, sizeof(int));
 }
 
 void
 pgmoneta_wal_parse_xl_hash_vacuum_one_page_v16(struct xl_hash_vacuum_one_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct xl_hash_vacuum_one_page_v16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.snaphost_conflict_horizon, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.ntuples, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.is_catalog_rel, ptr, sizeof(bool));
+   ptr += sizeof(bool);
+   if (wrapper->data.v16.ntuples > 0)
+   {
+      memcpy(wrapper->data.v16.offsets, ptr,
+             wrapper->data.v16.ntuples * sizeof(offset_number));
+   }
 }
 
 char*

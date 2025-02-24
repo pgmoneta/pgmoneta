@@ -57,7 +57,10 @@ pgmoneta_wal_create_xl_heap_freeze_page(void)
 void
 pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct xl_heap_freeze_page_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.cutoff_xid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.ntuples, ptr, sizeof(uint16_t));
 }
 
 /**
@@ -66,7 +69,12 @@ pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, 
 void
 pgmoneta_wal_parse_xl_heap_freeze_page_v16(struct xl_heap_freeze_page* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct xl_heap_freeze_page_v16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.nplans, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.is_catalog_rel, ptr, sizeof(bool));
 }
 
 /**

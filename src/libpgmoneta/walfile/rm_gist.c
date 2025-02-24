@@ -28,6 +28,7 @@
 
 #include <walfile/rm.h>
 #include <walfile/rm_gist.h>
+#include <walfile/transaction.h>
 #include <utils.h>
 
 struct gist_xlog_delete*
@@ -53,14 +54,26 @@ create_gist_xlog_delete(void)
 void
 pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct gist_xlog_delete_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.latestRemovedXid, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v15.ntodelete, ptr, sizeof(uint32_t));
 }
 
 // Parsing function for version 16
 void
 pgmoneta_wal_parse_gist_xlog_delete_v16(struct gist_xlog_delete* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct gist_xlog_delete_v16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.snapshotConflictHorizon, ptr, sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.ntodelete, ptr, sizeof(uint32_t));
+   ptr += sizeof(uint8_t);
+   if (wrapper->data.v16.ntodelete > 0)
+   {
+      memcpy(wrapper->data.v16.offsets, ptr,
+             wrapper->data.v16.ntodelete * sizeof(offset_number));
+   }
 }
 
 // Formatting function for version 15
@@ -104,13 +117,23 @@ create_gist_xlog_page_reuse(void)
 void
 pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v15, rec, sizeof(struct gist_xlog_page_reuse_v15));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v15.node, ptr, sizeof(struct rel_file_node));
+   ptr += sizeof(struct rel_file_node);
+   memcpy(&wrapper->data.v15.block, ptr, sizeof(block_id));
+   ptr += sizeof(block_id);
+   memcpy(&wrapper->data.v15.latestRemovedFullXid, ptr, sizeof(struct full_transaction_id));
 }
 
 void
 pgmoneta_wal_parse_gist_xlog_page_reuse_v16(struct gist_xlog_page_reuse* wrapper, const void* rec)
 {
-   memcpy(&wrapper->data.v16, rec, sizeof(struct gist_xlog_page_reuse_v16));
+   char* ptr = (char*)rec;
+   memcpy(&wrapper->data.v16.locator, ptr, sizeof(struct rel_file_locator));
+   ptr += sizeof(struct rel_file_locator);
+   memcpy(&wrapper->data.v16.block, ptr, sizeof(block_id));
+   ptr += sizeof(block_id);
+   memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr, sizeof(struct full_transaction_id));
 }
 
 char*
