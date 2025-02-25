@@ -40,7 +40,7 @@ extern "C" {
 
 #define MAX_PREFIX_LEN 10
 
-typedef int (*art_callback)(void* data, const unsigned char* key, uint32_t key_len, struct value* value);
+typedef int (*art_callback)(void* data, const char* key, struct value* value);
 
 typedef void (*value_destroy_callback)(void* value);
 
@@ -61,7 +61,7 @@ struct art_iterator
    struct deque* que;           /**< The deque */
    struct art* tree;            /**< The ART */
    uint32_t count;              /**< The count of the iterator */
-   unsigned char* key;          /**< The key */
+   char* key;                   /**< The key */
    struct value* value;         /**< The value */
 };
 
@@ -77,55 +77,50 @@ pgmoneta_art_create(struct art** tree);
  * inserts a new value into the art tree,note that the key is copied while the value is sometimes not(depending on value type)
  * @param t The tree
  * @param key The key
- * @param key_len The length of the key
  * @param value The value data
  * @param type The value type
  * @return 0 if the item was successfully inserted, otherwise 1
  */
 int
-pgmoneta_art_insert(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, enum value_type type);
+pgmoneta_art_insert(struct art* t, char* key, uintptr_t value, enum value_type type);
 
 /**
  * inserts a new ValueRef value into the art tree with a custom to_string and destroy data callback config
  * @param t The tree
  * @param key The key
- * @param key_len The length of the key
  * @param value The value data
  * @param config The config
  * @return 0 if the item was successfully inserted, otherwise 1
  */
 int
-pgmoneta_art_insert_with_config(struct art* t, unsigned char* key, uint32_t key_len, uintptr_t value, struct value_config* config);
+pgmoneta_art_insert_with_config(struct art* t, char* key, uintptr_t value, struct value_config* config);
 
 /**
  * Check if a key exists in the ART tree
  * @param t The tree
  * @param key The key
- * @param key_len The length of the key
  * @return true if the key exists, false if otherwise
  */
 bool
-pgmoneta_art_contains_key(struct art* t, unsigned char* key, uint32_t key_len);
+pgmoneta_art_contains_key(struct art* t, char* key);
 
 /**
  * Searches for a value in the ART tree
  * @param t The tree
  * @param key The key
- * @param key_len The length of the key
  * @return NULL if the item was not found, otherwise the value pointer is returned
  */
 uintptr_t
-pgmoneta_art_search(struct art* t, unsigned char* key, uint32_t key_len);
+pgmoneta_art_search(struct art* t, char* key);
 
 /**
  * Deletes a value from the ART tree
  * @param t The tree
  * @param key The key
- * @param key_len The length of the key
  * @return 0 if success or value not found, 1 if otherwise
  */
 int
-pgmoneta_art_delete(struct art* t, unsigned char* key, uint32_t key_len);
+pgmoneta_art_delete(struct art* t, char* key);
 
 /**
  * Remove all the key value pairs in the ART tree

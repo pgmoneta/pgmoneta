@@ -185,7 +185,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          pgmoneta_deque_iterator_create(que, &iter);
          while (pgmoneta_deque_iterator_next(iter))
          {
-            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)iter->tag, strlen(iter->tag) + 1);
+            checksum = (char*)pgmoneta_art_search(tree, iter->tag);
             if (checksum != NULL)
             {
                if (!strcmp((char*)pgmoneta_value_data(iter->value), checksum))
@@ -197,7 +197,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
                {
                   // file is changed
                   manifest_changed = true;
-                  pgmoneta_art_insert(changed, (unsigned char*)iter->tag, strlen(iter->tag) + 1, pgmoneta_value_data(iter->value), ValueString);
+                  pgmoneta_art_insert(changed, iter->tag, pgmoneta_value_data(iter->value), ValueString);
                   // changed but not deleted, remove the entry
                   pgmoneta_deque_iterator_remove(iter);
                }
@@ -216,7 +216,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          uintptr_t val = 0;
          manifest_changed = true;
          val = pgmoneta_deque_poll(que, &tag);
-         pgmoneta_art_insert(deleted, (unsigned char*)tag, strlen(tag) + 1, val, ValueString);
+         pgmoneta_art_insert(deleted, tag, val, ValueString);
          free(tag);
          free((void*)val);
       }
@@ -253,7 +253,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          pgmoneta_deque_iterator_create(que, &iter);
          while (pgmoneta_deque_iterator_next(iter))
          {
-            checksum = (char*)pgmoneta_art_search(tree, (unsigned char*)iter->tag, strlen(iter->tag) + 1);
+            checksum = (char*)pgmoneta_art_search(tree, iter->tag);
             if (checksum != NULL)
             {
                // the entry is not new, remove it
@@ -272,7 +272,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
          uintptr_t val = 0;
          manifest_changed = true;
          val = pgmoneta_deque_poll(que, &tag);
-         pgmoneta_art_insert(added, (unsigned char*)tag, strlen(tag) + 1, val, ValueString);
+         pgmoneta_art_insert(added, tag, val, ValueString);
          free(tag);
          free((void*)val);
       }
@@ -284,7 +284,7 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
 
    if (manifest_changed)
    {
-      pgmoneta_art_insert(changed, (unsigned char*)"backup_manifest", strlen("backup_manifest") + 1, (uintptr_t)"backup manifest", ValueString);
+      pgmoneta_art_insert(changed, "backup_manifest", (uintptr_t)"backup manifest", ValueString);
    }
 
    *deleted_files = deleted;
@@ -348,7 +348,7 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
       return;
    }
    path = f[MANIFEST_PATH_INDEX];
-   pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, (uintptr_t)f[MANIFEST_CHECKSUM_INDEX], ValueString);
+   pgmoneta_art_insert(tree, path, (uintptr_t)f[MANIFEST_CHECKSUM_INDEX], ValueString);
    free(f);
    while (tree->size < MANIFEST_CHUNK_SIZE && pgmoneta_csv_next_row(reader, &cols, &entry))
    {
@@ -359,7 +359,7 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
          continue;
       }
       path = entry[MANIFEST_PATH_INDEX];
-      pgmoneta_art_insert(tree, (unsigned char*)path, strlen(path) + 1, (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
+      pgmoneta_art_insert(tree, path, (uintptr_t)entry[MANIFEST_CHECKSUM_INDEX], ValueString);
       free(entry);
    }
 }

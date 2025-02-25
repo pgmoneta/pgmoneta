@@ -178,7 +178,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
             {
                f = pgmoneta_append_char(f, '/');
             }
-            f = pgmoneta_append(f, (char*)deleted_iter->key);
+            f = pgmoneta_append(f, deleted_iter->key);
 
             if (pgmoneta_exists(f))
             {
@@ -201,14 +201,14 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
                from = pgmoneta_append_char(from, '/');
             }
             from = pgmoneta_append(from, "data/");
-            from = pgmoneta_append(from, (char*)changed_iter->key);
+            from = pgmoneta_append(from, changed_iter->key);
 
             to = pgmoneta_append(to, destination);
             if (!pgmoneta_ends_with(to, "/"))
             {
                to = pgmoneta_append_char(to, '/');
             }
-            to = pgmoneta_append(to, (char*)changed_iter->key);
+            to = pgmoneta_append(to, changed_iter->key);
 
             pgmoneta_log_trace("hot_standby changed: %s -> %s", from, to);
 
@@ -229,14 +229,14 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
                from = pgmoneta_append_char(from, '/');
             }
             from = pgmoneta_append(from, "data/");
-            from = pgmoneta_append(from, (char*)added_iter->key);
+            from = pgmoneta_append(from, added_iter->key);
 
             to = pgmoneta_append(to, destination);
             if (!pgmoneta_ends_with(to, "/"))
             {
                to = pgmoneta_append_char(to, '/');
             }
-            to = pgmoneta_append(to, (char*)added_iter->key);
+            to = pgmoneta_append(to, added_iter->key);
 
             pgmoneta_log_trace("hot_standby new: %s -> %s", from, to);
 

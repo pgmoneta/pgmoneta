@@ -89,8 +89,8 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
             from_file = pgmoneta_remove_prefix(from_entry, base_from);
             from_file_trimmed = trim_suffix(from_file);
             // file in newer dir is not added nor changed, nor is an incremental file
-            if (!pgmoneta_art_contains_key(added, (unsigned char*)from_file_trimmed, strlen(from_file_trimmed) + 1) &&
-                !pgmoneta_art_contains_key(changed, (unsigned char*)from_file_trimmed, strlen(from_file_trimmed) + 1) &&
+            if (!pgmoneta_art_contains_key(added, from_file_trimmed) &&
+                !pgmoneta_art_contains_key(changed, from_file_trimmed) &&
                 !pgmoneta_is_incremental_path(from_file_trimmed))
             {
                to_entry = pgmoneta_append(to_entry, base_to);

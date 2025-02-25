@@ -362,7 +362,7 @@ pgmoneta_json_put(struct json* item, char* key, uintptr_t val, enum value_type t
    {
       goto error;
    }
-   return pgmoneta_art_insert((struct art*)item->elements, (unsigned char*)key, strlen(key) + 1, val, type);
+   return pgmoneta_art_insert((struct art*)item->elements, key, val, type);
 error:
    return 1;
 }
@@ -382,7 +382,7 @@ pgmoneta_json_remove(struct json* item, char* key)
       // no need to delete from an empty map
       return 0;
    }
-   if (pgmoneta_art_delete(tree, (unsigned char*)key, strlen(key) + 1))
+   if (pgmoneta_art_delete(tree, key))
    {
       goto error;
    }
@@ -498,7 +498,7 @@ pgmoneta_json_get(struct json* item, char* tag)
    {
       return 0;
    }
-   return pgmoneta_art_search(item->elements, (unsigned char*)tag, strlen(tag) + 1);
+   return pgmoneta_art_search(item->elements, tag);
 }
 
 bool
@@ -508,7 +508,7 @@ pgmoneta_json_contains_key(struct json* item, char* key)
    {
       return false;
    }
-   return pgmoneta_art_contains_key(item->elements, (unsigned char*)key, strlen(key) + 1);
+   return pgmoneta_art_contains_key(item->elements, key);
 }
 
 int
@@ -574,7 +574,7 @@ pgmoneta_json_iterator_next(struct json_iterator* iter)
       if (has_next)
       {
          iter->value = ((struct art_iterator*)iter->iter)->value;
-         iter->key = (char*)((struct art_iterator*)iter->iter)->key;
+         iter->key = ((struct art_iterator*)iter->iter)->key;
       }
    }
    return has_next;
