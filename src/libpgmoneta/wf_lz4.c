@@ -275,7 +275,7 @@ lz4_execute_uncompress(struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    return 0;
 }

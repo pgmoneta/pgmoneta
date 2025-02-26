@@ -131,8 +131,7 @@ gzip_execute_compress(struct deque* nodes)
    server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("GZip (compress): %s/%s", config->servers[server].name,
-                      identifier);
+   pgmoneta_log_debug("GZip (compress): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
@@ -194,7 +193,7 @@ gzip_execute_compress(struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_GZIP_ELAPSED, compression_gzip_elapsed_time);
 
@@ -218,7 +217,7 @@ static int
 gzip_execute_uncompress(struct deque* nodes)
 {
    int server = -1;
-   char* identifier = NULL;
+   char* label = NULL;
    char* base = NULL;
    time_t decompress_time;
    int total_seconds;
@@ -242,8 +241,7 @@ gzip_execute_uncompress(struct deque* nodes)
    server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("GZip (uncompress): %s/%s", config->servers[server].name,
-                      identifier);
+   pgmoneta_log_debug("GZip (uncompress): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
@@ -280,7 +278,7 @@ gzip_execute_uncompress(struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    return 0;
 }

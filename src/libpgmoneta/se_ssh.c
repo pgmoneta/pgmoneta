@@ -328,7 +328,7 @@ ssh_storage_backup_execute(struct deque* nodes)
 
    remote_root = get_remote_server_backup_identifier(server, label);
 
-   local_root = pgmoneta_get_server_backup_identifier(server, identifier);
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
 
    if (sftp_make_directory(local_root, remote_root) == 1)
    {

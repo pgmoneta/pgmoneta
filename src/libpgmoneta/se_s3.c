@@ -131,8 +131,8 @@ s3_storage_execute(struct deque* nodes)
    pgmoneta_log_debug("S3 storage engine (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   local_root = pgmoneta_get_server_backup_identifier(server, identifier);
-   s3_root = s3_get_basepath(server, identifier);
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+   s3_root = s3_get_basepath(server, label);
 
    if (s3_upload_files(local_root, s3_root, ""))
    {
