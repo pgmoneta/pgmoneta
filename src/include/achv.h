@@ -60,13 +60,13 @@ pgmoneta_extract_tar_file(char* file_path, char* destination);
 
 /**
  * Create a tar archive of the given directory
- * @param src_path The source directory
- * @param dst_path The destination tar file path
- * @param save_path The path within the tar file
+ * @param src The source directory
+ * @param dst The destination tar file path
+ * @param destination The destination name
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tar_directory(char* src_path, char* dst_path, char* save_path);
+pgmoneta_tar_directory(char* src, char* dst, char* destination);
 
 #ifdef __cplusplus
 }

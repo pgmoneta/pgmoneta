@@ -66,6 +66,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    char* root = NULL;
    char* d = NULL;
    unsigned long size;
+   bool backup_incremental = false;
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct workflow* workflow = NULL;
@@ -76,7 +77,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct json* req = NULL;
    struct json* response = NULL;
    struct configuration* config;
-   bool backup_incremental = false;
 
    pgmoneta_start_logging();
 
@@ -121,16 +121,38 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    server_backup = pgmoneta_get_server_backup(server);
    root = pgmoneta_get_server_backup_identifier(server, date);
 
-   pgmoneta_deque_create(false, &nodes);
+   if (pgmoneta_deque_create(false, &nodes))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_IDENTIFIER, (uintptr_t)date, ValueString))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_LABEL, (uintptr_t)date, ValueString))
+   {
+      goto error;
+   }
 
    if (incremental != NULL)
    {
-      backup_incremental = true;
       if (config->servers[server].version < 17)
       {
+         backup_incremental = false;
          pgmoneta_log_error("Incremental backup not supported for server %s at version %d",
                             config->servers[server].name, config->servers[server].version);
-         backup_incremental = false;
+         goto error;
+      }
+      else
+      {
+         backup_incremental = true;
       }
    }
 
@@ -150,30 +172,17 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
       if (!strcmp(incremental, "oldest"))
       {
-         for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
-         {
-            if (backups[i] != NULL)
-            {
-               backup_index = i;
-            }
-         }
+         backup_index = 0;
       }
-      else if (!strcmp(incremental, "latest") ||
-               !strcmp(incremental, "newest"))
+      else if (!strcmp(incremental, "latest") || !strcmp(incremental, "newest"))
       {
-         for (int i = number_of_backups - 1; backup_index == -1 && i >= 0; i--)
-         {
-            if (backups[i] != NULL)
-            {
-               backup_index = i;
-            }
-         }
+         backup_index = number_of_backups - 1;
       }
       else
       {
          for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
          {
-            if (backups[i] != NULL && !strcmp(backups[i]->label, incremental))
+            if (!strcmp(backups[i]->label, incremental))
             {
                backup_index = i;
             }
@@ -199,11 +208,14 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
          pgmoneta_log_error("Backup: Already an incremental backup for %s/%s", config->servers[server].name, incremental);
          goto error;
       }
+   }
 
+   if (backup_incremental)
+   {
       incremental_base = pgmoneta_get_server_backup_identifier(server, backups[backup_index]->label);
 
-      pgmoneta_deque_add(nodes, "IncrementalBase", (uintptr_t) incremental_base, ValueString);
-      pgmoneta_deque_add(nodes, "IncrementalLabel", (uintptr_t) backups[backup_index]->label, ValueString);
+      pgmoneta_deque_add(nodes, NODE_INCREMENTAL_BASE, (uintptr_t) incremental_base, ValueString);
+      pgmoneta_deque_add(nodes, NODE_INCREMENTAL_LABEL, (uintptr_t)backups[backup_index]->label, ValueString);
 
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_INCREMENTAL_BACKUP, server, NULL);
    }
@@ -219,7 +231,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, date, nodes))
+      if (current->setup(nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_SETUP, compression, encryption, payload);
 
@@ -231,7 +243,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, date, nodes))
+      if (current->execute(nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_EXECUTE, compression, encryption, payload);
 
@@ -243,7 +255,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, date, nodes))
+      if (current->teardown(nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_TEARDOWN, compression, encryption, payload);
 
@@ -602,6 +614,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct deque* nodes = NULL;
+   struct backup* backup = NULL;
    struct configuration* config;
 
    pgmoneta_start_logging();
@@ -618,12 +631,17 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, srv, NULL);
+   if (pgmoneta_workflow_nodes(srv, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, srv, backup);
 
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(srv, identifier, nodes))
+      if (current->setup(nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_SETUP, compression, encryption, payload);
 
@@ -635,7 +653,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(srv, identifier, nodes))
+      if (current->execute(nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_EXECUTE, compression, encryption, payload);
 
@@ -647,7 +665,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(srv, identifier, nodes))
+      if (current->teardown(nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_TEARDOWN, compression, encryption, payload);
 

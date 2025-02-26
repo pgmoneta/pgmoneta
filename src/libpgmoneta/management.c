@@ -912,26 +912,27 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
       goto error;
    }
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   if (server != NULL && strlen(server) > 0)
    {
-      if (!strcmp(server, config->servers[i].name))
+      for (int i = 0; i < config->number_of_servers; i++)
       {
-         srv = i;
+         if (!strcmp(server, config->servers[i].name))
+         {
+            srv = i;
+         }
       }
    }
 
-   if (server != NULL && strlen(server) > 0)
+   if (pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE) != 0)
    {
-      if (pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE) != 0)
+      response = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE);
+   }
+
+   if (response == NULL)
+   {
+      if (pgmoneta_management_create_response(payload, srv, &response))
       {
-         response = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_RESPONSE);
-      }
-      else
-      {
-         if (pgmoneta_management_create_response(payload, srv, &response))
-         {
-            goto error;
-         }
+         goto error;
       }
    }
 

@@ -32,13 +32,14 @@
 #include <utils.h>
 #include <workflow.h>
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int manifest_setup(int, char*, struct deque*);
-static int manifest_execute_build(int, char*, struct deque*);
-static int manifest_teardown(int, char*, struct deque*);
+static int manifest_setup(struct deque*);
+static int manifest_execute(struct deque*);
+static int manifest_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_manifest(void)
@@ -53,7 +54,7 @@ pgmoneta_create_manifest(void)
    }
 
    wf->setup = &manifest_setup;
-   wf->execute = &manifest_execute_build;
+   wf->execute = &manifest_execute;
    wf->teardown = &manifest_teardown;
    wf->next = NULL;
 
@@ -61,21 +62,35 @@ pgmoneta_create_manifest(void)
 }
 
 static int
-manifest_setup(int server, char* identifier, struct deque* nodes)
+manifest_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Manifest (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Manifest (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-manifest_execute_build(int server, char* identifier, struct deque* nodes)
+manifest_execute(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct timespec start_t;
    struct timespec end_t;
    double manifest_elapsed_time;
@@ -96,9 +111,19 @@ manifest_execute_build(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
 
-   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, label);
+
+   if (pgmoneta_workflow_nodes(server, label, nodes, &backup))
    {
       goto error;
    }
@@ -175,13 +200,25 @@ error:
 }
 
 static int
-manifest_teardown(int server, char* identifier, struct deque* nodes)
+manifest_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Manifest (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Manifest (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

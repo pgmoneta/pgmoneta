@@ -80,7 +80,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
    files = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_FILES);
 
-   if (pgmoneta_deque_create(true, &nodes))
+   if (pgmoneta_deque_create(false, &nodes))
    {
       goto error;
    }
@@ -90,7 +90,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
@@ -110,7 +110,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, identifier, nodes))
+      if (current->setup(nodes))
       {
          goto error;
       }
@@ -120,7 +120,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, identifier, nodes))
+      if (current->execute(nodes))
       {
          goto error;
       }
@@ -130,7 +130,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, identifier, nodes))
+      if (current->teardown(nodes))
       {
          goto error;
       }
@@ -207,7 +207,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)filesj, ValueJSON);
 
-   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_DESTINATION));
+   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE));
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
@@ -244,7 +244,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
 error:
 
-   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_DESTINATION));
+   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE));
 
    pgmoneta_deque_iterator_destroy(fiter);
    pgmoneta_deque_iterator_destroy(aiter);

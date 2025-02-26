@@ -39,12 +39,13 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int link_setup(int, char*, struct deque*);
-static int link_execute(int, char*, struct deque*);
-static int link_teardown(int, char*, struct deque*);
+static int link_setup(struct deque*);
+static int link_execute(struct deque*);
+static int link_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_link(void)
@@ -67,21 +68,35 @@ pgmoneta_create_link(void)
 }
 
 static int
-link_setup(int server, char* identifier, struct deque* nodes)
+link_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Link (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Link (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-link_execute(int server, char* identifier, struct deque* nodes)
+link_execute(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct timespec start_t;
    struct timespec end_t;
    double linking_elapsed_time;
@@ -109,7 +124,17 @@ link_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Link (execute): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Link (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
@@ -140,7 +165,7 @@ link_execute(int server, char* identifier, struct deque* nodes)
             pgmoneta_workers_initialize(number_of_workers, &workers);
          }
 
-         from = pgmoneta_get_server_backup_identifier(server, identifier);
+         from = pgmoneta_get_server_backup_identifier(server, label);
 
          to = pgmoneta_get_server_backup_identifier(server, backups[next_newest]->label);
 
@@ -176,7 +201,7 @@ link_execute(int server, char* identifier, struct deque* nodes)
          memset(&elapsed[0], 0, sizeof(elapsed));
          sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-         pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+         pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
          backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
          pgmoneta_update_info_double(backup_base, INFO_LINKING_ELAPSED, linking_elapsed_time);
@@ -230,13 +255,25 @@ error:
 }
 
 static int
-link_teardown(int server, char* identifier, struct deque* nodes)
+link_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Link (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Link (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

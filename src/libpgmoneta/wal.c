@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "value.h"
 #include <pgmoneta.h>
 #include <logging.h>
 #include <management.h>
@@ -160,7 +161,15 @@ pgmoneta_wal(int srv, char** argv)
    d = pgmoneta_get_server_wal(srv);
    pgmoneta_mkdir(d);
 
-   pgmoneta_deque_create(false, &nodes);
+   if (pgmoneta_deque_create(false, &nodes))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_SERVER, (uintptr_t)srv, ValueInt32))
+   {
+      goto error;
+   }
 
    if (config->storage_engine & STORAGE_ENGINE_SSH)
    {
@@ -171,7 +180,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->setup(srv, NULL, nodes))
+      if (current->setup(nodes))
       {
          goto error;
       }
@@ -181,7 +190,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->execute(srv, NULL, nodes))
+      if (current->execute(nodes))
       {
          goto error;
       }
@@ -582,7 +591,7 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      current->teardown(srv, NULL, nodes);
+      current->teardown(nodes);
 
       current = current->next;
    }
@@ -642,7 +651,7 @@ error:
    current = head;
    while (current != NULL)
    {
-      current->teardown(srv, NULL, nodes);
+      current->teardown(nodes);
 
       current = current->next;
    }

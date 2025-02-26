@@ -35,12 +35,13 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdlib.h>
 
-static int lz4_setup(int, char*, struct deque*);
-static int lz4_execute_compress(int, char*, struct deque*);
-static int lz4_execute_uncompress(int, char*, struct deque*);
-static int lz4_teardown(int, char*, struct deque*);
+static int lz4_setup(struct deque*);
+static int lz4_execute_compress(struct deque*);
+static int lz4_execute_uncompress(struct deque*);
+static int lz4_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_lz4(bool compress)
@@ -72,21 +73,35 @@ pgmoneta_create_lz4(bool compress)
 }
 
 static int
-lz4_setup(int server, char* identifier, struct deque* nodes)
+lz4_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("LZ4 (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("LZ4 (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-lz4_execute_compress(int server, char* identifier, struct deque* nodes)
+lz4_execute_compress(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct timespec start_t;
    struct timespec end_t;
    double compression_lz4_elapsed_time;
@@ -104,12 +119,22 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("LZ4 (compress): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("LZ4 (compress): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
+   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_FILE);
 
    if (tarfile == NULL)
    {
@@ -165,7 +190,7 @@ lz4_execute_compress(int server, char* identifier, struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_LZ4_ELAPSED, compression_lz4_elapsed_time);
 
@@ -186,8 +211,10 @@ error:
 }
 
 static int
-lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
+lz4_execute_uncompress(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    char* base = NULL;
    time_t decompress_time;
    int total_seconds;
@@ -201,10 +228,20 @@ lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("LZ4 (uncompress): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("LZ4 (uncompress): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
+   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
    if (base == NULL)
    {
       base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
@@ -244,13 +281,25 @@ lz4_execute_uncompress(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-lz4_teardown(int server, char* identifier, struct deque* nodes)
+lz4_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("LZ4 (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("LZ4 (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

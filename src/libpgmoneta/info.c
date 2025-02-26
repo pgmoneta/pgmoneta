@@ -37,8 +37,10 @@
 #include <utils.h>
 
 /* system */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #define INFO_BUFFER_SIZE 8192
@@ -57,6 +59,12 @@ pgmoneta_create_info(char* directory, char* label, int status)
    s = pgmoneta_append(s, "/backup.info");
 
    sfile = fopen(s, "w");
+   if (sfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      errno = 0;
+      goto error;
+   }
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
@@ -102,6 +110,12 @@ pgmoneta_create_info(char* directory, char* label, int status)
    }
 
    free(s);
+
+   return;
+
+error:
+
+   free(s);
 }
 
 void
@@ -122,7 +136,19 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
    d = pgmoneta_append(d, "/backup.info.tmp");
 
    sfile = fopen(s, "r");
+   if (sfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      errno = 0;
+      goto error;
+   }
    dfile = fopen(d, "w");
+   if (dfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", d, strerror(errno));
+      errno = 0;
+      goto error;
+   }
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
@@ -180,6 +206,13 @@ pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long val
 
    free(s);
    free(d);
+
+   return;
+
+error:
+
+   free(s);
+   free(d);
 }
 
 void
@@ -200,7 +233,19 @@ pgmoneta_update_info_double(char* directory, char* key, double value)
    d = pgmoneta_append(d, "/backup.info.tmp");
 
    sfile = fopen(s, "r");
+   if (sfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      errno = 0;
+      goto error;
+   }
    dfile = fopen(d, "w");
+   if (dfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", d, strerror(errno));
+      errno = 0;
+      goto error;
+   }
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
@@ -258,6 +303,13 @@ pgmoneta_update_info_double(char* directory, char* key, double value)
 
    free(s);
    free(d);
+
+   return;
+
+error:
+
+   free(s);
+   free(d);
 }
 
 void
@@ -278,7 +330,19 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
    d = pgmoneta_append(d, "/backup.info.tmp");
 
    sfile = fopen(s, "r");
+   if (sfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      errno = 0;
+      goto error;
+   }
    dfile = fopen(d, "w");
+   if (dfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", d, strerror(errno));
+      errno = 0;
+      goto error;
+   }
 
    while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
    {
@@ -333,6 +397,13 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
 
    pgmoneta_move_file(d, s);
    pgmoneta_permission(s, 6, 0, 0);
+
+   free(s);
+   free(d);
+
+   return;
+
+error:
 
    free(s);
    free(d);
@@ -846,11 +917,17 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
    char buffer[INFO_BUFFER_SIZE];
    FILE* file = NULL;
    int tbl_idx = 0;
-   struct backup* bck;
+   struct backup* bck = NULL;
 
    *backup = NULL;
 
    file = fopen(fn, "r");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", fn, strerror(errno));
+      errno = 0;
+      goto error;
+   }
 
    bck = (struct backup*)malloc(sizeof(struct backup));
 

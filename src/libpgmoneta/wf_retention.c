@@ -37,14 +37,15 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 
-static int retention_setup(int, char*, struct deque*);
-static int retention_execute(int, char*, struct deque*);
-static int retention_teardown(int, char*, struct deque*);
+static int retention_setup(struct deque*);
+static int retention_execute(struct deque*);
+static int retention_teardown(struct deque*);
 static void mark_retention(int server, int retention_days, int retention_weeks, int retention_months,
                            int retention_years, int number_of_backups, struct backup** backups, bool** retention_flags);
 
@@ -69,11 +70,16 @@ pgmoneta_create_retention(void)
 }
 
 static int
-retention_setup(int server, char* identifier, struct deque* nodes)
+retention_setup(struct deque* nodes)
 {
    struct configuration* config;
 
    config = (struct configuration*)shmem;
+
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+#endif
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
@@ -86,7 +92,7 @@ retention_setup(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-retention_execute(int server, char* identifier, struct deque* nodes)
+retention_execute(struct deque* nodes)
 {
    char* d;
    int number_of_backups = 0;
@@ -137,13 +143,13 @@ retention_execute(int server, char* identifier, struct deque* nodes)
 
       if (number_of_backups > 0)
       {
-         mark_retention(server, retention_days, retention_weeks, retention_months,
+         mark_retention(i, retention_days, retention_weeks, retention_months,
                         retention_years, number_of_backups, backups, &retention_keep);
          for (int j = 0; j < number_of_backups; j++)
          {
             if (!retention_keep[j])
             {
-               pgmoneta_get_backup_child(server, backups[j], &child);
+               pgmoneta_get_backup_child(i, backups[j], &child);
                // a backup can only be deleted if it has no child
                if (!backups[j]->keep && child == NULL)
                {
@@ -214,7 +220,7 @@ retention_execute(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-retention_teardown(int server, char* identifier, struct deque* nodes)
+retention_teardown(struct deque* nodes)
 {
    struct configuration* config;
 

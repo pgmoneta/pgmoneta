@@ -35,13 +35,14 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
-static int zstd_setup(int, char*, struct deque*);
-static int zstd_execute_compress(int, char*, struct deque*);
-static int zstd_execute_uncompress(int, char*, struct deque*);
-static int zstd_teardown(int, char*, struct deque*);
+static int zstd_setup(struct deque*);
+static int zstd_execute_compress(struct deque*);
+static int zstd_execute_uncompress(struct deque*);
+static int zstd_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_zstd(bool compress)
@@ -73,21 +74,35 @@ pgmoneta_create_zstd(bool compress)
 }
 
 static int
-zstd_setup(int server, char* identifier, struct deque* nodes)
+zstd_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("ZSTD (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("ZSTD (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-zstd_execute_compress(int server, char* identifier, struct deque* nodes)
+zstd_execute_compress(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct timespec start_t;
    struct timespec end_t;
    double compression_zstd_elapsed_time;
@@ -105,12 +120,23 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("ZSTD (compress): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("ZSTD (compress): %s/%s", config->servers[server].name, label);
+
    pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
+   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_FILE);
 
    if (tarfile == NULL)
    {
@@ -163,7 +189,7 @@ zstd_execute_compress(int server, char* identifier, struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
    pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_ZSTD_ELAPSED, compression_zstd_elapsed_time);
 
    free(d);
@@ -183,8 +209,10 @@ error:
 }
 
 static int
-zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
+zstd_execute_uncompress(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    char* base = NULL;
    time_t decompress_time;
    int total_seconds;
@@ -198,10 +226,21 @@ zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("ZSTD (decompress): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("ZSTD (decompress): %s/%s", config->servers[server].name, label);
+
    pgmoneta_deque_list(nodes);
 
-   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
+   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
    if (base == NULL)
    {
       base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
@@ -239,7 +278,7 @@ zstd_execute_uncompress(int server, char* identifier, struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    return 0;
 
@@ -254,13 +293,26 @@ error:
 }
 
 static int
-zstd_teardown(int server, char* identifier, struct deque* nodes)
+zstd_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("ZSTD (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("ZSTD (teardown): %s/%s", config->servers[server].name, label);
+
    pgmoneta_deque_list(nodes);
 
    return 0;

@@ -36,13 +36,14 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int bzip2_setup(int, char*, struct deque*);
-static int bzip2_execute_compress(int, char*, struct deque*);
-static int bzip2_execute_uncompress(int, char*, struct deque*);
-static int bzip2_teardown(int, char*, struct deque*);
+static int bzip2_setup(struct deque*);
+static int bzip2_execute_compress(struct deque*);
+static int bzip2_execute_uncompress(struct deque*);
+static int bzip2_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_bzip2(bool compress)
@@ -74,21 +75,35 @@ pgmoneta_create_bzip2(bool compress)
 }
 
 static int
-bzip2_setup(int server, char* identifier, struct deque* nodes)
+bzip2_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("BZip2 (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("BZip2 (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
+bzip2_execute_compress(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    int ret = 0;
    struct timespec start_t;
    struct timespec end_t;
@@ -107,12 +122,22 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("BZip2 (compress): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("BZip2 (compress): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARFILE);
+   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_FILE);
 
    if (tarfile == NULL)
    {
@@ -178,8 +203,10 @@ bzip2_execute_compress(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
+bzip2_execute_uncompress(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    int ret = 0;
    char* base = NULL;
    struct timespec start_t;
@@ -195,10 +222,20 @@ bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("BZip2 (uncompress): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("BZip2 (uncompress): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   base = (char*)pgmoneta_deque_get(nodes, NODE_DESTINATION);
+   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
    if (base == NULL)
    {
       base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
@@ -244,13 +281,25 @@ bzip2_execute_uncompress(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-bzip2_teardown(int server, char* identifier, struct deque* nodes)
+bzip2_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("BZip2 (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("BZip2 (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

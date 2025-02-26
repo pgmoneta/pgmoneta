@@ -33,8 +33,10 @@
 extern "C" {
 #endif
 
+#include <info.h>
 #include <json.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 
 /**
@@ -44,6 +46,14 @@ extern "C" {
  */
 int
 pgmoneta_get_restore_last_files_names(char*** output);
+
+/**
+ * Is the file part of the restore last chain
+ * @param file_name The file name
+ * @return True if part of the chain, otherwise false
+ */
+bool
+pgmoneta_is_restore_last_name(char* file_name);
 
 /**
  * Create a restore
@@ -59,16 +69,11 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
 /**
  * Restore to a directory
- * @param server The server
- * @param identifier The backup identifier
- * @param position The position
- * @param directory The base directory
- * @param output The output directory
- * @param label The label
+ * @param nodes The nodes
  * @return The result
  */
 int
-pgmoneta_restore_backup(int server, char* identifier, char* position, char* directory, char** output, char** label);
+pgmoneta_restore_backup(struct deque* nodes);
 
 /**
  * Combine the provided backups
@@ -83,7 +88,8 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
  * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_combine_backups(int server, char* base, char* input_dir, char* output_dir, struct deque* prior_backup_dirs, struct backup* bck, struct json* manifest);
+pgmoneta_combine_backups(int server, char* base, char* input_dir, char* output_dir, struct deque* prior_backup_dirs,
+                         struct backup* bck, struct json* manifest);
 
 #ifdef __cplusplus
 }

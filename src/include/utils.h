@@ -30,6 +30,7 @@
 #define PGMONETA_UTILS_H
 
 #include <stdbool.h>
+#include <openssl/asn1.h>
 #include <sys/types.h>
 #ifdef __cplusplus
 extern "C" {
@@ -735,6 +736,13 @@ pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mapping, 
  */
 int
 pgmoneta_copy_directory(char* from, char* to, char** restore_last_paths, struct workers* workers);
+
+/**
+ * List a directory
+ * @param directory The directory
+ */
+void
+pgmoneta_list_directory(char* directory);
 
 /**
  * Copy a file

@@ -50,53 +50,61 @@ pgmoneta_retention(char** argv)
    if (atomic_load(&config->active_restores) == 0 &&
        atomic_load(&config->active_archives) == 0)
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, 0, NULL);
-
-      pgmoneta_deque_create(false, &nodes);
-
-      current = workflow;
-      while (current != NULL)
+      for (int i = 0; i < config->number_of_servers; i++)
       {
-         if (current->setup(0, NULL, nodes))
+         workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, i, NULL);
+
+         if (pgmoneta_deque_create(false, &nodes))
          {
             goto error;
          }
-         current = current->next;
-      }
 
-      current = workflow;
-      while (current != NULL)
-      {
-         if (current->execute(0, NULL, nodes))
+         current = workflow;
+         while (current != NULL)
          {
-            goto error;
+            if (current->setup(nodes))
+            {
+               goto error;
+            }
+            current = current->next;
          }
-         current = current->next;
-      }
 
-      current = workflow;
-      while (current != NULL)
-      {
-         if (current->teardown(0, NULL, nodes))
+         current = workflow;
+         while (current != NULL)
          {
-            goto error;
+            if (current->execute(nodes))
+            {
+               goto error;
+            }
+            current = current->next;
          }
-         current = current->next;
+
+         current = workflow;
+         while (current != NULL)
+         {
+            if (current->teardown(nodes))
+            {
+               goto error;
+            }
+            current = current->next;
+         }
+
+         pgmoneta_deque_destroy(nodes);
+         pgmoneta_workflow_destroy(workflow);
+
+         nodes = NULL;
+         workflow = NULL;
       }
    }
-
-   pgmoneta_workflow_destroy(workflow);
-
-   pgmoneta_deque_destroy(nodes);
 
    pgmoneta_stop_logging();
 
    exit(0);
 
 error:
-   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_deque_destroy(nodes);
+   pgmoneta_workflow_destroy(workflow);
 
    pgmoneta_stop_logging();
 

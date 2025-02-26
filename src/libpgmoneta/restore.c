@@ -80,7 +80,7 @@ struct rfile
    uint32_t truncation_block_length;
 };
 
-static char* restore_last_files_names[] = {"/global/pg_control"};
+static char* restore_last_files_names[] = {"/global/pg_control", "/postgresql.conf", "/pg_hba.conf"};
 
 static void clear_manifest_incremental_entries(struct json* manifest);
 static int get_file_manifest(char* path, char* manifest_path, int algorithm, struct json** file);
@@ -195,6 +195,22 @@ pgmoneta_get_restore_last_files_names(char*** output)
    return 0;
 }
 
+bool
+pgmoneta_is_restore_last_name(char* file_name)
+{
+   int number_of_elements = sizeof(restore_last_files_names) / sizeof(restore_last_files_names[0]);
+
+   for (int i = 0; i < number_of_elements; i++)
+   {
+      if (strstr(restore_last_files_names[i], file_name) != NULL)
+      {
+         return true;
+      }
+   }
+
+   return false;
+}
+
 void
 pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -207,9 +223,8 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct timespec end_t;
    double total_seconds = 0;
    char* output = NULL;
-   char* label = NULL;
-   char* server_backup = NULL;
    struct backup* backup = NULL;
+   struct deque* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
    struct configuration* config;
@@ -228,7 +243,27 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   ret = pgmoneta_restore_backup(server, identifier, position, directory, &output, &label);
+   if (pgmoneta_deque_create(false, &nodes))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   {
+      goto error;
+   }
+
+   ret = pgmoneta_restore_backup(nodes);
    if (ret == RESTORE_OK)
    {
       if (pgmoneta_management_create_response(payload, server, &response))
@@ -238,14 +273,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      server_backup = pgmoneta_get_server_backup(server);
-
-      if (pgmoneta_get_backup(server_backup, label, &backup))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_ERROR, compression, encryption, payload);
-
-         goto error;
-      }
+      backup = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
@@ -295,7 +323,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    free(backup);
    free(elapsed);
-   free(server_backup);
    free(output);
 
    exit(0);
@@ -313,23 +340,22 @@ error:
 
    free(backup);
    free(elapsed);
-   free(server_backup);
    free(output);
 
    exit(1);
 }
 
 int
-pgmoneta_restore_backup(int server, char* identifier, char* position, char* directory, char** output, char** label)
+pgmoneta_restore_backup(struct deque* nodes)
 {
    int ret = RESTORE_OK;
+   int server = -1;
    uint64_t free_space = 0;
    uint64_t required_space = 0;
-   char* o = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct deque* nodes = NULL;
    struct backup* backup = NULL;
+   char* directory = NULL;
    char directory_incremental[MAX_PATH];
    char directory_combine[MAX_PATH];
    char* manifest_path = NULL;
@@ -340,24 +366,20 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
 
    memset(directory_incremental, 0, MAX_PATH);
    memset(directory_combine, 0, MAX_PATH);
-   directory = pgmoneta_remove_suffix(directory, "/");
 
-   *output = NULL;
-   *label = NULL;
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_BACKUP));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_ROOT));
+   assert(pgmoneta_deque_exists(nodes, NODE_POSITION));
+#endif
 
-   pgmoneta_deque_create(false, &nodes);
-
-   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
-   {
-      ret = RESTORE_MISSING_LABEL;
-      goto error;
-   }
-
-   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
-   {
-      ret = RESTORE_MISSING_LABEL;
-      goto error;
-   }
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   directory = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_ROOT);
+   backup = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
 
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
@@ -388,35 +410,32 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
-   {
-      goto error;
-   }
-
    if (backup->type == TYPE_FULL)
    {
-      if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory, ValueString))
-      {
-         goto error;
-      }
+      pgmoneta_log_trace("Full backup: %s", backup->label);
    }
    else if (backup->type == TYPE_INCREMENTAL)
    {
-      snprintf(directory_incremental, MAX_PATH, "%s/tmp_%s_incremental_%s", directory, config->servers[server].name, &backup->label[0]);
+      pgmoneta_log_trace("Incremental backup: %s", backup->label);
+
+      snprintf(directory_incremental, MAX_PATH, "%s/tmp_%s_incremental_%s",
+               directory, config->servers[server].name, &backup->label[0]);
       snprintf(directory_combine, MAX_PATH, "%s/%s-%s", directory, config->servers[server].name, &backup->label[0]);
       manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
       manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
 
-      if (pgmoneta_deque_add(nodes, NODE_DIRECTORY, (uintptr_t)directory_incremental, ValueString))
+      pgmoneta_deque_remove(nodes, NODE_TARGET_ROOT);
+      if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory_incremental, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_add(nodes, NODE_COMBINE_BASE, (uintptr_t)directory, ValueString))
+      if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
       {
          goto error;
       }
-      // read the manifest for later usage
+
+      // Read the manifest for later usage
       if (pgmoneta_json_read_file(manifest_path, &manifest))
       {
          goto error;
@@ -439,14 +458,14 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
    }
    else
    {
-      pgmoneta_log_error("unidentified backup type %d", backup->type);
+      pgmoneta_log_error("Unidentified backup type %d", backup->type);
       goto error;
    }
 
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(server, identifier, nodes))
+      if (current->setup(nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          goto error;
@@ -457,7 +476,7 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(server, identifier, nodes))
+      if (current->execute(nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          goto error;
@@ -468,43 +487,13 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(server, identifier, nodes))
+      if (current->teardown(nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          goto error;
       }
       current = current->next;
    }
-
-   o = (char*)pgmoneta_deque_get(nodes, NODE_OUTPUT);
-
-   if (o == NULL)
-   {
-      ret = RESTORE_MISSING_LABEL;
-      goto error;
-   }
-
-   *output = malloc(strlen(o) + 1);
-
-   if (*output == NULL)
-   {
-      ret = RESTORE_MISSING_LABEL;
-      goto error;
-   }
-
-   memset(*output, 0, strlen(o) + 1);
-   memcpy(*output, o, strlen(o));
-
-   *label = malloc(strlen(backup->label) + 1);
-
-   if (*label == NULL)
-   {
-      ret = RESTORE_MISSING_LABEL;
-      goto error;
-   }
-
-   memset(*label, 0, strlen(backup->label) + 1);
-   memcpy(*label, backup->label, strlen(backup->label));
 
    if (backup != NULL && backup->type == TYPE_INCREMENTAL)
    {
@@ -515,13 +504,9 @@ pgmoneta_restore_backup(int server, char* identifier, char* position, char* dire
       }
    }
 
-   free(backup);
-   free(directory);
    free(manifest_path);
 
    pgmoneta_workflow_destroy(workflow);
-
-   pgmoneta_deque_destroy(nodes);
 
    return RESTORE_OK;
 
@@ -549,12 +534,9 @@ error:
          }
       }
    }
-   free(backup);
-   free(directory);
+
    free(manifest_path);
    pgmoneta_workflow_destroy(workflow);
-
-   pgmoneta_deque_destroy(nodes);
 
    return ret;
 }

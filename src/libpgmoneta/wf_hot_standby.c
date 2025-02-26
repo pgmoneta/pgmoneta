@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "workflow.h"
 #include <pgmoneta.h>
 #include <hot_standby.h>
 #include <logging.h>
@@ -35,12 +36,13 @@
 #include <workers.h>
 
 /* system */
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int hot_standby_setup(int, char*, struct deque*);
-static int hot_standby_execute(int, char*, struct deque*);
-static int hot_standby_teardown(int, char*, struct deque*);
+static int hot_standby_setup(struct deque*);
+static int hot_standby_execute(struct deque*);
+static int hot_standby_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_hot_standby(void)
@@ -63,21 +65,35 @@ pgmoneta_create_hot_standby(void)
 }
 
 static int
-hot_standby_setup(int server, char* identifier, struct deque* nodes)
+hot_standby_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Hot standby (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Hot standby (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-hot_standby_execute(int server, char* identifier, struct deque* nodes)
+hot_standby_execute(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    char* root = NULL;
    char* base = NULL;
    char* source = NULL;
@@ -108,7 +124,17 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Hot standby (execute): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Hot standby (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    if (strlen(config->servers[server].hot_standby) > 0)
@@ -257,7 +283,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
          }
 
          source = pgmoneta_append(source, base);
-         source = pgmoneta_append(source, identifier);
+         source = pgmoneta_append(source, label);
          source = pgmoneta_append_char(source, '/');
          source = pgmoneta_append(source, "data");
 
@@ -312,7 +338,7 @@ hot_standby_execute(int server, char* identifier, struct deque* nodes)
       memset(&elapsed[0], 0, sizeof(elapsed));
       sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-      pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+      pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
    }
 
    free(old_manifest);
@@ -367,13 +393,25 @@ error:
 }
 
 static int
-hot_standby_teardown(int server, char* identifier, struct deque* nodes)
+hot_standby_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Hot standby (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Hot standby (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

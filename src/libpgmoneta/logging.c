@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <prometheus.h>
+#include <utils.h>
 
 /* system */
 #include <errno.h>

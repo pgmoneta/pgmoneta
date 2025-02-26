@@ -5,7 +5,7 @@
 Make sure that [**pgmoneta**][pgmoneta] is installed and in your path by using `pgmoneta -?`. You should see
 
 ``` console
-pgmoneta 0.12.0
+pgmoneta 0.16.0
   Backup / restore solution for PostgreSQL
 
 Usage:
@@ -24,6 +24,37 @@ Options:
   -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
   -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
   -?, --help                                      Display help
+
+Commands:
+  annotate                 Annotate a backup with comments
+  archive                  Archive a backup from a server
+  backup                   Backup a server
+  clear <what>             Clear data, with:
+                           - 'prometheus' to reset the Prometheus statistics
+  compress                 Compress a file using configured method
+  conf <action>            Manage the configuration, with one of subcommands:
+                           - 'get' to obtain information about a runtime configuration value
+                             conf get <parameter_name>
+                           - 'ls' to print the configurations used
+                           - 'reload' to reload the configuration
+                           - 'set' to modify a configuration value;
+                             conf set <parameter_name> <parameter_value>;
+  decompress               Decompress a file using configured method
+  decrypt                  Decrypt a file using master-key
+  delete                   Delete a backup from a server
+  encrypt                  Encrypt a file using master-key
+  expunge                  Expunge a backup from a server
+  info                     Information about a backup
+  list-backup              List the backups for a server
+  ping                     Check if pgmoneta is alive
+  restore                  Restore a backup from a server
+  retain                   Retain a backup from a server
+  shutdown                 Shutdown pgmoneta
+  status [details]         Status of pgmoneta, with optional details
+  verify                   Verify a backup from a server
+
+pgmoneta: https://pgmoneta.github.io/
+Report bugs: https://github.com/pgmoneta/pgmoneta/issues
 ```
 
 If you encounter any issues following the above steps, you can refer to the **Installation** chapter to see how to install or compile pgmoneta on your system.

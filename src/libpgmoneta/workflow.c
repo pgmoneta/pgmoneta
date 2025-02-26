@@ -35,6 +35,7 @@
 #include <workflow.h>
 #include <workflow_funcs.h>
 #include <utils.h>
+#include <value.h>
 
 /* system */
 #include <assert.h>
@@ -99,6 +100,14 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
    config = (struct configuration*)shmem;
 
    *backup = NULL;
+
+   if (!pgmoneta_deque_exists(nodes, NODE_SERVER))
+   {
+      if (pgmoneta_deque_add(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
+      {
+         goto error;
+      }
+   }
 
    if (!pgmoneta_deque_exists(nodes, NODE_IDENTIFIER))
    {
@@ -419,7 +428,16 @@ wf_restore_incremental(int server, struct backup* backup)
    current->next = pgmoneta_create_combine_incremental();
    current = current->next;
 
-   current->next = pgmoneta_create_permissions(PERMISSION_TYPE_RESTORE_INCREMENTAL);
+   current->next = pgmoneta_create_recovery_info();
+   current = current->next;
+
+   current->next = pgmoneta_restore_excluded_files();
+   current = current->next;
+
+   current->next = pgmoneta_create_permissions(PERMISSION_TYPE_RESTORE);
+   current = current->next;
+
+   current->next = pgmoneta_create_cleanup(CLEANUP_TYPE_RESTORE);
    current = current->next;
 
    free(server_dir);

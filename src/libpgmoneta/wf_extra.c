@@ -33,13 +33,14 @@
 #include <utils.h>
 #include <workflow.h>
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int extra_setup(int, char*, struct deque*);
-static int extra_execute(int, char*, struct deque*);
-static int extra_teardown(int, char*, struct deque*);
+static int extra_setup(struct deque*);
+static int extra_execute(struct deque*);
+static int extra_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_extra(void)
@@ -62,21 +63,35 @@ pgmoneta_create_extra(void)
 }
 
 static int
-extra_setup(int server, char* identifier, struct deque* nodes)
+extra_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Extra (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Extra (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-extra_execute(int server, char* identifier, struct deque* nodes)
+extra_execute(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    int usr;
    int socket = -1;
    double seconds;
@@ -95,17 +110,27 @@ extra_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
    if (config->servers[server].number_of_extra == 0)
    {
       pgmoneta_log_debug("No extra parameter are set for server: %s", config->servers[server].name);
       return 0;
    }
 
-   pgmoneta_log_debug("Extra (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_log_debug("Extra (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    // Create the root directory
-   root = pgmoneta_get_server_extra_identifier(server, identifier);
+   root = pgmoneta_get_server_extra_identifier(server, label);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -161,9 +186,9 @@ extra_execute(int server, char* identifier, struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
-   info_root = pgmoneta_get_server_backup_identifier(server, identifier);
+   info_root = pgmoneta_get_server_backup_identifier(server, label);
 
    if (info_extra == NULL)
    {
@@ -213,13 +238,25 @@ error:
 }
 
 static int
-extra_teardown(int server, char* identifier, struct deque* nodes)
+extra_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Extra (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Extra (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

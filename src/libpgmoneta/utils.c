@@ -1433,14 +1433,19 @@ pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
    char* d = NULL;
    char** array = NULL;
    int nod = 0;
-   int n;
-   DIR* dir;
-   struct dirent* entry;
+   int n = 0;
+   DIR* dir = NULL;
+   struct dirent* entry = NULL;
 
    *number_of_directories = 0;
    *dirs = NULL;
 
    nod = 0;
+
+   if (base == NULL || !strcmp(base, ""))
+   {
+      goto error;
+   }
 
    if (!(dir = opendir(base)))
    {
@@ -1862,11 +1867,17 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
          }
 
          from_buffer = pgmoneta_append(from_buffer, from);
-         from_buffer = pgmoneta_append(from_buffer, "/");
+         if (!pgmoneta_ends_with(from_buffer, "/"))
+         {
+            from_buffer = pgmoneta_append(from_buffer, "/");
+         }
          from_buffer = pgmoneta_append(from_buffer, entry->d_name);
 
          to_buffer = pgmoneta_append(to_buffer, to);
-         to_buffer = pgmoneta_append(to_buffer, "/");
+         if (!pgmoneta_ends_with(to_buffer, "/"))
+         {
+            to_buffer = pgmoneta_append(to_buffer, "/");
+         }
          to_buffer = pgmoneta_append(to_buffer, entry->d_name);
 
          if (!stat(from_buffer, &statbuf))
@@ -2350,6 +2361,53 @@ pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, s
 error:
 
    return 1;
+}
+
+void
+pgmoneta_list_directory(char* directory)
+{
+   DIR* d = opendir(directory);
+   char* current = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   if (d)
+   {
+      while ((entry = readdir(d)))
+      {
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         current = pgmoneta_append(current, directory);
+         if (!pgmoneta_ends_with(current, "/"))
+         {
+            current = pgmoneta_append_char(current, '/');
+         }
+         current = pgmoneta_append(current, entry->d_name);
+
+         if (!stat(current, &statbuf))
+         {
+            if (S_ISDIR(statbuf.st_mode))
+            {
+               pgmoneta_list_directory(current);
+            }
+            else
+            {
+               pgmoneta_log_debug(current);
+            }
+         }
+
+         free(current);
+         current = NULL;
+      }
+      closedir(d);
+   }
+   else
+   {
+      pgmoneta_log_error("%s doesn't exists", directory);
+   }
 }
 
 static int
@@ -3491,7 +3549,11 @@ pgmoneta_get_server_wal_shipping_wal(int server)
 
    if (ws != NULL)
    {
-      ws = pgmoneta_append(ws, "/wal/");
+      if (!pgmoneta_ends_with(ws, "/"))
+      {
+         ws = pgmoneta_append(ws, "/");
+      }
+      ws = pgmoneta_append(ws, "wal/");
    }
    return ws;
 }

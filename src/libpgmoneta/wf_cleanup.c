@@ -34,11 +34,12 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdlib.h>
 
-static int cleanup_setup(int, char*, struct deque*);
-static int cleanup_execute_restore(int, char*, struct deque*);
-static int cleanup_teardown(int, char*, struct deque*);
+static int cleanup_setup(struct deque*);
+static int cleanup_execute_restore(struct deque*);
+static int cleanup_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_cleanup(int type)
@@ -68,33 +69,54 @@ pgmoneta_create_cleanup(int type)
 }
 
 static int
-cleanup_setup(int server, char* identifier, struct deque* nodes)
+cleanup_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Cleanup (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Cleanup (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
+cleanup_execute_restore(struct deque* nodes)
 {
+   int server = -1;
    char* label = NULL;
    char* path = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Cleanup (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY));
+   path = pgmoneta_append(path, (char*)pgmoneta_deque_get(nodes, NODE_TARGET_ROOT));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
@@ -119,13 +141,25 @@ cleanup_execute_restore(int server, char* identifier, struct deque* nodes)
 }
 
 static int
-cleanup_teardown(int server, char* identifier, struct deque* nodes)
+cleanup_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Cleanup (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Cleanup (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

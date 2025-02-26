@@ -35,11 +35,12 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <dirent.h>
 
-static int sha256_setup(int, char*, struct deque*);
-static int sha256_execute(int, char*, struct deque*);
-static int sha256_teardown(int, char*, struct deque*);
+static int sha256_setup(struct deque*);
+static int sha256_execute(struct deque*);
+static int sha256_teardown(struct deque*);
 
 static int write_backup_sha256(char* root, char* relative_path);
 
@@ -61,21 +62,35 @@ pgmoneta_create_sha256(void)
 }
 
 static int
-sha256_setup(int server, char* identifier, struct deque* nodes)
+sha256_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("SHA256 (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("SHA256 (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-sha256_execute(int server, char* identifier, struct deque* nodes)
+sha256_execute(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    char* root = NULL;
    char* d = NULL;
    char* sha256_path = NULL;
@@ -83,10 +98,20 @@ sha256_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("SHA256 (execute): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("SHA256 (execute): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   root = pgmoneta_get_server_backup_identifier(server, identifier);
+   root = pgmoneta_get_server_backup_identifier(server, label);
 
    sha256_path = pgmoneta_append(sha256_path, root);
    sha256_path = pgmoneta_append(sha256_path, "backup.sha256");
@@ -97,7 +122,7 @@ sha256_execute(int server, char* identifier, struct deque* nodes)
       goto error;
    }
 
-   d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   d = pgmoneta_get_server_backup_identifier_data(server, label);
 
    if (write_backup_sha256(d, ""))
    {
@@ -129,13 +154,25 @@ error:
 }
 
 static int
-sha256_teardown(int server, char* identifier, struct deque* nodes)
+sha256_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("SHA256 (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("SHA256 (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

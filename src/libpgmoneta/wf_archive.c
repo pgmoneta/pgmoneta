@@ -38,6 +38,7 @@
 #include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -51,9 +52,9 @@
 #include <sys/param.h>
 #include <sys/types.h>
 
-static int archive_setup(int, char*, struct deque*);
-static int archive_execute(int, char*, struct deque*);
-static int archive_teardown(int, char*, struct deque*);
+static int archive_setup(struct deque*);
+static int archive_execute(struct deque*);
+static int archive_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_create_archive(void)
@@ -76,93 +77,138 @@ pgmoneta_create_archive(void)
 }
 
 static int
-archive_setup(int server, char* identifier, struct deque* nodes)
+archive_setup(struct deque* nodes)
 {
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-   pgmoneta_log_debug("Archive (setup): %s/%s", config->servers[server].name, identifier);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
-}
-
-static int
-archive_execute(int server, char* identifier, struct deque* nodes)
-{
-   char* tarfile = NULL;
-   char* save_path = NULL;
+   int server = -1;
    char* label = NULL;
-   char* directory = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Archive (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
+   return 0;
+}
+
+static int
+archive_execute(struct deque* nodes)
+{
+   int server = -1;
+   char* label = NULL;
+   char* root = NULL;
+   char* base = NULL;
+   char* src = NULL;
+   char* dst = NULL;
+   char* d_name = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_ROOT));
+   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_BASE));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
    label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-   directory = (char*)pgmoneta_deque_get(nodes, NODE_DIRECTORY);
+   root = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_ROOT);
+   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
 
-   tarfile = pgmoneta_append(tarfile, directory);
-   tarfile = pgmoneta_append(tarfile, "/archive-");
-   tarfile = pgmoneta_append(tarfile, config->servers[server].name);
-   tarfile = pgmoneta_append(tarfile, "-");
-   tarfile = pgmoneta_append(tarfile, label);
-   tarfile = pgmoneta_append(tarfile, ".tar");
+   pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_deque_list(nodes);
 
-   save_path = pgmoneta_append(save_path, "./archive-");
-   save_path = pgmoneta_append(save_path, config->servers[server].name);
-   save_path = pgmoneta_append(save_path, "-");
-   save_path = pgmoneta_append(save_path, label);
+   src = pgmoneta_append(src, base);
 
-   if (pgmoneta_tar_directory(directory, tarfile, save_path))
+   dst = pgmoneta_append(dst, root);
+   if (!pgmoneta_ends_with(dst, "/"))
+   {
+      dst = pgmoneta_append(dst, "/");
+   }
+   dst = pgmoneta_append(dst, "archive-");
+   dst = pgmoneta_append(dst, config->servers[server].name);
+   dst = pgmoneta_append(dst, "-");
+   dst = pgmoneta_append(dst, label);
+   dst = pgmoneta_append(dst, ".tar");
+
+   d_name = pgmoneta_append(d_name, config->servers[server].name);
+   d_name = pgmoneta_append(d_name, "-");
+   d_name = pgmoneta_append(d_name, label);
+
+   if (pgmoneta_exists(dst))
+   {
+      pgmoneta_delete_file(dst, NULL);
+   }
+
+   if (pgmoneta_tar_directory(src, dst, d_name))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_TARFILE, (uintptr_t)tarfile, ValueString))
+   if (pgmoneta_deque_add(nodes, NODE_TARGET_FILE, (uintptr_t)dst, ValueString))
    {
       goto error;
    }
 
-   free(tarfile);
-   free(save_path);
+   free(src);
+   free(dst);
+   free(d_name);
 
    return 0;
 
 error:
 
-   free(tarfile);
-   free(save_path);
+   free(src);
+   free(dst);
+   free(d_name);
 
    return 1;
 }
 
 static int
-archive_teardown(int server, char* identifier, struct deque* nodes)
+archive_teardown(struct deque* nodes)
 {
-   char* output = NULL;
+   int server = -1;
+   char* label = NULL;
+   char* destination = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_BASE));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
-   output = (char*)pgmoneta_deque_get(nodes, NODE_OUTPUT);
+   destination = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
 
-   if (output == NULL)
+   if (pgmoneta_exists(destination))
    {
-      goto error;
+      pgmoneta_delete_directory(destination);
    }
 
-   pgmoneta_delete_directory(output);
-
    return 0;
-
-error:
-
-   return 1;
 }

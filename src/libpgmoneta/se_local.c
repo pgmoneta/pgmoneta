@@ -32,13 +32,15 @@
 #include <logging.h>
 #include <storage.h>
 #include <utils.h>
+#include <workflow.h>
 
 /* system */
+#include <assert.h>
 #include <stdlib.h>
 
-static int local_storage_setup(int, char*, struct deque*);
-static int local_storage_execute(int, char*, struct deque*);
-static int local_storage_teardown(int, char*, struct deque*);
+static int local_storage_setup(struct deque*);
+static int local_storage_execute(struct deque*);
+static int local_storage_teardown(struct deque*);
 
 struct workflow*
 pgmoneta_storage_create_local(void)
@@ -61,21 +63,35 @@ pgmoneta_storage_create_local(void)
 }
 
 static int
-local_storage_setup(int server, char* identifier, struct deque* nodes)
+local_storage_setup(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Local storage engine (setup): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Local storage engine (setup): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-local_storage_execute(int server, char* identifier, struct deque* nodes)
+local_storage_execute(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct timespec start_t;
    struct timespec end_t;
    double total_seconds;
@@ -87,6 +103,16 @@ local_storage_execute(int server, char* identifier, struct deque* nodes)
 
    config = (struct configuration*)shmem;
 
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
    total_seconds = pgmoneta_compute_duration(start_t, end_t);
@@ -97,20 +123,32 @@ local_storage_execute(int server, char* identifier, struct deque* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->servers[server].name, identifier, &elapsed[0]);
+   pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
    pgmoneta_deque_list(nodes);
 
    return 0;
 }
 
 static int
-local_storage_teardown(int server, char* identifier, struct deque* nodes)
+local_storage_teardown(struct deque* nodes)
 {
+   int server = -1;
+   char* label = NULL;
    struct configuration* config;
 
    config = (struct configuration*)shmem;
 
-   pgmoneta_log_debug("Local storage engine (teardown): %s/%s", config->servers[server].name, identifier);
+#ifdef DEBUG
+   pgmoneta_deque_list(nodes);
+   assert(nodes != NULL);
+   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
+   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("Local storage engine (teardown): %s/%s", config->servers[server].name, label);
    pgmoneta_deque_list(nodes);
 
    return 0;

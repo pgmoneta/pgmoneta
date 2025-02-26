@@ -28,30 +28,32 @@ Options:
   -?, --help                                      Display help
 
 Commands:
-  backup                   Backup a server
-  list-backup              List the backups for a server
-  restore                  Restore a backup from a server
-  verify                   Verify a backup from a server
-  archive                  Archive a backup from a server
-  delete                   Delete a backup from a server
-  retain                   Retain a backup from a server
-  expunge                  Expunge a backup from a server
-  encrypt                  Encrypt a file using master-key
-  decrypt                  Decrypt a file using master-key
-  compress                 Compress a file using configured method
-  decompress               Decompress a file using configured method
-  info                     Information about a backup
   annotate                 Annotate a backup with comments
-  ping                     Check if pgmoneta is alive
-  shutdown                 Shutdown pgmoneta
-  status [details]         Status of pgmoneta, with optional details
-  conf <action>            Manage the configuration, with one of subcommands:
-                           - 'reload' to reload the configuration
-                           - 'ls' to print the configurations used
-                           - 'get' to obtain information about a runtime configuration value
-                           - 'set' to modify a runtime configuration value
+  archive                  Archive a backup from a server
+  backup                   Backup a server
   clear <what>             Clear data, with:
                            - 'prometheus' to reset the Prometheus statistics
+  compress                 Compress a file using configured method
+  conf <action>            Manage the configuration, with one of subcommands:
+                           - 'get' to obtain information about a runtime configuration value
+                             conf get <parameter_name>
+                           - 'ls' to print the configurations used
+                           - 'reload' to reload the configuration
+                           - 'set' to modify a configuration value;
+                             conf set <parameter_name> <parameter_value>;
+  decompress               Decompress a file using configured method
+  decrypt                  Decrypt a file using master-key
+  delete                   Delete a backup from a server
+  encrypt                  Encrypt a file using master-key
+  expunge                  Expunge a backup from a server
+  info                     Information about a backup
+  list-backup              List the backups for a server
+  ping                     Check if pgmoneta is alive
+  restore                  Restore a backup from a server
+  retain                   Retain a backup from a server
+  shutdown                 Shutdown pgmoneta
+  status [details]         Status of pgmoneta, with optional details
+  verify                   Verify a backup from a server
 ```
 
 ## backup

@@ -195,32 +195,32 @@ usage(void)
    printf("  -?, --help                                     Display help\n");
    printf("\n");
    printf("Commands:\n");
-   printf("  backup                   Backup a server\n");
-   printf("  list-backup              List the backups for a server\n");
-   printf("  restore                  Restore a backup from a server\n");
-   printf("  verify                   Verify a backup from a server\n");
-   printf("  archive                  Archive a backup from a server\n");
-   printf("  delete                   Delete a backup from a server\n");
-   printf("  retain                   Retain a backup from a server\n");
-   printf("  expunge                  Expunge a backup from a server\n");
-   printf("  encrypt                  Encrypt a file using master-key\n");
-   printf("  decrypt                  Decrypt a file using master-key\n");
-   printf("  compress                 Compress a file using configured method\n");
-   printf("  decompress               Decompress a file using configured method\n");
-   printf("  info                     Information about a backup\n");
    printf("  annotate                 Annotate a backup with comments\n");
-   printf("  ping                     Check if pgmoneta is alive\n");
-   printf("  shutdown                 Shutdown pgmoneta\n");
-   printf("  status [details]         Status of pgmoneta, with optional details\n");
-   printf("  conf <action>            Manage the configuration, with one of subcommands:\n");
-   printf("                           - 'reload' to reload the configuration\n");
-   printf("                           - 'ls' to print the configurations used\n");
-   printf("                           - 'get' to obtain information about a runtime configuration value\n");
-   printf("                             conf get <parameter_name>\n");
-   printf("                           - 'set' to modify a configuration value;\n");
-   printf("                             conf set <parameter_name> <parameter_value>;\n");
+   printf("  archive                  Archive a backup from a server\n");
+   printf("  backup                   Backup a server\n");
    printf("  clear <what>             Clear data, with:\n");
    printf("                           - 'prometheus' to reset the Prometheus statistics\n");
+   printf("  compress                 Compress a file using configured method\n");
+   printf("  conf <action>            Manage the configuration, with one of subcommands:\n");
+   printf("                           - 'get' to obtain information about a runtime configuration value\n");
+   printf("                             conf get <parameter_name>\n");
+   printf("                           - 'ls' to print the configurations used\n");
+   printf("                           - 'reload' to reload the configuration\n");
+   printf("                           - 'set' to modify a configuration value;\n");
+   printf("                             conf set <parameter_name> <parameter_value>;\n");
+   printf("  decompress               Decompress a file using configured method\n");
+   printf("  decrypt                  Decrypt a file using master-key\n");
+   printf("  delete                   Delete a backup from a server\n");
+   printf("  encrypt                  Encrypt a file using master-key\n");
+   printf("  expunge                  Expunge a backup from a server\n");
+   printf("  info                     Information about a backup\n");
+   printf("  list-backup              List the backups for a server\n");
+   printf("  ping                     Check if pgmoneta is alive\n");
+   printf("  restore                  Restore a backup from a server\n");
+   printf("  retain                   Retain a backup from a server\n");
+   printf("  shutdown                 Shutdown pgmoneta\n");
+   printf("  status [details]         Status of pgmoneta, with optional details\n");
+   printf("  verify                   Verify a backup from a server\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
@@ -1762,6 +1762,16 @@ error:
 static int
 annotate(SSL* ssl, int socket, char* server, char* backup, char* action, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
+   if (!strcmp(action, "add") || !strcmp(action, "remove") || !strcmp(action, "update"))
+   {
+      /* Ok */
+   }
+   else
+   {
+      printf("Unknown action: %s\n", action);
+      goto error;
+   }
+
    if (pgmoneta_management_request_annotate(ssl, socket, server, backup, action, key, comment, compression, encryption, output_format))
    {
       goto error;
