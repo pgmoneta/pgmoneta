@@ -29,16 +29,16 @@
  */
 
 /* pgmoneta */
-#include <pgmoneta.h>
 #include <logging.h>
+#include <lz4.h>
 #include <lz4_compression.h>
 #include <management.h>
+#include <pgmoneta.h>
 #include <utils.h>
 #include <workers.h>
 
 /* system */
 #include <dirent.h>
-#include "lz4.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

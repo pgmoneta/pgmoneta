@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <art.h>
+#include <deque.h>
 #include <info.h>
 #include <json.h>
 
@@ -73,7 +75,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
  * @return The result
  */
 int
-pgmoneta_restore_backup(struct deque* nodes);
+pgmoneta_restore_backup(struct art* nodes);
 
 /**
  * Combine the provided backups

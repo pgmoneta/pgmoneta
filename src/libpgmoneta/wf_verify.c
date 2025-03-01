@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <csv.h>
 #include <deque.h>
 #include <logging.h>
@@ -44,9 +45,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static int verify_setup(struct deque*);
-static int verify_execute(struct deque*);
-static int verify_teardown(struct deque*);
+static char* verify_name(void);
+static int verify_execute(char*, struct art*);
 
 static void do_verify(struct worker_input* wi);
 
@@ -62,41 +62,23 @@ pgmoneta_create_verify(void)
       return NULL;
    }
 
-   wf->setup = &verify_setup;
+   wf->name = &verify_name;
+   wf->setup = &pgmoneta_common_setup;
    wf->execute = &verify_execute;
-   wf->teardown = &verify_teardown;
+   wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
    return wf;
 }
 
-static int
-verify_setup(struct deque* nodes)
+static char *
+verify_name(void)
 {
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Verify (setup): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
+   return "Verify";
 }
 
 static int
-verify_execute(struct deque* nodes)
+verify_execute(char *name, struct art *nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -116,19 +98,21 @@ verify_execute(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Verify (execute): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
-   base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_deque_get(nodes, NODE_LABEL));
+   base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
 
    info_file = pgmoneta_append(info_file, base);
    if (!pgmoneta_ends_with(info_file, "/"))
@@ -151,7 +135,7 @@ verify_execute(struct deque* nodes)
       goto error;
    }
 
-   if (!strcasecmp((char*)pgmoneta_deque_get(nodes, NODE_FILES), NODE_ALL))
+   if (!strcasecmp((char*)pgmoneta_art_search(nodes, NODE_FILES), NODE_ALL))
    {
       if (pgmoneta_deque_create(true, &all_deque))
       {
@@ -185,7 +169,7 @@ verify_execute(struct deque* nodes)
          goto error;
       }
 
-      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_deque_get(nodes, NODE_TARGET_BASE), ValueString);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_art_search(nodes, NODE_TARGET_BASE), ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)columns[0], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)columns[1], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)backup->hash_algorithm, ValueInt32);
@@ -223,8 +207,8 @@ verify_execute(struct deque* nodes)
    pgmoneta_deque_list(failed_deque);
    pgmoneta_deque_list(all_deque);
 
-   pgmoneta_deque_add(nodes, NODE_FAILED, (uintptr_t)failed_deque, ValueDeque);
-   pgmoneta_deque_add(nodes, NODE_ALL, (uintptr_t)all_deque, ValueDeque);
+   pgmoneta_art_insert(nodes, NODE_FAILED, (uintptr_t)failed_deque, ValueDeque);
+   pgmoneta_art_insert(nodes, NODE_ALL, (uintptr_t)all_deque, ValueDeque);
 
    pgmoneta_csv_reader_destroy(csv);
 
@@ -243,8 +227,8 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
-   pgmoneta_deque_add(nodes, NODE_FAILED, (uintptr_t)NULL, ValueDeque);
-   pgmoneta_deque_add(nodes, NODE_ALL, (uintptr_t)NULL, ValueDeque);
+   pgmoneta_art_insert(nodes, NODE_FAILED, (uintptr_t)NULL, ValueDeque);
+   pgmoneta_art_insert(nodes, NODE_ALL, (uintptr_t)NULL, ValueDeque);
 
    pgmoneta_deque_destroy(failed_deque);
    pgmoneta_deque_destroy(all_deque);
@@ -258,31 +242,6 @@ error:
    free(manifest_file);
 
    return 1;
-}
-
-static int
-verify_teardown(struct deque* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Verify (teardown): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
 }
 
 static void

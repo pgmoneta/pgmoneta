@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
+#include <art.h>
 #include <deque.h>
 #include <info.h>
 #include <link.h>
@@ -42,10 +43,9 @@
 #include <assert.h>
 #include <stdlib.h>
 
-static int encryption_setup(struct deque*);
-static int encryption_execute(struct deque*);
-static int decryption_execute(struct deque*);
-static int encryption_teardown(struct deque*);
+static char* encryption_name(void);
+static int encryption_execute(char*, struct art*);
+static int decryption_execute(char*, struct art*);
 
 struct workflow*
 pgmoneta_encryption(bool encrypt)
@@ -59,7 +59,8 @@ pgmoneta_encryption(bool encrypt)
       return NULL;
    }
 
-   wf->setup = &encryption_setup;
+   wf->name = &encryption_name;
+   wf->setup = &pgmoneta_common_setup;
 
    if (encrypt)
    {
@@ -70,39 +71,20 @@ pgmoneta_encryption(bool encrypt)
       wf->execute = &decryption_execute;
    }
 
-   wf->teardown = &encryption_teardown;
+   wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
    return wf;
 }
 
-static int
-encryption_setup(struct deque* nodes)
+static char *
+encryption_name(void)
 {
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Encryption (setup): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
+   return "Encryption";
 }
 
 static int
-encryption_execute(struct deque* nodes)
+encryption_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -126,19 +108,21 @@ encryption_execute(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Encryption (execute): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_FILE);
+   tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -150,8 +134,8 @@ encryption_execute(struct deque* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
-      backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
+      backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+      backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
       if (pgmoneta_encrypt_data(backup_data, workers))
       {
@@ -252,7 +236,7 @@ error:
 }
 
 static int
-decryption_execute(struct deque* nodes)
+decryption_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -270,26 +254,28 @@ decryption_execute(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Decryption (execute): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
-   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
+   base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
    if (base == NULL)
    {
-      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+      base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
    }
    if (base == NULL)
    {
-      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
+      base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    }
 
    decrypt_time = time(NULL);
@@ -317,31 +303,6 @@ decryption_execute(struct deque* nodes)
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
    pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
-
-   return 0;
-}
-
-static int
-encryption_teardown(struct deque* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Encryption (teardown): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
    return 0;
 }

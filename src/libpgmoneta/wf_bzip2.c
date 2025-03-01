@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <bzip2_compression.h>
 #include <deque.h>
 #include <logging.h>
@@ -40,10 +41,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int bzip2_setup(struct deque*);
-static int bzip2_execute_compress(struct deque*);
-static int bzip2_execute_uncompress(struct deque*);
-static int bzip2_teardown(struct deque*);
+static char* bzip2_name(void);
+static int bzip2_execute_compress(char *, struct art *);
+static int bzip2_execute_uncompress(char *, struct art *);
 
 struct workflow*
 pgmoneta_create_bzip2(bool compress)
@@ -57,7 +57,8 @@ pgmoneta_create_bzip2(bool compress)
       return NULL;
    }
 
-   wf->setup = &bzip2_setup;
+   wf->name = &bzip2_name;
+   wf->setup = &pgmoneta_common_setup;
 
    if (compress == true)
    {
@@ -68,39 +69,20 @@ pgmoneta_create_bzip2(bool compress)
       wf->execute = &bzip2_execute_uncompress;
    }
 
-   wf->teardown = &bzip2_teardown;
+   wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
    return wf;
 }
 
-static int
-bzip2_setup(struct deque* nodes)
+static char *
+bzip2_name(void)
 {
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("BZip2 (setup): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
+   return "BZip2";
 }
 
 static int
-bzip2_execute_compress(struct deque* nodes)
+bzip2_execute_compress(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -123,21 +105,23 @@ bzip2_execute_compress(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("BZip2 (compress): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   tarfile = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_FILE);
+   tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
    if (tarfile == NULL)
    {
@@ -147,8 +131,8 @@ bzip2_execute_compress(struct deque* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      backup_base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
-      backup_data = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
+      backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+      backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
       pgmoneta_bzip2_data(backup_data, workers);
       pgmoneta_bzip2_tablespaces(backup_base, workers);
@@ -203,7 +187,7 @@ bzip2_execute_compress(struct deque* nodes)
 }
 
 static int
-bzip2_execute_uncompress(struct deque* nodes)
+bzip2_execute_uncompress(char *name, struct art *nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -223,26 +207,28 @@ bzip2_execute_uncompress(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("BZip2 (uncompress): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
-   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
+   base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
    if (base == NULL)
    {
-      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_BASE);
+      base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
    }
    if (base == NULL)
    {
-      base = (char*)pgmoneta_deque_get(nodes, NODE_BACKUP_DATA);
+      base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    }
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
@@ -278,29 +264,4 @@ bzip2_execute_uncompress(struct deque* nodes)
    pgmoneta_log_debug("Decompress: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    return ret;
-}
-
-static int
-bzip2_teardown(struct deque* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("BZip2 (teardown): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
 }

@@ -27,22 +27,22 @@
  */
 
 /* pgmoneta */
-#include "workflow.h"
 #include <pgmoneta.h>
+#include <art.h>
 #include <hot_standby.h>
 #include <logging.h>
 #include <manifest.h>
 #include <utils.h>
 #include <workers.h>
+#include <workflow.h>
 
 /* system */
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int hot_standby_setup(struct deque*);
-static int hot_standby_execute(struct deque*);
-static int hot_standby_teardown(struct deque*);
+static char* hot_standby_name(void);
+static int hot_standby_execute(char*, struct art*);
 
 struct workflow*
 pgmoneta_create_hot_standby(void)
@@ -56,41 +56,23 @@ pgmoneta_create_hot_standby(void)
       return NULL;
    }
 
-   wf->setup = &hot_standby_setup;
+   wf->name = &hot_standby_name;
+   wf->setup = &pgmoneta_common_setup;
    wf->execute = &hot_standby_execute;
-   wf->teardown = &hot_standby_teardown;
+   wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
    return wf;
 }
 
-static int
-hot_standby_setup(struct deque* nodes)
+static char *
+hot_standby_name(void)
 {
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Hot standby (setup): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
+   return "Hot standby";
 }
 
 static int
-hot_standby_execute(struct deque* nodes)
+hot_standby_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -125,17 +107,19 @@ hot_standby_execute(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Hot standby (execute): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
    if (strlen(config->servers[server].hot_standby) > 0)
    {
@@ -390,29 +374,4 @@ error:
    free(destination);
 
    return 1;
-}
-
-static int
-hot_standby_teardown(struct deque* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Hot standby (teardown): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
 }

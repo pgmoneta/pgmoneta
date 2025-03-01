@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
+#include <art.h>
 #include <deque.h>
 #include <info.h>
 #include <logging.h>
@@ -52,9 +53,9 @@
 #include <sys/param.h>
 #include <sys/types.h>
 
-static int archive_setup(struct deque*);
-static int archive_execute(struct deque*);
-static int archive_teardown(struct deque*);
+static char* archive_name(void);
+static int archive_execute(char*, struct art*);
+static int archive_teardown(char *, struct art *);
 
 struct workflow*
 pgmoneta_create_archive(void)
@@ -68,7 +69,8 @@ pgmoneta_create_archive(void)
       return NULL;
    }
 
-   wf->setup = &archive_setup;
+   wf->name = &archive_name;
+   wf->setup = &pgmoneta_common_setup;
    wf->execute = &archive_execute;
    wf->teardown = &archive_teardown;
    wf->next = NULL;
@@ -76,33 +78,14 @@ pgmoneta_create_archive(void)
    return wf;
 }
 
-static int
-archive_setup(struct deque* nodes)
+static char *
+archive_name(void)
 {
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Archive (setup): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
+   return "Archive";
 }
 
 static int
-archive_execute(struct deque* nodes)
+archive_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -116,21 +99,23 @@ archive_execute(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_ROOT));
-   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-   root = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_ROOT);
-   base = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 
    pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
    src = pgmoneta_append(src, base);
 
@@ -159,7 +144,7 @@ archive_execute(struct deque* nodes)
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_TARGET_FILE, (uintptr_t)dst, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_FILE, (uintptr_t)dst, ValueString))
    {
       goto error;
    }
@@ -180,7 +165,7 @@ error:
 }
 
 static int
-archive_teardown(struct deque* nodes)
+archive_teardown(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -190,20 +175,22 @@ archive_teardown(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
-   destination = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE);
+   destination = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 
    if (pgmoneta_exists(destination))
    {

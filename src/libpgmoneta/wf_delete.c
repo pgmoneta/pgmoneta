@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <deque.h>
 #include <info.h>
 #include <link.h>
@@ -42,9 +43,8 @@
 #include <stdlib.h>
 #include <strings.h>
 
-static int delete_backup_setup(struct deque*);
-static int delete_backup_execute(struct deque*);
-static int delete_backup_teardown(struct deque*);
+static char* delete_name(void);
+static int delete_backup_execute(char*, struct art*);
 
 static int delete_full_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
 static int delete_incremental_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
@@ -61,41 +61,23 @@ pgmoneta_create_delete_backup(void)
       return NULL;
    }
 
-   wf->setup = &delete_backup_setup;
+   wf->name = &delete_name;
+   wf->setup = &pgmoneta_common_setup;
    wf->execute = &delete_backup_execute;
-   wf->teardown = &delete_backup_teardown;
+   wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
    return wf;
 }
 
-static int
-delete_backup_setup(struct deque* nodes)
+static char *
+delete_name(void)
 {
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Delete (setup): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
+   return "Delete";
 }
 
 static int
-delete_backup_execute(struct deque* nodes)
+delete_backup_execute(char* name, struct art* nodes)
 {
    int server = -1;
    bool active = false;
@@ -111,17 +93,19 @@ delete_backup_execute(struct deque* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
 
    active = false;
 
@@ -146,8 +130,6 @@ delete_backup_execute(struct deque* nodes)
 
    free(d);
    d = NULL;
-
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
 
    /* Find backup index */
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
@@ -266,31 +248,6 @@ error:
    pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
 
    return 1;
-}
-
-static int
-delete_backup_teardown(struct deque* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_deque_list(nodes);
-   assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("Delete (teardown): %s/%s", config->servers[server].name, label);
-   pgmoneta_deque_list(nodes);
-
-   return 0;
 }
 
 static int

@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <deque.h>
 #include <info.h>
 #include <logging.h>
@@ -224,7 +225,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    double total_seconds = 0;
    char* output = NULL;
    struct backup* backup = NULL;
-   struct deque* nodes = NULL;
+   struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
    struct configuration* config;
@@ -243,7 +244,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   if (pgmoneta_deque_create(false, &nodes))
+   if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
@@ -253,12 +254,12 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
@@ -273,7 +274,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      backup = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
+      backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
@@ -346,7 +347,7 @@ error:
 }
 
 int
-pgmoneta_restore_backup(struct deque* nodes)
+pgmoneta_restore_backup(struct art* nodes)
 {
    int ret = RESTORE_OK;
    int server = -1;
@@ -368,18 +369,21 @@ pgmoneta_restore_backup(struct deque* nodes)
    memset(directory_combine, 0, MAX_PATH);
 
 #ifdef DEBUG
-   pgmoneta_deque_list(nodes);
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_deque_exists(nodes, NODE_SERVER));
-   assert(pgmoneta_deque_exists(nodes, NODE_BACKUP));
-   assert(pgmoneta_deque_exists(nodes, NODE_LABEL));
-   assert(pgmoneta_deque_exists(nodes, NODE_TARGET_ROOT));
-   assert(pgmoneta_deque_exists(nodes, NODE_POSITION));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
+   assert(pgmoneta_art_contains_key(nodes, NODE_POSITION));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_deque_get(nodes, NODE_SERVER);
-   directory = (char*)pgmoneta_deque_get(nodes, NODE_TARGET_ROOT);
-   backup = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
@@ -424,13 +428,13 @@ pgmoneta_restore_backup(struct deque* nodes)
       manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
       manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
 
-      pgmoneta_deque_remove(nodes, NODE_TARGET_ROOT);
-      if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory_incremental, ValueString))
+      pgmoneta_art_delete(nodes, NODE_TARGET_ROOT);
+      if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory_incremental, ValueString))
       {
          goto error;
       }
 
-      if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+      if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
       {
          goto error;
       }
@@ -440,7 +444,7 @@ pgmoneta_restore_backup(struct deque* nodes)
       {
          goto error;
       }
-      pgmoneta_deque_add(nodes, NODE_MANIFEST, (uintptr_t)manifest, ValueJSON);
+      pgmoneta_art_insert(nodes, NODE_MANIFEST, (uintptr_t)manifest, ValueJSON);
    }
    else
    {
@@ -465,7 +469,7 @@ pgmoneta_restore_backup(struct deque* nodes)
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(nodes))
+      if (current->setup(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          goto error;
@@ -476,7 +480,7 @@ pgmoneta_restore_backup(struct deque* nodes)
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(nodes))
+      if (current->execute(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          goto error;
@@ -487,7 +491,7 @@ pgmoneta_restore_backup(struct deque* nodes)
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(nodes))
+      if (current->teardown(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
          goto error;

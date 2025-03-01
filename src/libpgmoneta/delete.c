@@ -28,12 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <delete.h>
-#include <workflow.h>
 #include <info.h>
 #include <link.h>
 #include <logging.h>
 #include <utils.h>
+#include <workflow.h>
 
 /* system */
 #include <stdatomic.h>
@@ -56,12 +57,12 @@ pgmoneta_delete(int srv, char* label)
 {
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct deque* nodes = NULL;
+   struct art* nodes = NULL;
    struct backup* backup = NULL;
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, srv, NULL);
 
-   if (pgmoneta_deque_create(false, &nodes))
+   if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
@@ -74,7 +75,7 @@ pgmoneta_delete(int srv, char* label)
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(nodes))
+      if (current->setup(current->name(), nodes))
       {
          goto error;
       }
@@ -84,7 +85,7 @@ pgmoneta_delete(int srv, char* label)
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(nodes))
+      if (current->execute(current->name(), nodes))
       {
          goto error;
       }
@@ -94,14 +95,14 @@ pgmoneta_delete(int srv, char* label)
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(nodes))
+      if (current->teardown(current->name(), nodes))
       {
          goto error;
       }
       current = current->next;
    }
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
 
@@ -109,7 +110,7 @@ pgmoneta_delete(int srv, char* label)
 
 error:
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
 

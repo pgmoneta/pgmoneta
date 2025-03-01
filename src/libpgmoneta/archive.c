@@ -29,7 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
-#include <deque.h>
+#include <art.h>
 #include <gzip_compression.h>
 #include <info.h>
 #include <json.h>
@@ -67,7 +67,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct deque* nodes = NULL;
+   struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
    struct configuration* config;
@@ -86,17 +86,17 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
-   if (pgmoneta_deque_create(false, &nodes))
+   if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
@@ -132,7 +132,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_mkdir(real_directory);
 
-   if (pgmoneta_deque_add(nodes, NODE_TARGET_BASE, (uintptr_t)real_directory, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)real_directory, ValueString))
    {
       goto error;
    }
@@ -144,7 +144,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       current = workflow;
       while (current != NULL)
       {
-         if (current->setup(nodes))
+         if (current->setup(current->name(), nodes))
          {
             goto error;
          }
@@ -154,7 +154,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       current = workflow;
       while (current != NULL)
       {
-         if (current->execute(nodes))
+         if (current->execute(current->name(), nodes))
          {
             goto error;
          }
@@ -164,7 +164,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       current = workflow;
       while (current != NULL)
       {
-         if (current->teardown(nodes))
+         if (current->teardown(current->name(), nodes))
          {
             goto error;
          }
@@ -178,7 +178,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          goto error;
       }
 
-      filename = pgmoneta_append(filename, (char*)pgmoneta_deque_get(nodes, NODE_TARGET_FILE));
+      filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
       if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
       {
          filename = pgmoneta_append(filename, ".gz");
@@ -220,7 +220,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
    }
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
@@ -241,7 +241,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
 error:
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 

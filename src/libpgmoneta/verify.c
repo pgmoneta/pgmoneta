@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <deque.h>
 #include <info.h>
 #include <json.h>
@@ -57,7 +58,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct deque* nodes = NULL;
+   struct art* nodes = NULL;
    struct deque* f = NULL;
    struct deque* a = NULL;
    struct deque_iterator* fiter = NULL;
@@ -80,22 +81,22 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
    files = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_FILES);
 
-   if (pgmoneta_deque_create(false, &nodes))
+   if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_POSITION, (uintptr_t)"", ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)"", ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_FILES, (uintptr_t)files, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_FILES, (uintptr_t)files, ValueString))
    {
       goto error;
    }
@@ -110,7 +111,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(nodes))
+      if (current->setup(current->name(), nodes))
       {
          goto error;
       }
@@ -120,7 +121,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(nodes))
+      if (current->execute(current->name(), nodes))
       {
          goto error;
       }
@@ -130,17 +131,17 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(nodes))
+      if (current->teardown(current->name(), nodes))
       {
          goto error;
       }
       current = current->next;
    }
 
-   label = (char*)pgmoneta_deque_get(nodes, NODE_LABEL);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   f = (struct deque*)pgmoneta_deque_get(nodes, NODE_FAILED);
-   a = (struct deque*)pgmoneta_deque_get(nodes, NODE_ALL);
+   f = (struct deque*)pgmoneta_art_search(nodes, NODE_FAILED);
+   a = (struct deque*)pgmoneta_art_search(nodes, NODE_ALL);
 
    if (pgmoneta_json_create(&failed))
    {
@@ -207,7 +208,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILES, (uintptr_t)filesj, ValueJSON);
 
-   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE));
+   pgmoneta_delete_directory((char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
@@ -223,12 +224,10 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    pgmoneta_log_info("Verify: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
 
-   pgmoneta_deque_list(nodes);
-
    pgmoneta_deque_iterator_destroy(fiter);
    pgmoneta_deque_iterator_destroy(aiter);
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
@@ -244,12 +243,12 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
 error:
 
-   pgmoneta_delete_directory((char*)pgmoneta_deque_get(nodes, NODE_TARGET_BASE));
+   pgmoneta_delete_directory((char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
 
    pgmoneta_deque_iterator_destroy(fiter);
    pgmoneta_deque_iterator_destroy(aiter);
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 

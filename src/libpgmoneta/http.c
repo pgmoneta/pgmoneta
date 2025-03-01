@@ -29,7 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <http.h>
-#include "utils.h"
+#include <utils.h>
 
 struct curl_slist*
 pgmoneta_http_add_header(struct curl_slist* chunk, char* header, char* value)

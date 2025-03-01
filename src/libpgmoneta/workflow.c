@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <hot_standby.h>
 #include <info.h>
 #include <logging.h>
@@ -88,7 +89,7 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
 }
 
 int
-pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struct backup** backup)
+pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct backup** backup)
 {
    char* server_base = NULL;
    char* server_backup = NULL;
@@ -101,23 +102,23 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
 
    *backup = NULL;
 
-   if (!pgmoneta_deque_exists(nodes, NODE_SERVER))
+   if (!pgmoneta_art_contains_key(nodes, NODE_SERVER))
    {
-      if (pgmoneta_deque_add(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
+      if (pgmoneta_art_insert(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
       {
          goto error;
       }
    }
 
-   if (!pgmoneta_deque_exists(nodes, NODE_IDENTIFIER))
+   if (!pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER))
    {
-      if (pgmoneta_deque_add(nodes, NODE_IDENTIFIER, (uintptr_t)identifier, ValueString))
+      if (pgmoneta_art_insert(nodes, NODE_IDENTIFIER, (uintptr_t)identifier, ValueString))
       {
          goto error;
       }
    }
 
-   if (!pgmoneta_deque_exists(nodes, NODE_SERVER_BASE))
+   if (!pgmoneta_art_contains_key(nodes, NODE_SERVER_BASE))
    {
       server_base = pgmoneta_append(server_base, config->base_dir);
       if (!pgmoneta_ends_with(server_base, "/"))
@@ -127,7 +128,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
       server_base = pgmoneta_append(server_base, config->servers[server].name);
       server_base = pgmoneta_append(server_base, "/");
 
-      if (pgmoneta_deque_add(nodes, NODE_SERVER_BASE, (uintptr_t)server_base, ValueString))
+      if (pgmoneta_art_insert(nodes, NODE_SERVER_BASE, (uintptr_t)server_base, ValueString))
       {
          free(server_base);
          goto error;
@@ -137,12 +138,12 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
       server_base = NULL;
    }
 
-   if (!pgmoneta_deque_exists(nodes, NODE_SERVER_BACKUP))
+   if (!pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP))
    {
-      server_backup = pgmoneta_append(server_backup, (char*)pgmoneta_deque_get(nodes, NODE_SERVER_BASE));
+      server_backup = pgmoneta_append(server_backup, (char*)pgmoneta_art_search(nodes, NODE_SERVER_BASE));
       server_backup = pgmoneta_append(server_backup, "backup/");
 
-      if (pgmoneta_deque_add(nodes, NODE_SERVER_BACKUP, (uintptr_t)server_backup, ValueString))
+      if (pgmoneta_art_insert(nodes, NODE_SERVER_BACKUP, (uintptr_t)server_backup, ValueString))
       {
          free(server_backup);
          goto error;
@@ -159,29 +160,29 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
          goto error;
       }
 
-      if (!pgmoneta_deque_exists(nodes, NODE_LABEL))
+      if (!pgmoneta_art_contains_key(nodes, NODE_LABEL))
       {
-         if (pgmoneta_deque_add(nodes, NODE_LABEL, (uintptr_t)bck->label, ValueString))
+         if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)bck->label, ValueString))
          {
             goto error;
          }
       }
 
-      if (!pgmoneta_deque_exists(nodes, NODE_BACKUP))
+      if (!pgmoneta_art_contains_key(nodes, NODE_BACKUP))
       {
-         if (pgmoneta_deque_add(nodes, NODE_BACKUP, (uintptr_t)bck, ValueRef))
+         if (pgmoneta_art_insert(nodes, NODE_BACKUP, (uintptr_t)bck, ValueRef))
          {
             goto error;
          }
       }
 
-      backup_base = pgmoneta_append(backup_base, (char*)pgmoneta_deque_get(nodes, NODE_SERVER_BACKUP));
+      backup_base = pgmoneta_append(backup_base, (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP));
       backup_base = pgmoneta_append(backup_base, bck->label);
       backup_base = pgmoneta_append(backup_base, "/");
 
-      if (!pgmoneta_deque_exists(nodes, NODE_BACKUP_BASE))
+      if (!pgmoneta_art_contains_key(nodes, NODE_BACKUP_BASE))
       {
-         if (pgmoneta_deque_add(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
+         if (pgmoneta_art_insert(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
          {
             goto error;
          }
@@ -190,9 +191,9 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
       backup_data = pgmoneta_append(backup_data, backup_base);
       backup_data = pgmoneta_append(backup_data, "data/");
 
-      if (!pgmoneta_deque_exists(nodes, NODE_BACKUP_DATA))
+      if (!pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA))
       {
-         if (pgmoneta_deque_add(nodes, NODE_BACKUP_DATA, (uintptr_t)backup_data, ValueString))
+         if (pgmoneta_art_insert(nodes, NODE_BACKUP_DATA, (uintptr_t)backup_data, ValueString))
          {
             goto error;
          }
@@ -206,7 +207,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct deque* nodes, struc
    }
    else
    {
-      bck = (struct backup*)pgmoneta_deque_get(nodes, NODE_BACKUP);
+      bck = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    }
    *backup = bck;
 
@@ -236,6 +237,62 @@ pgmoneta_workflow_destroy(struct workflow* workflow)
          wf = nxt;
       }
    }
+
+   return 0;
+}
+
+int
+pgmoneta_common_setup(char* name, struct art* nodes)
+{
+   int server = -1;
+   char* label = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+#ifdef DEBUG
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
+   assert(nodes != NULL);
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("%s (setup): %s/%s", name, config->servers[server].name, label);
+
+   return 0;
+}
+
+int
+pgmoneta_common_teardown(char* name, struct art* nodes)
+{
+   int server = -1;
+   char* label = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+#ifdef DEBUG
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
+   assert(nodes != NULL);
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("%s (teardown): %s/%s", name, config->servers[server].name, label);
 
    return 0;
 }
@@ -326,6 +383,18 @@ wf_backup(struct backup* backup)
       current = current->next;
    }
 
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
+
    return head;
 }
 
@@ -376,6 +445,18 @@ wf_restore(struct backup* backup)
 
    current->next = pgmoneta_create_cleanup(CLEANUP_TYPE_RESTORE);
    current = current->next;
+
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
 
    return head;
 }
@@ -442,6 +523,18 @@ wf_restore_incremental(int server, struct backup* backup)
 
    free(server_dir);
    free(bck);
+
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
 
    return head;
 }
@@ -525,6 +618,18 @@ wf_incremental_backup(void)
       current = current->next;
    }
 
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
+
    return head;
 }
 
@@ -573,6 +678,18 @@ wf_verify(struct backup* backup)
    current->next = pgmoneta_create_verify();
    current = current->next;
 
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
+
    return head;
 }
 
@@ -617,6 +734,18 @@ wf_archive(struct backup* backup)
    current->next = pgmoneta_create_permissions(PERMISSION_TYPE_ARCHIVE);
    current = current->next;
 
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
+
    return head;
 }
 
@@ -624,8 +753,21 @@ static struct workflow*
 wf_retention(struct backup* backup)
 {
    struct workflow* head = NULL;
+   struct workflow* current = NULL;
 
    head = pgmoneta_create_retention();
+
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
 
    return head;
 }
@@ -634,8 +776,21 @@ static struct workflow*
 wf_delete_backup(struct backup* backup)
 {
    struct workflow* head = NULL;
+   struct workflow* current = NULL;
 
    head = pgmoneta_create_delete_backup();
+
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
 
    return head;
 }

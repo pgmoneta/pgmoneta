@@ -26,11 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "value.h"
 #include <pgmoneta.h>
 #include <deque.h>
 #include <logging.h>
 #include <utils.h>
+#include <value.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -508,27 +508,24 @@ deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type
    struct deque_node* last = NULL;
 
 #ifdef DEBUG
-   struct value* value = NULL;
-   char* vs = NULL;
-
+   if (deque == NULL)
+   {
+      pgmoneta_log_debug("Deque is NULL");
+   }
    if (tag == NULL)
    {
-      pgmoneta_log_error("Tag is NULL");
+      pgmoneta_log_debug("Tag is NULL");
    }
    else if (!strcmp(tag, ""))
    {
-      pgmoneta_log_error("Tag is empty");
+      pgmoneta_log_debug("Tag is empty");
    }
    else if (pgmoneta_deque_exists(deque, tag))
    {
-      pgmoneta_log_error("Tag exists: %s", tag);
+      pgmoneta_log_debug("Tag exists: %s", tag);
    }
 
-   pgmoneta_value_create(type, data, &value);
-   vs = pgmoneta_value_to_string(value, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_trace("pgmoneta_deque_add: %s -> %s", tag, vs);
-   free(vs);
-   pgmoneta_value_destroy(value);
+   pgmoneta_log_trace("pgmoneta_deque_add: %s -> %p", tag, data);
 #endif
 
    deque_node_create(data, type, tag, config, &n);

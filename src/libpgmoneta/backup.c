@@ -28,8 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <backup.h>
-#include <deque.h>
 #include <info.h>
 #include <json.h>
 #include <logging.h>
@@ -71,7 +71,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct backup** backups = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct deque* nodes = NULL;
+   struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct backup* child = NULL;
    struct json* req = NULL;
@@ -121,22 +121,22 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    server_backup = pgmoneta_get_server_backup(server);
    root = pgmoneta_get_server_backup_identifier(server, date);
 
-   if (pgmoneta_deque_create(false, &nodes))
+   if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
+   if (pgmoneta_art_insert(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_IDENTIFIER, (uintptr_t)date, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_IDENTIFIER, (uintptr_t)date, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_deque_add(nodes, NODE_LABEL, (uintptr_t)date, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)date, ValueString))
    {
       goto error;
    }
@@ -214,8 +214,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    {
       incremental_base = pgmoneta_get_server_backup_identifier(server, backups[backup_index]->label);
 
-      pgmoneta_deque_add(nodes, NODE_INCREMENTAL_BASE, (uintptr_t) incremental_base, ValueString);
-      pgmoneta_deque_add(nodes, NODE_INCREMENTAL_LABEL, (uintptr_t)backups[backup_index]->label, ValueString);
+      pgmoneta_art_insert(nodes, NODE_INCREMENTAL_BASE, (uintptr_t) incremental_base, ValueString);
+      pgmoneta_art_insert(nodes, NODE_INCREMENTAL_LABEL, (uintptr_t)backups[backup_index]->label, ValueString);
 
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_INCREMENTAL_BACKUP, server, NULL);
    }
@@ -231,7 +231,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(nodes))
+      if (current->setup(current->name(), nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_SETUP, compression, encryption, payload);
 
@@ -243,7 +243,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(nodes))
+      if (current->execute(current->name(), nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_EXECUTE, compression, encryption, payload);
 
@@ -255,7 +255,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(nodes))
+      if (current->teardown(current->name(), nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_TEARDOWN, compression, encryption, payload);
 
@@ -316,7 +316,7 @@ done:
 
    pgmoneta_workflow_destroy(workflow);
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    free(date);
    for (int i = 0; i < number_of_backups; i++)
@@ -354,7 +354,7 @@ error:
 
    pgmoneta_workflow_destroy(workflow);
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    free(date);
    free(backup);
@@ -613,7 +613,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    struct json* response = NULL;
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
-   struct deque* nodes = NULL;
+   struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct configuration* config;
 
@@ -623,7 +623,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   if (pgmoneta_deque_create(false, &nodes))
+   if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
@@ -641,7 +641,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->setup(nodes))
+      if (current->setup(current->name(), nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_SETUP, compression, encryption, payload);
 
@@ -653,7 +653,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->execute(nodes))
+      if (current->execute(current->name(), nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_EXECUTE, compression, encryption, payload);
 
@@ -665,7 +665,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    current = workflow;
    while (current != NULL)
    {
-      if (current->teardown(nodes))
+      if (current->teardown(current->name(), nodes))
       {
          pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_TEARDOWN, compression, encryption, payload);
 
@@ -682,7 +682,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    }
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL), ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)pgmoneta_art_search(nodes, NODE_LABEL), ValueString);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 
@@ -697,9 +697,9 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Delete: %s/%s (Elapsed: %s)", config->servers[srv].name,
-                     (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL), elapsed);
+                     (uintptr_t)pgmoneta_art_search(nodes, NODE_LABEL), elapsed);
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
@@ -715,9 +715,9 @@ error:
 
    pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_ERROR, compression, encryption, payload);
    pgmoneta_log_warn("Delete: Failed for %s/%s", config->servers[srv].name,
-                     (uintptr_t)pgmoneta_deque_get(nodes, NODE_LABEL));
+                     (uintptr_t)pgmoneta_art_search(nodes, NODE_LABEL));
 
-   pgmoneta_deque_destroy(nodes);
+   pgmoneta_art_destroy(nodes);
 
    pgmoneta_json_destroy(payload);
 
