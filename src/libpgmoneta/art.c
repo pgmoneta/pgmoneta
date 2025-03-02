@@ -380,7 +380,7 @@ pgmoneta_art_insert(struct art* t, char* key, uintptr_t value, enum value_type t
       pgmoneta_log_debug("Key exists: %s", key);
    }
 
-   pgmoneta_log_trace("pgmoneta_art_insert: %s -> %p", key, value);
+   pgmoneta_log_trace("pgmoneta_art_insert: %s -> %p(%s)", key, value, pgmoneta_value_type_to_string(type));
 #endif
 
    if (t == NULL || key == NULL)
