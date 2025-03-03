@@ -77,7 +77,7 @@ pgmoneta_create_permissions(int type)
    return wf;
 }
 
-static char *
+static char*
 permissions_name(void)
 {
    return "Permissions";

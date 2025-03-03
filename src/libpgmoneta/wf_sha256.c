@@ -62,7 +62,7 @@ pgmoneta_create_sha256(void)
    return wf;
 }
 
-static char *
+static char*
 sha256_name(void)
 {
    return "SHA-256";

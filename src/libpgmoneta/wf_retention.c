@@ -45,7 +45,7 @@
 #include <unistd.h>
 
 static char* retention_name(void);
-static int retention_setup(char*, struct art *);
+static int retention_setup(char*, struct art*);
 static int retention_execute(char*, struct art*);
 static int retention_teardown(char*, struct art*);
 static void mark_retention(int server, int retention_days, int retention_weeks, int retention_months,
@@ -72,7 +72,7 @@ pgmoneta_create_retention(void)
    return wf;
 }
 
-static char *
+static char*
 retention_name(void)
 {
    return "Retention";

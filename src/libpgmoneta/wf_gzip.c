@@ -42,7 +42,7 @@
 #include <string.h>
 
 static char* gzip_name(void);
-static int gzip_execute_compress(char*, struct art *);
+static int gzip_execute_compress(char*, struct art*);
 static int gzip_execute_uncompress(char*, struct art*);
 
 struct workflow*
@@ -75,7 +75,7 @@ pgmoneta_create_gzip(bool compress)
    return wf;
 }
 
-static char *
+static char*
 gzip_name(void)
 {
    return "GZip";

@@ -70,7 +70,7 @@ pgmoneta_create_delete_backup(void)
    return wf;
 }
 
-static char *
+static char*
 delete_name(void)
 {
    return "Delete";

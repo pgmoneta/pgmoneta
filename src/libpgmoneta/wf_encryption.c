@@ -77,7 +77,7 @@ pgmoneta_encryption(bool encrypt)
    return wf;
 }
 
-static char *
+static char*
 encryption_name(void)
 {
    return "Encryption";

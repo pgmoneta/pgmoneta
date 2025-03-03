@@ -65,7 +65,7 @@ pgmoneta_create_extra(void)
    return wf;
 }
 
-static char *
+static char*
 extra_name(void)
 {
    return "Extra";

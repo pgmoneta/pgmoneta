@@ -63,7 +63,7 @@ pgmoneta_create_manifest(void)
    return wf;
 }
 
-static char *
+static char*
 manifest_name(void)
 {
    return "Manifest";

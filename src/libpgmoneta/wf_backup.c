@@ -76,7 +76,7 @@ pgmoneta_create_basebackup(void)
    return wf;
 }
 
-static char *
+static char*
 basebackup_name(void)
 {
    return "Base backup";
@@ -154,7 +154,7 @@ basebackup_execute(char* name, struct art* nodes)
    if ((incremental != NULL && incremental_label == NULL) ||
        (incremental == NULL && incremental_label != NULL))
    {
-      pgmoneta_log_error("base and label for incremental should either be both NULL or both non-NULL\n");
+      pgmoneta_log_error("base and label for incremental should either be both NULL or both non-NULL");
       goto error;
    }
 
@@ -174,8 +174,8 @@ basebackup_execute(char* name, struct art* nodes)
    network_max_rate = pgmoneta_get_network_max_rate(server);
    if (network_max_rate)
    {
-      bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
-      if (pgmoneta_token_bucket_init(bucket, network_max_rate))
+      network_bucket = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+      if (pgmoneta_token_bucket_init(network_bucket, network_max_rate))
       {
          pgmoneta_log_error("failed to initialize the network token bucket for backup.\n");
          goto error;

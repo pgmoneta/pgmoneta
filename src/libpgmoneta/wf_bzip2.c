@@ -42,8 +42,8 @@
 #include <string.h>
 
 static char* bzip2_name(void);
-static int bzip2_execute_compress(char *, struct art *);
-static int bzip2_execute_uncompress(char *, struct art *);
+static int bzip2_execute_compress(char*, struct art*);
+static int bzip2_execute_uncompress(char*, struct art*);
 
 struct workflow*
 pgmoneta_create_bzip2(bool compress)
@@ -75,7 +75,7 @@ pgmoneta_create_bzip2(bool compress)
    return wf;
 }
 
-static char *
+static char*
 bzip2_name(void)
 {
    return "BZip2";
@@ -187,7 +187,7 @@ bzip2_execute_compress(char* name, struct art* nodes)
 }
 
 static int
-bzip2_execute_uncompress(char *name, struct art *nodes)
+bzip2_execute_uncompress(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

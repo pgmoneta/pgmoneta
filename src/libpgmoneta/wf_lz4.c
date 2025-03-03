@@ -73,7 +73,7 @@ pgmoneta_create_lz4(bool compress)
    return wf;
 }
 
-static char *
+static char*
 lz4_name(void)
 {
    return "LZ4";

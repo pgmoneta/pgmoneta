@@ -69,7 +69,7 @@ pgmoneta_create_cleanup(int type)
    return wf;
 }
 
-static char *
+static char*
 cleanup_name(void)
 {
    return "Cleanup";

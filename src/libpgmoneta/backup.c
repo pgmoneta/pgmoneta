@@ -143,9 +143,9 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    if (incremental != NULL)
    {
+      backup_incremental = false;
       if (config->servers[server].version < 17)
       {
-         backup_incremental = false;
          pgmoneta_log_error("Incremental backup not supported for server %s at version %d",
                             config->servers[server].name, config->servers[server].version);
          goto error;
@@ -208,10 +208,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
          pgmoneta_log_error("Backup: Already an incremental backup for %s/%s", config->servers[server].name, incremental);
          goto error;
       }
-   }
 
-   if (backup_incremental)
-   {
       incremental_base = pgmoneta_get_server_backup_identifier(server, backups[backup_index]->label);
 
       pgmoneta_art_insert(nodes, NODE_INCREMENTAL_BASE, (uintptr_t) incremental_base, ValueString);

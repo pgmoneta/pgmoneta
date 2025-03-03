@@ -434,11 +434,6 @@ pgmoneta_restore_backup(struct art* nodes)
          goto error;
       }
 
-      if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
-      {
-         goto error;
-      }
-
       // Read the manifest for later usage
       if (pgmoneta_json_read_file(manifest_path, &manifest))
       {

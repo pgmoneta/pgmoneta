@@ -55,7 +55,7 @@
 
 static char* archive_name(void);
 static int archive_execute(char*, struct art*);
-static int archive_teardown(char *, struct art *);
+static int archive_teardown(char*, struct art*);
 
 struct workflow*
 pgmoneta_create_archive(void)
@@ -78,7 +78,7 @@ pgmoneta_create_archive(void)
    return wf;
 }
 
-static char *
+static char*
 archive_name(void)
 {
    return "Archive";

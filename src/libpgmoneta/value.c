@@ -280,6 +280,28 @@ pgmoneta_value_to_float(uintptr_t val)
    return uni.val;
 }
 
+enum value_type
+pgmoneta_value_to_ref(enum value_type type)
+{
+   switch (type)
+   {
+      case ValueString:
+         return ValueStringRef;
+      case ValueBASE64:
+         return ValueBASE64Ref;
+      case ValueJSON:
+         return ValueJSONRef;
+      case ValueDeque:
+         return ValueDequeRef;
+      case ValueART:
+         return ValueARTRef;
+      case ValueMem:
+         return ValueRef;
+      default:
+         return type;
+   }
+}
+
 #ifdef DEBUG
 char*
 pgmoneta_value_type_to_string(enum value_type type)

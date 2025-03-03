@@ -67,7 +67,7 @@ pgmoneta_create_link(void)
    return wf;
 }
 
-static char *
+static char*
 link_name(void)
 {
    return "Link";

@@ -74,7 +74,7 @@ pgmoneta_create_zstd(bool compress)
    return wf;
 }
 
-static char *
+static char*
 zstd_name(void)
 {
    return "ZSTD";

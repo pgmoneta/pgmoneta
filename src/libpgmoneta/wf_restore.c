@@ -45,20 +45,20 @@
 #include <unistd.h>
 
 static char* restore_name(void);
-static int restore_execute(char*, struct art *);
+static int restore_execute(char*, struct art*);
 
 static char* combine_incremental_name(void);
-static int combine_incremental_execute(char *, struct art *);
+static int combine_incremental_execute(char*, struct art*);
 
 static char* batch_restore_relay_name(void);
-static int batch_restore_relay_execute(char *, struct art *);
+static int batch_restore_relay_execute(char*, struct art*);
 
-static char *recovery_info_name(void);
-static int recovery_info_execute(char *, struct art *);
+static char*recovery_info_name(void);
+static int recovery_info_execute(char*, struct art*);
 
-static char *restore_excluded_files_name(void);
-static int restore_excluded_files_execute(char *, struct art *);
-static int restore_excluded_files_teardown(char *, struct art *);
+static char*restore_excluded_files_name(void);
+static int restore_excluded_files_execute(char*, struct art*);
+static int restore_excluded_files_teardown(char*, struct art*);
 
 static char* get_user_password(char* username);
 static void create_standby_signal(char* basedir);
@@ -168,7 +168,7 @@ pgmoneta_restore_excluded_files(void)
    return wf;
 }
 
-static char *
+static char*
 restore_name(void)
 {
    return "Restore";
@@ -376,7 +376,7 @@ error:
    return 1;
 }
 
-static char *
+static char*
 combine_incremental_name(void)
 {
    return "Combine incremental";
@@ -469,7 +469,7 @@ error:
    return 1;
 }
 
-static char *
+static char*
 batch_restore_relay_name(void)
 {
    return "Batch restore relay";
@@ -924,7 +924,7 @@ error:
    return 1;
 }
 
-static char *
+static char*
 restore_excluded_files_name(void)
 {
    return "Recovery excluded files";

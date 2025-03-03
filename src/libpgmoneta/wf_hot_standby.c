@@ -65,7 +65,7 @@ pgmoneta_create_hot_standby(void)
    return wf;
 }
 
-static char *
+static char*
 hot_standby_name(void)
 {
    return "Hot standby";

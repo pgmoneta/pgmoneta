@@ -71,14 +71,14 @@ pgmoneta_create_verify(void)
    return wf;
 }
 
-static char *
+static char*
 verify_name(void)
 {
    return "Verify";
 }
 
 static int
-verify_execute(char *name, struct art *nodes)
+verify_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

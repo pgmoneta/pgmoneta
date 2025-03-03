@@ -181,7 +181,8 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->setup(current->name(), nodes)) {
+      if (current->setup(current->name(), nodes))
+      {
          goto error;
       }
       current = current->next;
@@ -190,7 +191,8 @@ pgmoneta_wal(int srv, char** argv)
    current = head;
    while (current != NULL)
    {
-      if (current->execute(current->name(), nodes)) {
+      if (current->execute(current->name(), nodes))
+      {
          goto error;
       }
       current = current->next;
