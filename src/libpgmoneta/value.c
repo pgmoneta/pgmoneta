@@ -145,22 +145,10 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
          val->destroy_data = free_destroy_cb;
          break;
       }
-      case ValueStringRef:
-      {
-         val->data = (uintptr_t)pgmoneta_append(NULL, (char*)data);
-         val->destroy_data = noop_destroy_cb;
-         break;
-      }
       case ValueBASE64:
       {
          val->data = (uintptr_t)pgmoneta_append(NULL, (char*)data);
          val->destroy_data = free_destroy_cb;
-         break;
-      }
-      case ValueBASE64Ref:
-      {
-         val->data = (uintptr_t)pgmoneta_append(NULL, (char*)data);
-         val->destroy_data = noop_destroy_cb;
          break;
       }
       case ValueMem:
