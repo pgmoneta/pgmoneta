@@ -512,20 +512,20 @@ deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type
    {
       pgmoneta_log_debug("Deque is NULL");
    }
-   if (tag == NULL)
+
+   if (pgmoneta_deque_exists(deque, tag))
    {
-      pgmoneta_log_debug("Tag is NULL");
-   }
-   else if (!strcmp(tag, ""))
-   {
-      pgmoneta_log_debug("Tag is empty");
-   }
-   else if (pgmoneta_deque_exists(deque, tag))
-   {
-      pgmoneta_log_debug("Tag exists: %s", tag);
+      pgmoneta_log_trace("Tag exists: %s", tag);
    }
 
-   pgmoneta_log_trace("pgmoneta_deque_add: %s -> %p", tag, data);
+   if (tag == NULL)
+   {
+      pgmoneta_log_trace("pgmoneta_deque_add: %p", data);
+   }
+   else
+   {
+      pgmoneta_log_trace("pgmoneta_deque_add: %s -> %p", tag, data);
+   }
 #endif
 
    deque_node_create(data, type, tag, config, &n);

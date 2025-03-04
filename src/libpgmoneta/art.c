@@ -339,7 +339,7 @@ pgmoneta_art_search(struct art* t, char* key)
 
    if (t == NULL)
    {
-      pgmoneta_log_error("ART is NULL");
+      pgmoneta_log_error("pgmoneta_art_search: ART is NULL");
       found = false;
    }
 
@@ -403,25 +403,24 @@ pgmoneta_art_insert(struct art* t, char* key, uintptr_t value, enum value_type t
 
    if (t == NULL)
    {
-      pgmoneta_log_debug("ART is NULL");
+      pgmoneta_log_debug("pgmoneta_art_insert: ART is NULL");
    }
 
-   if (key == NULL)
+   if (pgmoneta_art_contains_key(t, key))
    {
-      pgmoneta_log_debug("Key is NULL");
-   }
-   else if (!strcmp(key, ""))
-   {
-      pgmoneta_log_debug("Key is empty");
-   }
-   else if (pgmoneta_art_contains_key(t, key))
-   {
-      pgmoneta_log_debug("Key exists: %s", key);
+      pgmoneta_log_debug("pgmoneta_art_insert: Key exists: %s", key);
    }
 
    pgmoneta_value_create(pgmoneta_value_to_ref(type), value, &v);
    vs = pgmoneta_value_to_string(v, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_trace("pgmoneta_art_insert: %p %s -> %s (%s)", t, key, vs, pgmoneta_value_type_to_string(type));
+   if (key == NULL)
+   {
+      pgmoneta_log_trace("pgmoneta_art_insert: %p %s (%s)", t, vs, pgmoneta_value_type_to_string(type));
+   }
+   else
+   {
+      pgmoneta_log_trace("pgmoneta_art_insert: %p %s -> %s (%s)", t, key, vs, pgmoneta_value_type_to_string(type));
+   }
 
    free(vs);
    pgmoneta_value_destroy(v);
