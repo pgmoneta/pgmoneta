@@ -1577,6 +1577,8 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    socklen_t client_addr_length;
    int client_fd;
    struct configuration* config;
+   SSL_CTX* ctx = NULL;
+   SSL* client_ssl = NULL;
 
    if (EV_ERROR & revents)
    {
@@ -1586,6 +1588,15 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
 
    config = (struct configuration*)shmem;
+
+   if (strlen(config->prometheus_cert_file) > 0)
+   {
+      if (pgmoneta_create_ssl_ctx(false, &ctx))
+      {
+         pgmoneta_log_error("Failed to create SSL context");
+         return;
+      }
+   }
 
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
@@ -1633,7 +1644,15 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       ev_loop_fork(loop);
       shutdown_ports();
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
-      pgmoneta_prometheus(client_fd);
+      if (strlen(config->prometheus_cert_file) > 0)
+      {
+         if (pgmoneta_create_ssl_server(ctx, client_fd, config->prometheus_key_file, config->prometheus_cert_file, "", &client_ssl))
+         {
+            pgmoneta_log_error("Failed to create SSL server");
+            return;
+         }
+      }
+      pgmoneta_prometheus(client_ssl, client_fd);
    }
 
    pgmoneta_disconnect(client_fd);

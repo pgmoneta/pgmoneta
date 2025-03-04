@@ -125,9 +125,7 @@ static int  server_signature(char* password, char* salt, int salt_length, int it
                              char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
                              unsigned char** result, size_t* result_length);
 
-static int  create_ssl_ctx(bool client, SSL_CTX** ctx);
 static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
-static int  create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl);
 
 static int create_hash_file(char* filename, const char* algorithm, char** hash);
 
@@ -168,12 +166,12 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          SSL_CTX* ctx = NULL;
 
          /* We are acting as a server against the client */
-         if (create_ssl_ctx(false, &ctx))
+         if (pgmoneta_create_ssl_ctx(false, &ctx))
          {
             goto error;
          }
 
-         if (create_ssl_server(ctx, client_fd, &c_ssl))
+         if (pgmoneta_create_ssl_server(ctx, client_fd, config->tls_key_file, config->tls_cert_file, config->tls_ca_file, &c_ssl))
          {
             goto error;
          }
@@ -397,7 +395,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
 
                if (msg->kind == 'S')
                {
-                  if (create_ssl_ctx(true, &ctx))
+                  if (pgmoneta_create_ssl_ctx(true, &ctx))
                   {
                      goto error;
                   }
@@ -1127,7 +1125,7 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    {
       SSL_CTX* ctx = NULL;
 
-      if (create_ssl_ctx(true, &ctx))
+      if (pgmoneta_create_ssl_ctx(true, &ctx))
       {
          goto error;
       }
@@ -2516,8 +2514,8 @@ error:
    return 1;
 }
 
-static int
-create_ssl_ctx(bool client, SSL_CTX** ctx)
+int
+pgmoneta_create_ssl_ctx(bool client, SSL_CTX** ctx)
 {
    SSL_CTX* c = NULL;
 
@@ -2646,8 +2644,8 @@ error:
    return 1;
 }
 
-static int
-create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
+int
+pgmoneta_create_ssl_server(SSL_CTX* ctx, int socket, char* key, char* cert, char* ca, SSL** ssl)
 {
    SSL* s = NULL;
    STACK_OF(X509_NAME) * root_cert_list = NULL;
@@ -2655,34 +2653,34 @@ create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
 
    config = (struct configuration*)shmem;
 
-   if (strlen(config->tls_cert_file) == 0)
+   if (strlen(cert) == 0)
    {
       pgmoneta_log_error("No TLS certificate defined");
       goto error;
    }
 
-   if (strlen(config->tls_key_file) == 0)
+   if (strlen(key) == 0)
    {
       pgmoneta_log_error("No TLS private key defined");
       goto error;
    }
 
-   if (SSL_CTX_use_certificate_chain_file(ctx, config->tls_cert_file) != 1)
+   if (SSL_CTX_use_certificate_chain_file(ctx, cert) != 1)
    {
       unsigned long err;
 
       err = ERR_get_error();
-      pgmoneta_log_error("Couldn't load TLS certificate: %s", config->tls_cert_file);
+      pgmoneta_log_error("Couldn't load TLS certificate: %s", cert);
       pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
       goto error;
    }
 
-   if (SSL_CTX_use_PrivateKey_file(ctx, config->tls_key_file, SSL_FILETYPE_PEM) != 1)
+   if (SSL_CTX_use_PrivateKey_file(ctx, key, SSL_FILETYPE_PEM) != 1)
    {
       unsigned long err;
 
       err = ERR_get_error();
-      pgmoneta_log_error("Couldn't load TLS private key: %s", config->tls_key_file);
+      pgmoneta_log_error("Couldn't load TLS private key: %s", key);
       pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
       goto error;
    }
@@ -2692,30 +2690,30 @@ create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
       unsigned long err;
 
       err = ERR_get_error();
-      pgmoneta_log_error("TLS private key check failed: %s", config->tls_key_file);
+      pgmoneta_log_error("TLS private key check failed: %s", key);
       pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
       goto error;
    }
 
-   if (strlen(config->tls_ca_file) > 0)
+   if (strlen(ca) > 0)
    {
       if (SSL_CTX_load_verify_locations(ctx, config->tls_ca_file, NULL) != 1)
       {
          unsigned long err;
 
          err = ERR_get_error();
-         pgmoneta_log_error("Couldn't load TLS CA: %s", config->tls_ca_file);
+         pgmoneta_log_error("Couldn't load TLS CA: %s", ca);
          pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
          goto error;
       }
 
-      root_cert_list = SSL_load_client_CA_file(config->tls_ca_file);
+      root_cert_list = SSL_load_client_CA_file(ca);
       if (root_cert_list == NULL)
       {
          unsigned long err;
 
          err = ERR_get_error();
-         pgmoneta_log_error("Couldn't load TLS CA: %s", config->tls_ca_file);
+         pgmoneta_log_error("Couldn't load TLS CA: %s", ca);
          pgmoneta_log_error("Reason: %s", ERR_reason_error_string(err));
          goto error;
       }
