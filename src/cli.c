@@ -539,7 +539,7 @@ main(int argc, char** argv)
             }
             else
             {
-               warnx("pgmoneta-cli: Compress method is not correct");
+               warnx("pgmoneta-cli: Invalid compression method. Allowed values: gz, zstd, lz4, bz2, none.");
                exit(1);
             }
             break;
@@ -566,7 +566,7 @@ main(int argc, char** argv)
             }
             else
             {
-               warnx("pgmoneta-cli: Encrypt method is not correct");
+               warnx("pgmoneta-cli: Invalid encryption method. Allowed values: aes, aes256, aes192, aes128, none.");
                exit(1);
             }
             break;
@@ -581,13 +581,13 @@ main(int argc, char** argv)
 
    if (getuid() == 0)
    {
-      warnx("pgmoneta-cli: Using the root account is not allowed");
+      warnx("pgmoneta-cli: Running as root is not allowed for security reasons.");
       exit(1);
    }
 
    if (configuration_path != NULL && (host != NULL || port != NULL))
    {
-      warnx("pgmoneta-cli: Use either -c or -h/-p to define endpoint");
+      warnx("pgmoneta-cli: Conflicting options: Use either '-c' for config or '-h/-p' for manual endpoint definition, not both.");
       exit(1);
    }
 
@@ -600,7 +600,7 @@ main(int argc, char** argv)
    size = sizeof(struct configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
-      warnx("pgmoneta-cli: Error creating shared memory");
+      warnx("pgmoneta-cli: Failed to allocate shared memory. Check system resources and permissions.");
       exit(1);
    }
    pgmoneta_init_configuration(shmem);
@@ -610,7 +610,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_configuration(shmem, configuration_path);
       if (ret)
       {
-         warnx("pgmoneta-cli: Configuration not found: %s", configuration_path);
+         warnx("pgmoneta-cli: Configuration file not found at '%s'. Ensure the file exists and the path is correct.", configuration_path);
          exit(1);
       }
 
@@ -637,7 +637,7 @@ main(int argc, char** argv)
       {
          if (host == NULL || port == NULL)
          {
-            warnx("pgmoneta-cli: Host and port must be specified");
+            warnx("pgmoneta-cli: Missing required arguments: Both '--host' (-h) and '--port' (-p) must be provided.");
             exit(1);
          }
       }
@@ -703,7 +703,7 @@ main(int argc, char** argv)
       {
          if (need_server_conn)
          {
-            warnx("pgmoneta-cli: No route to host: %s:%s", host, port);
+            warnx("pgmoneta-cli: Cannot reach the server at '%s:%s'. Check network connection and firewall settings.", host, port);
             goto done;
          }
          else
@@ -765,7 +765,7 @@ password:
       {
          if (need_server_conn)
          {
-            warnx("pgmoneta-cli: Bad credentials for %s", username);
+            warnx("pgmoneta-cli: Authentication failed for user '%s'. Verify username and password.", username);
             goto done;
          }
          else
