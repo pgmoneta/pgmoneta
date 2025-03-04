@@ -54,16 +54,16 @@
 #define BAD_REQUEST  3
 
 static int resolve_page(struct message* msg);
-static int unknown_page(int client_fd);
-static int home_page(int client_fd);
-static int metrics_page(int client_fd);
-static int bad_request(int client_fd);
+static int unknown_page(SSL* client_ssl, int client_fd);
+static int home_page(SSL* client_ssl, int client_fd);
+static int metrics_page(SSL* client_ssl, int client_fd);
+static int bad_request(SSL* client_ssl, int client_fd);
 
-static void general_information(int client_fd);
-static void backup_information(int client_fd);
-static void size_information(int client_fd);
+static void general_information(SSL* client_ssl, int client_fd);
+static void backup_information(SSL* client_ssl, int client_fd);
+static void size_information(SSL* client_ssl, int client_fd);
 
-static int send_chunk(int client_fd, char* data);
+static int send_chunk(SSL* client_ssl, int client_fd, char* data);
 
 static bool is_metrics_cache_configured(void);
 static bool is_metrics_cache_valid(void);
@@ -73,7 +73,7 @@ static size_t metrics_cache_size_to_alloc(void);
 static void metrics_cache_invalidate(void);
 
 void
-pgmoneta_prometheus(int client_fd)
+pgmoneta_prometheus(SSL* client_ssl, int client_fd)
 {
    int status;
    int page;
@@ -85,7 +85,17 @@ pgmoneta_prometheus(int client_fd)
 
    config = (struct configuration*)shmem;
 
-   status = pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg);
+   if (client_ssl)
+   {
+      if (SSL_accept(client_ssl) <= 0)
+      {
+         pgmoneta_log_error("Failed to accept SSL connection");
+         goto error;
+
+      }
+   }
+   status = pgmoneta_read_timeout_message(client_ssl, client_fd, config->authentication_timeout, &msg);
+
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -95,19 +105,19 @@ pgmoneta_prometheus(int client_fd)
 
    if (page == PAGE_HOME)
    {
-      home_page(client_fd);
+      home_page(client_ssl, client_fd);
    }
    else if (page == PAGE_METRICS)
    {
-      metrics_page(client_fd);
+      metrics_page(client_ssl, client_fd);
    }
    else if (page == PAGE_UNKNOWN)
    {
-      unknown_page(client_fd);
+      unknown_page(client_ssl, client_fd);
    }
    else
    {
-      bad_request(client_fd);
+      bad_request(client_ssl, client_fd);
    }
 
    pgmoneta_disconnect(client_fd);
@@ -218,7 +228,7 @@ resolve_page(struct message* msg)
 }
 
 static int
-unknown_page(int client_fd)
+unknown_page(SSL* client_ssl, int client_fd)
 {
    char* data = NULL;
    time_t now;
@@ -244,7 +254,7 @@ unknown_page(int client_fd)
    msg.length = strlen(data);
    msg.data = data;
 
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
+   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
 
    free(data);
 
@@ -252,7 +262,7 @@ unknown_page(int client_fd)
 }
 
 static int
-home_page(int client_fd)
+home_page(SSL* client_ssl, int client_fd)
 {
    char* data = NULL;
    time_t now;
@@ -281,7 +291,7 @@ home_page(int client_fd)
    msg.length = strlen(data);
    msg.data = data;
 
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
+   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto done;
@@ -1177,7 +1187,7 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "</body>\n");
    data = pgmoneta_append(data, "</html>\n");
 
-   send_chunk(client_fd, data);
+   send_chunk(client_ssl, client_fd, data);
    free(data);
    data = NULL;
 
@@ -1188,7 +1198,7 @@ home_page(int client_fd)
    msg.length = strlen(data);
    msg.data = data;
 
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
+   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
 
 done:
    if (data != NULL)
@@ -1200,7 +1210,7 @@ done:
 }
 
 static int
-metrics_page(int client_fd)
+metrics_page(SSL* client_ssl, int client_fd)
 {
    char* data = NULL;
    time_t now;
@@ -1255,7 +1265,7 @@ retry_cache_locking:
          msg.length = strlen(data);
          msg.data = data;
 
-         status = pgmoneta_write_message(NULL, client_fd, &msg);
+         status = pgmoneta_write_message(client_ssl, client_fd, &msg);
          if (status != MESSAGE_STATUS_OK)
          {
             goto error;
@@ -1264,9 +1274,9 @@ retry_cache_locking:
          free(data);
          data = NULL;
 
-         general_information(client_fd);
-         backup_information(client_fd);
-         size_information(client_fd);
+         general_information(client_ssl, client_fd);
+         backup_information(client_ssl, client_fd);
+         size_information(client_ssl, client_fd);
 
          /* Footer */
          data = pgmoneta_append(data, "0\r\n\r\n");
@@ -1288,7 +1298,7 @@ retry_cache_locking:
       SLEEP_AND_GOTO(1000000L, retry_cache_locking)
    }
 
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
+   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -1306,7 +1316,7 @@ error:
 }
 
 static int
-bad_request(int client_fd)
+bad_request(SSL* client_ssl, int client_fd)
 {
    char* data = NULL;
    time_t now;
@@ -1332,7 +1342,7 @@ bad_request(int client_fd)
    msg.length = strlen(data);
    msg.data = data;
 
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
+   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
 
    free(data);
 
@@ -1340,7 +1350,7 @@ bad_request(int client_fd)
 }
 
 static void
-general_information(int client_fd)
+general_information(SSL* client_ssl, int client_fd)
 {
    char* d;
    unsigned long size;
@@ -2154,7 +2164,7 @@ general_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -2162,7 +2172,7 @@ general_information(int client_fd)
 }
 
 static void
-backup_information(int client_fd)
+backup_information(SSL* client_ssl, int client_fd)
 {
    char* d;
    int number_of_backups;
@@ -2220,7 +2230,7 @@ backup_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -2312,7 +2322,7 @@ backup_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -2372,7 +2382,7 @@ backup_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -2434,7 +2444,7 @@ backup_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3352,7 +3362,7 @@ backup_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3360,7 +3370,7 @@ backup_information(int client_fd)
 }
 
 static void
-size_information(int client_fd)
+size_information(SSL* client_ssl, int client_fd)
 {
    char* d;
    int number_of_backups;
@@ -3418,7 +3428,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3470,7 +3480,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3530,7 +3540,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3597,7 +3607,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3657,7 +3667,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3724,7 +3734,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3790,7 +3800,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3856,7 +3866,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3922,7 +3932,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -3988,7 +3998,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4054,7 +4064,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4120,7 +4130,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4186,7 +4196,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4252,7 +4262,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4318,7 +4328,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4384,7 +4394,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4450,7 +4460,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4516,7 +4526,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4576,7 +4586,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4606,7 +4616,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4646,7 +4656,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4781,7 +4791,7 @@ size_information(int client_fd)
 
    if (data != NULL)
    {
-      send_chunk(client_fd, data);
+      send_chunk(client_ssl, client_fd, data);
       metrics_cache_append(data);
       free(data);
       data = NULL;
@@ -4789,7 +4799,7 @@ size_information(int client_fd)
 }
 
 static int
-send_chunk(int client_fd, char* data)
+send_chunk(SSL* client_ssl, int client_fd, char* data)
 {
    int status;
    char* m = NULL;
@@ -4815,7 +4825,7 @@ send_chunk(int client_fd, char* data)
    msg.length = strlen(m);
    msg.data = m;
 
-   status = pgmoneta_write_message(NULL, client_fd, &msg);
+   status = pgmoneta_write_message(client_ssl, client_fd, &msg);
 
    free(m);
 

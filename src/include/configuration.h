@@ -80,6 +80,8 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_TLS_CERT_FILE          "tls_cert_file"
 #define CONFIGURATION_ARGUMENT_TLS_KEY_FILE           "tls_key_file"
 #define CONFIGURATION_ARGUMENT_TLS_CA_FILE            "tls_ca_file"
+#define CONFIGURATION_ARGUMENT_PROMETHEUS_CERT_FILE   "prometheus_cert_file"
+#define CONFIGURATION_ARGUMENT_PROMETHEUS_KEY_FILE    "prometheus_key_file"
 #define CONFIGURATION_ARGUMENT_LIBEV                  "libev"
 #define CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE        "backup_max_rate"
 #define CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE       "network_max_rate"

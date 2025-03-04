@@ -248,6 +248,8 @@ struct server
    char tls_cert_file[MISC_LENGTH];         /**< TLS certificate path */
    char tls_key_file[MISC_LENGTH];          /**< TLS key path */
    char tls_ca_file[MISC_LENGTH];           /**< TLS CA certificate path */
+   char prometheus_cert_file[MISC_LENGTH];         /**< TLS certificate path */
+   char prometheus_key_file[MISC_LENGTH];          /**< TLS key path */
    int workers;                             /**< The number of workers */
    int backup_max_rate;                     /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;                    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
@@ -365,6 +367,9 @@ struct configuration
    char tls_cert_file[MISC_LENGTH]; /**< TLS certificate path */
    char tls_key_file[MISC_LENGTH];  /**< TLS key path */
    char tls_ca_file[MISC_LENGTH];   /**< TLS CA certificate path */
+
+   char prometheus_cert_file[MISC_LENGTH]; /**< TLS certificate path */
+   char prometheus_key_file[MISC_LENGTH];  /**< TLS key path */
 
    int blocking_timeout;       /**< The blocking timeout in seconds */
    int authentication_timeout; /**< The authentication timeout in seconds */

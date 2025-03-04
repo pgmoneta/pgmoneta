@@ -643,6 +643,37 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "prometheus_cert_file"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->prometheus_cert_file, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.prometheus_cert_file, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "tls_key_file"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -668,6 +699,37 @@ pgmoneta_read_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(&srv.tls_key_file, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "prometheus_key_file"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->prometheus_key_file, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.prometheus_key_file, value, max);
                   }
                   else
                   {
@@ -2139,6 +2201,8 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->tls_ca_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->tls_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PROMETHEUS_CERT_FILE, (uintptr_t)config->prometheus_cert_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PROMETHEUS_KEY_FILE, (uintptr_t)config->prometheus_key_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LIBEV, (uintptr_t)config->libev, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->backup_max_rate, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->network_max_rate, ValueInt64);
@@ -2194,6 +2258,8 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->servers[i].tls_cert_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->servers[i].tls_ca_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->servers[i].tls_key_file, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PROMETHEUS_CERT_FILE, (uintptr_t)config->servers[i].prometheus_cert_file, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PROMETHEUS_KEY_FILE, (uintptr_t)config->servers[i].prometheus_key_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_EXTRA, (uintptr_t)config->servers[i].extra, ValueString);
 
       pgmoneta_json_put(res, config->servers[i].name, (uintptr_t)server_conf, ValueJSON);
@@ -2708,6 +2774,54 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             }
             memcpy(config->tls_key_file, config_value, max);
             pgmoneta_json_put(response, key, (uintptr_t)config->tls_key_file, ValueString);
+         }
+      }
+      else if (!strcmp(key, "prometheus_cert_file"))
+      {
+         if (strlen(section) > 0)
+         {
+            max = strlen(config_value);
+            if (max > MISC_LENGTH - 1)
+            {
+               max = MISC_LENGTH - 1;
+            }
+            memcpy(&config->servers[server_index].prometheus_cert_file, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].prometheus_cert_file, ValueString);
+            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+         }
+         else
+         {
+            max = strlen(config_value);
+            if (max > MISC_LENGTH - 1)
+            {
+               max = MISC_LENGTH - 1;
+            }
+            memcpy(config->prometheus_cert_file, config_value, max);
+            pgmoneta_json_put(response, key, (uintptr_t)config->prometheus_cert_file, ValueString);
+         }
+      }
+      else if (!strcmp(key, "prometheus_key_file"))
+      {
+         if (strlen(section) > 0)
+         {
+            max = strlen(config_value);
+            if (max > MISC_LENGTH - 1)
+            {
+               max = MISC_LENGTH - 1;
+            }
+            memcpy(&config->servers[server_index].prometheus_key_file, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].prometheus_key_file, ValueString);
+            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+         }
+         else
+         {
+            max = strlen(config_value);
+            if (max > MISC_LENGTH - 1)
+            {
+               max = MISC_LENGTH - 1;
+            }
+            memcpy(config->prometheus_key_file, config_value, max);
+            pgmoneta_json_put(response, key, (uintptr_t)config->prometheus_key_file, ValueString);
          }
       }
       else if (!strcmp(key, "blocking_timeout"))
@@ -4303,6 +4417,14 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    {
       changed = true;
    }
+   if (restart_string("prometheus_cert_file", config->prometheus_cert_file, reload->prometheus_cert_file))
+   {
+      changed = true;
+   }
+   if (restart_string("prometheus_key_file", config->prometheus_key_file, reload->prometheus_key_file))
+   {
+      changed = true;
+   }
 
    config->blocking_timeout = reload->blocking_timeout;
    config->authentication_timeout = reload->authentication_timeout;
@@ -4441,6 +4563,14 @@ copy_server(struct server* dst, struct server* src)
       changed = true;
    }
    if (restart_string("tls_ca_file", dst->tls_ca_file, src->tls_ca_file))
+   {
+      changed = true;
+   }
+   if (restart_string("prometheus_cert_file", dst->prometheus_cert_file, src->prometheus_cert_file))
+   {
+      changed = true;
+   }
+   if (restart_string("prometheus_key_file", dst->prometheus_key_file, src->prometheus_key_file))
    {
       changed = true;
    }
