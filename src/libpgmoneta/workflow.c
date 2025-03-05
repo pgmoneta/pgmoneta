@@ -753,11 +753,11 @@ static struct workflow*
 wf_retention(struct backup* backup)
 {
    struct workflow* head = NULL;
-   struct workflow* current = NULL;
 
    head = pgmoneta_create_retention();
 
 #ifdef DEBUG
+   struct workflow *current = NULL;
    current = head;
    while (current != NULL)
    {
@@ -776,11 +776,11 @@ static struct workflow*
 wf_delete_backup(struct backup* backup)
 {
    struct workflow* head = NULL;
-   struct workflow* current = NULL;
 
    head = pgmoneta_create_delete_backup();
 
 #ifdef DEBUG
+   struct workflow *current = NULL;
    current = head;
    while (current != NULL)
    {
