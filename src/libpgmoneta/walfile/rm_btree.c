@@ -148,7 +148,15 @@ pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, const vo
 void
 pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, const void* rec)
 {
-   wrapper->data.v16 = *(struct xl_btree_delete_v16*) rec;
+   const char* ptr = (const char*)rec;
+   memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr,
+          sizeof(transaction_id));
+   ptr += sizeof(transaction_id);
+   memcpy(&wrapper->data.v16.ndeleted, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.nupdated, ptr, sizeof(uint16_t));
+   ptr += sizeof(uint16_t);
+   memcpy(&wrapper->data.v16.is_catalog_rel, ptr, sizeof(bool));
 }
 
 char*
