@@ -37,32 +37,45 @@
  */
 
 #include <walfile/relpath.h>
-
 #include <assert.h>
 #include <utils.h>
+#include <stdlib.h>
+
+static inline bool
+is_valid_fork_number(enum fork_number forkNumber)
+{
+   return forkNumber >= MAIN_FORKNUM && forkNumber <= INIT_FORKNUM;
+}
+
+static const char* const FORK_NAMES[] =
+{
+   "main",
+   "fsm",
+   "vm",
+   "init"
+};
 
 char*
 pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
                                int backendId, enum fork_number forkNumber)
 {
-   char* forkNames[] = {
-      "main",                       /* MAIN_FORKNUM */
-      "fsm",                        /* FSM_FORKNUM */
-      "vm",                      /* VISIBILITYMAP_FORKNUM */
-      "init"                        /* INIT_FORKNUM */
-   };
-   char* path;
-   path = NULL;
+   char* path = NULL;
+
+   if (!is_valid_fork_number(forkNumber))
+   {
+      goto error;
+   }
 
    if (spcNode == GLOBALTABLESPACE_OID)
    {
-      /* Shared system relations live in {datadir}/global */
-      assert(dbNode == 0);
-      assert(backendId == INVALID_BACKEND_ID);
+      if (dbNode != 0 || backendId != INVALID_BACKEND_ID)
+      {
+         goto error;
+      }
+
       if (forkNumber != MAIN_FORKNUM)
       {
-         path = pgmoneta_format_and_append(path, "global/%u_%s",
-                                           relNode, forkNames[forkNumber]);
+         path = pgmoneta_format_and_append(path, "global/%u_%s", relNode, FORK_NAMES[forkNumber]);
       }
       else
       {
@@ -71,55 +84,48 @@ pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
    }
    else if (spcNode == DEFAULTTABLESPACE_OID)
    {
-      /* The default tablespace is {datadir}/base */
       if (backendId == INVALID_BACKEND_ID)
       {
          if (forkNumber != MAIN_FORKNUM)
          {
-            path = pgmoneta_format_and_append(path, "base/%u/%u_%s",
-                                              dbNode, relNode,
-                                              forkNames[forkNumber]);
+            path = pgmoneta_format_and_append(path, "base/%u/%u_%s", dbNode, relNode, FORK_NAMES[forkNumber]);
          }
          else
          {
-            path = pgmoneta_format_and_append(path, "base/%u/%u",
-                                              dbNode, relNode);
+            path = pgmoneta_format_and_append(path, "base/%u/%u", dbNode, relNode);
          }
       }
       else
       {
          if (forkNumber != MAIN_FORKNUM)
          {
-            path = pgmoneta_format_and_append(path, "base/%u/t%d_%u_%s",
-                                              dbNode, backendId, relNode,
-                                              forkNames[forkNumber]);
+            path = pgmoneta_format_and_append(path, "base/%u/t%d_%u_%s", dbNode, backendId, relNode, FORK_NAMES[forkNumber]);
          }
          else
          {
-            path = pgmoneta_format_and_append(path, "base/%u/t%d_%u",
-                                              dbNode, backendId, relNode);
+            path = pgmoneta_format_and_append(path, "base/%u/t%d_%u", dbNode, backendId, relNode);
          }
       }
    }
    else
    {
       char* version_directory = pgmoneta_wal_get_tablespace_version_directory();
-      /* All other tablespaces are accessed via symlinks */
+      if (!version_directory)
+      {
+         goto error;
+      }
+
       if (backendId == INVALID_BACKEND_ID)
       {
-
          if (forkNumber != MAIN_FORKNUM)
          {
             path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/%u_%s",
-                                              spcNode, version_directory,
-                                              dbNode, relNode,
-                                              forkNames[forkNumber]);
+                                              spcNode, version_directory, dbNode, relNode, FORK_NAMES[forkNumber]);
          }
          else
          {
             path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/%u",
-                                              spcNode, version_directory,
-                                              dbNode, relNode);
+                                              spcNode, version_directory, dbNode, relNode);
          }
       }
       else
@@ -127,32 +133,63 @@ pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
          if (forkNumber != MAIN_FORKNUM)
          {
             path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/t%d_%u_%s",
-                                              spcNode, version_directory,
-                                              dbNode, backendId, relNode,
-                                              forkNames[forkNumber]);
+                                              spcNode, version_directory, dbNode, backendId, relNode, FORK_NAMES[forkNumber]);
          }
          else
          {
             path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/t%d_%u",
-                                              spcNode, version_directory,
-                                              dbNode, backendId, relNode);
+                                              spcNode, version_directory, dbNode, backendId, relNode);
          }
       }
       free(version_directory);
    }
+
    return path;
+
+error:
+   free(path);
+   return NULL;
 }
 
 char*
 pgmoneta_wal_get_tablespace_version_directory(void)
 {
-   char* result = (char*)malloc(50);
-   result = pgmoneta_format_and_append(result, "PG_%d_%s", server_config->version, pgmoneta_wal_get_catalog_version_number());
+   char* result = NULL;
+   char* catalog_version = NULL;
+
+   if (!server_config)
+   {
+      goto error;
+   }
+
+   result = (char*)malloc(MAX_VERSION_DIR_SIZE);
+   if (!result)
+   {
+      goto error;
+   }
+
+   if (!catalog_version)
+   {
+      goto error;
+   }
+
+   if (!pgmoneta_format_and_append(result, "PG_%d_%s",
+                                   server_config->version, catalog_version))
+   {
+      goto error;
+   }
+
    return result;
+
+error:
+   free(result);
+   return NULL;
 }
+
 char*
 pgmoneta_wal_get_catalog_version_number(void)
 {
+
    switch (server_config->version)
    {
       case 13: return "202004022";
@@ -160,6 +197,7 @@ pgmoneta_wal_get_catalog_version_number(void)
       case 15: return "202204062";
       case 16: return "202303311";
       case 17: return "202407111";
-      default: return "Key not found";    // Return a default message for invalid keys
+      default:
+         return NULL;
    }
 }

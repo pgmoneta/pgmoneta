@@ -28,6 +28,7 @@
 
 #ifndef PGMONETA_RELPATH_H
 #define PGMONETA_RELPATH_H
+#define MAX_VERSION_DIR_SIZE 50
 
 #include <walfile/wal_reader.h>
 
@@ -39,12 +40,12 @@ typedef int backend_id;        /* unique currently active backend identifier */
 #define GLOBALTABLESPACE_OID     1664
 
 #define RELPATHBACKEND(rnode, backend, forknum) \
-        pgmoneta_wal_get_relation_path((rnode).dbNode, (rnode).spcNode, (rnode).relNode, \
-                                       backend, forknum)
+   pgmoneta_wal_get_relation_path((rnode).dbNode, (rnode).spcNode, (rnode).relNode, \
+                                  backend, forknum)
 
 /* First argument is a rel_file_node */
 #define RELPATHPERM(rnode, forknum) \
-        RELPATHBACKEND(rnode, INVALID_BACKEND_ID, forknum)
+   RELPATHBACKEND(rnode, INVALID_BACKEND_ID, forknum)
 
 /**
  * @brief Generates the filesystem path for a relation file.
