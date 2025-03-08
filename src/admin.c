@@ -394,6 +394,13 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       goto error;
    }
 
+   #if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+      #define GET_ENV(name) getenv(name)
+   #else
+      #define GET_ENV(name) secure_getenv(name)
+   #endif
+
+
    if (password == NULL)
    {
       if (generate_pwd)
@@ -403,7 +410,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       }
       else
       {
-         password = secure_getenv("PGMONETA_PASSWORD");
+         password = GET_ENV("PGMONETA_PASSWORD");
 
          if (password == NULL)
          {
@@ -632,7 +639,7 @@ password:
       }
       else
       {
-         password = secure_getenv("PGMONETA_PASSWORD");
+         password = GET_ENV("PGMONETA_PASSWORD");
 
          if (password == NULL)
          {
@@ -867,7 +874,7 @@ password:
             }
             else
             {
-               password = secure_getenv("PGMONETA_PASSWORD");
+               password = GET_ENV("PGMONETA_PASSWORD");
 
                if (password == NULL)
                {
