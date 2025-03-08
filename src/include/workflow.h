@@ -76,6 +76,7 @@ extern "C" {
 #define NODE_TARGET_BASE       "target_base"       /* The target base directory */
 #define NODE_TARGET_FILE       "target_file"       /* The target file */
 #define NODE_TARGET_ROOT       "target_root"       /* The target root directory */
+#define NODE_WORKSPACE_ROOT    "workspace_root"    /* The workspace root directory */
 
 typedef char* (*name)(void);
 typedef int (*setup)(char*, struct art*);

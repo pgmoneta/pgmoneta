@@ -356,8 +356,9 @@ pgmoneta_restore_backup(struct art* nodes)
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct backup* backup = NULL;
-   char* directory = NULL;
-   char directory_incremental[MAX_PATH];
+   char* target_root = NULL;
+   char* target_base = NULL;
+   char* workspace_root = NULL;
    char directory_combine[MAX_PATH];
    char* manifest_path = NULL;
    struct json* manifest = NULL;
@@ -365,7 +366,6 @@ pgmoneta_restore_backup(struct art* nodes)
 
    config = (struct configuration*)shmem;
 
-   memset(directory_incremental, 0, MAX_PATH);
    memset(directory_combine, 0, MAX_PATH);
 
 #ifdef DEBUG
@@ -382,17 +382,28 @@ pgmoneta_restore_backup(struct art* nodes)
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
-   directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   target_root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+   workspace_root = pgmoneta_get_server_workspace(server);
+
+   if (workspace_root == NULL || strlen(workspace_root) == 0)
+   {
+      workspace_root = strdup(target_root);
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_WORKSPACE_ROOT, (uintptr_t)workspace_root, ValueString))
+   {
+      goto error;
+   }
 
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
    {
-      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(directory), directory);
-      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(directory), directory);
-      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(directory), directory);
+      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(target_root), target_root);
+      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(target_root), target_root);
+      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
    }
 
-   free_space = pgmoneta_free_space(directory);
+   free_space = pgmoneta_free_space(target_root);
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
 
@@ -404,13 +415,63 @@ pgmoneta_restore_backup(struct art* nodes)
       f = pgmoneta_translate_file_size(free_space);
       r = pgmoneta_translate_file_size(required_space);
 
-      pgmoneta_log_error("Restore: Not enough disk space for %s/%s (Available: %s, Required: %s)",
-                         config->servers[server].name, backup->label, f, r);
+      pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
+                         config->servers[server].name, backup->label, target_root, f, r);
 
       free(f);
       free(r);
 
       ret = RESTORE_NO_DISK_SPACE;
+      goto error;
+   }
+
+   if (backup->type == TYPE_INCREMENTAL)
+   {
+      if (strcmp(target_root, workspace_root))
+      {
+         if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
+         {
+            pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(workspace_root), workspace_root);
+            pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(workspace_root), workspace_root);
+            pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(workspace_root), workspace_root);
+         }
+
+         free_space = pgmoneta_free_space(workspace_root);
+         required_space =
+            backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+
+         if (free_space < required_space)
+         {
+            char* f = NULL;
+            char* r = NULL;
+
+            f = pgmoneta_translate_file_size(free_space);
+            r = pgmoneta_translate_file_size(required_space);
+
+            pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
+                               config->servers[server].name, backup->label, workspace_root, f, r);
+
+            free(f);
+            free(r);
+
+            ret = RESTORE_NO_DISK_SPACE;
+            goto error;
+         }
+      }
+   }
+
+   target_base = pgmoneta_append(target_base, target_root);
+   if (!pgmoneta_ends_with(target_base, "/"))
+   {
+      target_base = pgmoneta_append(target_base, "/");
+   }
+   target_base = pgmoneta_append(target_base, config->servers[server].name);
+   target_base = pgmoneta_append(target_base, "-");
+   target_base = pgmoneta_append(target_base, backup->label);
+   target_base = pgmoneta_append(target_base, "/");
+
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base, ValueString))
+   {
       goto error;
    }
 
@@ -422,17 +483,9 @@ pgmoneta_restore_backup(struct art* nodes)
    {
       pgmoneta_log_trace("Incremental backup: %s", backup->label);
 
-      snprintf(directory_incremental, MAX_PATH, "%s/tmp_%s_incremental_%s",
-               directory, config->servers[server].name, &backup->label[0]);
-      snprintf(directory_combine, MAX_PATH, "%s/%s-%s", directory, config->servers[server].name, &backup->label[0]);
+      snprintf(directory_combine, MAX_PATH, "%s/%s-%s", target_root, config->servers[server].name, &backup->label[0]);
       manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
       manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
-
-      pgmoneta_art_delete(nodes, NODE_TARGET_ROOT);
-      if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory_incremental, ValueString))
-      {
-         goto error;
-      }
 
       // Read the manifest for later usage
       if (pgmoneta_json_read_file(manifest_path, &manifest))
@@ -494,28 +547,18 @@ pgmoneta_restore_backup(struct art* nodes)
       current = current->next;
    }
 
-   if (backup != NULL && backup->type == TYPE_INCREMENTAL)
-   {
-      // clean up the temporary workspace we used to combine backups
-      if (strlen(directory_incremental) != 0 && pgmoneta_exists(directory_incremental))
-      {
-         pgmoneta_delete_directory(directory_incremental);
-      }
-   }
-
+   free(target_base);
    free(manifest_path);
+   free(workspace_root);
 
    pgmoneta_workflow_destroy(workflow);
 
    return RESTORE_OK;
 
 error:
+
    if (backup != NULL && backup->type == TYPE_INCREMENTAL)
    {
-      if (strlen(directory_incremental) != 0)
-      {
-         pgmoneta_delete_directory(directory_incremental);
-      }
       if (strlen(directory_combine) != 0)
       {
          pgmoneta_delete_directory(directory_combine);
@@ -524,8 +567,8 @@ error:
          {
             char tblspc[MAX_PATH];
             memset(tblspc, 0, MAX_PATH);
-            snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s",
-                     directory, config->servers[server].name, backup->label, backup->tablespaces[i]);
+            snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", target_root, config->servers[server].name,
+                     backup->label, backup->tablespaces[i]);
             if (pgmoneta_exists(tblspc))
             {
                pgmoneta_delete_directory(tblspc);
@@ -534,7 +577,10 @@ error:
       }
    }
 
+   free(target_base);
    free(manifest_path);
+   free(workspace_root);
+
    pgmoneta_workflow_destroy(workflow);
 
    return ret;

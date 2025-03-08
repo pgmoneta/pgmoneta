@@ -202,6 +202,7 @@ restore_execute(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, NODE_POSITION));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
    free(a);
 #endif
@@ -216,24 +217,6 @@ restore_execute(char* name, struct art* nodes)
 
    from = pgmoneta_get_server_backup_identifier_data(server, label);
    to = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
-
-   if (to == NULL)
-   {
-      to = pgmoneta_append(to, directory);
-      if (!pgmoneta_ends_with(to, "/"))
-      {
-         to = pgmoneta_append(to, "/");
-      }
-      to = pgmoneta_append(to, config->servers[server].name);
-      to = pgmoneta_append(to, "-");
-      to = pgmoneta_append(to, label);
-      to = pgmoneta_append(to, "/");
-
-      if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)to, ValueString))
-      {
-         goto error;
-      }
-   }
 
    pgmoneta_delete_directory(to);
 
@@ -353,7 +336,6 @@ restore_execute(char* name, struct art* nodes)
    }
 
    free(from);
-   free(to);
    free(origwal);
    free(waldir);
    free(waltarget);
@@ -368,7 +350,6 @@ error:
    }
 
    free(from);
-   free(to);
    free(origwal);
    free(waldir);
    free(waltarget);
@@ -479,7 +460,6 @@ static int
 batch_restore_relay_execute(char* name, struct art* nodes)
 {
    int server = -1;
-   char* identifier = NULL;
    struct deque* prior_backups = NULL;
    char* label = NULL;
    struct backup* bck = NULL;
@@ -496,17 +476,17 @@ batch_restore_relay_execute(char* name, struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
    free(a);
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
-   identifier = (char*)pgmoneta_art_search(nodes, NODE_IDENTIFIER);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   server_dir = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BASE);
 
-   server_dir = pgmoneta_get_server_backup(server);
-
-   pgmoneta_log_debug("Batch restore relay (execute): %s/%s", config->servers[server].name, identifier);
-
-   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
+   pgmoneta_log_debug("Batch restore relay (execute): %s/%s", config->servers[server].name, label);
 
    // This isn't ideal because we have read the backup info previously when constructing the workflow,
    // but for now we have no choice but to read a second time
@@ -538,6 +518,7 @@ batch_restore_relay_execute(char* name, struct art* nodes)
       {
          continue;
       }
+      pgmoneta_log_debug("Removing: %s", iter->key);
       pgmoneta_art_iterator_remove(iter);
    }
 
