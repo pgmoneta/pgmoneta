@@ -3191,3 +3191,46 @@ pgmoneta_get_hash_algorithm(char* algorithm)
 
    return HASH_ALGORITHM_SHA256;
 }
+
+int
+pgmoneta_extract_server_parameters(struct deque** server_parameters)
+{
+   int i;
+   char* data = NULL;
+   ssize_t data_length;
+   size_t offset;
+   char* name = NULL;
+   char* value = NULL;
+   struct message* msg = NULL;
+   struct deque* sp = NULL;
+   *server_parameters = NULL;
+
+   if (pgmoneta_deque_create(false, &sp))
+   {
+      return 1;
+   }
+
+   for (i = 0; i < NUMBER_OF_SECURITY_MESSAGES; ++i)
+   {
+      if ((data_length = security_lengths[i]) > 0)
+      {
+         data = &security_messages[i][0];
+         offset = 0;
+
+         while (offset < data_length)
+         {
+            offset = pgmoneta_extract_message_offset(offset, data, &msg);
+            if (msg->kind == 'S')
+            {
+               name = pgmoneta_read_string(msg->data + 5); // 1 byte for kind + 4 bytes for length
+               value = pgmoneta_read_string(msg->data + strlen(name) + 6);
+               pgmoneta_deque_add(sp, name, (uintptr_t)value, ValueString);
+            }
+            pgmoneta_free_message(msg);
+         }
+      }
+   }
+
+   *server_parameters = sp;
+   return 0;
+}
