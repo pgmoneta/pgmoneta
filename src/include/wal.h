@@ -26,26 +26,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_WAL_H
-#define PGMONETA_WAL_H
+ #ifndef PGMONETA_WAL_H
+ #define PGMONETA_WAL_H
 
-#ifdef __cplusplus
+ #ifdef __cplusplus
 extern "C" {
-#endif
+ #endif
 
-#include <ev.h>
-#include <stdint.h>
-#include <stdlib.h>
+ #include <ev.h>
+ #include <stdint.h>
+ #include <stdlib.h>
 
 /** @struct timeline_history
  * Defines a timeline history
  */
 struct timeline_history
 {
-   uint32_t parent_tli;           /**< the previous timeline current timeline switched off from */
-   uint32_t switchpos_hi;         /**< the high 32 bit in decimal of xlog pos where the switch happened */
-   uint32_t switchpos_lo;         /**< the low 32 bit in decimal of xlog pos where the switch happened */
-   struct timeline_history* next; /**< the next history entry */
+   uint32_t parent_tli;            /**< the previous timeline current timeline switched off from */
+   uint32_t switchpos_hi;          /**< the high 32 bit in decimal of xlog pos where the switch happened */
+   uint32_t switchpos_lo;          /**< the low 32 bit in decimal of xlog pos where the switch happened */
+   struct timeline_history* next;  /**< the next history entry */
 };
 
 /**
@@ -73,8 +73,31 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
 void
 pgmoneta_free_timeline_history(struct timeline_history* history);
 
-#ifdef __cplusplus
-}
-#endif
+typedef enum
+{
+   OBJ_TABLESPACE,
+   OBJ_DATABASE,
+   OBJ_RELATION
+} ObjectType;
 
-#endif
+typedef struct
+{
+   int oid;           // OID (e.g., tablespace OID, database OID, relation OID)
+   ObjectType type;   // Type of the object (tablespace, database, relation)
+   const char* name;  // Name corresponding to the OID
+} OidMapping;
+
+extern OidMapping* oidMappings;
+extern int mappings_size;      
+
+int pgmoneta_read_mappings(char* mappings_path);
+const char* get_tablespace_name(int oid);
+const char* get_database_name(int oid);
+const char* get_relation_name(int oid);
+void pgmoneta_free_mappings();
+
+ #ifdef __cplusplus
+}
+ #endif
+
+ #endif

@@ -26,23 +26,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <pgmoneta.h>
-#include <configuration.h>
-#include <deque.h>
-#include <logging.h>
-#include <shmem.h>
-#include <utils.h>
-#include <walfile.h>
+ #include <pgmoneta.h>
+ #include <configuration.h>
+ #include <deque.h>
+ #include <logging.h>
+ #include <shmem.h>
+ #include <utils.h>
+ #include <walfile.h>
 
-#include <inttypes.h>
-#include <err.h>
-#include <getopt.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+ #include <inttypes.h>
+ #include <err.h>
+ #include <getopt.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
+ #include <wal.h>
 
-#define OPT_COLOR 1000
+ #define OPT_COLOR 1000
 
 static void
 version(void)
@@ -75,6 +76,8 @@ usage(void)
    printf("  -l, --limit              Limit number of outputs\n");
    printf("  -v, --verbose            Output result\n");
    printf("  -V, --version            Display version information\n");
+   printf("  -m, --mapping            Provide a mappings file that is used to translate OIDs to object names\n");
+   printf("  -t, --translate          Translate OIDs in description of XLOG records into actual names\n");
    printf("  -?, --help               Display help\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
@@ -106,6 +109,8 @@ main(int argc, char** argv)
    enum value_type type = ValueString;
    size_t size;
    struct configuration* config = NULL;
+   bool enable_mapping = false;
+   char* mappings_path = NULL;
 
    if (argc < 2)
    {
@@ -130,12 +135,13 @@ main(int argc, char** argv)
          {"limit", required_argument, 0, 'l'},
          {"verbose", no_argument, 0, 'v'},
          {"version", no_argument, 0, 'V'},
+         {"mapping", required_argument, 0, 'm'},
+         {"translate", no_argument, 0, 't'},
          {"help", no_argument, 0, '?'},
          {0, 0, 0, 0}
       };
 
-      c = getopt_long(argc, argv, "c:qvV?:o:F:L:r:s:e:x:l:",
-                      long_options, &option_index);
+      c = getopt_long(argc, argv, "c:m:tqvV?:o:F:L:r:s:e:x:l:", long_options, &option_index);
 
       if (c == -1)
       {
@@ -144,6 +150,18 @@ main(int argc, char** argv)
 
       switch (c)
       {
+         case 'm':
+            enable_mapping = true;
+            mappings_path = optarg;  // Path provided via --mapping
+            break;
+         case 't':
+            enable_mapping = true;
+            // Use default path if --mapping wasn't provided
+            if (mappings_path == NULL)
+            {
+               mappings_path = "/etc/pgmoneta/pgmoneta_walinfo_conf.json";
+            }
+            break;
          case 'c':
             configuration_path = optarg;
             break;
@@ -189,7 +207,6 @@ main(int argc, char** argv)
             }
 
             pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
-
             break;
          case 's':
             if (strchr(optarg, '/'))
@@ -207,13 +224,12 @@ main(int argc, char** argv)
             }
             else
             {
-               start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+               start_lsn = strtoull(optarg, NULL, 10);
             }
             break;
          case 'e':
             if (strchr(optarg, '/'))
             {
-               // Assuming optarg is a string like "16/B374D848"
                if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2)
                {
                   end_lsn = (end_lsn_high << 32) + end_lsn_low;
@@ -239,7 +255,6 @@ main(int argc, char** argv)
             }
 
             pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
-
             break;
          case 'l':
             limit = pgmoneta_atoi(optarg);
@@ -255,6 +270,15 @@ main(int argc, char** argv)
             exit(0);
          default:
             break;
+      }
+   }
+
+   if (enable_mapping && mappings_path != NULL)
+   {
+      if (pgmoneta_read_mappings(mappings_path) != 0)
+      {
+         pgmoneta_log_error("Failed to read mappings file");
+         exit(1);
       }
    }
 
@@ -347,6 +371,7 @@ error:
 
    pgmoneta_deque_destroy(rms);
    pgmoneta_deque_destroy(xids);
+   pgmoneta_free_mappings();
 
    if (shmem != NULL)
    {
