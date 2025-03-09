@@ -757,7 +757,7 @@ wf_retention(struct backup* backup)
    head = pgmoneta_create_retention();
 
 #ifdef DEBUG
-   struct workflow *current = NULL;
+   struct workflow* current = NULL;
    current = head;
    while (current != NULL)
    {
@@ -780,7 +780,7 @@ wf_delete_backup(struct backup* backup)
    head = pgmoneta_create_delete_backup();
 
 #ifdef DEBUG
-   struct workflow *current = NULL;
+   struct workflow* current = NULL;
    current = head;
    while (current != NULL)
    {

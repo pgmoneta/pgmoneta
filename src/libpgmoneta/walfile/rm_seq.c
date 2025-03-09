@@ -29,6 +29,7 @@
 #include <walfile/rm.h>
 #include <walfile/rm_seq.h>
 #include <utils.h>
+#include <wal.h>
 
 char*
 pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
@@ -39,9 +40,13 @@ pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_SEQ_LOG)
    {
-      buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u",
-                                       xlrec->node.spcNode, xlrec->node.dbNode,
-                                       xlrec->node.relNode);
+      const char* dbname = get_database_name(xlrec->node.dbNode);
+      const char* relname = get_relation_name(xlrec->node.relNode);
+      const char* spcname = get_tablespace_name(xlrec->node.spcNode);
+
+      buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s",
+                                       spcname, dbname,
+                                       relname);
    }
    return buf;
 }

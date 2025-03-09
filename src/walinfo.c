@@ -33,6 +33,9 @@
 #include <shmem.h>
 #include <utils.h>
 #include <walfile.h>
+#include <security.h>
+#include <management.h>
+#include <logging.h>
 
 #include <inttypes.h>
 #include <err.h>
@@ -41,6 +44,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <wal.h>
+
+#ifdef HAVE_LINUX
+#include <systemd/sd-daemon.h>
+#endif
 
 #define OPT_COLOR 1000
 
@@ -75,6 +83,8 @@ usage(void)
    printf("  -l, --limit              Limit number of outputs\n");
    printf("  -v, --verbose            Output result\n");
    printf("  -V, --version            Display version information\n");
+   printf("  -m, --mapping            Provide a mappings file that is used to translate OIDs to object names\n");
+   printf("  -t, --translate          Translate OIDs in description of XLOG records into actual names\n");
    printf("  -?, --help               Display help\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
@@ -88,6 +98,7 @@ main(int argc, char** argv)
    int option_index = 0;
    int loaded = 1;
    char* configuration_path = NULL;
+   char* users_path = NULL;
    char* output = NULL;
    char* format = NULL;
    char* logfile = NULL;
@@ -106,6 +117,14 @@ main(int argc, char** argv)
    enum value_type type = ValueString;
    size_t size;
    struct configuration* config = NULL;
+   bool enable_mapping = false;
+   char* mappings_path = NULL;
+   SSL* ssl = NULL;
+   int socket = -1;
+   int server_index = -1;
+   int user_index = -1;
+   int auth;
+   int ret;
 
    if (argc < 2)
    {
@@ -130,12 +149,14 @@ main(int argc, char** argv)
          {"limit", required_argument, 0, 'l'},
          {"verbose", no_argument, 0, 'v'},
          {"version", no_argument, 0, 'V'},
+         {"mapping", required_argument, 0, 'm'},
+         {"translate", no_argument, 0, 't'},
+         {"users", required_argument, 0, 'u'},
          {"help", no_argument, 0, '?'},
          {0, 0, 0, 0}
       };
 
-      c = getopt_long(argc, argv, "c:qvV?:o:F:L:r:s:e:x:l:",
-                      long_options, &option_index);
+      c = getopt_long(argc, argv, "c:m:tqvV?:o:F:L:r:s:e:x:l:u:", long_options, &option_index);
 
       if (c == -1)
       {
@@ -144,6 +165,16 @@ main(int argc, char** argv)
 
       switch (c)
       {
+         case 'u':
+            users_path = optarg;
+            break;
+         case 'm':
+            enable_mapping = true;
+            mappings_path = optarg; // Path provided via --mapping
+            break;
+         case 't':
+            enable_mapping = true;
+            break;
          case 'c':
             configuration_path = optarg;
             break;
@@ -189,7 +220,6 @@ main(int argc, char** argv)
             }
 
             pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
-
             break;
          case 's':
             if (strchr(optarg, '/'))
@@ -207,13 +237,12 @@ main(int argc, char** argv)
             }
             else
             {
-               start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+               start_lsn = strtoull(optarg, NULL, 10);
             }
             break;
          case 'e':
             if (strchr(optarg, '/'))
             {
-               // Assuming optarg is a string like "16/B374D848"
                if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2)
                {
                   end_lsn = (end_lsn_high << 32) + end_lsn_low;
@@ -226,7 +255,7 @@ main(int argc, char** argv)
             }
             else
             {
-               end_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+               end_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
             }
             break;
          case 'x':
@@ -239,7 +268,6 @@ main(int argc, char** argv)
             }
 
             pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
-
             break;
          case 'l':
             limit = pgmoneta_atoi(optarg);
@@ -267,6 +295,7 @@ main(int argc, char** argv)
 
    pgmoneta_init_configuration(shmem);
    config = (struct configuration*)shmem;
+
 
    if (configuration_path != NULL)
    {
@@ -303,6 +332,94 @@ main(int argc, char** argv)
    if (pgmoneta_start_logging())
    {
       exit(1);
+   }
+
+   if (users_path != NULL)
+   {
+      ret = pgmoneta_read_users_configuration(shmem, users_path);
+      if (ret == 1)
+      {
+         warnx("pgmoneta: USERS configuration not found: %s", users_path);
+#ifdef HAVE_LINUX
+         sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
+#endif
+         goto error;
+      }
+      else if (ret == 2)
+      {
+         warnx("pgmoneta: Invalid master key file");
+#ifdef HAVE_LINUX
+         sd_notify(0, "STATUS=Invalid master key file");
+#endif
+         goto error;
+      }
+      else if (ret == 3)
+      {
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+#ifdef HAVE_LINUX
+         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+#endif
+         goto error;
+      }
+      memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+   }
+   else
+   {
+      users_path = "/etc/pgmoneta/pgmoneta_users.conf";
+      ret = pgmoneta_read_users_configuration(shmem, users_path);
+      if (ret == 0)
+      {
+         memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+      }
+   }
+
+   if (enable_mapping && mappings_path != NULL)
+   {
+      if (pgmoneta_read_mappings_from_json(mappings_path) != 0)
+      {
+         pgmoneta_log_error("Failed to read mappings file");
+      }
+   }
+   else if (mappings_path == NULL)
+   {
+      config = (struct configuration*)shmem;
+      int rc;
+
+      server_index = 0;
+
+      for (int i = 0; i < config->number_of_users; i++)
+      {
+         if (strcmp(config->users[i].username, config->servers[server_index].username) == 0)
+         {
+            user_index = i;
+            break;
+         }
+      }
+
+      if (user_index == -1)
+      {
+         pgmoneta_log_error("User %s not found", config->servers[server_index].username);
+         return 1;
+      }
+
+      // This line is just a tempoarary fix to bypass the assertion
+      // that fails in memory.c:73 when building the project in debug mode
+      pgmoneta_memory_init();
+
+      auth = pgmoneta_server_authenticate(server_index, "postgres", config->users[user_index].username, config->users[user_index].password, false, &ssl, &socket);
+
+      if (auth != AUTH_SUCCESS)
+      {
+         pgmoneta_log_error("Authentication failed for user %s on %s", config->users[user_index].username, config->servers[server_index].name);
+      }
+
+      rc = pgmoneta_read_mappings_from_server(ssl, socket);
+
+      if (rc != 0)
+      {
+         pgmoneta_log_error("Failed to read mappings from server");
+         return 1;
+      }
    }
 
    if (optind < argc)
@@ -347,6 +464,7 @@ error:
 
    pgmoneta_deque_destroy(rms);
    pgmoneta_deque_destroy(xids);
+   pgmoneta_free_mappings();
 
    if (shmem != NULL)
    {

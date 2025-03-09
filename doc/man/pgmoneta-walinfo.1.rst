@@ -45,6 +45,12 @@ OPTIONS
 -V, --version
   Display version information
 
+-t, --translate
+  Translate the OIDs in the XLOG records to the corresponding object (database/tablespace/relation) names
+
+-m, --mapping
+  The JSON file that contains the mapping of the OIDs to the corresponding object names
+
 -?, --help
   Display help and usage information.
 

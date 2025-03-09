@@ -31,6 +31,7 @@
 #include <walfile.h>
 #include <walfile/rmgr.h>
 #include <walfile/wal_reader.h>
+#include <wal.h>
 
 #include <assert.h>
 #include <libgen.h>
@@ -742,9 +743,13 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf, " ");
          }
 
-         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %u/%u/%u forknum %d blk %u",
+         const char* dbname = get_database_name(rlocator.dbOid);
+         const char* relname = get_relation_name(rlocator.relNumber);
+         const char* spcname = get_tablespace_name(rlocator.spcOid);
+
+         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %s/%s/%s forknum %d blk %u",
                                           block_id,
-                                          rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                          spcname, dbname, relname,
                                           forknum,
                                           blk);
 
@@ -980,6 +985,8 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 
          rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
          backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+
+         // TODO: Update the rm_desc with the oid mappings
 
          if (color)
          {
