@@ -98,8 +98,8 @@ struct xl_clog_truncate_16
  */
 struct xl_clog_truncate
 {
-   void (*parse)(struct xl_clog_truncate* wrapper, char* rec);      /**< Function pointer to parse the record */
-   char* (*format)(struct xl_clog_truncate* wrapper, char* buf);    /**< Function pointer to format the record */
+   void (* parse)(struct xl_clog_truncate* wrapper, char* rec);      /**< Function pointer to parse the record */
+   char* (* format)(struct xl_clog_truncate* wrapper, char* buf);    /**< Function pointer to format the record */
    union
    {
       struct xl_clog_truncate_16 v16;                               /**< Truncate record for version 16 */

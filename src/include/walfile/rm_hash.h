@@ -213,8 +213,8 @@ struct xl_hash_vacuum_one_page_v16
  */
 struct xl_hash_vacuum_one_page
 {
-   void (*parse)(struct xl_hash_vacuum_one_page* wrapper, const void* rec);   /**< Function pointer to parse the record */
-   char* (*format)(struct xl_hash_vacuum_one_page* wrapper, char* buf);       /**< Function pointer to format the record */
+   void (* parse)(struct xl_hash_vacuum_one_page* wrapper, const void* rec);   /**< Function pointer to parse the record */
+   char* (* format)(struct xl_hash_vacuum_one_page* wrapper, char* buf);       /**< Function pointer to format the record */
    union
    {
       struct xl_hash_vacuum_one_page_v15 v15;                                 /**< Version 15 */

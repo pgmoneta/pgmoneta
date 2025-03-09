@@ -117,8 +117,8 @@ struct gist_xlog_delete_v16
  */
 struct gist_xlog_delete
 {
-   void (*parse)(struct gist_xlog_delete* wrapper, const void* rec);     /**< Parsing function pointer */
-   char* (*format)(struct gist_xlog_delete* wrapper, char* buf);         /**< Formatting function pointer */
+   void (* parse)(struct gist_xlog_delete* wrapper, const void* rec);     /**< Parsing function pointer */
+   char* (* format)(struct gist_xlog_delete* wrapper, char* buf);         /**< Formatting function pointer */
    union
    {
       struct gist_xlog_delete_v15 v15;                                   /**< Version 15 structure */
@@ -217,8 +217,8 @@ struct gist_xlog_page_reuse_v16
  */
 struct gist_xlog_page_reuse
 {
-   void (*parse)(struct gist_xlog_page_reuse* wrapper, const void* rec);  /**< Parsing function pointer */
-   char* (*format)(struct gist_xlog_page_reuse* wrapper, char* buf);      /**< Formatting function pointer */
+   void (* parse)(struct gist_xlog_page_reuse* wrapper, const void* rec);  /**< Parsing function pointer */
+   char* (* format)(struct gist_xlog_page_reuse* wrapper, char* buf);      /**< Formatting function pointer */
    union
    {
       struct gist_xlog_page_reuse_v15 v15;                                /**< Version 15 structure */

@@ -71,7 +71,7 @@ extern "C" {
 struct rmgr_data
 {
    char* name;                                    /**< The name of the resource manager */
-   char* (*rm_desc)(char* buf, struct decoded_xlog_record* record);  /**< Function pointer to the RMGR description function */
+   char* (* rm_desc)(char* buf, struct decoded_xlog_record* record);  /**< Function pointer to the RMGR description function */
 };
 
 /**

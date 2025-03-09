@@ -35,18 +35,18 @@
 
 typedef struct xl_xact_xinfo xl_xact_xinfo;
 
-static char*xact_desc_relations(char* buf, char* label, int nrels, struct rel_file_node* xnodes);
+static char* xact_desc_relations(char* buf, char* label, int nrels, struct rel_file_node* xnodes);
 
-static char*xact_desc_commit_v14(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
-static char*xact_desc_abort_v14(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
-static char*xact_desc_prepare_v14(char* buf, uint8_t info, struct xl_xact_prepare_v14* xlrec);
+static char* xact_desc_commit_v14(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
+static char* xact_desc_abort_v14(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
+static char* xact_desc_prepare_v14(char* buf, uint8_t info, struct xl_xact_prepare_v14* xlrec);
 
-static char*xact_desc_commit_v15(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
-static char*xact_desc_abort_v15(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
-static char*xact_desc_prepare_v15(char* buf, uint8_t info, struct xl_xact_prepare_v15* xlrec);
+static char* xact_desc_commit_v15(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
+static char* xact_desc_abort_v15(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
+static char* xact_desc_prepare_v15(char* buf, uint8_t info, struct xl_xact_prepare_v15* xlrec);
 
-static char*xact_desc_assignment(char* buf, struct xl_xact_assignment* xlrec);
-static char*xact_desc_subxacts(char* buf, int nsubxacts, transaction_id* subxacts);
+static char* xact_desc_assignment(char* buf, struct xl_xact_assignment* xlrec);
+static char* xact_desc_subxacts(char* buf, int nsubxacts, transaction_id* subxacts);
 
 void parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v14* parsed);
 void parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v15* parsed);

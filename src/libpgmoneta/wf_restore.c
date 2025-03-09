@@ -53,10 +53,10 @@ static int combine_incremental_execute(char*, struct art*);
 static char* batch_restore_relay_name(void);
 static int batch_restore_relay_execute(char*, struct art*);
 
-static char*recovery_info_name(void);
+static char* recovery_info_name(void);
 static int recovery_info_execute(char*, struct art*);
 
-static char*restore_excluded_files_name(void);
+static char* restore_excluded_files_name(void);
 static int restore_excluded_files_execute(char*, struct art*);
 static int restore_excluded_files_teardown(char*, struct art*);
 

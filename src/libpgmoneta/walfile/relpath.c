@@ -36,109 +36,107 @@
  * the trouble considering backend_id is just int anyway.
  */
 
-#include <walfile/relpath.h>
+ #include <walfile/relpath.h>
+ #include <assert.h>
+ #include <utils.h>
+ #include <stdlib.h>
+ #include <errno.h>
 
-#include <assert.h>
-#include <utils.h>
+/* Constants for configuration */
+ #define MAX_VERSION_DIR_SIZE 50
+ #define MIN_PG_VERSION 13
+ #define MAX_PG_VERSION 17
+
+/* Validation helper for fork numbers */
+static inline bool
+is_valid_fork_number(enum fork_number forkNumber)
+{
+   return forkNumber >= MAIN_FORKNUM && forkNumber <= INIT_FORKNUM;
+}
+
+/* Static array for fork names to improve performance */
+static const char* const FORK_NAMES[] = {
+   "main",                         /* MAIN_FORKNUM */
+   "fsm",                          /* FSM_FORKNUM */
+   "vm",                           /* VISIBILITYMAP_FORKNUM */
+   "init"                          /* INIT_FORKNUM */
+};
 
 char*
 pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
                                int backendId, enum fork_number forkNumber)
 {
-   const char*const forkNames[] = {
-      "main",                       /* MAIN_FORKNUM */
-      "fsm",                        /* FSM_FORKNUM */
-      "vm",                      /* VISIBILITYMAP_FORKNUM */
-      "init"                        /* INIT_FORKNUM */
-   };
-   char* path;
-   path = NULL;
+   /* Input validation */
+   if (!is_valid_fork_number(forkNumber))
+   {
+      errno = EINVAL;
+      return NULL;
+   }
+
+   char* path = NULL;
 
    if (spcNode == GLOBALTABLESPACE_OID)
    {
       /* Shared system relations live in {datadir}/global */
-      assert(dbNode == 0);
-      assert(backendId == INVALID_BACKEND_ID);
-      if (forkNumber != MAIN_FORKNUM)
+      if (dbNode != 0 || backendId != INVALID_BACKEND_ID)
       {
-         path = pgmoneta_format_and_append(path, "global/%u_%s",
-                                           relNode, forkNames[forkNumber]);
+         errno = EINVAL;
+         return NULL;
       }
-      else
-      {
-         path = pgmoneta_format_and_append(path, "global/%u", relNode);
-      }
+
+      path = pgmoneta_format_and_append(path,
+                                        forkNumber != MAIN_FORKNUM ? "global/%u_%s" : "global/%u",
+                                        relNode, forkNumber != MAIN_FORKNUM ? FORK_NAMES[forkNumber] : NULL);
    }
    else if (spcNode == DEFAULTTABLESPACE_OID)
    {
       /* The default tablespace is {datadir}/base */
       if (backendId == INVALID_BACKEND_ID)
       {
-         if (forkNumber != MAIN_FORKNUM)
-         {
-            path = pgmoneta_format_and_append(path, "base/%u/%u_%s",
-                                              dbNode, relNode,
-                                              forkNames[forkNumber]);
-         }
-         else
-         {
-            path = pgmoneta_format_and_append(path, "base/%u/%u",
-                                              dbNode, relNode);
-         }
+         path = pgmoneta_format_and_append(path,
+                                           forkNumber != MAIN_FORKNUM ? "base/%u/%u_%s" : "base/%u/%u",
+                                           dbNode, relNode,
+                                           forkNumber != MAIN_FORKNUM ? FORK_NAMES[forkNumber] : NULL);
       }
       else
       {
-         if (forkNumber != MAIN_FORKNUM)
-         {
-            path = pgmoneta_format_and_append(path, "base/%u/t%d_%u_%s",
-                                              dbNode, backendId, relNode,
-                                              forkNames[forkNumber]);
-         }
-         else
-         {
-            path = pgmoneta_format_and_append(path, "base/%u/t%d_%u",
-                                              dbNode, backendId, relNode);
-         }
+         path = pgmoneta_format_and_append(path,
+                                           forkNumber != MAIN_FORKNUM ? "base/%u/t%d_%u_%s" : "base/%u/t%d_%u",
+                                           dbNode, backendId, relNode,
+                                           forkNumber != MAIN_FORKNUM ? FORK_NAMES[forkNumber] : NULL);
       }
    }
    else
    {
-      char* version_directory = pgmoneta_wal_get_tablespace_version_directory();
       /* All other tablespaces are accessed via symlinks */
+      char* version_directory = pgmoneta_wal_get_tablespace_version_directory();
+      if (!version_directory)
+      {
+         return NULL;     /* errno already set */
+      }
+
       if (backendId == INVALID_BACKEND_ID)
       {
-
-         if (forkNumber != MAIN_FORKNUM)
-         {
-            path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/%u_%s",
-                                              spcNode, version_directory,
-                                              dbNode, relNode,
-                                              forkNames[forkNumber]);
-         }
-         else
-         {
-            path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/%u",
-                                              spcNode, version_directory,
-                                              dbNode, relNode);
-         }
+         path = pgmoneta_format_and_append(path,
+                                           forkNumber != MAIN_FORKNUM ?
+                                           "pg_tblspc/%u/%s/%u/%u_%s" : "pg_tblspc/%u/%s/%u/%u",
+                                           spcNode, version_directory, dbNode, relNode,
+                                           forkNumber != MAIN_FORKNUM ? FORK_NAMES[forkNumber] : NULL);
       }
       else
       {
-         if (forkNumber != MAIN_FORKNUM)
-         {
-            path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/t%d_%u_%s",
-                                              spcNode, version_directory,
-                                              dbNode, backendId, relNode,
-                                              forkNames[forkNumber]);
-         }
-         else
-         {
-            path = pgmoneta_format_and_append(path, "pg_tblspc/%u/%s/%u/t%d_%u",
-                                              spcNode, version_directory,
-                                              dbNode, backendId, relNode);
-         }
+         path = pgmoneta_format_and_append(path,
+                                           forkNumber != MAIN_FORKNUM ?
+                                           "pg_tblspc/%u/%s/%u/t%d_%u_%s" : "pg_tblspc/%u/%s/%u/t%d_%u",
+                                           spcNode, version_directory, dbNode, backendId, relNode,
+                                           forkNumber != MAIN_FORKNUM ? FORK_NAMES[forkNumber] : NULL);
       }
       free(version_directory);
+   }
+
+   if (!path)
+   {
+      errno = ENOMEM;
    }
    return path;
 }
@@ -146,13 +144,47 @@ pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
 char*
 pgmoneta_wal_get_tablespace_version_directory(void)
 {
-   char* result = (char*)malloc(50);
-   result = pgmoneta_format_and_append(result, "PG_%d_%s", server_config->version, pgmoneta_wal_get_catalog_version_number());
+   if (!server_config)
+   {
+      errno = EINVAL;
+      return NULL;
+   }
+
+   char* result = (char*)malloc(MAX_VERSION_DIR_SIZE);
+   if (!result)
+   {
+      errno = ENOMEM;
+      return NULL;
+   }
+
+   const char* catalog_version = pgmoneta_wal_get_catalog_version_number();
+   if (!catalog_version)
+   {
+      free(result);
+      return NULL;    /* errno already set */
+   }
+
+   if (!pgmoneta_format_and_append(result, "PG_%d_%s",
+                                   server_config->version, catalog_version))
+   {
+      free(result);
+      errno = ENOMEM;
+      return NULL;
+   }
+
    return result;
 }
+
 char*
 pgmoneta_wal_get_catalog_version_number(void)
 {
+   if (!server_config || server_config->version < MIN_PG_VERSION ||
+       server_config->version > MAX_PG_VERSION)
+   {
+      errno = EINVAL;
+      return NULL;
+   }
+
    switch (server_config->version)
    {
       case 13: return "202004022";
@@ -160,6 +192,8 @@ pgmoneta_wal_get_catalog_version_number(void)
       case 15: return "202204062";
       case 16: return "202303311";
       case 17: return "202407111";
-      default: return "Key not found";    // Return a default message for invalid keys
+      default:
+         errno = EINVAL;
+         return NULL;
    }
 }

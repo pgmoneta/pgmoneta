@@ -63,7 +63,7 @@ extern "C" {
 #define GIN_SEGMENT_ADDITEMS            4  /**< Items are added to existing segment */
 
 #define SIZE_OF_GIN_POSTING_LIST(plist) \
-        (offsetof(struct gin_posting_list, bytes) + SHORTALIGN((plist)->nbytes))
+   (offsetof(struct gin_posting_list, bytes) + SHORTALIGN((plist)->nbytes))
 
 /**
  * @struct index_tuple_data

@@ -149,8 +149,8 @@ struct check_point_v17
  */
 struct check_point
 {
-   void (*parse)(struct check_point* wrapper, const void* rec);     /**< Parse function pointer */
-   char* (*format)(struct check_point* wrapper, char* buf);          /**< Format function pointer */
+   void (* parse)(struct check_point* wrapper, const void* rec);     /**< Parse function pointer */
+   char* (* format)(struct check_point* wrapper, char* buf);          /**< Format function pointer */
    union
    {
       struct check_point_v16 v16;       /**< Version 16 data */

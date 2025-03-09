@@ -983,7 +983,7 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
    unsigned char iv[EVP_MAX_IV_LENGTH];
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
-   const EVP_CIPHER* (*cipher_fp)(void) = NULL;
+   const EVP_CIPHER* (* cipher_fp)(void) = NULL;
    size_t cipher_block_size = 0;
    size_t outbuf_size = 0;
    size_t outl = 0;

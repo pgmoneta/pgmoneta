@@ -78,10 +78,10 @@ extern "C" {
 #define NODE_TARGET_ROOT       "target_root"       /* The target root directory */
 #define NODE_WORKSPACE_ROOT    "workspace_root"    /* The workspace root directory */
 
-typedef char* (*name)(void);
-typedef int (*setup)(char*, struct art*);
-typedef int (*execute)(char*, struct art*);
-typedef int (*teardown)(char*, struct art*);
+typedef char* (* name)(void);
+typedef int (* setup)(char*, struct art*);
+typedef int (* execute)(char*, struct art*);
+typedef int (* teardown)(char*, struct art*);
 
 /** @struct workflow
  * Defines a workflow

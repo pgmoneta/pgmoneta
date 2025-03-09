@@ -97,14 +97,14 @@ typedef int64_t timestamp_tz;
 #define SHORTALIGN(LEN)            TYPEALIGN(ALIGNOF_SHORT, (LEN))
 
 #define XLogRecHasBlockRef(record, block_id) \
-        ((record->max_block_id >= (block_id)) && \
-         (record->blocks[block_id].in_use))
+   ((record->max_block_id >= (block_id)) && \
+    (record->blocks[block_id].in_use))
 
 #define XLogRecHasBlockImage(record, block_id) \
-        (record->blocks[block_id].has_image)
+   (record->blocks[block_id].has_image)
 
 #define XLogRecHasBlockData(record, block_id) \
-        (record->blocks[block_id].has_data)
+   (record->blocks[block_id].has_data)
 
 #define LSN_FORMAT_ARGS(lsn)    ((uint32_t)((lsn) >> 32)), ((uint32_t)(lsn))
 #define XLOG_REC_GET_DATA(record) ((record)->main_data)
@@ -115,7 +115,7 @@ typedef int64_t timestamp_tz;
 #define XLOG_REC_GET_DATA_LEN(record) (record->main_data_len)
 
 #define XLOG_SEG_NO_OFFEST_TO_REC_PTR(segno, offset, wal_segsz_bytes, dest) \
-        (dest) = (segno) * (wal_segsz_bytes) + (offset)
+   (dest) = (segno) * (wal_segsz_bytes) + (offset)
 
 /* Enums */
 

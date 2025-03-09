@@ -139,8 +139,8 @@ struct xl_end_of_recovery_v16
  */
 struct xl_end_of_recovery
 {
-   void (*parse)(struct xl_end_of_recovery* wrapper, const void* rec);     /**< Function pointer to parse the record */
-   char* (*format)(struct xl_end_of_recovery* wrapper, char* buf);         /**< Function pointer to format the record */
+   void (* parse)(struct xl_end_of_recovery* wrapper, const void* rec);     /**< Function pointer to parse the record */
+   char* (* format)(struct xl_end_of_recovery* wrapper, char* buf);         /**< Function pointer to format the record */
    union
    {
       struct xl_end_of_recovery_v17 v17;                                   /**< End of recovery data for version 17 */

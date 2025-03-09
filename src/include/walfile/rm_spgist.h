@@ -221,8 +221,8 @@ struct spg_xlog_vacuum_redirect_v16
  */
 struct spg_xlog_vacuum_redirect
 {
-   void (*parse)(struct spg_xlog_vacuum_redirect* wrapper, const void* rec);  /**< Function pointer to parse the record. */
-   char* (*format)(struct spg_xlog_vacuum_redirect* wrapper, char* buf);      /**< Function pointer to format the record. */
+   void (* parse)(struct spg_xlog_vacuum_redirect* wrapper, const void* rec);  /**< Function pointer to parse the record. */
+   char* (* format)(struct spg_xlog_vacuum_redirect* wrapper, char* buf);      /**< Function pointer to format the record. */
 
    union
    {

@@ -318,8 +318,8 @@ struct xl_heap_clean_v13
  */
 struct xl_heap_prune
 {
-   void (*parse)(struct xl_heap_prune* wrapper, const void* rec);     /**< Function pointer to parse the record */
-   char* (*format)(struct xl_heap_prune* wrapper, char* buf);         /**< Function pointer to format the record */
+   void (* parse)(struct xl_heap_prune* wrapper, const void* rec);     /**< Function pointer to parse the record */
+   char* (* format)(struct xl_heap_prune* wrapper, char* buf);         /**< Function pointer to format the record */
    union
    {
       struct xl_heap_prune_v17 v17;                                   /**< Prune operation for version 17 */
@@ -386,8 +386,8 @@ struct xl_heap_freeze_page_v16
  */
 struct xl_heap_freeze_page
 {
-   void (*parse)(struct xl_heap_freeze_page* wrapper, const void* rec);  /**< Parse function pointer.    */
-   char* (*format)(struct xl_heap_freeze_page* wrapper, char* buf);      /**< Format function pointer.  */
+   void (* parse)(struct xl_heap_freeze_page* wrapper, const void* rec);  /**< Parse function pointer.    */
+   char* (* format)(struct xl_heap_freeze_page* wrapper, char* buf);      /**< Format function pointer.  */
    union
    {
       struct xl_heap_freeze_page_v15 v15;                                /**< Version 15 heap freeze structure. */

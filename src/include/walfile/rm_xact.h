@@ -60,11 +60,11 @@
 #define XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG      (1U << 31)
 
 #define XACT_COMPLETION_APPLY_FEEDBACK(xinfo) \
-        ((xinfo & XACT_COMPLETION_APPLY_FEEDBACK_FLAG) != 0)
+   ((xinfo & XACT_COMPLETION_APPLY_FEEDBACK_FLAG) != 0)
 #define XACT_COMPLETION_RELCACHE_INIT_FILE_INVAL(xinfo) \
-        ((xinfo & XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG) != 0)
+   ((xinfo & XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG) != 0)
 #define XACT_COMPLETION_FORCE_SYNC_COMMIT(xinfo) \
-        ((xinfo & XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG) != 0)
+   ((xinfo & XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG) != 0)
 
 #define MIN_SIZE_OF_XACT_STATS_ITEMS    offsetof(struct xl_xact_stats_items, items)
 #define MIN_SIZE_OF_XACT_SUBXACTS       offsetof(struct xl_xact_subxacts, subxacts)
@@ -314,8 +314,8 @@ struct xl_xact_prepare_v15
  */
 struct xl_xact_prepare
 {
-   void (*parse)(struct xl_xact_prepare* wrapper, const void* rec);         /**< Parsing function. */
-   char* (*format)(struct xl_xact_prepare* wrapper, char* rec, char* buf);  /**< Formatting function. */
+   void (* parse)(struct xl_xact_prepare* wrapper, const void* rec);         /**< Parsing function. */
+   char* (* format)(struct xl_xact_prepare* wrapper, char* rec, char* buf);  /**< Formatting function. */
    union
    {
       struct xl_xact_prepare_v14 v14;                                       /**< Version 14 structure. */
@@ -397,8 +397,8 @@ typedef struct xl_xact_parsed_commit_v15 xl_xact_parsed_prepare_v15;
  */
 struct xl_xact_parsed_commit
 {
-   void (*parse)(struct xl_xact_parsed_commit* wrapper, const void* rec);           /**< Parsing function pointer. */
-   char* (*format)(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf);    /**< Formatting function pointer. */
+   void (* parse)(struct xl_xact_parsed_commit* wrapper, const void* rec);           /**< Parsing function pointer. */
+   char* (* format)(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf);    /**< Formatting function pointer. */
    union
    {
       struct xl_xact_parsed_commit_v14 v14;                                         /**< Parsed commit record for version 14. */
@@ -461,8 +461,8 @@ struct xl_xact_parsed_abort_v15
  */
 struct xl_xact_parsed_abort
 {
-   void (*parse)(struct xl_xact_parsed_abort* wrapper, const void* rec);         /**< Parse function pointer. */
-   char* (*format)(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf);  /**< Format function pointer. */
+   void (* parse)(struct xl_xact_parsed_abort* wrapper, const void* rec);         /**< Parse function pointer. */
+   char* (* format)(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf);  /**< Format function pointer. */
    union
    {
       struct xl_xact_parsed_abort_v14 v14;                                       /**< Parsed abort transaction data for version 14. */

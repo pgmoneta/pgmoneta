@@ -62,8 +62,8 @@ extern "C" {
 #define SIZE_OF_BTREE_UPDATE           (offsetof(struct xl_btree_update, ndeletedtids) + sizeof(uint16_t))
 
 #define OFFSET_NUMBER_IS_VALID(offsetNumber) \
-        ((bool) ((offsetNumber != INVALID_OFFSET_NUMBER) && \
-                 (offsetNumber <= MAX_OFFSET_NUMBER)))
+   ((bool) ((offsetNumber != INVALID_OFFSET_NUMBER) && \
+            (offsetNumber <= MAX_OFFSET_NUMBER)))
 
 /**
  * @struct item_id_data
@@ -124,8 +124,8 @@ struct xl_btree_metadata_v14
  */
 struct xl_btree_metadata
 {
-   void (*parse)(struct xl_btree_metadata* wrapper, const char* rec);  /**< Pointer to parse function.*/
-   char* (*format)(struct xl_btree_metadata* wrapper, char* buf);      /**< Pointer to format function.*/
+   void (* parse)(struct xl_btree_metadata* wrapper, const char* rec);  /**< Pointer to parse function.*/
+   char* (* format)(struct xl_btree_metadata* wrapper, char* buf);      /**< Pointer to format function.*/
    union
    {
       struct xl_btree_metadata_v13 v13;                                /**< Version 13 of btree metadata.*/
@@ -236,8 +236,8 @@ struct xl_btree_reuse_page_v16
  */
 struct xl_btree_reuse_page
 {
-   void (*parse)(struct xl_btree_reuse_page* wrapper, const void* rec);  /**< Function pointer to parse the structure.*/
-   char* (*format)(struct xl_btree_reuse_page* wrapper, char* buf);      /**< Function pointer to format the structure.*/
+   void (* parse)(struct xl_btree_reuse_page* wrapper, const void* rec);  /**< Function pointer to parse the structure.*/
+   char* (* format)(struct xl_btree_reuse_page* wrapper, char* buf);      /**< Function pointer to format the structure.*/
    union
    {
       struct xl_btree_reuse_page_v13 v13;                                /**< Version 13 of xl_btree_reuse_page.*/
@@ -318,8 +318,8 @@ struct xl_btree_delete_v16
  */
 struct xl_btree_delete
 {
-   void (*parse)(struct xl_btree_delete* wrapper, const void* rec);    /**< Function pointer to parse the structure. */
-   char* (*format)(struct xl_btree_delete* wrapper, char* buf);        /**< Function pointer to format the structure. */
+   void (* parse)(struct xl_btree_delete* wrapper, const void* rec);    /**< Function pointer to parse the structure. */
+   char* (* format)(struct xl_btree_delete* wrapper, char* buf);        /**< Function pointer to format the structure. */
    union
    {
       struct xl_btree_delete_v13 v13;     /**< Version 13 of the structure. */
@@ -409,8 +409,8 @@ struct xl_btree_unlink_page_v14
  */
 struct xl_btree_unlink_page
 {
-   void (*parse)(struct xl_btree_unlink_page* wrapper, const void* rec);    /**< Function to parse the record.*/
-   char* (*format)(struct xl_btree_unlink_page* wrapper, char* buf);        /**< Function to format the record as a string.*/
+   void (* parse)(struct xl_btree_unlink_page* wrapper, const void* rec);    /**< Function to parse the record.*/
+   char* (* format)(struct xl_btree_unlink_page* wrapper, char* buf);        /**< Function to format the record as a string.*/
    union
    {
       struct xl_btree_unlink_page_v13 v13;                                  /**< Version 13 of the structure.*/

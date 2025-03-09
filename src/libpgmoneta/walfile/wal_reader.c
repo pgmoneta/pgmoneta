@@ -98,7 +98,7 @@ static inline int
 xlog_from_file_name(const char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
 {
 #define XLogSegmentsPerXLogId(wal_segsz_bytes) \
-        (0x100000000UL / (wal_segsz_bytes))
+   (0x100000000UL / (wal_segsz_bytes))
    uint32_t log;
    uint32_t seg;
    int items_scanned;
@@ -168,12 +168,12 @@ int
 pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 {
 #define MALLOC(pointer, size) \
-        pointer = malloc(size); \
-        if (pointer == NULL) \
-        { \
-           pgmoneta_log_fatal("Error: Could not allocate memory for %s", #pointer); \
-           goto error; \
-        }
+   pointer = malloc(size); \
+   if (pointer == NULL) \
+   { \
+      pgmoneta_log_fatal("Error: Could not allocate memory for %s", #pointer); \
+      goto error; \
+   }
 
    struct xlog_record* record = NULL;
    struct xlog_long_page_header_data* long_header = NULL;
@@ -403,13 +403,13 @@ static int
 decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn)
 {
 #define COPY_HEADER_FIELD(_dst, _size)          \
-        do {                                        \
-           if (remaining < _size)                  \
-           goto shortdata_err;                 \
-           memcpy(_dst, ptr, _size);               \
-           ptr += _size;                           \
-           remaining -= _size;                     \
-        } while (0)
+   do {                                        \
+      if (remaining < _size)                  \
+      goto shortdata_err;                 \
+      memcpy(_dst, ptr, _size);               \
+      ptr += _size;                           \
+      remaining -= _size;                     \
+   } while (0)
 
    decoded->header = *record;
    decoded->lsn = lsn;

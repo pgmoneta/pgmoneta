@@ -29,7 +29,7 @@
 #ifndef PGMONETA_COMPRESSION_H
 #define PGMONETA_COMPRESSION_H
 
-typedef int (*compression_func)(char*, char*);
+typedef int (* compression_func)(char*, char*);
 
 /**
  * Decompress a file using the appropriate decompression method.
