@@ -33,6 +33,7 @@
 #include <walfile/rm.h>
 #include <walfile/rm_xlog.h>
 #include <walfile/wal_reader.h>
+#include <wal.h>
 
 const struct config_enum_entry wal_level_options[] = {
    {"minimal", WAL_LEVEL_MINIMAL, false},
@@ -101,9 +102,12 @@ check_point_format_v16(struct check_point* wrapper, char* buf)
 {
    struct check_point_v16 checkpoint = wrapper->data.v16;
 
+   const char* OldXidDBname = get_database_name(checkpoint.oldest_xid_db);
+   const char* OldMultiDBname = get_database_name(checkpoint.oldest_multi_db);
+
    buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
                                     "tli %u; prev tli %u; fpw %s; xid %u:%u; oid %u; multi %u; offset %u; "
-                                    "oldest xid %u in DB %u; oldest multi %u in DB %u; "
+                                    "oldest xid %u in DB %s; oldest multi %u in DB %s; "
                                     "oldest/newest commit timestamp xid: %u/%u; "
                                     "oldest running xid %u;",
                                     LSN_FORMAT_ARGS(checkpoint.redo),
@@ -116,9 +120,9 @@ check_point_format_v16(struct check_point* wrapper, char* buf)
                                     checkpoint.next_multi,
                                     checkpoint.next_multi_offset,
                                     checkpoint.oldest_xid,
-                                    checkpoint.oldest_xid_db,
+                                    OldXidDBname,
                                     checkpoint.oldest_multi,
-                                    checkpoint.oldest_multi_db,
+                                    OldMultiDBname,
                                     checkpoint.oldest_commit_ts_xid,
                                     checkpoint.newest_commit_ts_xid,
                                     checkpoint.oldest_active_xid);
@@ -131,9 +135,12 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
 {
    struct check_point_v17 checkpoint = wrapper->data.v17;
 
+   const char* OldXidDBname = get_database_name(checkpoint.oldest_xid_db);
+   const char* OldMultiDBname = get_database_name(checkpoint.oldest_multi_db);
+
    buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
                                     "tli %u; prev tli %u; fpw %s; wal_level %s; xid %u:%u; oid %u; multi %u; offset %u; "
-                                    "oldest xid %u in DB %u; oldest multi %u in DB %u; "
+                                    "oldest xid %u in DB %s; oldest multi %u in DB %s; "
                                     "oldest/newest commit timestamp xid: %u/%u; "
                                     "oldest running xid %u",
                                     LSN_FORMAT_ARGS(checkpoint.redo),
@@ -147,9 +154,9 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
                                     checkpoint.next_multi,
                                     checkpoint.next_multi_offset,
                                     checkpoint.oldest_xid,
-                                    checkpoint.oldest_xid_db,
+                                    OldXidDBname,
                                     checkpoint.oldest_multi,
-                                    checkpoint.oldest_multi_db,
+                                    OldMultiDBname,
                                     checkpoint.oldest_commit_ts_xid,
                                     checkpoint.newest_commit_ts_xid,
                                     checkpoint.oldest_active_xid);

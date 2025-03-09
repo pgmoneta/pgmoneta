@@ -28,6 +28,7 @@
 
 #include <walfile/rm_standby.h>
 #include <utils.h>
+#include <wal.h>
 
 static char*
 standby_desc_running_xacts(char* buf, struct xl_running_xacts* xlrec)
@@ -106,7 +107,8 @@ pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_inval
       /* not expected, but print something anyway */
       else if (msg->id == SHAREDINVALRELMAP_ID)
       {
-         buf = pgmoneta_format_and_append(buf, " relmap db %u", msg->rm.db_id);
+         const char* dbname = get_database_name(msg->rm.db_id);
+         buf = pgmoneta_format_and_append(buf, " relmap db %s", dbname);
       }
       else if (msg->id == SHAREDINVALSNAPSHOT_ID)
       {
@@ -133,9 +135,12 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
 
       for (i = 0; i < xlrec->nlocks; i++)
       {
-         buf = pgmoneta_format_and_append(buf, "xid %u db %u rel %u ",
-                                          xlrec->locks[i].xid, xlrec->locks[i].db_oid,
-                                          xlrec->locks[i].rel_oid);
+         const char* dbname = get_database_name(xlrec->locks[i].db_oid);
+         const char* relname = get_relation_name(xlrec->locks[i].rel_oid);
+
+         buf = pgmoneta_format_and_append(buf, "xid %u db %s rel %u ",
+                                          xlrec->locks[i].xid, dbname,
+                                          relname);
       }
    }
    else if (info == XLOG_RUNNING_XACTS)

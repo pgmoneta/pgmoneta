@@ -42,6 +42,7 @@
 #include <value.h>
 #include <wal.h>
 #include <workflow.h>
+#include <json.h>
 
 /* system */
 #include <ctype.h>
@@ -57,6 +58,7 @@
 #include <openssl/ssl.h>
 #include <libssh/libssh.h>
 #include <libssh/sftp.h>
+#include <string.h>
 
 static char* wal_file_name(uint32_t timeline, size_t segno, int segsize);
 static int wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket);
@@ -1199,4 +1201,184 @@ wal_shipping_setup(int srv, char** wal_shipping)
    }
    *wal_shipping = NULL;
    return 0;
+}
+
+OidMapping* oidMappings = NULL;
+int mappings_size = 0;
+
+/*
+   This function should read and parse the json file
+   at `mappings_path` and populate the global mappings
+   HashTable with the contents of the file.
+
+   Format of the json file:
+   ```json
+   {
+      "relations": {
+         "relation_name": "oid",
+         ...
+      },
+      "databases": {
+         "database_name": "oid",
+         ...
+      },
+      "tablespaces": {
+         "tablespace_name": "oid",
+         ...
+      }
+   }
+   ```
+ */
+int
+pgmoneta_read_mappings(char* mappings_path)
+{
+   struct json* root = NULL;
+   struct json* section = NULL;
+   struct json_iterator* iter = NULL;
+   int total_entries = 0;
+   int index = 0;
+   char* oid_str;
+   int oid;
+   ObjectType current_type;
+
+   if (pgmoneta_json_read_file(mappings_path, &root))
+   {
+      pgmoneta_log_error("Failed to read mappings file: %s", mappings_path);
+      return 1;
+   }
+
+   // Count total entries across all sections
+   char* sections[] = {"tablespaces", "databases", "relations"};
+   for (int i = 0; i < 3; i++)
+   {
+      section = (struct json*)pgmoneta_json_get(root, sections[i]);
+      if (section && section->type == JSONItem)
+      {
+         struct art* art_tree = (struct art*)section->elements;
+         total_entries += art_tree->size;
+      }
+   }
+
+   oidMappings = (OidMapping*)malloc(total_entries * sizeof(OidMapping));
+   if (!oidMappings)
+   {
+      pgmoneta_log_error("Memory allocation failed");
+      pgmoneta_json_destroy(root);
+      return 1;
+   }
+
+   for (int i = 0; i < 3; i++)
+   {
+      current_type = (ObjectType)i;   // OBJ_TABLESPACE, OBJ_DATABASE, OBJ_RELATION
+      section = (struct json*)pgmoneta_json_get(root, sections[i]);
+      if (section && section->type == JSONItem)
+      {
+         pgmoneta_json_iterator_create(section, &iter);
+         while (pgmoneta_json_iterator_next(iter))
+         {
+            const char* name = iter->key;
+            oid_str = (char*)iter->value->data;
+            oid = (int)strtol(oid_str, NULL, 10);
+
+            // Store the mapping with type
+            oidMappings[index].oid = oid;
+            oidMappings[index].type = current_type;
+            oidMappings[index].name = strdup(name);
+            index++;
+         }
+         pgmoneta_json_iterator_destroy(iter);
+      }
+   }
+
+   mappings_size = total_entries;
+   pgmoneta_json_destroy(root);
+
+   return 0;
+}
+
+const char*
+get_tablespace_name(int oid)
+{
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_TABLESPACE)
+      {
+         return oidMappings[i].name;
+      }
+   }
+
+   int max_digits = snprintf(NULL, 0, "%d", INT_MAX);
+   char* oid_str = malloc(max_digits + 2);
+
+   if (oid_str == NULL)
+   {
+      return NULL;
+   }
+
+   snprintf(oid_str, max_digits + 2, "%d", oid);
+
+   return oid_str;
+}
+
+const char*
+get_database_name(int oid)
+{
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_DATABASE)
+      {
+         return oidMappings[i].name;
+      }
+   }
+
+   int max_digits = snprintf(NULL, 0, "%d", INT_MAX);
+   char* oid_str = malloc(max_digits + 2);
+
+   if (oid_str == NULL)
+   {
+      return NULL;
+   }
+
+   snprintf(oid_str, max_digits + 2, "%d", oid);
+
+   return oid_str;
+}
+
+const char*
+get_relation_name(int oid)
+{
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_RELATION)
+      {
+         return oidMappings[i].name;
+      }
+   }
+
+   int max_digits = snprintf(NULL, 0, "%d", INT_MAX);
+   char* oid_str = malloc(max_digits + 2);
+
+   if (oid_str == NULL)
+   {
+      return NULL;
+   }
+
+   snprintf(oid_str, max_digits + 2, "%d", oid);
+
+   return oid_str;
+}
+
+void
+pgmoneta_free_mappings()
+{
+   if (oidMappings != NULL)
+   {
+      for (int i = 0; i < mappings_size; i++)
+      {
+         free((char*)oidMappings[i].name);
+      }
+      free(oidMappings);
+      oidMappings = NULL;
+      mappings_size = 0;
+   }
 }

@@ -29,7 +29,7 @@
 #include <utils.h>
 #include <walfile/rm_heap.h>
 #include <walfile/wal_reader.h>
-
+#include <wal.h>
 #include <assert.h>
 
 struct xl_heap_freeze_page*
@@ -331,10 +331,14 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    {
       struct xl_heap_new_cid* xlrec = (struct xl_heap_new_cid*) rec;
 
-      buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; tid %u/%u",
-                                       xlrec->target_node.spcNode,
-                                       xlrec->target_node.dbNode,
-                                       xlrec->target_node.relNode,
+      const char* dbname = get_database_name(xlrec->target_node.dbNode);
+      const char* relname = get_relation_name(xlrec->target_node.relNode);
+      const char* spcname = get_tablespace_name(xlrec->target_node.spcNode);
+
+      buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; tid %u/%u",
+                                       spcname,
+                                       dbname,
+                                       relname,
                                        ITEM_POINTER_GET_BLOCK_NUMBER(&(xlrec->target_tid)),
                                        ITEM_POINTER_GET_OFFSET_NUMBER(&(xlrec->target_tid)));
       buf = pgmoneta_format_and_append(buf, "; cmin: %u, cmax: %u, combo: %u",
@@ -460,6 +464,7 @@ redirect_elem_desc(char* buf, void* offset, void* data)
 char*
 oid_elem_desc(char* buf, void* relid, void* data)
 {
-   buf = pgmoneta_format_and_append(buf, "%u", *(oid*) relid);
+   const char* relname = get_relation_name(*(oid*) relid);
+   buf = pgmoneta_format_and_append(buf, "rel %s", relname);
    return buf;
 }
