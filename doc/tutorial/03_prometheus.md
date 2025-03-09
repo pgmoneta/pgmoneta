@@ -47,3 +47,30 @@ http://localhost:5001/metrics
 ```
 
 (`pgmoneta` user)
+
+### TLS support
+To add TLS support for Prometheus metrics, first we need a self-signed certificate.
+Generate the server key
+```
+$ openssl genrsa -out localhost.key 2048
+```
+
+Generate the certificate
+```
+$ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout localhost.key -out localhost.crt \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+```
+
+Edit `pgmoneta.conf` to add the following keys under pgmoneta section:
+```
+[pgmoneta]
+.
+.
+.
+metrics_cert_file=<path-to-cert-file>
+metrics_key_file=<path-to-key-file>
+```
+
+You can now access metrics at `https://localhost:5001`

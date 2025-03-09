@@ -199,6 +199,28 @@ pgmoneta_close_ssl(SSL* ssl);
 int
 pgmoneta_get_hash_algorithm(char* algorithm);
 
+/**
+ * Create a SSL context
+ * @param client Is this a client context
+ * @param ctx The SSL context
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_ssl_ctx(bool client, SSL_CTX** ctx);
+
+/**
+ * Create a SSL server
+ * @param ctx The SSL context
+ * @param socket The socket
+ * @param key The key file path
+ * @param cert The certificate file path
+ * @param ca The ca file path
+ * @param ssl The SSL structure
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_ssl_server(SSL_CTX* ctx, int socket, char* key, char* cert, char* ca, SSL** ssl);
+
 #ifdef __cplusplus
 }
 #endif
