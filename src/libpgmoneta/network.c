@@ -356,9 +356,6 @@ error:
    return 1;
 }
 
-/**
- *
- */
 int
 pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd)
 {
@@ -368,8 +365,7 @@ pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd)
    if ((*fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
    {
       pgmoneta_log_warn("pgmoneta_connect_unix_socket: socket: %s %s", directory, strerror(errno));
-      errno = 0;
-      return 1;
+      goto error;
    }
 
    memset(&addr, 0, sizeof(addr));
@@ -382,11 +378,21 @@ pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd)
 
    if (connect(*fd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
    {
-      errno = 0;
-      return 1;
+      pgmoneta_log_warn("pgmoneta_connect_unix_socket: %d %s", *fd, strerror(errno));
+      goto error;
    }
 
    return 0;
+
+error:
+
+   errno = 0;
+
+   pgmoneta_disconnect(*fd);
+
+   *fd = -1;
+
+   return 1;
 }
 
 bool
