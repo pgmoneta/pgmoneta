@@ -31,6 +31,8 @@ Options:
       --color              Use colors (on, off)
   -v, --verbose            Output result
   -V, --version            Display version information
+  -t, --translate		   Translate the OIDs in the XLOG records to the corresponding object (database/tablespace/relation) names
+  -m, --mapping			   The JSON file that contains the mapping of the OIDs to the corresponding object names  
   -?, --help               Display help
 ```
 
@@ -60,10 +62,25 @@ This format makes it easy to visually distinguish different parts of the WAL fil
 
 #### Example
 
-To view WAL file details in JSON format:
+1. To view WAL file details in JSON format:
 
 ```bash
 pgmoneta-walinfo -F json /path/to/walfile
+```
+
+2. To view WAL file details with OIDs in the records translated to object names:
+
+```bash
+pgmoneta-walinfo --translate --mapping mapping.json /path/to/walfile
+```
+
+Currently, `pgmoneta-walinfo` only supports translating OIDs using a predefined mapping file. In the future, we plan to add support for dynamically fetching object names from the database cluster.
+
+User can get the needed info from the file using these queries:
+```sql
+SELECT spcname FROM pg_tablespace WHERE oid = ?
+SELECT datname FROM pg_database WHERE oid = ?
+SELECT relname FROM pg_class WHERE  relfillnode = ?
 ```
 
 ## High-Level API Overview
