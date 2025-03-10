@@ -1741,6 +1741,7 @@ static void
 coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
    pgmoneta_log_info("core dump requested (%p, %p, %d)", loop, w, revents);
+   remove_pidfile();
    abort();
 }
 
