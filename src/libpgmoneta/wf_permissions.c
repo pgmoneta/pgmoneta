@@ -98,12 +98,12 @@ permissions_execute_backup(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Permissions (backup): %s/%s", config->servers[server].name, label);
@@ -132,12 +132,12 @@ permissions_execute_restore(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    path = pgmoneta_append(path, (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT));
 
@@ -178,12 +178,12 @@ permissions_execute_archive(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Permissions (archive): %s/%s", config->servers[server].name, label);

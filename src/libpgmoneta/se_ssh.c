@@ -144,12 +144,12 @@ ssh_storage_setup(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->servers[server].name, label);
@@ -327,12 +327,12 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->servers[server].name, label);
@@ -457,12 +457,12 @@ ssh_storage_wal_shipping_execute(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->servers[server].name, label);
@@ -505,12 +505,12 @@ ssh_storage_backup_teardown(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->servers[server].name, label);
@@ -553,12 +553,12 @@ ssh_storage_wal_shipping_teardown(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->servers[server].name, label);

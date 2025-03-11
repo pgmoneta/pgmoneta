@@ -126,12 +126,17 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
+   if (pgmoneta_art_insert(nodes, USER_SERVER, (uintptr_t)config->servers[server].name, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_IDENTIFIER, (uintptr_t)date, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_SERVER_ID, (uintptr_t)server, ValueInt32))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_art_insert(nodes, USER_IDENTIFIER, (uintptr_t)date, ValueString))
    {
       goto error;
    }

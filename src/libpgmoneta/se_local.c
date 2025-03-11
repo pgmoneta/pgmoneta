@@ -90,12 +90,12 @@ local_storage_execute(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);

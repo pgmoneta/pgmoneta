@@ -254,12 +254,12 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
+   if (pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)position, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   if (pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
@@ -356,6 +356,7 @@ pgmoneta_restore_backup(struct art* nodes)
    struct workflow* workflow = NULL;
    struct workflow* current = NULL;
    struct backup* backup = NULL;
+   char* directory = NULL;
    char* target_root = NULL;
    char* target_base = NULL;
    char* workspace_root = NULL;
@@ -373,18 +374,38 @@ pgmoneta_restore_backup(struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+
+   assert(pgmoneta_art_contains_key(nodes, USER_DIRECTORY));
+   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, USER_POSITION));
+   assert(pgmoneta_art_contains_key(nodes, USER_SERVER));
+
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
-   assert(pgmoneta_art_contains_key(nodes, NODE_POSITION));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
-   target_root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   directory = (char*)pgmoneta_art_search(nodes, USER_DIRECTORY);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    workspace_root = pgmoneta_get_server_workspace(server);
+
+   target_root = pgmoneta_append(target_root, directory);
+
+   if (backup->type == TYPE_INCREMENTAL)
+   {
+      if (!pgmoneta_ends_with(target_root, "/"))
+      {
+         target_root = pgmoneta_append_char(target_root, '/');
+      }
+      target_root = pgmoneta_append(target_root, "tmp_incremental");
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString))
+   {
+      goto error;
+   }
 
    if (workspace_root == NULL || strlen(workspace_root) == 0)
    {
@@ -460,7 +481,7 @@ pgmoneta_restore_backup(struct art* nodes)
       }
    }
 
-   target_base = pgmoneta_append(target_base, target_root);
+   target_base = pgmoneta_append(target_base, directory);
    if (!pgmoneta_ends_with(target_base, "/"))
    {
       target_base = pgmoneta_append(target_base, "/");
@@ -484,6 +505,7 @@ pgmoneta_restore_backup(struct art* nodes)
       pgmoneta_log_trace("Incremental backup: %s", backup->label);
 
       snprintf(directory_combine, MAX_PATH, "%s/%s-%s", target_root, config->servers[server].name, &backup->label[0]);
+
       manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
       manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
 
@@ -506,7 +528,8 @@ pgmoneta_restore_backup(struct art* nodes)
    }
    else if (backup->type == TYPE_INCREMENTAL)
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE_INCREMENTAL, server, backup);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE_INCREMENTAL,
+                                          server, backup);
    }
    else
    {
@@ -547,6 +570,7 @@ pgmoneta_restore_backup(struct art* nodes)
       current = current->next;
    }
 
+   free(target_root);
    free(target_base);
    free(manifest_path);
    free(workspace_root);
@@ -567,8 +591,9 @@ error:
          {
             char tblspc[MAX_PATH];
             memset(tblspc, 0, MAX_PATH);
-            snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", target_root, config->servers[server].name,
-                     backup->label, backup->tablespaces[i]);
+            snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", target_root,
+                     config->servers[server].name, backup->label,
+                     backup->tablespaces[i]);
             if (pgmoneta_exists(tblspc))
             {
                pgmoneta_delete_directory(tblspc);
@@ -577,6 +602,7 @@ error:
       }
    }
 
+   free(target_root);
    free(target_base);
    free(manifest_path);
    free(workspace_root);

@@ -86,17 +86,17 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)"", ValueString))
+   if (pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)"", ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   if (pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)directory, ValueString))
    {
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_FILES, (uintptr_t)files, ValueString))
+   if (pgmoneta_art_insert(nodes, USER_FILES, (uintptr_t)files, ValueString))
    {
       goto error;
    }

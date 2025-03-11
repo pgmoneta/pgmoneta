@@ -102,17 +102,25 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 
    *backup = NULL;
 
-   if (!pgmoneta_art_contains_key(nodes, NODE_SERVER))
+   if (!pgmoneta_art_contains_key(nodes, USER_SERVER))
    {
-      if (pgmoneta_art_insert(nodes, NODE_SERVER, (uintptr_t)server, ValueInt32))
+      if (pgmoneta_art_insert(nodes, USER_SERVER, (uintptr_t)config->servers[server].name, ValueString))
       {
          goto error;
       }
    }
 
-   if (!pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER))
+   if (!pgmoneta_art_contains_key(nodes, NODE_SERVER_ID))
    {
-      if (pgmoneta_art_insert(nodes, NODE_IDENTIFIER, (uintptr_t)identifier, ValueString))
+      if (pgmoneta_art_insert(nodes, NODE_SERVER_ID, (uintptr_t)server, ValueInt32))
+      {
+         goto error;
+      }
+   }
+
+   if (!pgmoneta_art_contains_key(nodes, USER_IDENTIFIER))
+   {
+      if (pgmoneta_art_insert(nodes, USER_IDENTIFIER, (uintptr_t)identifier, ValueString))
       {
          goto error;
       }
@@ -255,13 +263,13 @@ pgmoneta_common_setup(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("%s (setup): %s/%s", name, config->servers[server].name, label);
@@ -283,13 +291,13 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
    a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
    pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("%s (teardown): %s/%s", name, config->servers[server].name, label);

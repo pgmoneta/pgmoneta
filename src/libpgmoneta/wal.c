@@ -167,7 +167,7 @@ pgmoneta_wal(int srv, char** argv)
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_SERVER, (uintptr_t)srv, ValueInt32))
+   if (pgmoneta_art_insert(nodes, NODE_SERVER_ID, (uintptr_t)srv, ValueInt32))
    {
       goto error;
    }

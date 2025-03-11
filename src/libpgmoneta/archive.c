@@ -91,7 +91,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
+   if (pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)position, ValueString))
    {
       goto error;
    }

@@ -61,16 +61,13 @@ extern "C" {
 #define NODE_BACKUP_BASE       "backup_base"       /* The base directory of the backup */
 #define NODE_BACKUP_DATA       "backup_data"       /* The data directory of the backup */
 #define NODE_FAILED            "failed"            /* The failed files in a manifest */
-#define NODE_FILES             "files"             /* The files */
-#define NODE_IDENTIFIER        "identifier"        /* The backup identifier (oldest, newest, <timestamp>) */
 #define NODE_INCREMENTAL_BASE  "incremental_base"  /* The base directory of incremental */
 #define NODE_INCREMENTAL_LABEL "incremental_label" /* The label of the incremental backup */
 #define NODE_LABEL             "label"             /* The backup label */
 #define NODE_MANIFEST          "manifest"          /* The manifest */
-#define NODE_POSITION          "position"          /* The recovery positions */
 #define NODE_PRIMARY           "primary"           /* Is the server a primary */
 #define NODE_RECOVERY_INFO     "recovery_info"     /* The recovery information */
-#define NODE_SERVER            "server"            /* The server number */
+#define NODE_SERVER_ID         "server_id"         /* The server number */
 #define NODE_SERVER_BACKUP     "server_backup"     /* The backup directory of the server */
 #define NODE_SERVER_BASE       "server_base"       /* The base directory of the server */
 #define NODE_TARGET_BASE       "target_base"       /* The target base directory */
@@ -78,7 +75,14 @@ extern "C" {
 #define NODE_TARGET_ROOT       "target_root"       /* The target root directory */
 #define NODE_WORKSPACE_ROOT    "workspace_root"    /* The workspace root directory */
 
-typedef char* (*name)(void);
+/* Supplied by the user */
+#define USER_DIRECTORY         "directory"         /* The target root directory */
+#define USER_FILES             "files"             /* The files that should be checked */
+#define USER_IDENTIFIER        "identifier"        /* The backup identifier (oldest, newest, <timestamp>) */
+#define USER_POSITION          "position"          /* The recovery positions */
+#define USER_SERVER            "server"            /* The server name */
+
+typedef char*(*name)(void);
 typedef int (*setup)(char*, struct art*);
 typedef int (*execute)(char*, struct art*);
 typedef int (*teardown)(char*, struct art*);

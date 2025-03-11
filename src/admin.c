@@ -400,7 +400,6 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       #define GET_ENV(name) secure_getenv(name)
    #endif
 
-
    if (password == NULL)
    {
       if (generate_pwd)
