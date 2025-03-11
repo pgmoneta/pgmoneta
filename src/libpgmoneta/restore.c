@@ -390,11 +390,22 @@ pgmoneta_restore_backup(struct art* nodes)
    directory = (char*)pgmoneta_art_search(nodes, USER_DIRECTORY);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    workspace_root = pgmoneta_get_server_workspace(server);
-
    target_root = pgmoneta_append(target_root, directory);
 
-   if (backup->type == TYPE_INCREMENTAL)
+   if (backup->type == TYPE_FULL)
    {
+      if (pgmoneta_art_insert(nodes, NODE_RESTORE_TYPE, (uintptr_t)false, ValueBool))
+      {
+         goto error;
+      }
+   }
+   else
+   {
+      if (pgmoneta_art_insert(nodes, NODE_RESTORE_TYPE, (uintptr_t)true, ValueBool))
+      {
+         goto error;
+      }
+
       if (!pgmoneta_ends_with(target_root, "/"))
       {
          target_root = pgmoneta_append_char(target_root, '/');
@@ -409,7 +420,7 @@ pgmoneta_restore_backup(struct art* nodes)
 
    if (workspace_root == NULL || strlen(workspace_root) == 0)
    {
-      workspace_root = strdup(target_root);
+      workspace_root = pgmoneta_append(workspace_root, target_root);
    }
 
    if (pgmoneta_art_insert(nodes, NODE_WORKSPACE_ROOT, (uintptr_t)workspace_root, ValueString))

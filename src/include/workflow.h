@@ -67,9 +67,10 @@ extern "C" {
 #define NODE_MANIFEST          "manifest"          /* The manifest */
 #define NODE_PRIMARY           "primary"           /* Is the server a primary */
 #define NODE_RECOVERY_INFO     "recovery_info"     /* The recovery information */
-#define NODE_SERVER_ID         "server_id"         /* The server number */
+#define NODE_RESTORE_TYPE      "restore_type"      /* The type of restore (false == FULL, true == INCREMENTAL) */
 #define NODE_SERVER_BACKUP     "server_backup"     /* The backup directory of the server */
 #define NODE_SERVER_BASE       "server_base"       /* The base directory of the server */
+#define NODE_SERVER_ID         "server_id"         /* The server number */
 #define NODE_TARGET_BASE       "target_base"       /* The target base directory */
 #define NODE_TARGET_FILE       "target_file"       /* The target file */
 #define NODE_TARGET_ROOT       "target_root"       /* The target root directory */
