@@ -73,6 +73,93 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
 void
 pgmoneta_free_timeline_history(struct timeline_history* history);
 
+/**
+ * @brief Enum representing types of PostgreSQL objects
+ */
+typedef enum
+{
+   OBJ_TABLESPACE,  /**< Tablespace object */
+   OBJ_DATABASE,    /**< Database object */
+   OBJ_RELATION     /**< Relation (table/view) object */
+} object_type;
+
+/**
+ * @brief Structure representing OID mapping for PostgreSQL objects
+ */
+typedef struct
+{
+   int oid;           /**< Object identifier (OID) */
+   object_type type;  /**< Type of object (tablespace/database/relation) */
+   char* name;        /**< Name of the object (read-only) */
+} oid_mapping;
+
+/**
+ * @brief Read OID mappings from PostgreSQL server
+ *
+ * Executes SQL queries to retrieve OID mappings for tablespaces, databases,
+ * and relations. Populates global oidMappings array.
+ *
+ * @param server_index Index of the server
+ * @return 0 on success, 1 on failure
+ */
+int
+pgmoneta_read_mappings_from_server(int server_index);
+
+/**
+ * @brief Read OID mappings from JSON file
+ *
+ * @param mappings_path Path to JSON file with format:
+ * ```json
+ * {
+ *    "tablespaces": [
+ *       {"name1": "oid1"},
+ *       {"name2": "oid2"},
+ *        ...
+ *    ],
+ *    "databases": [
+ *       {"name1": "oid1"},
+ *       {"name2": "oid2"},
+ *       ...
+ *    ],
+ *    "relations": [
+ *       {"name1": "oid1"},
+ *       {"name2": "oid2"},
+ *       ...
+ *    ],
+ * }
+ * ```
+ * @endcode
+ * @return 0 on success, 1 on failure
+ */
+int
+pgmoneta_read_mappings_from_json(char* mappings_path);
+
+/**
+ * @brief Get tablespace name by OID
+ * @param oid Tablespace OID to lookup
+ * @param name [out] Tablespace name
+ * @return Tablespace name or provided oid if not found
+ */
+int
+pgmoneta_get_tablespace_name(int oid, char** name);
+
+/**
+ * @brief Get database name by OID
+ * @param oid Database OID to lookup
+ * @param name [out] Database name
+ * @return Database name or provided oid if not found
+ */
+int
+pgmoneta_get_database_name(int oid, char** name);
+
+/**
+ * @brief Get relation name by OID
+ * @param oid Relation OID to lookup
+ * @param name [out] Relation name
+ * @return Relation name (schema-qualified) or provided oid if not found
+ */
+int
+pgmoneta_get_relation_name(int oid, char** name);
 #ifdef __cplusplus
 }
 #endif

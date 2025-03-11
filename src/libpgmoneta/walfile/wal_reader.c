@@ -26,12 +26,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* pgmoneta */
 #include <logging.h>
 #include <utils.h>
+#include <wal.h>
 #include <walfile.h>
 #include <walfile/rmgr.h>
 #include <walfile/wal_reader.h>
 
+/* system */
 #include <assert.h>
 #include <libgen.h>
 #include <stdint.h>
@@ -718,6 +721,10 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
       buf = pgmoneta_format_and_append(buf, "\n");
    }
 
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
+
    for (block_id = 0; block_id <= record->max_block_id; block_id++)
    {
       struct rel_file_locator rlocator;
@@ -742,9 +749,24 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf, " ");
          }
 
-         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %u/%u/%u forknum %d blk %u",
+         if (pgmoneta_get_database_name(rlocator.dbOid, &dbname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_relation_name(rlocator.relNumber, &relname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_tablespace_name(rlocator.spcOid, &spcname))
+         {
+            goto error;
+         }
+
+         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %s/%s/%s forknum %d blk %u",
                                           block_id,
-                                          rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                          spcname, dbname, relname,
                                           forknum,
                                           blk);
 
@@ -811,12 +833,27 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
       {
          /* Get block references in short format. */
 
+         if (pgmoneta_get_database_name(rlocator.dbOid, &dbname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_relation_name(rlocator.relNumber, &relname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_tablespace_name(rlocator.spcOid, &spcname))
+         {
+            goto error;
+         }
+
          if (forknum != MAIN_FORKNUM)
          {
             buf = pgmoneta_format_and_append(buf,
                                              ", blkref #%d: rel %u/%u/%u fork %d blk %u",
                                              block_id,
-                                             rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                             spcname, dbname, relname,
                                              forknum,
                                              blk);
          }
@@ -825,7 +862,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf,
                                              ", blkref #%d: rel %u/%u/%u blk %u",
                                              block_id,
-                                             rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                             spcname, dbname, relname,
                                              blk);
          }
 
@@ -847,14 +884,24 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             }
          }
       }
+
+      if (!detailed_format && pretty)
+      {
+         buf = pgmoneta_format_and_append(buf, "\n");
+      }
+
+      free(dbname);
+      free(spcname);
+      free(relname);
+      return buf;
    }
 
-   if (!detailed_format && pretty)
-   {
-      buf = pgmoneta_format_and_append(buf, "\n");
-   }
-   return buf;
-
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+   free(buf);
+   return NULL;
 }
 
 static bool
