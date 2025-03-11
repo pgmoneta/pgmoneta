@@ -26,10 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* pgmoneta */
 #include <utils.h>
 #include <walfile/rm_heap.h>
 #include <walfile/wal_reader.h>
+#include <wal.h>
 
+/* system */
 #include <assert.h>
 
 struct xl_heap_freeze_page*
@@ -331,14 +334,44 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    {
       struct xl_heap_new_cid* xlrec = (struct xl_heap_new_cid*) rec;
 
-      buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; tid %u/%u",
-                                       xlrec->target_node.spcNode,
-                                       xlrec->target_node.dbNode,
-                                       xlrec->target_node.relNode,
+      char* dbname = NULL;
+      int ret = pgmoneta_get_database_name(xlrec->target_node.dbNode, &dbname);
+
+      if (ret)
+      {
+         return NULL;
+      }
+
+      char* relname = NULL;
+
+      ret = pgmoneta_get_relation_name(xlrec->target_node.relNode, &relname);
+
+      if (ret)
+      {
+         return NULL;
+      }
+
+      char* spcname = NULL;
+
+      ret = pgmoneta_get_tablespace_name(xlrec->target_node.spcNode, &spcname);
+
+      if (ret)
+      {
+         return NULL;
+      }
+
+      buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; tid %u/%u",
+                                       spcname,
+                                       dbname,
+                                       relname,
                                        ITEM_POINTER_GET_BLOCK_NUMBER(&(xlrec->target_tid)),
                                        ITEM_POINTER_GET_OFFSET_NUMBER(&(xlrec->target_tid)));
       buf = pgmoneta_format_and_append(buf, "; cmin: %u, cmax: %u, combo: %u",
                                        xlrec->cmin, xlrec->cmax, xlrec->combocid);
+
+      free(dbname);
+      free(spcname);
+      free(relname);
    }
    return buf;
 }
@@ -460,6 +493,16 @@ redirect_elem_desc(char* buf, void* offset, void* data)
 char*
 oid_elem_desc(char* buf, void* relid, void* data)
 {
-   buf = pgmoneta_format_and_append(buf, "%u", *(oid*) relid);
+   char* relname = NULL;
+
+   int ret = pgmoneta_get_relation_name(*(oid*) relid, &relname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s", relname);
+   free(relname);
    return buf;
 }

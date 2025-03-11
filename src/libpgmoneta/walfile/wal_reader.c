@@ -26,12 +26,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* pgmoneta */
 #include <logging.h>
 #include <utils.h>
+#include <wal.h>
 #include <walfile.h>
 #include <walfile/rmgr.h>
 #include <walfile/wal_reader.h>
 
+/* system */
 #include <assert.h>
 #include <libgen.h>
 #include <stdint.h>
@@ -742,11 +745,41 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf, " ");
          }
 
-         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %u/%u/%u forknum %d blk %u",
+         char* dbname = NULL;
+         int ret = pgmoneta_get_database_name(rlocator.dbOid, &dbname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         char* relname = NULL;
+
+         ret = pgmoneta_get_relation_name(rlocator.relNumber, &relname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         char* spcname = NULL;
+
+         ret = pgmoneta_get_tablespace_name(rlocator.spcOid, &spcname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %s/%s/%s forknum %d blk %u",
                                           block_id,
-                                          rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                          spcname, dbname, relname,
                                           forknum,
                                           blk);
+
+         free(dbname);
+         free(spcname);
+         free(relname);
 
          if (XLogRecHasBlockImage(record, block_id))
          {
@@ -811,12 +844,38 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
       {
          /* Get block references in short format. */
 
+         char* dbname = NULL;
+         int ret = pgmoneta_get_database_name(rlocator.dbOid, &dbname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         char* relname = NULL;
+
+         ret = pgmoneta_get_relation_name(rlocator.relNumber, &relname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         char* spcname = NULL;
+
+         ret = pgmoneta_get_tablespace_name(rlocator.spcOid, &spcname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
          if (forknum != MAIN_FORKNUM)
          {
             buf = pgmoneta_format_and_append(buf,
                                              ", blkref #%d: rel %u/%u/%u fork %d blk %u",
                                              block_id,
-                                             rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                             spcname, dbname, relname,
                                              forknum,
                                              blk);
          }
@@ -825,9 +884,13 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf,
                                              ", blkref #%d: rel %u/%u/%u blk %u",
                                              block_id,
-                                             rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                             spcname, dbname, relname,
                                              blk);
          }
+
+         free(dbname);
+         free(spcname);
+         free(relname);
 
          if (XLogRecHasBlockImage(record, block_id))
          {

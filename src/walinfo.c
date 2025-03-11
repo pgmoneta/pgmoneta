@@ -26,21 +26,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <pgmoneta.h>
+/* pgmoneta */
 #include <configuration.h>
 #include <deque.h>
 #include <logging.h>
+#include <management.h>
+#include <pgmoneta.h>
+#include <security.h>
 #include <shmem.h>
 #include <utils.h>
+#include <wal.h>
 #include <walfile.h>
 
-#include <inttypes.h>
+/* system */
 #include <err.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#ifdef HAVE_LINUX
+#include <systemd/sd-daemon.h>
+#endif
 
 #define OPT_COLOR 1000
 
@@ -59,23 +68,26 @@ usage(void)
    printf("\n");
 
    printf("Usage:\n");
-   printf("  pgmoneta-walinfo <file>\n");
+   printf("  pgmoneta-walinfo [ -u USERS_FILE ] <file>\n");
    printf("\n");
    printf("Options:\n");
-   printf("  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file\n");
-   printf("  -o, --output FILE        Output file\n");
-   printf("  -F, --format             Output format (raw, json)\n");
-   printf("  -L, --logfile FILE       Set the log file\n");
-   printf("  -q, --quiet              No output only result\n");
-   printf("      --color              Use colors (on, off)\n");
-   printf("  -r, --rmgr               Filter on a resource manager\n");
-   printf("  -s, --start              Filter on a start LSN\n");
-   printf("  -e, --end                Filter on an end LSN\n");
-   printf("  -x, --xid                Filter on an XID\n");
-   printf("  -l, --limit              Limit number of outputs\n");
-   printf("  -v, --verbose            Output result\n");
-   printf("  -V, --version            Display version information\n");
-   printf("  -?, --help               Display help\n");
+   printf("  -c, --config CONFIG_FILE  Set the path to the pgmoneta_walinfo.conf file\n");
+   printf("  -u, --users USERS_FILE    Set the path to the pgmoneta_users.conf file \n");
+   printf("  -o, --output FILE         Output file\n");
+   printf("  -F, --format              Output format (raw, json)\n");
+   printf("  -L, --logfile FILE        Set the log file\n");
+   printf("  -q, --quiet               No output only result\n");
+   printf("      --color               Use colors (on, off)\n");
+   printf("  -r, --rmgr                Filter on a resource manager\n");
+   printf("  -s, --start               Filter on a start LSN\n");
+   printf("  -e, --end                 Filter on an end LSN\n");
+   printf("  -x, --xid                 Filter on an XID\n");
+   printf("  -l, --limit               Limit number of outputs\n");
+   printf("  -v, --verbose             Output result\n");
+   printf("  -V, --version             Display version information\n");
+   printf("  -m, --mapping             Provide a mappings file that is used to translate OIDs to object names\n");
+   printf("  -t, --translate           Translate OIDs in description of XLOG records into actual names\n");
+   printf("  -?, --help                Display help\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
@@ -88,6 +100,7 @@ main(int argc, char** argv)
    int option_index = 0;
    int loaded = 1;
    char* configuration_path = NULL;
+   char* users_path = NULL;
    char* output = NULL;
    char* format = NULL;
    char* logfile = NULL;
@@ -106,6 +119,9 @@ main(int argc, char** argv)
    enum value_type type = ValueString;
    size_t size;
    struct configuration* config = NULL;
+   bool enable_mapping = false;
+   char* mappings_path = NULL;
+   int ret;
 
    if (argc < 2)
    {
@@ -130,12 +146,14 @@ main(int argc, char** argv)
          {"limit", required_argument, 0, 'l'},
          {"verbose", no_argument, 0, 'v'},
          {"version", no_argument, 0, 'V'},
+         {"mapping", required_argument, 0, 'm'},
+         {"translate", no_argument, 0, 't'},
+         {"users", required_argument, 0, 'u'},
          {"help", no_argument, 0, '?'},
          {0, 0, 0, 0}
       };
 
-      c = getopt_long(argc, argv, "c:qvV?:o:F:L:r:s:e:x:l:",
-                      long_options, &option_index);
+      c = getopt_long(argc, argv, "c:m:tqvV?:o:F:L:r:s:e:x:l:u:", long_options, &option_index);
 
       if (c == -1)
       {
@@ -144,6 +162,16 @@ main(int argc, char** argv)
 
       switch (c)
       {
+         case 'u':
+            users_path = optarg;
+            break;
+         case 'm':
+            enable_mapping = true;
+            mappings_path = optarg;
+            break;
+         case 't':
+            enable_mapping = true;
+            break;
          case 'c':
             configuration_path = optarg;
             break;
@@ -189,7 +217,6 @@ main(int argc, char** argv)
             }
 
             pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
-
             break;
          case 's':
             if (strchr(optarg, '/'))
@@ -207,13 +234,12 @@ main(int argc, char** argv)
             }
             else
             {
-               start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+               start_lsn = strtoull(optarg, NULL, 10);   // Assuming optarg is a decimal number
             }
             break;
          case 'e':
             if (strchr(optarg, '/'))
             {
-               // Assuming optarg is a string like "16/B374D848"
                if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2)
                {
                   end_lsn = (end_lsn_high << 32) + end_lsn_low;
@@ -239,7 +265,6 @@ main(int argc, char** argv)
             }
 
             pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
-
             break;
          case 'l':
             limit = pgmoneta_atoi(optarg);
@@ -265,14 +290,14 @@ main(int argc, char** argv)
       goto error;
    }
 
-   pgmoneta_init_configuration(shmem);
+   pgmoneta_walinfo_init_configuration(shmem);
    config = (struct configuration*)shmem;
 
    if (configuration_path != NULL)
    {
       if (pgmoneta_exists(configuration_path))
       {
-         loaded = pgmoneta_read_configuration(shmem, configuration_path);
+         loaded = pgmoneta_walinfo_read_configuration(shmem, configuration_path);
       }
 
       if (loaded)
@@ -281,9 +306,9 @@ main(int argc, char** argv)
       }
    }
 
-   if (loaded && pgmoneta_exists(PGMONETA_MAIN_CONFIG_FILE_PATH))
+   if (loaded && pgmoneta_exists(PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH))
    {
-      loaded = pgmoneta_read_configuration(shmem, PGMONETA_MAIN_CONFIG_FILE_PATH);
+      loaded = pgmoneta_walinfo_read_configuration(shmem, PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH);
    }
 
    if (loaded)
@@ -300,9 +325,79 @@ main(int argc, char** argv)
       }
    }
 
+   if (pgmoneta_walinfo_validate_configuration(shmem))
+   {
+      goto error;
+   }
+
    if (pgmoneta_start_logging())
    {
       exit(1);
+   }
+
+   if (users_path != NULL)
+   {
+      ret = pgmoneta_read_users_configuration(shmem, users_path);
+      if (ret == 1)
+      {
+         warnx("pgmoneta: USERS configuration not found: %s", users_path);
+#ifdef HAVE_LINUX
+         sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
+#endif
+         goto error;
+      }
+      else if (ret == 2)
+      {
+         warnx("pgmoneta: Invalid master key file");
+#ifdef HAVE_LINUX
+         sd_notify(0, "STATUS=Invalid master key file");
+#endif
+         goto error;
+      }
+      else if (ret == 3)
+      {
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+#ifdef HAVE_LINUX
+         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+#endif
+         goto error;
+      }
+      memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+   }
+   else
+   {
+      users_path = PGMONETA_DEFAULT_USERS_FILE_PATH;
+      ret = pgmoneta_read_users_configuration(shmem, users_path);
+      if (ret == 0)
+      {
+         memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+      }
+   }
+
+   if (enable_mapping)
+   {
+      if (mappings_path != NULL)
+      {
+         if (pgmoneta_read_mappings_from_json(mappings_path) != 0)
+         {
+            pgmoneta_log_error("Failed to read mappings file");
+            goto error;
+         }
+      }
+      else
+      {
+         if (config->number_of_servers == 0)
+         {
+            pgmoneta_log_error("No servers defined, user should provide exactly one server in the configuration file");
+            goto error;
+         }
+
+         if (pgmoneta_read_mappings_from_server(0) != 0)
+         {
+            pgmoneta_log_error("Failed to read mappings from server");
+            goto error;
+         }
+      }
    }
 
    if (optind < argc)

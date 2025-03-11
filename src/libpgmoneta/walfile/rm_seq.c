@@ -26,9 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <walfile/rm.h>
-#include <walfile/rm_seq.h>
-#include <utils.h>
+ #include <utils.h>
+ #include <wal.h>
+ #include <walfile/rm.h>
+ #include <walfile/rm_seq.h>
 
 char*
 pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
@@ -39,9 +40,39 @@ pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_SEQ_LOG)
    {
-      buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u",
-                                       xlrec->node.spcNode, xlrec->node.dbNode,
-                                       xlrec->node.relNode);
+      char* dbname = NULL;
+      int ret = pgmoneta_get_database_name(xlrec->node.dbNode, &dbname);
+
+      if (ret)
+      {
+         return NULL;
+      }
+
+      char* relname = NULL;
+
+      ret = pgmoneta_get_relation_name(xlrec->node.relNode, &relname);
+
+      if (ret)
+      {
+         return NULL;
+      }
+
+      char* spcname = NULL;
+
+      ret = pgmoneta_get_tablespace_name(xlrec->node.spcNode, &spcname);
+
+      if (ret)
+      {
+         return NULL;
+      }
+
+      buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s",
+                                       spcname, dbname,
+                                       relname);
+
+      free(dbname);
+      free(spcname);
+      free(relname);
    }
    return buf;
 }

@@ -26,6 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <wal.h>
 #include <walfile/rm_standby.h>
 #include <utils.h>
 
@@ -106,7 +107,16 @@ pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_inval
       /* not expected, but print something anyway */
       else if (msg->id == SHAREDINVALRELMAP_ID)
       {
-         buf = pgmoneta_format_and_append(buf, " relmap db %u", msg->rm.db_id);
+         char* dbname = NULL;
+         int ret = pgmoneta_get_database_name(msg->rm.db_id, &dbname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+         buf = pgmoneta_format_and_append(buf, " relmap db %s", dbname);
+
+         free(dbname);
       }
       else if (msg->id == SHAREDINVALSNAPSHOT_ID)
       {
@@ -133,9 +143,29 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
 
       for (i = 0; i < xlrec->nlocks; i++)
       {
-         buf = pgmoneta_format_and_append(buf, "xid %u db %u rel %u ",
-                                          xlrec->locks[i].xid, xlrec->locks[i].db_oid,
-                                          xlrec->locks[i].rel_oid);
+         char* dbname = NULL;
+         int ret = pgmoneta_get_database_name(xlrec->locks[i].db_oid, &dbname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         char* relname = NULL;
+
+         ret = pgmoneta_get_relation_name(xlrec->locks[i].rel_oid, &relname);
+
+         if (ret)
+         {
+            return NULL;
+         }
+
+         buf = pgmoneta_format_and_append(buf, "xid %u db %s rel %u ",
+                                          xlrec->locks[i].xid, dbname,
+                                          relname);
+
+         free(dbname);
+         free(relname);
       }
    }
    else if (info == XLOG_RUNNING_XACTS)
