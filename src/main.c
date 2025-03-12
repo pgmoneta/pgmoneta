@@ -150,6 +150,23 @@ shutdown_mgt(void)
 static void
 start_metrics(void)
 {
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   if (strlen(config->metrics_cert_file) > 0)
+   {
+      if (pgmoneta_create_ssl_server_ctx(config->metrics_cert_file, config->metrics_key_file, "", &config->metrics_ssl_ctx))
+      {
+         pgmoneta_log_fatal("Failed to create SSL context for metrics");
+         return;
+      }
+   }
+   else
+   {
+      config->metrics_ssl_ctx = NULL;
+   }
+
    for (int i = 0; i < metrics_fds_length; i++)
    {
       int sockfd = *(metrics_fds + i);
@@ -1577,6 +1594,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    socklen_t client_addr_length;
    int client_fd;
    struct configuration* config;
+   SSL* client_ssl = NULL;
 
    if (EV_ERROR & revents)
    {
@@ -1633,9 +1651,18 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       ev_loop_fork(loop);
       shutdown_ports();
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
-      pgmoneta_prometheus(client_fd);
+      if (strlen(config->metrics_cert_file) > 0)
+      {
+         if (pgmoneta_create_ssl_server(config->metrics_ssl_ctx, client_fd, &client_ssl))
+         {
+            pgmoneta_log_error("Failed to create SSL server");
+            return;
+         }
+      }
+      pgmoneta_prometheus(client_ssl, client_fd);
    }
 
+   pgmoneta_close_ssl(client_ssl);
    pgmoneta_disconnect(client_fd);
 }
 
