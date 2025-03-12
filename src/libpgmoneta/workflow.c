@@ -46,7 +46,7 @@
 static struct workflow* wf_backup(struct backup* backup);
 static struct workflow* wf_incremental_backup(void);
 static struct workflow* wf_restore(struct backup* backup);
-static struct workflow* wf_restore_incremental(int server, struct backup* backup);
+static struct workflow* wf_combine(int server, struct backup* backup);
 static struct workflow* wf_verify(struct backup* backup);
 static struct workflow* wf_archive(struct backup* backup);
 static struct workflow* wf_delete_backup(struct backup* backup);
@@ -63,8 +63,8 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
       case WORKFLOW_TYPE_RESTORE:
          return wf_restore(backup);
          break;
-      case WORKFLOW_TYPE_RESTORE_INCREMENTAL:
-         return wf_restore_incremental(server, backup);
+      case WORKFLOW_TYPE_COMBINE:
+         return wf_combine(server, backup);
          break;
       case WORKFLOW_TYPE_VERIFY:
          return wf_verify(backup);
@@ -470,52 +470,13 @@ wf_restore(struct backup* backup)
 }
 
 static struct workflow*
-wf_restore_incremental(int server, struct backup* backup)
+wf_combine(int server, struct backup* backup)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
-   struct backup* bck = NULL;
-   char* server_dir = pgmoneta_get_server_backup(server);
-   char label[sizeof(backup->parent_label)];
 
-   // initialize label to be the parent label of current backup
-   memset(label, 0, sizeof(backup->parent_label));
-   memcpy(label, backup->parent_label, sizeof(backup->parent_label));
-
-   head = wf_restore(backup);
+   head = pgmoneta_create_combine_incremental();
    current = head;
-
-   while (current->next != NULL)
-   {
-      current = current->next;
-   }
-   current->next = pgmoneta_create_batch_restore_relay();
-   current = current->next;
-
-   while (bck == NULL || bck->type != TYPE_FULL)
-   {
-      free(bck);
-      pgmoneta_get_backup(server_dir, label, &bck);
-      current->next = wf_restore(bck);
-
-      while (current->next != NULL)
-      {
-         current = current->next;
-      }
-      current->next = pgmoneta_create_batch_restore_relay();
-      current = current->next;
-
-      // get a copy of current backup's parent before we free it in the next round
-      memcpy(label, bck->parent_label, sizeof(bck->parent_label));
-   }
-
-#ifdef DEBUG
-   assert(bck != NULL && bck->type == TYPE_FULL);
-   assert(strlen(label) == 0);
-#endif
-
-   current->next = pgmoneta_create_combine_incremental();
-   current = current->next;
 
    current->next = pgmoneta_create_recovery_info();
    current = current->next;
@@ -528,9 +489,6 @@ wf_restore_incremental(int server, struct backup* backup)
 
    current->next = pgmoneta_create_cleanup(CLEANUP_TYPE_RESTORE);
    current = current->next;
-
-   free(server_dir);
-   free(bck);
 
 #ifdef DEBUG
    current = head;
