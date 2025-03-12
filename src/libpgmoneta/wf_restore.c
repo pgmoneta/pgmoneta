@@ -50,9 +50,6 @@ static int restore_execute(char*, struct art*);
 static char* combine_incremental_name(void);
 static int combine_incremental_execute(char*, struct art*);
 
-static char* batch_restore_relay_name(void);
-static int batch_restore_relay_execute(char*, struct art*);
-
 static char*recovery_info_name(void);
 static int recovery_info_execute(char*, struct art*);
 
@@ -99,27 +96,6 @@ pgmoneta_create_combine_incremental(void)
    wf->name = &combine_incremental_name;
    wf->setup = &pgmoneta_common_setup;
    wf->execute = &combine_incremental_execute;
-   wf->teardown = &pgmoneta_common_teardown;
-   wf->next = NULL;
-
-   return wf;
-}
-
-struct workflow*
-pgmoneta_create_batch_restore_relay(void)
-{
-   struct workflow* wf = NULL;
-
-   wf = (struct workflow*)malloc(sizeof(struct workflow));
-
-   if (wf == NULL)
-   {
-      return NULL;
-   }
-
-   wf->name = &batch_restore_relay_name;
-   wf->setup = &pgmoneta_common_setup;
-   wf->execute = &batch_restore_relay_execute;
    wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
@@ -370,7 +346,7 @@ combine_incremental_execute(char* name, struct art* nodes)
    char* identifier = NULL;
    struct deque* prior_backups = NULL;
    char* input_dir = NULL;
-   char output_dir[MAX_PATH];
+   char* output_dir;
    char* base = NULL;
    struct backup* bck = NULL;
    struct json* manifest = NULL;
@@ -406,15 +382,13 @@ combine_incremental_execute(char* name, struct art* nodes)
    }
    input_dir = (char*)pgmoneta_deque_poll(prior_backups, NULL);
    base = (char*) pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
-
+   output_dir = (char*) pgmoneta_art_search(nodes, NODE_TARGET_BASE);
    manifest = (struct json*)pgmoneta_art_search(nodes, NODE_MANIFEST);
    if (manifest == NULL)
    {
       goto error;
    }
 
-   memset(output_dir, 0, MAX_PATH);
-   snprintf(output_dir, MAX_PATH, "%s/%s-%s", base, config->servers[server].name, &bck->label[0]);
    if (pgmoneta_exists(output_dir))
    {
       pgmoneta_delete_directory(output_dir);
@@ -437,108 +411,11 @@ combine_incremental_execute(char* name, struct art* nodes)
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)output_dir, ValueString))
-   {
-      goto error;
-   }
-
    free(input_dir);
    return 0;
 
 error:
    free(input_dir);
-   return 1;
-}
-
-static char*
-batch_restore_relay_name(void)
-{
-   return "Batch restore relay";
-}
-
-static int
-batch_restore_relay_execute(char* name, struct art* nodes)
-{
-   int server = -1;
-   struct deque* prior_backups = NULL;
-   char* label = NULL;
-   struct backup* bck = NULL;
-   struct art_iterator* iter = NULL;
-   struct configuration* config;
-   char* server_dir = NULL;
-
-   config = (struct configuration*)shmem;
-
-#ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
-   assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BASE));
-   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
-   free(a);
-#endif
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-   server_dir = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BASE);
-
-   pgmoneta_log_debug("Batch restore relay (execute): %s/%s", config->servers[server].name, label);
-
-   // This isn't ideal because we have read the backup info previously when constructing the workflow,
-   // but for now we have no choice but to read a second time
-   if (pgmoneta_get_backup(server_dir, label, &bck))
-   {
-      goto error;
-   }
-
-   prior_backups = (struct deque*)pgmoneta_art_search(nodes, NODE_BACKUPS);
-   if (prior_backups == NULL)
-   {
-      pgmoneta_deque_create(false, &prior_backups);
-      pgmoneta_art_insert(nodes, NODE_BACKUPS, (uintptr_t)prior_backups, ValueDeque);
-   }
-
-   pgmoneta_deque_add(prior_backups, NULL, pgmoneta_art_search(nodes, NODE_TARGET_BASE), ValueString);
-
-   pgmoneta_art_iterator_create(nodes, &iter);
-   while (pgmoneta_art_iterator_next(iter))
-   {
-      // Keep the directory, position, prior_backups
-      // since they'll remain unchanged. Purge the rest in case they unexpectedly
-      // affect the next restore workflow
-      if (pgmoneta_compare_string(iter->key, NODE_TARGET_ROOT) ||
-          pgmoneta_compare_string(iter->key, USER_POSITION) ||
-          pgmoneta_compare_string(iter->key, NODE_BACKUPS) ||
-          pgmoneta_compare_string(iter->key, NODE_BACKUP) ||
-          pgmoneta_compare_string(iter->key, NODE_MANIFEST))
-      {
-         continue;
-      }
-      pgmoneta_log_debug("Removing: %s", iter->key);
-      pgmoneta_art_iterator_remove(iter);
-   }
-
-   // restore stops at full backup
-   if (bck->type != TYPE_FULL)
-   {
-      pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)bck->parent_label, ValueString);
-   }
-
-   // free the label since adding to deque makes a copy of it
-   free(bck);
-   free(server_dir);
-   pgmoneta_art_iterator_destroy(iter);
-
-   return 0;
-
-error:
-   free(bck);
-   free(server_dir);
-   pgmoneta_art_iterator_destroy(iter);
    return 1;
 }
 

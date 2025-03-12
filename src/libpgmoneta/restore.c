@@ -53,10 +53,11 @@
 #define RESTORE_OK            0
 #define RESTORE_MISSING_LABEL 1
 #define RESTORE_NO_DISK_SPACE 2
+#define RESTORE_TYPE_UNKNOWN  3
 #define INCREMENTAL_MAGIC 0xd3ae1f0d
 #define INCREMENTAL_PREFIX_LENGTH (sizeof(INCREMENTAL_PREFIX) - 1)
 #define MANIFEST_FILES "Files"
-#define MAX_PATH_INCREMENTAL (MAX_PATH * 2)
+#define MAX_PATH_CONCAT (MAX_PATH * 2)
 
 /**
  * An rfile stores the metadata we need to use a file on disk for reconstruction.
@@ -82,6 +83,12 @@ struct rfile
 };
 
 static char* restore_last_files_names[] = {"/global/pg_control", "/postgresql.conf", "/pg_hba.conf"};
+
+static int restore_backup_full(struct art* nodes);
+
+static int restore_backup_incremental(struct art* nodes);
+
+static int carry_out_workflow(struct workflow* workflow, struct art* nodes);
 
 static void clear_manifest_incremental_entries(struct json* manifest);
 static int get_file_manifest(char* path, char* manifest_path, int algorithm, struct json** file);
@@ -349,25 +356,7 @@ error:
 int
 pgmoneta_restore_backup(struct art* nodes)
 {
-   int ret = RESTORE_OK;
-   int server = -1;
-   uint64_t free_space = 0;
-   uint64_t required_space = 0;
-   struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
    struct backup* backup = NULL;
-   char* directory = NULL;
-   char* target_root = NULL;
-   char* target_base = NULL;
-   char* workspace_root = NULL;
-   char directory_combine[MAX_PATH];
-   char* manifest_path = NULL;
-   struct json* manifest = NULL;
-   struct configuration* config;
-
-   config = (struct configuration*)shmem;
-
-   memset(directory_combine, 0, MAX_PATH);
 
 #ifdef DEBUG
    char* a = NULL;
@@ -386,241 +375,19 @@ pgmoneta_restore_backup(struct art* nodes)
    free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   directory = (char*)pgmoneta_art_search(nodes, USER_DIRECTORY);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
-   workspace_root = pgmoneta_get_server_workspace(server);
-   target_root = pgmoneta_append(target_root, directory);
-
    if (backup->type == TYPE_FULL)
    {
-      if (pgmoneta_art_insert(nodes, NODE_RESTORE_TYPE, (uintptr_t)false, ValueBool))
-      {
-         goto error;
-      }
-   }
-   else
-   {
-      if (pgmoneta_art_insert(nodes, NODE_RESTORE_TYPE, (uintptr_t)true, ValueBool))
-      {
-         goto error;
-      }
-
-      if (!pgmoneta_ends_with(target_root, "/"))
-      {
-         target_root = pgmoneta_append_char(target_root, '/');
-      }
-      target_root = pgmoneta_append(target_root, "tmp_incremental");
-   }
-
-   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString))
-   {
-      goto error;
-   }
-
-   if (workspace_root == NULL || strlen(workspace_root) == 0)
-   {
-      workspace_root = pgmoneta_append(workspace_root, target_root);
-   }
-
-   if (pgmoneta_art_insert(nodes, NODE_WORKSPACE_ROOT, (uintptr_t)workspace_root, ValueString))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
-   {
-      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(target_root), target_root);
-      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(target_root), target_root);
-      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
-   }
-
-   free_space = pgmoneta_free_space(target_root);
-   required_space =
-      backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
-
-   if (free_space < required_space)
-   {
-      char* f = NULL;
-      char* r = NULL;
-
-      f = pgmoneta_translate_file_size(free_space);
-      r = pgmoneta_translate_file_size(required_space);
-
-      pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
-                         config->servers[server].name, backup->label, target_root, f, r);
-
-      free(f);
-      free(r);
-
-      ret = RESTORE_NO_DISK_SPACE;
-      goto error;
-   }
-
-   if (backup->type == TYPE_INCREMENTAL)
-   {
-      if (strcmp(target_root, workspace_root))
-      {
-         if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
-         {
-            pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(workspace_root), workspace_root);
-            pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(workspace_root), workspace_root);
-            pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(workspace_root), workspace_root);
-         }
-
-         free_space = pgmoneta_free_space(workspace_root);
-         required_space =
-            backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
-
-         if (free_space < required_space)
-         {
-            char* f = NULL;
-            char* r = NULL;
-
-            f = pgmoneta_translate_file_size(free_space);
-            r = pgmoneta_translate_file_size(required_space);
-
-            pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
-                               config->servers[server].name, backup->label, workspace_root, f, r);
-
-            free(f);
-            free(r);
-
-            ret = RESTORE_NO_DISK_SPACE;
-            goto error;
-         }
-      }
-   }
-
-   target_base = pgmoneta_append(target_base, directory);
-   if (!pgmoneta_ends_with(target_base, "/"))
-   {
-      target_base = pgmoneta_append(target_base, "/");
-   }
-   target_base = pgmoneta_append(target_base, config->servers[server].name);
-   target_base = pgmoneta_append(target_base, "-");
-   target_base = pgmoneta_append(target_base, backup->label);
-   target_base = pgmoneta_append(target_base, "/");
-
-   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base, ValueString))
-   {
-      goto error;
-   }
-
-   if (backup->type == TYPE_FULL)
-   {
-      pgmoneta_log_trace("Full backup: %s", backup->label);
+      return restore_backup_full(nodes);
    }
    else if (backup->type == TYPE_INCREMENTAL)
    {
-      pgmoneta_log_trace("Incremental backup: %s", backup->label);
-
-      snprintf(directory_combine, MAX_PATH, "%s/%s-%s", target_root, config->servers[server].name, &backup->label[0]);
-
-      manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
-      manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
-
-      // Read the manifest for later usage
-      if (pgmoneta_json_read_file(manifest_path, &manifest))
-      {
-         goto error;
-      }
-      pgmoneta_art_insert(nodes, NODE_MANIFEST, (uintptr_t)manifest, ValueJSON);
+      return restore_backup_incremental(nodes);
    }
    else
    {
-      pgmoneta_log_error("Unidentified backup type %d", backup->type);
-      goto error;
+      return RESTORE_TYPE_UNKNOWN;
    }
-
-   if (backup->type == TYPE_FULL)
-   {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, server, backup);
-   }
-   else if (backup->type == TYPE_INCREMENTAL)
-   {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE_INCREMENTAL,
-                                          server, backup);
-   }
-   else
-   {
-      pgmoneta_log_error("Unidentified backup type %d", backup->type);
-      goto error;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->setup(current->name(), nodes))
-      {
-         ret = RESTORE_MISSING_LABEL;
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->execute(current->name(), nodes))
-      {
-         ret = RESTORE_MISSING_LABEL;
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->teardown(current->name(), nodes))
-      {
-         ret = RESTORE_MISSING_LABEL;
-         goto error;
-      }
-      current = current->next;
-   }
-
-   free(target_root);
-   free(target_base);
-   free(manifest_path);
-   free(workspace_root);
-
-   pgmoneta_workflow_destroy(workflow);
-
-   return RESTORE_OK;
-
-error:
-
-   if (backup != NULL && backup->type == TYPE_INCREMENTAL)
-   {
-      if (strlen(directory_combine) != 0)
-      {
-         pgmoneta_delete_directory(directory_combine);
-         // purge each table space
-         for (int i = 0; i < backup->number_of_tablespaces; i++)
-         {
-            char tblspc[MAX_PATH];
-            memset(tblspc, 0, MAX_PATH);
-            snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", target_root,
-                     config->servers[server].name, backup->label,
-                     backup->tablespaces[i]);
-            if (pgmoneta_exists(tblspc))
-            {
-               pgmoneta_delete_directory(tblspc);
-            }
-         }
-      }
-   }
-
-   free(target_root);
-   free(target_base);
-   free(manifest_path);
-   free(workspace_root);
-
-   pgmoneta_workflow_destroy(workflow);
-
-   return ret;
 }
 
 int
@@ -798,20 +565,20 @@ combine_backups_recursive(uint32_t tsoid,
    }
    while ((entry = readdir(dir)) != NULL)
    {
-      char ifullpath[MAX_PATH_INCREMENTAL];
-      char ofullpath[MAX_PATH_INCREMENTAL];
-      char manifest_path[MAX_PATH_INCREMENTAL];
+      char ifullpath[MAX_PATH_CONCAT];
+      char ofullpath[MAX_PATH_CONCAT];
+      char manifest_path[MAX_PATH_CONCAT];
 
       if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
          continue;
       }
 
-      memset(ifullpath, 0, MAX_PATH_INCREMENTAL);
-      memset(ofullpath, 0, MAX_PATH_INCREMENTAL);
-      memset(manifest_path, 0, MAX_PATH_INCREMENTAL);
+      memset(ifullpath, 0, MAX_PATH_CONCAT);
+      memset(ofullpath, 0, MAX_PATH_CONCAT);
+      memset(manifest_path, 0, MAX_PATH_CONCAT);
 
-      snprintf(ifullpath, MAX_PATH_INCREMENTAL, "%s/%s", ifulldir, entry->d_name);
+      snprintf(ifullpath, MAX_PATH_CONCAT, "%s/%s", ifulldir, entry->d_name);
 
       // Right now we only care about copying everything directly underneath pg_tblspc dir that's not a symlink
       if (is_pg_tblspc &&
@@ -861,8 +628,8 @@ combine_backups_recursive(uint32_t tsoid,
       if (is_incremental_dir && pgmoneta_starts_with(entry->d_name, INCREMENTAL_PREFIX))
       {
          // finally found an incremental file
-         snprintf(ofullpath, MAX_PATH_INCREMENTAL, "%s/%s", ofulldir, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
-         snprintf(manifest_path, MAX_PATH_INCREMENTAL, "%s%s", relative_prefix, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
+         snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", ofulldir, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
+         snprintf(manifest_path, MAX_PATH_CONCAT, "%s%s", relative_prefix, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
          if (reconstruct_backup_file(server,
                                      ifullpath,
                                      ofullpath,
@@ -886,7 +653,7 @@ combine_backups_recursive(uint32_t tsoid,
       else
       {
          // copy the full file from input dir to output dir
-         snprintf(ofullpath, MAX_PATH_INCREMENTAL, "%s/%s", ofulldir, entry->d_name);
+         snprintf(ofullpath, MAX_PATH_CONCAT, "%s/%s", ofulldir, entry->d_name);
          pgmoneta_copy_file(ifullpath, ofullpath, NULL);
       }
    }
@@ -1418,7 +1185,7 @@ clear_manifest_incremental_entries(struct json* manifest)
    {
       return;
    }
-   files = (struct json*)pgmoneta_json_get(files, MANIFEST_FILES);
+   files = (struct json*)pgmoneta_json_get(manifest, MANIFEST_FILES);
    if (files == NULL)
    {
       return;
@@ -1497,4 +1264,275 @@ error:
    free(checksum);
    pgmoneta_json_destroy(f);
    return 1;
+}
+
+static int
+restore_backup_full(struct art* nodes)
+{
+   int ret = RESTORE_OK;
+   int server = -1;
+   char* directory = NULL;
+   struct backup* backup = NULL;
+   char* target_root = NULL;
+   char* target_base = NULL;
+   uint64_t free_space = 0;
+   uint64_t required_space = 0;
+   struct configuration* config;
+
+   struct workflow* workflow = NULL;
+
+   config = (struct configuration*)shmem;
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   directory = (char*)pgmoneta_art_search(nodes, USER_DIRECTORY);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+
+   target_root = pgmoneta_append(target_root, directory);
+   target_base = pgmoneta_append(target_base, directory);
+   if (!pgmoneta_ends_with(target_base, "/"))
+   {
+      target_base = pgmoneta_append(target_base, "/");
+   }
+   target_base = pgmoneta_append(target_base, config->servers[server].name);
+   target_base = pgmoneta_append(target_base, "-");
+   target_base = pgmoneta_append(target_base, backup->label);
+   target_base = pgmoneta_append(target_base, "/");
+
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
+   {
+      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(target_root), target_root);
+      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(target_root), target_root);
+      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
+   }
+
+   free_space = pgmoneta_free_space(target_root);
+   required_space =
+      backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+
+   if (free_space < required_space)
+   {
+      char* f = NULL;
+      char* r = NULL;
+
+      f = pgmoneta_translate_file_size(free_space);
+      r = pgmoneta_translate_file_size(required_space);
+
+      pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
+                         config->servers[server].name, backup->label, target_root, f, r);
+
+      free(f);
+      free(r);
+
+      ret = RESTORE_NO_DISK_SPACE;
+      goto error;
+   }
+
+   pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString);
+   pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base, ValueString);
+   pgmoneta_log_trace("Full backup restore: %s", backup->label);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, server, backup);
+   if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
+   {
+      goto error;
+   }
+
+   free(target_root);
+   free(target_base);
+
+   pgmoneta_workflow_destroy(workflow);
+   return RESTORE_OK;
+
+error:
+   free(target_root);
+   free(target_base);
+
+   pgmoneta_workflow_destroy(workflow);
+   return ret;
+}
+
+static int
+restore_backup_incremental(struct art* nodes)
+{
+   int ret = RESTORE_OK;
+   int server = -1;
+   char* directory = NULL;
+   struct backup* backup = NULL;
+   struct backup* bck = NULL;
+   struct deque* prior_backups = NULL;
+   char target_root_restore[MAX_PATH];
+   char target_base_restore[MAX_PATH_CONCAT];
+   char target_root_combine[MAX_PATH];
+   char target_base_combine[MAX_PATH_CONCAT];
+   char label[MISC_LENGTH];
+   char* manifest_path = NULL;
+   char* server_dir = NULL;
+   struct json* manifest = NULL;
+   struct configuration* config;
+
+   struct workflow* workflow = NULL;
+   config = (struct configuration*)shmem;
+
+   memset(target_root_restore, 0, MAX_PATH);
+   memset(target_base_restore, 0, MAX_PATH_CONCAT);
+   memset(target_root_combine, 0, MAX_PATH);
+   memset(target_base_combine, 0, MAX_PATH_CONCAT);
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   directory = (char*)pgmoneta_art_search(nodes, USER_DIRECTORY);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+   server_dir = pgmoneta_get_server_backup(server);
+   pgmoneta_deque_create(false, &prior_backups);
+   pgmoneta_art_insert(nodes, NODE_BACKUPS, (uintptr_t)prior_backups, ValueDeque);
+
+   // initialize label to be the parent label of current backup
+   memset(label, 0, MISC_LENGTH);
+   memcpy(label, backup->parent_label, sizeof(backup->parent_label));
+
+   snprintf(target_root_restore, MAX_PATH, "%s/tmp_%s_incremental_%s", directory, config->servers[server].name, &backup->label[0]);
+   snprintf(target_root_combine, MAX_PATH, "%s", directory);
+   snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/%s-%s", directory, config->servers[server].name, backup->label);
+   manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
+   manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
+   // read the manifest for later usage
+   if (pgmoneta_json_read_file(manifest_path, &manifest))
+   {
+      goto error;
+   }
+   pgmoneta_art_insert(nodes, NODE_MANIFEST, (uintptr_t)manifest, ValueJSON);
+
+   //TODO: free space check during incr restore should be handled specially
+
+   // restore current incremental backup
+   snprintf(target_base_restore, MAX_PATH_CONCAT, "%s/%s-%s", target_root_restore, config->servers[server].name, backup->label);
+   pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root_restore, ValueString);
+   pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_restore, ValueString);
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, server, backup);
+   if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
+   {
+      goto error;
+   }
+   pgmoneta_workflow_destroy(workflow);
+   workflow = NULL;
+   pgmoneta_deque_add(prior_backups, NULL, (uintptr_t)target_base_restore, ValueString);
+
+   // restore the chain of prior backups
+   while (bck == NULL || bck->type != TYPE_FULL)
+   {
+      free(bck);
+      bck = NULL;
+      pgmoneta_get_backup(server_dir, label, &bck);
+      if (bck == NULL)
+      {
+         ret = RESTORE_MISSING_LABEL;
+         pgmoneta_log_error("Unable to find backup %s", label);
+         goto error;
+      }
+
+      memset(target_base_restore, 0, MAX_PATH_CONCAT);
+      snprintf(target_base_restore, MAX_PATH_CONCAT, "%s/%s-%s", target_root_restore, config->servers[server].name, bck->label);
+      pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_restore, ValueString);
+      pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)label, ValueString);
+      pgmoneta_art_insert(nodes, NODE_BACKUP, (uintptr_t)bck, ValueRef);
+
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, server, backup);
+      if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
+      {
+         goto error;
+      }
+      pgmoneta_workflow_destroy(workflow);
+      workflow = NULL;
+
+      // get a copy of current backup's parent before we free it in the next round
+      memset(label, 0, MISC_LENGTH);
+      memcpy(label, bck->parent_label, sizeof(bck->parent_label));
+      pgmoneta_deque_add(prior_backups, NULL, (uintptr_t)target_base_restore, ValueString);
+   }
+
+   //combine the backups, first reset some input keys
+   pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root_combine, ValueString);
+   pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_combine, ValueString);
+   pgmoneta_art_insert(nodes, NODE_BACKUP, (uintptr_t)backup, ValueRef);
+   pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)backup->label, ValueString);
+
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE, server, backup);
+   if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
+   {
+      goto error;
+   }
+   pgmoneta_workflow_destroy(workflow);
+   workflow = NULL;
+
+   free(manifest_path);
+   free(server_dir);
+   free(bck);
+   return RESTORE_OK;
+
+error:
+   pgmoneta_delete_directory(target_root_restore);
+   pgmoneta_delete_directory(target_base_combine);
+   // purge each table space
+   for (int i = 0; i < backup->number_of_tablespaces; i++)
+   {
+      char tblspc[MAX_PATH];
+      memset(tblspc, 0, MAX_PATH);
+      snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
+               config->servers[server].name, backup->label,
+               backup->tablespaces[i]);
+      if (pgmoneta_exists(tblspc))
+      {
+         pgmoneta_delete_directory(tblspc);
+      }
+   }
+
+   free(manifest_path);
+   free(bck);
+   free(server_dir);
+
+   pgmoneta_workflow_destroy(workflow);
+
+   return ret;
+}
+
+static int
+carry_out_workflow(struct workflow* workflow, struct art* nodes)
+{
+   struct workflow* current = NULL;
+   int ret = RESTORE_OK;
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->setup(current->name(), nodes))
+      {
+         ret = RESTORE_MISSING_LABEL;
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->execute(current->name(), nodes))
+      {
+         ret = RESTORE_MISSING_LABEL;
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->teardown(current->name(), nodes))
+      {
+         ret = RESTORE_MISSING_LABEL;
+         goto error;
+      }
+      current = current->next;
+   }
+
+   return ret;
+error:
+   return ret;
 }
