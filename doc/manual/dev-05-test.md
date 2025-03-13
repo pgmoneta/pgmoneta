@@ -48,6 +48,14 @@ cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
+You can do
+
+```
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DCORE_DEBUG" ..
+```
+
+in order to get information from the core libraries too.
+
 ### Run test suites
 
 To run the testsuites get inside your build and just execute -

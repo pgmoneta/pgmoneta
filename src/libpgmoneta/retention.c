@@ -37,7 +37,6 @@ void
 pgmoneta_retention(char** argv)
 {
    struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
    struct art* nodes = NULL;
    struct configuration* config;
 
@@ -59,34 +58,9 @@ pgmoneta_retention(char** argv)
             goto error;
          }
 
-         current = workflow;
-         while (current != NULL)
+         if (pgmoneta_workflow_execute(workflow, nodes, i, -1, 0, 0, NULL))
          {
-            if (current->setup(current->name(), nodes))
-            {
-               goto error;
-            }
-            current = current->next;
-         }
-
-         current = workflow;
-         while (current != NULL)
-         {
-            if (current->execute(current->name(), nodes))
-            {
-               goto error;
-            }
-            current = current->next;
-         }
-
-         current = workflow;
-         while (current != NULL)
-         {
-            if (current->teardown(current->name(), nodes))
-            {
-               goto error;
-            }
-            current = current->next;
+            goto error;
          }
 
          pgmoneta_art_destroy(nodes);

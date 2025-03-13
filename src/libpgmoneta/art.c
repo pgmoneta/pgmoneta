@@ -332,7 +332,7 @@ pgmoneta_art_destroy(struct art* tree)
 uintptr_t
 pgmoneta_art_search(struct art* t, char* key)
 {
-#ifdef DEBUG
+#ifdef CORE_DEBUG
    char* vs = NULL;
    struct value* v = NULL;
    bool found = true;
@@ -397,7 +397,7 @@ pgmoneta_art_insert(struct art* t, char* key, uintptr_t value, enum value_type t
    struct value* old_val = NULL;
    bool new = false;
 
-#ifdef DEBUG
+#ifdef CORE_DEBUG
    char* vs = NULL;
    struct value* v = NULL;
 

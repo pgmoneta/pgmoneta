@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define NAME "gzip"
 #define BUFFER_LENGTH 8192
 
 static int gz_compress(char* from, int level, char* to);
@@ -319,7 +320,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: No file for %s", from);
       goto error;
    }
@@ -328,14 +329,14 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    to = pgmoneta_append(to, ".gz");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
 
    if (pgmoneta_gzip_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error gzip %s", from);
       goto error;
    }
@@ -351,7 +352,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
@@ -362,7 +363,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
@@ -445,7 +446,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: No file for %s", from);
       goto error;
    }
@@ -454,14 +455,14 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
    to = pgmoneta_remove_suffix(orig, ".gz");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
 
    if (pgmoneta_gunzip_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error gunzip %s", from);
       goto error;
    }
@@ -477,7 +478,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
@@ -488,7 +489,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }

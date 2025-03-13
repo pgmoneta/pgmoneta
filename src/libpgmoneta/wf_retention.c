@@ -86,11 +86,14 @@ retention_setup(char* name, struct art* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
-   free(a);
 #endif
 
    for (int i = 0; i < config->number_of_servers; i++)
@@ -114,11 +117,14 @@ retention_execute(char* name, struct art* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
-   free(a);
 #endif
 
    for (int i = 0; i < config->number_of_servers; i++)
@@ -244,11 +250,14 @@ retention_teardown(char* name, struct art* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
-   free(a);
 #endif
 
    for (int i = 0; i < config->number_of_servers; i++)

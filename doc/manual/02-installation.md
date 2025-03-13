@@ -156,6 +156,14 @@ cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
+You can do
+
+```
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DCORE_DEBUG" ..
+```
+
+in order to get information from the core libraries too.
+
 ## Compiling the documentation
 
 [**pgmoneta**][pgmoneta]'s documentation requires

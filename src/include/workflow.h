@@ -81,7 +81,7 @@ extern "C" {
 #define USER_POSITION          "position"          /* The recovery positions */
 #define USER_SERVER            "server"            /* The server name */
 
-typedef char*(*name)(void);
+typedef char* (*name)(void);
 typedef int (*setup)(char*, struct art*);
 typedef int (*execute)(char*, struct art*);
 typedef int (*teardown)(char*, struct art*);
@@ -91,12 +91,14 @@ typedef int (*teardown)(char*, struct art*);
  */
 struct workflow
 {
-   name name;        /**< The setup  function pointer */
-   setup setup;      /**< The setup  function pointer */
-   execute execute;  /**< The execute function pointer */
-   teardown teardown; /**< The taerdown function pointer */
+  int type;          /**< The type */
 
-   struct workflow* next; /**< The next workflow */
+  name name;         /**< The name */
+  setup setup;       /**< The setup  function pointer */
+  execute execute;   /**< The execute function pointer */
+  teardown teardown; /**< The teardown function pointer */
+
+  struct workflow *next; /**< The next workflow */
 };
 
 /**
@@ -119,6 +121,22 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup);
  */
 int
 pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct backup** backup);
+
+/**
+ * Execute a workflow
+ * @param workflow The workflow
+ * @param nodes The nodes
+ * @param server The server
+ * @param client_fd The client socket
+ * @param compression The compression level
+ * @param encryption The encryption level
+ * @param payload The payload
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
+                          int server, int client_fd, uint8_t compression,
+                          uint8_t encryption, struct json* payload);
 
 /**
  * Destroy the workflow

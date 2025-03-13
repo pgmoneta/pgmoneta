@@ -32,16 +32,21 @@
 #include <hot_standby.h>
 #include <info.h>
 #include <logging.h>
+#include <management.h>
 #include <storage.h>
-#include <workflow.h>
-#include <workflow_funcs.h>
 #include <utils.h>
 #include <value.h>
+#include <workflow.h>
+#include <workflow_funcs.h>
 
 /* system */
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define SETUP    0
+#define EXECUTE  1
+#define TEARDOWN 2
 
 static struct workflow* wf_backup(struct backup* backup);
 static struct workflow* wf_incremental_backup(void);
@@ -52,9 +57,14 @@ static struct workflow* wf_archive(struct backup* backup);
 static struct workflow* wf_delete_backup(struct backup* backup);
 static struct workflow* wf_retention(struct backup* backup);
 
+static int get_error_code(int type, int flow);
+
 struct workflow*
 pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
 {
+   struct workflow* w = NULL;
+   struct workflow* c = NULL;
+
    switch (workflow_type)
    {
       case WORKFLOW_TYPE_BACKUP:
@@ -79,13 +89,23 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
          return wf_retention(backup);
          break;
       case WORKFLOW_TYPE_INCREMENTAL_BACKUP:
-         return wf_incremental_backup();
+         w = wf_incremental_backup();
          break;
       default:
          break;
    }
 
-   return NULL;
+   if (w != NULL)
+   {
+      c = w;
+      while (c != NULL)
+      {
+         c->type = workflow_type;
+         c = c->next;
+      }
+   }
+
+   return w;
 }
 
 int
@@ -227,6 +247,74 @@ error:
 }
 
 int
+pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
+                          int server, int client_fd, uint8_t compression,
+                          uint8_t encryption, struct json* payload)
+{
+   struct workflow* current = NULL;
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->setup(current->name(), nodes))
+      {
+         if (client_fd > 0)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+                                               get_error_code(current->type, SETUP), current->name(),
+                                               compression, encryption, payload);
+         }
+
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->execute(current->name(), nodes))
+      {
+         if (client_fd > 0)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+                                               get_error_code(current->type, EXECUTE), current->name(),
+                                               compression, encryption, payload);
+         }
+
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->teardown(current->name(), nodes))
+      {
+         if (client_fd > 0)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+                                               get_error_code(current->type, TEARDOWN), current->name(),
+                                               compression, encryption, payload);
+         }
+
+         goto error;
+      }
+      current = current->next;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+int
 pgmoneta_workflow_destroy(struct workflow* workflow)
 {
    struct workflow* wf = NULL;
@@ -259,14 +347,17 @@ pgmoneta_common_setup(char* name, struct art* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   free(a);
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
@@ -287,14 +378,17 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   free(a);
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
@@ -759,4 +853,194 @@ wf_delete_backup(struct backup* backup)
 #endif
 
    return head;
+}
+
+static int
+get_error_code(int type, int flow)
+{
+   if (type == WORKFLOW_TYPE_BACKUP)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_BACKUP_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_BACKUP_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_BACKUP_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_RESTORE)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_RESTORE_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_RESTORE_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_RESTORE_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_ARCHIVE)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_ARCHIVE_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_ARCHIVE_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_ARCHIVE_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_DELETE_BACKUP)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_DELETE_BACKUP_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_DELETE_BACKUP_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_DELETE_BACKUP_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_RETENTION)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_RETENTION_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_RETENTION_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_RETENTION_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_WAL_SHIPPING)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_WAL_SHIPPING_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_WAL_SHIPPING_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_WAL_SHIPPING_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_VERIFY)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_VERIFY_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_VERIFY_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_VERIFY_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_INCREMENTAL_BACKUP)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_INCREMENTAL_BACKUP_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_INCREMENTAL_BACKUP_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_INCREMENTAL_BACKUP_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else if (type == WORKFLOW_TYPE_COMBINE)
+   {
+      if (flow == SETUP)
+      {
+         return MANAGEMENT_ERROR_COMBINE_SETUP;
+      }
+      else if (flow == EXECUTE)
+      {
+         return MANAGEMENT_ERROR_COMBINE_EXECUTE;
+      }
+      else if (flow == TEARDOWN)
+      {
+         return MANAGEMENT_ERROR_COMBINE_TEARDOWN;
+      }
+      else
+      {
+         pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+         return -1;
+      }
+   }
+   else
+   {
+      pgmoneta_log_error("Incorrect error code: %d/%d", type, flow);
+      return -1;
+   }
 }

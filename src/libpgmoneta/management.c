@@ -36,6 +36,7 @@
 #include <lz4_compression.h>
 #include <management.h>
 #include <utils.h>
+#include <value.h>
 #include <zstandard_compression.h>
 
 /* system */
@@ -898,7 +899,8 @@ error:
 }
 
 int
-pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, char* workflow,
+                                   uint8_t compression, uint8_t encryption, struct json* payload)
 {
    int srv = -1;
    struct json* response = NULL;
@@ -907,7 +909,7 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
 
    config = (struct configuration*)shmem;
 
-   if (pgmoneta_management_create_outcome_failure(payload, error, &outcome))
+   if (pgmoneta_management_create_outcome_failure(payload, error, workflow, &outcome))
    {
       goto error;
    }
@@ -1759,7 +1761,7 @@ error:
 }
 
 int
-pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, struct json** outcome)
+pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, char* workflow, struct json** outcome)
 {
    struct json* r = NULL;
 
@@ -1772,6 +1774,7 @@ pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, str
 
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)false, ValueBool);
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_ERROR, (uintptr_t)error, ValueInt32);
+   pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_WORKFLOW, (uintptr_t)workflow, ValueString);
 
    pgmoneta_json_put(json, MANAGEMENT_CATEGORY_OUTCOME, (uintptr_t)r, ValueJSON);
 

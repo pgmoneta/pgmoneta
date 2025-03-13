@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define NAME "bzip2"
 #define BUFFER_LENGTH 8192
 
 static int bzip2_compress(char* from, int level, char* to);
@@ -415,7 +416,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: No file for %s", from);
       goto error;
    }
@@ -424,14 +425,14 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
    to = pgmoneta_remove_suffix(orig, ".bz2");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
 
    if (bzip2_decompress(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error bunzip2 %s", from);
       goto error;
    }
@@ -447,7 +448,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
@@ -458,7 +459,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error sending response");
       goto error;
    }
@@ -519,7 +520,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: No file for %s", from);
       goto error;
    }
@@ -528,14 +529,14 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
    to = pgmoneta_append(to, ".bz2");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
 
    if (pgmoneta_bzip2_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error bzip2 %s", from);
       goto error;
    }
@@ -551,7 +552,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
@@ -562,7 +563,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error sending response");
       goto error;
    }

@@ -288,7 +288,7 @@ pgmoneta_deque_get(struct deque* deque, char* tag)
    struct deque_node* n = NULL;
    uintptr_t ret = 0;
 
-#ifdef DEBUG
+#ifdef CORE_DEBUG
    pgmoneta_log_trace("pgmoneta_deque_get: %s", tag);
 #endif
 
@@ -507,7 +507,7 @@ deque_offer(struct deque* deque, char* tag, uintptr_t data, enum value_type type
    struct deque_node* n = NULL;
    struct deque_node* last = NULL;
 
-#ifdef DEBUG
+#ifdef CORE_DEBUG
    if (deque == NULL)
    {
       pgmoneta_log_debug("Deque is NULL");

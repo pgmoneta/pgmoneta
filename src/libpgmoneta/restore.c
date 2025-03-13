@@ -50,6 +50,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#define NAME "restore"
 #define RESTORE_OK            0
 #define RESTORE_MISSING_LABEL 1
 #define RESTORE_NO_DISK_SPACE 2
@@ -276,7 +277,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
          goto error;
       }
@@ -298,7 +299,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Restore: Error sending response for %s", config->servers[server].name);
 
          goto error;
@@ -309,13 +310,13 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    }
    else if (ret == RESTORE_MISSING_LABEL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
       pgmoneta_log_warn("Restore: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
    else
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NODISK,
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NODISK, NAME,
                                          compression, encryption, payload);
       goto error;
    }
@@ -359,9 +360,13 @@ pgmoneta_restore_backup(struct art* nodes)
    struct backup* backup = NULL;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
 
    assert(pgmoneta_art_contains_key(nodes, USER_DIRECTORY));
@@ -372,7 +377,6 @@ pgmoneta_restore_backup(struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   free(a);
 #endif
 
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);

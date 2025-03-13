@@ -47,6 +47,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define NAME "backup"
+
 void
 pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -70,7 +72,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct backup* child = NULL;
@@ -85,7 +86,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    if (!config->servers[server].valid)
    {
       pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->servers[server].name);
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_INVALID, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_INVALID, NAME, compression, encryption, payload);
 
       goto error;
    }
@@ -93,7 +94,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    if (!config->servers[server].wal_streaming)
    {
       pgmoneta_log_error("Backup: Server %s is not WAL streaming", config->servers[server].name);
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_WAL, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_WAL, NAME, compression, encryption, payload);
 
       goto error;
    }
@@ -101,7 +102,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    if (!atomic_compare_exchange_strong(&config->servers[server].backup, &active, true))
    {
       pgmoneta_log_info("Backup: Active backup for server %s", config->servers[server].name);
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ACTIVE, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ACTIVE, NAME, compression, encryption, payload);
 
       goto done;
    }
@@ -165,13 +166,13 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    {
       if (pgmoneta_get_backups(server_backup, &number_of_backups, &backups))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NOBACKUPS, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NOBACKUPS, NAME, compression, encryption, payload);
          goto error;
       }
 
       if (number_of_backups == 0)
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NOBACKUPS, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NOBACKUPS, NAME, compression, encryption, payload);
          goto error;
       }
 
@@ -202,14 +203,14 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
       if (pgmoneta_get_backup_child(server, backups[backup_index], &child))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NOCHILD, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NOCHILD, NAME, compression, encryption, payload);
          pgmoneta_log_error("Backup: Unable to scan for children for %s/%s", config->servers[server].name, incremental);
          goto error;
       }
 
       if (child != NULL)
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ALREADYCHILD, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ALREADYCHILD, NAME, compression, encryption, payload);
          pgmoneta_log_error("Backup: Already an incremental backup for %s/%s", config->servers[server].name, incremental);
          goto error;
       }
@@ -230,40 +231,9 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    d = pgmoneta_get_server_backup_identifier_data(server, date);
 
-   current = workflow;
-   while (current != NULL)
+   if (pgmoneta_workflow_execute(workflow, nodes, server, client_fd, compression, encryption, payload))
    {
-      if (current->setup(current->name(), nodes))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_SETUP, compression, encryption, payload);
-
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->execute(current->name(), nodes))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_EXECUTE, compression, encryption, payload);
-
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->teardown(current->name(), nodes))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_TEARDOWN, compression, encryption, payload);
-
-         goto error;
-      }
-      current = current->next;
+      goto error;
    }
 
    size = pgmoneta_directory_size(d);
@@ -271,14 +241,14 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
       goto error;
    }
 
    if (pgmoneta_get_backup(server_backup, date, &backup))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ERROR, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_ERROR, NAME, compression, encryption, payload);
 
       goto error;
    }
@@ -302,7 +272,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_BACKUP_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("Backup: Error sending response for %s", config->servers[server].name);
 
       goto error;
@@ -400,7 +370,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
    if (pgmoneta_deque_create(false, &jl))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_DEQUE_CREATE, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_DEQUE_CREATE, NAME, compression, encryption, payload);
       pgmoneta_log_error("List backup: Error creating the deque for %s", config->servers[server].name);
 
       goto error;
@@ -411,7 +381,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
    if (pgmoneta_get_backups(d, &number_of_backups, &backups))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_BACKUPS, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_BACKUPS, NAME, compression, encryption, payload);
       pgmoneta_log_error("List backup: Unable to get backups for %s", config->servers[server].name);
 
       goto error;
@@ -518,7 +488,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
       goto error;
    }
@@ -550,7 +520,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("List backup: Error sending response for %s", config->servers[server].name);
 
       goto error;
@@ -579,7 +549,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
 json_error:
 
-   pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_JSON_VALUE, compression, encryption, payload);
+   pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_JSON_VALUE, NAME, compression, encryption, payload);
    pgmoneta_log_error("List backup: Error creating a JSON value for %s", config->servers[server].name);
 
 error:
@@ -614,7 +584,6 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    struct json* req = NULL;
    struct json* response = NULL;
    struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
    struct configuration* config;
@@ -640,45 +609,14 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, srv, backup);
 
-   current = workflow;
-   while (current != NULL)
+   if (pgmoneta_workflow_execute(workflow, nodes, srv, client_fd, compression, encryption, payload))
    {
-      if (current->setup(current->name(), nodes))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_SETUP, compression, encryption, payload);
-
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->execute(current->name(), nodes))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_EXECUTE, compression, encryption, payload);
-
-         goto error;
-      }
-      current = current->next;
-   }
-
-   current = workflow;
-   while (current != NULL)
-   {
-      if (current->teardown(current->name(), nodes))
-      {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_TEARDOWN, compression, encryption, payload);
-
-         goto error;
-      }
-      current = current->next;
+      goto error;
    }
 
    if (pgmoneta_management_create_response(payload, srv, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
       goto error;
    }
@@ -690,7 +628,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_NETWORK, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("Delete: Error sending response for %s", config->servers[srv].name);
 
       goto error;
@@ -715,7 +653,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
 error:
 
-   pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_ERROR, compression, encryption, payload);
+   pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_DELETE_ERROR, NAME, compression, encryption, payload);
    pgmoneta_log_warn("Delete: Failed for %s/%s", config->servers[srv].name,
                      (uintptr_t)pgmoneta_art_search(nodes, NODE_LABEL));
 

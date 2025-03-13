@@ -51,6 +51,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#define NAME "admin"
 #define DEFAULT_PASSWORD_LENGTH 64
 
 static char CHARS[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -491,7 +492,7 @@ error:
       file = NULL;
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -754,7 +755,7 @@ error:
       users_file = NULL;
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -1019,7 +1020,7 @@ error:
       remove(tmpfilename);
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -1169,7 +1170,7 @@ error:
       remove(tmpfilename);
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -1257,7 +1258,7 @@ error:
       users_file = NULL;
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {

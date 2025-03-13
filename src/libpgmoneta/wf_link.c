@@ -106,13 +106,16 @@ link_execute(char* name, struct art* nodes)
    config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   char* a = NULL;
-   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-   pgmoneta_log_debug("(Tree)\n%s", a);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *a = NULL;
+      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+      pgmoneta_log_debug("(Tree)\n%s", a);
+      free(a);
+   }
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   free(a);
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);

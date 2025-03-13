@@ -80,6 +80,7 @@
 #include <systemd/sd-daemon.h>
 #endif
 
+#define NAME "main"
 #define MAX_FDS 64
 #define OFFLINE 1000
 
@@ -839,7 +840,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    /* Process internal management request */
    if (pgmoneta_management_read_json(NULL, client_fd, &compression, &encryption, &payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, compression, encryption, NULL);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, NAME, compression, encryption, NULL);
       pgmoneta_log_error("Management: Bad payload (%d)", MANAGEMENT_ERROR_BAD_PAYLOAD);
       goto error;
    }
@@ -872,7 +873,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pid = fork();
             if (pid == -1)
             {
-               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, compression, encryption, payload);
+               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, NAME, compression, encryption, payload);
                pgmoneta_log_error("Backup: No fork (%d)", MANAGEMENT_ERROR_BACKUP_NOFORK);
                goto error;
             }
@@ -890,7 +891,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, NAME, compression, encryption, payload);
             pgmoneta_log_error("Backup: No server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_NOSERVER);
             goto error;
          }
@@ -899,7 +900,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          pgmoneta_log_warn("Can not create backups in offline mode");
 
-         pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER), MANAGEMENT_ERROR_BACKUP_OFFLINE, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER), MANAGEMENT_ERROR_BACKUP_OFFLINE, NAME, compression, encryption, payload);
          pgmoneta_log_error("Offline: Server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_OFFLINE);
       }
    }
@@ -921,7 +922,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("List backup: No fork %s (%d)", server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK);
             goto error;
          }
@@ -939,7 +940,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("List backup: No server %s (%d)", server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER);
          goto error;
       }
@@ -962,7 +963,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Delete: No fork %s (%d)", server, MANAGEMENT_ERROR_DELETE_NOFORK);
             goto error;
          }
@@ -981,7 +982,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Delete: No server %s (%d)", server, MANAGEMENT_ERROR_DELETE_NOSERVER);
          goto error;
       }
@@ -1004,7 +1005,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Restore: No fork %s (%d)", server, MANAGEMENT_ERROR_RESTORE_NOFORK);
             goto error;
          }
@@ -1022,7 +1023,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Restore: No server %s (%d)", server, MANAGEMENT_ERROR_RESTORE_NOSERVER);
          goto error;
       }
@@ -1045,7 +1046,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Verify: No fork %s (%d)", server, MANAGEMENT_ERROR_VERIFY_NOFORK);
             goto error;
          }
@@ -1063,7 +1064,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Restore: No server %s (%d)", server, MANAGEMENT_ERROR_VERIFY_NOSERVER);
          goto error;
       }
@@ -1086,7 +1087,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Archive: No fork %s (%d)", server, MANAGEMENT_ERROR_ARCHIVE_NOFORK);
             goto error;
          }
@@ -1104,7 +1105,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Archive: No server %s (%d)", server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER);
          goto error;
       }
@@ -1182,7 +1183,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Conf Get: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_GET_NOFORK);
          goto error;
       }
@@ -1203,7 +1204,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Conf Set: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_SET_NOFORK);
          goto error;
       }
@@ -1224,7 +1225,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Status: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_NOFORK);
          goto error;
       }
@@ -1245,7 +1246,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Details: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK);
          goto error;
       }
@@ -1279,7 +1280,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Retain: No fork %s (%d)", server, MANAGEMENT_ERROR_RETAIN_NOFORK);
             goto error;
          }
@@ -1297,7 +1298,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Retain: No server %s (%d)", server, MANAGEMENT_ERROR_RETAIN_NOSERVER);
          goto error;
       }
@@ -1320,7 +1321,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Expunge: No fork %s (%d)", server, MANAGEMENT_ERROR_EXPUNGE_NOFORK);
             goto error;
          }
@@ -1338,7 +1339,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Expunge: No server %s (%d)", server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER);
          goto error;
       }
@@ -1348,7 +1349,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Decrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_DECRYPT_NOFORK);
          goto error;
       }
@@ -1369,7 +1370,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Encrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_ENCRYPT_NOFORK);
          goto error;
       }
@@ -1390,7 +1391,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Decompress: No fork %s (%d)", server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          goto error;
       }
@@ -1424,7 +1425,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, NAME, compression, encryption, payload);
             pgmoneta_log_error("Decompress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          }
       }
@@ -1434,7 +1435,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Compress: No fork %s (%d)", server, MANAGEMENT_ERROR_COMPRESS_NOFORK);
          goto error;
       }
@@ -1468,7 +1469,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, NAME, compression, encryption, payload);
             pgmoneta_log_error("Compress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          }
       }
@@ -1491,7 +1492,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Info: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
             goto error;
          }
@@ -1509,7 +1510,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Info: No server %s (%d)", server, MANAGEMENT_ERROR_INFO_NOSERVER);
          goto error;
       }
@@ -1532,7 +1533,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, NAME, compression, encryption, payload);
             pgmoneta_log_error("Annotate: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
             goto error;
          }
@@ -1550,14 +1551,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, NAME, compression, encryption, payload);
          pgmoneta_log_error("Annotate: No server %s (%d)", server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER);
          goto error;
       }
    }
    else
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_UNKNOWN_COMMAND, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_UNKNOWN_COMMAND, NAME, compression, encryption, payload);
       pgmoneta_log_error("Unknown: %s (%d)", pgmoneta_json_to_string(payload, FORMAT_JSON, NULL, 0), MANAGEMENT_ERROR_UNKNOWN_COMMAND);
       goto error;
    }

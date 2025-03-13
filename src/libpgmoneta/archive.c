@@ -48,6 +48,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define NAME "archive"
+
 static void write_tar_file(struct archive* a, char* src, char* dst);
 
 void
@@ -66,7 +68,6 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    char* filename = NULL;
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
-   struct workflow* current = NULL;
    struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
@@ -104,14 +105,14 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
       pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
-                                         MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, compression, encryption, payload);
+                                         MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
       pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
    if (backup == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
       pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
@@ -141,39 +142,14 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, server, backup);
 
-      current = workflow;
-      while (current != NULL)
+      if (pgmoneta_workflow_execute(workflow, nodes, server, client_fd, compression, encryption, payload))
       {
-         if (current->setup(current->name(), nodes))
-         {
-            goto error;
-         }
-         current = current->next;
-      }
-
-      current = workflow;
-      while (current != NULL)
-      {
-         if (current->execute(current->name(), nodes))
-         {
-            goto error;
-         }
-         current = current->next;
-      }
-
-      current = workflow;
-      while (current != NULL)
-      {
-         if (current->teardown(current->name(), nodes))
-         {
-            goto error;
-         }
-         current = current->next;
+        goto error;
       }
 
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
          goto error;
       }
@@ -209,7 +185,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, NAME, compression, encryption, payload);
          pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, identifier);
 
          goto error;
