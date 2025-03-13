@@ -34,6 +34,7 @@ Mohab Yaser <mohabyaserofficial2003@gmail.com>
 Georg Pfuetzenreuter <mail@georg-pfuetzenreuter.net>
 Ahmed Ashour <a8087027@gmail.com>
 Sangkeun J.C. Kim <jchrys@me.com>
+Tejas Tyagi <tejastyagi.tt@gmail.com>
 ```
 
 ## Committers

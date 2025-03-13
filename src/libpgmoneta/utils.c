@@ -57,6 +57,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
@@ -4488,6 +4489,106 @@ pgmoneta_backtrace(void)
 #endif
 
    return 0;
+}
+
+int
+pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int* kernel_patch)
+{
+   bool bsd = false;
+   *os = NULL;
+   *kernel_major = 0;
+   *kernel_minor = 0;
+   *kernel_patch = 0;
+
+#if defined(HAVE_LINUX) || defined(HAVE_FREEBSD) || defined(HAVE_OPENBSD) || defined(HAVE_OSX)
+   struct utsname buffer;
+
+   if (uname(&buffer) != 0)
+   {
+      pgmoneta_log_debug("Failed to retrieve system information.");
+      goto error;
+   }
+
+   // Copy system name using pgmoneta_append (dynamically allocated)
+   *os = pgmoneta_append(NULL, buffer.sysname);
+   if (*os == NULL)
+   {
+      pgmoneta_log_debug("Failed to allocate memory for OS name.");
+      goto error;
+   }
+
+   // Parse kernel version based on OS
+#if defined(HAVE_LINUX)
+   if (sscanf(buffer.release, "%d.%d.%d", kernel_major, kernel_minor, kernel_patch) < 2)
+   {
+      pgmoneta_log_debug("Failed to parse Linux kernel version.");
+      goto error;
+   }
+#elif defined(HAVE_FREEBSD) || defined(HAVE_OPENBSD)
+   if (sscanf(buffer.release, "%d.%d", kernel_major, kernel_minor) < 2)
+   {
+      pgmoneta_log_debug("Failed to parse BSD OS kernel version.");
+      goto error;
+   }
+   *kernel_patch = 0; // BSD doesn't use patch version
+    bsd = true;
+#elif defined(HAVE_OSX)
+   if (sscanf(buffer.release, "%d.%d.%d", kernel_major, kernel_minor, kernel_patch) < 2)
+   {
+      pgmoneta_log_debug("Failed to parse macOS kernel version.");
+      goto error;
+   }
+#endif
+
+   if (!bsd)
+
+   {
+
+      pgmoneta_log_debug("OS: %s | Kernel Version: %d.%d.%d", *os, *kernel_major, *kernel_minor, *kernel_patch);
+
+   }
+
+   else
+
+   {
+
+      pgmoneta_log_debug("OS: %s | Version: %d.%d", *os, *kernel_major, *kernel_minor);
+
+   }
+
+   return 0;
+
+error:
+   //Free memory if already allocated
+   if (*os != NULL)
+   {
+      free(*os);
+      *os = NULL;
+   }
+
+   *os = pgmoneta_append(NULL, "Unknown");
+   if (*os == NULL)
+   {
+      pgmoneta_log_debug("Failed to allocate memory for unknown OS name.");
+   }
+
+   pgmoneta_log_debug("Unable to retrieve OS and kernel version.");
+
+   *kernel_major = 0;
+   *kernel_minor = 0;
+   *kernel_patch = 0;
+   return 1;
+
+#else
+   *os = pgmoneta_append(NULL, "Unknown");
+   if (*os == NULL)
+   {
+      pgmoneta_log_debug("Failed to allocate memory for unknown OS name.");
+   }
+
+   pgmoneta_log_debug("Kernel version not available.");
+   return 1;
+#endif
 }
 
 #endif

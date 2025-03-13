@@ -251,6 +251,9 @@ main(int argc, char** argv)
    struct configuration* config = NULL;
    int ret;
    int c;
+   char* os = NULL;
+
+   int kernel_major, kernel_minor, kernel_patch;
 
    argv_ptr = argv;
 
@@ -684,6 +687,10 @@ main(int argc, char** argv)
    pgmoneta_log_debug("Configuration size: %lu", shmem_size);
    pgmoneta_log_debug("Known users: %d", config->number_of_users);
    pgmoneta_log_debug("Known admins: %d", config->number_of_admins);
+
+   pgmoneta_os_kernel_version(&os, &kernel_major, &kernel_minor, &kernel_patch);
+
+   free(os);
 
 #ifdef HAVE_LINUX
    sd_notifyf(0,
