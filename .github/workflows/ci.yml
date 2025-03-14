@@ -47,6 +47,18 @@ jobs:
       run: sudo apt install net-tools
     - name: Install check
       run: sudo apt install check
+    - name: CLANG/Release/mkdir
+      run: mkdir build
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/
+    - name: CLANG/Release/cmake
+      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Release ..
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+    - name: CLANG/Release/make
+      run: make
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+    - name: CLANG/Release/rm -Rf
+      run: rm -Rf build/
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/
     - name: GCC/mkdir
       run: mkdir build
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
@@ -56,7 +68,7 @@ jobs:
     - name: GCC/make
       run: make
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: rm -Rf
+    - name: GCC/rm -Rf
       run: rm -Rf build/
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
     - name: CLANG/mkdir
