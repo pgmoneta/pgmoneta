@@ -69,7 +69,6 @@ static char* as_ciphers(char* str);
 static int as_encryption_mode(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
-static int as_logging_rotation_age(char* str, int* age);
 static int as_seconds(char* str, int* age, int default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
 static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
@@ -120,7 +119,7 @@ pgmoneta_init_configuration(void* shm)
 
    config->tls = false;
 
-   config->blocking_timeout = 30;
+   config->blocking_timeout = DEFAULT_BLOCKING_TIMEOUT;
    config->authentication_timeout = 5;
 
    config->keep_alive = true;
@@ -678,7 +677,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_int(value, &config->blocking_timeout))
+                     if (as_seconds(value, &config->blocking_timeout, DEFAULT_BLOCKING_TIMEOUT))
                      {
                         unknown = true;
                      }
@@ -792,7 +791,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_logging_rotation_age(value, &config->log_rotation_age))
+                     if (as_seconds(value, &config->log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
                      {
                         unknown = true;
                      }
@@ -2712,7 +2711,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       }
       else if (!strcmp(key, "blocking_timeout"))
       {
-         if (as_int(config_value, &config->blocking_timeout))
+         if (as_seconds(config_value, &config->blocking_timeout, DEFAULT_BLOCKING_TIMEOUT))
          {
             unknown = true;
          }
@@ -2783,7 +2782,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       }
       else if (!strcmp(key, "log_rotation_age"))
       {
-         if (as_logging_rotation_age(config_value, &config->log_rotation_age))
+         if (as_seconds(config_value, &config->log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
          {
             unknown = true;
          }
@@ -3891,26 +3890,6 @@ static int
 as_logging_rotation_size(char* str, int* size)
 {
    return as_bytes(str, size, PGMONETA_LOGGING_ROTATION_DISABLED);
-}
-
-/**
- * Parses the log_rotation_age string.
- * The string accepts
- * - s for seconds
- * - m for minutes
- * - h for hours
- * - d for days
- * - w for weeks
- *
- * The default is expressed in seconds.
- * The function sets the number of rotationg age as minutes.
- * Returns 1 for errors, 0 for correct parsing.
- *
- */
-static int
-as_logging_rotation_age(char* str, int* age)
-{
-   return as_seconds(str, age, PGMONETA_LOGGING_ROTATION_DISABLED);
 }
 
 /**
