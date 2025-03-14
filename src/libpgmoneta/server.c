@@ -767,6 +767,11 @@ process_server_parameters(int server, struct deque* server_parameters)
             config->servers[server].version = major;
             config->servers[server].minor_version = minor;
          }
+         else if ((major = atoi(server_version)) > 0)
+         {
+            config->servers[server].version = major;
+            config->servers[server].minor_version = 0;
+         }
          else
          {
             pgmoneta_log_error("Unable to parse server_version '%s' for %s",
