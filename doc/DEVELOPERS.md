@@ -46,6 +46,14 @@ This will install PostgreSQL 13.
 
 ``` sh
 dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel
+
+# libbacktrace may need to be installed from source
+git clone https://github.com/ianlancetaylor/libbacktrace.git
+cd libbacktrace 
+mkdir build 
+cd build 
+../configure 
+sudo make install
 ```
 
 #### Generate user and developer guide
