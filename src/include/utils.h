@@ -1296,16 +1296,12 @@ pgmoneta_lsn_to_string(uint64_t lsn);
 bool
 pgmoneta_is_incremental_path(char* path);
 
-#ifdef DEBUG
-
 /**
  * Generate a backtrace in the log
  * @return 0 if success, otherwise 1
  */
 int
 pgmoneta_backtrace(void);
-
-#endif
 
 /**
  * Get the OS name and kernel version.
