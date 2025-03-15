@@ -37,6 +37,16 @@ jobs:
       run: sudo apt install -y libarchive-dev
     - name: Install libcurl
       run: sudo apt install -y libcurl4-openssl-dev
+    - name: Install libbacktrace
+      run: |
+        git clone https://github.com/ianlancetaylor/libbacktrace.git
+        cd libbacktrace
+        mkdir build
+        cd build
+        ../configure
+        sudo make install
+        cd ../..
+        rm -rf libbacktrace
     - name: Install clang
       run: sudo apt install -y clang
     - name: Install graphviz

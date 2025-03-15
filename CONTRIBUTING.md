@@ -35,6 +35,14 @@ You can use the follow command, if you are using a [Fedora](https://getfedora.or
 
 ```
 dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic libcurl libcurl-devel bzip2 bzip2-devel libarchive libarchive-devel
+
+# libbacktrace may need to be installed from source
+git clone https://github.com/ianlancetaylor/libbacktrace.git
+cd libbacktrace 
+mkdir build 
+cd build 
+../configure 
+sudo make install
 ```
 
 in order to get the necessary dependencies.
