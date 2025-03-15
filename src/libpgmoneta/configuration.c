@@ -587,24 +587,24 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(config->tls_ca_file, value, max);
                   }
                   else if (strlen(section) > 0)
                   {
                      max = strlen(section);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(&srv.tls_ca_file, value, max);
                   }
@@ -618,24 +618,24 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(config->tls_cert_file, value, max);
                   }
                   else if (strlen(section) > 0)
                   {
                      max = strlen(section);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(&srv.tls_cert_file, value, max);
                   }
@@ -649,26 +649,58 @@ pgmoneta_read_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(config->tls_key_file, value, max);
                   }
                   else if (strlen(section) > 0)
                   {
                      max = strlen(section);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(&srv.name, section, max);
                      max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     if (max > MAX_PATH - 1)
                      {
-                        max = MISC_LENGTH - 1;
+                        max = MAX_PATH - 1;
                      }
                      memcpy(&srv.tls_key_file, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "metrics_cert_file"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(config->metrics_cert_file, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "metrics_key_file"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(config->metrics_key_file, value, max);
                   }
                   else
                   {
@@ -1573,6 +1605,26 @@ pgmoneta_validate_configuration(void* shm)
       config->workers = 0;
    }
 
+   if (strlen(config->metrics_cert_file) > 0)
+   {
+      if (!pgmoneta_exists(config->metrics_cert_file))
+      {
+         pgmoneta_log_error("metrics cert file does not exist, falling back to plain HTTP");
+         memset(config->metrics_cert_file, 0, sizeof(config->metrics_cert_file));
+         memset(config->metrics_key_file, 0, sizeof(config->metrics_key_file));
+      }
+   }
+
+   if (strlen(config->metrics_key_file) > 0)
+   {
+      if (!pgmoneta_exists(config->metrics_key_file))
+      {
+         pgmoneta_log_error("metrics key file does not exist, falling back to plain HTTP");
+         memset(config->metrics_cert_file, 0, sizeof(config->metrics_cert_file));
+         memset(config->metrics_key_file, 0, sizeof(config->metrics_key_file));
+      }
+   }
+
    for (int i = 0; i < config->number_of_servers; i++)
    {
       if (!strcmp(config->servers[i].name, "pgmoneta"))
@@ -2140,6 +2192,8 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->tls_ca_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->tls_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CERT_FILE, (uintptr_t)config->metrics_cert_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_KEY_FILE, (uintptr_t)config->metrics_key_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LIBEV, (uintptr_t)config->libev, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->backup_max_rate, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->network_max_rate, ValueInt64);
@@ -2644,9 +2698,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          if (strlen(section) > 0)
          {
             max = strlen(config_value);
-            if (max > MISC_LENGTH - 1)
+            if (max > MAX_PATH - 1)
             {
-               max = MISC_LENGTH - 1;
+               max = MAX_PATH - 1;
             }
             memcpy(&config->servers[server_index].tls_ca_file, config_value, max);
             pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].tls_ca_file, ValueString);
@@ -2655,9 +2709,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          else
          {
             max = strlen(config_value);
-            if (max > MISC_LENGTH - 1)
+            if (max > MAX_PATH - 1)
             {
-               max = MISC_LENGTH - 1;
+               max = MAX_PATH - 1;
             }
             memcpy(config->tls_ca_file, config_value, max);
             pgmoneta_json_put(response, key, (uintptr_t)config->tls_ca_file, ValueString);
@@ -2668,9 +2722,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          if (strlen(section) > 0)
          {
             max = strlen(config_value);
-            if (max > MISC_LENGTH - 1)
+            if (max > MAX_PATH - 1)
             {
-               max = MISC_LENGTH - 1;
+               max = MAX_PATH - 1;
             }
             memcpy(&config->servers[server_index].tls_cert_file, config_value, max);
             pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].tls_cert_file, ValueString);
@@ -2679,9 +2733,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          else
          {
             max = strlen(config_value);
-            if (max > MISC_LENGTH - 1)
+            if (max > MAX_PATH - 1)
             {
-               max = MISC_LENGTH - 1;
+               max = MAX_PATH - 1;
             }
             memcpy(config->tls_cert_file, config_value, max);
             pgmoneta_json_put(response, key, (uintptr_t)config->tls_cert_file, ValueString);
@@ -2692,9 +2746,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          if (strlen(section) > 0)
          {
             max = strlen(config_value);
-            if (max > MISC_LENGTH - 1)
+            if (max > MAX_PATH - 1)
             {
-               max = MISC_LENGTH - 1;
+               max = MAX_PATH - 1;
             }
             memcpy(&config->servers[server_index].tls_key_file, config_value, max);
             pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].tls_key_file, ValueString);
@@ -2703,13 +2757,33 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          else
          {
             max = strlen(config_value);
-            if (max > MISC_LENGTH - 1)
+            if (max > MAX_PATH - 1)
             {
-               max = MISC_LENGTH - 1;
+               max = MAX_PATH - 1;
             }
             memcpy(config->tls_key_file, config_value, max);
             pgmoneta_json_put(response, key, (uintptr_t)config->tls_key_file, ValueString);
          }
+      }
+      else if (!strcmp(key, "metrics_cert_file"))
+      {
+         max = strlen(config_value);
+         if (max > MAX_PATH - 1)
+         {
+            max = MAX_PATH - 1;
+         }
+         memcpy(config->metrics_cert_file, config_value, max);
+         pgmoneta_json_put(response, key, (uintptr_t)config->metrics_cert_file, ValueString);
+      }
+      else if (!strcmp(key, "metrics_key_file"))
+      {
+         max = strlen(config_value);
+         if (max > MAX_PATH - 1)
+         {
+            max = MAX_PATH - 1;
+         }
+         memcpy(config->metrics_key_file, config_value, max);
+         pgmoneta_json_put(response, key, (uintptr_t)config->metrics_key_file, ValueString);
       }
       else if (!strcmp(key, "blocking_timeout"))
       {
@@ -4304,6 +4378,16 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    {
       changed = true;
    }
+   if (restart_string("metrics_cert_file", config->metrics_cert_file, reload->metrics_cert_file))
+   {
+      changed = true;
+   }
+   if (restart_string("metrics_key_file", config->metrics_key_file, reload->metrics_key_file))
+   {
+      changed = true;
+   }
+
+   config->metrics_ssl_ctx = reload->metrics_ssl_ctx;
 
    config->blocking_timeout = reload->blocking_timeout;
    config->authentication_timeout = reload->authentication_timeout;
