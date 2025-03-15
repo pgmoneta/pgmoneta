@@ -252,6 +252,13 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    position = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_POSITION);
    directory = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_DIRECTORY);
 
+   if (identifier == NULL || strlen(identifier) == 0)
+   {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+                                         MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
+      goto error;
+   }
+
    if (pgmoneta_art_create(&nodes))
    {
       goto error;
@@ -259,6 +266,8 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+                                         MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
       goto error;
    }
 
