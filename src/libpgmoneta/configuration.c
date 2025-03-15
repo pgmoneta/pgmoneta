@@ -1648,6 +1648,290 @@ pgmoneta_validate_configuration(void* shm)
    return 0;
 }
 
+int
+pgmoneta_walinfo_init_configuration(void* shmem)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+   config->log_level = PGMONETA_LOGGING_LEVEL_INFO;
+   config->log_mode = PGMONETA_LOGGING_MODE_APPEND;
+   atomic_init(&config->log_lock, STATE_FREE);
+
+   return 0;
+}
+
+int
+pgmoneta_walinfo_read_configuration(void* shmem, char* filename)
+{
+   FILE* file;
+   char section[LINE_LENGTH];
+   char line[LINE_LENGTH];
+   char* trimmed_line = NULL;
+   char* key = NULL;
+   char* value = NULL;
+   char* ptr = NULL;
+   size_t max;
+   struct configuration* config;
+   int idx_server = 0;
+   struct server srv = {0};
+
+   file = fopen(filename, "r");
+
+   if (!file)
+   {
+      return 1;
+   }
+
+   memset(&section, 0, LINE_LENGTH);
+   config = (struct configuration*)shmem;
+
+   while (fgets(line, sizeof(line), file))
+   {
+      if (!is_empty_string(line))
+      {
+         if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
+         {
+            if (is_empty_string(trimmed_line))
+            {
+               free(trimmed_line);
+               trimmed_line = NULL;
+               continue;
+            }
+         }
+         else
+         {
+            goto error;
+         }
+
+         if (trimmed_line[0] == '[')
+         {
+            ptr = strchr(trimmed_line, ']');
+            if (ptr)
+            {
+               memset(&section, 0, LINE_LENGTH);
+               max = ptr - trimmed_line - 1;
+               if (max > MISC_LENGTH - 1)
+               {
+                  max = MISC_LENGTH - 1;
+               }
+               memcpy(&section, trimmed_line + 1, max);
+               if (strcmp(section, "pgmoneta-walinfo"))
+               {
+                  if (idx_server == 1)
+                  {
+                     memcpy(&(config->servers[idx_server - 1]), &srv, sizeof(struct server));
+                  }
+                  else if (idx_server > 1)
+                  {
+                     warnx("Maximum number of servers exceeded");
+                  }
+
+                  memset(&srv, 0, sizeof(struct server));
+                  memcpy(&srv.name, &section, strlen(section));
+                  idx_server++;
+               }
+            }
+         }
+         else
+         {
+            extract_key_value(trimmed_line, &key, &value);
+
+            if (key && value)
+            {
+               bool unknown = false;
+
+               /* printf("|%s|%s|\n", key, value); */
+
+               if (!strcmp(key, "host"))
+               {
+                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->host, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.host, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "port"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     if (as_int(value, &srv.port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "user"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MAX_USERNAME_LENGTH - 1)
+                     {
+                        max = MAX_USERNAME_LENGTH - 1;
+                     }
+                     memcpy(&srv.username, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "wal_slot"))
+               {
+                  if (strlen(section) > 0)
+                  {
+                     max = strlen(section);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.name, section, max);
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(&srv.wal_slot, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_type"))
+               {
+                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  {
+                     config->log_type = as_logging_type(value);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_level"))
+               {
+                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  {
+                     config->log_level = as_logging_level(value);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "log_path"))
+               {
+                  if (!strcmp(section, "pgmoneta-walinfo"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->log_path, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else
+               {
+                  unknown = true;
+               }
+
+               if (unknown)
+               {
+                  warnx("Unknown: Section=%s, Key=%s, Value=%s", strlen(section) > 0 ? section : "<unknown>", key, value);
+               }
+
+               free(key);
+               free(value);
+               key = NULL;
+               value = NULL;
+            }
+            else
+            {
+               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
+            }
+         }
+      }
+      free(trimmed_line);
+      trimmed_line = NULL;
+   }
+
+   if (strlen(srv.name) > 0)
+   {
+      memcpy(&(config->servers[idx_server - 1]), &srv, sizeof(struct server));
+   }
+
+   config->number_of_servers = idx_server;
+
+   fclose(file);
+
+   return 0;
+
+error:
+
+   free(trimmed_line);
+   trimmed_line = NULL;
+   if (file)
+   {
+      fclose(file);
+   }
+
+   return 1;
+}
+
+int
+pgmoneta_walinfo_validate_configuration(void* shmem)
+{
+   /**
+    * Currently this function is useless because
+    * pgmoneta_walinfo.confhas the minimum number
+    * of options to make the tool run so no need
+    * for any validation.
+    */
+   return 0;
+}
+
 /**
  *
  */

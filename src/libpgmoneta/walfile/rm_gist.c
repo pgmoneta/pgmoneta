@@ -29,6 +29,7 @@
 #include <walfile/rm.h>
 #include <walfile/rm_gist.h>
 #include <utils.h>
+#include <wal.h>
 
 struct gist_xlog_delete*
 create_gist_xlog_delete(void)
@@ -117,11 +118,43 @@ char*
 pgmoneta_wal_format_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper, char* buf)
 {
    struct gist_xlog_page_reuse_v15* xlrec = &wrapper->data.v15;
-   buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; blk %u; latestRemovedXid %u:%u",
-                                    xlrec->node.spcNode, xlrec->node.dbNode,
-                                    xlrec->node.relNode, xlrec->block,
+
+   char* dbname = NULL;
+   int ret = pgmoneta_get_database_name(xlrec->node.dbNode, &dbname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   char* relname = NULL;
+
+   ret = pgmoneta_get_relation_name(xlrec->node.relNode, &relname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   char* spcname = NULL;
+
+   ret = pgmoneta_get_tablespace_name(xlrec->node.spcNode, &spcname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; blk %u; latestRemovedXid %u:%u",
+                                    spcname, dbname,
+                                    relname, xlrec->block,
                                     EPOCH_FROM_FULL_TRANSACTION_ID(xlrec->latestRemovedFullXid),
                                     XID_FROM_FULL_TRANSACTION_ID(xlrec->latestRemovedFullXid));
+
+   free(dbname);
+   free(spcname);
+   free(relname);
+
    return buf;
 }
 
@@ -129,11 +162,43 @@ char*
 pgmoneta_wal_format_gist_xlog_page_reuse_v16(struct gist_xlog_page_reuse* wrapper, char* buf)
 {
    struct gist_xlog_page_reuse_v16* xlrec = &wrapper->data.v16;
-   buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; blk %u; snapshot_conflict_horizon_id %u:%u",
-                                    xlrec->locator.spcOid, xlrec->locator.dbOid,
-                                    xlrec->locator.relNumber, xlrec->block,
+
+   char* dbname = NULL;
+   int ret = pgmoneta_get_database_name(xlrec->locator.dbOid, &dbname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   char* relname = NULL;
+
+   ret = pgmoneta_get_relation_name(xlrec->locator.relNumber, &relname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   char* spcname = NULL;
+
+   ret = pgmoneta_get_tablespace_name(xlrec->locator.spcOid, &spcname);
+
+   if (ret)
+   {
+      return NULL;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; blk %u; snapshot_conflict_horizon_id %u:%u",
+                                    spcname, dbname,
+                                    relname, xlrec->block,
                                     EPOCH_FROM_FULL_TRANSACTION_ID(xlrec->snapshot_conflict_horizon),
                                     XID_FROM_FULL_TRANSACTION_ID(xlrec->snapshot_conflict_horizon));
+
+   free(dbname);
+   free(spcname);
+   free(relname);
+
    return buf;
 }
 
