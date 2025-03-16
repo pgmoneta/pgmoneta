@@ -32,7 +32,6 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | compression           | zstd  |String|   No   | The compression type (none, gzip, client-gzip, server-gzip, zstd, client-zstd, server-zstd, lz4, client-lz4, server-lz4, bzip2, client-bzip2) |
 | compression_level     |   3   | Int  |   No   | The compression level |
 | workers               |   0   | Int  |   No   | The number of workers that each process can use for its work. Use 0 to disable. Maximum is CPU count |
-| workspace             | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work |
 | storage_engine        | local |String|   No   | The storage engine type (local, ssh, s3, azure) |
 | encryption            | none  |String|   No   | The encryption mode for encrypt wal and data<br/> `none`: No encryption <br/> `aes` or `aes-256` or `aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192` or `aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128` or `aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length |
 | create_slot           |  no   | Bool |   No   | Create a replication slot for all server. Valid values are: yes, no |
@@ -87,7 +86,6 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | follow | | String | No | Failover to this server if follow server fails |
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | wal_shipping | | String | No | The WAL shipping directory |
-| workspace | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work |
 | hot_standby | | String | No | Hot standby directory |
 | hot_standby_overrides | | String | No | Files to override in the hot standby directory |
 | hot_standby_tablespaces | | String | No | Tablespace mappings for the hot standby. Syntax is [from -> to,?]+ |

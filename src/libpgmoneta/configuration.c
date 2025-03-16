@@ -1177,38 +1177,6 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "workspace"))
-               {
-                  if (!strcmp(section, "pgmoneta"))
-                  {
-                     max = strlen(value);
-                     if (max > MAX_PATH - 1)
-                     {
-                        max = MAX_PATH - 1;
-                     }
-                     memcpy(config->workspace, value, max);
-                  }
-                  else if (strlen(section) > 0)
-                  {
-                     max = strlen(section);
-                     if (max > MISC_LENGTH - 1)
-                     {
-                        max = MISC_LENGTH - 1;
-                     }
-                     memcpy(&srv.name, section, max);
-                     max = strlen(value);
-                     if (max > MAX_PATH - 1)
-                     {
-                        max = MAX_PATH - 1;
-                     }
-                     memcpy(&srv.workspace, value, max);
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
-
                else if (!strcmp(key, "retention"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -2126,7 +2094,6 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_STORAGE_ACCOUNT, (uintptr_t)config->azure_storage_account, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_CONTAINER, (uintptr_t)config->azure_container, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY, (uintptr_t)config->azure_shared_key, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->workspace, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)config->log_type, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)config->log_level, ValueInt32);
@@ -2182,7 +2149,6 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SLOT, (uintptr_t)config->servers[i].wal_slot, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->servers[i].create_slot, ValueInt32);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_FOLLOW, (uintptr_t)config->servers[i].follow, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->servers[i].workspace, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING, (uintptr_t)config->servers[i].wal_shipping, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)config->servers[i].hot_standby, ValueString);
@@ -3013,16 +2979,6 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          }
          memcpy(config->azure_base_dir, config_value, max);
          pgmoneta_json_put(response, key, (uintptr_t)config->azure_base_dir, ValueString);
-      }
-      else if (!strcmp(key, "azure_base_dir"))
-      {
-         max = strlen(config_value);
-         if (max > MAX_PATH - 1)
-         {
-            max = MAX_PATH - 1;
-         }
-         memcpy(config->workspace, config_value, max);
-         pgmoneta_json_put(response, key, (uintptr_t)config->workspace, ValueString);
       }
       else if (!strcmp(key, "retention"))
       {
@@ -4255,10 +4211,6 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    config->create_slot = reload->create_slot;
    config->compression_type = reload->compression_type;
    config->compression_level = reload->compression_level;
-   if (restart_string("workspace", config->workspace, reload->workspace))
-   {
-      changed = true;
-   }
    config->retention_days = reload->retention_days;
    config->retention_weeks = reload->retention_weeks;
    config->retention_months = reload->retention_months;
@@ -4394,10 +4346,6 @@ copy_server(struct server* dst, struct server* src)
       changed = true;
    }
    if (restart_string("username", &dst->username[0], &src->username[0]))
-   {
-      changed = true;
-   }
-   if (restart_string("workspace", &dst->workspace[0], &src->workspace[0]))
    {
       changed = true;
    }

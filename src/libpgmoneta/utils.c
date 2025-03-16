@@ -3560,53 +3560,6 @@ pgmoneta_get_server_wal_shipping_wal(int server)
 }
 
 char*
-pgmoneta_get_server_workspace(int server)
-{
-   struct configuration* config;
-   char* ws = NULL;
-
-   config = (struct configuration*)shmem;
-
-   if (strlen(config->servers[server].workspace) > 0)
-   {
-      ws = pgmoneta_append(ws, config->servers[server].workspace);
-
-      if (!pgmoneta_ends_with(ws, "/"))
-      {
-         ws = pgmoneta_append_char(ws, '/');
-      }
-   }
-   else if (strlen(config->workspace) > 0)
-   {
-      ws = pgmoneta_append(ws, config->workspace);
-
-      if (!pgmoneta_ends_with(ws, "/"))
-      {
-         ws = pgmoneta_append_char(ws, '/');
-      }
-   }
-   else
-   {
-      ws = pgmoneta_append(ws, "/tmp/pgmoneta-workspace/");
-   }
-
-   if (!pgmoneta_exists(ws))
-   {
-      if (pgmoneta_mkdir(ws))
-      {
-         pgmoneta_log_error("Could not create directory: %s", ws);
-         goto error;
-      }
-   }
-
-   return ws;
-
-error:
-
-   return NULL;
-}
-
-char*
 pgmoneta_get_server_hot_standby(int server)
 {
    struct configuration* config;

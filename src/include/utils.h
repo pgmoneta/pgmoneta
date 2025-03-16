@@ -1028,14 +1028,6 @@ char*
 pgmoneta_get_server_wal_shipping_wal(int server);
 
 /**
- * Get the workspace directory for a server
- * @param server The server
- * @return The workspace directory
- */
-char*
-pgmoneta_get_server_workspace(int server);
-
-/**
  * Get the hot standby directory for a server
  * @param server The server
  * @return The hot standby directory

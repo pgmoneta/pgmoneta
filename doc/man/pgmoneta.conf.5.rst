@@ -65,10 +65,6 @@ workers
   The number of workers that each process can use for its work.
   Use 0 to disable. Maximum is CPU count. Default is 0
 
-workspace
-  The directory for the workspace that incremental backup can use for its work.
-  Default is /tmp/pgmoneta-workspace/
-
 storage_engine
   The storage engine type (local, ssh, s3, azure). Default is local
 
@@ -262,10 +258,6 @@ retention
 
 wal_shipping
   The WAL shipping directory
-
-workspace
-  The directory for the workspace that incremental backup can use for its work.
-  Default is /tmp/pgmoneta-workspace/
 
 hot_standby
   Hot standby directory

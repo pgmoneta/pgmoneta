@@ -63,12 +63,6 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | :------- | :------ | :--- | :------- | :---------- |
 | workers | 0 | Int | No | The number of workers that each process can use for its work. Use 0 to disable. Maximum is CPU count |
 
-#### Workspace
-
-| Property | Default | Unit | Required | Description |
-| :------- | :------ | :--- | :------- | :---------- |
-| workspace | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work |
-
 #### Storage
 
 | Property | Default | Unit | Required | Description |
