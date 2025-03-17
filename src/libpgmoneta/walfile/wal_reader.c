@@ -51,7 +51,7 @@ static int magic_value_to_postgres_version(uint16_t magic_value);
 static bool is_included(char* rm, struct deque* rms,
                         uint64_t s_lsn, uint64_t start_lsn,
                         uint64_t e_lsn, uint64_t end_lsn,
-                        uint32_t xid, struct deque* xids);
+                        uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc);
 
 bool
 is_bimg_apply(uint8_t bimg_info)
@@ -937,7 +937,7 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
 
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
-                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit)
+                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, char** included_objects)
 {
    static uint32_t current_limit = 0;
    char* header_str = NULL;
@@ -950,13 +950,21 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    uint32_t rec_len = 0;
    uint32_t fpi_len = 0;
 
+   rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
+   backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+
+   // TODO: not sure whether I should include the rm_desc or just check the backup_str
+   char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
+
    if (!is_included(RmgrTable[record->header.xl_rmid].name, rms,
                     record->header.xl_prev, start_lsn,
                     record->lsn, end_lsn,
-                    record->header.xl_xid, xids))
+                    record->header.xl_xid, xids, included_objects, record_desc))
    {
+      free(record_desc);
       return;
    }
+   free(record_desc);
 
    current_limit++;
    if (limit > 0 && current_limit > limit)
@@ -1025,8 +1033,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                                                     record->header.xl_xid);
          }
 
-         rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
-         backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+         // backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
          if (color)
          {
@@ -1053,7 +1060,7 @@ static bool
 is_included(char* rm, struct deque* rms,
             uint64_t s_lsn, uint64_t start_lsn,
             uint64_t e_lsn, uint64_t end_lsn,
-            uint32_t xid, struct deque* xids)
+            uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc)
 {
    struct deque_iterator* rms_iter = NULL;
    struct deque_iterator* xids_iter = NULL;
@@ -1124,13 +1131,77 @@ is_included(char* rm, struct deque* rms,
       }
    }
 
+   if (included_objects != NULL && rm_desc != NULL)
+   {
+      char* oid = NULL;
+      bool included = false;
+
+      for (int i = 0; included_objects[i] != NULL; i++)
+      {
+         // If the object name is already there
+         if (pgmoneta_is_substring(included_objects[i], rm_desc))
+         {
+            included = true;
+            free(oid);
+            break;
+         }
+
+         // If the object name is not in rm_desc, then we need to get its oid
+         // and try to find it in the rm_desc again
+
+         // 1. The object maybe a relation
+         if (!pgmoneta_get_relation_oid(included_objects[i], &oid))
+         {
+            // If oid == included_objects[i], then the object was not found
+            // and we don't need to check for substring
+            if (oid != included_objects[i] && pgmoneta_is_substring(rm_desc, oid))
+            {
+               included = true;
+               free(oid);
+               break;
+            }
+         }
+
+         // 2. The object maybe a database
+         if (!pgmoneta_get_database_oid(included_objects[i], &oid))
+         {
+            // If oid == included_objects[i], then the object was not found
+            // and we don't need to check for substring
+            if (oid != included_objects[i] && pgmoneta_is_substring(rm_desc, oid))
+            {
+               included = true;
+               free(oid);
+               break;
+            }
+         }
+
+         // 3. The object maybe a tablespace
+         if (!pgmoneta_get_tablespace_oid(included_objects[i], &oid))
+         {
+            // If oid == included_objects[i], then the object was not found
+            // and we don't need to check for substring
+            if (oid != included_objects[i] && pgmoneta_is_substring(rm_desc, oid))
+            {
+               included = true;
+               free(oid);
+               break;
+            }
+         }
+
+         if (!included)
+         {
+            free(oid);
+            goto no;
+         }
+      }
+   }
+
    pgmoneta_deque_iterator_destroy(rms_iter);
    pgmoneta_deque_iterator_destroy(xids_iter);
 
    return true;
 
 no:
-
    pgmoneta_deque_iterator_destroy(rms_iter);
    pgmoneta_deque_iterator_destroy(xids_iter);
 
@@ -1140,7 +1211,6 @@ no:
 static void
 record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value)
 {
-
    char* rm_desc = NULL;
    char* backup_str = NULL;
    struct json* record_json = NULL;

@@ -67,23 +67,27 @@ usage(void)
    printf("  pgmoneta-walinfo <file>\n");
    printf("\n");
    printf("Options:\n");
-   printf("  -c, --config CONFIG_FILE  Set the path to the pgmoneta_walinfo.conf file\n");
-   printf("  -u, --users USERS_FILE    Set the path to the pgmoneta_users.conf file \n");
-   printf("  -o, --output FILE         Output file\n");
-   printf("  -F, --format              Output format (raw, json)\n");
-   printf("  -L, --logfile FILE        Set the log file\n");
-   printf("  -q, --quiet               No output only result\n");
-   printf("      --color               Use colors (on, off)\n");
-   printf("  -r, --rmgr                Filter on a resource manager\n");
-   printf("  -s, --start               Filter on a start LSN\n");
-   printf("  -e, --end                 Filter on an end LSN\n");
-   printf("  -x, --xid                 Filter on an XID\n");
-   printf("  -l, --limit               Limit number of outputs\n");
-   printf("  -v, --verbose             Output result\n");
-   printf("  -V, --version             Display version information\n");
-   printf("  -m, --mapping             Provide a mappings file that is used to translate OIDs to object names\n");
-   printf("  -t, --translate           Translate OIDs in description of XLOG records into actual names\n");
-   printf("  -?, --help                Display help\n");
+   printf("  -c,   --config CONFIG_FILE                     Set the path to the pgmoneta_walinfo.conf file\n");
+   printf("  -u,   --users USERS_FILE                       Set the path to the pgmoneta_users.conf file \n");
+   printf("  --RT, --tablespaces TBLSPCS,COMMA,SEPARATED    Filter on tablspaces\n");
+   printf("  --RD, --databases DBS,COMMA,SEPARATED          Filter on databases\n");
+   printf("  --RT, --relations RELS,COMMA,SEPARATED         Filter on relations\n");
+   printf("  -R,   --filter TBLSPC/DB/REL                   Combination of --RT, --RD, --RR\n");
+   printf("  -o,   --output FILE                            Output file\n");
+   printf("  -F,   --format                                 Output format (raw, json)\n");
+   printf("  -L,   --logfile FILE                           Set the log file\n");
+   printf("  -q,   --quiet                                  No output only result\n");
+   printf("        --color                                  Use colors (on, off)\n");
+   printf("  -r,   --rmgr                                   Filter on a resource manager\n");
+   printf("  -s,   --start                                  Filter on a start LSN\n");
+   printf("  -e,   --end                                    Filter on an end LSN\n");
+   printf("  -x,   --xid                                    Filter on an XID\n");
+   printf("  -l,   --limit                                  Limit number of outputs\n");
+   printf("  -v,   --verbose                                Output result\n");
+   printf("  -V,   --version                                Display version information\n");
+   printf("  -m,   --mapping                                Provide mappings file for OID translation\n");
+   printf("  -t,   --translate                              Translate OIDs to object names in XLOG records\n");
+   printf("  -?,   --help                                   Display help\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
@@ -118,6 +122,20 @@ main(int argc, char** argv)
    bool enable_mapping = false;
    char* mappings_path = NULL;
    int ret;
+   char* tablespaces = NULL;
+   char* databases = NULL;
+   char* relations = NULL;
+   char* filters = NULL;
+   bool filtering_enabled = false;
+   char** included_objects = NULL;
+   char** databases_list = NULL;
+   char** tablespaces_list = NULL;
+   char** relations_list = NULL;
+   int databases_count = 0;
+   int tablespaces_count = 0;
+   int relations_count = 0;
+   char** temp_list = NULL;
+   int cnt = 0;
 
    if (argc < 2)
    {
@@ -129,27 +147,34 @@ main(int argc, char** argv)
    {
       static struct option long_options[] =
       {
-         {"config", optional_argument, 0, 'c'},
-         {"output", required_argument, 0, 'o'},
-         {"format", required_argument, 0, 'F'},
-         {"logfile", required_argument, 0, 'L'},
-         {"quiet", no_argument, 0, 'q'},
+         {"config", required_argument, 0, 'c' },
+         {"output", required_argument, 0, 'o' },
+         {"format", required_argument, 0, 'F' },
+         {"logfile", required_argument, 0, 'L' },
+         {"quiet", no_argument, 0, 'q' },
          {"color", required_argument, 0, OPT_COLOR},
-         {"rmgr", required_argument, 0, 'r'},
-         {"start", required_argument, 0, 's'},
-         {"end", required_argument, 0, 'e'},
-         {"xid", required_argument, 0, 'x'},
-         {"limit", required_argument, 0, 'l'},
-         {"verbose", no_argument, 0, 'v'},
-         {"version", no_argument, 0, 'V'},
-         {"mapping", required_argument, 0, 'm'},
-         {"translate", no_argument, 0, 't'},
-         {"users", required_argument, 0, 'u'},
+         {"rmgr", required_argument, 0, 'r' },
+         {"start", required_argument, 0, 's' },
+         {"end", required_argument, 0, 'e' },
+         {"xid", required_argument, 0, 'x' },
+         {"limit", required_argument, 0, 'l' },
+         {"verbose", no_argument, 0, 'v' },
+         {"version", no_argument, 0, 'V' },
+         {"mapping", required_argument, 0, 'm' },
+         {"translate", no_argument, 0, 't' },
+         {"users", required_argument, 0, 'u' },
+         {"filter", required_argument, 0, 'R' },
+         {"RT", required_argument, 0, 'T' },
+         {"RD", required_argument, 0, 'D' },
+         {"RR", required_argument, 0, 'E' },
+         {"tablespaces", required_argument, 0, 'T' },
+         {"databases", required_argument, 0, 'D' },
+         {"relations", required_argument, 0, 'E' },
          {"help", no_argument, 0, '?'},
          {0, 0, 0, 0}
       };
 
-      c = getopt_long(argc, argv, "c:m:tqvV?:o:F:L:r:s:e:x:l:u:", long_options, &option_index);
+      c = getopt_long(argc, argv, "c:o:F:L:qr:s:e:x:l:vVm:tu:T:D:R:E:?", long_options, &option_index);
 
       if (c == -1)
       {
@@ -271,6 +296,22 @@ main(int argc, char** argv)
          case 'V':
             version();
             exit(0);
+         case 'D':
+            databases = optarg;
+            filtering_enabled = true;
+            break;
+         case 'T':
+            tablespaces = optarg;
+            filtering_enabled = true;
+            break;
+         case 'E':
+            relations = optarg;
+            filtering_enabled = true;
+            break;
+         case 'R':
+            filters = optarg;
+            filtering_enabled = true;
+            break;
          case '?':
             usage();
             exit(0);
@@ -286,14 +327,14 @@ main(int argc, char** argv)
       goto error;
    }
 
-   pgmoneta_walinfo_init_configuration(shmem);
+   pgmoneta_init_walinfo_configuration(shmem);
    config = (struct walinfo_configuration*)shmem;
 
    if (configuration_path != NULL)
    {
       if (pgmoneta_exists(configuration_path))
       {
-         loaded = pgmoneta_walinfo_read_main_configuration(shmem, configuration_path);
+         loaded = pgmoneta_read_walinfo_configuration(shmem, configuration_path);
       }
 
       if (loaded)
@@ -304,7 +345,7 @@ main(int argc, char** argv)
 
    if (loaded && pgmoneta_exists(PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH))
    {
-      loaded = pgmoneta_walinfo_read_main_configuration(shmem, PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH);
+      loaded = pgmoneta_read_walinfo_configuration(shmem, PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH);
    }
 
    if (loaded)
@@ -321,12 +362,14 @@ main(int argc, char** argv)
       }
    }
 
-   if (pgmoneta_walinfo_validate_configuration(shmem))
+   config->common.config_type = CONFIGURATION_TYPE_WALINFO;
+
+   if (pgmoneta_validate_walinfo_configuration(shmem))
    {
       goto error;
    }
 
-   if (pgmoneta_walinfo_validate_configuration(shmem))
+   if (pgmoneta_validate_walinfo_configuration(shmem))
    {
       goto error;
    }
@@ -351,10 +394,10 @@ main(int argc, char** argv)
       }
       else if (ret == 3)
       {
-         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
          goto error;
       }
-      memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+      memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
    }
    else
    {
@@ -362,7 +405,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_users_configuration(shmem, users_path);
       if (ret == 0)
       {
-         memcpy(&config->users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+         memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
       }
    }
 
@@ -378,7 +421,7 @@ main(int argc, char** argv)
       }
       else
       {
-         if (config->number_of_servers == 0)
+         if (config->common.number_of_servers == 0)
          {
             pgmoneta_log_error("No servers defined, user should provide exactly one server in the configuration file");
             goto error;
@@ -392,12 +435,141 @@ main(int argc, char** argv)
       }
    }
 
+   if (filtering_enabled)
+   {
+      if (enable_mapping)
+      {
+         if (filters != NULL)
+         {
+            if (pgmoneta_split(filters, &temp_list, &cnt, '/'))
+            {
+               pgmoneta_log_error("Failed to parse filters");
+               goto error;
+            }
+            else
+            {
+               if (pgmoneta_split(temp_list[0], &tablespaces_list, &tablespaces_count, ','))
+               {
+                  pgmoneta_log_error("Failed to parse tablespaces to be included");
+                  goto error;
+               }
+
+               if (pgmoneta_split(temp_list[1], &databases_list, &databases_count, ','))
+               {
+                  pgmoneta_log_error("Failed to parse databases to be included");
+                  goto error;
+               }
+
+               if (pgmoneta_split(temp_list[2], &relations_list, &relations_count, ','))
+               {
+                  pgmoneta_log_error("Failed to parse relations to be included");
+                  goto error;
+               }
+
+               if (temp_list)
+               {
+                  for (int i = 0; temp_list[i] != NULL; i++)
+                  {
+                     free(temp_list[i]);
+                  }
+                  free(temp_list);
+               }
+            }
+         }
+
+         if (databases != NULL)
+         {
+            if (pgmoneta_split(databases, &databases_list, &databases_count, ','))
+            {
+               pgmoneta_log_error("Failed to parse databases to be included");
+               goto error;
+            }
+         }
+
+         if (tablespaces != NULL)
+         {
+            if (pgmoneta_split(tablespaces, &tablespaces_list, &tablespaces_count, ','))
+            {
+               pgmoneta_log_error("Failed to parse tablespaces to be included");
+               goto error;
+            }
+         }
+
+         if (relations != NULL)
+         {
+            if (pgmoneta_split(relations, &relations_list, &relations_count, ','))
+            {
+               pgmoneta_log_error("Failed to parse relations to be included");
+               goto error;
+            }
+         }
+
+         char** merged_lists[4] = {0};
+         int idx = 0;
+
+         if (databases_list != NULL)
+         {
+            merged_lists[idx++] = databases_list;
+         }
+
+         if (tablespaces_list != NULL)
+         {
+            merged_lists[idx++] = tablespaces_list;
+         }
+
+         if (relations_list != NULL)
+         {
+            merged_lists[idx++] = relations_list;
+         }
+
+         merged_lists[idx] = NULL;
+
+         if (pgmoneta_merge_string_arrays(merged_lists, &included_objects))
+         {
+            pgmoneta_log_error("Failed to merge include lists");
+            goto error;
+         }
+
+         if (databases_list)
+         {
+            for (int i = 0; i < databases_count; i++)
+            {
+               free(databases_list[i]);
+            }
+            free(databases_list);
+         }
+
+         if (tablespaces_list)
+         {
+            for (int i = 0; i < tablespaces_count; i++)
+            {
+               free(tablespaces_list[i]);
+            }
+            free(tablespaces_list);
+         }
+
+         if (relations_list)
+         {
+            for (int i = 0; i < relations_count; i++)
+            {
+               free(relations_list[i]);
+            }
+            free(relations_list);
+         }
+      }
+      else
+      {
+         pgmoneta_log_error("OID mappings are not loaded, please provide a mappings file or server credentials and enable translation (-t)");
+         goto error;
+      }
+   }
+
    if (optind < argc)
    {
       char* file_path = argv[optind];
 
       if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
-                                    rms, start_lsn, end_lsn, xids, limit))
+                                    rms, start_lsn, end_lsn, xids, limit, included_objects))
       {
          fprintf(stderr, "Error while reading/describing WAL file\n");
          goto error;
@@ -409,6 +581,16 @@ main(int argc, char** argv)
       usage();
       goto error;
    }
+
+   if (included_objects)
+   {
+      for (int i = 0; included_objects[i] != NULL; i++)
+      {
+         free(included_objects[i]);
+      }
+      free(included_objects);
+   }
+
    pgmoneta_destroy_shared_memory(shmem, size);
 
    if (logfile)
@@ -443,6 +625,51 @@ error:
    if (verbose)
    {
       printf("Failure\n");
+   }
+
+   if (databases_list)
+   {
+      for (int i = 0; i < databases_count; i++)
+      {
+         free(databases_list[i]);
+      }
+      free(databases_list);
+   }
+
+   if (tablespaces_list)
+   {
+      for (int i = 0; i < tablespaces_count; i++)
+      {
+         free(tablespaces_list[i]);
+      }
+      free(tablespaces_list);
+   }
+
+   if (relations_list)
+   {
+      for (int i = 0; i < relations_count; i++)
+      {
+         free(relations_list[i]);
+      }
+      free(relations_list);
+   }
+
+   if (included_objects)
+   {
+      for (int i = 0; included_objects[i] != NULL; i++)
+      {
+         free(included_objects[i]);
+      }
+      free(included_objects);
+   }
+
+   if (temp_list)
+   {
+      for (int i = 0; temp_list[i] != NULL; i++)
+      {
+         free(temp_list[i]);
+      }
+      free(temp_list);
    }
 
    return 1;

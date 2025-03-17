@@ -45,6 +45,7 @@
 #include <libgen.h>
 #include <pwd.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -4420,6 +4421,152 @@ pgmoneta_is_incremental_path(char* path)
    }
    name = path + (len - seglen);
    return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
+}
+
+int
+pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
+{
+   char delim_str[2] = {delimiter, '\0'};
+   char* temp = strdup(string);
+   int num_objects = 0;
+   char* token = strtok(temp, delim_str);
+
+   *results = NULL;
+   *count = 0;
+
+   if (!string || !results || !count || !temp)
+   {
+      goto error;
+   }
+
+   // Handle empty input case
+   if (strlen(string) == 0)
+   {
+      *results = calloc(1, sizeof(char*));
+
+      if (!*results)
+      {
+         goto error;
+      }
+
+      (*results)[0] = NULL;
+      return 0;
+   }
+
+   while (token)
+   {
+      num_objects++;
+      token = strtok(NULL, delim_str);
+   }
+
+   *results = calloc(num_objects + 1, sizeof(char*));
+   if (!*results)
+   {
+      goto error;
+   }
+
+   temp = strdup(string);
+   if (!temp)
+   {
+      free(*results);
+      goto error;
+   }
+
+   token = strtok(temp, delim_str);
+   for (int i = 0; i < num_objects; i++)
+   {
+      (*results)[i] = strdup(token);
+      if (!(*results)[i])
+      {
+         goto error;
+      }
+      token = strtok(NULL, delim_str);
+   }
+
+   (*results)[num_objects] = NULL;
+   *count = num_objects;
+
+   free(temp);
+   return 0;
+
+error:
+   if (temp)
+   {
+      free(temp);
+   }
+
+   if (*results)
+   {
+      for (int i = 0; i < num_objects; i++)
+      {
+         if ((*results)[i])
+         {
+            free((*results)[i]);
+         }
+      }
+      free(*results);
+   }
+
+   return -1;
+}
+
+int
+pgmoneta_merge_string_arrays(char** lists[], char*** out_list)
+{
+   if (!lists || !out_list)
+   {
+      return -1;
+   }
+
+   int total = 0;
+   char*** current;
+   char** merged = NULL;
+   int index = 0;
+
+   for (current = lists; *current; current++)
+   {
+      for (char** str = *current; *str; str++)
+      {
+         total++;
+      }
+   }
+
+   merged = calloc(total + 1, sizeof(char*));
+   if (!merged)
+   {
+      return -1;
+   }
+
+   for (current = lists; *current; current++)
+   {
+      for (char** str = *current; *str; str++)
+      {
+         merged[index] = strdup(*str);
+         if (!merged[index])
+         {
+            for (int i = 0; i < index; i++)
+            {
+               free(merged[i]);
+            }
+            free(merged);
+            return -1;
+         }
+         index++;
+      }
+   }
+
+   *out_list = merged;
+   return 0;
+}
+
+int
+pgmoneta_is_substring(char* a, char* b)
+{
+   if (!a || !b || *a == '\0')
+   {
+      return 0;
+   }
+   return strstr(b, a) != NULL;
 }
 
 #ifdef DEBUG

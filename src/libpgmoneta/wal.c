@@ -1289,18 +1289,18 @@ pgmoneta_read_mappings_from_server(int server_index)
    unsigned int oid;
    int rc = 0;
    int count;
-   struct configuration* config = NULL;
+   struct walinfo_configuration* config = NULL;
    int user_index = -1;
    int auth;
    SSL* ssl = NULL;
    int socket = -1;
 
-   config = (struct configuration*)shmem;
+   config = (struct walinfo_configuration*)shmem;
    pgmoneta_memory_init();
 
-   for (int i = 0; i < config->number_of_users; i++)
+   for (int i = 0; i < config->common.number_of_users; i++)
    {
-      if (strcmp(config->users[i].username, config->servers[server_index].username) == 0)
+      if (strcmp(config->common.users[i].username, config->common.servers[server_index].username) == 0)
       {
          user_index = i;
          break;
@@ -1309,16 +1309,16 @@ pgmoneta_read_mappings_from_server(int server_index)
 
    if (user_index == -1)
    {
-      pgmoneta_log_error("User %s not found", config->servers[server_index].username);
+      pgmoneta_log_error("User %s not found", config->common.servers[server_index].username);
       rc = 1;
       goto cleanup;
    }
 
-   auth = pgmoneta_server_authenticate(server_index, "postgres", config->users[user_index].username, config->users[user_index].password, false, &ssl, &socket);
+   auth = pgmoneta_server_authenticate(server_index, "postgres", config->common.users[user_index].username, config->common.users[user_index].password, false, &ssl, &socket);
 
    if (auth != AUTH_SUCCESS)
    {
-      pgmoneta_log_error("Authentication failed for user %s on %s", config->users[user_index].username, config->servers[server_index].name);
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[user_index].username, config->common.servers[server_index].name);
       rc = 1;
       goto cleanup;
    }
@@ -1457,7 +1457,7 @@ pgmoneta_get_database_name(int oid, char** name)
       }
    }
 
-   warnx("Could not find database with oid %d", oid);
+   pgmoneta_log_info("Could not find database with oid %d", oid);
 
    int max_digits = snprintf(NULL, 0, "%d", oid) + 1;
    *name = malloc(max_digits);
@@ -1495,7 +1495,7 @@ pgmoneta_get_tablespace_name(int oid, char** name)
       }
    }
 
-   warnx("Could not find tablespace with oid %d", oid);
+   pgmoneta_log_info("Could not find tablespace with oid %d", oid);
 
    int max_digits = snprintf(NULL, 0, "%d", oid) + 1;
    *name = malloc(max_digits);
@@ -1533,7 +1533,7 @@ pgmoneta_get_relation_name(int oid, char** name)
       }
    }
 
-   warnx("Could not find relation with oid %d", oid);
+   pgmoneta_log_info("Could not find relation with oid %d", oid);
 
    int max_digits = snprintf(NULL, 0, "%d", oid) + 1;
    *name = malloc(max_digits);
@@ -1545,6 +1545,123 @@ pgmoneta_get_relation_name(int oid, char** name)
    }
 
    snprintf(*name, max_digits, "%d", oid);
+
+   return 0;
+}
+
+int
+pgmoneta_get_tablespace_oid(char* name, char** oid)
+{
+   if (oid == NULL)
+   {
+      return -1;
+   }
+
+   if (*oid != NULL)
+   {
+      free(*oid);
+      *oid = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].type == OBJ_TABLESPACE && oidMappings[i].name == name)
+      {
+         int max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+         *oid = malloc(max_digits);
+
+         if (*oid == NULL)
+         {
+            free(*oid);
+            return -1;
+         }
+
+         snprintf(*oid, max_digits, "%d", oidMappings[i].oid);
+         return 0;
+      }
+   }
+
+   pgmoneta_log_info("Could not find tablespace with name %s", name);
+
+   *oid = strdup(name);
+
+   return 0;
+}
+
+int
+pgmoneta_get_database_oid(char* name, char** oid)
+{
+   if (oid == NULL)
+   {
+      return -1;
+   }
+
+   if (*oid != NULL)
+   {
+      free(*oid);
+      *oid = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].type == OBJ_DATABASE && oidMappings[i].name == name)
+      {
+         int max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+         *oid = malloc(max_digits);
+
+         if (*oid == NULL)
+         {
+            free(*oid);
+            return -1;
+         }
+
+         snprintf(*oid, max_digits, "%d", oidMappings[i].oid);
+         return 0;
+      }
+   }
+
+   pgmoneta_log_info("Could not find database with name %s", name);
+
+   *oid = strdup(name);
+
+   return 0;
+}
+
+int
+pgmoneta_get_relation_oid(char* name, char** oid)
+{
+   if (oid == NULL)
+   {
+      return -1;
+   }
+
+   if (*oid != NULL)
+   {
+      free(*oid);
+      *oid = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].type == OBJ_RELATION && oidMappings[i].name == name)
+      {
+         int max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+         *oid = malloc(max_digits);
+
+         if (*oid == NULL)
+         {
+            free(*oid);
+            return -1;
+         }
+
+         snprintf(*oid, max_digits, "%d", oidMappings[i].oid);
+         return 0;
+      }
+   }
+
+   pgmoneta_log_info("Could not find relation with name %s", name);
+
+   *oid = strdup(name);
 
    return 0;
 }

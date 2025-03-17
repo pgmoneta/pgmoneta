@@ -138,7 +138,8 @@ pgmoneta_read_mappings_from_json(char* mappings_path);
  * @brief Get tablespace name by OID
  * @param oid Tablespace OID to lookup
  * @param name [out] Tablespace name
- * @return Tablespace name or provided oid if not found
+ * @return 0 on success, 1 on failure
+ * @note Name will be tablespace name or provided oid if not found
  */
 int
 pgmoneta_get_tablespace_name(int oid, char** name);
@@ -147,7 +148,8 @@ pgmoneta_get_tablespace_name(int oid, char** name);
  * @brief Get database name by OID
  * @param oid Database OID to lookup
  * @param name [out] Database name
- * @return Database name or provided oid if not found
+ * @return 0 on success, 1 on failure
+ * @note Name will be database name or provided oid if not found
  */
 int
 pgmoneta_get_database_name(int oid, char** name);
@@ -156,10 +158,45 @@ pgmoneta_get_database_name(int oid, char** name);
  * @brief Get relation name by OID
  * @param oid Relation OID to lookup
  * @param name [out] Relation name
- * @return Relation name (schema-qualified) or provided oid if not found
+ * @return 0 on success, 1 on failure
+ * @note Name will be relation name (schema-qualified) or provided oid if not found
  */
 int
 pgmoneta_get_relation_name(int oid, char** name);
+
+/**
+ * @brief Get tablespace OID by name
+ *
+ * @param name Tablespace name to lookup
+ * @param oid [out] Tablespace OID
+ * @return 0 on success, 1 on failure
+ * @note OID will be tablespace OID or provided name if not found
+ */
+int
+pgmoneta_get_tablespace_oid(char* name, char** oid);
+
+/**
+ * @brief Get database OID by name
+ *
+ * @param name Database name to lookup
+ * @param oid [out] Database OID
+ * @return 0 on success, 1 on failure
+ * @note OID will be database OID or provided name if not found
+ */
+int
+pgmoneta_get_database_oid(char* name, char** oid);
+
+/**
+ * @brief Get relation OID by name
+ *
+ * @param name Relation name to lookup
+ * @param oid [out] Relation OID
+ * @return 0 on success, 1 on failure
+ * @note OID will be relation OID or provided name if not found
+ */
+int
+pgmoneta_get_relation_oid(char* name, char** oid);
+
 #ifdef __cplusplus
 }
 #endif

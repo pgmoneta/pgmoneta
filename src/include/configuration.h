@@ -105,6 +105,9 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_USER_CONF_PATH          "users_configuration_path"
 #define CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH         "admin_configuration_path"
 
+#define CONFIGURATION_TYPE_MAIN 0
+#define CONFIGURATION_TYPE_WALINFO 1
+
 /**
  * Initialize the configuration structure
  * @param shmem The shared memory segment
@@ -136,7 +139,7 @@ pgmoneta_validate_main_configuration(void* shmem);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_walinfo_init_configuration(void* shmem);
+pgmoneta_init_walinfo_configuration(void* shmem);
 
 /**
  * Read the WALINFO configuration from a file
@@ -145,7 +148,7 @@ pgmoneta_walinfo_init_configuration(void* shmem);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_walinfo_read_configuration(void* shmem, char* filename);
+pgmoneta_read_walinfo_configuration(void* shmem, char* filename);
 
 /**
  * Validate the WALINFO configuration
@@ -153,7 +156,7 @@ pgmoneta_walinfo_read_configuration(void* shmem, char* filename);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_walinfo_validate_configuration(void* shmem);
+pgmoneta_validate_walinfo_configuration(void* shmem);
 
 /**
  * Read the USERS configuration from a file
