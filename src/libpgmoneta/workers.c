@@ -123,7 +123,7 @@ error:
 }
 
 int
-pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_input*), struct worker_input* wi)
+pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_common*), struct worker_common* wc)
 {
    struct task* t = NULL;
 
@@ -137,7 +137,7 @@ pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_inp
       }
 
       t->function = function;
-      t->wi = wi;
+      t->wc = wc;
 
       queue_push(&workers->queue, t);
 
@@ -267,7 +267,7 @@ pgmoneta_create_worker_input(char* directory, char* from, char* to, int level,
    w->data = NULL;
    w->failed = NULL;
    w->all = NULL;
-   w->workers = workers;
+   w->common.workers = workers;
 
    *wi = w;
 
@@ -309,7 +309,7 @@ error:
 static void*
 worker_do(struct worker* worker)
 {
-   void (*func_ref)(struct worker_input*);
+   void (*func_ref)(struct worker_common*);
    struct task* t;
    struct workers* workers = worker->workers;
 
@@ -331,7 +331,7 @@ worker_do(struct worker* worker)
          if (t)
          {
             func_ref = t->function;
-            func_ref(t->wi);
+            func_ref(t->wc);
 
             free(t);
          }

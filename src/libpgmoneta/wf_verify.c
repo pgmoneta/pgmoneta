@@ -48,7 +48,7 @@
 static char* verify_name(void);
 static int verify_execute(char*, struct art*);
 
-static void do_verify(struct worker_input* wi);
+static void do_verify(struct worker_common* wc);
 
 struct workflow*
 pgmoneta_create_verify(void)
@@ -186,12 +186,12 @@ verify_execute(char* name, struct art* nodes)
       {
          if (workers->outcome)
          {
-            pgmoneta_workers_add(workers, do_verify, payload);
+            pgmoneta_workers_add(workers, do_verify, (struct worker_common*)payload);
          }
       }
       else
       {
-         do_verify(payload);
+         do_verify((struct worker_common*)payload);
       }
 
       free(columns);
@@ -249,9 +249,10 @@ error:
 }
 
 static void
-do_verify(struct worker_input* wi)
+do_verify(struct worker_common* wc)
 {
-   char* f = NULL;
+   struct worker_input *wi = (struct worker_input*)wc;
+   char *f = NULL;
    char* hash_cal = NULL;
    bool failed = false;
    int ha = 0;

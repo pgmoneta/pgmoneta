@@ -39,7 +39,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
-struct worker_input;
+struct worker_common;
 
 /** @struct semaphore
  * Defines a semaphore
@@ -57,8 +57,8 @@ struct semaphore
 struct task
 {
    struct task* previous;                  /**< The previous task */
-   void (*function)(struct worker_input*); /**< The task */
-   struct worker_input* wi;                /**< The input */
+   void (*function)(struct worker_common*); /**< The task */
+   struct worker_common* wc;                /**< The common base */
 };
 
 /** @struct queue
@@ -96,19 +96,27 @@ struct workers
    struct queue queue;             /**< The queue */
 };
 
+/** @struct worker_common
+ * Defines the common base for worker input
+ */
+struct worker_common
+{
+   struct workers* workers;  /**< The root structure */
+};
+
 /** @struct worker_input
  * Defines the worker input
  */
 struct worker_input
 {
-   char directory[MAX_PATH]; /**< The directory */
-   char from[MAX_PATH];      /**< The from directory */
-   char to[MAX_PATH];        /**< The to directory */
-   int level;                /**< The compression level */
-   struct json* data;        /**< JSON data */
-   struct deque* failed;     /**< Failed files */
-   struct deque* all;        /**< All files */
-   struct workers* workers;  /**< The root structure */
+   struct worker_common common; /**< The common base */
+   char directory[MAX_PATH];    /**< The directory */
+   char from[MAX_PATH];         /**< The from directory */
+   char to[MAX_PATH];           /**< The to directory */
+   int level;                   /**< The compression level */
+   struct json* data;           /**< JSON data */
+   struct deque* failed;        /**< Failed files */
+   struct deque* all;           /**< All files */
 };
 
 /**
@@ -128,7 +136,7 @@ pgmoneta_workers_initialize(int num, struct workers** workers);
  * @return 0 upon success, otherwise 1.
  */
 int
-pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_input*), struct worker_input* wi);
+pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_common*), struct worker_common* wi);
 
 /**
  * Wait for all queued work units to finish

@@ -42,9 +42,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-static void do_link(struct worker_input* wi);
-static void do_relink(struct worker_input* wi);
-static void do_comparefiles(struct worker_input* wi);
+static void do_link(struct worker_common* wc);
+static void do_relink(struct worker_common* wc);
+static void do_comparefiles(struct worker_common* wc);
 static char* trim_suffix(char* str);
 
 int
@@ -108,12 +108,12 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_link, wi);
+                     pgmoneta_workers_add(workers, do_link, (struct worker_common*)wi);
                   }
                }
                else
                {
-                  do_link(wi);
+                  do_link((struct worker_common *)wi);
                }
             }
          }
@@ -150,8 +150,10 @@ error:
 }
 
 static void
-do_link(struct worker_input* wi)
+do_link(struct worker_common* wc)
 {
+   struct worker_input* wi = (struct worker_input*)wc;
+
    if (pgmoneta_exists(wi->to))
    {
       if (pgmoneta_exists(wi->from))
@@ -235,12 +237,12 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_relink, wi);
+                  pgmoneta_workers_add(workers, do_relink, (struct worker_common*)wi);
                }
             }
             else
             {
-               do_relink(wi);
+               do_relink((struct worker_common *)wi);
             }
          }
       }
@@ -283,9 +285,10 @@ error:
 }
 
 static void
-do_relink(struct worker_input* wi)
+do_relink(struct worker_common* wc)
 {
-   char* link = NULL;
+   struct worker_input* wi = (struct worker_input*)wc;
+   char *link = NULL;
 
 #ifdef DEBUG
    if (!pgmoneta_exists(wi->from))
@@ -318,7 +321,7 @@ do_relink(struct worker_input* wi)
          {
             pgmoneta_log_debug("%s doesn't exists", wi->to);
          }
-         pgmoneta_copy_file(wi->from, wi->to, wi->workers);
+         pgmoneta_copy_file(wi->from, wi->to, wi->common.workers);
       }
       else
       {
@@ -410,12 +413,12 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_comparefiles, wi);
+                  pgmoneta_workers_add(workers, do_comparefiles, (struct worker_common*)wi);
                }
             }
             else
             {
-               do_comparefiles(wi);
+               do_comparefiles((struct worker_common *)wi);
             }
          }
       }
@@ -445,8 +448,9 @@ error:
 }
 
 static void
-do_comparefiles(struct worker_input* wi)
+do_comparefiles(struct worker_common* wc)
 {
+   struct worker_input *wi = (struct worker_input*)wc;
    bool equal;
 
    equal = pgmoneta_compare_files(wi->from, wi->to);

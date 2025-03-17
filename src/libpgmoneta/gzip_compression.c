@@ -51,8 +51,8 @@
 static int gz_compress(char* from, int level, char* to);
 static int gz_decompress(char* from, char* to);
 
-static void do_gz_compress(struct worker_input* wi);
-static void do_gz_decompress(struct worker_input* wi);
+static void do_gz_compress(struct worker_common* wc);
+static void do_gz_decompress(struct worker_common* wc);
 
 int
 pgmoneta_gzip_data(char* directory, struct workers* workers)
@@ -122,12 +122,12 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_gz_compress, wi);
+                     pgmoneta_workers_add(workers, do_gz_compress, (struct worker_common*)wi);
                   }
                }
                else
                {
-                  do_gz_compress(wi);
+                  do_gz_compress((struct worker_common *)wi);
                }
             }
             else
@@ -165,8 +165,10 @@ error:
 }
 
 static void
-do_gz_compress(struct worker_input* wi)
+do_gz_compress(struct worker_common* wc)
 {
+   struct worker_input* wi = (struct worker_input*)wc;
+
    if (pgmoneta_exists(wi->from))
    {
       if (gz_compress(wi->from, wi->level, wi->to))
@@ -604,12 +606,12 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_gz_decompress, wi);
+                     pgmoneta_workers_add(workers, do_gz_decompress, (struct worker_common*)wi);
                   }
                }
                else
                {
-                  do_gz_decompress(wi);
+                  do_gz_decompress((struct worker_common *)wi);
                }
             }
             else
@@ -814,8 +816,10 @@ pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size,
 }
 
 static void
-do_gz_decompress(struct worker_input* wi)
+do_gz_decompress(struct worker_common* wc)
 {
+   struct worker_input* wi = (struct worker_input*)wc;
+
    if (pgmoneta_exists(wi->from))
    {
       if (gz_decompress(wi->from, wi->to))

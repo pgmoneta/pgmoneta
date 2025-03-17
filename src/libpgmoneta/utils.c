@@ -84,8 +84,8 @@ static int copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappin
 
 static int get_permissions(char* from, int* permissions);
 
-static void do_copy_file(struct worker_input* wi);
-static void do_delete_file(struct worker_input* wi);
+static void do_copy_file(struct worker_common* wc);
+static void do_delete_file(struct worker_common* wc);
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -1794,12 +1794,12 @@ pgmoneta_delete_file(char* file, struct workers* workers)
    {
       if (workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_delete_file, fi);
+         pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi);
       }
    }
    else
    {
-      do_delete_file(fi);
+      do_delete_file((struct worker_common*)fi);
    }
 
    return 0;
@@ -1810,8 +1810,9 @@ error:
 }
 
 static void
-do_delete_file(struct worker_input* fi)
+do_delete_file(struct worker_common* wc)
 {
+   struct worker_input *fi = (struct worker_input*)wc;
    int ret = unlink(fi->from);
 
    if (ret != 0)
@@ -2440,12 +2441,12 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    {
       if (workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_copy_file, fi);
+         pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi);
       }
    }
    else
    {
-      do_copy_file(fi);
+      do_copy_file((struct worker_common *)fi);
    }
 
    return 0;
@@ -2456,8 +2457,9 @@ error:
 }
 
 static void
-do_copy_file(struct worker_input* fi)
+do_copy_file(struct worker_common* wc)
 {
+   struct worker_input *fi = (struct worker_input*)wc;
    int fd_from = -1;
    int fd_to = -1;
    char buffer[8192];

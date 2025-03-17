@@ -47,8 +47,8 @@ static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* k
 static const EVP_CIPHER* (*get_cipher(int mode))(void);
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 
-static void do_encrypt_file(struct worker_input* wi);
-static void do_decrypt_file(struct worker_input* wi);
+static void do_encrypt_file(struct worker_common* wc);
+static void do_decrypt_file(struct worker_common* wc);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
@@ -107,12 +107,12 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
                   {
                      if (workers->outcome)
                      {
-                        pgmoneta_workers_add(workers, do_encrypt_file, wi);
+                        pgmoneta_workers_add(workers, do_encrypt_file, (struct worker_common*)wi);
                      }
                   }
                   else
                   {
-                     do_encrypt_file(wi);
+                     do_encrypt_file((struct worker_common *)wi);
                   }
                }
             }
@@ -141,8 +141,10 @@ error:
 }
 
 static void
-do_encrypt_file(struct worker_input* wi)
+do_encrypt_file(struct worker_common* wc)
 {
+   struct worker_input* wi = (struct worker_input*)wc;
+
    if (!encrypt_file(wi->from, wi->to, 1))
    {
       if (pgmoneta_exists(wi->from))
@@ -483,12 +485,12 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_decrypt_file, wi);
+                     pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common *)wi);
                   }
                }
                else
                {
-                  do_decrypt_file(wi);
+                  do_decrypt_file((struct worker_common *)wi);
                }
             }
             else
@@ -521,8 +523,10 @@ error:
 }
 
 static void
-do_decrypt_file(struct worker_input* wi)
+do_decrypt_file(struct worker_common* wc)
 {
+   struct worker_input* wi = (struct worker_input*)wc;
+
    if (!encrypt_file(wi->from, wi->to, 0))
    {
       if (pgmoneta_exists(wi->from))

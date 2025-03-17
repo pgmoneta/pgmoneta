@@ -51,8 +51,8 @@
 static int lz4_compress(char* from, char* to);
 static int lz4_decompress(char* from, char* to);
 
-static void do_lz4_compress(struct worker_input* wi);
-static void do_lz4_decompress(struct worker_input* wi);
+static void do_lz4_compress(struct worker_common* wc);
+static void do_lz4_decompress(struct worker_common* wc);
 
 int
 pgmoneta_lz4c_data(char* directory, struct workers* workers)
@@ -106,12 +106,12 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_lz4_compress, wi);
+                  pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
                }
             }
             else
             {
-               do_lz4_compress(wi);
+               do_lz4_compress((struct worker_common *)wi);
             }
          }
          else
@@ -148,8 +148,10 @@ error:
 }
 
 static void
-do_lz4_compress(struct worker_input* wi)
+do_lz4_compress(struct worker_common* wc)
 {
+   struct worker_input *wi = (struct worker_input*)wc;
+
    if (pgmoneta_exists(wi->from))
    {
       if (lz4_compress(wi->from, wi->to))
@@ -316,12 +318,12 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_lz4_decompress, wi);
+                  pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
                }
             }
             else
             {
-               do_lz4_decompress(wi);
+               do_lz4_decompress((struct worker_common*)wi);
             }
          }
          else
@@ -362,8 +364,10 @@ error:
 }
 
 static void
-do_lz4_decompress(struct worker_input* wi)
+do_lz4_decompress(struct worker_common* wc)
 {
+   struct worker_input *wi = (struct worker_input*)wc;
+
    if (pgmoneta_exists(wi->from))
    {
       if (lz4_decompress(wi->from, wi->to))
