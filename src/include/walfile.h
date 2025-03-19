@@ -32,6 +32,13 @@
 #include <deque.h>
 #include <walfile/wal_reader.h>
 
+/* Return Codes */
+#define PGMONETA_WAL_SUCCESS      0   /**< WAL operation succeeded */
+#define PGMONETA_WAL_ERR_IO       1   /**< I/O error (e.g., file read/write failure) */
+#define PGMONETA_WAL_ERR_MEMORY   2   /**< Memory allocation failure */
+#define PGMONETA_WAL_ERR_FORMAT   3   /**< Invalid WAL file format */
+#define PGMONETA_WAL_ERR_PARAM    4   /**< Invalid input parameters */
+
 /**
  * @struct xlog_long_page_header_data
  * @brief Extended XLOG page header.
