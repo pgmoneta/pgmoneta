@@ -314,6 +314,14 @@ struct common_configuration
    int log_rotation_age;              /**< minutes for log rotation */
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
+
+   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
+   struct user users[NUMBER_OF_USERS];             /**< The users */
+   struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
+
+   int number_of_servers;        /**< The number of servers */
+   int number_of_users;          /**< The number of users */
+   int number_of_admins;         /**< The number of admins */
 } __attribute__ ((aligned (64)));
 
 /** @struct main_configuration
@@ -393,10 +401,6 @@ struct main_configuration
 
    char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain Socket */
 
-   int number_of_servers;        /**< The number of servers */
-   int number_of_users;          /**< The number of users */
-   int number_of_admins;         /**< The number of admins */
-
    int backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
@@ -406,9 +410,6 @@ struct main_configuration
    bool link; /**< Do linking */
 #endif
 
-   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
-   struct user users[NUMBER_OF_USERS];             /**< The users */
-   struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
    struct prometheus prometheus;                   /**< The Prometheus metrics */
 } __attribute__ ((aligned (64)));
 
@@ -418,12 +419,6 @@ struct main_configuration
 struct walinfo_configuration
 {
    struct common_configuration common; /**< Common configurations that are shared across multiple tools */
-
-   int number_of_servers;        /**< The number of servers */
-   int number_of_users;          /**< The number of users */
-
-   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
-   struct user users[NUMBER_OF_USERS];             /**< The users */
 } __attribute__ ((aligned (64)));
 
 #ifdef __cplusplus

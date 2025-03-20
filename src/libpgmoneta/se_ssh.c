@@ -155,7 +155,7 @@ ssh_storage_setup(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->common.servers[server].name, label);
 
    homedir = getenv("HOME");
    pubkey_path = "/.ssh/id_rsa.pub";
@@ -341,7 +341,7 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->common.servers[server].name, label);
 
    remote_root = get_remote_server_backup_identifier(server, label);
 
@@ -474,7 +474,7 @@ ssh_storage_wal_shipping_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->common.servers[server].name, label);
 
    remote_root = get_remote_server_wal(server);
    local_root = pgmoneta_get_server_wal(server);
@@ -525,7 +525,7 @@ ssh_storage_backup_teardown(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->common.servers[server].name, label);
 
    if (!is_error)
    {
@@ -576,7 +576,7 @@ ssh_storage_wal_shipping_teardown(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->common.servers[server].name, label);
 
    sftp_free(sftp);
 
@@ -928,7 +928,7 @@ get_remote_server_basepath(int server)
    {
       d = pgmoneta_append(d, "/");
    }
-   d = pgmoneta_append(d, config->servers[server].name);
+   d = pgmoneta_append(d, config->common.servers[server].name);
    d = pgmoneta_append(d, "/");
 
    return d;

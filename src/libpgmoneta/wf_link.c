@@ -121,7 +121,7 @@ link_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Link (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Link (execute): %s/%s", config->common.servers[server].name, label);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -187,7 +187,7 @@ link_execute(char* name, struct art* nodes)
          memset(&elapsed[0], 0, sizeof(elapsed));
          sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-         pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
+         pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
          backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
          pgmoneta_update_info_double(backup_base, INFO_LINKING_ELAPSED, linking_elapsed_time);

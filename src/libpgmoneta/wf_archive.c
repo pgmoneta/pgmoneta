@@ -118,7 +118,7 @@ archive_execute(char* name, struct art* nodes)
    root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 
-   pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Archive (execute): %s/%s", config->common.servers[server].name, label);
 
    src = pgmoneta_append(src, base);
 
@@ -128,12 +128,12 @@ archive_execute(char* name, struct art* nodes)
       dst = pgmoneta_append(dst, "/");
    }
    dst = pgmoneta_append(dst, "archive-");
-   dst = pgmoneta_append(dst, config->servers[server].name);
+   dst = pgmoneta_append(dst, config->common.servers[server].name);
    dst = pgmoneta_append(dst, "-");
    dst = pgmoneta_append(dst, label);
    dst = pgmoneta_append(dst, ".tar");
 
-   d_name = pgmoneta_append(d_name, config->servers[server].name);
+   d_name = pgmoneta_append(d_name, config->common.servers[server].name);
    d_name = pgmoneta_append(d_name, "-");
    d_name = pgmoneta_append(d_name, label);
 
@@ -194,7 +194,7 @@ archive_teardown(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Archive (teardown): %s/%s", config->common.servers[server].name, label);
 
    destination = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 

@@ -109,7 +109,7 @@ azure_storage_setup(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->common.servers[server].name, label);
 
    return 0;
 
@@ -149,7 +149,7 @@ azure_storage_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->common.servers[server].name, label);
 
    local_root = pgmoneta_get_server_backup_identifier(server, label);
    azure_root = azure_get_basepath(server, label);
@@ -209,7 +209,7 @@ azure_storage_teardown(char* name, struct art* nodes)
 
    curl_easy_cleanup(curl);
 
-   pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->common.servers[server].name, label);
 
    free(root);
 
@@ -544,7 +544,7 @@ azure_get_basepath(int server, char* identifier)
    {
       d = pgmoneta_append(d, "/");
    }
-   d = pgmoneta_append(d, config->servers[server].name);
+   d = pgmoneta_append(d, config->common.servers[server].name);
    d = pgmoneta_append(d, "/backup/");
    d = pgmoneta_append(d, identifier);
 

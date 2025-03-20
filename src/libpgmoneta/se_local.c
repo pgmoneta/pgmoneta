@@ -111,7 +111,7 @@ local_storage_execute(char* name, struct art* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
+   pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    return 0;
 }

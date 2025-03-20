@@ -108,19 +108,19 @@ delete_backup_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Delete (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Delete (execute): %s/%s", config->common.servers[server].name, label);
 
    active = false;
 
-   if (!atomic_compare_exchange_strong(&config->servers[server].delete, &active, true))
+   if (!atomic_compare_exchange_strong(&config->common.servers[server].delete, &active, true))
    {
-      pgmoneta_log_debug("Delete is active for %s (Waiting for %s)", config->servers[server].name, label);
+      pgmoneta_log_debug("Delete is active for %s (Waiting for %s)", config->common.servers[server].name, label);
       goto error;
    }
 
-   if (atomic_load(&config->servers[server].backup))
+   if (atomic_load(&config->common.servers[server].backup))
    {
-      pgmoneta_log_debug("Backup is active for %s", config->servers[server].name);
+      pgmoneta_log_debug("Backup is active for %s", config->common.servers[server].name);
       goto error;
    }
 
@@ -145,13 +145,13 @@ delete_backup_execute(char* name, struct art* nodes)
 
    if (backup_index == -1)
    {
-      pgmoneta_log_error("Delete: No identifier for %s/%s", config->servers[server].name, label);
+      pgmoneta_log_error("Delete: No identifier for %s/%s", config->common.servers[server].name, label);
       goto error;
    }
 
    if (backups[backup_index]->keep)
    {
-      pgmoneta_log_error("Delete: Backup is retained for %s/%s", config->servers[server].name, label);
+      pgmoneta_log_error("Delete: Backup is retained for %s/%s", config->common.servers[server].name, label);
       goto error;
    }
 
@@ -159,7 +159,7 @@ delete_backup_execute(char* name, struct art* nodes)
    {
       if (delete_full_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
       {
-         pgmoneta_log_error("Delete: Full backup error for %s/%s", config->servers[server].name, label);
+         pgmoneta_log_error("Delete: Full backup error for %s/%s", config->common.servers[server].name, label);
          goto error;
       }
    }
@@ -174,12 +174,12 @@ delete_backup_execute(char* name, struct art* nodes)
 
       if (delete_incremental_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
       {
-         pgmoneta_log_error("Delete: Incremental backup error for %s/%s", config->servers[server].name, label);
+         pgmoneta_log_error("Delete: Incremental backup error for %s/%s", config->common.servers[server].name, label);
          goto error;
       }
    }
 
-   pgmoneta_log_debug("Delete: %s/%s", config->servers[server].name, backups[backup_index]->label);
+   pgmoneta_log_debug("Delete: %s/%s", config->common.servers[server].name, backups[backup_index]->label);
 
    for (int i = 0; i < number_of_backups; i++)
    {
@@ -188,7 +188,7 @@ delete_backup_execute(char* name, struct art* nodes)
    free(backups);
    free(backup);
 
-   /* if (strlen(config->servers[server].hot_standby) > 0) */
+   /* if (strlen(config->common.servers[server].hot_standby) > 0) */
    /* { */
    /*    char* srv = NULL; */
    /*    char* hs = NULL; */
@@ -202,7 +202,7 @@ delete_backup_execute(char* name, struct art* nodes)
 
    /*    if (number_of_backups == 0) */
    /*    { */
-   /*       hs = pgmoneta_append(hs, config->servers[server].hot_standby); */
+   /*       hs = pgmoneta_append(hs, config->common.servers[server].hot_standby); */
    /*       if (!pgmoneta_ends_with(hs, "/")) */
    /*       { */
    /*          hs = pgmoneta_append_char(hs, '/'); */
@@ -212,7 +212,7 @@ delete_backup_execute(char* name, struct art* nodes)
    /*       { */
    /*          pgmoneta_delete_directory(hs); */
 
-   /*          pgmoneta_log_info("Hot standby deleted: %s", config->servers[server].name); */
+   /*          pgmoneta_log_info("Hot standby deleted: %s", config->common.servers[server].name); */
    /*       } */
    /*    } */
 
@@ -230,8 +230,8 @@ delete_backup_execute(char* name, struct art* nodes)
 
    free(child);
 
-   atomic_store(&config->servers[server].delete, false);
-   pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
+   atomic_store(&config->common.servers[server].delete, false);
+   pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
 
    return 0;
 
@@ -247,8 +247,8 @@ error:
 
    free(child);
 
-   atomic_store(&config->servers[server].delete, false);
-   pgmoneta_log_trace("Delete is ready for %s", config->servers[server].name);
+   atomic_store(&config->common.servers[server].delete, false);
+   pgmoneta_log_trace("Delete is ready for %s", config->common.servers[server].name);
 
    return 1;
 }
@@ -288,14 +288,14 @@ delete_full_backup(int server, int index, struct backup* backup, int number_of_b
 
    if (prev_index != -1)
    {
-      pgmoneta_log_trace("Prev label: %s/%s", config->servers[server].name, backups[prev_index]->label);
+      pgmoneta_log_trace("Prev label: %s/%s", config->common.servers[server].name, backups[prev_index]->label);
    }
 
-   pgmoneta_log_trace("Delt label: %s/%s", config->servers[server].name, backups[index]->label);
+   pgmoneta_log_trace("Delt label: %s/%s", config->common.servers[server].name, backups[index]->label);
 
    if (next_index != -1)
    {
-      pgmoneta_log_trace("Next label: %s/%s", config->servers[server].name, backups[next_index]->label);
+      pgmoneta_log_trace("Next label: %s/%s", config->common.servers[server].name, backups[next_index]->label);
    }
 
    d = pgmoneta_get_server_backup_identifier(server, backups[index]->label);

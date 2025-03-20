@@ -49,7 +49,7 @@ pgmoneta_retention(char** argv)
    if (atomic_load(&config->active_restores) == 0 &&
        atomic_load(&config->active_archives) == 0)
    {
-      for (int i = 0; i < config->number_of_servers; i++)
+      for (int i = 0; i < config->common.number_of_servers; i++)
       {
          workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, i, NULL);
 

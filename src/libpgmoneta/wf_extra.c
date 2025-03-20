@@ -110,13 +110,13 @@ extra_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   if (config->servers[server].number_of_extra == 0)
+   if (config->common.servers[server].number_of_extra == 0)
    {
-      pgmoneta_log_debug("No extra parameter are set for server: %s", config->servers[server].name);
+      pgmoneta_log_debug("No extra parameter are set for server: %s", config->common.servers[server].name);
       return 0;
    }
 
-   pgmoneta_log_debug("Extra (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Extra (execute): %s/%s", config->common.servers[server].name, label);
 
    // Create the root directory
    root = pgmoneta_get_server_extra_identifier(server, label);
@@ -127,9 +127,9 @@ extra_execute(char* name, struct art* nodes)
 
    usr = -1;
    // find the corresponding user's index of the given server
-   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+   for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      if (!strcmp(config->servers[server].username, config->users[i].username))
+      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
       {
          usr = i;
       }
@@ -142,26 +142,26 @@ extra_execute(char* name, struct art* nodes)
    }
 
    // establish a connection, with replication flag set
-   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
+   if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
-      pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[server].name);
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[server].name);
       goto error;
    }
 
    pgmoneta_ext_is_installed(ssl, socket, &qr);
    if (qr == NULL || qr->tuples == NULL || qr->tuples->data == NULL || qr->tuples->data[0] == NULL || qr->tuples->data[2] == NULL || strcmp(qr->tuples->data[0], "pgmoneta_ext") != 0)
    {
-      pgmoneta_log_warn("extra failed: Server %s does not have the pgmoneta_ext extension installed.", config->servers[server].name);
+      pgmoneta_log_warn("extra failed: Server %s does not have the pgmoneta_ext extension installed.", config->common.servers[server].name);
       goto error;
    }
    pgmoneta_free_query_response(qr);
    qr = NULL;
 
-   for (int i = 0; i < config->servers[server].number_of_extra; i++)
+   for (int i = 0; i < config->common.servers[server].number_of_extra; i++)
    {
-      if (pgmoneta_receive_extra_files(ssl, socket, config->servers[server].name, config->servers[server].extra[i], root, &info_extra) != 0)
+      if (pgmoneta_receive_extra_files(ssl, socket, config->common.servers[server].name, config->common.servers[server].extra[i], root, &info_extra) != 0)
       {
-         pgmoneta_log_warn("extra failed: Server %s failed to retrieve extra files %s", config->servers[server].name, config->servers[server].extra[i]);
+         pgmoneta_log_warn("extra failed: Server %s failed to retrieve extra files %s", config->common.servers[server].name, config->common.servers[server].extra[i]);
       }
    }
 
@@ -175,7 +175,7 @@ extra_execute(char* name, struct art* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
+   pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    info_root = pgmoneta_get_server_backup_identifier(server, label);
 

@@ -192,7 +192,7 @@ restore_execute(char* name, struct art* nodes)
    directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-   pgmoneta_log_debug("Restore (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Restore (execute): %s/%s", config->common.servers[server].name, label);
 
    from = pgmoneta_get_server_backup_identifier_data(server, label);
    to = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
@@ -205,9 +205,9 @@ restore_execute(char* name, struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->servers[server].name, label, backup, workers))
+   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->common.servers[server].name, label, backup, workers))
    {
-      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, label);
+      pgmoneta_log_error("Restore: Could not restore %s/%s", config->common.servers[server].name, label);
       goto error;
    }
    else
@@ -287,7 +287,7 @@ restore_execute(char* name, struct art* nodes)
 
             waltarget = pgmoneta_append(waltarget, directory);
             waltarget = pgmoneta_append(waltarget, "/");
-            waltarget = pgmoneta_append(waltarget, config->servers[server].name);
+            waltarget = pgmoneta_append(waltarget, config->common.servers[server].name);
             waltarget = pgmoneta_append(waltarget, "-");
             waltarget = pgmoneta_append(waltarget, label);
             waltarget = pgmoneta_append(waltarget, "/pg_wal/");
@@ -377,7 +377,7 @@ combine_incremental_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
 
-   pgmoneta_log_debug("Combine incremental (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_log_debug("Combine incremental (execute): %s/%s", config->common.servers[server].name, identifier);
    bck = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    prior_backups = (struct deque*)pgmoneta_art_search(nodes, NODE_BACKUPS);
@@ -405,7 +405,7 @@ combine_incremental_execute(char* name, struct art* nodes)
       char tblspc[MAX_PATH];
       memset(tblspc, 0, MAX_PATH);
       snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s",
-               base, config->servers[server].name, bck->label, bck->tablespaces[i]);
+               base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
       if (pgmoneta_exists(tblspc))
       {
          pgmoneta_delete_directory(tblspc);
@@ -470,7 +470,7 @@ recovery_info_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
 
-   pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_log_debug("Recovery (execute): %s/%s", config->common.servers[server].name, identifier);
 
    is_recovery_info = (bool)pgmoneta_art_search(nodes, NODE_RECOVERY_INFO);
 
@@ -558,12 +558,12 @@ recovery_info_execute(char* name, struct art* nodes)
 
          memset(&line[0], 0, sizeof(line));
          snprintf(&line[0], sizeof(line), "primary_conninfo = \'host=%s port=%d user=%s password=%s application_name=%s\'\n",
-                  config->servers[server].host, config->servers[server].port, config->servers[server].username,
-                  get_user_password(config->servers[server].username), config->servers[server].wal_slot);
+                  config->common.servers[server].host, config->common.servers[server].port, config->common.servers[server].username,
+                  get_user_password(config->common.servers[server].username), config->common.servers[server].wal_slot);
          fputs(&line[0], tfile);
 
          memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->servers[server].wal_slot);
+         snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->common.servers[server].wal_slot);
          fputs(&line[0], tfile);
 
          ptr = strtok(&tokens[0], ",");
@@ -827,7 +827,7 @@ restore_excluded_files_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
 
-   pgmoneta_log_debug("Excluded (execute): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_log_debug("Excluded (execute): %s/%s", config->common.servers[server].name, identifier);
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
    {
@@ -991,7 +991,7 @@ restore_excluded_files_teardown(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
 
-   pgmoneta_log_debug("Excluded (teardown): %s/%s", config->servers[server].name, identifier);
+   pgmoneta_log_debug("Excluded (teardown): %s/%s", config->common.servers[server].name, identifier);
 
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
@@ -1101,11 +1101,11 @@ get_user_password(char* username)
 
    config = (struct main_configuration*)shmem;
 
-   for (int i = 0; i < config->number_of_users; i++)
+   for (int i = 0; i < config->common.number_of_users; i++)
    {
-      if (!strcmp(&config->users[i].username[0], username))
+      if (!strcmp(&config->common.users[i].username[0], username))
       {
-         return &config->users[i].password[0];
+         return &config->common.users[i].password[0];
       }
    }
 

@@ -123,7 +123,7 @@ encryption_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Encryption (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Encryption (execute): %s/%s", config->common.servers[server].name, label);
 
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
@@ -216,7 +216,7 @@ encryption_execute(char* name, struct art* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Encryption: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
+   pgmoneta_log_debug("Encryption: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    pgmoneta_update_info_double(backup_base, INFO_ENCRYPTION_ELAPSED, encryption_elapsed_time);
 
@@ -272,7 +272,7 @@ decryption_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Decryption (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Decryption (execute): %s/%s", config->common.servers[server].name, label);
 
    base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
    if (base == NULL)
@@ -308,7 +308,7 @@ decryption_execute(char* name, struct art* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%02i", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
+   pgmoneta_log_debug("Decryption: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    return 0;
 }

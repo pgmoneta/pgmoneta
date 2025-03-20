@@ -114,7 +114,7 @@ verify_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Verify (execute): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Verify (execute): %s/%s", config->common.servers[server].name, label);
 
    base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
 

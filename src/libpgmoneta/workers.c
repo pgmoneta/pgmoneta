@@ -213,9 +213,9 @@ pgmoneta_get_number_of_workers(int server)
 
    config = (struct main_configuration*)shmem;
 
-   if (config->servers[server].workers != -1)
+   if (config->common.servers[server].workers != -1)
    {
-      nw = config->servers[server].workers;
+      nw = config->common.servers[server].workers;
    }
    else
    {

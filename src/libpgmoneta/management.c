@@ -858,9 +858,9 @@ pgmoneta_management_create_response(struct json* json, int server, struct json**
 
    if (server >= 0)
    {
-      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)config->servers[server].version, ValueInt32);
-      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)config->servers[server].minor_version, ValueInt32);
-      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)config->common.servers[server].version, ValueInt32);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)config->common.servers[server].minor_version, ValueInt32);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
    }
 
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
@@ -916,9 +916,9 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
 
    if (server != NULL && strlen(server) > 0)
    {
-      for (int i = 0; i < config->number_of_servers; i++)
+      for (int i = 0; i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(server, config->servers[i].name))
+         if (!strcmp(server, config->common.servers[i].name))
          {
             srv = i;
          }

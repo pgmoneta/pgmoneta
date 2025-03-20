@@ -245,7 +245,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    atomic_fetch_add(&config->active_restores, 1);
-   atomic_fetch_add(&config->servers[server].restore, 1);
+   atomic_fetch_add(&config->common.servers[server].restore, 1);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -254,7 +254,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    if (identifier == NULL || strlen(identifier) == 0)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                          MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
       goto error;
    }
@@ -266,7 +266,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                          MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
       goto error;
    }
@@ -286,14 +286,14 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
          goto error;
       }
 
       backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup->label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)backup->backup_size, ValueUInt64);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)backup->restore_size, ValueUInt64);
@@ -308,24 +308,24 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Restore: Error sending response for %s", config->servers[server].name);
+         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Restore: Error sending response for %s", config->common.servers[server].name);
 
          goto error;
       }
 
       elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
-      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->servers[server].name, backup->label, elapsed);
+      pgmoneta_log_info("Restore: %s/%s (Elapsed: %s)", config->common.servers[server].name, backup->label, elapsed);
    }
    else if (ret == RESTORE_MISSING_LABEL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Restore: No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
+      pgmoneta_log_warn("Restore: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
    else
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_RESTORE_NODISK, NAME,
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_NODISK, NAME,
                                          compression, encryption, payload);
       goto error;
    }
@@ -334,7 +334,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->servers[server].restore, 1);
+   atomic_fetch_sub(&config->common.servers[server].restore, 1);
    atomic_fetch_sub(&config->active_restores, 1);
 
    pgmoneta_stop_logging();
@@ -351,7 +351,7 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->servers[server].restore, 1);
+   atomic_fetch_sub(&config->common.servers[server].restore, 1);
    atomic_fetch_sub(&config->active_restores, 1);
 
    pgmoneta_stop_logging();
@@ -460,8 +460,8 @@ pgmoneta_combine_backups(int server, char* base, char* input_dir, char* output_d
       snprintf(otblspc_dir, MAX_PATH, "%s/%s/%u", output_dir, "pg_tblspc", tsoid);
       snprintf(itblspc_dir, MAX_PATH, "%s/%s/%u", input_dir, "pg_tblspc", tsoid);
       snprintf(relative_tablespace_path, MAX_PATH, "../../%s-%s-%s",
-               config->servers[server].name, bck->label, bck->tablespaces[i]);
-      snprintf(full_tablespace_path, MAX_PATH, "%s/%s-%s-%s", base, config->servers[server].name, bck->label, bck->tablespaces[i]);
+               config->common.servers[server].name, bck->label, bck->tablespaces[i]);
+      snprintf(full_tablespace_path, MAX_PATH, "%s/%s-%s-%s", base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
 
       // create and link the actual tablespace directory
       if (pgmoneta_mkdir(full_tablespace_path))
@@ -710,7 +710,7 @@ reconstruct_backup_file(int server,
 
    config = (struct main_configuration*)shmem;
 
-   blocksz = config->servers[server].block_size;
+   blocksz = config->common.servers[server].block_size;
 
    pgmoneta_deque_create(false, &sources);
 
@@ -933,8 +933,8 @@ incremental_rfile_initialize(int server, char* file_path, struct rfile** rfile)
 
    config = (struct main_configuration*)shmem;
 
-   relsegsz = config->servers[server].relseg_size;
-   blocksz = config->servers[server].block_size;
+   relsegsz = config->common.servers[server].relseg_size;
+   blocksz = config->common.servers[server].block_size;
 
    // create rfile after file is opened successfully
    if (rfile_create(file_path, &rf))
@@ -1306,7 +1306,7 @@ restore_backup_full(struct art* nodes)
    {
       target_base = pgmoneta_append(target_base, "/");
    }
-   target_base = pgmoneta_append(target_base, config->servers[server].name);
+   target_base = pgmoneta_append(target_base, config->common.servers[server].name);
    target_base = pgmoneta_append(target_base, "-");
    target_base = pgmoneta_append(target_base, backup->label);
    target_base = pgmoneta_append(target_base, "/");
@@ -1331,7 +1331,7 @@ restore_backup_full(struct art* nodes)
       r = pgmoneta_translate_file_size(required_space);
 
       pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
-                         config->servers[server].name, backup->label, target_root, f, r);
+                         config->common.servers[server].name, backup->label, target_root, f, r);
 
       free(f);
       free(r);
@@ -1401,9 +1401,9 @@ restore_backup_incremental(struct art* nodes)
    memset(label, 0, MISC_LENGTH);
    memcpy(label, backup->parent_label, sizeof(backup->parent_label));
 
-   snprintf(target_root_restore, MAX_PATH, "%s/tmp_%s_incremental_%s", directory, config->servers[server].name, &backup->label[0]);
+   snprintf(target_root_restore, MAX_PATH, "%s/tmp_%s_incremental_%s", directory, config->common.servers[server].name, &backup->label[0]);
    snprintf(target_root_combine, MAX_PATH, "%s", directory);
-   snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/%s-%s", directory, config->servers[server].name, backup->label);
+   snprintf(target_base_combine, MAX_PATH_CONCAT, "%s/%s-%s", directory, config->common.servers[server].name, backup->label);
    manifest_path = pgmoneta_get_server_backup_identifier_data(server, backup->label);
    manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
    // read the manifest for later usage
@@ -1416,7 +1416,7 @@ restore_backup_incremental(struct art* nodes)
    //TODO: free space check during incr restore should be handled specially
 
    // restore current incremental backup
-   snprintf(target_base_restore, MAX_PATH_CONCAT, "%s/%s-%s", target_root_restore, config->servers[server].name, backup->label);
+   snprintf(target_base_restore, MAX_PATH_CONCAT, "%s/%s-%s", target_root_restore, config->common.servers[server].name, backup->label);
    pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root_restore, ValueString);
    pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_restore, ValueString);
 
@@ -1443,7 +1443,7 @@ restore_backup_incremental(struct art* nodes)
       }
 
       memset(target_base_restore, 0, MAX_PATH_CONCAT);
-      snprintf(target_base_restore, MAX_PATH_CONCAT, "%s/%s-%s", target_root_restore, config->servers[server].name, bck->label);
+      snprintf(target_base_restore, MAX_PATH_CONCAT, "%s/%s-%s", target_root_restore, config->common.servers[server].name, bck->label);
       pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_restore, ValueString);
       pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)label, ValueString);
       pgmoneta_art_insert(nodes, NODE_BACKUP, (uintptr_t)bck, ValueRef);
@@ -1490,7 +1490,7 @@ error:
       char tblspc[MAX_PATH];
       memset(tblspc, 0, MAX_PATH);
       snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s", directory,
-               config->servers[server].name, backup->label,
+               config->common.servers[server].name, backup->label,
                backup->tablespaces[i]);
       if (pgmoneta_exists(tblspc))
       {

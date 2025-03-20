@@ -3531,14 +3531,14 @@ pgmoneta_get_server_wal_shipping(int server)
    struct main_configuration* config;
    char* ws = NULL;
    config = (struct main_configuration*) shmem;
-   if (strlen(config->servers[server].wal_shipping) > 0)
+   if (strlen(config->common.servers[server].wal_shipping) > 0)
    {
-      ws = pgmoneta_append(ws, config->servers[server].wal_shipping);
+      ws = pgmoneta_append(ws, config->common.servers[server].wal_shipping);
       if (!pgmoneta_ends_with(ws, "/"))
       {
          ws = pgmoneta_append(ws, "/");
       }
-      ws = pgmoneta_append(ws, config->servers[server].name);
+      ws = pgmoneta_append(ws, config->common.servers[server].name);
       return ws;
    }
    return NULL;
@@ -3569,16 +3569,16 @@ pgmoneta_get_server_hot_standby(int server)
 
    config = (struct main_configuration*)shmem;
 
-   if (strlen(config->servers[server].hot_standby) > 0)
+   if (strlen(config->common.servers[server].hot_standby) > 0)
    {
-      hs = pgmoneta_append(hs, config->servers[server].hot_standby);
+      hs = pgmoneta_append(hs, config->common.servers[server].hot_standby);
 
       if (!pgmoneta_ends_with(hs, "/"))
       {
          hs = pgmoneta_append(hs, "/");
       }
 
-      hs = pgmoneta_append(hs, config->servers[server].name);
+      hs = pgmoneta_append(hs, config->common.servers[server].name);
 
       return hs;
    }
@@ -3823,7 +3823,7 @@ get_server_basepath(int server)
    {
       d = pgmoneta_append(d, "/");
    }
-   d = pgmoneta_append(d, config->servers[server].name);
+   d = pgmoneta_append(d, config->common.servers[server].name);
    d = pgmoneta_append(d, "/");
 
    return d;

@@ -1087,17 +1087,17 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
       memset(&security_messages[i], 0, SECURITY_BUFFER_SIZE);
    }
 
-   if (config->servers[server].host[0] == '/')
+   if (config->common.servers[server].host[0] == '/')
    {
       char pgsql[MISC_LENGTH];
 
       memset(&pgsql, 0, sizeof(pgsql));
-      snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->servers[server].port);
-      ret = pgmoneta_connect_unix_socket(config->servers[server].host, &pgsql[0], &server_fd);
+      snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->common.servers[server].port);
+      ret = pgmoneta_connect_unix_socket(config->common.servers[server].host, &pgsql[0], &server_fd);
    }
    else
    {
-      ret = pgmoneta_connect(config->servers[server].host, config->servers[server].port, &server_fd);
+      ret = pgmoneta_connect(config->common.servers[server].host, config->common.servers[server].port, &server_fd);
    }
 
    if (ret != 0)
@@ -1132,11 +1132,11 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
          goto error;
       }
 
-      pgmoneta_log_trace("%s: Key file @ %s", config->servers[server].name, config->servers[server].tls_key_file);
-      pgmoneta_log_trace("%s: Certificate file @ %s", config->servers[server].name, config->servers[server].tls_cert_file);
-      pgmoneta_log_trace("%s: CA file @ %s", config->servers[server].name, config->servers[server].tls_ca_file);
+      pgmoneta_log_trace("%s: Key file @ %s", config->common.servers[server].name, config->common.servers[server].tls_key_file);
+      pgmoneta_log_trace("%s: Certificate file @ %s", config->common.servers[server].name, config->common.servers[server].tls_cert_file);
+      pgmoneta_log_trace("%s: CA file @ %s", config->common.servers[server].name, config->common.servers[server].tls_ca_file);
 
-      if (create_ssl_client(ctx, config->servers[server].tls_key_file, config->servers[server].tls_cert_file, config->servers[server].tls_ca_file, server_fd, &c_ssl))
+      if (create_ssl_client(ctx, config->common.servers[server].tls_key_file, config->common.servers[server].tls_cert_file, config->common.servers[server].tls_ca_file, server_fd, &c_ssl))
       {
          goto error;
       }
@@ -1736,11 +1736,11 @@ get_admin_password(char* username)
 
    config = (struct main_configuration*)shmem;
 
-   for (int i = 0; i < config->number_of_admins; i++)
+   for (int i = 0; i < config->common.number_of_admins; i++)
    {
-      if (!strcmp(&config->admins[i].username[0], username))
+      if (!strcmp(&config->common.admins[i].username[0], username))
       {
-         return &config->admins[i].password[0];
+         return &config->common.admins[i].password[0];
       }
    }
 

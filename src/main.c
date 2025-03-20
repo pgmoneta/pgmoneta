@@ -377,9 +377,9 @@ main(int argc, char** argv)
       }
       else if (ret == 3)
       {
-         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
 #ifdef HAVE_LINUX
-         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
 #endif
          goto error;
       }
@@ -416,9 +416,9 @@ main(int argc, char** argv)
       }
       else if (ret == 3)
       {
-         warnx("pgmoneta: ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
+         warnx("pgmoneta: ADMINS: Too many admins defined %d (max %d)", config->common.number_of_admins, NUMBER_OF_ADMINS);
 #ifdef HAVE_LINUX
-         sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
+         sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->common.number_of_admins, NUMBER_OF_ADMINS);
 #endif
          goto error;
       }
@@ -686,8 +686,8 @@ main(int argc, char** argv)
    pgmoneta_log_debug("libev engine: %s", pgmoneta_libev_engine(ev_backend(main_loop)));
    pgmoneta_log_debug("%s", OpenSSL_version(OPENSSL_VERSION));
    pgmoneta_log_debug("Configuration size: %lu", shmem_size);
-   pgmoneta_log_debug("Known users: %d", config->number_of_users);
-   pgmoneta_log_debug("Known admins: %d", config->number_of_admins);
+   pgmoneta_log_debug("Known users: %d", config->common.number_of_users);
+   pgmoneta_log_debug("Known admins: %d", config->common.number_of_admins);
 
    pgmoneta_os_kernel_version(&os, &kernel_major, &kernel_minor, &kernel_patch);
 
@@ -860,9 +860,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (!offline)
       {
          srv = -1;
-         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+         for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
          {
-            if (!strcmp(config->servers[i].name, server))
+            if (!strcmp(config->common.servers[i].name, server))
             {
                srv = i;
             }
@@ -885,7 +885,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
                pgmoneta_json_clone(payload, &pyl);
 
-               pgmoneta_set_proc_title(1, ai->argv, "backup", config->servers[srv].name);
+               pgmoneta_set_proc_title(1, ai->argv, "backup", config->common.servers[srv].name);
                pgmoneta_backup(client_fd, srv, compression, encryption, pyl);
             }
          }
@@ -909,9 +909,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -934,7 +934,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "list-backup", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "list-backup", config->common.servers[srv].name);
             pgmoneta_list_backup(client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -950,9 +950,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -975,7 +975,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "delete", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "delete", config->common.servers[srv].name);
             pgmoneta_delete_backup(client_fd, srv, compression, encryption, pyl);
             pgmoneta_delete_wal(srv);
          }
@@ -992,9 +992,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1017,7 +1017,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "restore", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "restore", config->common.servers[srv].name);
             pgmoneta_restore(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1033,9 +1033,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1058,7 +1058,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "verify", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "verify", config->common.servers[srv].name);
             pgmoneta_verify(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1074,9 +1074,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1099,7 +1099,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "archive", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "archive", config->common.servers[srv].name);
             pgmoneta_archive(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1267,9 +1267,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1292,7 +1292,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "retain", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "retain", config->common.servers[srv].name);
             pgmoneta_retain_backup(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1308,9 +1308,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1333,7 +1333,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "expunge", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "expunge", config->common.servers[srv].name);
             pgmoneta_expunge_backup(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1479,9 +1479,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1504,7 +1504,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "info", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "info", config->common.servers[srv].name);
             pgmoneta_info_request(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1520,9 +1520,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, server))
+         if (!strcmp(config->common.servers[i].name, server))
          {
             srv = i;
          }
@@ -1545,7 +1545,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "annotate", config->servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "annotate", config->common.servers[srv].name);
             pgmoneta_annotate_request(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1766,7 +1766,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       return;
    }
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       /* Compression is always in a fork() */
       if (!fork())
@@ -1774,11 +1774,11 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
          bool active = false;
          char* d = NULL;
 
-         pgmoneta_set_proc_title(1, argv_ptr, "wal", config->servers[i].name);
+         pgmoneta_set_proc_title(1, argv_ptr, "wal", config->common.servers[i].name);
 
          shutdown_ports();
 
-         if (atomic_compare_exchange_strong(&config->servers[i].wal, &active, true))
+         if (atomic_compare_exchange_strong(&config->common.servers[i].wal, &active, true))
          {
             d = pgmoneta_get_server_wal(i);
 
@@ -1806,7 +1806,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
             free(d);
 
-            atomic_store(&config->servers[i].wal, false);
+            atomic_store(&config->common.servers[i].wal, false);
          }
 
          exit(0);
@@ -1850,11 +1850,11 @@ valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       pgmoneta_start_logging();
       pgmoneta_memory_init();
 
-      for (int i = 0; i < config->number_of_servers; i++)
+      for (int i = 0; i < config->common.number_of_servers; i++)
       {
-         pgmoneta_log_trace("Valid - Server %d Valid %d WAL %d", i, config->servers[i].valid, config->servers[i].wal_streaming);
+         pgmoneta_log_trace("Valid - Server %d Valid %d WAL %d", i, config->common.servers[i].valid, config->common.servers[i].wal_streaming);
 
-         if (keep_running && !config->servers[i].valid)
+         if (keep_running && !config->common.servers[i].valid)
          {
             pgmoneta_server_info(i);
          }
@@ -1882,23 +1882,23 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       return;
    }
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d CHECKSUMS %d SUMMARIZE_WAL %d",
-                         i, config->servers[i].valid, config->servers[i].wal_streaming,
-                         config->servers[i].checksums, config->servers[i].summarize_wal);
+                         i, config->common.servers[i].valid, config->common.servers[i].wal_streaming,
+                         config->common.servers[i].checksums, config->common.servers[i].summarize_wal);
 
-      if (keep_running && !config->servers[i].wal_streaming)
+      if (keep_running && !config->common.servers[i].wal_streaming)
       {
          start = false;
 
-         if (strlen(config->servers[i].follow) == 0)
+         if (strlen(config->common.servers[i].follow) == 0)
          {
             follow = -1;
 
-            for (int j = 0; follow == -1 && j < config->number_of_servers; j++)
+            for (int j = 0; follow == -1 && j < config->common.number_of_servers; j++)
             {
-               if (!strcmp(config->servers[j].follow, config->servers[i].name))
+               if (!strcmp(config->common.servers[j].follow, config->common.servers[i].name))
                {
                   follow = j;
                }
@@ -1908,16 +1908,16 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
             {
                start = true;
             }
-            else if (!config->servers[follow].wal_streaming)
+            else if (!config->common.servers[follow].wal_streaming)
             {
                start = true;
             }
          }
          else
          {
-            for (int j = 0; !start && j < config->number_of_servers; j++)
+            for (int j = 0; !start && j < config->common.number_of_servers; j++)
             {
-               if (!strcmp(config->servers[i].follow, config->servers[j].name) && !config->servers[j].wal_streaming)
+               if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name) && !config->common.servers[j].wal_streaming)
                {
                   start = true;
                }
@@ -2057,9 +2057,9 @@ init_receivewals(void)
 
    config = (struct main_configuration*)shmem;
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      if (strlen(config->servers[i].follow) == 0)
+      if (strlen(config->common.servers[i].follow) == 0)
       {
          pid_t pid;
 
@@ -2105,13 +2105,13 @@ init_replication_slots(void)
 
    pgmoneta_memory_init();
 
-   for (int srv = 0; srv < config->number_of_servers; srv++)
+   for (int srv = 0; srv < config->common.number_of_servers; srv++)
    {
       usr = -1;
 
-      for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+      for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
       {
-         if (!strcmp(config->servers[srv].username, config->users[i].username))
+         if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
          {
             usr = i;
          }
@@ -2119,10 +2119,10 @@ init_replication_slots(void)
 
       if (usr != -1)
       {
-         create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
-                       (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
+         create_slot = config->common.servers[srv].create_slot == CREATE_SLOT_YES ||
+                       (config->create_slot == CREATE_SLOT_YES && config->common.servers[srv].create_slot != CREATE_SLOT_NO);
          socket = 0;
-         auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket);
+         auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket);
 
          if (auth == AUTH_SUCCESS)
          {
@@ -2130,37 +2130,37 @@ init_replication_slots(void)
 
             if (!pgmoneta_server_valid(srv))
             {
-               pgmoneta_log_fatal("Could not get version for server %s", config->servers[srv].name);
+               pgmoneta_log_fatal("Could not get version for server %s", config->common.servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
-            if (config->servers[srv].version < POSTGRESQL_MIN_VERSION)
+            if (config->common.servers[srv].version < POSTGRESQL_MIN_VERSION)
             {
-               pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->servers[srv].name);
+               pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->common.servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
-            if (config->servers[srv].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
-                                                      config->compression_type == COMPRESSION_SERVER_ZSTD ||
-                                                      config->compression_type == COMPRESSION_SERVER_LZ4))
+            if (config->common.servers[srv].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
+                                                             config->compression_type == COMPRESSION_SERVER_ZSTD ||
+                                                             config->compression_type == COMPRESSION_SERVER_LZ4))
             {
-               pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->servers[srv].name);
+               pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->common.servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
-            if (config->servers[srv].version >= 17 && !config->servers[srv].summarize_wal)
+            if (config->common.servers[srv].version >= 17 && !config->common.servers[srv].summarize_wal)
             {
                pgmoneta_log_fatal("PostgreSQL %d or higher requires summarize_wal for server %s",
-                                  config->servers[srv].version, config->servers[srv].name);
+                                  config->common.servers[srv].version, config->common.servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
             /* Verify replication slot */
-            slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, ssl, socket);
+            slot_status = verify_replication_slot(config->common.servers[srv].wal_slot, srv, ssl, socket);
             if (slot_status == VALID_SLOT)
             {
                /* Ok */
@@ -2169,19 +2169,19 @@ init_replication_slots(void)
             {
                if (slot_status == SLOT_NOT_FOUND)
                {
-                  pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
+                  pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->common.servers[srv].wal_slot, config->common.servers[srv].name);
                   ret = 1;
                }
                else if (slot_status == INCORRECT_SLOT_TYPE)
                {
-                  pgmoneta_log_fatal("Replication slot '%s' should be physical", config->servers[srv].wal_slot);
+                  pgmoneta_log_fatal("Replication slot '%s' should be physical", config->common.servers[srv].wal_slot);
                   ret = 1;
                }
             }
          }
          else
          {
-            pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
+            pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[srv].name);
             ret = 1;
          }
 
@@ -2191,27 +2191,27 @@ init_replication_slots(void)
 
          if (create_slot && slot_status == SLOT_NOT_FOUND)
          {
-            auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
+            auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, true, &ssl, &socket);
 
             if (auth == AUTH_SUCCESS)
             {
-               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, config->servers[srv].wal_slot);
+               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->common.servers[srv].name, config->common.servers[srv].wal_slot);
 
-               pgmoneta_create_replication_slot_message(config->servers[srv].wal_slot, &slot_request_msg, config->servers[srv].version);
+               pgmoneta_create_replication_slot_message(config->common.servers[srv].wal_slot, &slot_request_msg, config->common.servers[srv].version);
                if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
                {
                   if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                   {
-                     pgmoneta_log_info("Created replication slot %s on %s", config->servers[srv].wal_slot, config->servers[srv].name);
+                     pgmoneta_log_info("Created replication slot %s on %s", config->common.servers[srv].wal_slot, config->common.servers[srv].name);
                   }
                   else
                   {
-                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->servers[srv].name);
+                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->common.servers[srv].name);
                   }
                }
                else
                {
-                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->servers[srv].name);
+                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->common.servers[srv].name);
                }
 
                pgmoneta_free_message(slot_request_msg);
@@ -2222,7 +2222,7 @@ init_replication_slots(void)
             }
             else
             {
-               pgmoneta_log_error("Authentication failed for user on %s", config->servers[srv].name);
+               pgmoneta_log_error("Authentication failed for user on %s", config->common.servers[srv].name);
             }
 
 server_done:
@@ -2232,7 +2232,7 @@ server_done:
       }
       else
       {
-         pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
+         pgmoneta_log_error("Invalid user for %s", config->common.servers[srv].name);
       }
    }
 
@@ -2255,7 +2255,7 @@ verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket)
    pgmoneta_create_search_replication_slot_message(slot_name, &query);
    if (pgmoneta_query_execute(ssl, socket, query, &response) || response == NULL)
    {
-      pgmoneta_log_error("Could not execute verify replication slot query for %s", config->servers[srv].name);
+      pgmoneta_log_error("Could not execute verify replication slot query for %s", config->common.servers[srv].name);
    }
    else
    {

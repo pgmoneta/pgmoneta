@@ -870,7 +870,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
    if (id == NULL)
    {
-      pgmoneta_log_warn("No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_log_warn("No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
 
@@ -879,7 +879,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
    if (pgmoneta_get_backup(root, id, &bck))
    {
-      pgmoneta_log_error("Unable to get backup for %s/%s", config->servers[server].name, id);
+      pgmoneta_log_error("Unable to get backup for %s/%s", config->common.servers[server].name, id);
       goto error;
    }
 
@@ -1420,7 +1420,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    if (bck == NULL)
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Info: No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_log_warn("Info: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
 
@@ -1497,7 +1497,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("Info: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
+   pgmoneta_log_info("Info: %s/%s (Elapsed: %s)", config->common.servers[server].name, bck->label, elapsed);
 
    pgmoneta_json_destroy(payload);
 
@@ -1690,7 +1690,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("Annotate: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
+   pgmoneta_log_info("Annotate: %s/%s (Elapsed: %s)", config->common.servers[server].name, bck->label, elapsed);
 
    pgmoneta_json_destroy(payload);
 

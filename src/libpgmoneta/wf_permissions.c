@@ -109,7 +109,7 @@ permissions_execute_backup(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Permissions (backup): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Permissions (backup): %s/%s", config->common.servers[server].name, label);
 
    path = pgmoneta_get_server_backup_identifier_data(server, label);
 
@@ -151,12 +151,12 @@ permissions_execute_restore(char* name, struct art* nodes)
    {
       path = pgmoneta_append(path, "/");
    }
-   path = pgmoneta_append(path, config->servers[server].name);
+   path = pgmoneta_append(path, config->common.servers[server].name);
    path = pgmoneta_append(path, "-");
    path = pgmoneta_append(path, label);
    path = pgmoneta_append(path, "/");
 
-   pgmoneta_log_debug("Permissions (restore): %s/%s at %s", config->servers[server].name, label, path);
+   pgmoneta_log_debug("Permissions (restore): %s/%s at %s", config->common.servers[server].name, label, path);
 
    pgmoneta_permission_recursive(path);
 
@@ -195,14 +195,14 @@ permissions_execute_archive(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Permissions (archive): %s/%s", config->servers[server].name, label);
+   pgmoneta_log_debug("Permissions (archive): %s/%s", config->common.servers[server].name, label);
 
    path = pgmoneta_append(path, (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT));
    if (!pgmoneta_ends_with(path, "/"))
    {
       path = pgmoneta_append(path, "/");
    }
-   path = pgmoneta_append(path, config->servers[server].name);
+   path = pgmoneta_append(path, config->common.servers[server].name);
    path = pgmoneta_append(path, "-");
    path = pgmoneta_append(path, label);
    path = pgmoneta_append(path, ".tar");

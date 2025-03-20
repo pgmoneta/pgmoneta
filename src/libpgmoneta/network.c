@@ -700,9 +700,9 @@ pgmoneta_get_network_max_rate(int server)
 
    config = (struct main_configuration*)shmem;
 
-   if (config->servers[server].network_max_rate != -1)
+   if (config->common.servers[server].network_max_rate != -1)
    {
-      return config->servers[server].network_max_rate;
+      return config->common.servers[server].network_max_rate;
    }
 
    return config->network_max_rate;

@@ -124,7 +124,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 
    if (!pgmoneta_art_contains_key(nodes, USER_SERVER))
    {
-      if (pgmoneta_art_insert(nodes, USER_SERVER, (uintptr_t)config->servers[server].name, ValueString))
+      if (pgmoneta_art_insert(nodes, USER_SERVER, (uintptr_t)config->common.servers[server].name, ValueString))
       {
          goto error;
       }
@@ -153,7 +153,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
       {
          server_base = pgmoneta_append(server_base, "/");
       }
-      server_base = pgmoneta_append(server_base, config->servers[server].name);
+      server_base = pgmoneta_append(server_base, config->common.servers[server].name);
       server_base = pgmoneta_append(server_base, "/");
 
       if (pgmoneta_art_insert(nodes, NODE_SERVER_BASE, (uintptr_t)server_base, ValueString))
@@ -263,7 +263,7 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
       {
          if (client_fd > 0)
          {
-            pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                                get_error_code(current->type, SETUP), current->name(),
                                                compression, encryption, payload);
          }
@@ -280,7 +280,7 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
       {
          if (client_fd > 0)
          {
-            pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                                get_error_code(current->type, EXECUTE), current->name(),
                                                compression, encryption, payload);
          }
@@ -297,7 +297,7 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
       {
          if (client_fd > 0)
          {
-            pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                                get_error_code(current->type, TEARDOWN), current->name(),
                                                compression, encryption, payload);
          }
@@ -363,7 +363,7 @@ pgmoneta_common_setup(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("%s (setup): %s/%s", name, config->servers[server].name, label);
+   pgmoneta_log_debug("%s (setup): %s/%s", name, config->common.servers[server].name, label);
 
    return 0;
 }
@@ -394,7 +394,7 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("%s (teardown): %s/%s", name, config->servers[server].name, label);
+   pgmoneta_log_debug("%s (teardown): %s/%s", name, config->common.servers[server].name, label);
 
    return 0;
 }

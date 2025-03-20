@@ -148,7 +148,7 @@ basebackup_execute(char* name, struct art* nodes)
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Basebackup (execute): %s", config->servers[server].name, label);
+   pgmoneta_log_debug("Basebackup (execute): %s", config->common.servers[server].name, label);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
    incremental = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_BASE);
@@ -186,17 +186,17 @@ basebackup_execute(char* name, struct art* nodes)
    }
    usr = -1;
    // find the corresponding user's index of the given server
-   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
+   for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      if (!strcmp(config->servers[server].username, config->users[i].username))
+      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
       {
          usr = i;
       }
    }
    // establish a connection, with replication flag set
-   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
+   if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
    {
-      pgmoneta_log_info("Invalid credentials for %s", config->users[usr].username);
+      pgmoneta_log_info("Invalid credentials for %s", config->common.users[usr].username);
       goto error;
    }
 
@@ -210,9 +210,9 @@ basebackup_execute(char* name, struct art* nodes)
       }
    }
    memset(version, 0, sizeof(version));
-   snprintf(version, sizeof(version), "%d", config->servers[server].version);
+   snprintf(version, sizeof(version), "%d", config->common.servers[server].version);
    memset(minor_version, 0, sizeof(minor_version));
-   snprintf(minor_version, sizeof(minor_version), "%d", config->servers[server].minor_version);
+   snprintf(minor_version, sizeof(minor_version), "%d", config->common.servers[server].minor_version);
 
    pgmoneta_create_query_message("SELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;", &tablespace_msg);
    if (pgmoneta_query_execute(ssl, socket, tablespace_msg, &response) || response == NULL)
@@ -250,9 +250,9 @@ basebackup_execute(char* name, struct art* nodes)
    pgmoneta_close_ssl(ssl);
    pgmoneta_disconnect(socket);
 
-   if (pgmoneta_server_authenticate(server, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket) != AUTH_SUCCESS)
+   if (pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username, config->common.users[usr].password, true, &ssl, &socket) != AUTH_SUCCESS)
    {
-      pgmoneta_log_info("Invalid credentials for %s", config->users[usr].username);
+      pgmoneta_log_info("Invalid credentials for %s", config->common.users[usr].username);
       goto error;
    }
 
@@ -263,14 +263,14 @@ basebackup_execute(char* name, struct art* nodes)
       // send UPLOAD_MANIFEST
       if (send_upload_manifest(ssl, socket))
       {
-         pgmoneta_log_error("Fail to send UPLOAD_MANIFEST to server %s", config->servers[server].name);
+         pgmoneta_log_error("Fail to send UPLOAD_MANIFEST to server %s", config->common.servers[server].name);
          goto error;
       }
       manifest_path = pgmoneta_append(NULL, incremental);
       manifest_path = pgmoneta_append(manifest_path, "data/backup_manifest");
       if (upload_manifest(ssl, socket, manifest_path))
       {
-         pgmoneta_log_error("Fail to upload manifest to server %s", config->servers[server].name);
+         pgmoneta_log_error("Fail to upload manifest to server %s", config->common.servers[server].name);
          goto error;
       }
       // receive and ignore the result set for UPLOAD_MANIFEST
@@ -285,13 +285,13 @@ basebackup_execute(char* name, struct art* nodes)
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
 
-   hash = config->servers[server].manifest;
+   hash = config->common.servers[server].manifest;
    if (hash == HASH_ALGORITHM_DEFAULT)
    {
       hash = config->manifest;
    }
 
-   pgmoneta_create_base_backup_message(config->servers[server].version, incremental != NULL, tag, true, hash,
+   pgmoneta_create_base_backup_message(config->common.servers[server].version, incremental != NULL, tag, true, hash,
                                        config->compression_type, config->compression_level,
                                        &basebackup_msg);
 
@@ -316,11 +316,11 @@ basebackup_execute(char* name, struct art* nodes)
    backup_base = pgmoneta_get_server_backup_identifier(server, label);
 
    pgmoneta_mkdir(backup_base);
-   if (config->servers[server].version < 15)
+   if (config->common.servers[server].version < 15)
    {
       if (pgmoneta_receive_archive_files(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
-         pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
+         pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
          pgmoneta_create_info(backup_base, label, 0);
 
@@ -331,7 +331,7 @@ basebackup_execute(char* name, struct art* nodes)
    {
       if (pgmoneta_receive_archive_stream(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
-         pgmoneta_log_error("Backup: Could not backup %s", config->servers[server].name);
+         pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
          pgmoneta_create_info(backup_base, label, 0);
 
@@ -386,7 +386,7 @@ basebackup_execute(char* name, struct art* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
+   pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    backup_data = pgmoneta_get_server_backup_identifier_data(server, label);
 

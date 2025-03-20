@@ -80,7 +80,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    atomic_fetch_add(&config->active_archives, 1);
-   atomic_fetch_add(&config->servers[server].archiving, 1);
+   atomic_fetch_add(&config->common.servers[server].archiving, 1);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -104,16 +104,16 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                          MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
 
    if (backup == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
+      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
 
@@ -122,7 +122,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       real_directory = pgmoneta_append_char(real_directory, '/');
    }
-   real_directory = pgmoneta_append(real_directory, config->servers[server].name);
+   real_directory = pgmoneta_append(real_directory, config->common.servers[server].name);
    real_directory = pgmoneta_append_char(real_directory, '-');
    real_directory = pgmoneta_append(real_directory, backup->label);
 
@@ -149,7 +149,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
          goto error;
       }
@@ -177,7 +177,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          filename = pgmoneta_append(filename, ".aes");
       }
 
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
 
@@ -185,15 +185,15 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, identifier);
+         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->common.servers[server].name, identifier);
 
          goto error;
       }
 
       elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
+      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, elapsed);
    }
 
    pgmoneta_art_destroy(nodes);
@@ -204,7 +204,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->servers[server].archiving, 1);
+   atomic_fetch_sub(&config->common.servers[server].archiving, 1);
    atomic_fetch_sub(&config->active_archives, 1);
 
    pgmoneta_stop_logging();
@@ -225,7 +225,7 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->servers[server].archiving, 1);
+   atomic_fetch_sub(&config->common.servers[server].archiving, 1);
    atomic_fetch_sub(&config->active_archives, 1);
 
    pgmoneta_stop_logging();

@@ -1401,17 +1401,17 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_server The retention of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_server gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_retention_server{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
       data = pgmoneta_append(data, "parameter= \"days\"");
       data = pgmoneta_append(data, "} ");
-      retention = config->servers[i].retention_days;
+      retention = config->common.servers[i].retention_days;
       if (retention <= 0)
       {
          retention = config->retention_days;
@@ -1421,12 +1421,12 @@ general_information(int client_fd)
 
       data = pgmoneta_append(data, "pgmoneta_retention_server{");
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
       data = pgmoneta_append(data, "parameter= \"weeks\"");
       data = pgmoneta_append(data, "} ");
-      retention = config->servers[i].retention_weeks;
+      retention = config->common.servers[i].retention_weeks;
       if (retention <= 0)
       {
          retention = config->retention_weeks;
@@ -1436,12 +1436,12 @@ general_information(int client_fd)
 
       data = pgmoneta_append(data, "pgmoneta_retention_server{");
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
       data = pgmoneta_append(data, "parameter= \"months\"");
       data = pgmoneta_append(data, "} ");
-      retention = config->servers[i].retention_months;
+      retention = config->common.servers[i].retention_months;
       if (retention <= 0)
       {
          retention = config->retention_months;
@@ -1451,12 +1451,12 @@ general_information(int client_fd)
 
       data = pgmoneta_append(data, "pgmoneta_retention_server{");
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
       data = pgmoneta_append(data, "parameter= \"years\"");
       data = pgmoneta_append(data, "} ");
-      retention = config->servers[i].retention_years;
+      retention = config->common.servers[i].retention_years;
       if (retention <= 0)
       {
          retention = config->retention_years;
@@ -1521,12 +1521,12 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping The disk space used for WAL shipping for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_wal_shipping_wal(i);
@@ -1550,12 +1550,12 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_used_space The disk space used for WAL shipping of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_used_space gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_used_space{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_wal_shipping(i);
@@ -1578,12 +1578,12 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_free_space The free disk space for WAL shipping of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_free_space gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_free_space{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_wal_shipping(i);
@@ -1607,12 +1607,12 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_total_space The total disk space for WAL shipping of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_total_space gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_shipping_total_space{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_wal_shipping(i);
@@ -1640,12 +1640,12 @@ general_information(int client_fd)
    /* hot_standby */
    data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby The disk space used for hot standby for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_hot_standby{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_hot_standby(i);
@@ -1669,12 +1669,12 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_free_space The free disk space for hot standby of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_free_space gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_hot_standby_free_space{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_hot_standby(i);
@@ -1698,12 +1698,12 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_total_space The total disk space for hot standby of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_total_space gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_hot_standby_total_space{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       d = pgmoneta_get_server_hot_standby(i);
@@ -1727,15 +1727,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline The current timeline a server is on\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline counter\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_timeline{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_int(data, config->servers[i].cur_timeline);
+      data = pgmoneta_append_int(data, config->common.servers[i].cur_timeline);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1743,7 +1743,7 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_parent_tli The parent timeline of a timeline on a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_parent_tli gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       struct timeline_history* history = NULL;
       struct timeline_history* curh = NULL;
@@ -1752,7 +1752,7 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_server_parent_tli{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\", ");
 
       data = pgmoneta_append(data, "tli=\"");
@@ -1763,14 +1763,14 @@ general_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      pgmoneta_get_timeline_history(i, config->servers[i].cur_timeline, &history);
+      pgmoneta_get_timeline_history(i, config->common.servers[i].cur_timeline, &history);
       curh = history;
       while (curh != NULL)
       {
          data = pgmoneta_append(data, "pgmoneta_server_parent_tli{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\", ");
 
          data = pgmoneta_append(data, "tli=\"");
@@ -1790,7 +1790,7 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline_switchpos The WAL switch position of a timeline on a server (showed in hex as a parameter)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline_switchpos gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       struct timeline_history* history = NULL;
       struct timeline_history* curh = NULL;
@@ -1799,7 +1799,7 @@ general_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_server_timeline_switchpos{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\", ");
 
       data = pgmoneta_append(data, "tli=\"1\", ");
@@ -1810,7 +1810,7 @@ general_information(int client_fd)
 
       data = pgmoneta_append(data, "\n");
 
-      pgmoneta_get_timeline_history(i, config->servers[i].cur_timeline, &history);
+      pgmoneta_get_timeline_history(i, config->common.servers[i].cur_timeline, &history);
       curh = history;
       while (curh != NULL)
       {
@@ -1821,7 +1821,7 @@ general_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_server_timeline_switchpos{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\", ");
 
          data = pgmoneta_append(data, "tli=\"");
@@ -1845,14 +1845,14 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_workers The numbeer of workers for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_workers gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      int workers = config->servers[i].workers != -1 ? config->servers[i].workers : config->workers;
+      int workers = config->common.servers[i].workers != -1 ? config->common.servers[i].workers : config->workers;
 
       data = pgmoneta_append(data, "pgmoneta_server_workers{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_int(data, workers);
@@ -1863,15 +1863,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_valid Is the server in a valid state\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_valid gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_valid{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->servers[i].valid);
+      data = pgmoneta_append_bool(data, config->common.servers[i].valid);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1879,15 +1879,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_streaming The WAL streaming status of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_streaming gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_wal_streaming{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);
+      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1895,15 +1895,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_operation_count The count of client operations of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_operation_count gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_operation_count{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_ulong(data, atomic_load(&config->servers[i].operation_count));
+      data = pgmoneta_append_ulong(data, atomic_load(&config->common.servers[i].operation_count));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1911,15 +1911,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_failed_operation_count The count of failed client operations of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_failed_operation_count gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_failed_operation_count{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_ulong(data, atomic_load(&config->servers[i].failed_operation_count));
+      data = pgmoneta_append_ulong(data, atomic_load(&config->common.servers[i].failed_operation_count));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -1927,18 +1927,18 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_last_operation_time The time of the latest client operation of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_operation_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_last_operation_time{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      if (atomic_load(&config->servers[i].operation_count) > 0)
+      if (atomic_load(&config->common.servers[i].operation_count) > 0)
       {
          memset(&time_str[0], 0, sizeof(time_str));
-         t = (time_t)atomic_load(&config->servers[i].last_operation_time);
+         t = (time_t)atomic_load(&config->common.servers[i].last_operation_time);
          time_info = localtime(&t);
          strftime(&time_str[0], sizeof(time_str), "%Y%m%d%H%M%S", time_info);
 
@@ -1955,18 +1955,18 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_last_failed_operation_time The time of the latest failed client operation of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_failed_operation_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_last_failed_operation_time{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      if (atomic_load(&config->servers[i].failed_operation_count) > 0)
+      if (atomic_load(&config->common.servers[i].failed_operation_count) > 0)
       {
          memset(&time_str[0], 0, sizeof(time_str));
-         t = (time_t)atomic_load(&config->servers[i].last_failed_operation_time);
+         t = (time_t)atomic_load(&config->common.servers[i].last_failed_operation_time);
          time_info = localtime(&t);
          strftime(&time_str[0], sizeof(time_str), "%Y%m%d%H%M%S", time_info);
 
@@ -1983,15 +1983,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_checksums Are checksums enabled\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_checksums gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_checksums{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      if (config->servers[i].checksums)
+      if (config->common.servers[i].checksums)
       {
          data = pgmoneta_append_int(data, 1);
       }
@@ -2006,15 +2006,15 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_server_summarize_wal Is summarize_wal enabled\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_summarize_wal gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_server_summarize_wal{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      if (config->servers[i].summarize_wal)
+      if (config->common.servers[i].summarize_wal)
       {
          data = pgmoneta_append_int(data, 1);
       }
@@ -2029,19 +2029,19 @@ general_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_extension The version of pgmoneta extension\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_extension gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_extension{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
       data = pgmoneta_append(data, "version=\"");
-      data = pgmoneta_append(data, config->servers[i].ext_version);
+      data = pgmoneta_append(data, config->common.servers[i].ext_version);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, "} ");
-      if (config->servers[i].ext_valid)
+      if (config->common.servers[i].ext_valid)
       {
          data = pgmoneta_append_int(data, 1);
       }
@@ -2078,7 +2078,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_oldest The oldest backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_oldest gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2090,7 +2090,7 @@ backup_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_backup_oldest{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       valid = false;
@@ -2130,7 +2130,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_newest The newest backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2142,7 +2142,7 @@ backup_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_backup_newest{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       valid = false;
@@ -2174,7 +2174,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_count The number of valid backups for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_count gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2186,7 +2186,7 @@ backup_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_backup_count{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       valid_count = 0;
@@ -2222,7 +2222,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup Is the backup valid for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2240,7 +2240,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2256,7 +2256,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2282,7 +2282,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_version The version of postgresql for a backup\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_version gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2300,7 +2300,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_version{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", major=\"");
@@ -2318,7 +2318,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_version{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2344,7 +2344,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_total_elapsed_time The backup in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_total_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2362,7 +2362,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_total_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2378,7 +2378,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_total_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2396,7 +2396,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_basebackup_elapsed_time The duration for basebackup in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_basebackup_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2414,7 +2414,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_basebackup_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2430,7 +2430,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_basebackup_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2448,7 +2448,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_manifest_elapsed_time The duration for manifest in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_manifest_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2466,7 +2466,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_manifest_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2482,7 +2482,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_manifest_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2500,7 +2500,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_zstd_elapsed_time The duration for zstd compression in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_zstd_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2518,7 +2518,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2534,7 +2534,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2552,7 +2552,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_gzip_elapsed_time The duration for gzip compression in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_gzip_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2570,7 +2570,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2586,7 +2586,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2604,7 +2604,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_bzip2_elapsed_time The duration for bzip2 compression in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_bzip2_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2622,7 +2622,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2638,7 +2638,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2656,7 +2656,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_lz4_elapsed_time The duration for lz4 compression in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_lz4_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2674,7 +2674,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2690,7 +2690,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2708,7 +2708,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_encryption_elapsed_time The duration for encryption in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_encryption_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2726,7 +2726,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_encryption_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2742,7 +2742,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_encryption_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2760,7 +2760,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_linking_elapsed_time The duration for linking in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_linking_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2778,7 +2778,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_linking_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2794,7 +2794,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_linking_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2812,7 +2812,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_ssh_elapsed_time The duration for remote ssh in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_ssh_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2830,7 +2830,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2846,7 +2846,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2865,7 +2865,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_s3_elapsed_time The duration for remote_s3 in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_s3_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2883,7 +2883,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2899,7 +2899,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2918,7 +2918,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_azure_elapsed_time The duration for remote_azure in seconds for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_azure_elapsed_time gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2936,7 +2936,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_elapsed_time{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -2952,7 +2952,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_elapsed_time{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -2971,7 +2971,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_timeline The starting timeline of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_start_timeline gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -2989,7 +2989,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_start_timeline{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3005,7 +3005,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_start_timeline{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3023,7 +3023,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_end_timeline The ending timeline of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_end_timeline gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3041,7 +3041,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_end_timeline{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3057,7 +3057,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_end_timeline{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3075,7 +3075,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_start_walpos The starting WAL position of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_start_walpos gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3095,7 +3095,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_start_walpos{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", ");
@@ -3116,7 +3116,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_start_walpos{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\", ");
          data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
@@ -3134,7 +3134,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_checkpoint_walpos The checkpoint WAL position of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_checkpoint_walpos gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3154,7 +3154,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_checkpoint_walpos{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", ");
@@ -3175,7 +3175,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_checkpoint_walpos{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\", ");
          data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
@@ -3194,7 +3194,7 @@ backup_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_end_walpos The ending WAL position of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_end_walpos gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3214,7 +3214,7 @@ backup_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_end_walpos{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", ");
@@ -3235,7 +3235,7 @@ backup_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_end_walpos{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\", ");
          data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
@@ -3276,7 +3276,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_restore_newest_size The size of the newest restore for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_restore_newest_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3288,7 +3288,7 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_restore_newest_size{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       valid = false;
@@ -3328,7 +3328,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_newest_size The size of the newest backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3340,7 +3340,7 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_backup_newest_size{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       valid = false;
@@ -3380,7 +3380,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_restore_size The size of a restore for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_restore_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3398,7 +3398,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_restore_size{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3414,7 +3414,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_restore_size{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3440,7 +3440,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_restore_size_increment The size increment of a restore for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_restore_size_increment gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3458,7 +3458,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_restore_size_increment{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3481,7 +3481,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_restore_size_increment{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3507,7 +3507,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_size The size of a backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3525,7 +3525,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_size{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3541,7 +3541,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_size{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3567,7 +3567,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_ratio The ratio of backup size to restore size for each backup\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_ratio gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3585,7 +3585,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_ratio{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3608,7 +3608,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_ratio{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3634,7 +3634,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_throughput The throughput of the backup for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_throughput gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3652,7 +3652,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_throughput{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3674,7 +3674,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_throughput{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3700,7 +3700,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_basebackup_mbs The throughput of the basebackup for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_basebackup_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3718,7 +3718,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_basebackup_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3740,7 +3740,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_basebackup_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3766,7 +3766,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_manifest_mbs The throughput of the manifest for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_manifest_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3784,7 +3784,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_manifest_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3806,7 +3806,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_manifest_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3832,7 +3832,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_zstd_mbs The throughput of the zstd compression for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_zstd_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3850,7 +3850,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3872,7 +3872,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3898,7 +3898,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_gzip_mbs The throughput of the gzip compression for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_gzip_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3916,7 +3916,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -3938,7 +3938,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3964,7 +3964,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_bzip2_mbs The throughput of the bzip2 compression for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_bzip2_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -3982,7 +3982,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4004,7 +4004,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4030,7 +4030,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_compression_lz4_mbs The throughput of the lz4 compression for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_compression_lz4_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4048,7 +4048,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4070,7 +4070,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4096,7 +4096,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_encryption_mbs The throughput of the encryption for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_encryption_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4114,7 +4114,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_encryption_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4136,7 +4136,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_encryption_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4162,7 +4162,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_linking_mbs The throughput of the linking for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_linking_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4180,7 +4180,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_linking_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4202,7 +4202,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_linking_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4228,7 +4228,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_ssh_mbs The throughput of the remote_ssh for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_ssh_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4246,7 +4246,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4268,7 +4268,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4294,7 +4294,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_s3_mbs The throughput of the remote_s3 for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_s3_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4312,7 +4312,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4334,7 +4334,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4360,7 +4360,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_remote_azure_mbs The throughput of the remote_azure for a server (MB/s)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_remote_azure_mbs gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4378,7 +4378,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_mbs{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4400,7 +4400,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_mbs{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4426,7 +4426,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_retain Retain backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_retain gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4444,7 +4444,7 @@ size_information(int client_fd)
                data = pgmoneta_append(data, "pgmoneta_backup_retain{");
 
                data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->servers[i].name);
+               data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\",label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
@@ -4460,7 +4460,7 @@ size_information(int client_fd)
          data = pgmoneta_append(data, "pgmoneta_backup_retain{");
 
          data = pgmoneta_append(data, "name=\"");
-         data = pgmoneta_append(data, config->servers[i].name);
+         data = pgmoneta_append(data, config->common.servers[i].name);
          data = pgmoneta_append(data, "\",label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -4486,7 +4486,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_total_size The total size of the backups for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_total_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
 
@@ -4495,7 +4495,7 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_backup_total_size{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_ulong(data, size);
@@ -4516,7 +4516,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_total_size The total size of the WAL for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_total_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_wal(i);
 
@@ -4535,7 +4535,7 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_wal_total_size{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_ulong(data, size);
@@ -4556,7 +4556,7 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_total_size The total size for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_total_size gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server(i);
 
@@ -4574,7 +4574,7 @@ size_information(int client_fd)
       data = pgmoneta_append(data, "pgmoneta_total_size{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_ulong(data, size);
@@ -4588,14 +4588,14 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#HELP pgmoneta_active_backup Is there an active backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_active_backup gauge\n");
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_active_backup{");
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, atomic_load(&config->servers[i].backup));
+      data = pgmoneta_append_bool(data, atomic_load(&config->common.servers[i].backup));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -4604,14 +4604,14 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#HELP pgmoneta_active_backup Is there an active restore for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_active_restore gauge\n");
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_active_restore{");
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, atomic_load(&config->servers[i].restore));
+      data = pgmoneta_append_bool(data, atomic_load(&config->common.servers[i].restore));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -4620,14 +4620,14 @@ size_information(int client_fd)
    data = pgmoneta_append(data, "#HELP pgmoneta_active_archiving Is there an active archiving for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_active_archiving gauge\n");
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_active_backup{");
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, atomic_load(&config->servers[i].archiving));
+      data = pgmoneta_append_bool(data, atomic_load(&config->common.servers[i].archiving));
 
       data = pgmoneta_append(data, "\n");
    }
@@ -4635,19 +4635,19 @@ size_information(int client_fd)
 
    data = pgmoneta_append(data, "#HELP pgmoneta_current_wal_file The current streaming WAL filename of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_current_wal_file gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_current_wal_file{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\", ");
 
       data = pgmoneta_append(data, "file=\"");
-      data = pgmoneta_append(data, config->servers[i].current_wal_filename);
+      data = pgmoneta_append(data, config->common.servers[i].current_wal_filename);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);
+      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -4656,26 +4656,26 @@ size_information(int client_fd)
    // Append the WAL LSN of every server
    data = pgmoneta_append(data, "#HELP pgmoneta_current_wal_lsn The current WAL log sequence number\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_current_wal_lsn gauge\n");
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       data = pgmoneta_append(data, "pgmoneta_current_wal_lsn{");
 
       data = pgmoneta_append(data, "name=\"");
-      data = pgmoneta_append(data, config->servers[i].name);
+      data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\", ");
 
       data = pgmoneta_append(data, "lsn=\"");
-      if (!strcmp(config->servers[i].current_wal_lsn, ""))
+      if (!strcmp(config->common.servers[i].current_wal_lsn, ""))
       {
          data = pgmoneta_append(data, "0/0");
       }
       else
       {
-         data = pgmoneta_append(data, config->servers[i].current_wal_lsn);
+         data = pgmoneta_append(data, config->common.servers[i].current_wal_lsn);
       }
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->servers[i].wal_streaming);
+      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming);
 
       data = pgmoneta_append(data, "\n");
    }

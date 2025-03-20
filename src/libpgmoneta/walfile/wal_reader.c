@@ -213,13 +213,13 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    if (server == -1)
    {
-      config->servers[0].version = magic_value_to_postgres_version(long_header->std.xlp_magic);
-      server_config = &config->servers[0];
+      config->common.servers[0].version = magic_value_to_postgres_version(long_header->std.xlp_magic);
+      server_config = &config->common.servers[0];
    }
    else
    {
-      assert(config->servers[server].version == magic_value_to_postgres_version(long_header->std.xlp_magic));
-      server_config = &config->servers[server];
+      assert(config->common.servers[server].version == magic_value_to_postgres_version(long_header->std.xlp_magic));
+      server_config = &config->common.servers[server];
    }
 
    if (long_header->std.xlp_rem_len > 0)

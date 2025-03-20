@@ -124,19 +124,19 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       }
    }
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[srv].name, ValueString);
 
    if (backup_index == -1)
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, NAME, compression, encryption, payload);
-         pgmoneta_log_warn("Retain: No identifier for %s/%s", config->servers[srv].name, backup_id);
+         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, NAME, compression, encryption, payload);
+         pgmoneta_log_warn("Retain: No identifier for %s/%s", config->common.servers[srv].name, backup_id);
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, NAME, compression, encryption, payload);
-         pgmoneta_log_warn("Expunge: No identifier for %s/%s", config->servers[srv].name, backup_id);
+         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, NAME, compression, encryption, payload);
+         pgmoneta_log_warn("Expunge: No identifier for %s/%s", config->common.servers[srv].name, backup_id);
       }
 
       goto error;
@@ -179,7 +179,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("%s: %s/%s (Elapsed: %s)", prefix, config->servers[srv].name, backups[backup_index]->label, elapsed);
+   pgmoneta_log_info("%s: %s/%s (Elapsed: %s)", prefix, config->common.servers[srv].name, backups[backup_index]->label, elapsed);
 
    for (int i = 0; i < number_of_backups; i++)
    {

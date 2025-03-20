@@ -213,7 +213,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
                   {
-                     memcpy(&(config->servers[idx_server - 1]), &srv, sizeof(struct server));
+                     memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
                   }
                   else if (idx_server > NUMBER_OF_SERVERS)
                   {
@@ -1348,10 +1348,10 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
 
    if (strlen(srv.name) > 0)
    {
-      memcpy(&(config->servers[idx_server - 1]), &srv, sizeof(struct server));
+      memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
    }
 
-   config->number_of_servers = idx_server;
+   config->common.number_of_servers = idx_server;
 
    fclose(file);
 
@@ -1484,7 +1484,7 @@ pgmoneta_validate_main_configuration(void* shm)
       config->backlog = 16;
    }
 
-   if (config->number_of_servers <= 0)
+   if (config->common.number_of_servers <= 0)
    {
       pgmoneta_log_fatal("No servers defined");
       return 1;
@@ -1540,50 +1540,50 @@ pgmoneta_validate_main_configuration(void* shm)
       config->workers = 0;
    }
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      if (!strcmp(config->servers[i].name, "pgmoneta"))
+      if (!strcmp(config->common.servers[i].name, "pgmoneta"))
       {
          pgmoneta_log_fatal("pgmoneta is a reserved word for a host");
          return 1;
       }
 
-      if (!strcmp(config->servers[i].name, "all"))
+      if (!strcmp(config->common.servers[i].name, "all"))
       {
          pgmoneta_log_fatal("all is a reserved word for a host");
          return 1;
       }
 
-      if (strlen(config->servers[i].host) == 0)
+      if (strlen(config->common.servers[i].host) == 0)
       {
-         pgmoneta_log_fatal("No host defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No host defined for %s", config->common.servers[i].name);
          return 1;
       }
 
-      if (config->servers[i].port == 0)
+      if (config->common.servers[i].port == 0)
       {
-         pgmoneta_log_fatal("No port defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No port defined for %s", config->common.servers[i].name);
          return 1;
       }
 
-      if (strlen(config->servers[i].username) == 0)
+      if (strlen(config->common.servers[i].username) == 0)
       {
-         pgmoneta_log_fatal("No user defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No user defined for %s", config->common.servers[i].name);
          return 1;
       }
 
-      if (strlen(config->servers[i].wal_slot) == 0)
+      if (strlen(config->common.servers[i].wal_slot) == 0)
       {
-         pgmoneta_log_fatal("No WAL slot defined for %s", config->servers[i].name);
+         pgmoneta_log_fatal("No WAL slot defined for %s", config->common.servers[i].name);
          return 1;
       }
 
-      if (strlen(config->servers[i].follow) > 0)
+      if (strlen(config->common.servers[i].follow) > 0)
       {
          found = false;
-         for (int j = 0; !found && j < config->number_of_servers; j++)
+         for (int j = 0; !found && j < config->common.number_of_servers; j++)
          {
-            if (!strcmp(config->servers[i].follow, config->servers[j].name))
+            if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name))
             {
                found = true;
             }
@@ -1591,24 +1591,24 @@ pgmoneta_validate_main_configuration(void* shm)
 
          if (!found)
          {
-            pgmoneta_log_fatal("Invalid follow value for %s", config->servers[i].name);
+            pgmoneta_log_fatal("Invalid follow value for %s", config->common.servers[i].name);
             return 1;
          }
       }
 
-      if (config->servers[i].workers < -1)
+      if (config->common.servers[i].workers < -1)
       {
-         config->servers[i].workers = -1;
+         config->common.servers[i].workers = -1;
       }
 
-      if (config->servers[i].backup_max_rate < -1)
+      if (config->common.servers[i].backup_max_rate < -1)
       {
-         config->servers[i].backup_max_rate = -1;
+         config->common.servers[i].backup_max_rate = -1;
       }
 
-      if (config->servers[i].network_max_rate < -1)
+      if (config->common.servers[i].network_max_rate < -1)
       {
-         config->servers[i].network_max_rate = -1;
+         config->common.servers[i].network_max_rate = -1;
       }
    }
 
@@ -1690,8 +1690,8 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
          if (strlen(username) < MAX_USERNAME_LENGTH &&
              strlen(password) < MAX_PASSWORD_LENGTH)
          {
-            memcpy(&config->users[index].username, username, strlen(username));
-            memcpy(&config->users[index].password, password, strlen(password));
+            memcpy(&config->common.users[index].username, username, strlen(username));
+            memcpy(&config->common.users[index].password, password, strlen(password));
          }
          else
          {
@@ -1712,9 +1712,9 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
       trimmed_line = NULL;
    }
 
-   config->number_of_users = index;
+   config->common.number_of_users = index;
 
-   if (config->number_of_users > NUMBER_OF_USERS)
+   if (config->common.number_of_users > NUMBER_OF_USERS)
    {
       goto above;
    }
@@ -1777,19 +1777,19 @@ pgmoneta_validate_users_configuration(void* shm)
 
    config = (struct main_configuration*)shm;
 
-   if (config->number_of_users <= 0)
+   if (config->common.number_of_users <= 0)
    {
       pgmoneta_log_fatal("No users defined");
       return 1;
    }
 
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       bool found = false;
 
-      for (int j = 0; !found && j < config->number_of_users; j++)
+      for (int j = 0; !found && j < config->common.number_of_users; j++)
       {
-         if (!strcmp(config->servers[i].username, config->users[j].username))
+         if (!strcmp(config->common.servers[i].username, config->common.users[j].username))
          {
             found = true;
          }
@@ -1797,7 +1797,7 @@ pgmoneta_validate_users_configuration(void* shm)
 
       if (!found)
       {
-         pgmoneta_log_fatal("Unknown user (\'%s\') defined for %s", config->servers[i].username, config->servers[i].name);
+         pgmoneta_log_fatal("Unknown user (\'%s\') defined for %s", config->common.servers[i].username, config->common.servers[i].name);
          return 1;
       }
    }
@@ -1881,8 +1881,8 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
          if (strlen(username) < MAX_USERNAME_LENGTH &&
              strlen(password) < MAX_PASSWORD_LENGTH)
          {
-            memcpy(&config->admins[index].username, username, strlen(username));
-            memcpy(&config->admins[index].password, password, strlen(password));
+            memcpy(&config->common.admins[index].username, username, strlen(username));
+            memcpy(&config->common.admins[index].password, password, strlen(password));
          }
          else
          {
@@ -1903,9 +1903,9 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
       trimmed_line = NULL;
    }
 
-   config->number_of_admins = index;
+   config->common.number_of_admins = index;
 
-   if (config->number_of_admins > NUMBER_OF_ADMINS)
+   if (config->common.number_of_admins > NUMBER_OF_ADMINS)
    {
       goto above;
    }
@@ -1968,11 +1968,11 @@ pgmoneta_validate_admins_configuration(void* shm)
 
    config = (struct main_configuration*)shm;
 
-   if (config->management > 0 && config->number_of_admins == 0)
+   if (config->management > 0 && config->common.number_of_admins == 0)
    {
       pgmoneta_log_warn("Remote management enabled, but no admins are defined");
    }
-   else if (config->management == 0 && config->number_of_admins > 0)
+   else if (config->management == 0 && config->common.number_of_admins > 0)
    {
       pgmoneta_log_warn("Remote management disabled, but admins are defined");
    }
@@ -2132,37 +2132,37 @@ add_servers_configuration_response(struct json* res)
    config = (struct main_configuration*)shmem;
 
    // JSON of server configuration
-   for (int i = 0; i < config->number_of_servers; i++)
+   for (int i = 0; i < config->common.number_of_servers; i++)
    {
       struct json* server_conf = NULL;
-      char* ret = get_retention_string(config->servers[i].retention_days, config->servers[i].retention_weeks, config->servers[i].retention_months, config->servers[i].retention_years);
+      char* ret = get_retention_string(config->common.servers[i].retention_days, config->common.servers[i].retention_weeks, config->common.servers[i].retention_months, config->common.servers[i].retention_years);
 
       if (pgmoneta_json_create(&server_conf))
       {
          return;
       }
 
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->servers[i].host, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PORT, (uintptr_t)config->servers[i].port, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_USER, (uintptr_t)config->servers[i].username, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SLOT, (uintptr_t)config->servers[i].wal_slot, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->servers[i].create_slot, ValueInt32);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_FOLLOW, (uintptr_t)config->servers[i].follow, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->common.servers[i].host, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PORT, (uintptr_t)config->common.servers[i].port, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_USER, (uintptr_t)config->common.servers[i].username, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SLOT, (uintptr_t)config->common.servers[i].wal_slot, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->common.servers[i].create_slot, ValueInt32);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_FOLLOW, (uintptr_t)config->common.servers[i].follow, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING, (uintptr_t)config->servers[i].wal_shipping, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)config->servers[i].hot_standby, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES, (uintptr_t)config->servers[i].hot_standby_overrides, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->servers[i].hot_standby_tablespaces, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->servers[i].workers, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->servers[i].backup_max_rate, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->servers[i].network_max_rate, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)config->servers[i].manifest, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->servers[i].tls_cert_file, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->servers[i].tls_ca_file, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->servers[i].tls_key_file, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_EXTRA, (uintptr_t)config->servers[i].extra, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING, (uintptr_t)config->common.servers[i].wal_shipping, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)config->common.servers[i].hot_standby, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES, (uintptr_t)config->common.servers[i].hot_standby_overrides, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->common.servers[i].hot_standby_tablespaces, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->common.servers[i].backup_max_rate, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->common.servers[i].network_max_rate, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)config->common.servers[i].manifest, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->common.servers[i].tls_cert_file, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->common.servers[i].tls_ca_file, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->common.servers[i].tls_key_file, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_EXTRA, (uintptr_t)config->common.servers[i].extra, ValueString);
 
-      pgmoneta_json_put(res, config->servers[i].name, (uintptr_t)server_conf, ValueJSON);
+      pgmoneta_json_put(res, config->common.servers[i].name, (uintptr_t)server_conf, ValueJSON);
 
       free(ret);
    }
@@ -2308,9 +2308,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          goto error;
       }
 
-      for (int i = 0; i < config->number_of_servers; i++)
+      for (int i = 0; i < config->common.number_of_servers; i++)
       {
-         if (!strcmp(config->servers[i].name, section))
+         if (!strcmp(config->common.servers[i].name, section))
          {
             server_index = i;
             break;
@@ -2343,10 +2343,10 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MISC_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].host, config_value, max);
-            config->servers[server_index].host[max] = '\0';
+            memcpy(&config->common.servers[server_index].host, config_value, max);
+            config->common.servers[server_index].host[max] = '\0';
             pgmoneta_json_put(server_j, key, (uintptr_t)config_value, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2364,12 +2364,12 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            if (as_int(config_value, &config->servers[server_index].port))
+            if (as_int(config_value, &config->common.servers[server_index].port))
             {
                unknown = true;
             }
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].port, ValueInt64);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].port, ValueInt64);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2385,9 +2385,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MAX_USERNAME_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].username, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].username, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].username, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].username, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2404,10 +2404,10 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
                max = MAX_PATH - 1;
             }
             int count = 0;
-            split_extra(config_value, config->servers[server_index].extra, &count);
-            config->servers[server_index].number_of_extra = count;
+            split_extra(config_value, config->common.servers[server_index].extra, &count);
+            config->common.servers[server_index].number_of_extra = count;
             pgmoneta_json_put(server_j, key, (uintptr_t)config_value, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2423,9 +2423,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MISC_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].wal_slot, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].wal_slot, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].wal_slot, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].wal_slot, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2442,12 +2442,12 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
                max = MISC_LENGTH - 1;
             }
 
-            if (as_create_slot(config_value, &config->servers[server_index].create_slot))
+            if (as_create_slot(config_value, &config->common.servers[server_index].create_slot))
             {
                unknown = true;
             }
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].create_slot, ValueInt32);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].create_slot, ValueInt32);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2473,9 +2473,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MISC_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].follow, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].follow, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].follow, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].follow, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2501,9 +2501,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MAX_PATH - 1;
             }
-            memcpy(&config->servers[server_index].wal_shipping[0], config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].wal_shipping, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].wal_shipping[0], config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].wal_shipping, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2519,9 +2519,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MAX_PATH - 1;
             }
-            memcpy(&config->servers[server_index].hot_standby, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].hot_standby, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].hot_standby, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].hot_standby, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2537,9 +2537,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MAX_PATH - 1;
             }
-            memcpy(&config->servers[server_index].hot_standby_overrides, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].hot_standby_overrides, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].hot_standby_overrides, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].hot_standby_overrides, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2555,9 +2555,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MAX_PATH - 1;
             }
-            memcpy(&config->servers[server_index].hot_standby_tablespaces, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].hot_standby_tablespaces, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].hot_standby_tablespaces, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].hot_standby_tablespaces, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2613,9 +2613,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MISC_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].tls_ca_file, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].tls_ca_file, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].tls_ca_file, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].tls_ca_file, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2637,9 +2637,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MISC_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].tls_cert_file, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].tls_cert_file, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].tls_cert_file, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].tls_cert_file, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2661,9 +2661,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             {
                max = MISC_LENGTH - 1;
             }
-            memcpy(&config->servers[server_index].tls_key_file, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].tls_key_file, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            memcpy(&config->common.servers[server_index].tls_key_file, config_value, max);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].tls_key_file, ValueString);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2703,12 +2703,12 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            if (as_int(config_value, &config->servers[server_index].workers))
+            if (as_int(config_value, &config->common.servers[server_index].workers))
             {
                unknown = true;
             }
             pgmoneta_json_put(server_j, key, (uintptr_t)config->workers, ValueInt64);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -2983,20 +2983,20 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            char* ret = get_retention_string(config->servers[server_index].retention_days, config->servers[server_index].retention_weeks, config->servers[server_index].retention_months, config->servers[server_index].retention_years);
-            config->servers[server_index].retention_days = -1;
-            config->servers[server_index].retention_weeks = -1;
-            config->servers[server_index].retention_months = -1;
-            config->servers[server_index].retention_years = -1;
-            if (as_retention(config_value, &config->servers[server_index].retention_days,
-                             &config->servers[server_index].retention_weeks,
-                             &config->servers[server_index].retention_months,
-                             &config->servers[server_index].retention_years))
+            char* ret = get_retention_string(config->common.servers[server_index].retention_days, config->common.servers[server_index].retention_weeks, config->common.servers[server_index].retention_months, config->common.servers[server_index].retention_years);
+            config->common.servers[server_index].retention_days = -1;
+            config->common.servers[server_index].retention_weeks = -1;
+            config->common.servers[server_index].retention_months = -1;
+            config->common.servers[server_index].retention_years = -1;
+            if (as_retention(config_value, &config->common.servers[server_index].retention_days,
+                             &config->common.servers[server_index].retention_weeks,
+                             &config->common.servers[server_index].retention_months,
+                             &config->common.servers[server_index].retention_years))
             {
                unknown = true;
             }
             pgmoneta_json_put(server_j, key, (uintptr_t)ret, ValueString);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
             free(ret);
          }
          else
@@ -3026,12 +3026,12 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            if (as_int(config_value, &config->servers[server_index].backup_max_rate))
+            if (as_int(config_value, &config->common.servers[server_index].backup_max_rate))
             {
                unknown = true;
             }
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].backup_max_rate, ValueInt32);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].backup_max_rate, ValueInt32);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -3046,12 +3046,12 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            if (as_int(config_value, &config->servers[server_index].network_max_rate))
+            if (as_int(config_value, &config->common.servers[server_index].network_max_rate))
             {
                unknown = true;
             }
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].network_max_rate, ValueInt32);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].network_max_rate, ValueInt32);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -3066,9 +3066,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            config->servers[server_index].manifest = pgmoneta_get_hash_algorithm(config_value);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->servers[server_index].manifest, ValueInt32);
-            pgmoneta_json_put(response, config->servers[server_index].name, (uintptr_t)server_j, ValueJSON);
+            config->common.servers[server_index].manifest = pgmoneta_get_hash_algorithm(config_value);
+            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].manifest, ValueInt32);
+            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
          {
@@ -4267,27 +4267,27 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
 
    for (int i = 0; i < NUMBER_OF_SERVERS; i++)
    {
-      if (copy_server(&config->servers[i], &reload->servers[i]))
+      if (copy_server(&config->common.servers[i], &reload->common.servers[i]))
       {
          changed = true;
       }
    }
-   if (restart_int("number_of_servers", config->number_of_servers, reload->number_of_servers))
+   if (restart_int("number_of_servers", config->common.number_of_servers, reload->common.number_of_servers))
    {
       changed = true;
    }
 
    for (int i = 0; i < NUMBER_OF_USERS; i++)
    {
-      copy_user(&config->users[i], &reload->users[i]);
+      copy_user(&config->common.users[i], &reload->common.users[i]);
    }
-   config->number_of_users = reload->number_of_users;
+   config->common.number_of_users = reload->common.number_of_users;
 
    for (int i = 0; i < NUMBER_OF_ADMINS; i++)
    {
-      copy_user(&config->admins[i], &reload->admins[i]);
+      copy_user(&config->common.admins[i], &reload->common.admins[i]);
    }
-   config->number_of_admins = reload->number_of_admins;
+   config->common.number_of_admins = reload->common.number_of_admins;
 
    config->workers = reload->workers;
    config->backup_max_rate = reload->backup_max_rate;
