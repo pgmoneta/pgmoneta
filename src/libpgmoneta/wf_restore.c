@@ -165,9 +165,9 @@ restore_execute(char* name, struct art* nodes)
    char* waltarget = NULL;
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -353,9 +353,9 @@ combine_incremental_execute(char* name, struct art* nodes)
    char* base = NULL;
    struct backup* bck = NULL;
    struct json* manifest = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -450,9 +450,9 @@ recovery_info_execute(char* name, struct art* nodes)
    char* path = NULL;
    bool mode = false;
    char* ptr = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -809,7 +809,7 @@ restore_excluded_files_execute(char* name, struct art* nodes)
    struct workers* workers = NULL;
    int number_of_workers = 0;
    char** restore_last_files_names = NULL;
-   struct configuration* config = (struct configuration*)shmem;
+   struct main_configuration* config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -971,9 +971,9 @@ restore_excluded_files_teardown(char* name, struct art* nodes)
    char* to = NULL;
    char* suffix = NULL;
    struct backup* backup = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -1097,9 +1097,9 @@ error:
 static char*
 get_user_password(char* username)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    for (int i = 0; i < config->number_of_users; i++)
    {

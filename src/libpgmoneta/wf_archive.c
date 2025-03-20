@@ -94,9 +94,9 @@ archive_execute(char* name, struct art* nodes)
    char* src = NULL;
    char* dst = NULL;
    char* d_name = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -173,9 +173,9 @@ archive_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* destination = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

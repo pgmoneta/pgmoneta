@@ -236,11 +236,11 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -413,14 +413,14 @@ pgmoneta_combine_backups(int server, char* base, char* input_dir, char* output_d
    char otblspc_dir[MAX_PATH];
    char manifest_path[MAX_PATH];
    struct json* files = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    if (manifest == NULL || prior_backup_dirs == NULL || base == NULL || input_dir == NULL || output_dir == NULL)
    {
       goto error;
    }
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    memset(manifest_path, 0, MAX_PATH);
    snprintf(manifest_path, MAX_PATH, "%s/backup_manifest", output_dir);
@@ -700,7 +700,7 @@ reconstruct_backup_file(int server,
    uint32_t block_length = 0; // total number of blocks in the reconstructed file
    bool full_copy_possible = true; // whether we could just copy over directly instead of block by block
    uint32_t b = 0; // temp variable for block numbers
-   struct configuration* config;
+   struct main_configuration* config;
    size_t blocksz = 0;
    char path[MAX_PATH];
    uint32_t nblocks = 0;
@@ -708,7 +708,7 @@ reconstruct_backup_file(int server,
    struct rfile* copy_source = NULL;
    struct value_config rfile_config = {.destroy_data = rfile_destroy_cb, .to_string = NULL};
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    blocksz = config->servers[server].block_size;
 
@@ -927,11 +927,11 @@ incremental_rfile_initialize(int server, char* file_path, struct rfile** rfile)
    uint32_t magic = 0;
    int nread = 0;
    struct rfile* rf = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
    size_t relsegsz = 0;
    size_t blocksz = 0;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    relsegsz = config->servers[server].relseg_size;
    blocksz = config->servers[server].block_size;
@@ -1290,11 +1290,11 @@ restore_backup_full(struct art* nodes)
    char* target_base = NULL;
    uint64_t free_space = 0;
    uint64_t required_space = 0;
-   struct configuration* config;
+   struct main_configuration* config;
 
    struct workflow* workflow = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    directory = (char*)pgmoneta_art_search(nodes, USER_DIRECTORY);
@@ -1380,10 +1380,10 @@ restore_backup_incremental(struct art* nodes)
    char* manifest_path = NULL;
    char* server_dir = NULL;
    struct json* manifest = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    struct workflow* workflow = NULL;
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    memset(target_root_restore, 0, MAX_PATH);
    memset(target_base_restore, 0, MAX_PATH_CONCAT);

@@ -435,7 +435,7 @@ main(int argc, char** argv)
    /* Store the result from command parser*/
    size_t size;
    char un[MAX_USERNAME_LENGTH];
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
    int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
    int32_t compression = MANAGEMENT_COMPRESSION_NONE;
    int32_t encryption = MANAGEMENT_ENCRYPTION_NONE;
@@ -597,17 +597,17 @@ main(int argc, char** argv)
       exit(1);
    }
 
-   size = sizeof(struct configuration);
+   size = sizeof(struct main_configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
       warnx("pgmoneta-cli: Failed to allocate shared memory. Check system resources and permissions.");
       exit(1);
    }
-   pgmoneta_init_configuration(shmem);
+   pgmoneta_init_main_configuration(shmem);
 
    if (configuration_path != NULL)
    {
-      ret = pgmoneta_read_configuration(shmem, configuration_path);
+      ret = pgmoneta_read_main_configuration(shmem, configuration_path);
       if (ret)
       {
          warnx("pgmoneta-cli: Configuration file not found at '%s'. Ensure the file exists and the path is correct.", configuration_path);
@@ -616,11 +616,11 @@ main(int argc, char** argv)
 
       if (logfile)
       {
-         config = (struct configuration*)shmem;
+         config = (struct main_configuration*)shmem;
 
-         config->log_type = PGMONETA_LOGGING_TYPE_FILE;
-         memset(&config->log_path[0], 0, MISC_LENGTH);
-         memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+         config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
+         memset(&config->common.log_path[0], 0, MISC_LENGTH);
+         memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
       }
 
       if (pgmoneta_start_logging())
@@ -628,11 +628,11 @@ main(int argc, char** argv)
          exit(1);
       }
 
-      config = (struct configuration*)shmem;
+      config = (struct main_configuration*)shmem;
    }
    else
    {
-      ret = pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
+      ret = pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
       if (ret)
       {
          if (host == NULL || port == NULL)
@@ -647,11 +647,11 @@ main(int argc, char** argv)
 
          if (logfile)
          {
-            config = (struct configuration*)shmem;
+            config = (struct main_configuration*)shmem;
 
-            config->log_type = PGMONETA_LOGGING_TYPE_FILE;
-            memset(&config->log_path[0], 0, MISC_LENGTH);
-            memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+            config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
+            memset(&config->common.log_path[0], 0, MISC_LENGTH);
+            memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
          }
 
          if (pgmoneta_start_logging())
@@ -659,7 +659,7 @@ main(int argc, char** argv)
             exit(1);
          }
 
-         config = (struct configuration*)shmem;
+         config = (struct main_configuration*)shmem;
       }
    }
    if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))

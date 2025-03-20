@@ -76,7 +76,7 @@ static int as_retention(char* str, int* days, int* weeks, int* months, int* year
 static int as_create_slot(char* str, int* create_slot);
 static char* get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year);
 
-static bool transfer_configuration(struct configuration* config, struct configuration* reload);
+static bool transfer_configuration(struct main_configuration* config, struct main_configuration* reload);
 static int copy_server(struct server* dst, struct server* src);
 static void copy_user(struct user* dst, struct user* src);
 static int restart_bool(char* name, bool e, bool n);
@@ -95,11 +95,11 @@ static void split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], 
  *
  */
 int
-pgmoneta_init_configuration(void* shm)
+pgmoneta_init_main_configuration(void* shm)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    config->running = true;
 
@@ -134,10 +134,10 @@ pgmoneta_init_configuration(void* shm)
 
    config->update_process_title = UPDATE_PROCESS_TITLE_VERBOSE;
 
-   config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
-   config->log_level = PGMONETA_LOGGING_LEVEL_INFO;
-   config->log_mode = PGMONETA_LOGGING_MODE_APPEND;
-   atomic_init(&config->log_lock, STATE_FREE);
+   config->common.log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+   config->common.log_level = PGMONETA_LOGGING_LEVEL_INFO;
+   config->common.log_mode = PGMONETA_LOGGING_MODE_APPEND;
+   atomic_init(&config->common.log_lock, STATE_FREE);
 
    config->backup_max_rate = 0;
    config->network_max_rate = 0;
@@ -155,7 +155,7 @@ pgmoneta_init_configuration(void* shm)
  *
  */
 int
-pgmoneta_read_configuration(void* shm, char* filename)
+pgmoneta_read_main_configuration(void* shm, char* filename)
 {
    FILE* file;
    char section[LINE_LENGTH];
@@ -165,7 +165,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
    char* value = NULL;
    char* ptr = NULL;
    size_t max;
-   struct configuration* config;
+   struct main_configuration* config;
    int idx_server = 0;
    struct server srv = {0};
 
@@ -177,7 +177,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
    }
 
    memset(&section, 0, LINE_LENGTH);
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    while (fgets(line, sizeof(line), file))
    {
@@ -740,7 +740,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->log_type = as_logging_type(value);
+                     config->common.log_type = as_logging_type(value);
                   }
                   else
                   {
@@ -751,7 +751,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->log_level = as_logging_level(value);
+                     config->common.log_level = as_logging_level(value);
                   }
                   else
                   {
@@ -767,7 +767,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->log_path, value, max);
+                     memcpy(config->common.log_path, value, max);
                   }
                   else
                   {
@@ -778,7 +778,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_logging_rotation_size(value, &config->log_rotation_size))
+                     if (as_logging_rotation_size(value, &config->common.log_rotation_size))
                      {
                         unknown = true;
                      }
@@ -792,7 +792,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
+                     if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
                      {
                         unknown = true;
                      }
@@ -811,7 +811,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->log_line_prefix, value, max);
+                     memcpy(config->common.log_line_prefix, value, max);
                   }
                   else
                   {
@@ -822,7 +822,7 @@ pgmoneta_read_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->log_mode = as_logging_mode(value);
+                     config->common.log_mode = as_logging_mode(value);
                   }
                   else
                   {
@@ -1373,13 +1373,13 @@ error:
  *
  */
 int
-pgmoneta_validate_configuration(void* shm)
+pgmoneta_validate_main_configuration(void* shm)
 {
    bool found = false;
    struct stat st;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    if (strlen(config->host) == 0)
    {
@@ -1631,7 +1631,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    char* decoded = NULL;
    size_t decoded_length = 0;
    char* ptr = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    file = fopen(filename, "r");
 
@@ -1645,7 +1645,7 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
    }
 
    index = 0;
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    while (fgets(line, sizeof(line), file))
    {
@@ -1773,9 +1773,9 @@ above:
 int
 pgmoneta_validate_users_configuration(void* shm)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    if (config->number_of_users <= 0)
    {
@@ -1821,7 +1821,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
    char* decoded = NULL;
    size_t decoded_length = 0;
    char* ptr = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    file = fopen(filename, "r");
 
@@ -1836,7 +1836,7 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
    }
 
    index = 0;
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    while (fgets(line, sizeof(line), file))
    {
@@ -1964,9 +1964,9 @@ above:
 int
 pgmoneta_validate_admins_configuration(void* shm)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shm;
+   config = (struct main_configuration*)shm;
 
    if (config->management > 0 && config->number_of_admins == 0)
    {
@@ -1984,10 +1984,10 @@ int
 pgmoneta_reload_configuration(bool* restart)
 {
    size_t reload_size;
-   struct configuration* reload = NULL;
-   struct configuration* config;
+   struct main_configuration* reload = NULL;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    *restart = false;
 
@@ -1995,16 +1995,16 @@ pgmoneta_reload_configuration(bool* restart)
    pgmoneta_log_trace("Users: %s", config->users_path);
    pgmoneta_log_trace("Admins: %s", config->admins_path);
 
-   reload_size = sizeof(struct configuration);
+   reload_size = sizeof(struct main_configuration);
 
    if (pgmoneta_create_shared_memory(reload_size, HUGEPAGE_OFF, (void**)&reload))
    {
       goto error;
    }
 
-   pgmoneta_init_configuration((void*)reload);
+   pgmoneta_init_main_configuration((void*)reload);
 
-   if (pgmoneta_read_configuration((void*)reload, config->configuration_path))
+   if (pgmoneta_read_main_configuration((void*)reload, config->configuration_path))
    {
       goto error;
    }
@@ -2022,7 +2022,7 @@ pgmoneta_reload_configuration(bool* restart)
       }
    }
 
-   if (pgmoneta_validate_configuration(reload))
+   if (pgmoneta_validate_main_configuration(reload))
    {
       goto error;
    }
@@ -2061,9 +2061,9 @@ error:
 static void
 add_configuration_response(struct json* res)
 {
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    char* ret = get_retention_string(config->retention_days, config->retention_weeks, config->retention_months, config->retention_years);
    // JSON of main configuration
@@ -2094,13 +2094,13 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_CONTAINER, (uintptr_t)config->azure_container, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY, (uintptr_t)config->azure_shared_key, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)config->log_type, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)config->log_level, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_PATH, (uintptr_t)config->log_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, (uintptr_t)config->log_rotation_age, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, (uintptr_t)config->log_rotation_size, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX, (uintptr_t)config->log_line_prefix, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)config->log_mode, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)config->common.log_type, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)config->common.log_level, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_PATH, (uintptr_t)config->common.log_path, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, (uintptr_t)config->common.log_rotation_age, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, (uintptr_t)config->common.log_rotation_size, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX, (uintptr_t)config->common.log_line_prefix, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)config->common.log_mode, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, (uintptr_t)config->blocking_timeout, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS, (uintptr_t)config->tls, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
@@ -2127,9 +2127,9 @@ add_configuration_response(struct json* res)
 static void
 add_servers_configuration_response(struct json* res)
 {
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    // JSON of server configuration
    for (int i = 0; i < config->number_of_servers; i++)
@@ -2237,7 +2237,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    double total_seconds;
    char section[MISC_LENGTH];
    char key[MISC_LENGTH];
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
    struct json* server_j = NULL;
    size_t max;
    int server_index = -1;
@@ -2247,7 +2247,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    // Extract config_key and config_value from request
    request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    if (!request)
@@ -2721,13 +2721,13 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       }
       else if (!strcmp(key, "log_type"))
       {
-         config->log_type = as_logging_type(config_value);
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_type, ValueInt32);
+         config->common.log_type = as_logging_type(config_value);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_type, ValueInt32);
       }
       else if (!strcmp(key, "log_level"))
       {
-         config->log_level = as_logging_level(config_value);
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_level, ValueInt32);
+         config->common.log_level = as_logging_level(config_value);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_level, ValueInt32);
       }
       else if (!strcmp(key, "log_path"))
       {
@@ -2736,24 +2736,24 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          {
             max = MISC_LENGTH - 1;
          }
-         memcpy(config->log_path, config_value, max);
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_path, ValueString);
+         memcpy(config->common.log_path, config_value, max);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_path, ValueString);
       }
       else if (!strcmp(key, "log_rotation_size"))
       {
-         if (as_logging_rotation_size(config_value, &config->log_rotation_size))
+         if (as_logging_rotation_size(config_value, &config->common.log_rotation_size))
          {
             unknown = true;
          }
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_rotation_size, ValueInt32);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_rotation_size, ValueInt32);
       }
       else if (!strcmp(key, "log_rotation_age"))
       {
-         if (as_seconds(config_value, &config->log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
+         if (as_seconds(config_value, &config->common.log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
          {
             unknown = true;
          }
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_rotation_age, ValueInt32);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_rotation_age, ValueInt32);
       }
       else if (!strcmp(key, "log_line_prefix"))
       {
@@ -2762,13 +2762,13 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          {
             max = MISC_LENGTH - 1;
          }
-         memcpy(config->log_line_prefix, config_value, max);
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_line_prefix, ValueString);
+         memcpy(config->common.log_line_prefix, config_value, max);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_line_prefix, ValueString);
       }
       else if (!strcmp(key, "log_mode"))
       {
-         config->log_mode = as_logging_mode(config_value);
-         pgmoneta_json_put(response, key, (uintptr_t)config->log_mode, ValueInt32);
+         config->common.log_mode = as_logging_mode(config_value);
+         pgmoneta_json_put(response, key, (uintptr_t)config->common.log_mode, ValueInt32);
       }
       else if (!strcmp(key, "unix_socket_dir"))
       {
@@ -4164,7 +4164,7 @@ get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year)
 }
 
 static bool
-transfer_configuration(struct configuration* config, struct configuration* reload)
+transfer_configuration(struct main_configuration* config, struct main_configuration* reload)
 {
    bool changed = false;
 
@@ -4198,24 +4198,24 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
    {
       changed = true;
    }
-   if (restart_int("log_type", config->log_type, reload->log_type))
+   if (restart_int("log_type", config->common.log_type, reload->common.log_type))
    {
       changed = true;
    }
-   config->log_level = reload->log_level;
+   config->common.log_level = reload->common.log_level;
 
-   if (strncmp(config->log_path, reload->log_path, MISC_LENGTH) ||
-       config->log_rotation_size != reload->log_rotation_size ||
-       config->log_rotation_age != reload->log_rotation_age ||
-       config->log_mode != reload->log_mode)
+   if (strncmp(config->common.log_path, reload->common.log_path, MISC_LENGTH) ||
+       config->common.log_rotation_size != reload->common.log_rotation_size ||
+       config->common.log_rotation_age != reload->common.log_rotation_age ||
+       config->common.log_mode != reload->common.log_mode)
    {
       pgmoneta_log_debug("Log restart triggered!");
       pgmoneta_stop_logging();
-      config->log_rotation_size = reload->log_rotation_size;
-      config->log_rotation_age = reload->log_rotation_age;
-      config->log_mode = reload->log_mode;
-      memcpy(config->log_line_prefix, reload->log_line_prefix, MISC_LENGTH);
-      memcpy(config->log_path, reload->log_path, MISC_LENGTH);
+      config->common.log_rotation_size = reload->common.log_rotation_size;
+      config->common.log_rotation_age = reload->common.log_rotation_age;
+      config->common.log_mode = reload->common.log_mode;
+      memcpy(config->common.log_line_prefix, reload->common.log_line_prefix, MISC_LENGTH);
+      memcpy(config->common.log_path, reload->common.log_path, MISC_LENGTH);
       pgmoneta_start_logging();
    }
 

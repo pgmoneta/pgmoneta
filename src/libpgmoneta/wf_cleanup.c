@@ -81,9 +81,9 @@ cleanup_execute_restore(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* path = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

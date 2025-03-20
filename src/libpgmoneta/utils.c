@@ -973,9 +973,9 @@ void
 pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 {
    char title[MAX_PROCESS_TITLE_LENGTH];
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    memset(&title, 0, sizeof(title));
 
    // sanity check: if the user does not want to
@@ -3528,9 +3528,9 @@ pgmoneta_get_server_wal(int server)
 char*
 pgmoneta_get_server_wal_shipping(int server)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    char* ws = NULL;
-   config = (struct configuration*) shmem;
+   config = (struct main_configuration*) shmem;
    if (strlen(config->servers[server].wal_shipping) > 0)
    {
       ws = pgmoneta_append(ws, config->servers[server].wal_shipping);
@@ -3564,10 +3564,10 @@ pgmoneta_get_server_wal_shipping_wal(int server)
 char*
 pgmoneta_get_server_hot_standby(int server)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    char* hs = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (strlen(config->servers[server].hot_standby) > 0)
    {
@@ -3814,9 +3814,9 @@ static char*
 get_server_basepath(int server)
 {
    char* d = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    d = pgmoneta_append(d, config->base_dir);
    if (!pgmoneta_ends_with(config->base_dir, "/"))

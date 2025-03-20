@@ -71,11 +71,11 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -243,9 +243,9 @@ pgmoneta_extract_tar_file(char* file_path, char* destination)
    char* archive_name = NULL;
    struct archive* a;
    struct archive_entry* entry;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    a = archive_read_new();
    archive_read_support_format_tar(a);

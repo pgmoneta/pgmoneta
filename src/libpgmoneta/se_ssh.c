@@ -135,9 +135,9 @@ ssh_storage_setup(char* name, struct art* nodes)
    size_t hash_length;
    int rc;
    enum ssh_known_hosts_e state;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -319,11 +319,11 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
    int next_newest = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -454,9 +454,9 @@ ssh_storage_wal_shipping_execute(char* name, struct art* nodes)
    char* label = NULL;
    char* local_root = NULL;
    char* remote_root = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -505,9 +505,9 @@ ssh_storage_backup_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* root = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -556,9 +556,9 @@ ssh_storage_wal_shipping_teardown(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -919,9 +919,9 @@ static char*
 get_remote_server_basepath(int server)
 {
    char* d = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    d = pgmoneta_append(d, config->ssh_base_dir);
    if (!pgmoneta_ends_with(config->ssh_base_dir, "/"))

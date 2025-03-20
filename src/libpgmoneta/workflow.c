@@ -116,9 +116,9 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
    char* backup_base = NULL;
    char* backup_data = NULL;
    struct backup* bck = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    *backup = NULL;
 
@@ -252,9 +252,9 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
                           uint8_t encryption, struct json* payload)
 {
    struct workflow* current = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    current = workflow;
    while (current != NULL)
@@ -342,9 +342,9 @@ pgmoneta_common_setup(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -373,9 +373,9 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -404,9 +404,9 @@ wf_backup(struct backup* backup)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    head = pgmoneta_create_basebackup();
    current = head;
@@ -604,9 +604,9 @@ wf_incremental_backup(void)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    head = pgmoneta_create_basebackup();
    current = head;

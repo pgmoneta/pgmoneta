@@ -81,9 +81,9 @@ retention_name(void)
 static int
 retention_setup(char* name, struct art* nodes)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -112,9 +112,9 @@ retention_execute(char* name, struct art* nodes)
    struct backup** backups = NULL;
    struct backup* child = NULL;
    bool* retention_keep = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -245,9 +245,9 @@ retention_execute(char* name, struct art* nodes)
 static int
 retention_teardown(char* name, struct art* nodes)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -276,9 +276,9 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
    time_t t;
    char check_date[128];
    struct tm* time_info;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    keep = (bool*) malloc(sizeof (bool*) * number_of_backups);
 

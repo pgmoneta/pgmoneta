@@ -88,9 +88,9 @@ delete_backup_execute(char* name, struct art* nodes)
    struct backup** backups = NULL;
    struct backup* backup = NULL;
    struct backup* child = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -264,9 +264,9 @@ delete_full_backup(int server, int index, struct backup* backup, int number_of_b
    unsigned long size;
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    /* Find previous valid backup */
    for (int i = index - 1; prev_index == -1 && i >= 0; i--)

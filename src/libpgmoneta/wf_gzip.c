@@ -99,9 +99,9 @@ gzip_execute_compress(char* name, struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -214,9 +214,9 @@ gzip_execute_uncompress(char* name, struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

@@ -93,9 +93,9 @@ verify_execute(char* name, struct art* nodes)
    struct deque* all_deque = NULL;
    struct csv_reader* csv = NULL;
    struct workers* workers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

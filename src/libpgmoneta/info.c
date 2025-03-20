@@ -52,9 +52,9 @@ pgmoneta_create_info(char* directory, char* label, int status)
    char buffer[INFO_BUFFER_SIZE];
    char* s = NULL;
    FILE* sfile = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    s = pgmoneta_append(s, directory);
    s = pgmoneta_append(s, "/backup.info");
@@ -811,9 +811,9 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct backup* bck = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    *backup = NULL;
 
@@ -1374,9 +1374,9 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    struct json* tablespaces = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -1555,9 +1555,9 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    struct json* tablespaces = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 

@@ -69,9 +69,9 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    struct backup** backups = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 

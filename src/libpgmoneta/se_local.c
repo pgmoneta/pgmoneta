@@ -81,9 +81,9 @@ local_storage_execute(char* name, struct art* nodes)
    int minutes;
    double seconds;
    char elapsed[128];
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

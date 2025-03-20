@@ -301,11 +301,28 @@ struct prometheus
    atomic_ulong logging_fatal; /**< Logging: FATAL */
 } __attribute__ ((aligned (64)));
 
-/** @struct configuration
- * Defines the configuration and state of pgmoneta
+/** @struct common_configuration
+ * Defines configurations that are common between all tools
  */
-struct configuration
+struct common_configuration
 {
+   int log_type;                      /**< The logging type */
+   int log_level;                     /**< The logging level */
+   char log_path[MISC_LENGTH];        /**< The logging path */
+   int log_mode;                      /**< The logging mode */
+   int log_rotation_size;             /**< bytes to force log rotation */
+   int log_rotation_age;              /**< minutes for log rotation */
+   char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
+   atomic_schar log_lock;             /**< The logging lock */
+} __attribute__ ((aligned (64)));
+
+/** @struct main_configuration
+ * Defines the main configuration list
+ */
+struct main_configuration
+{
+   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+
    bool running; /**< Is pgmoneta running */
 
    char configuration_path[MAX_PATH]; /**< The configuration path */
@@ -351,15 +368,6 @@ struct configuration
    int retention_years;                 /**< The retention years for the server */
    int retention_interval;              /**< The retention interval */
 
-   int log_type;                      /**< The logging type */
-   int log_level;                     /**< The logging level */
-   char log_path[MISC_LENGTH];        /**< The logging path */
-   int log_mode;                      /**< The logging mode */
-   int log_rotation_size;             /**< bytes to force log rotation */
-   int log_rotation_age;              /**< minutes for log rotation */
-   char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
-   atomic_schar log_lock;             /**< The logging lock */
-
    bool tls;                        /**< Is TLS enabled */
    char tls_cert_file[MISC_LENGTH]; /**< TLS certificate path */
    char tls_key_file[MISC_LENGTH];  /**< TLS key path */
@@ -402,6 +410,20 @@ struct configuration
    struct user users[NUMBER_OF_USERS];             /**< The users */
    struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
    struct prometheus prometheus;                   /**< The Prometheus metrics */
+} __attribute__ ((aligned (64)));
+
+/** @struct walinfo_configuration
+ * Defines the walinfo configuration list
+ */
+struct walinfo_configuration
+{
+   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+
+   int number_of_servers;        /**< The number of servers */
+   int number_of_users;          /**< The number of users */
+
+   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
+   struct user users[NUMBER_OF_USERS];             /**< The users */
 } __attribute__ ((aligned (64)));
 
 #ifdef __cplusplus

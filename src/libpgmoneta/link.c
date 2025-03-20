@@ -475,9 +475,9 @@ static char*
 trim_suffix(char* str)
 {
    char* res = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*) shmem;
+   config = (struct main_configuration*) shmem;
    int len = 0;
    if (str == NULL)
    {

@@ -84,9 +84,9 @@ s3_storage_setup(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -128,11 +128,11 @@ s3_storage_execute(char* name, struct art* nodes)
    double remote_s3_elapsed_time;
    char* local_root = NULL;
    char* s3_root = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -184,9 +184,9 @@ s3_storage_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* root = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -307,9 +307,9 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    struct stat file_info;
    CURLcode res = -1;
    struct curl_slist* chunk = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    local_path = pgmoneta_append(local_path, local_root);
    local_path = pgmoneta_append(local_path, relative_path);
@@ -561,9 +561,9 @@ static char*
 s3_get_host(void)
 {
    char* host = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    host = pgmoneta_append(host, config->s3_bucket);
    host = pgmoneta_append(host, ".s3.");
@@ -577,9 +577,9 @@ static char*
 s3_get_basepath(int server, char* identifier)
 {
    char* d = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    d = pgmoneta_append(d, config->s3_base_dir);
    if (!pgmoneta_ends_with(config->s3_base_dir, "/"))

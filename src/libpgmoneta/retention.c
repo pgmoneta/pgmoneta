@@ -38,11 +38,11 @@ pgmoneta_retention(char** argv)
 {
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    pgmoneta_set_proc_title(1, argv, "retention", NULL);
 

@@ -119,7 +119,7 @@ basebackup_execute(char* name, struct art* nodes)
    int network_max_rate;
    int hash;
    uint64_t biggest_file_size;
-   struct configuration* config;
+   struct main_configuration* config;
    struct message* basebackup_msg = NULL;
    struct message* tablespace_msg = NULL;
    struct stream_buffer* buffer = NULL;
@@ -130,7 +130,7 @@ basebackup_execute(char* name, struct art* nodes)
    struct token_bucket* bucket = NULL;
    struct token_bucket* network_bucket = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

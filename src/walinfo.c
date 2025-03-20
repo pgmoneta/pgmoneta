@@ -105,7 +105,7 @@ main(int argc, char** argv)
    bool verbose = false;
    enum value_type type = ValueString;
    size_t size;
-   struct configuration* config = NULL;
+   struct walinfo_configuration* config = NULL;
 
    if (argc < 2)
    {
@@ -258,21 +258,21 @@ main(int argc, char** argv)
       }
    }
 
-   size = sizeof(struct configuration);
+   size = sizeof(struct walinfo_configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
       warnx("Error creating shared memory");
       goto error;
    }
 
-   pgmoneta_init_configuration(shmem);
-   config = (struct configuration*)shmem;
+   pgmoneta_init_main_configuration(shmem);
+   config = (struct walinfo_configuration*)shmem;
 
    if (configuration_path != NULL)
    {
       if (pgmoneta_exists(configuration_path))
       {
-         loaded = pgmoneta_read_configuration(shmem, configuration_path);
+         loaded = pgmoneta_read_main_configuration(shmem, configuration_path);
       }
 
       if (loaded)
@@ -283,20 +283,20 @@ main(int argc, char** argv)
 
    if (loaded && pgmoneta_exists(PGMONETA_MAIN_CONFIG_FILE_PATH))
    {
-      loaded = pgmoneta_read_configuration(shmem, PGMONETA_MAIN_CONFIG_FILE_PATH);
+      loaded = pgmoneta_read_main_configuration(shmem, PGMONETA_MAIN_CONFIG_FILE_PATH);
    }
 
    if (loaded)
    {
-      config->log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+      config->common.log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
    }
    else
    {
       if (logfile)
       {
-         config->log_type = PGMONETA_LOGGING_TYPE_FILE;
-         memset(&config->log_path[0], 0, MISC_LENGTH);
-         memcpy(&config->log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+         config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
+         memset(&config->common.log_path[0], 0, MISC_LENGTH);
+         memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
       }
    }
 

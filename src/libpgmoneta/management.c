@@ -843,9 +843,9 @@ int
 pgmoneta_management_create_response(struct json* json, int server, struct json** response)
 {
    struct json* r = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    *response = NULL;
 
@@ -905,9 +905,9 @@ pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t e
    int srv = -1;
    struct json* response = NULL;
    struct json* outcome = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (pgmoneta_management_create_outcome_failure(payload, error, workflow, &outcome))
    {

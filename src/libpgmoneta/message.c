@@ -1372,9 +1372,9 @@ error:
 static bool
 is_server_side_compression(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    return config->compression_type == COMPRESSION_SERVER_GZIP || config->compression_type == COMPRESSION_SERVER_LZ4 || config->compression_type == COMPRESSION_SERVER_ZSTD;
 }
 
@@ -1816,9 +1816,9 @@ pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer)
    int numbytes = 0;
    bool keep_read = false;
    int err;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    /*
     * if buffer is still too full,
@@ -2044,9 +2044,9 @@ pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* b
    bool keep_read = false;
    int status;
    int length;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    do
    {
       while (config->running && buffer->cursor >= buffer->end)
@@ -2175,9 +2175,9 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct tuple* current = NULL;
    struct query_response* r = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (msg == NULL)
    {

@@ -98,12 +98,12 @@ link_execute(char* name, struct art* nodes)
    char elapsed[128];
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
    struct art* deleted_files = NULL;
    struct art* changed_files = NULL;
    struct art* added_files = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

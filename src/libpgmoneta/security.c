@@ -135,7 +135,7 @@ int
 pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
 {
    int status = MESSAGE_STATUS_ERROR;
-   struct configuration* config;
+   struct main_configuration* config;
    struct message* msg = NULL;
    struct message* request_msg = NULL;
    int32_t request;
@@ -145,7 +145,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
    char* password = NULL;
    SSL* c_ssl = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    *client_ssl = NULL;
 
@@ -853,14 +853,14 @@ client_scram256(SSL* c_ssl, int client_fd, char* password, int slot)
    size_t server_signature_calc_length = 0;
    char* base64_server_signature_calc = NULL;
    size_t base64_server_signature_calc_length;
-   struct configuration* config;
+   struct main_configuration* config;
    struct message* msg = NULL;
    struct message* sasl_continue = NULL;
    struct message* sasl_final = NULL;
 
    pgmoneta_log_debug("client_scram256 %d %d", client_fd, slot);
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    status = pgmoneta_write_auth_scram256(c_ssl, client_fd);
    if (status != MESSAGE_STATUS_OK)
@@ -1073,14 +1073,14 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    struct message* ssl_msg = NULL;
    struct message* startup_msg = NULL;
    struct message* msg = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    *ssl = NULL;
    *fd = -1;
 
    auth_type = SECURITY_INVALID;
    server_fd = -1;
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    for (int i = 0; i < NUMBER_OF_SECURITY_MESSAGES; i++)
    {
@@ -1732,9 +1732,9 @@ error:
 static char*
 get_admin_password(char* username)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    for (int i = 0; i < config->number_of_admins; i++)
    {
@@ -1835,10 +1835,10 @@ error:
 int
 pgmoneta_tls_valid(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    struct stat st = {0};
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (config->tls)
    {
@@ -2651,9 +2651,9 @@ create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
 {
    SSL* s = NULL;
    STACK_OF(X509_NAME) * root_cert_list = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (strlen(config->tls_cert_file) == 0)
    {

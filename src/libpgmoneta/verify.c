@@ -70,11 +70,11 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
    struct json* req = NULL;
    struct json* response = NULL;
    struct json* filesj = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 

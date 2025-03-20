@@ -78,12 +78,12 @@ pgmoneta_prometheus(int client_fd)
    int status;
    int page;
    struct message* msg = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    status = pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg);
    if (status != MESSAGE_STATUS_OK)
@@ -131,10 +131,10 @@ void
 pgmoneta_prometheus_reset(void)
 {
    signed char cache_is_free;
-   struct configuration* config;
+   struct main_configuration* config;
    struct prometheus_cache* cache;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    cache = (struct prometheus_cache*)prometheus_cache_shmem;
 
 retry_cache_locking:
@@ -160,9 +160,9 @@ retry_cache_locking:
 void
 pgmoneta_prometheus_logging(int type)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    switch (type)
    {
@@ -1340,9 +1340,9 @@ general_information(int client_fd)
    time_t t;
    char time_str[128];
    struct tm* time_info;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    data = pgmoneta_append(data, "#HELP pgmoneta_state The state of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_state gauge\n");
@@ -2072,9 +2072,9 @@ backup_information(int client_fd)
    bool valid;
    int valid_count;
    char* data = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    data = pgmoneta_append(data, "#HELP pgmoneta_backup_oldest The oldest backup for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_oldest gauge\n");
@@ -3270,9 +3270,9 @@ size_information(int client_fd)
    unsigned long size;
    bool valid;
    char* data = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    data = pgmoneta_append(data, "#HELP pgmoneta_restore_newest_size The size of the newest restore for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_restore_newest_size gauge\n");
@@ -4739,9 +4739,9 @@ error:
 static bool
 is_metrics_cache_configured(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    // cannot have caching if not set metrics!
    if (config->metrics == 0)
@@ -4782,11 +4782,11 @@ int
 pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem)
 {
    struct prometheus_cache* cache;
-   struct configuration* config;
+   struct main_configuration* config;
    size_t cache_size = 0;
    size_t struct_size = 0;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    // first of all, allocate the overall cache structure
    cache_size = metrics_cache_size_to_alloc();
@@ -4830,10 +4830,10 @@ error:
 static size_t
 metrics_cache_size_to_alloc(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    size_t cache_size = 0;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    // which size to use ?
    // either the configured (i.e., requested by user) if lower than the max size
@@ -4931,12 +4931,12 @@ metrics_cache_append(char* data)
 static bool
 metrics_cache_finalize(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    struct prometheus_cache* cache;
    time_t now;
 
    cache = (struct prometheus_cache*)prometheus_cache_shmem;
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!is_metrics_cache_configured())
    {

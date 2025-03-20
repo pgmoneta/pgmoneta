@@ -64,9 +64,9 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
    struct dirent* entry;
    int level;
    int ws;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -240,9 +240,9 @@ pgmoneta_zstandardc_wal(char* directory)
    struct dirent* entry;
    int level;
    int workers;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -745,9 +745,9 @@ pgmoneta_zstandardc_file(char* from, char* to)
    ZSTD_CCtx* cctx = NULL;
    int level;
    int workers;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    level = config->compression_level;
    if (level < 1)

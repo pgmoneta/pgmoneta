@@ -204,9 +204,9 @@ pgmoneta_encrypt_wal(char* d)
    DIR* dir;
    struct dirent* entry;
    char* compress_suffix = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    switch (config->compression_type)
    {
       case COMPRESSION_CLIENT_GZIP:
@@ -846,7 +846,7 @@ encrypt_file(char* from, char* to, int enc)
    unsigned char iv[EVP_MAX_IV_LENGTH];
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
    const EVP_CIPHER* (* cipher_fp)(void) = NULL;
    int cipher_block_size = 0;
    int inbuf_size = 0;
@@ -857,7 +857,7 @@ encrypt_file(char* from, char* to, int enc)
    int outl = 0;
    int f_len = 0;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    cipher_fp = get_cipher(config->encryption);
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
    inbuf_size = ENC_BUF_SIZE;

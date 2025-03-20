@@ -88,11 +88,11 @@ manifest_execute(char* name, struct art* nodes)
    struct csv_writer* writer = NULL;
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
-   struct configuration* config;
+   struct main_configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

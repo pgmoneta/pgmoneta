@@ -68,11 +68,11 @@ pgmoneta_server_info(int srv)
    size_t blocksz = 0;
    size_t segsz = 0;
    bool sw = false;
-   struct configuration* config;
+   struct main_configuration* config;
    char* ext_version = NULL;
    struct deque* server_parameters = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    config->servers[srv].valid = false;
    config->servers[srv].checksums = false;
@@ -232,9 +232,9 @@ done:
 bool
 pgmoneta_server_valid(int srv)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!config->servers[srv].valid)
    {
@@ -748,9 +748,9 @@ process_server_parameters(int server, struct deque* server_parameters)
    int major = 0;
    int minor = 0;
    struct deque_iterator* iter = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    config->servers[server].version = 0;
    config->servers[server].minor_version = 0;

@@ -89,10 +89,10 @@ extra_execute(char* name, struct art* nodes)
    struct timespec start_t;
    struct timespec end_t;
    SSL* ssl = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
    struct query_response* qr = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))

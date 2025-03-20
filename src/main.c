@@ -137,9 +137,9 @@ start_mgt(void)
 static void
 shutdown_mgt(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    ev_io_stop(main_loop, (struct ev_io*)&io_mgt);
    pgmoneta_disconnect(unix_management_socket);
@@ -249,7 +249,7 @@ main(int argc, char** argv)
    struct ev_periodic wal_streaming;
    size_t shmem_size;
    size_t prometheus_cache_shmem_size = 0;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
    int ret;
    int c;
    char* os = NULL;
@@ -318,7 +318,7 @@ main(int argc, char** argv)
       exit(1);
    }
 
-   shmem_size = sizeof(struct configuration);
+   shmem_size = sizeof(struct main_configuration);
    if (pgmoneta_create_shared_memory(shmem_size, HUGEPAGE_OFF, &shmem))
    {
       warnx("pgmoneta: Error in creating shared memory");
@@ -328,12 +328,12 @@ main(int argc, char** argv)
       goto error;
    }
 
-   pgmoneta_init_configuration(shmem);
-   config = (struct configuration*)shmem;
+   pgmoneta_init_main_configuration(shmem);
+   config = (struct main_configuration*)shmem;
 
    if (configuration_path != NULL)
    {
-      if (pgmoneta_read_configuration(shmem, configuration_path))
+      if (pgmoneta_read_main_configuration(shmem, configuration_path))
       {
          warnx("pgmoneta: Configuration not found: %s", configuration_path);
 #ifdef HAVE_LINUX
@@ -344,7 +344,7 @@ main(int argc, char** argv)
    }
    else
    {
-      if (pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
+      if (pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
       {
          warnx("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #ifdef HAVE_LINUX
@@ -450,7 +450,7 @@ main(int argc, char** argv)
       goto error;
    }
 
-   if (pgmoneta_validate_configuration(shmem))
+   if (pgmoneta_validate_main_configuration(shmem))
    {
 #ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid configuration");
@@ -472,11 +472,11 @@ main(int argc, char** argv)
       goto error;
    }
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!offline && daemon)
    {
-      if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+      if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
          warnx("pgmoneta: Daemon mode can't be used with console logging");
 #ifdef HAVE_LINUX
@@ -796,7 +796,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    struct json* payload = NULL;
    struct json* header = NULL;
    struct json* request = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
    uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
    uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
 
@@ -806,7 +806,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       return;
    }
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    ai = (struct accept_io*)watcher;
 
    client_addr_length = sizeof(client_addr);
@@ -1584,7 +1584,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
-   struct configuration* config;
+   struct main_configuration* config;
 
    if (EV_ERROR & revents)
    {
@@ -1593,7 +1593,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       return;
    }
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
@@ -1654,7 +1654,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    socklen_t client_addr_length;
    int client_fd;
    char address[INET6_ADDRSTRLEN];
-   struct configuration* config;
+   struct main_configuration* config;
 
    if (EV_ERROR & revents)
    {
@@ -1665,7 +1665,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    memset(&address, 0, sizeof(address));
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
@@ -1728,9 +1728,9 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 static void
 shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    pgmoneta_log_debug("shutdown requested (%p, %p, %d)", loop, w, revents);
    ev_break(loop, EVBREAK_ALL);
@@ -1756,9 +1756,9 @@ coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 static void
 wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (EV_ERROR & revents)
    {
@@ -1834,9 +1834,9 @@ retention_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 static void
 valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (EV_ERROR & revents)
    {
@@ -1872,9 +1872,9 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
    bool start = false;
    int follow;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (EV_ERROR & revents)
    {
@@ -1973,9 +1973,9 @@ reload_configuration(void)
    bool restart = false;
    int old_metrics;
    int old_management;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    old_metrics = config->metrics;
    old_management = config->management;
@@ -2053,9 +2053,9 @@ static void
 init_receivewals(void)
 {
    int active = 0;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    for (int i = 0; i < config->number_of_servers; i++)
    {
@@ -2098,10 +2098,10 @@ init_replication_slots(void)
    int ret = 0;
    struct message* slot_request_msg = NULL;
    struct message* slot_response_msg = NULL;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
    bool create_slot = false;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    pgmoneta_memory_init();
 
@@ -2247,10 +2247,10 @@ verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket)
    int ret = VALID_SLOT;
    struct message* query;
    struct query_response* response;
-   struct configuration* config = NULL;
+   struct main_configuration* config = NULL;
    struct tuple* current = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    pgmoneta_create_search_replication_slot_message(slot_name, &query);
    if (pgmoneta_query_execute(ssl, socket, query, &response) || response == NULL)
@@ -2283,9 +2283,9 @@ create_pidfile(void)
    pid_t pid;
    int r;
    int fd;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (strlen(config->pidfile) == 0)
    {
@@ -2348,9 +2348,9 @@ error:
 static void
 remove_pidfile(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (strlen(config->pidfile) > 0 && access(config->pidfile, F_OK) == 0)
    {
@@ -2361,9 +2361,9 @@ remove_pidfile(void)
 static void
 shutdown_ports(void)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (config->metrics > 0)
    {

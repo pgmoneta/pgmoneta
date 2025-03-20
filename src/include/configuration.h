@@ -110,7 +110,7 @@ extern "C" {
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_init_configuration(void* shmem);
+pgmoneta_init_main_configuration(void* shmem);
 
 /**
  * Read the configuration from a file
@@ -119,7 +119,7 @@ pgmoneta_init_configuration(void* shmem);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_read_configuration(void* shmem, char* filename);
+pgmoneta_read_main_configuration(void* shmem, char* filename);
 
 /**
  * Validate the configuration
@@ -127,7 +127,7 @@ pgmoneta_read_configuration(void* shmem, char* filename);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_validate_configuration(void* shmem);
+pgmoneta_validate_main_configuration(void* shmem);
 
 /**
  * Read the USERS configuration from a file

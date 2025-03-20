@@ -63,9 +63,9 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
    struct dirent* entry;
    int level;
    struct worker_input* wi = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -223,9 +223,9 @@ pgmoneta_gzip_wal(char* directory)
    DIR* dir;
    struct dirent* entry;
    int level;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -392,9 +392,9 @@ int
 pgmoneta_gzip_file(char* from, char* to)
 {
    int level;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    level = config->compression_level;
    if (level < 1)

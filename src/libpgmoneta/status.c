@@ -60,11 +60,11 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
    struct backup** backups = NULL;
    struct json* response = NULL;
    struct json* servers = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -254,11 +254,11 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
    struct json* response = NULL;
    struct json* servers = NULL;
    struct json* bcks = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 

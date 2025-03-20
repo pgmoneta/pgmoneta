@@ -108,13 +108,13 @@ pgmoneta_wal(int srv, char** argv)
    struct query_response* end_of_timeline_response = NULL;
    struct message* start_replication_msg = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));;
-   struct configuration* config;
+   struct main_configuration* config;
    struct stream_buffer* buffer = NULL;
    struct workflow* head = NULL;
    struct workflow* current = NULL;
    struct art* nodes = NULL;
 
-   config = (struct configuration*) shmem;
+   config = (struct main_configuration*) shmem;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
@@ -728,7 +728,7 @@ error:
 static void
 update_wal_lsn(int srv, size_t xlogptr)
 {
-   struct configuration* config = (struct configuration*) shmem;
+   struct main_configuration* config = (struct main_configuration*) shmem;
    uint32_t low32 = xlogptr & 0xffffffff;
    uint32_t high32 = xlogptr >> 32 & 0xffffffff;
    memset(config->servers[srv].current_wal_lsn, 0, MISC_LENGTH);

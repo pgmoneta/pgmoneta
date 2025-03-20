@@ -180,13 +180,13 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    char* buffer = NULL;
    struct decoded_xlog_record* decoded = NULL;
    struct xlog_page_header_data* page_header = NULL;
-   struct configuration* config = NULL;
+   struct walinfo_configuration* config = NULL;
    timeline_id tli = 0;
    xlog_seg_no logSegNo = 0;
    xlog_rec_ptr base;
    int wal_segz_bytes = DEFAULT_WAL_SEGZ_BYTES;
 
-   config = (struct configuration*) shmem;
+   config = (struct walinfo_configuration*) shmem;
 
    FILE* file = fopen(path, "rb");
    if (file == NULL)

@@ -77,11 +77,11 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct backup* child = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (!config->servers[server].valid)
    {
@@ -362,9 +362,9 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
    struct json* j = NULL;
    struct json* bcks = NULL;
    struct deque_iterator* diter = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -586,11 +586,11 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -673,9 +673,9 @@ error:
 int
 pgmoneta_get_backup_max_rate(int server)
 {
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (config->servers[server].backup_max_rate != -1)
    {

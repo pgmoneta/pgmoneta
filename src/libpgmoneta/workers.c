@@ -209,9 +209,9 @@ int
 pgmoneta_get_number_of_workers(int server)
 {
    int nw = 0;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    if (config->servers[server].workers != -1)
    {

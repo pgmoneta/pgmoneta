@@ -84,9 +84,9 @@ azure_storage_setup(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    curl = curl_easy_init();
    if (curl == NULL)
@@ -127,11 +127,11 @@ azure_storage_execute(char* name, struct art* nodes)
    double remote_azure_elapsed_time;
    char* local_root = NULL;
    char* azure_root = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -183,9 +183,9 @@ azure_storage_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* root = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
@@ -334,9 +334,9 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    struct stat file_info;
    CURLcode res = -1;
    struct curl_slist* chunk = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    local_path = pgmoneta_append(local_path, local_root);
    local_path = pgmoneta_append(local_path, relative_path);
@@ -520,9 +520,9 @@ static char*
 azure_get_host()
 {
    char* host = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    host = pgmoneta_append(host, config->azure_storage_account);
    host = pgmoneta_append(host, ".blob.core.windows.net/");
@@ -535,9 +535,9 @@ static char*
 azure_get_basepath(int server, char* identifier)
 {
    char* d = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    d = pgmoneta_append(d, config->azure_base_dir);
    if (!pgmoneta_ends_with(config->azure_base_dir, "/"))
