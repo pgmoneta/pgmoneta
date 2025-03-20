@@ -27,93 +27,32 @@
  *
  */
 
+#include <tsclient.h>
+
 #include "pgmoneta_test_1.h"
-#include "common.h"
 
 // test backup
 START_TEST(test_pgmoneta_backup)
 {
    int found = 0;
-   char command[BUFFER_SIZE];
-   char* executable_path = NULL;
-   char* configuration_path = NULL;
-   char* log_path = NULL;
-   char command_output[BUFFER_SIZE];
-   FILE* fp;
-
-   executable_path = get_executable_path();
-   configuration_path = get_configuration_path();
-   log_path = get_log_path();
-
-   snprintf(command, sizeof(command), "%s -c %s backup primary", executable_path, configuration_path);
-
-   fp = popen(command, "r");
-   if (fp == NULL)
-   {
-      ck_assert_msg(0, "couldn't execute the command");
-   }
-
-   fread(command_output, sizeof(char), BUFFER_SIZE - 1, fp);
-
-   pclose(fp);
-
-   if (strstr(command_output, SUCCESS_STATUS) != NULL)
-   {
-      found = 1;
-   }
+   found = !pgmoneta_tsclient_execute_backup("primary", NULL);
    ck_assert_msg(found, "success status not found");
-
-done:
-   free(executable_path);
-   free(configuration_path);
-   free(log_path);
 }
 END_TEST
 // test restore
 START_TEST(test_pgmoneta_restore)
 {
    int found = 0;
-   char command[BUFFER_SIZE];
-   char* executable_path = NULL;
-   char* configuration_path = NULL;
-   char* restore_path = NULL;
-   char* log_path = NULL;
-   FILE* fp;
-   char command_output[BUFFER_SIZE];
-
-   executable_path = get_executable_path();
-   configuration_path = get_configuration_path();
-   restore_path = get_restore_path();
-   log_path = get_log_path();
-
-   snprintf(command, sizeof(command), "%s -c %s restore primary newest current %s", executable_path, configuration_path, restore_path);
-
-   fp = popen(command, "r");
-   if (fp == NULL)
-   {
-      ck_assert_msg(0, "couldn't execute the command");
-   }
-
-   fread(command_output, sizeof(char), BUFFER_SIZE - 1, fp);
-
-   pclose(fp);
-
-done:
-   free(executable_path);
-   free(configuration_path);
-   free(restore_path);
-   free(log_path);
+   found = !pgmoneta_tsclient_execute_restore("primary", "newest", "current");
+   ck_assert_msg(found, "success status not found");
 }
 END_TEST
 
 Suite*
-pgmoneta_test1_suite(char* dir)
+pgmoneta_test1_suite()
 {
    Suite* s;
    TCase* tc_core;
-
-   memset(project_directory, 0, sizeof(project_directory));
-   memcpy(project_directory, dir, strlen(dir));
 
    s = suite_create("pgmoneta_test1");
 
