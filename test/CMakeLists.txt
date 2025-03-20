@@ -28,20 +28,21 @@
 if (check)
 
   set(SOURCES
-    testcases/common.c
+    testcases/tsclient.c
     testcases/pgmoneta_test_1.c
     testcases/pgmoneta_test_2.c
     testcases/runner.c
   )
 
   add_executable(pgmoneta_test ${SOURCES})
+  target_include_directories(pgmoneta_test PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 
   if(EXISTS "/etc/debian_version")
-    target_link_libraries(pgmoneta_test Check::check subunit pthread rt m)
+    target_link_libraries(pgmoneta_test Check::check subunit pthread rt m pgmoneta)
   elseif(APPLE)
-    target_link_libraries(pgmoneta_test Check::check m)
+    target_link_libraries(pgmoneta_test Check::check m pgmoneta)
   else()
-    target_link_libraries(pgmoneta_test Check::check pthread rt m)
+    target_link_libraries(pgmoneta_test Check::check pthread rt m pgmoneta)
   endif()
 
   add_custom_target(custom_clean
