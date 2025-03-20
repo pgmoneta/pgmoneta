@@ -3478,7 +3478,7 @@ error:
 static int
 string_compare(const void* a, const void* b)
 {
-   return strcmp(*(const char**)a, *(const char**)b);
+   return strcmp(*(char**)a, *(char**)b);
 }
 
 static bool
@@ -4022,7 +4022,7 @@ parse_command(int argc,
               char** argv,
               int offset,
               struct pgmoneta_parsed_command* parsed,
-              const struct pgmoneta_command command_table[],
+              struct pgmoneta_command command_table[],
               size_t command_count)
 {
    char* command = NULL;
@@ -4274,7 +4274,7 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens)
 }
 
 char*
-pgmoneta_format_and_append(char* buf, const char* format, ...)
+pgmoneta_format_and_append(char* buf, char* format, ...)
 {
    va_list args;
    va_start(args, format);
@@ -4299,7 +4299,7 @@ pgmoneta_format_and_append(char* buf, const char* format, ...)
 }
 
 int
-pgmoneta_atoi(const char* input)
+pgmoneta_atoi(char* input)
 {
    if (input == NULL)
    {

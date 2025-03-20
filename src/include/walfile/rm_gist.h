@@ -117,7 +117,7 @@ struct gist_xlog_delete_v16
  */
 struct gist_xlog_delete
 {
-   void (*parse)(struct gist_xlog_delete* wrapper, const void* rec);     /**< Parsing function pointer */
+   void (*parse)(struct gist_xlog_delete* wrapper, void* rec);     /**< Parsing function pointer */
    char* (*format)(struct gist_xlog_delete* wrapper, char* buf);         /**< Formatting function pointer */
    union
    {
@@ -217,7 +217,7 @@ struct gist_xlog_page_reuse_v16
  */
 struct gist_xlog_page_reuse
 {
-   void (*parse)(struct gist_xlog_page_reuse* wrapper, const void* rec);  /**< Parsing function pointer */
+   void (*parse)(struct gist_xlog_page_reuse* wrapper, void* rec);  /**< Parsing function pointer */
    char* (*format)(struct gist_xlog_page_reuse* wrapper, char* buf);      /**< Formatting function pointer */
    union
    {
@@ -241,7 +241,7 @@ create_gist_xlog_delete(void);
  * @param rec The record to parse.
  */
 void
-pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, const void* rec);
+pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, void* rec);
 
 /**
  * @brief Parses a version 16 GIST index delete record.
@@ -250,7 +250,7 @@ pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, const 
  * @param rec The record to parse.
  */
 void
-pgmoneta_wal_parse_gist_xlog_delete_v16(struct gist_xlog_delete* wrapper, const void* rec);
+pgmoneta_wal_parse_gist_xlog_delete_v16(struct gist_xlog_delete* wrapper, void* rec);
 
 /**
  * @brief Formats a version 15 GIST index delete record.
@@ -297,7 +297,7 @@ create_gist_xlog_page_reuse(void);
  * @param rec The record to parse.
  */
 void
-pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper, const void* rec);
+pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper, void* rec);
 
 /**
  * @brief Parses a version 16 GIST index page reuse record.
@@ -306,7 +306,7 @@ pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper
  * @param rec The record to parse.
  */
 void
-pgmoneta_wal_parse_gist_xlog_page_reuse_v16(struct gist_xlog_page_reuse* wrapper, const void* rec);
+pgmoneta_wal_parse_gist_xlog_page_reuse_v16(struct gist_xlog_page_reuse* wrapper, void* rec);
 
 /**
  * @brief Formats a version 15 GIST index page reuse record.

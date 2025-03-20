@@ -35,7 +35,7 @@
 #include <walfile/wal_reader.h>
 #include <walfile/transaction.h>
 
-const struct config_enum_entry wal_level_options[] = {
+struct config_enum_entry wal_level_options[] = {
    {"minimal", WAL_LEVEL_MINIMAL, false},
    {"replica", WAL_LEVEL_REPLICA, false},
    {"archive", WAL_LEVEL_REPLICA, true},        /* deprecated */
@@ -44,11 +44,11 @@ const struct config_enum_entry wal_level_options[] = {
    {NULL, 0, false}
 };
 
-static const char*
+static char*
 get_wal_level_string(int wal_level)
 {
-   const struct config_enum_entry* entry;
-   const char* wal_level_str = "?";
+   struct config_enum_entry* entry;
+   char* wal_level_str = "?";
 
    for (entry = wal_level_options; entry->name; entry++)
    {
@@ -158,7 +158,7 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
 }
 
 void
-check_point_parse_v16(struct check_point* wrapper, const void* rec)
+check_point_parse_v16(struct check_point* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.redo, ptr, sizeof(xlog_rec_ptr));
@@ -193,7 +193,7 @@ check_point_parse_v16(struct check_point* wrapper, const void* rec)
 }
 
 void
-check_point_parse_v17(struct check_point* wrapper, const void* rec)
+check_point_parse_v17(struct check_point* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v17.redo, ptr, sizeof(xlog_rec_ptr));
@@ -230,7 +230,7 @@ check_point_parse_v17(struct check_point* wrapper, const void* rec)
 }
 
 void
-xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, const void* rec)
+xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v17.this_timeline_id, ptr, sizeof(uint32_t));
@@ -243,7 +243,7 @@ xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, const void* rec
 }
 
 void
-xl_end_of_recovery_parse_v16(struct xl_end_of_recovery* wrapper, const void* rec)
+xl_end_of_recovery_parse_v16(struct xl_end_of_recovery* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.this_timeline_id, ptr, sizeof(uint32_t));
@@ -317,8 +317,8 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
    else if (info == XLOG_PARAMETER_CHANGE)
    {
       struct xl_parameter_change xlrec;
-      const char* wal_level_str;
-      const struct config_enum_entry* entry;
+      char* wal_level_str;
+      struct config_enum_entry* entry;
 
       memcpy(&xlrec, rec, sizeof(struct xl_parameter_change));
 
@@ -382,7 +382,7 @@ timestamptz_to_time_t(timestamp_tz t)
    return result;
 }
 
-const char*
+char*
 pgmoneta_wal_timestamptz_to_str(timestamp_tz dt)
 {
    static char buf[MAXDATELEN + 1];

@@ -95,7 +95,7 @@ pgmoneta_wal_is_bkp_image_compressed(uint16_t magic_value, uint8_t bimg_info)
 }
 
 static inline int
-xlog_from_file_name(const char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
+xlog_from_file_name(char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
 {
 #define XLogSegmentsPerXLogId(wal_segsz_bytes) \
         (0x100000000UL / (wal_segsz_bytes))
@@ -760,7 +760,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
 
             if (pgmoneta_wal_is_bkp_image_compressed(magic_value, bimg_info))
             {
-               const char* method;
+               char* method;
 
                if ((bimg_info & BKPIMAGE_COMPRESS_PGLZ) != 0)
                {

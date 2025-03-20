@@ -417,7 +417,7 @@ pgmoneta_create_query_message(char* query, struct message** msg);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_send_copy_data(SSL* ssl, int socket, const char* buffer, size_t nbytes);
+pgmoneta_send_copy_data(SSL* ssl, int socket, char* buffer, size_t nbytes);
 
 /**
  * Has a message

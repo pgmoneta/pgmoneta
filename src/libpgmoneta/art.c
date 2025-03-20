@@ -202,7 +202,7 @@ leaf_match(struct art_leaf* leaf, unsigned char* key, uint32_t key_len);
  * @return The index
  */
 static int
-find_index(unsigned char ch, const unsigned char* keys, int length);
+find_index(unsigned char ch, unsigned char* keys, int length);
 
 /**
  * Insert a value into a node recursively, adopting lazy expansion and path compression --
@@ -289,13 +289,13 @@ static struct value*
 art_search(struct art* t, unsigned char* key, uint32_t key_len);
 
 static int
-art_to_json_string_cb(void* param, const char* key, struct value* value);
+art_to_json_string_cb(void* param, char* key, struct value* value);
 
 static int
-art_to_text_string_cb(void* param, const char* key, struct value* value);
+art_to_text_string_cb(void* param, char* key, struct value* value);
 
 static int
-art_to_compact_json_string_cb(void* param, const char* key, struct value* value);
+art_to_compact_json_string_cb(void* param, char* key, struct value* value);
 
 static char*
 to_json_string(struct art* t, char* tag, int indent);
@@ -1132,7 +1132,7 @@ node256_add_child(struct art_node256* node, unsigned char ch, void* child)
 }
 
 static int
-find_index(unsigned char ch, const unsigned char* keys, int length)
+find_index(unsigned char ch, unsigned char* keys, int length)
 {
    int left = 0;
    int right = length - 1;
@@ -1617,7 +1617,7 @@ art_search(struct art* t, unsigned char* key, uint32_t key_len)
 }
 
 static int
-art_to_json_string_cb(void* param, const char* key, struct value* value)
+art_to_json_string_cb(void* param, char* key, struct value* value)
 {
    struct to_string_param* p = (struct to_string_param*) param;
    char* str = NULL;
@@ -1641,7 +1641,7 @@ art_to_json_string_cb(void* param, const char* key, struct value* value)
 }
 
 static int
-art_to_compact_json_string_cb(void* param, const char* key, struct value* value)
+art_to_compact_json_string_cb(void* param, char* key, struct value* value)
 {
    struct to_string_param* p = (struct to_string_param*) param;
    char* str = NULL;
@@ -1665,7 +1665,7 @@ art_to_compact_json_string_cb(void* param, const char* key, struct value* value)
 }
 
 static int
-art_to_text_string_cb(void* param, const char* key, struct value* value)
+art_to_text_string_cb(void* param, char* key, struct value* value)
 {
    struct to_string_param* p = (struct to_string_param*) param;
    char* str = NULL;

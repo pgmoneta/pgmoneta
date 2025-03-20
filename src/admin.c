@@ -69,7 +69,7 @@ static int list_users(char* users_path, int32_t output_format);
 static char* generate_password(int pwd_length);
 static int create_response(char* users_path, struct json* json, struct json** response);
 
-const struct pgmoneta_command command_table[] =
+struct pgmoneta_command command_table[] =
 {
    {
       .command = "master-key",

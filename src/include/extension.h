@@ -101,7 +101,7 @@ pgmoneta_ext_privilege(SSL* ssl, int socket, struct query_response** qr);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
+pgmoneta_ext_get_file(SSL* ssl, int socket, char* file_path, struct query_response** qr);
 
 /**
  * Retrieve all file paths under the specified directory
@@ -112,7 +112,7 @@ pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query_response** qr);
+pgmoneta_ext_get_files(SSL* ssl, int socket, char* file_path, struct query_response** qr);
 
 /**
  * Send a file chunk to the extension
@@ -124,7 +124,7 @@ pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, const char* dest_path, char* base64_data, struct query_response** qr);
+pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, char* dest_path, char* base64_data, struct query_response** qr);
 
 /**
  * Promote a standby (replica) server to become the primary server

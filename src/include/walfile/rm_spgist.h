@@ -221,7 +221,7 @@ struct spg_xlog_vacuum_redirect_v16
  */
 struct spg_xlog_vacuum_redirect
 {
-   void (*parse)(struct spg_xlog_vacuum_redirect* wrapper, const void* rec);  /**< Function pointer to parse the record. */
+   void (*parse)(struct spg_xlog_vacuum_redirect* wrapper, void* rec);  /**< Function pointer to parse the record. */
    char* (*format)(struct spg_xlog_vacuum_redirect* wrapper, char* buf);      /**< Function pointer to format the record. */
 
    union
@@ -250,7 +250,7 @@ pgmoneta_wal_spg_desc(char* buf, struct decoded_xlog_record* record);
  * @param rec The raw XLOG record to parse.
  */
 void
-pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect* wrapper, const void* rec);
+pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect* wrapper, void* rec);
 
 /**
  * Parse SP-GiST vacuum redirect XLOG record for version 16.
@@ -259,7 +259,7 @@ pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect*
  * @param rec The raw XLOG record to parse.
  */
 void
-pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v16(struct spg_xlog_vacuum_redirect* wrapper, const void* rec);
+pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v16(struct spg_xlog_vacuum_redirect* wrapper, void* rec);
 
 /**
  * Format the SP-GiST vacuum redirect XLOG record for version 15.

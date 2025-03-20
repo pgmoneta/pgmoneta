@@ -213,7 +213,7 @@ struct xl_hash_vacuum_one_page_v16
  */
 struct xl_hash_vacuum_one_page
 {
-   void (*parse)(struct xl_hash_vacuum_one_page* wrapper, const void* rec);   /**< Function pointer to parse the record */
+   void (*parse)(struct xl_hash_vacuum_one_page* wrapper, void* rec);   /**< Function pointer to parse the record */
    char* (*format)(struct xl_hash_vacuum_one_page* wrapper, char* buf);       /**< Function pointer to format the record */
    union
    {
@@ -253,7 +253,7 @@ pgmoneta_wal_create_xl_hash_vacuum_one_page(void);
  * @param rec A pointer to the raw WAL record data to be parsed.
  */
 void
-pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* wrapper, const void* rec);
+pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* wrapper, void* rec);
 
 /**
  * Parse a WAL record of type xl_hash_vacuum_one_page for PostgreSQL version 16.
@@ -265,7 +265,7 @@ pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* w
  * @param rec A pointer to the raw WAL record data to be parsed.
  */
 void
-pgmoneta_wal_parse_xl_hash_vacuum_one_page_v16(struct xl_hash_vacuum_one_page* wrapper, const void* rec);
+pgmoneta_wal_parse_xl_hash_vacuum_one_page_v16(struct xl_hash_vacuum_one_page* wrapper, void* rec);
 
 /**
  * Format the xl_hash_vacuum_one_page structure for PostgreSQL version 15 into a string.

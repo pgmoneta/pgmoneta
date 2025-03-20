@@ -149,7 +149,7 @@ struct check_point_v17
  */
 struct check_point
 {
-   void (*parse)(struct check_point* wrapper, const void* rec);     /**< Parse function pointer */
+   void (*parse)(struct check_point* wrapper, void* rec);     /**< Parse function pointer */
    char* (*format)(struct check_point* wrapper, char* buf);          /**< Format function pointer */
    union
    {
@@ -173,7 +173,7 @@ create_check_point(void);
  * @param rec The record to parse.
  */
 void
-check_point_parse_v16(struct check_point* wrapper, const void* rec);
+check_point_parse_v16(struct check_point* wrapper, void* rec);
 
 /**
  * @brief Parses a version 17 checkpoint record.
@@ -182,7 +182,7 @@ check_point_parse_v16(struct check_point* wrapper, const void* rec);
  * @param rec The record to parse.
  */
 void
-check_point_parse_v17(struct check_point* wrapper, const void* rec);
+check_point_parse_v17(struct check_point* wrapper, void* rec);
 
 /**
  * @brief Formats a version 16 checkpoint record.

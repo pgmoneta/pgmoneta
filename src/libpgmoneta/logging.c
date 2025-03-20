@@ -51,7 +51,7 @@ time_t next_log_rotation_age;  /* number of seconds at which the next location w
 
 char current_log_path[MAX_PATH]; /* the current log file */
 
-static const char* levels[] =
+static char* levels[] =
 {
    "TRACE",
    "DEBUG",
@@ -61,7 +61,7 @@ static const char* levels[] =
    "FATAL"
 };
 
-static const char* colors[] =
+static char* colors[] =
 {
    "\x1b[37m",
    "\x1b[36m",

@@ -124,7 +124,7 @@ struct xl_btree_metadata_v14
  */
 struct xl_btree_metadata
 {
-   void (*parse)(struct xl_btree_metadata* wrapper, const char* rec);  /**< Pointer to parse function.*/
+   void (*parse)(struct xl_btree_metadata* wrapper, char* rec);  /**< Pointer to parse function.*/
    char* (*format)(struct xl_btree_metadata* wrapper, char* buf);      /**< Pointer to format function.*/
    union
    {
@@ -236,7 +236,7 @@ struct xl_btree_reuse_page_v16
  */
 struct xl_btree_reuse_page
 {
-   void (*parse)(struct xl_btree_reuse_page* wrapper, const void* rec);  /**< Function pointer to parse the structure.*/
+   void (*parse)(struct xl_btree_reuse_page* wrapper, void* rec);  /**< Function pointer to parse the structure.*/
    char* (*format)(struct xl_btree_reuse_page* wrapper, char* buf);      /**< Function pointer to format the structure.*/
    union
    {
@@ -318,7 +318,7 @@ struct xl_btree_delete_v16
  */
 struct xl_btree_delete
 {
-   void (*parse)(struct xl_btree_delete* wrapper, const void* rec);    /**< Function pointer to parse the structure. */
+   void (*parse)(struct xl_btree_delete* wrapper, void* rec);    /**< Function pointer to parse the structure. */
    char* (*format)(struct xl_btree_delete* wrapper, char* buf);        /**< Function pointer to format the structure. */
    union
    {
@@ -409,7 +409,7 @@ struct xl_btree_unlink_page_v14
  */
 struct xl_btree_unlink_page
 {
-   void (*parse)(struct xl_btree_unlink_page* wrapper, const void* rec);    /**< Function to parse the record.*/
+   void (*parse)(struct xl_btree_unlink_page* wrapper, void* rec);    /**< Function to parse the record.*/
    char* (*format)(struct xl_btree_unlink_page* wrapper, char* buf);        /**< Function to format the record as a string.*/
    union
    {
@@ -448,7 +448,7 @@ struct xl_btree_reuse_page* pgmoneta_wal_create_xl_btree_reuse_page(void);
  * @param wrapper Pointer to the wrapper structure.
  * @param rec The raw record data to be parsed.
  */
-void pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, void* rec);
 
 /**
  * Parses a version 15 xl_btree_reuse_page record.
@@ -456,7 +456,7 @@ void pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrap
  * @param wrapper Pointer to the wrapper structure.
  * @param rec The raw record data to be parsed.
  */
-void pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, void* rec);
 
 /**
  * Parses a version 16 xl_btree_reuse_page record.
@@ -464,7 +464,7 @@ void pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrap
  * @param wrapper Pointer to the wrapper structure.
  * @param rec The raw record data to be parsed.
  */
-void pgmoneta_wal_parse_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wrapper, void* rec);
 
 /**
  * Formats a version 13 xl_btree_reuse_page record.
@@ -499,7 +499,7 @@ char* pgmoneta_wal_format_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wr
  * @param wrapper The wrapper structure.
  * @param rec The raw record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, void* rec);
 
 /**
  * Parses the v15 version of xl_btree_delete.
@@ -507,7 +507,7 @@ void pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, con
  * @param wrapper The wrapper structure.
  * @param rec The raw record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, void* rec);
 
 /**
  * Parses the v16 version of xl_btree_delete.
@@ -515,7 +515,7 @@ void pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, con
  * @param wrapper The wrapper structure.
  * @param rec The raw record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, void* rec);
 
 /**
  * Formats the v13 version of xl_btree_delete into a string.
@@ -557,7 +557,7 @@ struct xl_btree_metadata* pgmoneta_wal_create_xl_btree_metadata(void);
  * @param wrapper The wrapper containing the metadata.
  * @param rec The raw record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_metadata_v13(struct xl_btree_metadata* wrapper, const char* rec);
+void pgmoneta_wal_parse_xl_btree_metadata_v13(struct xl_btree_metadata* wrapper, char* rec);
 
 /**
  * Parses a version 14 xl_btree_metadata record.
@@ -565,7 +565,7 @@ void pgmoneta_wal_parse_xl_btree_metadata_v13(struct xl_btree_metadata* wrapper,
  * @param wrapper The wrapper containing the metadata.
  * @param rec The raw record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_metadata_v14(struct xl_btree_metadata* wrapper, const char* rec);
+void pgmoneta_wal_parse_xl_btree_metadata_v14(struct xl_btree_metadata* wrapper, char* rec);
 
 /**
  * Formats a version 13 xl_btree_metadata record as a string.
@@ -591,7 +591,7 @@ char* pgmoneta_wal_format_xl_btree_metadata_v14(struct xl_btree_metadata* wrappe
  * @param wrapper The wrapper struct.
  * @param rec The record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wrapper, void* rec);
 
 /**
  * Parses a version 14 xl_btree_unlink_page record.
@@ -599,7 +599,7 @@ void pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wr
  * @param wrapper The wrapper struct.
  * @param rec The record to parse.
  */
-void pgmoneta_wal_parse_xl_btree_unlink_page_v14(struct xl_btree_unlink_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_btree_unlink_page_v14(struct xl_btree_unlink_page* wrapper, void* rec);
 
 /**
  * Formats a version 13 xl_btree_unlink_page record into a string.

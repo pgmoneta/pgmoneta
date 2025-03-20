@@ -51,13 +51,13 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-static int bind_host(const char* hostname, int port, int** fds, int* length);
+static int bind_host(char* hostname, int port, int** fds, int* length);
 
 /**
  *
  */
 int
-pgmoneta_bind(const char* hostname, int port, int** fds, int* length)
+pgmoneta_bind(char* hostname, int port, int** fds, int* length)
 {
    struct ifaddrs* ifaddr, * ifa;
    struct sockaddr_in* sa4;
@@ -141,7 +141,7 @@ pgmoneta_bind(const char* hostname, int port, int** fds, int* length)
  *
  */
 int
-pgmoneta_bind_unix_socket(const char* directory, const char* file, int* fd)
+pgmoneta_bind_unix_socket(char* directory, char* file, int* fd)
 {
    int status;
    char buf[107];
@@ -211,7 +211,7 @@ error:
  *
  */
 int
-pgmoneta_remove_unix_socket(const char* directory, const char* file)
+pgmoneta_remove_unix_socket(char* directory, char* file)
 {
    char buf[MISC_LENGTH];
 
@@ -227,7 +227,7 @@ pgmoneta_remove_unix_socket(const char* directory, const char* file)
  *
  */
 int
-pgmoneta_connect(const char* hostname, int port, int* fd)
+pgmoneta_connect(char* hostname, int port, int* fd)
 {
    struct addrinfo hints = {0};
    struct addrinfo* servinfo = NULL;
@@ -357,7 +357,7 @@ error:
 }
 
 int
-pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd)
+pgmoneta_connect_unix_socket(char* directory, char* file, int* fd)
 {
    char buf[107];
    struct sockaddr_un addr;
@@ -565,7 +565,7 @@ pgmoneta_socket_buffers(int fd)
  *
  */
 static int
-bind_host(const char* hostname, int port, int** fds, int* length)
+bind_host(char* hostname, int port, int** fds, int* length)
 {
    int* result = NULL;
    int index, size;

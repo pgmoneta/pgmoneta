@@ -50,7 +50,7 @@ create_spg_xlog_vacuum_redirect(void)
 }
 
 void
-pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect* wrapper, const void* rec)
+pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.nToPlaceholder, ptr, sizeof(uint16_t));
@@ -67,7 +67,7 @@ pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v15(struct spg_xlog_vacuum_redirect*
 }
 
 void
-pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v16(struct spg_xlog_vacuum_redirect* wrapper, const void* rec)
+pgmoneta_wal_parse_spg_xlog_vacuum_redirect_v16(struct spg_xlog_vacuum_redirect* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.n_to_placeholder, ptr, sizeof(uint16_t));

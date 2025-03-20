@@ -129,7 +129,7 @@ static int  create_ssl_ctx(bool client, SSL_CTX** ctx);
 static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
 static int  create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl);
 
-static int create_hash_file(char* filename, const char* algorithm, char** hash);
+static int create_hash_file(char* filename, char* algorithm, char** hash);
 
 int
 pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
@@ -2748,7 +2748,7 @@ error:
 }
 
 static int
-create_hash_file(char* filename, const char* algorithm, char** hash)
+create_hash_file(char* filename, char* algorithm, char** hash)
 {
    EVP_MD_CTX* md_ctx;
    const EVP_MD* md;
@@ -2984,7 +2984,7 @@ pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc)
    #else
    uint32_t crc_int = ~(*crc);
 
-   static const uint32_t crc32_tab[256] = {
+   static uint32_t crc32_tab[256] = {
       0x00000000L, 0xF26B8303L, 0xE13B70F7L, 0x1350F3F4L,
       0xC79A971FL, 0x35F1141CL, 0x26A1E7E8L, 0xD4CA64EBL,
       0x8AD958CFL, 0x78B2DBCCL, 0x6BE22838L, 0x9989AB3BL,

@@ -100,19 +100,19 @@ struct signal_info
  */
 struct pgmoneta_command
 {
-   const char* command;                            /**< The command */
-   const char* subcommand;                         /**< The subcommand if there is one */
-   const int accepted_argument_count[MISC_LENGTH]; /**< The argument count */
+   char* command;                            /**< The command */
+   char* subcommand;                         /**< The subcommand if there is one */
+   int accepted_argument_count[MISC_LENGTH]; /**< The argument count */
 
-   const int action;                               /**< The specific action */
-   const char* default_argument;                   /**< The default argument */
-   const char* log_message;                        /**< The log message used */
+   int action;                               /**< The specific action */
+   char* default_argument;                   /**< The default argument */
+   char* log_message;                        /**< The log message used */
 
    /* Deprecation information */
    bool deprecated;                                /**< Is the command deprecated */
    unsigned int deprecated_since_major;            /**< Deprecated since major version */
    unsigned int deprecated_since_minor;            /**< Deprecated since minor version */
-   const char* deprecated_by;                      /**< Deprecated by this command */
+   char* deprecated_by;                      /**< Deprecated by this command */
 };
 
 /** @struct pgmoneta_parsed_command
@@ -124,7 +124,7 @@ struct pgmoneta_command
  */
 struct pgmoneta_parsed_command
 {
-   const struct pgmoneta_command* cmd; /**< The command */
+   struct pgmoneta_command* cmd; /**< The command */
    char* args[MISC_LENGTH];            /**< The arguments */
 };
 
@@ -165,7 +165,7 @@ parse_command(int argc,
               char** argv,
               int offset,
               struct pgmoneta_parsed_command* parsed,
-              const struct pgmoneta_command command_table[],
+              struct pgmoneta_command command_table[],
               size_t command_count);
 
 /**
@@ -1252,7 +1252,7 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
  * @return The resulting string
  */
 char*
-pgmoneta_format_and_append(char* buf, const char* format, ...);
+pgmoneta_format_and_append(char* buf, char* format, ...);
 
 /**
  * Wrapper for the atoi() function, which provides NULL input check
@@ -1260,7 +1260,7 @@ pgmoneta_format_and_append(char* buf, const char* format, ...);
  * @return 0 if input is NULL, otherwise what atoi() returns
  */
 int
-pgmoneta_atoi(const char* input);
+pgmoneta_atoi(char* input);
 
 /**
  * Indent a string

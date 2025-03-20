@@ -55,7 +55,7 @@ pgmoneta_wal_create_xl_heap_freeze_page(void)
  * Parses a version 15 xl_heap_freeze_page structure.
  */
 void
-pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.cutoff_xid, ptr, sizeof(transaction_id));
@@ -67,7 +67,7 @@ pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, 
  * Parses a version 16 xl_heap_freeze_page structure.
  */
 void
-pgmoneta_wal_parse_xl_heap_freeze_page_v16(struct xl_heap_freeze_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_heap_freeze_page_v16(struct xl_heap_freeze_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr, sizeof(transaction_id));

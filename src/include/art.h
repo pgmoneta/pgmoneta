@@ -40,7 +40,7 @@ extern "C" {
 
 #define MAX_PREFIX_LEN 10
 
-typedef int (*art_callback)(void* data, const char* key, struct value* value);
+typedef int (*art_callback)(void* data, char* key, struct value* value);
 
 typedef void (*value_destroy_callback)(void* value);
 

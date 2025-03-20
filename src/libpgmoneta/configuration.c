@@ -89,7 +89,7 @@ static void add_servers_configuration_response(struct json* res);
 static bool is_empty_string(char* s);
 static int remove_leading_whitespace_and_comments(char* s, char** trimmed_line);
 
-static void split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count);
+static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count);
 
 /**
  *
@@ -4504,7 +4504,7 @@ error:
 }
 
 static void
-split_extra(const char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
+split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
 {
    int i = 0;
    char temp[DEFAULT_BUFFER_SIZE];

@@ -45,7 +45,7 @@ char*
 pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
                                int backendId, enum fork_number forkNumber)
 {
-   const char*const forkNames[] = {
+   char*forkNames[] = {
       "main",                       /* MAIN_FORKNUM */
       "fsm",                        /* FSM_FORKNUM */
       "vm",                      /* VISIBILITYMAP_FORKNUM */

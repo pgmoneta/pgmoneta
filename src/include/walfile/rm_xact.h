@@ -314,7 +314,7 @@ struct xl_xact_prepare_v15
  */
 struct xl_xact_prepare
 {
-   void (*parse)(struct xl_xact_prepare* wrapper, const void* rec);         /**< Parsing function. */
+   void (*parse)(struct xl_xact_prepare* wrapper, void* rec);         /**< Parsing function. */
    char* (*format)(struct xl_xact_prepare* wrapper, char* rec, char* buf);  /**< Formatting function. */
    union
    {
@@ -397,7 +397,7 @@ typedef struct xl_xact_parsed_commit_v15 xl_xact_parsed_prepare_v15;
  */
 struct xl_xact_parsed_commit
 {
-   void (*parse)(struct xl_xact_parsed_commit* wrapper, const void* rec);           /**< Parsing function pointer. */
+   void (*parse)(struct xl_xact_parsed_commit* wrapper, void* rec);           /**< Parsing function pointer. */
    char* (*format)(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf);    /**< Formatting function pointer. */
    union
    {
@@ -461,7 +461,7 @@ struct xl_xact_parsed_abort_v15
  */
 struct xl_xact_parsed_abort
 {
-   void (*parse)(struct xl_xact_parsed_abort* wrapper, const void* rec);         /**< Parse function pointer. */
+   void (*parse)(struct xl_xact_parsed_abort* wrapper, void* rec);         /**< Parse function pointer. */
    char* (*format)(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf);  /**< Format function pointer. */
    union
    {
@@ -487,7 +487,7 @@ pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record);
  * @param rec The record data to parse.
  */
 void
-pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, const void* rec);
+pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, void* rec);
 
 /**
  * Parses a version 15 xl_xact_prepare record.
@@ -496,7 +496,7 @@ pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, const vo
  * @param rec The record data to parse.
  */
 void
-pgmoneta_wal_parse_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, const void* rec);
+pgmoneta_wal_parse_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, void* rec);
 
 /**
  * Formats a version 14 xl_xact_prepare record into a buffer.
@@ -533,7 +533,7 @@ pgmoneta_wal_create_xact_parsed_commit(void);
  * @param rec The raw commit record to parse.
  */
 void
-pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, const void* rec);
+pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, void* rec);
 
 /**
  * Parses a commit record for version 15.
@@ -542,7 +542,7 @@ pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, const 
  * @param rec The raw commit record to parse.
  */
 void
-pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, const void* rec);
+pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, void* rec);
 
 /**
  * Formats a commit record for version 14 into a human-readable string.
@@ -587,7 +587,7 @@ pgmoneta_wal_create_xl_xact_parsed_abort(void);
  * @param rec Pointer to the raw WAL record to be parsed.
  */
 void
-pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper, const void* rec);
+pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper, void* rec);
 
 /**
  * Parse a transaction abort record (v15).
@@ -600,7 +600,7 @@ pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper
  * @param rec Pointer to the raw WAL record to be parsed.
  */
 void
-pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, const void* rec);
+pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, void* rec);
 
 /**
  * Format a transaction abort record (v14) as a string.

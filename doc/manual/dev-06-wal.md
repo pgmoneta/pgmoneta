@@ -240,7 +240,7 @@ struct xl_end_of_recovery {
         struct xl_end_of_recovery_v16 v16;
         struct xl_end_of_recovery_v17 v17;
     } data;
-    void (*parse)(struct xl_end_of_recovery* wrapper, const void* rec);
+    void (*parse)(struct xl_end_of_recovery* wrapper, void* rec);
     char* (*format)(struct xl_end_of_recovery* wrapper, char* buf);
 };
 
@@ -259,11 +259,11 @@ xl_end_of_recovery* create_xl_end_of_recovery(int pg_version) {
     return wrapper;
 }
 
-void parse_v16(xl_end_of_recovery* wrapper, const void* rec) {
+void parse_v16(xl_end_of_recovery* wrapper, void* rec) {
     memcpy(&wrapper->data.v16, rec, sizeof(struct xl_end_of_recovery_v16));
 }
 
-void parse_v17(xl_end_of_recovery* wrapper, const void* rec) {
+void parse_v17(xl_end_of_recovery* wrapper, void* rec) {
     memcpy(&wrapper->data.v17, rec, sizeof(struct xl_end_of_recovery_v17));
 }
 

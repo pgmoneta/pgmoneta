@@ -226,7 +226,7 @@ usage(void)
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
 }
 
-const struct pgmoneta_command command_table[] = {
+struct pgmoneta_command command_table[] = {
    {
       .command = "backup",
       .subcommand = "",

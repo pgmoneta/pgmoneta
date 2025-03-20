@@ -50,7 +50,7 @@ pgmoneta_wal_create_xl_hash_vacuum_one_page(void)
 }
 
 void
-pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.latestRemovedXid, ptr, sizeof(transaction_id));
@@ -59,7 +59,7 @@ pgmoneta_wal_parse_xl_hash_vacuum_one_page_v15(struct xl_hash_vacuum_one_page* w
 }
 
 void
-pgmoneta_wal_parse_xl_hash_vacuum_one_page_v16(struct xl_hash_vacuum_one_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_hash_vacuum_one_page_v16(struct xl_hash_vacuum_one_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.snaphost_conflict_horizon, ptr, sizeof(transaction_id));

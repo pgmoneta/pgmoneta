@@ -139,7 +139,7 @@ struct xl_end_of_recovery_v16
  */
 struct xl_end_of_recovery
 {
-   void (*parse)(struct xl_end_of_recovery* wrapper, const void* rec);     /**< Function pointer to parse the record */
+   void (*parse)(struct xl_end_of_recovery* wrapper, void* rec);     /**< Function pointer to parse the record */
    char* (*format)(struct xl_end_of_recovery* wrapper, char* buf);         /**< Function pointer to format the record */
    union
    {
@@ -159,7 +159,7 @@ struct xl_end_of_recovery
  */
 struct config_enum_entry
 {
-   const char* name;       /**< Name of the configuration entry */
+   char* name;       /**< Name of the configuration entry */
    int val;                /**< Value of the configuration entry */
    bool hidden;            /**< Indicates if the entry is hidden */
 };
@@ -179,7 +179,7 @@ create_xl_end_of_recovery(void);
  * @param rec The record to parse.
  */
 void
-xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, const void* rec);
+xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, void* rec);
 
 /**
  * @brief Parses a version 16 end of recovery record.
@@ -188,7 +188,7 @@ xl_end_of_recovery_parse_v17(struct xl_end_of_recovery* wrapper, const void* rec
  * @param rec The record to parse.
  */
 void
-xl_end_of_recovery_parse_v16(struct xl_end_of_recovery* wrapper, const void* rec);
+xl_end_of_recovery_parse_v16(struct xl_end_of_recovery* wrapper, void* rec);
 
 /**
  * @brief Formats a version 17 end of recovery record.
@@ -214,9 +214,9 @@ xl_end_of_recovery_format_v16(struct xl_end_of_recovery* wrapper, char* buf);
  * @brief Convert a timestamp to a string.
  *
  * @param dt The timestamp to convert.
- * @return const char* The string representation of the timestamp.
+ * @return char* The string representation of the timestamp.
  */
-const char*
+char*
 pgmoneta_wal_timestamptz_to_str(timestamp_tz dt);
 
 /**

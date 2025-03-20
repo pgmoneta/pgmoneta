@@ -71,7 +71,7 @@ pgmoneta_ext_privilege(SSL* ssl, int socket, struct query_response** qr)
 }
 
 int
-pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_response** qr)
+pgmoneta_ext_get_file(SSL* ssl, int socket, char* file_path, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
    snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_file('%s');", file_path);
@@ -79,7 +79,7 @@ pgmoneta_ext_get_file(SSL* ssl, int socket, const char* file_path, struct query_
 }
 
 int
-pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query_response** qr)
+pgmoneta_ext_get_files(SSL* ssl, int socket, char* file_path, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
    snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_files('%s');", file_path);
@@ -87,7 +87,7 @@ pgmoneta_ext_get_files(SSL* ssl, int socket, const char* file_path, struct query
 }
 
 int
-pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, const char* dest_path, char* base64_data, struct query_response** qr)
+pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, char* dest_path, char* base64_data, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
    snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_receive_file_chunk('%s', '%s');", base64_data, dest_path);

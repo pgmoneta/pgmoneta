@@ -61,7 +61,7 @@ void parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct 
  * Parses a version 14 xl_xact_prepare record.
  */
 void
-pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v14.magic, ptr, sizeof(uint32_t));
@@ -97,7 +97,7 @@ pgmoneta_wal_parse_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, const vo
  * Parses a version 15 xl_xact_prepare record.
  */
 void
-pgmoneta_wal_parse_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.magic, ptr, sizeof(uint32_t));
@@ -195,7 +195,7 @@ pgmoneta_wal_create_xact_parsed_commit(void)
 
 /* Parse commit record for version 14 */
 void
-pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, const void* rec)
+pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v14.xact_time, ptr, sizeof(timestamp_tz));
@@ -233,7 +233,7 @@ pgmoneta_wal_parse_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, const 
 
 /* Parse commit record for version 15 */
 void
-pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, const void* rec)
+pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.xact_time, ptr, sizeof(timestamp_tz));
@@ -311,7 +311,7 @@ pgmoneta_wal_create_xl_xact_parsed_abort(void)
 }
 
 void
-pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v14.xact_time, ptr, sizeof(timestamp_tz));
@@ -340,7 +340,7 @@ pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper
 }
 
 void
-pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.xact_time, ptr, sizeof(timestamp_tz));

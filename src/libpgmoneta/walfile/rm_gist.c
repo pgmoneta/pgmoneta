@@ -52,7 +52,7 @@ create_gist_xlog_delete(void)
 
 // Parsing function for version 15
 void
-pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, const void* rec)
+pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.latestRemovedXid, ptr, sizeof(transaction_id));
@@ -62,7 +62,7 @@ pgmoneta_wal_parse_gist_xlog_delete_v15(struct gist_xlog_delete* wrapper, const 
 
 // Parsing function for version 16
 void
-pgmoneta_wal_parse_gist_xlog_delete_v16(struct gist_xlog_delete* wrapper, const void* rec)
+pgmoneta_wal_parse_gist_xlog_delete_v16(struct gist_xlog_delete* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.snapshotConflictHorizon, ptr, sizeof(transaction_id));
@@ -115,7 +115,7 @@ create_gist_xlog_page_reuse(void)
 }
 
 void
-pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper, const void* rec)
+pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.node, ptr, sizeof(struct rel_file_node));
@@ -126,7 +126,7 @@ pgmoneta_wal_parse_gist_xlog_page_reuse_v15(struct gist_xlog_page_reuse* wrapper
 }
 
 void
-pgmoneta_wal_parse_gist_xlog_page_reuse_v16(struct gist_xlog_page_reuse* wrapper, const void* rec)
+pgmoneta_wal_parse_gist_xlog_page_reuse_v16(struct gist_xlog_page_reuse* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.locator, ptr, sizeof(struct rel_file_locator));

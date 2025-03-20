@@ -46,7 +46,7 @@ extern "C" {
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_bind(const char* hostname, int port, int** fds, int* length);
+pgmoneta_bind(char* hostname, int port, int** fds, int* length);
 
 /**
  * Bind a Unix Domain Socket
@@ -56,7 +56,7 @@ pgmoneta_bind(const char* hostname, int port, int** fds, int* length);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_bind_unix_socket(const char* directory, const char* file, int* fd);
+pgmoneta_bind_unix_socket(char* directory, char* file, int* fd);
 
 /**
  * Remove Unix Domain Socket directory
@@ -65,7 +65,7 @@ pgmoneta_bind_unix_socket(const char* directory, const char* file, int* fd);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_remove_unix_socket(const char* directory, const char* file);
+pgmoneta_remove_unix_socket(char* directory, char* file);
 
 /**
  * Connect to a host
@@ -75,7 +75,7 @@ pgmoneta_remove_unix_socket(const char* directory, const char* file);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_connect(const char* hostname, int port, int* fd);
+pgmoneta_connect(char* hostname, int port, int* fd);
 
 /**
  * Connect to a Unix Domain Socket
@@ -85,7 +85,7 @@ pgmoneta_connect(const char* hostname, int port, int* fd);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd);
+pgmoneta_connect_unix_socket(char* directory, char* file, int* fd);
 
 /**
  * Is the socket valid

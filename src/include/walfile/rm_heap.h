@@ -318,7 +318,7 @@ struct xl_heap_clean_v13
  */
 struct xl_heap_prune
 {
-   void (*parse)(struct xl_heap_prune* wrapper, const void* rec);     /**< Function pointer to parse the record */
+   void (*parse)(struct xl_heap_prune* wrapper, void* rec);     /**< Function pointer to parse the record */
    char* (*format)(struct xl_heap_prune* wrapper, char* buf);         /**< Function pointer to format the record */
    union
    {
@@ -386,7 +386,7 @@ struct xl_heap_freeze_page_v16
  */
 struct xl_heap_freeze_page
 {
-   void (*parse)(struct xl_heap_freeze_page* wrapper, const void* rec);  /**< Parse function pointer.    */
+   void (*parse)(struct xl_heap_freeze_page* wrapper, void* rec);  /**< Parse function pointer.    */
    char* (*format)(struct xl_heap_freeze_page* wrapper, char* buf);      /**< Format function pointer.  */
    union
    {
@@ -503,7 +503,7 @@ struct xl_heap_prune* create_xl_heap_prune(void);
  * @param wrapper The wrapper structure containing the record data.
  * @param rec The record to parse.
  */
-void xl_heap_prune_parse_v17(struct xl_heap_prune* wrapper, const void* rec);
+void xl_heap_prune_parse_v17(struct xl_heap_prune* wrapper, void* rec);
 
 /**
  * @brief Parses a version 16 prune record.
@@ -511,7 +511,7 @@ void xl_heap_prune_parse_v17(struct xl_heap_prune* wrapper, const void* rec);
  * @param wrapper The wrapper structure containing the record data.
  * @param rec The record to parse.
  */
-void xl_heap_prune_parse_v16(struct xl_heap_prune* wrapper, const void* rec);
+void xl_heap_prune_parse_v16(struct xl_heap_prune* wrapper, void* rec);
 
 /**
  * @brief Parses a version 15 prune record.
@@ -519,7 +519,7 @@ void xl_heap_prune_parse_v16(struct xl_heap_prune* wrapper, const void* rec);
  * @param wrapper The wrapper structure containing the record data.
  * @param rec The record to parse.
  */
-void xl_heap_prune_parse_v15(struct xl_heap_prune* wrapper, const void* rec);
+void xl_heap_prune_parse_v15(struct xl_heap_prune* wrapper, void* rec);
 
 /**
  * @brief Parses a version 14 prune record.
@@ -527,7 +527,7 @@ void xl_heap_prune_parse_v15(struct xl_heap_prune* wrapper, const void* rec);
  * @param wrapper The wrapper structure containing the record data.
  * @param rec The record to parse.
  */
-void xl_heap_prune_parse_v14(struct xl_heap_prune* wrapper, const void* rec);
+void xl_heap_prune_parse_v14(struct xl_heap_prune* wrapper, void* rec);
 
 /**
  * @brief Parses a version 13 clean record.
@@ -535,7 +535,7 @@ void xl_heap_prune_parse_v14(struct xl_heap_prune* wrapper, const void* rec);
  * @param wrapper The wrapper structure containing the record data.
  * @param rec The record to parse.
  */
-void xl_heap_prune_parse_v13(struct xl_heap_prune* wrapper, const void* rec);
+void xl_heap_prune_parse_v13(struct xl_heap_prune* wrapper, void* rec);
 
 /**
  * @brief Formats a version 17 prune record.
@@ -635,7 +635,7 @@ struct xl_heap_freeze_page* pgmoneta_wal_create_xl_heap_freeze_page(void);
  * @param wrapper The wrapper structure containing the union of different versions.
  * @param rec The raw data to parse.
  */
-void pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrapper, void* rec);
 
 /**
  * Parses a version 16 xl_heap_freeze_page structure.
@@ -643,7 +643,7 @@ void pgmoneta_wal_parse_xl_heap_freeze_page_v15(struct xl_heap_freeze_page* wrap
  * @param wrapper The wrapper structure containing the union of different versions.
  * @param rec The raw data to parse.
  */
-void pgmoneta_wal_parse_xl_heap_freeze_page_v16(struct xl_heap_freeze_page* wrapper, const void* rec);
+void pgmoneta_wal_parse_xl_heap_freeze_page_v16(struct xl_heap_freeze_page* wrapper, void* rec);
 
 /**
  * Formats a version 15 xl_heap_freeze_page structure.

@@ -59,7 +59,7 @@ pgmoneta_wal_create_xl_btree_reuse_page(void)
 }
 
 void
-pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v13.node, ptr, sizeof(struct rel_file_node));
@@ -70,7 +70,7 @@ pgmoneta_wal_parse_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, 
 }
 
 void
-pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.node, ptr, sizeof(struct rel_file_node));
@@ -81,7 +81,7 @@ pgmoneta_wal_parse_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, 
 }
 
 void
-pgmoneta_wal_parse_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.locator, ptr, sizeof(struct rel_file_locator));
@@ -152,7 +152,7 @@ pgmoneta_wal_create_xl_btree_delete(void)
 }
 
 void
-pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v13.latest_removed_xid, ptr, sizeof(transaction_id));
@@ -161,7 +161,7 @@ pgmoneta_wal_parse_xl_btree_delete_v13(struct xl_btree_delete* wrapper, const vo
 }
 
 void
-pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v15.latestRemovedXid, ptr, sizeof(transaction_id));
@@ -172,7 +172,7 @@ pgmoneta_wal_parse_xl_btree_delete_v15(struct xl_btree_delete* wrapper, const vo
 }
 
 void
-pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_delete_v16(struct xl_btree_delete* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
    memcpy(&wrapper->data.v16.snapshot_conflict_horizon, ptr,
@@ -233,13 +233,13 @@ pgmoneta_wal_create_xl_btree_metadata(void)
 }
 
 void
-pgmoneta_wal_parse_xl_btree_metadata_v13(struct xl_btree_metadata* wrapper, const char* rec)
+pgmoneta_wal_parse_xl_btree_metadata_v13(struct xl_btree_metadata* wrapper, char* rec)
 {
    memcpy(&wrapper->data.v13, rec, sizeof(struct xl_btree_metadata_v13));
 }
 
 void
-pgmoneta_wal_parse_xl_btree_metadata_v14(struct xl_btree_metadata* wrapper, const char* rec)
+pgmoneta_wal_parse_xl_btree_metadata_v14(struct xl_btree_metadata* wrapper, char* rec)
 {
    memcpy(&wrapper->data.v14, rec, sizeof(struct xl_btree_metadata_v14));
 }
@@ -289,7 +289,7 @@ pgmoneta_wal_create_xl_btree_unlink_page(void)
  * @param rec The record to parse.
  */
 void
-pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wrapper, void* rec)
 {
    memcpy(&wrapper->data.v13, rec, sizeof(struct xl_btree_unlink_page_v13));
 }
@@ -301,7 +301,7 @@ pgmoneta_wal_parse_xl_btree_unlink_page_v13(struct xl_btree_unlink_page* wrapper
  * @param rec The record to parse.
  */
 void
-pgmoneta_wal_parse_xl_btree_unlink_page_v14(struct xl_btree_unlink_page* wrapper, const void* rec)
+pgmoneta_wal_parse_xl_btree_unlink_page_v14(struct xl_btree_unlink_page* wrapper, void* rec)
 {
    memcpy(&wrapper->data.v14, rec, sizeof(struct xl_btree_unlink_page_v14));
 }

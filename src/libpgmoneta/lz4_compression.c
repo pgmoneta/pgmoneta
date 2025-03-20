@@ -797,7 +797,7 @@ pgmoneta_lz4d_string(unsigned char* compressed_buffer, size_t compressed_size, c
       return 1;
    }
 
-   decompressed_size = LZ4_decompress_safe((const char*)compressed_buffer, *output_string, compressed_size, max_decompressed_size);
+   decompressed_size = LZ4_decompress_safe((char*)compressed_buffer, *output_string, compressed_size, max_decompressed_size);
    if (decompressed_size < 0)
    {
       pgmoneta_log_error("LZ4: Decompress failed");
