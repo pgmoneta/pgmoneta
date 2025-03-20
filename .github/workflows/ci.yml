@@ -47,6 +47,18 @@ jobs:
       run: sudo apt install net-tools
     - name: Install check
       run: sudo apt install check
+    - name: Install PostgreSQL
+      run: |
+        sudo apt install curl ca-certificates
+        sudo install -d /usr/share/postgresql-common/pgdg
+        sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        sudo apt update
+        sudo apt install -y postgresql-17
+    - name: Set Env Path Variable
+      run: |
+        echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
+        echo $PATH
     - name: CLANG/Release/mkdir
       run: mkdir build
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
@@ -68,6 +80,13 @@ jobs:
     - name: GCC/make
       run: make
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+    - name: GCC/Testsuite
+      id: gcc-test
+      run: $(which bash) ./testsuite.sh
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+    - name: GCC/Testsuite Clean
+      run: $(which bash) ./testsuite.sh clean
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: GCC/rm -Rf
       run: rm -Rf build/
       working-directory: /home/runner/work/pgmoneta/pgmoneta/
@@ -80,29 +99,19 @@ jobs:
     - name: CLANG/make
       run: make
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: Install PostgreSQL
-      run: |
-        sudo apt install curl ca-certificates
-        sudo install -d /usr/share/postgresql-common/pgdg
-        sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-        sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-        sudo apt update
-        sudo apt install -y postgresql-17
-    - name: Set Env Path Variable
-      run: |
-        echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
-        echo $PATH
-    - name: Run Test Suite
+    - name: CLANG/Testsuite
+      id: clang-test
       run: $(which bash) ./testsuite.sh
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: Cleanup
+    - name: CLANG/Testsuite Clean
       run: $(which bash) ./testsuite.sh clean
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: Show logs
-      if: failure()
+      if: failure() && (steps.gcc-test.outcome == 'failure' || steps.clang-test.outcome == 'failure')
       run: |
         cat ./log/logfile
         cat ./log/pgmoneta.log
+        $(which bash) ./testsuite.sh clean
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: Upload artifact for failed workflow
       if: failure()

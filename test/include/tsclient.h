@@ -27,12 +27,18 @@
  *
  */
 
+#ifndef PGMONETA_TSCLIENT_H
+#define PGMONETA_TSCLIENT_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <json.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifndef PGMONETA_TEST_COMMON_H
-#define PGMONETA_TEST_COMMON_H
 
 #define BUFFER_SIZE 8192
 
@@ -41,49 +47,56 @@
 #define PGMONETA_CONFIGURATION_TRAIL "/pgmoneta-testsuite/conf/pgmoneta.conf"
 #define PGMONETA_RESTORE_TRAIL       "/pgmoneta-testsuite/restore/"
 
-#define PGMONETA_BACKUP_LOG      "INFO  backup.c:195 Backup: primary/"
-#define PGMONETA_RESTORE_LOG     "INFO  restore.c:142 Restore: primary/"
-#define PGMONETA_DELETE_LOG      "INFO  backup.c:545 Delete: primary/"
-
-#define SUCCESS_STATUS  "Status: true"
-
 extern char project_directory[BUFFER_SIZE];
 
 /**
- * get the executable path from the project directory and its corresponding trail
- * @return executable path
- */
-char*
-get_executable_path();
-
-/**
- * get the configuration path from the project directory and its corresponding trail
- * @return configuration path
- */
-char*
-get_configuration_path();
-
-/**
- * get the restore path from the project directory and its corresponding trail
- * @return restore path
- */
-char*
-get_restore_path();
-
-/**
- * get the log path from the project directory and its corresponding trail
- * @return log path
- */
-char*
-get_log_path();
-
-/**
- * get the last entry of a log file (remember to free the buffer)
- * @param log_path The path of log file
- * @param buffer The buffer to store the last entry of the log file
- * @return 0 for success otherwise 1
+ * Initialize the tsclient API
+ * @param base_dir path to base
+ * @return 0 upon success, otherwise 1
  */
 int
-get_last_log_entry(char* log_path, char** buffer);
+pgmoneta_tsclient_init(char* base_dir);
+
+/**
+ * Destroy the tsclient (must be used after pgmoneta_tsclient_init)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_destroy();
+
+/**
+ * Execute backup command on the server
+ * @param socket the value of socket corresponding to the main server
+ * @param server the server to perform backup on
+ * @param incremental execute backup in incremental mode
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_backup(char* server, char* incremental);
+
+/**
+ * Execute restore command on the server
+ * @param socket the value of socket corresponding to the main server
+ * @param server the server to perform restore on
+ * @param backup_id the backup_id to perform restore on
+ * @param position the position parameters
+ * @return 0 upon success, otherwise 
+ */
+int
+pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position);
+
+/**
+ * Execute delete command on the server
+ * @param socket the value of socket corresponding to the main server
+ * @param server the server to perform delete on
+ * @param backup_id the backup_id to delete
+ * @return 0 upon success, otherwise 
+ */
+int
+pgmoneta_tsclient_execute_delete(char* server, char* backup_id);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
