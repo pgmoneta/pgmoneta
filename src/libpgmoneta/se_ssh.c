@@ -142,7 +142,7 @@ ssh_storage_setup(char* name, struct art* nodes)
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
    {
-      char *a = NULL;
+      char* a = NULL;
       a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
       pgmoneta_log_debug("(Tree)\n%s", a);
       free(a);
@@ -328,7 +328,7 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
    {
-      char *a = NULL;
+      char* a = NULL;
       a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
       pgmoneta_log_debug("(Tree)\n%s", a);
       free(a);
@@ -461,7 +461,7 @@ ssh_storage_wal_shipping_execute(char* name, struct art* nodes)
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
    {
-      char *a = NULL;
+      char* a = NULL;
       a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
       pgmoneta_log_debug("(Tree)\n%s", a);
       free(a);
@@ -512,7 +512,7 @@ ssh_storage_backup_teardown(char* name, struct art* nodes)
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
    {
-      char *a = NULL;
+      char* a = NULL;
       a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
       pgmoneta_log_debug("(Tree)\n%s", a);
       free(a);
@@ -563,7 +563,7 @@ ssh_storage_wal_shipping_teardown(char* name, struct art* nodes)
 #ifdef DEBUG
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
    {
-      char *a = NULL;
+      char* a = NULL;
       a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
       pgmoneta_log_debug("(Tree)\n%s", a);
       free(a);

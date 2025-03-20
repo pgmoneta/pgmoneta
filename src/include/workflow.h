@@ -91,14 +91,14 @@ typedef int (*teardown)(char*, struct art*);
  */
 struct workflow
 {
-  int type;          /**< The type */
+   int type;         /**< The type */
 
-  name name;         /**< The name */
-  setup setup;       /**< The setup  function pointer */
-  execute execute;   /**< The execute function pointer */
-  teardown teardown; /**< The teardown function pointer */
+   name name;        /**< The name */
+   setup setup;      /**< The setup  function pointer */
+   execute execute;  /**< The execute function pointer */
+   teardown teardown; /**< The teardown function pointer */
 
-  struct workflow *next; /**< The next workflow */
+   struct workflow* next; /**< The next workflow */
 };
 
 /**

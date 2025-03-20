@@ -112,7 +112,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
                   }
                   else
                   {
-                     do_encrypt_file((struct worker_common *)wi);
+                     do_encrypt_file((struct worker_common*)wi);
                   }
                }
             }
@@ -485,12 +485,12 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common *)wi);
+                     pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common*)wi);
                   }
                }
                else
                {
-                  do_decrypt_file((struct worker_common *)wi);
+                  do_decrypt_file((struct worker_common*)wi);
                }
             }
             else

@@ -1812,7 +1812,7 @@ error:
 static void
 do_delete_file(struct worker_common* wc)
 {
-   struct worker_input *fi = (struct worker_input*)wc;
+   struct worker_input* fi = (struct worker_input*)wc;
    int ret = unlink(fi->from);
 
    if (ret != 0)
@@ -2446,7 +2446,7 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    }
    else
    {
-      do_copy_file((struct worker_common *)fi);
+      do_copy_file((struct worker_common*)fi);
    }
 
    return 0;
@@ -2459,7 +2459,7 @@ error:
 static void
 do_copy_file(struct worker_common* wc)
 {
-   struct worker_input *fi = (struct worker_input*)wc;
+   struct worker_input* fi = (struct worker_input*)wc;
    int fd_from = -1;
    int fd_to = -1;
    char buffer[8192];
@@ -4488,7 +4488,7 @@ pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int*
       goto error;
    }
    *kernel_patch = 0; // BSD doesn't use patch version
-    bsd = true;
+   bsd = true;
 #elif defined(HAVE_OSX)
    if (sscanf(buffer.release, "%d.%d.%d", kernel_major, kernel_minor, kernel_patch) < 2)
    {

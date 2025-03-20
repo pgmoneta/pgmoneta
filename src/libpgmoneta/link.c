@@ -113,7 +113,7 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                }
                else
                {
-                  do_link((struct worker_common *)wi);
+                  do_link((struct worker_common*)wi);
                }
             }
          }
@@ -242,7 +242,7 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
             }
             else
             {
-               do_relink((struct worker_common *)wi);
+               do_relink((struct worker_common*)wi);
             }
          }
       }
@@ -288,7 +288,7 @@ static void
 do_relink(struct worker_common* wc)
 {
    struct worker_input* wi = (struct worker_input*)wc;
-   char *link = NULL;
+   char* link = NULL;
 
 #ifdef DEBUG
    if (!pgmoneta_exists(wi->from))
@@ -418,7 +418,7 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
             }
             else
             {
-               do_comparefiles((struct worker_common *)wi);
+               do_comparefiles((struct worker_common*)wi);
             }
          }
       }
@@ -450,7 +450,7 @@ error:
 static void
 do_comparefiles(struct worker_common* wc)
 {
-   struct worker_input *wi = (struct worker_input*)wc;
+   struct worker_input* wi = (struct worker_input*)wc;
    bool equal;
 
    equal = pgmoneta_compare_files(wi->from, wi->to);

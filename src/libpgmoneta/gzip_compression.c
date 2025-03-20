@@ -127,7 +127,7 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
                }
                else
                {
-                  do_gz_compress((struct worker_common *)wi);
+                  do_gz_compress((struct worker_common*)wi);
                }
             }
             else
@@ -611,7 +611,7 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
                }
                else
                {
-                  do_gz_decompress((struct worker_common *)wi);
+                  do_gz_decompress((struct worker_common*)wi);
                }
             }
             else

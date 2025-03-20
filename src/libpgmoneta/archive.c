@@ -144,7 +144,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_workflow_execute(workflow, nodes, server, client_fd, compression, encryption, payload))
       {
-        goto error;
+         goto error;
       }
 
       if (pgmoneta_management_create_response(payload, server, &response))

@@ -111,7 +111,7 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
             }
             else
             {
-               do_lz4_compress((struct worker_common *)wi);
+               do_lz4_compress((struct worker_common*)wi);
             }
          }
          else
@@ -150,7 +150,7 @@ error:
 static void
 do_lz4_compress(struct worker_common* wc)
 {
-   struct worker_input *wi = (struct worker_input*)wc;
+   struct worker_input* wi = (struct worker_input*)wc;
 
    if (pgmoneta_exists(wi->from))
    {
@@ -366,7 +366,7 @@ error:
 static void
 do_lz4_decompress(struct worker_common* wc)
 {
-   struct worker_input *wi = (struct worker_input*)wc;
+   struct worker_input* wi = (struct worker_input*)wc;
 
    if (pgmoneta_exists(wi->from))
    {
