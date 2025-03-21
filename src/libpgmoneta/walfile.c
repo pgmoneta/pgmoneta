@@ -214,7 +214,7 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 int
 pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                          uint32_t limit)
+                          uint32_t limit, char** included_objects)
 {
    FILE* out = NULL;
    char* tmp_wal = NULL;
@@ -312,33 +312,21 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       color = false;
    }
 
-   if (type == ValueJSON)
+   if (type == ValueJSON && !quiet)
    {
-      if (!quiet)
-      {
-         fprintf(out, "{ \"WAL\": [\n");
-      }
-
-      while (pgmoneta_deque_iterator_next(record_iterator))
-      {
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit);
-      }
-
-      if (!quiet)
-      {
-         fprintf(out, "\n]}");
-      }
+      fprintf(out, "{ \"WAL\": [\n");
    }
-   else
+
+   while (pgmoneta_deque_iterator_next(record_iterator))
    {
-      while (pgmoneta_deque_iterator_next(record_iterator))
-      {
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit);
-      }
+      record = (struct decoded_xlog_record*) record_iterator->value->data;
+      pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                  rms, start_lsn, end_lsn, xids, limit, included_objects);
+   }
+
+   if (type == ValueJSON && !quiet)
+   {
+      fprintf(out, "\n]}");
    }
 
    if (output != NULL)

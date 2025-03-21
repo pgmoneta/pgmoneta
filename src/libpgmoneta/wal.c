@@ -27,13 +27,15 @@
  */
 
 /* pgmoneta */
-#include <pgmoneta.h>
 #include <art.h>
+#include <extension.h>
+#include <json.h>
 #include <logging.h>
 #include <management.h>
 #include <memory.h>
 #include <message.h>
 #include <network.h>
+#include <pgmoneta.h>
 #include <prometheus.h>
 #include <security.h>
 #include <server.h>
@@ -46,17 +48,19 @@
 /* system */
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
 #include <ev.h>
+#include <libssh/libssh.h>
+#include <libssh/sftp.h>
+#include <openssl/ssl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <openssl/ssl.h>
-#include <libssh/libssh.h>
-#include <libssh/sftp.h>
+#include <unistd.h>
 
 static char* wal_file_name(uint32_t timeline, size_t segno, int segsize);
 static int wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket);
@@ -107,7 +111,7 @@ pgmoneta_wal(int srv, char** argv)
    struct query_response* identify_system_response = NULL;
    struct query_response* end_of_timeline_response = NULL;
    struct message* start_replication_msg = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));;
+   struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct main_configuration* config;
    struct stream_buffer* buffer = NULL;
    struct workflow* head = NULL;
@@ -1198,5 +1202,466 @@ wal_shipping_setup(int srv, char** wal_shipping)
       return 0;
    }
    *wal_shipping = NULL;
+   return 0;
+}
+
+oid_mapping* oidMappings = NULL;
+int mappings_size = 0;
+
+int
+pgmoneta_read_mappings_from_json(char* mappings_path)
+{
+   struct json* root = NULL;
+   struct json* section = NULL;
+   struct json_iterator* iter = NULL;
+   int total_entries = 0;
+   int index = 0;
+   char* oid_str;
+   int oid;
+   object_type current_type;
+
+   if (pgmoneta_json_read_file(mappings_path, &root))
+   {
+      pgmoneta_log_error("Failed to read mappings file: %s", mappings_path);
+      goto error;
+   }
+
+   // Count total entries across all sections
+   char* sections[] = {"tablespaces", "databases", "relations"};
+   for (int i = 0; i < 3; i++)
+   {
+      section = (struct json*)pgmoneta_json_get(root, sections[i]);
+      if (section && section->type == JSONItem)
+      {
+         struct art* art_tree = (struct art*)section->elements;
+         total_entries += art_tree->size;
+      }
+   }
+
+   oidMappings = (oid_mapping*)malloc(total_entries * sizeof(oid_mapping));
+   if (!oidMappings)
+   {
+      pgmoneta_log_error("Memory allocation failed");
+      goto error;
+   }
+
+   for (int i = 0; i < 3; i++)
+   {
+      current_type = (object_type)i; // OBJ_TABLESPACE, OBJ_DATABASE, OBJ_RELATION
+      section = (struct json*)pgmoneta_json_get(root, sections[i]);
+      if (section && section->type == JSONItem)
+      {
+         pgmoneta_json_iterator_create(section, &iter);
+         while (pgmoneta_json_iterator_next(iter))
+         {
+            const char* name = iter->key;
+            oid_str = (char*)iter->value->data;
+            oid = (int)strtol(oid_str, NULL, 10);
+
+            // Store the mapping with type
+            oidMappings[index].oid = oid;
+            oidMappings[index].type = current_type;
+            oidMappings[index].name = strdup(name);
+            index++;
+         }
+         pgmoneta_json_iterator_destroy(iter);
+      }
+   }
+
+   mappings_size = total_entries;
+   pgmoneta_json_destroy(root);
+
+   return 0;
+
+error:
+   pgmoneta_json_destroy(root);
+   return 1;
+}
+
+int
+pgmoneta_read_mappings_from_server(int server_index)
+{
+   struct query_response* qr = NULL;
+   struct message* query_msg = NULL;
+   struct tuple* tuple = NULL;
+   char* name = NULL;
+   char* oid_str = NULL;
+   unsigned int oid;
+   int rc = 0;
+   int count;
+   struct walinfo_configuration* config = NULL;
+   int user_index = -1;
+   int auth;
+   SSL* ssl = NULL;
+   int socket = -1;
+
+   config = (struct walinfo_configuration*)shmem;
+   pgmoneta_memory_init();
+
+   for (int i = 0; i < config->common.number_of_users; i++)
+   {
+      if (strcmp(config->common.users[i].username, config->common.servers[server_index].username) == 0)
+      {
+         user_index = i;
+         break;
+      }
+   }
+
+   if (user_index == -1)
+   {
+      pgmoneta_log_error("User %s not found", config->common.servers[server_index].username);
+      rc = 1;
+      goto cleanup;
+   }
+
+   auth = pgmoneta_server_authenticate(server_index, "postgres", config->common.users[user_index].username, config->common.users[user_index].password, false, &ssl, &socket);
+
+   if (auth != AUTH_SUCCESS)
+   {
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[user_index].username, config->common.servers[server_index].name);
+      rc = 1;
+      goto cleanup;
+   }
+
+   const char* queries[] = {
+      "SELECT spcname, oid FROM pg_tablespace",
+      "SELECT datname, oid FROM pg_database",
+      "SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid"
+   };
+
+   const char* section_names[] = {"tablespaces", "databases", "relations"};
+   const object_type types[] = {OBJ_TABLESPACE, OBJ_DATABASE, OBJ_RELATION};
+
+   int len = sizeof(queries) / sizeof(queries[0]);
+
+   for (int i = 0; i < len; i++)
+   {
+      query_msg = NULL;
+      if (pgmoneta_create_query_message((char*)queries[i], &query_msg) != MESSAGE_STATUS_OK)
+      {
+         pgmoneta_log_error("Failed to create query message");
+         rc = 1;
+         goto cleanup;
+      }
+
+      if (pgmoneta_query_execute(ssl, socket, query_msg, &qr) != 0 || qr == NULL)
+      {
+         pgmoneta_log_error("Failed to fetch %s", section_names[i]);
+         rc = 1;
+         pgmoneta_free_message(query_msg);
+         goto cleanup;
+      }
+
+      if (qr->number_of_columns < 2)
+      {
+         pgmoneta_log_error("Invalid response for %s", section_names[i]);
+         rc = 1;
+         pgmoneta_free_query_response(qr);
+         qr = NULL;
+         pgmoneta_free_message(query_msg);
+         continue;
+      }
+
+      count = 0;
+      tuple = qr->tuples;
+      while (tuple != NULL)
+      {
+         count++;
+         tuple = tuple->next;
+      }
+
+      oid_mapping* temp = realloc(oidMappings, (mappings_size + count) * sizeof(oid_mapping));
+      if (temp == NULL)
+      {
+         pgmoneta_log_error("Memory allocation failed");
+         rc = 1;
+         pgmoneta_free_query_response(qr);
+         qr = NULL;
+         pgmoneta_free_message(query_msg);
+         goto cleanup;
+      }
+      oidMappings = temp;
+
+      tuple = qr->tuples;
+      while (tuple != NULL)
+      {
+         name = tuple->data[0];
+         oid_str = tuple->data[1];
+         oid = (unsigned int)strtoul(oid_str, NULL, 10);
+
+         oidMappings[mappings_size].type = types[i];
+         oidMappings[mappings_size].oid = oid;
+         oidMappings[mappings_size].name = strdup(name);
+
+         if (oidMappings[mappings_size].name == NULL)
+         {
+            pgmoneta_log_error("Failed to duplicate name");
+            rc = 1;
+            pgmoneta_free_query_response(qr);
+            qr = NULL;
+            pgmoneta_free_message(query_msg);
+            goto cleanup;
+         }
+
+         mappings_size++;
+         tuple = tuple->next;
+      }
+
+      pgmoneta_free_query_response(qr);
+      qr = NULL;
+      pgmoneta_free_message(query_msg);
+   }
+
+   pgmoneta_close_ssl(ssl);
+
+   if (socket != -1)
+   {
+      pgmoneta_disconnect(socket);
+   }
+
+   pgmoneta_memory_destroy();
+
+   return 0;
+
+cleanup:
+   if (qr != NULL)
+   {
+      pgmoneta_free_query_response(qr);
+   }
+
+   pgmoneta_memory_destroy();
+
+   return rc;
+}
+
+int
+pgmoneta_get_database_name(int oid, char** name)
+{
+   if (name == NULL)
+   {
+      return -1;
+   }
+
+   if (*name != NULL)
+   {
+      free(*name);
+      *name = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_DATABASE)
+      {
+         *name = strdup(oidMappings[i].name);
+         return (*name != NULL) ? 0 : -1;
+      }
+   }
+
+   pgmoneta_log_info("Could not find database with oid %d", oid);
+
+   int max_digits = snprintf(NULL, 0, "%d", oid) + 1;
+   *name = malloc(max_digits);
+
+   if (*name == NULL)
+   {
+      return -1;
+   }
+
+   snprintf(*name, max_digits, "%d", oid);
+
+   return 0;
+}
+
+int
+pgmoneta_get_tablespace_name(int oid, char** name)
+{
+   if (name == NULL)
+   {
+      return -1;
+   }
+
+   if (*name != NULL)
+   {
+      free(*name);
+      *name = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_TABLESPACE)
+      {
+         *name = strdup(oidMappings[i].name);
+         return (*name != NULL) ? 0 : -1;
+      }
+   }
+
+   pgmoneta_log_info("Could not find tablespace with oid %d", oid);
+
+   int max_digits = snprintf(NULL, 0, "%d", oid) + 1;
+   *name = malloc(max_digits);
+
+   if (*name == NULL)
+   {
+      return -1;
+   }
+
+   snprintf(*name, max_digits, "%d", oid);
+
+   return 0;
+}
+
+int
+pgmoneta_get_relation_name(int oid, char** name)
+{
+   if (name == NULL)
+   {
+      return -1;
+   }
+
+   if (*name != NULL)
+   {
+      free(*name);
+      *name = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].oid == oid && oidMappings[i].type == OBJ_RELATION)
+      {
+         *name = strdup(oidMappings[i].name);
+         return (*name != NULL) ? 0 : -1;
+      }
+   }
+
+   pgmoneta_log_info("Could not find relation with oid %d", oid);
+
+   int max_digits = snprintf(NULL, 0, "%d", oid) + 1;
+   *name = malloc(max_digits);
+
+   if (*name == NULL)
+   {
+      free(*name);
+      return -1;
+   }
+
+   snprintf(*name, max_digits, "%d", oid);
+
+   return 0;
+}
+
+int
+pgmoneta_get_tablespace_oid(char* name, char** oid)
+{
+   if (oid == NULL)
+   {
+      return -1;
+   }
+
+   if (*oid != NULL)
+   {
+      free(*oid);
+      *oid = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].type == OBJ_TABLESPACE && oidMappings[i].name == name)
+      {
+         int max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+         *oid = malloc(max_digits);
+
+         if (*oid == NULL)
+         {
+            free(*oid);
+            return -1;
+         }
+
+         snprintf(*oid, max_digits, "%d", oidMappings[i].oid);
+         return 0;
+      }
+   }
+
+   pgmoneta_log_info("Could not find tablespace with name %s", name);
+
+   *oid = strdup(name);
+
+   return 0;
+}
+
+int
+pgmoneta_get_database_oid(char* name, char** oid)
+{
+   if (oid == NULL)
+   {
+      return -1;
+   }
+
+   if (*oid != NULL)
+   {
+      free(*oid);
+      *oid = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].type == OBJ_DATABASE && oidMappings[i].name == name)
+      {
+         int max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+         *oid = malloc(max_digits);
+
+         if (*oid == NULL)
+         {
+            free(*oid);
+            return -1;
+         }
+
+         snprintf(*oid, max_digits, "%d", oidMappings[i].oid);
+         return 0;
+      }
+   }
+
+   pgmoneta_log_info("Could not find database with name %s", name);
+
+   *oid = strdup(name);
+
+   return 0;
+}
+
+int
+pgmoneta_get_relation_oid(char* name, char** oid)
+{
+   if (oid == NULL)
+   {
+      return -1;
+   }
+
+   if (*oid != NULL)
+   {
+      free(*oid);
+      *oid = NULL;
+   }
+
+   for (int i = 0; i < mappings_size; i++)
+   {
+      if (oidMappings[i].type == OBJ_RELATION && oidMappings[i].name == name)
+      {
+         int max_digits = snprintf(NULL, 0, "%d", oidMappings[i].oid) + 1;
+         *oid = malloc(max_digits);
+
+         if (*oid == NULL)
+         {
+            free(*oid);
+            return -1;
+         }
+
+         snprintf(*oid, max_digits, "%d", oidMappings[i].oid);
+         return 0;
+      }
+   }
+
+   pgmoneta_log_info("Could not find relation with name %s", name);
+
+   *oid = strdup(name);
+
    return 0;
 }

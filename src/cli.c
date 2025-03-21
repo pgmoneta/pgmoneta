@@ -662,6 +662,9 @@ main(int argc, char** argv)
          config = (struct main_configuration*)shmem;
       }
    }
+
+   config->common.config_type = CONFIGURATION_TYPE_MAIN;
+
    if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
    {
       if (argc > optind)
