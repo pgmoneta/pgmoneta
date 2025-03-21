@@ -58,6 +58,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <backtrace-supported.h>
+#include <backtrace.h>
 
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
@@ -4422,26 +4424,83 @@ pgmoneta_is_incremental_path(char* path)
    return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
 }
 
-#ifdef DEBUG
+struct backtrace_self_state
+{
+   int frame;
+   bool try_simple;
+};
+
+static void
+error_callback (void* data, const char* msg, int errnum)
+{
+   struct backtrace_self_state* state = (struct backtrace_self_state
+                                         *)data;
+
+   if (errnum < 0)
+   {
+      state->try_simple = true;
+   }
+   else if (errnum == 0)
+   {
+      printf("Could not print backtrace: %s\n", msg);
+   }
+   else
+   {
+      printf("Could not print backtrace: %s, errno: %s",
+             msg, strerror(errnum));
+   }
+}
+
+static int
+simple_callback (void* data, uintptr_t pc)
+{
+   struct backtrace_self_state* state = (struct backtrace_self_state
+                                         *)data;
+   printf("#%d  0x%lx\n", state->frame, (unsigned long) pc);
+   (state->frame)++;
+   return 0;
+}
+
+static int
+full_callback(void* data, uintptr_t pc, const char* filename, int lineno, const char* function)
+{
+   struct backtrace_self_state* state = (struct backtrace_self_state
+                                         *)data;
+
+   printf("#%d  0x%lx in %s\n", state->frame, (unsigned long) pc, function ? function : "???");
+   if (filename || lineno)
+   {
+      printf("\tat %s:%d\n", filename ? filename : "???", lineno);
+   }
+   (state->frame)++;
+
+   if (function && strcmp(function, "main") == 0)
+   {
+      return 1;
+   }
+
+   return 0;
+}
 
 int
 pgmoneta_backtrace(void)
 {
-#ifdef HAVE_LINUX
-   void* array[100];
-   size_t size;
-   char** strings;
+   struct backtrace_state* state = backtrace_create_state(NULL, 0, error_callback, NULL);
+   struct backtrace_self_state self_state = {0, false};
 
-   size = backtrace(array, 100);
-   strings = backtrace_symbols(array, size);
-
-   for (size_t i = 0; i < size; i++)
+   if (!BACKTRACE_SUPPORTED)
    {
-      printf("%s\n", strings[i]);
+      /* If symbolic backtrace is not supported on this target, print a simple backtrace */
+      backtrace_simple(state, 0, simple_callback, error_callback, &self_state);
    }
-
-   free(strings);
-#endif
+   else
+   {
+      backtrace_full(state, 0, full_callback, error_callback, &self_state);
+      if (self_state.try_simple)
+      {
+         backtrace_simple(state, 0, simple_callback, error_callback, &self_state);
+      }
+   }
 
    return 0;
 }
