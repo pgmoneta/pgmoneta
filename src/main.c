@@ -32,6 +32,7 @@
 #include <aes.h>
 #include <backup.h>
 #include <bzip2_compression.h>
+#include <cmd.h>
 #include <configuration.h>
 #include <delete.h>
 #include <gzip_compression.h>
@@ -61,7 +62,6 @@
 #include <errno.h>
 #include <ev.h>
 #include <fcntl.h>
-#include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -251,61 +251,73 @@ main(int argc, char** argv)
    size_t prometheus_cache_shmem_size = 0;
    struct main_configuration* config = NULL;
    int ret;
-   int c;
    char* os = NULL;
-
    int kernel_major, kernel_minor, kernel_patch;
-
    argv_ptr = argv;
+   char* filepath = NULL;
+   int optind = 0;
+   int num_options = 0;
+   int num_results = 0;
 
-   while (1)
+   cli_option options[] = {
+      {"c", "config", true},
+      {"u", "users", true},
+      {"A", "admins", true},
+      {"d", "daemon", false},
+      {"", "offline", false},
+      {"V", "version", false},
+      {"?", "help", false},
+   };
+
+   num_options = sizeof(options) / sizeof(options[0]);
+
+   cli_result results[num_options];
+
+   num_results = cmd_parse(argc, argv, options, num_options, results, num_options, false, &filepath, &optind);
+
+   if (num_results < 0)
    {
-      static struct option long_options[] =
-      {
-         {"config", required_argument, 0, 'c'},
-         {"users", required_argument, 0, 'u'},
-         {"admins", required_argument, 0, 'A'},
-         {"daemon", no_argument, 0, 'd'},
-         {"offline", no_argument, 0, OFFLINE},
-         {"version", no_argument, 0, 'V'},
-         {"help", no_argument, 0, '?'}
-      };
-      int option_index = 0;
+      errx(1, "Error parsing command line\n");
+      return 1;
+   }
 
-      c = getopt_long (argc, argv, "dV?c:u:A:",
-                       long_options, &option_index);
+   for (int i = 0; i < num_results; i++)
+   {
+      char* optname = results[i].option_name;
+      char* optarg = results[i].argument;
 
-      if (c == -1)
+      if (optname == NULL)
       {
          break;
       }
-
-      switch (c)
+      else if (strcmp(optname, "c") == 0 || strcmp(optname, "config") == 0)
       {
-         case 'c':
-            configuration_path = optarg;
-            break;
-         case 'u':
-            users_path = optarg;
-            break;
-         case 'A':
-            admins_path = optarg;
-            break;
-         case 'd':
-            daemon = true;
-            break;
-         case OFFLINE:
-            offline = true;
-            break;
-         case 'V':
-            version();
-            break;
-         case '?':
-            usage();
-            exit(1);
-            break;
-         default:
-            break;
+         configuration_path = optarg;
+      }
+      else if (strcmp(optname, "u") == 0 || strcmp(optname, "users") == 0)
+      {
+         users_path = optarg;
+      }
+      else if (strcmp(optname, "A") == 0 || strcmp(optname, "admins") == 0)
+      {
+         admins_path = optarg;
+      }
+      else if (strcmp(optname, "d") == 0 || strcmp(optname, "daemon") == 0)
+      {
+         daemon = true;
+      }
+      else if (strcmp(optname, "offline") == 0)
+      {
+         offline = true;
+      }
+      else if (strcmp(optname, "V") == 0 || strcmp(optname, "version") == 0)
+      {
+         version();
+      }
+      else if (strcmp(optname, "?") == 0 || strcmp(optname, "help") == 0)
+      {
+         usage();
+         exit(0);
       }
    }
 

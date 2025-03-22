@@ -27,6 +27,7 @@
  */
 
 #include <pgmoneta.h>
+#include <cmd.h>
 #include <configuration.h>
 #include <deque.h>
 #include <logging.h>
@@ -36,13 +37,10 @@
 
 #include <inttypes.h>
 #include <err.h>
-#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#define OPT_COLOR 1000
 
 static void
 version(void)
@@ -84,8 +82,6 @@ usage(void)
 int
 main(int argc, char** argv)
 {
-   int c;
-   int option_index = 0;
    int loaded = 1;
    char* configuration_path = NULL;
    char* output = NULL;
@@ -106,6 +102,30 @@ main(int argc, char** argv)
    enum value_type type = ValueString;
    size_t size;
    struct walinfo_configuration* config = NULL;
+   int optind = 0;
+   char* filepath;
+   int num_results = 0;
+   int num_options = 0;
+
+   cli_option options[] = {
+      {"c", "config", true},
+      {"o", "output", true},
+      {"F", "format", true},
+      {"L", "logfile", true},
+      {"q", "quiet", false},
+      {"", "color", true},
+      {"r", "rmgr", true},
+      {"s", "start", true},
+      {"e", "end", true},
+      {"x", "xid", true},
+      {"l", "limit", true},
+      {"v", "verbose", false},
+      {"V", "version", false},
+      {"?", "help", false},
+   };
+
+   num_options = sizeof(options) / sizeof(options[0]);
+   cli_result results[num_options];
 
    if (argc < 2)
    {
@@ -113,148 +133,144 @@ main(int argc, char** argv)
       goto error;
    }
 
-   while (1)
+   num_results = cmd_parse(argc, argv, options, num_options, results, num_options, true, &filepath, &optind);
+
+   if (num_results < 0)
    {
-      static struct option long_options[] =
-      {
-         {"config", optional_argument, 0, 'c'},
-         {"output", required_argument, 0, 'o'},
-         {"format", required_argument, 0, 'F'},
-         {"logfile", required_argument, 0, 'L'},
-         {"quiet", no_argument, 0, 'q'},
-         {"color", required_argument, 0, OPT_COLOR},
-         {"rmgr", required_argument, 0, 'r'},
-         {"start", required_argument, 0, 's'},
-         {"end", required_argument, 0, 'e'},
-         {"xid", required_argument, 0, 'x'},
-         {"limit", required_argument, 0, 'l'},
-         {"verbose", no_argument, 0, 'v'},
-         {"version", no_argument, 0, 'V'},
-         {"help", no_argument, 0, '?'},
-         {0, 0, 0, 0}
-      };
+      errx(1, "Error parsing command line\n");
+      return 1;
+   }
 
-      c = getopt_long(argc, argv, "c:qvV?:o:F:L:r:s:e:x:l:",
-                      long_options, &option_index);
+   for (int i = 0; i < num_results; i++)
+   {
+      char* optname = results[i].option_name;
+      char* optarg = results[i].argument;
 
-      if (c == -1)
+      if (optname == NULL)
       {
          break;
       }
-
-      switch (c)
+      else if (strcmp(optname, "c") == 0 || strcmp(optname, "config") == 0)
       {
-         case 'c':
-            configuration_path = optarg;
-            break;
-         case 'o':
-            output = optarg;
-            break;
-         case 'F':
-            format = optarg;
+         configuration_path = optarg;
+      }
+      else if (strcmp(optname, "o") == 0 || strcmp(optname, "output") == 0)
+      {
+         output = optarg;
+      }
+      else if (strcmp(optname, "F") == 0 || strcmp(optname, "format") == 0)
+      {
+         format = optarg;
 
-            if (!strcmp(format, "json"))
+         if (!strcmp(format, "json"))
+         {
+            type = ValueJSON;
+         }
+         else
+         {
+            type = ValueString;
+         }
+      }
+      else if (strcmp(optname, "L") == 0 || strcmp(optname, "logfile") == 0)
+      {
+         logfile = optarg;
+      }
+      else if (strcmp(optname, "q") == 0 || strcmp(optname, "quiet") == 0)
+      {
+         quiet = true;
+      }
+      else if (strcmp(optname, "color") == 0)
+      {
+         if (!strcmp(optarg, "off"))
+         {
+            color = false;
+         }
+         else
+         {
+            color = true;
+         }
+      }
+      else if (strcmp(optname, "r") == 0 || strcmp(optname, "rmgr") == 0)
+      {
+         if (rms == NULL)
+         {
+            if (pgmoneta_deque_create(false, &rms))
             {
-               type = ValueJSON;
+               exit(1);
+            }
+         }
+
+         pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
+      }
+      else if (strcmp(optname, "s") == 0 || strcmp(optname, "start") == 0)
+      {
+         if (strchr(optarg, '/'))
+         {
+            // Assuming optarg is a string like "16/B374D848"
+            if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &start_lsn_high, &start_lsn_low) == 2)
+            {
+               start_lsn = (start_lsn_high << 32) + start_lsn_low;
             }
             else
             {
-               type = ValueString;
+               fprintf(stderr, "Invalid start LSN format\n");
+               exit(1);
             }
-
-            break;
-         case 'L':
-            logfile = optarg;
-            break;
-         case 'q':
-            quiet = true;
-            break;
-         case OPT_COLOR:
-            if (!strcmp(optarg, "off"))
+         }
+         else
+         {
+            start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+         }
+      }
+      else if (strcmp(optname, "e") == 0 || strcmp(optname, "end") == 0)
+      {
+         if (strchr(optarg, '/'))
+         {
+            // Assuming optarg is a string like "16/B374D848"
+            if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2)
             {
-               color = false;
+               end_lsn = (end_lsn_high << 32) + end_lsn_low;
             }
             else
             {
-               color = true;
+               fprintf(stderr, "Invalid end LSN format\n");
+               exit(1);
             }
-            break;
-         case 'r':
-            if (rms == NULL)
+         }
+         else
+         {
+            end_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+         }
+      }
+      else if (strcmp(optname, "x") == 0 || strcmp(optname, "xid") == 0)
+      {
+         if (xids == NULL)
+         {
+            if (pgmoneta_deque_create(false, &xids))
             {
-               if (pgmoneta_deque_create(false, &rms))
-               {
-                  exit(1);
-               }
+               exit(1);
             }
+         }
 
-            pgmoneta_deque_add(rms, NULL, (uintptr_t)optarg, ValueString);
-
-            break;
-         case 's':
-            if (strchr(optarg, '/'))
-            {
-               // Assuming optarg is a string like "16/B374D848"
-               if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &start_lsn_high, &start_lsn_low) == 2)
-               {
-                  start_lsn = (start_lsn_high << 32) + start_lsn_low;
-               }
-               else
-               {
-                  fprintf(stderr, "Invalid start LSN format\n");
-                  exit(1);
-               }
-            }
-            else
-            {
-               start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
-            }
-            break;
-         case 'e':
-            if (strchr(optarg, '/'))
-            {
-               // Assuming optarg is a string like "16/B374D848"
-               if (sscanf(optarg, "%" SCNx64 "/%" SCNx64, &end_lsn_high, &end_lsn_low) == 2)
-               {
-                  end_lsn = (end_lsn_high << 32) + end_lsn_low;
-               }
-               else
-               {
-                  fprintf(stderr, "Invalid end LSN format\n");
-                  exit(1);
-               }
-            }
-            else
-            {
-               end_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
-            }
-            break;
-         case 'x':
-            if (xids == NULL)
-            {
-               if (pgmoneta_deque_create(false, &xids))
-               {
-                  exit(1);
-               }
-            }
-
-            pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
-
-            break;
-         case 'l':
-            limit = pgmoneta_atoi(optarg);
-            break;
-         case 'v':
-            verbose = true;
-            break;
-         case 'V':
-            version();
-            exit(0);
-         case '?':
-            usage();
-            exit(0);
-         default:
-            break;
+         pgmoneta_deque_add(xids, NULL, (uintptr_t)pgmoneta_atoi(optarg), ValueUInt32);
+      }
+      else if (strcmp(optname, "l") == 0 || strcmp(optname, "limit") == 0)
+      {
+         limit = pgmoneta_atoi(optarg);
+      }
+      else if (strcmp(optname, "v") == 0 || strcmp(optname, "verbose") == 0)
+      {
+         verbose = true;
+      }
+      else if (strcmp(optname, "V") == 0 || strcmp(optname, "version") == 0)
+      {
+         version();
+         exit(0);
+      }
+      else if (strcmp(optname, "?") == 0 || strcmp(optname, "help") == 0)
+      {
+         usage();
+         exit(0);
       }
    }
 
@@ -305,11 +321,9 @@ main(int argc, char** argv)
       exit(1);
    }
 
-   if (optind < argc)
+   if (filepath != NULL)
    {
-      char* file_path = argv[optind];
-
-      if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
+      if (pgmoneta_describe_walfile(filepath, type, output, quiet, color,
                                     rms, start_lsn, end_lsn, xids, limit))
       {
          fprintf(stderr, "Error while reading/describing WAL file\n");

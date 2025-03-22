@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <aes.h>
 #include <bzip2_compression.h>
+#include <cmd.h>
 #include <configuration.h>
 #include <gzip_compression.h>
 #include <json.h>
@@ -428,8 +429,6 @@ main(int argc, char** argv)
    bool verbose = false;
    char* logfile = NULL;
    bool do_free = true;
-   int c;
-   int option_index = 0;
    int need_server_conn = 1;
    int is_server_conn = 0;
    /* Store the result from command parser*/
@@ -441,141 +440,162 @@ main(int argc, char** argv)
    int32_t encryption = MANAGEMENT_ENCRYPTION_NONE;
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
+   char* filepath = NULL;
+   int optind = 0;
+   int num_options = 0;
+   int num_results = 0;
+
+   cli_option options[] = {
+      {"c", "config", true},
+      {"h", "host", true},
+      {"p", "port", true},
+      {"U", "user", true},
+      {"P", "password", true},
+      {"L", "logfile", true},
+      {"v", "verbose", false},
+      {"V", "version", false},
+      {"F", "format", true},
+      {"C", "compress", true},
+      {"E", "encrypt", true},
+      {"?", "help", false}
+   };
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
    setbuf(stdout, NULL);
 
-   while (1)
+   num_options = sizeof(options) / sizeof(options[0]);
+
+   cli_result results[num_options];
+
+   num_results = cmd_parse(argc, argv, options, num_options, results, num_options, false, &filepath, &optind);
+
+   if (num_results < 0)
    {
-      static struct option long_options[] =
-      {
-         {"config", required_argument, 0, 'c'},
-         {"host", required_argument, 0, 'h'},
-         {"port", required_argument, 0, 'p'},
-         {"user", required_argument, 0, 'U'},
-         {"password", required_argument, 0, 'P'},
-         {"logfile", required_argument, 0, 'L'},
-         {"verbose", no_argument, 0, 'v'},
-         {"version", no_argument, 0, 'V'},
-         {"format", required_argument, 0, 'F'},
-         {"help", no_argument, 0, '?'},
-         {"compress", required_argument, 0, 'C'},
-         {"encrypt", required_argument, 0, 'E'}
-      };
+      errx(1, "Error parsing command line\n");
+      return 1;
+   }
 
-      c = getopt_long(argc, argv, "vV?c:h:p:U:P:L:F:C:E:",
-                      long_options, &option_index);
+   for (int i = 0; i < num_results; i++)
+   {
+      char* optname = results[i].option_name;
+      char* optarg = results[i].argument;
 
-      if (c == -1)
+      if (optname == NULL)
       {
          break;
       }
-
-      switch (c)
+      else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
       {
-         case 'c':
-            configuration_path = optarg;
-            break;
-         case 'h':
-            host = optarg;
-            break;
-         case 'p':
-            port = optarg;
-            break;
-         case 'U':
-            username = optarg;
-            break;
-         case 'P':
-            password = optarg;
-            break;
-         case 'L':
-            logfile = optarg;
-            break;
-         case 'v':
-            verbose = true;
-            break;
-         case 'V':
-            version();
-            break;
-         case 'F':
-            if (!strncmp(optarg, "json", MISC_LENGTH))
-            {
-               output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
-            }
-            else if (!strncmp(optarg, "raw", MISC_LENGTH))
-            {
-               output_format = MANAGEMENT_OUTPUT_FORMAT_RAW;
-            }
-            else if (!strncmp(optarg, "text", MISC_LENGTH))
-            {
-               output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
-            }
-            else
-            {
-               warnx("pgmoneta-cli: Format type is not correct");
-               exit(1);
-            }
-            break;
-         case 'C':
-            if (!strncmp(optarg, "gz", MISC_LENGTH))
-            {
-               compression = MANAGEMENT_COMPRESSION_GZIP;
-            }
-            else if (!strncmp(optarg, "zstd", MISC_LENGTH))
-            {
-               compression = MANAGEMENT_COMPRESSION_ZSTD;
-            }
-            else if (!strncmp(optarg, "lz4", MISC_LENGTH))
-            {
-               compression = MANAGEMENT_COMPRESSION_LZ4;
-            }
-            else if (!strncmp(optarg, "bz2", MISC_LENGTH))
-            {
-               compression = MANAGEMENT_COMPRESSION_BZIP2;
-            }
-            else if (!strncmp(optarg, "none", MISC_LENGTH))
-            {
-               break;
-            }
-            else
-            {
-               warnx("pgmoneta-cli: Invalid compression method. Allowed values: gz, zstd, lz4, bz2, none.");
-               exit(1);
-            }
-            break;
-         case 'E':
-            if (!strncmp(optarg, "aes", MISC_LENGTH))
-            {
-               encryption = MANAGEMENT_ENCRYPTION_AES256;
-            }
-            else if (!strncmp(optarg, "aes256", MISC_LENGTH))
-            {
-               encryption = MANAGEMENT_ENCRYPTION_AES256;
-            }
-            else if (!strncmp(optarg, "aes192", MISC_LENGTH))
-            {
-               encryption = MANAGEMENT_ENCRYPTION_AES192;
-            }
-            else if (!strncmp(optarg, "aes128", MISC_LENGTH))
-            {
-               encryption = MANAGEMENT_ENCRYPTION_AES128;
-            }
-            else if (!strncmp(optarg, "none", MISC_LENGTH))
-            {
-               break;
-            }
-            else
-            {
-               warnx("pgmoneta-cli: Invalid encryption method. Allowed values: aes, aes256, aes192, aes128, none.");
-               exit(1);
-            }
-            break;
-         case '?':
-            usage();
+         configuration_path = optarg;
+      }
+      else if (!strcmp(optname, "h") || !strcmp(optname, "host"))
+      {
+         host = optarg;
+      }
+      else if (!strcmp(optname, "p") || !strcmp(optname, "port"))
+      {
+         port = optarg;
+      }
+      else if (!strcmp(optname, "U") || !strcmp(optname, "user"))
+      {
+         username = optarg;
+      }
+      else if (!strcmp(optname, "P") || !strcmp(optname, "password"))
+      {
+         password = optarg;
+      }
+      else if (!strcmp(optname, "L") || !strcmp(optname, "logfile"))
+      {
+         logfile = optarg;
+      }
+      else if (!strcmp(optname, "v") || !strcmp(optname, "verbose"))
+      {
+         verbose = true;
+      }
+      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
+      {
+         version();
+      }
+      else if (!strcmp(optname, "F") || !strcmp(optname, "format"))
+      {
+         if (!strncmp(optarg, "json", MISC_LENGTH))
+         {
+            output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
+         }
+         else if (!strncmp(optarg, "raw", MISC_LENGTH))
+         {
+            output_format = MANAGEMENT_OUTPUT_FORMAT_RAW;
+         }
+         else if (!strncmp(optarg, "text", MISC_LENGTH))
+         {
+            output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
+         }
+         else
+         {
+            warnx("pgmoneta-cli: Format type is not correct");
             exit(1);
+         }
+      }
+      else if (!strcmp(optname, "C") || !strcmp(optname, "compress"))
+      {
+         if (!strncmp(optarg, "gz", MISC_LENGTH))
+         {
+            compression = MANAGEMENT_COMPRESSION_GZIP;
+         }
+         else if (!strncmp(optarg, "zstd", MISC_LENGTH))
+         {
+            compression = MANAGEMENT_COMPRESSION_ZSTD;
+         }
+         else if (!strncmp(optarg, "lz4", MISC_LENGTH))
+         {
+            compression = MANAGEMENT_COMPRESSION_LZ4;
+         }
+         else if (!strncmp(optarg, "bz2", MISC_LENGTH))
+         {
+            compression = MANAGEMENT_COMPRESSION_BZIP2;
+         }
+         else if (!strncmp(optarg, "none", MISC_LENGTH))
+         {
             break;
-         default:
+         }
+         else
+         {
+            warnx("pgmoneta-cli: Invalid compression method. Allowed values: gz, zstd, lz4, bz2, none.");
+            exit(1);
+         }
+      }
+      else if (!strcmp(optname, "E") || !strcmp(optname, "encrypt"))
+      {
+         if (!strncmp(optarg, "aes", MISC_LENGTH))
+         {
+            encryption = MANAGEMENT_ENCRYPTION_AES256;
+         }
+         else if (!strncmp(optarg, "aes256", MISC_LENGTH))
+         {
+            encryption = MANAGEMENT_ENCRYPTION_AES256;
+         }
+         else if (!strncmp(optarg, "aes192", MISC_LENGTH))
+         {
+            encryption = MANAGEMENT_ENCRYPTION_AES192;
+         }
+         else if (!strncmp(optarg, "aes128", MISC_LENGTH))
+         {
+            encryption = MANAGEMENT_ENCRYPTION_AES128;
+         }
+         else if (!strncmp(optarg, "none", MISC_LENGTH))
+         {
             break;
+         }
+         else
+         {
+            warnx("pgmoneta-cli: Invalid encryption method. Allowed values: aes, aes256, aes192, aes128, none.");
+            exit(1);
+         }
+      }
+      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
+      {
+         usage();
+         exit(0);
       }
    }
 
