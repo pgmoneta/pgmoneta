@@ -2567,19 +2567,18 @@ pgmoneta_move_file(char* from, char* to)
 }
 
 int
-pgmoneta_basename_file(char* s, char** basename)
+pgmoneta_strip_extension(char* s, char** name)
 {
    size_t size;
    char* ext = NULL;
    char* r = NULL;
 
-   *basename = NULL;
+   *name = NULL;
 
    ext = strrchr(s, '.');
    if (ext != NULL)
    {
       size = ext - s + 1;
-
       r = (char*)malloc(size);
       if (r == NULL)
       {
@@ -2591,23 +2590,19 @@ pgmoneta_basename_file(char* s, char** basename)
    }
    else
    {
-      size = strlen(s) + 1;
-
-      r = (char*)malloc(size);
+      r = pgmoneta_append(r, s);
       if (r == NULL)
       {
          goto error;
       }
-
-      memset(r, 0, size);
-      memcpy(r, s, strlen(s));
    }
 
-   *basename = r;
+   *name = r;
 
    return 0;
 
 error:
+
    return 1;
 }
 
@@ -2947,11 +2942,32 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
 
    for (int i = 0; i < number_of_wal_files; i++)
    {
-      pgmoneta_basename_file(wal_files[i], &basename);
-
-      if (strcmp(wal_files[i], start) >= 0)
+      if (pgmoneta_is_encrypted(wal_files[i]))
       {
-         if (pgmoneta_ends_with(wal_files[i], ".partial"))
+         if (pgmoneta_strip_extension(wal_files[i], &basename))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         basename = pgmoneta_append(basename, wal_files[i]);
+      }
+
+      if (pgmoneta_is_compressed(basename))
+      {
+         char* bn = basename;
+         basename = NULL;
+         if (pgmoneta_strip_extension(bn, &basename))
+         {
+            goto error;
+         }
+         free(bn);
+      }
+
+      if (strcmp(basename, start) >= 0)
+      {
+         if (pgmoneta_ends_with(basename, ".partial"))
          {
             ff = pgmoneta_append(ff, from);
             if (!pgmoneta_ends_with(ff, "/"))
@@ -3003,6 +3019,16 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
    free(wal_files);
 
    return 0;
+
+error:
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return 1;
 }
 
 int
@@ -3019,7 +3045,28 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
 
    for (int i = 0; i < number_of_wal_files; i++)
    {
-      pgmoneta_basename_file(wal_files[i], &basename);
+      if (pgmoneta_is_encrypted(wal_files[i]))
+      {
+         if (pgmoneta_strip_extension(wal_files[i], &basename))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         basename = pgmoneta_append(basename, wal_files[i]);
+      }
+
+      if (pgmoneta_is_compressed(basename))
+      {
+         char* bn = basename;
+         basename = NULL;
+         if (pgmoneta_strip_extension(bn, &basename))
+         {
+            goto error;
+         }
+         free(bn);
+      }
 
       if (strcmp(basename, from) >= 0)
       {
@@ -3040,6 +3087,16 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
    free(wal_files);
 
    return result;
+
+error:
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return 0;
 }
 
 unsigned long
@@ -4039,7 +4096,7 @@ pgmoneta_get_file_size(char* file_path)
 }
 
 bool
-pgmoneta_is_encrypted_archive(char* file_path)
+pgmoneta_is_encrypted(char* file_path)
 {
    if (pgmoneta_ends_with(file_path, ".aes"))
    {
@@ -4050,7 +4107,7 @@ pgmoneta_is_encrypted_archive(char* file_path)
 }
 
 bool
-pgmoneta_is_compressed_archive(char* file_path)
+pgmoneta_is_compressed(char* file_path)
 {
    if (pgmoneta_ends_with(file_path, ".zstd") ||
        pgmoneta_ends_with(file_path, ".lz4") ||

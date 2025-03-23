@@ -404,7 +404,10 @@ pgmoneta_decrypt_file(char* from, char* to)
 
    if (!to)
    {
-      pgmoneta_basename_file(from, &to);
+      if (pgmoneta_strip_extension(from, &to))
+      {
+         return 1;
+      }
       flag = 1;
    }
 

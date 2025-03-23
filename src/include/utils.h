@@ -764,13 +764,13 @@ int
 pgmoneta_move_file(char* from, char* to);
 
 /**
- * Get basename of a file
+ * Strip the extension of a file
  * @param s The string
- * @param basename The basename of the file
+ * @param name The name of the file
  * @return The result
  */
 int
-pgmoneta_basename_file(char* s, char** basename);
+pgmoneta_strip_extension(char* s, char** name);
 
 /**
  * Get the translated size of a file
@@ -1197,18 +1197,18 @@ pgmoneta_get_file_size(char* file_path);
 /**
  * Is the file encrypted
  * @param file_path The file path
- * @return True if archive, otherwise false
+ * @return True if encrypted, otherwise false
  */
 bool
-pgmoneta_is_encrypted_archive(char* file_path);
+pgmoneta_is_encrypted(char* file_path);
 
 /**
  * Is the file compressed
  * @param file_path The file path
- * @return True if archive, otherwise false
+ * @return True if compressed, otherwise false
  */
 bool
-pgmoneta_is_compressed_archive(char* file_path);
+pgmoneta_is_compressed(char* file_path);
 
 /**
  * Init a token bucket

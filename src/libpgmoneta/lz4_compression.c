@@ -184,8 +184,8 @@ pgmoneta_lz4c_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_compressed_archive(entry->d_name) ||
-             pgmoneta_is_encrypted_archive(entry->d_name) ||
+         if (pgmoneta_is_compressed(entry->d_name) ||
+             pgmoneta_is_encrypted(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))
          {

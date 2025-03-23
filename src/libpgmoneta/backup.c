@@ -27,6 +27,8 @@
  */
 
 /* pgmoneta */
+#include "aes.h"
+#include "compression.h"
 #include <pgmoneta.h>
 #include <art.h>
 #include <backup.h>
@@ -36,6 +38,8 @@
 #include <management.h>
 #include <message.h>
 #include <network.h>
+#include <stdint.h>
+#include <string.h>
 #include <utils.h>
 #include <value.h>
 #include <workflow.h>
@@ -683,4 +687,94 @@ pgmoneta_get_backup_max_rate(int server)
    }
 
    return config->backup_max_rate;
+}
+
+int
+pgmoneta_extract_backup_file(int server, char* label, char* file, char* target_directory, char** target_file)
+{
+   char* from = NULL;
+   char* to = NULL;
+
+   *target_file = NULL;
+
+   from = pgmoneta_get_server_backup_identifier_data(server, label);
+
+   if (!pgmoneta_ends_with(from, "/"))
+   {
+      from = pgmoneta_append_char(from, '/');
+   }
+   from = pgmoneta_append(from, file);
+
+   if (target_directory == NULL || strlen(target_directory) == 0)
+   {
+      to = pgmoneta_get_server_workspace(server);
+   }
+   else
+   {
+      to = pgmoneta_append(to, target_directory);
+   }
+
+   if (!pgmoneta_ends_with(to, "/"))
+   {
+      from = pgmoneta_append_char(to, '/');
+   }
+   to = pgmoneta_append(to, file);
+
+   if (pgmoneta_copy_file(from, to, NULL))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_is_encrypted(to))
+   {
+      char* new_to = NULL;
+
+      if (pgmoneta_strip_extension(to, &new_to))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_decrypt_file(to, new_to))
+      {
+         free(new_to);
+         goto error;
+      }
+
+      free(to);
+      to = new_to;
+   }
+
+   if (pgmoneta_is_compressed(to))
+   {
+      char* new_to = NULL;
+
+      if (pgmoneta_strip_extension(to, &new_to))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_decompress(to, new_to))
+      {
+         free(new_to);
+         goto error;
+      }
+
+      free(to);
+      to = new_to;
+   }
+
+   pgmoneta_log_trace("Extract: %s -> %s", from, to);
+
+   *target_file = to;
+
+   free(from);
+
+   return 0;
+
+error:
+
+   free(from);
+   free(to);
+
+   return 1;
 }

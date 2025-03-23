@@ -327,7 +327,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
    wal_path = pgmoneta_append(wal_path, path);
 
    // Based on the file extension, if it's an encrypted file, decrypt it in /tmp
-   if (pgmoneta_is_encrypted_archive(wal_path))
+   if (pgmoneta_is_encrypted(wal_path))
    {
       tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
 
@@ -336,7 +336,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       pgmoneta_copy_file(wal_path, tmp_wal, NULL);
       copy = false;
 
-      pgmoneta_basename_file(basename(wal_path), &decrypted_file_name);
+      pgmoneta_strip_extension(basename(wal_path), &decrypted_file_name);
 
       free(wal_path);
       wal_path = NULL;
@@ -353,7 +353,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 
    // Based on the file extension, if it's a compressed file, decompress it
    // in /tmp
-   if (pgmoneta_is_compressed_archive(wal_path))
+   if (pgmoneta_is_compressed(wal_path))
    {
       free(tmp_wal);
       tmp_wal = NULL;
@@ -367,7 +367,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
          pgmoneta_copy_file(wal_path, tmp_wal, NULL);
       }
 
-      pgmoneta_basename_file(basename(wal_path), &decompressed_file_name);
+      pgmoneta_strip_extension(basename(wal_path), &decompressed_file_name);
 
       free(wal_path);
       wal_path = NULL;
