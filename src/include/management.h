@@ -174,6 +174,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_WAL                   "WAL"
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 #define MANAGEMENT_ARGUMENT_WORKFLOW              "Workflow"
+#define MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE  "WorkspaceFreeSpace"
 
 /**
  * Management error

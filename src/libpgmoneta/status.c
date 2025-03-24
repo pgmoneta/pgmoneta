@@ -48,6 +48,7 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
    uint64_t used_size;
    uint64_t free_size;
    uint64_t total_size;
+   uint64_t workspace_size;
    uint64_t hot_standby_size;
    int32_t number_of_directories = 0;
    char** array = NULL;
@@ -148,6 +149,15 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
       free(d);
       d = NULL;
 
+      if (strlen(config->common.servers[i].workspace) > 0)
+      {
+         workspace_size = pgmoneta_directory_size(config->common.servers[i].workspace);
+      }
+      else
+      {
+         workspace_size = 0;
+      }
+
       if (strlen(config->common.servers[i].hot_standby) > 0)
       {
          hot_standby_size = pgmoneta_directory_size(config->common.servers[i].hot_standby);
@@ -156,6 +166,8 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
       {
          hot_standby_size = 0;
       }
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)workspace_size, ValueUInt64);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE, (uintptr_t)hot_standby_size, ValueUInt64);
 
@@ -239,6 +251,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
    uint64_t used_size;
    uint64_t free_size;
    uint64_t total_size;
+   uint64_t workspace_size;
    uint64_t hot_standby_size;
    int32_t number_of_directories = 0;
    char** array = NULL;
@@ -337,6 +350,18 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
       free(d);
       d = NULL;
 
+      if (strlen(config->common.servers[i].workspace) > 0)
+      {
+         d = pgmoneta_get_server_workspace(i);
+         workspace_size = pgmoneta_free_space(d);
+         free(d);
+         d = NULL;
+      }
+      else
+      {
+         workspace_size = 0;
+      }
+
       if (strlen(config->common.servers[i].hot_standby) > 0)
       {
          hot_standby_size = pgmoneta_directory_size(config->common.servers[i].hot_standby);
@@ -345,6 +370,8 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
       {
          hot_standby_size = 0;
       }
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)workspace_size, ValueUInt64);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE, (uintptr_t)hot_standby_size, ValueUInt64);
 
