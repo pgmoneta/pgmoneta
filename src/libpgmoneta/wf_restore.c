@@ -53,6 +53,9 @@ static int combine_incremental_execute(char*, struct art*);
 static char*recovery_info_name(void);
 static int recovery_info_execute(char*, struct art*);
 
+static char* copy_wal_name(void);
+static int copy_wal_execute(char*, struct art*);
+
 static char*restore_excluded_files_name(void);
 static int restore_excluded_files_execute(char*, struct art*);
 static int restore_excluded_files_teardown(char*, struct art*);
@@ -96,6 +99,27 @@ pgmoneta_create_combine_incremental(void)
    wf->name = &combine_incremental_name;
    wf->setup = &pgmoneta_common_setup;
    wf->execute = &combine_incremental_execute;
+   wf->teardown = &pgmoneta_common_teardown;
+   wf->next = NULL;
+
+   return wf;
+}
+
+struct workflow*
+pgmoneta_create_copy_wal(void)
+{
+   struct workflow* wf = NULL;
+
+   wf = (struct workflow*)malloc(sizeof(struct workflow));
+
+   if (wf == NULL)
+   {
+      return NULL;
+   }
+
+   wf->name = &copy_wal_name;
+   wf->setup = &pgmoneta_common_setup;
+   wf->execute = &copy_wal_execute;
    wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
@@ -154,7 +178,6 @@ static int
 restore_execute(char* name, struct art* nodes)
 {
    int server = -1;
-   char* position = NULL;
    char* directory = NULL;
    struct backup* backup = NULL;
    char* label = NULL;
@@ -188,7 +211,6 @@ restore_execute(char* name, struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
    directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
@@ -209,99 +231,6 @@ restore_execute(char* name, struct art* nodes)
    {
       pgmoneta_log_error("Restore: Could not restore %s/%s", config->common.servers[server].name, label);
       goto error;
-   }
-   else
-   {
-      if (position != NULL && strlen(position) > 0)
-      {
-         char tokens[512];
-         bool primary = true;
-         bool copy_wal = false;
-         char* ptr = NULL;
-
-         memset(&tokens[0], 0, sizeof(tokens));
-         memcpy(&tokens[0], position, strlen(position));
-
-         ptr = strtok(&tokens[0], ",");
-
-         while (ptr != NULL)
-         {
-            char key[256];
-            char value[256];
-            char* equal = NULL;
-
-            memset(&key[0], 0, sizeof(key));
-            memset(&value[0], 0, sizeof(value));
-
-            equal = strchr(ptr, '=');
-
-            if (equal == NULL)
-            {
-               memcpy(&key[0], ptr, strlen(ptr));
-            }
-            else
-            {
-               memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
-               memcpy(&value[0], equal + 1, strlen(equal) - 1);
-            }
-
-            if (!strcmp(&key[0], "current") ||
-                !strcmp(&key[0], "immediate") ||
-                !strcmp(&key[0], "name") ||
-                !strcmp(&key[0], "xid") ||
-                !strcmp(&key[0], "lsn") ||
-                !strcmp(&key[0], "time"))
-            {
-               copy_wal = true;
-            }
-            else if (!strcmp(&key[0], "primary"))
-            {
-               primary = true;
-            }
-            else if (!strcmp(&key[0], "replica"))
-            {
-               primary = false;
-            }
-            else if (!strcmp(&key[0], "inclusive") || !strcmp(&key[0], "timeline") || !strcmp(&key[0], "action"))
-            {
-               /* Ok */
-            }
-
-            ptr = strtok(NULL, ",");
-         }
-
-         if (pgmoneta_art_insert(nodes, NODE_PRIMARY, primary, ValueBool))
-         {
-            goto error;
-         }
-
-         if (pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, true, ValueBool))
-         {
-            goto error;
-         }
-
-         if (copy_wal)
-         {
-            origwal = pgmoneta_get_server_backup_identifier_data_wal(server, label);
-            waldir = pgmoneta_get_server_wal(server);
-
-            waltarget = pgmoneta_append(waltarget, directory);
-            waltarget = pgmoneta_append(waltarget, "/");
-            waltarget = pgmoneta_append(waltarget, config->common.servers[server].name);
-            waltarget = pgmoneta_append(waltarget, "-");
-            waltarget = pgmoneta_append(waltarget, label);
-            waltarget = pgmoneta_append(waltarget, "/pg_wal/");
-
-            pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
-         }
-      }
-      else
-      {
-         if (pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, false, ValueBool))
-         {
-            goto error;
-         }
-      }
    }
 
    if (number_of_workers > 0)
@@ -347,7 +276,8 @@ combine_incremental_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* identifier = NULL;
-   struct deque* prior_backups = NULL;
+   char* label = NULL;
+   struct deque* prior_labels = NULL;
    char* input_dir = NULL;
    char* output_dir;
    char* base = NULL;
@@ -369,7 +299,8 @@ combine_incremental_execute(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
-   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUPS));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABELS));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_MANIFEST));
 #endif
@@ -380,13 +311,15 @@ combine_incremental_execute(char* name, struct art* nodes)
    pgmoneta_log_debug("Combine incremental (execute): %s/%s", config->common.servers[server].name, identifier);
    bck = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-   prior_backups = (struct deque*)pgmoneta_art_search(nodes, NODE_BACKUPS);
-   if (prior_backups == NULL || pgmoneta_deque_size(prior_backups) < 2)
+   prior_labels = (struct deque*)pgmoneta_art_search(nodes, NODE_LABELS);
+   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
+   if (prior_labels == NULL || pgmoneta_deque_size(prior_labels) < 1)
    {
-      pgmoneta_log_error("Combine incremental: should have at least 2 backups");
+      pgmoneta_log_error("Combine incremental: should have at least 1 previous backup");
       goto error;
    }
-   input_dir = (char*)pgmoneta_deque_poll(prior_backups, NULL);
+
+   input_dir = pgmoneta_get_server_backup_identifier_data(server, label);
    base = (char*) pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    output_dir = (char*) pgmoneta_art_search(nodes, NODE_TARGET_BASE);
    manifest = (struct json*)pgmoneta_art_search(nodes, NODE_MANIFEST);
@@ -412,7 +345,7 @@ combine_incremental_execute(char* name, struct art* nodes)
       }
    }
 
-   if (pgmoneta_combine_backups(server, base, input_dir, output_dir, prior_backups, bck, manifest))
+   if (pgmoneta_combine_backups(server, label, base, input_dir, output_dir, prior_labels, bck, manifest))
    {
       goto error;
    }
@@ -788,6 +721,92 @@ error:
    free(t);
    free(path);
 
+   return 1;
+}
+
+static char*
+copy_wal_name(void)
+{
+   return "Copy WAL";
+}
+
+static int
+copy_wal_execute(char* name, struct art* nodes)
+{
+   char* origwal = NULL;
+   char* waldir = NULL;
+   char* waltarget = NULL;
+   char* directory = NULL;
+   bool copy_wal = false;
+   int server = 0;
+   char* label = NULL;
+   struct backup* backup = NULL;
+   int number_of_workers = 0;
+   struct workers* workers = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef DEBUG
+   assert(nodes != NULL);
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+#endif
+
+   copy_wal = (bool) pgmoneta_art_search(nodes, NODE_COPY_WAL);
+   if (!copy_wal)
+   {
+      return 0;
+   }
+
+   number_of_workers = pgmoneta_get_number_of_workers(server);
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_initialize(number_of_workers, &workers);
+   }
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
+   directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+
+   origwal = pgmoneta_get_server_backup_identifier_data_wal(server, label);
+   waldir = pgmoneta_get_server_wal(server);
+
+   waltarget = pgmoneta_append(waltarget, directory);
+   waltarget = pgmoneta_append(waltarget, "/");
+   waltarget = pgmoneta_append(waltarget, config->common.servers[server].name);
+   waltarget = pgmoneta_append(waltarget, "-");
+   waltarget = pgmoneta_append(waltarget, label);
+   waltarget = pgmoneta_append(waltarget, "/pg_wal/");
+
+   pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
+
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_wait(workers);
+      if (!workers->outcome)
+      {
+         goto error;
+      }
+      pgmoneta_workers_destroy(workers);
+   }
+
+   free(origwal);
+   free(waldir);
+   free(waltarget);
+   return 0;
+
+error:
+   if (number_of_workers > 0)
+   {
+      pgmoneta_workers_destroy(workers);
+   }
+   free(origwal);
+   free(waldir);
+   free(waltarget);
    return 1;
 }
 

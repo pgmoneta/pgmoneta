@@ -133,6 +133,9 @@ pgmoneta_create_bzip2(bool compress);
 struct workflow*
 pgmoneta_create_link(void);
 
+struct workflow*
+pgmoneta_create_copy_wal(void);
+
 /**
  * Create a workflow for recovery info
  * @return The workflow

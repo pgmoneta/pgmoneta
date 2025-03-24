@@ -536,6 +536,9 @@ wf_restore(struct backup* backup)
       current = current->next;
    }
 
+   current->next = pgmoneta_create_copy_wal();
+   current = current->next;
+
    current->next = pgmoneta_create_recovery_info();
    current = current->next;
 
@@ -572,10 +575,10 @@ wf_combine(int server, struct backup* backup)
    head = pgmoneta_create_combine_incremental();
    current = head;
 
-   current->next = pgmoneta_create_recovery_info();
+   current->next = pgmoneta_create_copy_wal();
    current = current->next;
 
-   current->next = pgmoneta_restore_excluded_files();
+   current->next = pgmoneta_create_recovery_info();
    current = current->next;
 
    current->next = pgmoneta_create_permissions(PERMISSION_TYPE_RESTORE);

@@ -690,7 +690,7 @@ pgmoneta_get_backup_max_rate(int server)
 }
 
 int
-pgmoneta_extract_backup_file(int server, char* label, char* file, char* target_directory, char** target_file)
+pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file)
 {
    char* from = NULL;
    char* to = NULL;
@@ -703,11 +703,18 @@ pgmoneta_extract_backup_file(int server, char* label, char* file, char* target_d
    {
       from = pgmoneta_append_char(from, '/');
    }
-   from = pgmoneta_append(from, file);
+   from = pgmoneta_append(from, relative_file_path);
+
+   if (!pgmoneta_exists(from))
+   {
+      goto error;
+   }
 
    if (target_directory == NULL || strlen(target_directory) == 0)
    {
       to = pgmoneta_get_server_workspace(server);
+      to = pgmoneta_append(to, label);
+      to = pgmoneta_append(to, "/");
    }
    else
    {
@@ -718,7 +725,7 @@ pgmoneta_extract_backup_file(int server, char* label, char* file, char* target_d
    {
       from = pgmoneta_append_char(to, '/');
    }
-   to = pgmoneta_append(to, file);
+   to = pgmoneta_append(to, relative_file_path);
 
    if (pgmoneta_copy_file(from, to, NULL))
    {
@@ -776,5 +783,51 @@ error:
    free(from);
    free(to);
 
+   return 1;
+}
+
+int
+pgmoneta_file_basename(char* file, char** basename)
+{
+   char* b = NULL;
+
+   *basename = NULL;
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   b = pgmoneta_append(b, file);
+   if (pgmoneta_is_encrypted(b))
+   {
+      char* new_b = NULL;
+
+      if (pgmoneta_strip_extension(b, &new_b))
+      {
+         goto error;
+      }
+
+      free(b);
+      b = new_b;
+   }
+
+   if (pgmoneta_is_compressed(b))
+   {
+      char* new_b = NULL;
+
+      if (pgmoneta_strip_extension(b, &new_b))
+      {
+         goto error;
+      }
+
+      free(b);
+      b = new_b;
+   }
+
+   *basename = b;
+   return 0;
+
+error:
+   free(b);
    return 1;
 }

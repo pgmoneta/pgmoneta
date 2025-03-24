@@ -57,13 +57,14 @@ extern "C" {
 
 #define NODE_ALL               "all"               /* All the files in a manifest */
 #define NODE_BACKUP            "backup"            /* The backup structure */
-#define NODE_BACKUPS           "backups"           /* A list of backups */
+#define NODE_COPY_WAL          "copy_wal"          /* Whether to copy WAL */
 #define NODE_BACKUP_BASE       "backup_base"       /* The base directory of the backup */
 #define NODE_BACKUP_DATA       "backup_data"       /* The data directory of the backup */
 #define NODE_FAILED            "failed"            /* The failed files in a manifest */
 #define NODE_INCREMENTAL_BASE  "incremental_base"  /* The base directory of incremental */
 #define NODE_INCREMENTAL_LABEL "incremental_label" /* The label of the incremental backup */
 #define NODE_LABEL             "label"             /* The backup label */
+#define NODE_LABELS            "labels"            /* A list of backup labels */
 #define NODE_MANIFEST          "manifest"          /* The manifest */
 #define NODE_PRIMARY           "primary"           /* Is the server a primary */
 #define NODE_RECOVERY_INFO     "recovery_info"     /* The recovery information */
