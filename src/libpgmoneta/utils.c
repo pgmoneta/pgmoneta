@@ -1929,6 +1929,11 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
       goto error;
    }
 
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+   }
+
    if (restore_last_files_names != NULL)
    {
       for (int i = 0; restore_last_files_names[i] != NULL; i++)
@@ -1941,6 +1946,12 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
    return 0;
 
 error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+   }
+
    if (restore_last_files_names != NULL)
    {
       for (int i = 0; restore_last_files_names[i] != NULL; i++)
@@ -2465,6 +2476,8 @@ do_copy_file(struct worker_common* wc)
    char buffer[8192];
    ssize_t nread = -1;
    int permissions = -1;
+   char* dn = NULL;
+   char* to = NULL;
 
    fd_from = open(fi->from, O_RDONLY);
 
@@ -2480,11 +2493,20 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
-   fd_to = open(fi->to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
+   to = strdup(fi->to);
+   dn = strdup(dirname(fi->to));
+
+   if (pgmoneta_mkdir(dn))
+   {
+      pgmoneta_log_error("Could not create directory: %s", dn);
+      goto error;
+   }
+
+   fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
 
    if (fd_to < 0)
    {
-      pgmoneta_log_error("Unable to create file: %s", fi->to);
+      pgmoneta_log_error("Unable to create file: %s", to);
       goto error;
    }
 
@@ -2526,6 +2548,13 @@ do_copy_file(struct worker_common* wc)
    pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", fi->from, fi->to);
 #endif
 
+   if (fi->common.workers != NULL)
+   {
+      fi->common.workers->outcome = true;
+   }
+
+   free(dn);
+   free(to);
    free(fi);
 
    return;
@@ -2547,6 +2576,13 @@ error:
 
    errno = 0;
 
+   if (fi->common.workers != NULL)
+   {
+      fi->common.workers->outcome = false;
+   }
+
+   free(dn);
+   free(to);
    free(fi);
 }
 
