@@ -212,6 +212,13 @@ else ()
   message(FATAL_ERROR "libcurl needed")
 endif()
 
+find_package(Libbacktrace)
+if (LIBBACKTRACE_FOUND)
+  message(STATUS "libbacktrace found")
+else ()
+  message(FATAL_ERROR "libbacktrace needed")
+endif()
+
 find_package(THREAD)
 if (THREAD_FOUND)
   message(STATUS "pthread found")

@@ -17,12 +17,21 @@
 * [libssh](https://www.libssh.org/)
 * [libcurl](https://curl.se/libcurl/)
 * [libarchive](http://www.libarchive.org/)
+* [libbacktrace](https://github.com/ianlancetaylor/libbacktrace)
 * [pandoc](https://pandoc.org/)
 * [texlive](https://www.tug.org/texlive/)
 
-On Fedora, these can be installed using `dnf` or `yum`:
+On Fedora, most of these can be installed using `dnf` or `yum`:
 ```
 dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel libcurl libcurl-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel pandoc texlive-scheme-basic 'tex(footnote.sty)'
+
+# libbacktrace may need to be installed from source
+git clone https://github.com/ianlancetaylor/libbacktrace.git
+cd libbacktrace 
+mkdir build 
+cd build 
+../configure 
+sudo make install
 ```
 On Rocky, before you install the required packages, some additional repositories, CodeReady Builder and EPEL in this case, need to be enabled or installed first.
 ```
