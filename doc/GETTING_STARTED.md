@@ -285,6 +285,7 @@ There are a few short tutorials available to help you better understand and conf
 - [Annotate](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/14_annotate.md)
 - [Extra files](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/15_extra.md)
 - [Incremental backup and restore](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/16_incremental_backup_restore.md)
+- [Dockerize pgmoneta](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/17_docker.md)
 
 ## Closing
 

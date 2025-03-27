@@ -36,6 +36,7 @@ Ahmed Ashour <a8087027@gmail.com>
 Sangkeun J.C. Kim <jchrys@me.com>
 Tejas Tyagi <tejastyagi.tt@gmail.com>
 Aryan Arora <aryanarora.w1@gmail.com>
+Arshdeep Singh <balarsh535@gmail.com>
 ```
 
 ## Committers

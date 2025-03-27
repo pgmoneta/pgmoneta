@@ -73,6 +73,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/14_annotate.md %{buildroot}%{_docdir}/%{name}/tutorial/14_annotate.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/15_extra.md %{buildroot}%{_docdir}/%{name}/tutorial/15_extra.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/16_incremental_backup_restore.md %{buildroot}%{_docdir}/%{name}/tutorial/16_incremental_backup_restore.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/tutorial/17_docker.md %{buildroot}%{_docdir}/%{name}/tutorial/17_docker.md
 
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.1 %{buildroot}%{_mandir}/man1/pgmoneta.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
@@ -131,6 +132,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/tutorial/14_annotate.md
 %{_docdir}/%{name}/tutorial/15_extra.md
 %{_docdir}/%{name}/tutorial/16_incremental_backup_restore.md
+%{_docdir}/%{name}/tutorial/17_docker.md
 %{_mandir}/man1/pgmoneta.1*
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
