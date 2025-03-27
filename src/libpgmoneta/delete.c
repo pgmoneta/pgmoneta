@@ -76,6 +76,7 @@ pgmoneta_delete(int srv, char* label)
       goto error;
    }
 
+   free(backup);
    pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
@@ -84,6 +85,7 @@ pgmoneta_delete(int srv, char* label)
 
 error:
 
+   free(backup);
    pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
