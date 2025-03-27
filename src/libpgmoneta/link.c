@@ -227,23 +227,33 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
          else
          {
             struct worker_input* wi = NULL;
+            char* link = NULL;
 
-            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
+            link = pgmoneta_get_symlink(from_entry);
+            if (pgmoneta_is_symlink(from_entry) && pgmoneta_is_directory(link))
             {
-               goto error;
-            }
-
-            if (workers != NULL)
-            {
-               if (workers->outcome)
-               {
-                  pgmoneta_workers_add(workers, do_relink, (struct worker_common*)wi);
-               }
+               pgmoneta_relink(from_entry, to_entry, workers);
             }
             else
             {
-               do_relink((struct worker_common*)wi);
+               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
+               {
+                  goto error;
+               }
+
+               if (workers != NULL)
+               {
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_relink, (struct worker_common*)wi);
+                  }
+               }
+               else
+               {
+                  do_relink((struct worker_common*)wi);
+               }
             }
+            free(link);
          }
       }
 
@@ -342,7 +352,6 @@ do_relink(struct worker_common* wc)
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", wi->to, pgmoneta_is_symlink_valid(wi->to) ? "Yes " : "No  ");
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", link, pgmoneta_is_symlink_valid(link) ? "Yes " : "No  ");
 #endif
-
             free(link);
          }
          else
