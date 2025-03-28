@@ -124,7 +124,6 @@ error:
    if (new_wf)
    {
       pgmoneta_destroy_walfile(new_wf);
-      free(new_wf);
    }
    return error_code;
 }
@@ -306,7 +305,7 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 int
 pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                          uint32_t limit)
+                          uint32_t limit, char** included_objects)
 {
    FILE* out = NULL;
    char* tmp_wal = NULL;
@@ -415,7 +414,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       {
          record = (struct decoded_xlog_record*) record_iterator->value->data;
          pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit);
+                                     rms, start_lsn, end_lsn, xids, limit, included_objects);
       }
 
       if (!quiet)
@@ -429,7 +428,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       {
          record = (struct decoded_xlog_record*) record_iterator->value->data;
          pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit);
+                                     rms, start_lsn, end_lsn, xids, limit, included_objects);
       }
    }
 
