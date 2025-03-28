@@ -1036,6 +1036,15 @@ char*
 pgmoneta_get_server_workspace(int server);
 
 /**
+ * Delete the workspace directory for a server
+ * @param server The server
+ * @param label An optional label
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_server_workspace(int server, char* label);
+
+/**
  * Get the hot standby directory for a server
  * @param server The server
  * @return The hot standby directory

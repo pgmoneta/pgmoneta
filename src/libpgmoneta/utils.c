@@ -3701,6 +3701,34 @@ error:
    return NULL;
 }
 
+int
+pgmoneta_delete_server_workspace(int server, char* label)
+{
+   char* ws = NULL;
+
+   ws = pgmoneta_get_server_workspace(server);
+
+   if (label != NULL && strlen(label) > 0)
+   {
+      ws = pgmoneta_append(ws, label);
+   }
+
+   if (pgmoneta_delete_directory(ws))
+   {
+      goto error;
+   }
+
+   free(ws);
+
+   return 0;
+
+error:
+
+   free(ws);
+
+   return 1;
+}
+
 char*
 pgmoneta_get_server_hot_standby(int server)
 {
