@@ -76,7 +76,7 @@
 #include <sys/types.h>
 
 #include <openssl/crypto.h>
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
 
@@ -324,7 +324,7 @@ main(int argc, char** argv)
    if (getuid() == 0)
    {
       warnx("pgmoneta: Using the root account is not allowed");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Using the root account is not allowed");
 #endif
       exit(1);
@@ -334,7 +334,7 @@ main(int argc, char** argv)
    if (pgmoneta_create_shared_memory(shmem_size, HUGEPAGE_OFF, &shmem))
    {
       warnx("pgmoneta: Error in creating shared memory");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notifyf(0, "STATUS=Error in creating shared memory");
 #endif
       goto error;
@@ -348,7 +348,7 @@ main(int argc, char** argv)
       if (pgmoneta_read_main_configuration(shmem, configuration_path))
       {
          warnx("pgmoneta: Configuration not found: %s", configuration_path);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=Configuration not found: %s", configuration_path);
 #endif
          goto error;
@@ -359,7 +359,7 @@ main(int argc, char** argv)
       if (pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
       {
          warnx("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notify(0, "STATUS=Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #endif
          goto error;
@@ -374,7 +374,7 @@ main(int argc, char** argv)
       if (ret == 1)
       {
          warnx("pgmoneta: USERS configuration not found: %s", users_path);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
 #endif
          goto error;
@@ -382,7 +382,7 @@ main(int argc, char** argv)
       else if (ret == 2)
       {
          warnx("pgmoneta: Invalid master key file");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
          goto error;
@@ -390,7 +390,7 @@ main(int argc, char** argv)
       else if (ret == 3)
       {
          warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
 #endif
          goto error;
@@ -413,7 +413,7 @@ main(int argc, char** argv)
       if (ret == 1)
       {
          warnx("pgmoneta: ADMINS configuration not found: %s", admins_path);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=ADMINS configuration not found: %s", admins_path);
 #endif
          goto error;
@@ -421,7 +421,7 @@ main(int argc, char** argv)
       else if (ret == 2)
       {
          warnx("pgmoneta: Invalid master key file");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
          goto error;
@@ -429,7 +429,7 @@ main(int argc, char** argv)
       else if (ret == 3)
       {
          warnx("pgmoneta: ADMINS: Too many admins defined %d (max %d)", config->common.number_of_admins, NUMBER_OF_ADMINS);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->common.number_of_admins, NUMBER_OF_ADMINS);
 #endif
          goto error;
@@ -448,7 +448,7 @@ main(int argc, char** argv)
 
    if (pgmoneta_init_logging())
    {
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Failed to init logging");
 #endif
       goto error;
@@ -456,7 +456,7 @@ main(int argc, char** argv)
 
    if (pgmoneta_start_logging())
    {
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Failed to start logging");
 #endif
       goto error;
@@ -464,21 +464,21 @@ main(int argc, char** argv)
 
    if (pgmoneta_validate_main_configuration(shmem))
    {
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Invalid configuration");
 #endif
       goto error;
    }
    if (pgmoneta_validate_users_configuration(shmem))
    {
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Invalid USERS configuration");
 #endif
       goto error;
    }
    if (pgmoneta_validate_admins_configuration(shmem))
    {
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Invalid ADMINS configuration");
 #endif
       goto error;
@@ -491,7 +491,7 @@ main(int argc, char** argv)
       if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
          warnx("pgmoneta: Daemon mode can't be used with console logging");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notify(0, "STATUS=Daemon mode can't be used with console logging");
 #endif
          goto error;
@@ -502,7 +502,7 @@ main(int argc, char** argv)
       if (pid < 0)
       {
          warnx("pgmoneta: Daemon mode failed");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notify(0, "STATUS=Daemon mode failed");
 #endif
          goto error;
@@ -537,7 +537,7 @@ main(int argc, char** argv)
 
    if (pgmoneta_init_prometheus_cache(&prometheus_cache_shmem_size, &prometheus_cache_shmem))
    {
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notifyf(0, "STATUS=Error in creating and initializing prometheus cache shared memory");
 #endif
       errx(1, "Error in creating and initializing prometheus cache shared memory");
@@ -547,7 +547,7 @@ main(int argc, char** argv)
    if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
    {
       pgmoneta_log_fatal("Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
 #endif
       goto error;
@@ -559,7 +559,7 @@ main(int argc, char** argv)
    {
       pgmoneta_log_fatal("No loop implementation (%x) (%x)",
                          pgmoneta_libev(config->libev), ev_supported_backends());
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notifyf(0, "STATUS=No loop implementation (%x) (%x)", pgmoneta_libev(config->libev), ev_supported_backends());
 #endif
       goto error;
@@ -580,7 +580,7 @@ main(int argc, char** argv)
    if (pgmoneta_tls_valid())
    {
       pgmoneta_log_fatal("Invalid TLS configuration");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
       sd_notify(0, "STATUS=Invalid TLS configuration");
 #endif
       goto error;
@@ -595,7 +595,7 @@ main(int argc, char** argv)
       if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
       {
          pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->metrics);
 #endif
          goto error;
@@ -604,7 +604,7 @@ main(int argc, char** argv)
       if (metrics_fds_length > MAX_FDS)
       {
          pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=Too many descriptors %d", metrics_fds_length);
 #endif
          goto error;
@@ -620,7 +620,7 @@ main(int argc, char** argv)
       if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
       {
          pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->management);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->management);
 #endif
          goto error;
@@ -629,7 +629,7 @@ main(int argc, char** argv)
       if (management_fds_length > MAX_FDS)
       {
          pgmoneta_log_fatal("Too many descriptors %d", management_fds_length);
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
          sd_notifyf(0, "STATUS=Too many descriptors %d", management_fds_length);
 #endif
          goto error;
@@ -705,7 +705,7 @@ main(int argc, char** argv)
 
    free(os);
 
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
    sd_notifyf(0,
               "READY=1\n"
               "STATUS=Running\n"
@@ -718,7 +718,7 @@ main(int argc, char** argv)
    }
 
    pgmoneta_log_info("Shutdown");
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
    sd_notify(0, "STOPPING=1");
 #endif
 

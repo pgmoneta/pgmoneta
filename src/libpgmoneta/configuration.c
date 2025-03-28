@@ -50,7 +50,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
 
@@ -4212,7 +4212,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
 {
    bool changed = false;
 
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
    sd_notify(0, "RELOADING=1");
 #endif
 
@@ -4348,7 +4348,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    atomic_init(&config->prometheus.logging_error, 0);
    atomic_init(&config->prometheus.logging_fatal, 0);
 
-#ifdef HAVE_LINUX
+#ifdef HAVE_SYSTEMD
    sd_notify(0, "READY=1");
 #endif
 
