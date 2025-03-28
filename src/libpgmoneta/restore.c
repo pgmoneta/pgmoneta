@@ -188,6 +188,9 @@ write_backup_label(char* from_dir, char* to_dir);
 static uint32_t
 parse_oid(char* name);
 
+static void
+cleanup_workspaces(int server, struct deque* labels);
+
 int
 pgmoneta_get_restore_last_files_names(char*** output)
 {
@@ -1629,6 +1632,9 @@ restore_backup_incremental(struct art* nodes)
       pgmoneta_log_debug("restore_backup_incremental: rename file %s to %s", tmp_excluded_file_path, excluded_file_path);
    }
 
+   pgmoneta_delete_server_workspace(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
+   cleanup_workspaces(server, labels);
+
    pgmoneta_workflow_destroy(workflow);
    workflow = NULL;
 
@@ -1638,6 +1644,9 @@ restore_backup_incremental(struct art* nodes)
    return RESTORE_OK;
 
 error:
+   pgmoneta_delete_server_workspace(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
+   cleanup_workspaces(server, labels);
+
    pgmoneta_delete_directory(target_base_combine);
    // purge each table space
    for (int i = 0; i < backup->number_of_tablespaces; i++)
@@ -1707,4 +1716,22 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
    return ret;
 error:
    return ret;
+}
+
+static void
+cleanup_workspaces(int server, struct deque* labels)
+{
+   struct deque_iterator* iter = NULL;
+
+   if (labels == NULL)
+   {
+      return;
+   }
+
+   pgmoneta_deque_iterator_create(labels, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      pgmoneta_delete_server_workspace(server, (char*)pgmoneta_value_data(iter->value));
+   }
+   pgmoneta_deque_iterator_destroy(iter);
 }
