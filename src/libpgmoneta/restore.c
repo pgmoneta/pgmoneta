@@ -1544,7 +1544,7 @@ restore_backup_incremental(struct art* nodes)
    char target_root_combine[MAX_PATH];
    char target_base_combine[MAX_PATH_CONCAT];
    char excluded_file_path[MAX_PATH_CONCAT];
-   char tmp_excluded_file_path[MAX_PATH_CONCAT+sizeof(TMP_SUFFIX)];
+   char tmp_excluded_file_path[MAX_PATH_CONCAT + sizeof(TMP_SUFFIX)];
    int excluded_files = 0;
    char label[MISC_LENGTH];
    char* manifest_path = NULL;

@@ -914,6 +914,11 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
       {
          ZSTD_outBuffer output = {zout, zout_size, 0};
          size_t remaining = ZSTD_compressStream2(cctx, &output, &input, mode);
+         if (ZSTD_isError(remaining))
+         {
+            pgmoneta_log_error("ZSTD: Compression error: %s", ZSTD_getErrorName(remaining));
+            goto error;
+         }
          fwrite(zout, sizeof(char), output.pos, fout);
          finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
       }
@@ -961,7 +966,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       goto error;
    }
 
-   fout = fopen(to, "wb");;
+   fout = fopen(to, "wb");
 
    if (fout == NULL)
    {
@@ -976,6 +981,11 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       {
          ZSTD_outBuffer output = {zout, zout_size, 0};
          size_t ret = ZSTD_decompressStream(dctx, &output, &input);
+         if (ZSTD_isError(ret))
+         {
+            pgmoneta_log_error("ZSTD: Decompression error: %s", ZSTD_getErrorName(ret));
+            goto error;
+         }
          fwrite(zout, sizeof(char), output.pos, fout);
          lastRet = ret;
       }
@@ -983,6 +993,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
 
    if (lastRet != 0)
    {
+      pgmoneta_log_error("ZSTD: Incomplete or corrupted frame");
       goto error;
    }
 
