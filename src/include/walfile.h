@@ -31,6 +31,7 @@
 
 #include <deque.h>
 #include <walfile/wal_reader.h>
+#include <wal.h>
 
 /* Return Codes */
 #define PGMONETA_WAL_SUCCESS      0   /**< WAL operation succeeded */
@@ -131,11 +132,12 @@ pgmoneta_destroy_walfile(struct walfile* wf);
  * @param end_lsn The end LSN
  * @param xids The XIDs
  * @param limit The limit
+ * @param included_objects The objects to include the wal records for, if NULL, all objects are included
  * @return 0 upon success, otherwise 1
  */
 int
 pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                          uint32_t limit);
+                          uint32_t limit, char** included_objects);
 
 #endif //PGMONETA_WALFILE_H

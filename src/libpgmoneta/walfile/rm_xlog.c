@@ -29,6 +29,7 @@
 #include <logging.h>
 #include <pgmoneta.h>
 #include <utils.h>
+#include <wal.h>
 #include <walfile/pg_control.h>
 #include <walfile/rm.h>
 #include <walfile/rm_xlog.h>
@@ -102,9 +103,22 @@ check_point_format_v16(struct check_point* wrapper, char* buf)
 {
    struct check_point_v16 checkpoint = wrapper->data.v16;
 
+   char* oldest_xid_db = NULL;
+   char* oldest_multi_db = NULL;
+
+   if (pgmoneta_get_database_name(checkpoint.oldest_xid_db, &oldest_xid_db))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_database_name(checkpoint.oldest_multi_db, &oldest_multi_db))
+   {
+      goto error;
+   }
+
    buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
                                     "tli %u; prev tli %u; fpw %s; xid %u:%u; oid %u; multi %u; offset %u; "
-                                    "oldest xid %u in DB %u; oldest multi %u in DB %u; "
+                                    "oldest xid %u in DB %s; oldest multi %u in DB %s; "
                                     "oldest/newest commit timestamp xid: %u/%u; "
                                     "oldest running xid %u;",
                                     LSN_FORMAT_ARGS(checkpoint.redo),
@@ -117,13 +131,23 @@ check_point_format_v16(struct check_point* wrapper, char* buf)
                                     checkpoint.next_multi,
                                     checkpoint.next_multi_offset,
                                     checkpoint.oldest_xid,
-                                    checkpoint.oldest_xid_db,
+                                    oldest_xid_db,
                                     checkpoint.oldest_multi,
-                                    checkpoint.oldest_multi_db,
+                                    oldest_multi_db,
                                     checkpoint.oldest_commit_ts_xid,
                                     checkpoint.newest_commit_ts_xid,
                                     checkpoint.oldest_active_xid);
+
+   free(oldest_xid_db);
+   free(oldest_multi_db);
+
    return buf;
+
+error:
+   free(oldest_xid_db);
+   free(oldest_multi_db);
+
+   return NULL;
 
 }
 
@@ -132,9 +156,22 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
 {
    struct check_point_v17 checkpoint = wrapper->data.v17;
 
+   char* oldest_xid_db = NULL;
+   char* oldest_multi_db = NULL;
+
+   if (pgmoneta_get_database_name(checkpoint.oldest_xid_db, &oldest_xid_db))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_database_name(checkpoint.oldest_multi_db, &oldest_multi_db))
+   {
+      goto error;
+   }
+
    buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
                                     "tli %u; prev tli %u; fpw %s; wal_level %s; xid %u:%u; oid %u; multi %u; offset %u; "
-                                    "oldest xid %u in DB %u; oldest multi %u in DB %u; "
+                                    "oldest xid %u in DB %s; oldest multi %u in DB %s; "
                                     "oldest/newest commit timestamp xid: %u/%u; "
                                     "oldest running xid %u",
                                     LSN_FORMAT_ARGS(checkpoint.redo),
@@ -148,13 +185,22 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
                                     checkpoint.next_multi,
                                     checkpoint.next_multi_offset,
                                     checkpoint.oldest_xid,
-                                    checkpoint.oldest_xid_db,
+                                    oldest_xid_db,
                                     checkpoint.oldest_multi,
-                                    checkpoint.oldest_multi_db,
+                                    oldest_multi_db,
                                     checkpoint.oldest_commit_ts_xid,
                                     checkpoint.newest_commit_ts_xid,
                                     checkpoint.oldest_active_xid);
+
+   free(oldest_xid_db);
+   free(oldest_multi_db);
+
    return buf;
+
+error:
+   free(oldest_xid_db);
+   free(oldest_multi_db);
+   return NULL;
 }
 
 void
