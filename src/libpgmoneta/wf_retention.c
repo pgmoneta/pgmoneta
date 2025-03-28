@@ -176,9 +176,9 @@ retention_execute(char* name, struct art* nodes)
                // a backup can only be deleted if it has no child
                if (!backups[j]->keep && child == NULL)
                {
-                  pgmoneta_log_trace("Retention: %s/%s (%s)", config->common.servers[i].name, backups[j]->label, atomic_load(&config->common.servers[i].delete) ? "Active" : "Inactive");
+                  pgmoneta_log_trace("Retention: %s/%s (%s)", config->common.servers[i].name, backups[j]->label, atomic_load(&config->common.servers[i].repository) ? "Active" : "Inactive");
 
-                  if (!atomic_load(&config->common.servers[i].delete))
+                  if (!atomic_load(&config->common.servers[i].repository))
                   {
                      pgmoneta_log_info("Retention: %s/%s", config->common.servers[i].name, backups[j]->label);
                      pgmoneta_delete(i, backups[j]->label);

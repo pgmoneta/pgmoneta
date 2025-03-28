@@ -1790,7 +1790,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
          shutdown_ports();
 
-         if (atomic_compare_exchange_strong(&config->common.servers[i].wal, &active, true))
+         if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
          {
             d = pgmoneta_get_server_wal(i);
 
@@ -1818,7 +1818,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
             free(d);
 
-            atomic_store(&config->common.servers[i].wal, false);
+            atomic_store(&config->common.servers[i].repository, false);
          }
 
          exit(0);

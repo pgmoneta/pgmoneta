@@ -45,6 +45,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <dirent.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -55,6 +56,7 @@ static void write_tar_file(struct archive* a, char* src, char* dst);
 void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
+   bool active = false;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
@@ -79,8 +81,15 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   atomic_fetch_add(&config->active_archives, 1);
-   atomic_fetch_add(&config->common.servers[server].archiving, 1);
+   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+   {
+      pgmoneta_log_info("Archive: Server %s is active", config->common.servers[server].name);
+      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_ACTIVE, NAME, compression, encryption, payload);
+
+      goto done;
+   }
+
+   config->common.servers[server].active_archive = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -204,8 +213,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->common.servers[server].archiving, 1);
-   atomic_fetch_sub(&config->active_archives, 1);
+   config->common.servers[server].active_archive = false;
+   atomic_store(&config->common.servers[server].repository, false);
+
+done:
 
    pgmoneta_stop_logging();
 
@@ -225,8 +236,8 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
-   atomic_fetch_sub(&config->common.servers[server].archiving, 1);
-   atomic_fetch_sub(&config->active_archives, 1);
+   config->common.servers[server].active_archive = false;
+   atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_stop_logging();
 

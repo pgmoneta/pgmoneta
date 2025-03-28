@@ -129,9 +129,6 @@ pgmoneta_init_main_configuration(void* shm)
    config->backlog = 16;
    config->hugepage = HUGEPAGE_TRY;
 
-   atomic_init(&config->active_restores, 0);
-   atomic_init(&config->active_archives, 0);
-
    config->update_process_title = UPDATE_PROCESS_TITLE_VERBOSE;
 
    config->common.log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
@@ -223,14 +220,15 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   memset(&srv, 0, sizeof(struct server));
                   memcpy(&srv.name, &section, strlen(section));
 
-                  atomic_init(&srv.backup, false);
-                  atomic_init(&srv.restore, 0);
-                  atomic_init(&srv.archiving, 0);
-                  atomic_init(&srv.delete, false);
-                  atomic_init(&srv.wal, false);
+                  atomic_init(&srv.repository, false);
+                  srv.active_backup = false;
+                  srv.active_restore = false;
+                  srv.active_archive = false;
+                  srv.active_delete = false;
+                  srv.active_retention = false;
                   srv.wal_streaming = false;
                   srv.valid = false;
-                  srv.cur_timeline = 1; // by default current timeline is 1
+                  srv.cur_timeline = 1;
                   atomic_init(&srv.operation_count, 0);
                   atomic_init(&srv.failed_operation_count, 0);
                   atomic_init(&srv.last_operation_time, 0);

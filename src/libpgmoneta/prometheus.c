@@ -1132,8 +1132,30 @@ home_page(int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_active_archiving</h2>\n");
-   data = pgmoneta_append(data, "  Is there an active archiving for a server\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_active_archive</h2>\n");
+   data = pgmoneta_append(data, "  Is there an active archive for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_active_delete</h2>\n");
+   data = pgmoneta_append(data, "  Is there an active delete for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_active_retention</h2>\n");
+   data = pgmoneta_append(data, "  Is there an active retention for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -4693,13 +4715,19 @@ size_information(int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, atomic_load(&config->common.servers[i].backup));
-
+      if (config->common.servers[i].active_backup)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_backup Is there an active restore for a server\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_active_restore Is there an active restore for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_active_restore gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -4709,23 +4737,84 @@ size_information(int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, atomic_load(&config->common.servers[i].restore));
+      if (config->common.servers[i].active_restore)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
 
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_active_archiving Is there an active archiving for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_active_archiving gauge\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_active_archive Is there an active archiving for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_active_archive gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      data = pgmoneta_append(data, "pgmoneta_active_backup{");
+      data = pgmoneta_append(data, "pgmoneta_active_archive{");
       data = pgmoneta_append(data, "name=\"");
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, atomic_load(&config->common.servers[i].archiving));
+      if (config->common.servers[i].active_archive)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_active_delete Is there an active delete for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_active_delete gauge\n");
+
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_active_delete{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      if (config->common.servers[i].active_delete)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_active_retention Is there an "
+                          "active archiving for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_active_retention gauge\n");
+
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_active_retention{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      if (config->common.servers[i].active_retention)
+      {
+         data = pgmoneta_append_int(data, 1);
+      }
+      else
+      {
+         data = pgmoneta_append_int(data, 0);
+      }
 
       data = pgmoneta_append(data, "\n");
    }

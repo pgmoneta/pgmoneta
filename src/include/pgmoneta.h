@@ -223,11 +223,12 @@ struct server
    int retention_months;                    /**< The retention months for the server */
    int retention_years;                     /**< The retention years for the server */
    int create_slot;                         /**< Create a slot */
-   atomic_bool backup;                      /**< Is there an active backup */
-   atomic_ulong restore;                    /**< Is there an active restore */
-   atomic_ulong archiving;                  /**< Is there an active archiving */
-   atomic_bool delete;                      /**< Is there an active delete */
-   atomic_bool wal;                         /**< Is there an active wal */
+   atomic_bool repository;                  /**< Repository lock */
+   bool active_backup;                      /**< Is there an active backup */
+   bool active_restore;                     /**< Is there an active restore */
+   bool active_archive;                     /**< Is there an active archive */
+   bool active_delete;                      /**< Is there an active delete */
+   bool active_retention;                   /**< Is there an active retention */
    int wal_size;                            /**< The size of the WAL files */
    size_t block_size;                       /**< The size of a block in relation files*/
    size_t segment_size;                     /**< The max size of a relation file segment*/
@@ -389,9 +390,6 @@ struct main_configuration
    char pidfile[MAX_PATH];     /**< File containing the PID */
 
    int workers;                /**< The number of workers */
-
-   atomic_ulong active_restores; /**< The number of active restores */
-   atomic_ulong active_archives; /**< The number of active archives */
 
    unsigned int update_process_title;  /**< Behaviour for updating the process title */
 

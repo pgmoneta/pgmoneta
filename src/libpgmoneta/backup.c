@@ -103,13 +103,15 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].backup, &active, true))
+   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
    {
-      pgmoneta_log_info("Backup: Active backup for server %s", config->common.servers[server].name);
+      pgmoneta_log_info("Backup: Server %s is active", config->common.servers[server].name);
       pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_BACKUP_ACTIVE, NAME, compression, encryption, payload);
 
       goto done;
    }
+
+   config->common.servers[server].active_backup = true;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -284,7 +286,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->common.servers[server].name, date, elapsed);
 
-   atomic_store(&config->common.servers[server].backup, false);
+   config->common.servers[server].active_backup = false;
+   atomic_store(&config->common.servers[server].repository, false);
 
 done:
 

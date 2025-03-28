@@ -36,6 +36,7 @@
 void
 pgmoneta_retention(char** argv)
 {
+   int server = 0;
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
    struct main_configuration* config;
@@ -46,29 +47,38 @@ pgmoneta_retention(char** argv)
 
    pgmoneta_set_proc_title(1, argv, "retention", NULL);
 
-   if (atomic_load(&config->active_restores) == 0 &&
-       atomic_load(&config->active_archives) == 0)
+   for (server = 0; server < config->common.number_of_servers; server++)
    {
-      for (int i = 0; i < config->common.number_of_servers; i++)
+      bool active = false;
+
+      if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
       {
-         workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, i, NULL);
-
-         if (pgmoneta_art_create(&nodes))
-         {
-            goto error;
-         }
-
-         if (pgmoneta_workflow_execute(workflow, nodes, i, -1, 0, 0, NULL))
-         {
-            goto error;
-         }
-
-         pgmoneta_art_destroy(nodes);
-         pgmoneta_workflow_destroy(workflow);
-
-         nodes = NULL;
-         workflow = NULL;
+         pgmoneta_log_info("Retention: Server %s is active", config->common.servers[server].name);
+         continue;
       }
+
+      config->common.servers[server].active_retention = true;
+
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, server, NULL);
+
+      if (pgmoneta_art_create(&nodes))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_workflow_execute(workflow, nodes, server, -1, 0, 0, NULL))
+      {
+         goto error;
+      }
+
+      pgmoneta_art_destroy(nodes);
+      pgmoneta_workflow_destroy(workflow);
+
+      nodes = NULL;
+      workflow = NULL;
+
+      config->common.servers[server].active_retention = false;
+      atomic_store(&config->common.servers[server].repository, false);
    }
 
    pgmoneta_stop_logging();
@@ -79,6 +89,9 @@ error:
 
    pgmoneta_art_destroy(nodes);
    pgmoneta_workflow_destroy(workflow);
+
+   config->common.servers[server].active_retention = false;
+   atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_stop_logging();
 
