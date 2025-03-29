@@ -471,6 +471,23 @@ pgmoneta_wal(int srv, char** argv)
                               pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
                               goto error;
                            }
+                           memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
+                           snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
+                           if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
+                           {
+                              if (wal_shipping != NULL)
+                              {
+                                 pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
+                              }
+                           }
+                           if (config->storage_engine & STORAGE_ENGINE_SSH)
+                           {
+                              if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
+                              {
+                                 pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
+                                 goto error;
+                              }
+                           }
                            curr_xlogoff += bytes_left;
                            fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_file);
                            if (sftp_wal_file != NULL)
