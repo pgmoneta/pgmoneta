@@ -87,8 +87,6 @@ pgmoneta_wal(int srv, char** argv)
    int hdrlen = 1 + 8 + 8 + 8;
    size_t bytes_left = 0;
    char* xlogpos = NULL;
-   char* remain_buffer = NULL;
-   size_t remain_buffer_alloc_size = 0;
    char cmd[MISC_LENGTH];
    size_t xlogpos_size = 0;
    size_t xlogptr = 0;
@@ -365,53 +363,35 @@ pgmoneta_wal(int srv, char** argv)
 
                   if (wal_file == NULL)
                   {
-                     if (xlogoff != 0 && bytes_left != xlogoff)
+                     if (xlogoff != 0)
                      {
                         pgmoneta_log_error("Received WAL record of offset %d with no file open", xlogoff);
                         goto error;
                      }
-                     else
+                     // new wal file
+                     segno = xlogptr / segsize;
+                     curr_xlogoff = 0;
+                     filename = wal_file_name(timeline, segno, segsize);
+                     if ((wal_file = wal_open(d, filename, segsize)) == NULL)
                      {
-                        // new wal file
-                        segno = xlogptr / segsize;
-                        curr_xlogoff = 0;
-                        filename = wal_file_name(timeline, segno, segsize);
-                        if ((wal_file = wal_open(d, filename, segsize)) == NULL)
+                        pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
+                        goto error;
+                     }
+                     memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
+                     snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
+                     if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
+                     {
+                        if (wal_shipping != NULL)
                         {
-                           pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
+                           pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
+                        }
+                     }
+                     if (config->storage_engine & STORAGE_ENGINE_SSH)
+                     {
+                        if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
+                        {
+                           pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
                            goto error;
-                        }
-                        memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
-                        snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
-                        if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
-                        {
-                           if (wal_shipping != NULL)
-                           {
-                              pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
-                           }
-                        }
-                        if (config->storage_engine & STORAGE_ENGINE_SSH)
-                        {
-                           if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
-                           {
-                              pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
-                              goto error;
-                           }
-                        }
-
-                        if (bytes_left > 0)
-                        {
-                           curr_xlogoff += bytes_left;
-                           fwrite(remain_buffer, 1, bytes_left, wal_file);
-                           if (sftp_wal_file != NULL)
-                           {
-                              sftp_write(sftp_wal_file, remain_buffer, bytes_left);
-                           }
-                           if (wal_shipping_file != NULL)
-                           {
-                              fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
-                           }
-                           bytes_left = 0;
                         }
                      }
                   }
@@ -482,19 +462,26 @@ pgmoneta_wal(int srv, char** argv)
 
                         if (bytes_left > 0)
                         {
-                           /* Save the rest of the data for the next WAL segment */
-                           if (remain_buffer == NULL)
+                           /* Write the rest of the data for the next WAL segment */
+                           segno = xlogptr / segsize;
+                           curr_xlogoff = 0;
+                           filename = wal_file_name(timeline, segno, segsize);
+                           if ((wal_file = wal_open(d, filename, segsize)) == NULL)
                            {
-                              remain_buffer = malloc(bytes_left);
-                              remain_buffer_alloc_size = bytes_left;
+                              pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
+                              goto error;
                            }
-                           else if (bytes_left > remain_buffer_alloc_size)
+                           curr_xlogoff += bytes_left;
+                           fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_file);
+                           if (sftp_wal_file != NULL)
                            {
-                              remain_buffer = realloc(remain_buffer, bytes_left);
-                              remain_buffer_alloc_size = bytes_left;
+                              sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_left);
                            }
-                           memset(remain_buffer, 0, remain_buffer_alloc_size);
-                           memcpy(remain_buffer, msg->data + bytes_written, bytes_left);
+                           if (wal_shipping_file != NULL)
+                           {
+                              fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_shipping_file);
+                           }
+                           bytes_left = 0;
                         }
                         break;
                      }
@@ -613,7 +600,6 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_art_destroy(nodes);
 
-   free(remain_buffer);
    free(d);
    free(wal_shipping);
    free(filename);
@@ -662,7 +648,6 @@ error:
 
    pgmoneta_art_destroy(nodes);
 
-   free(remain_buffer);
    free(d);
    free(wal_shipping);
    free(filename);
