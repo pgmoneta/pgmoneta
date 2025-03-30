@@ -98,13 +98,23 @@ List the backups for a server
 Command
 
 ``` sh
-pgmoneta-cli list-backup <server>
+pgmoneta-cli list-backup <server> [--sort asc|desc]
 ```
+
+The `--sort` option allows sorting backups by timestamp:
+- `asc` for ascending order (oldest first)
+- `desc` for descending order (newest first)
 
 Example
 
 ``` sh
 pgmoneta-cli list-backup primary
+```
+
+Example with sorting
+
+``` sh
+pgmoneta-cli list-backup primary --sort desc
 ```
 
 ## restore

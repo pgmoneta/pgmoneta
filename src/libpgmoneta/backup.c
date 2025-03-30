@@ -370,6 +370,10 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
    struct json* bcks = NULL;
    struct deque_iterator* diter = NULL;
    struct main_configuration* config;
+   struct json* request = NULL;
+   char* sort_order = NULL;
+   bool sort_desc = false;
+   int comp_result;
 
    config = (struct main_configuration*)shmem;
 
@@ -393,6 +397,49 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
       goto error;
    }
+   
+   request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   if (request != NULL)
+   {
+      sort_order = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SORT);
+      if (sort_order != NULL)
+      {
+         // Only accept valid sort orders: "asc" or "desc"
+         if (!strcmp(sort_order, "desc"))
+         {
+            sort_desc = true;
+         }
+         else if (!strcmp(sort_order, "asc"))
+         {
+            sort_desc = false;
+         }
+         else
+         {
+            pgmoneta_log_warn("List backup: Invalid sort order '%s', using valid sort orders: \"asc\" or \"desc\"", sort_order);
+            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_LIST_BACKUP_INVALID_SORT, NAME, compression, encryption, payload);
+
+            goto error;
+         }
+         
+         // Sort the backups array based on timestamps (label)
+         for (int i = 0; i < number_of_backups - 1; i++)
+         {
+            for (int j = i + 1; j < number_of_backups; j++)
+            {
+               comp_result = strcmp(backups[i]->label, backups[j]->label);
+               
+               // Swap if needed based on sort order
+               if ((sort_desc && comp_result < 0) || (!sort_desc && comp_result > 0))
+               {
+                  struct backup* temp = backups[i];
+                  backups[i] = backups[j];
+                  backups[j] = temp;
+               }
+            }
+         }
+      }
+   }
+   
 
    for (int i = 0; i < number_of_backups; i++)
    {

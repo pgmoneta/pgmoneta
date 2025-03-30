@@ -37,6 +37,7 @@ Sangkeun J.C. Kim <jchrys@me.com>
 Tejas Tyagi <tejastyagi.tt@gmail.com>
 Aryan Arora <aryanarora.w1@gmail.com>
 Arshdeep Singh <balarsh535@gmail.com>
+Din Xin Chen <s990346@gmail.com>
 ```
 
 ## Committers

@@ -75,6 +75,22 @@ Response:
   ServerVersion: 0.16.0
 ```
 
+## Sorting backups
+
+You can sort the backup list by timestamp using the `--sort` option:
+
+```
+pgmoneta-cli list-backup primary --sort asc
+```
+
+for ascending order (oldest first), or 
+
+```
+pgmoneta-cli list-backup primary --sort desc
+```
+
+for descending order (newest first).
+
 ## Create an incremental backup
 
 We can take an incremental backup from the primary with the following command

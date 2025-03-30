@@ -158,6 +158,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
 #define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
 #define MANAGEMENT_ARGUMENT_SERVER_VERSION        "ServerVersion"
+#define MANAGEMENT_ARGUMENT_SORT                  "Sort"
 #define MANAGEMENT_ARGUMENT_SOURCE_FILE           "SourceFile"
 #define MANAGEMENT_ARGUMENT_START_HILSN           "StartHiLSN"
 #define MANAGEMENT_ARGUMENT_START_LOLSN           "StartLoLSN"
@@ -208,6 +209,7 @@ extern "C" {
 #define MANAGEMENT_ERROR_LIST_BACKUP_NETWORK      303
 #define MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER     304
 #define MANAGEMENT_ERROR_LIST_BACKUP_NOFORK       305
+#define MANAGEMENT_ERROR_LIST_BACKUP_INVALID_SORT 306
 
 #define MANAGEMENT_ERROR_DELETE_SETUP    400
 #define MANAGEMENT_ERROR_DELETE_EXECUTE  401
@@ -411,13 +413,14 @@ pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t c
  * @param ssl The SSL connection
  * @param socket The socket descriptor
  * @param server The server
+ * @param sort_order The sort order (asc, desc, or NULL)
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request

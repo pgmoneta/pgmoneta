@@ -88,6 +88,7 @@
 
 #define UNSPECIFIED "Unspecified"
 
+/* Global variables */
 static void help_backup(void);
 static void help_list_backup(void);
 static void help_restore(void);
@@ -110,7 +111,7 @@ static void help_annotate(void);
 static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
-static int list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -193,6 +194,7 @@ usage(void)
    printf("  -F, --format text|json|raw                     Set the output format\n");
    printf("  -C, --compress none|gz|zstd|lz4|bz2            Compress the wire protocol\n");
    printf("  -E, --encrypt none|aes|aes256|aes192|aes128    Encrypt the wire protocol\n");
+   printf("  -s, --sort asc|desc                            Sort result (for list-backup)\n");
    printf("  -?, --help                                     Display help\n");
    printf("\n");
    printf("Commands:\n");
@@ -239,7 +241,7 @@ struct pgmoneta_command command_table[] = {
    {
       .command = "list-backup",
       .subcommand = "",
-      .accepted_argument_count = {1},
+      .accepted_argument_count = {1, 2},
       .action = MANAGEMENT_LIST_BACKUP,
       .deprecated = false,
       .log_message = "<list-backup> [%s]",
@@ -414,6 +416,8 @@ struct pgmoneta_command command_table[] = {
    }
 };
 
+
+
 int
 main(int argc, char** argv)
 {
@@ -444,6 +448,7 @@ main(int argc, char** argv)
    int optind = 0;
    int num_options = 0;
    int num_results = 0;
+   char* sort_option = NULL;
 
    cli_option options[] = {
       {"c", "config", true},
@@ -457,6 +462,7 @@ main(int argc, char** argv)
       {"F", "format", true},
       {"C", "compress", true},
       {"E", "encrypt", true},
+      {"s", "sort", true},
       {"?", "help", false}
    };
 
@@ -589,6 +595,18 @@ main(int argc, char** argv)
          else
          {
             warnx("pgmoneta-cli: Invalid encryption method. Allowed values: aes, aes256, aes192, aes128, none.");
+            exit(1);
+         }
+      }
+      else if (!strcmp(optname, "s") || !strcmp(optname, "sort"))
+      {
+         if (!strncmp(optarg, "asc", 3) || !strncmp(optarg, "desc", 4))
+         {
+            sort_option = optarg;
+         }
+         else
+         {
+            warnx("pgmoneta-cli: Invalid sort order. Allowed values: asc, desc.");
             exit(1);
          }
       }
@@ -811,7 +829,7 @@ execute:
    }
    else if (parsed.cmd->action == MANAGEMENT_LIST_BACKUP)
    {
-      exit_code = list_backup(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+      exit_code = list_backup(s_ssl, socket, parsed.args[0], sort_option, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
@@ -1004,7 +1022,7 @@ static void
 help_list_backup(void)
 {
    printf("List backups for a server\n");
-   printf("  pgmoneta-cli list-backup <server>\n");
+   printf("  pgmoneta-cli list-backup <server> [--sort asc|desc]\n");
 }
 
 static void
@@ -1235,9 +1253,9 @@ error:
 }
 
 static int
-list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
+list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_list_backup(ssl, socket, server, compression, encryption, output_format))
+   if (pgmoneta_management_request_list_backup(ssl, socket, server, sort_order, compression, encryption, output_format))
    {
       goto error;
    }
