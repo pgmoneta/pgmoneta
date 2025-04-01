@@ -24,59 +24,66 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-#ifndef CMD_H
-#define CMD_H
-
-#include <stdbool.h>
-
-/**
- * @struct cli_option
- * Struct to hold option definition
- */
-typedef struct
-{
-   char* short_name;    /**< Short option name */
-   char* long_name;     /**< Long option name */
-   bool requires_arg;   /**< Whether this option requires an argument */
-} cli_option;
-
-/**
- * @struct cli_result
- * Struct to hold parsed option result
- */
-typedef struct
-{
-   char* option_name;   /**< The matched option name (short or long) */
-   char* argument;      /**< Argument value if applicable, NULL otherwise */
-} cli_result;
-
-/**
- * Parse command line arguments based on the provided options
  *
- * @param argc Number of arguments
- * @param argv Array of argument strings
- * @param options Array of option definitions
- * @param num_options Number of options in the array
- * @param results Output array for results
- * @param num_results Maximum number of results to store
- * @param use_last_arg_as_filename Whether to use the last argument as a filename
- * @param filename Output parameter for filename if requested
- * @param optind Output parameter for the index of the first non-option argument
- *
- * @return Number of results found, or -1 on error
  */
-int cmd_parse(
-   int argc,
-   char** argv,
-   cli_option* options,
-   int num_options,
-   cli_result* results,
-   int num_results,
-   bool use_last_arg_as_filename,
-   char** filename,
-   int* optind
-   );
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef PGMONETA_TEST_COMMON_H
+#define PGMONETA_TEST_COMMON_H
+
+#define BUFFER_SIZE 8192
+
+#define PGMONETA_LOG_FILE_TRAIL      "/log/pgmoneta.log"
+#define PGMONETA_EXECUTABLE_TRAIL    "/src/pgmoneta-cli"
+#define PGMONETA_CONFIGURATION_TRAIL "/pgmoneta-testsuite/conf/pgmoneta.conf"
+#define PGMONETA_RESTORE_TRAIL       "/pgmoneta-testsuite/restore/"
+
+#define PGMONETA_BACKUP_LOG      "INFO  backup.c:195 Backup: primary/"
+#define PGMONETA_RESTORE_LOG     "INFO  restore.c:142 Restore: primary/"
+#define PGMONETA_DELETE_LOG      "INFO  backup.c:545 Delete: primary/"
+
+#define SUCCESS_STATUS  "Status: true"
+
+extern char project_directory[BUFFER_SIZE];
+
+/**
+ * get the executable path from the project directory and its corresponding trail
+ * @return executable path
+ */
+char*
+get_executable_path();
+
+/**
+ * get the configuration path from the project directory and its corresponding trail
+ * @return configuration path
+ */
+char*
+get_configuration_path();
+
+/**
+ * get the restore path from the project directory and its corresponding trail
+ * @return restore path
+ */
+char*
+get_restore_path();
+
+/**
+ * get the log path from the project directory and its corresponding trail
+ * @return log path
+ */
+char*
+get_log_path();
+
+/**
+ * get the last entry of a log file (remember to free the buffer)
+ * @param log_path The path of log file
+ * @param buffer The buffer to store the last entry of the log file
+ * @return 0 for success otherwise 1
+ */
+int
+get_last_log_entry(char* log_path, char** buffer);
 
 #endif

@@ -54,14 +54,14 @@ pgmoneta_remote_management(int client_fd, char* address)
    uint8_t encryption;
    SSL* client_ssl = NULL;
    struct json* payload = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
 
    exit_code = 0;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("pgmoneta_remote_management: connect %d", client_fd);
 

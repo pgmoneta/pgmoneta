@@ -95,7 +95,7 @@ pgmoneta_wal_is_bkp_image_compressed(uint16_t magic_value, uint8_t bimg_info)
 }
 
 static inline int
-xlog_from_file_name(char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
+xlog_from_file_name(const char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
 {
 #define XLogSegmentsPerXLogId(wal_segsz_bytes) \
         (0x100000000UL / (wal_segsz_bytes))
@@ -180,13 +180,13 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    char* buffer = NULL;
    struct decoded_xlog_record* decoded = NULL;
    struct xlog_page_header_data* page_header = NULL;
-   struct walinfo_configuration* config = NULL;
+   struct configuration* config = NULL;
    timeline_id tli = 0;
    xlog_seg_no logSegNo = 0;
    xlog_rec_ptr base;
    int wal_segz_bytes = DEFAULT_WAL_SEGZ_BYTES;
 
-   config = (struct walinfo_configuration*) shmem;
+   config = (struct configuration*) shmem;
 
    FILE* file = fopen(path, "rb");
    if (file == NULL)
@@ -213,13 +213,13 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    if (server == -1)
    {
-      config->common.servers[0].version = magic_value_to_postgres_version(long_header->std.xlp_magic);
-      server_config = &config->common.servers[0];
+      config->servers[0].version = magic_value_to_postgres_version(long_header->std.xlp_magic);
+      server_config = &config->servers[0];
    }
    else
    {
-      assert(config->common.servers[server].version == magic_value_to_postgres_version(long_header->std.xlp_magic));
-      server_config = &config->common.servers[server];
+      assert(config->servers[server].version == magic_value_to_postgres_version(long_header->std.xlp_magic));
+      server_config = &config->servers[server];
    }
 
    if (long_header->std.xlp_rem_len > 0)
@@ -760,7 +760,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
 
             if (pgmoneta_wal_is_bkp_image_compressed(magic_value, bimg_info))
             {
-               char* method;
+               const char* method;
 
                if ((bimg_info & BKPIMAGE_COMPRESS_PGLZ) != 0)
                {

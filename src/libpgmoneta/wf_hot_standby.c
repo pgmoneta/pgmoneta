@@ -102,29 +102,26 @@ hot_standby_execute(char* name, struct art* nodes)
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct workers* workers = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Hot standby (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Hot standby (execute): %s/%s", config->servers[server].name, label);
 
-   if (strlen(config->common.servers[server].hot_standby) > 0)
+   if (strlen(config->servers[server].hot_standby) > 0)
    {
       number_of_workers = pgmoneta_get_number_of_workers(server);
       if (number_of_workers > 0)
@@ -138,14 +135,14 @@ hot_standby_execute(char* name, struct art* nodes)
 
       pgmoneta_get_backups(base, &number_of_backups, &backups);
 
-      root = pgmoneta_append(root, config->common.servers[server].hot_standby);
+      root = pgmoneta_append(root, config->servers[server].hot_standby);
       if (!pgmoneta_ends_with(root, "/"))
       {
          root = pgmoneta_append_char(root, '/');
       }
 
       destination = pgmoneta_append(destination, root);
-      destination = pgmoneta_append(destination, config->common.servers[server].name);
+      destination = pgmoneta_append(destination, config->servers[server].name);
 
       if (pgmoneta_exists(destination) && number_of_backups >= 2)
       {
@@ -277,7 +274,7 @@ hot_standby_execute(char* name, struct art* nodes)
          pgmoneta_mkdir(root);
          pgmoneta_mkdir(destination);
 
-         pgmoneta_copy_postgresql_hotstandby(source, destination, config->common.servers[server].hot_standby_tablespaces, backups[number_of_backups - 1], workers);
+         pgmoneta_copy_postgresql_hotstandby(source, destination, config->servers[server].hot_standby_tablespaces, backups[number_of_backups - 1], workers);
       }
 
       pgmoneta_log_debug("hot_standby source:      %s", source);
@@ -292,14 +289,14 @@ hot_standby_execute(char* name, struct art* nodes)
          }
       }
 
-      if (strlen(config->common.servers[server].hot_standby_overrides) > 0 &&
-          pgmoneta_exists(config->common.servers[server].hot_standby_overrides) &&
-          pgmoneta_is_directory(config->common.servers[server].hot_standby_overrides))
+      if (strlen(config->servers[server].hot_standby_overrides) > 0 &&
+          pgmoneta_exists(config->servers[server].hot_standby_overrides) &&
+          pgmoneta_is_directory(config->servers[server].hot_standby_overrides))
       {
-         pgmoneta_log_debug("hot_standby_overrides source:      %s", config->common.servers[server].hot_standby_overrides);
+         pgmoneta_log_debug("hot_standby_overrides source:      %s", config->servers[server].hot_standby_overrides);
          pgmoneta_log_debug("hot_standby_overrides destination: %s", destination);
 
-         pgmoneta_copy_directory(config->common.servers[server].hot_standby_overrides,
+         pgmoneta_copy_directory(config->servers[server].hot_standby_overrides,
                                  destination,
                                  NULL,
                                  workers);
@@ -325,7 +322,7 @@ hot_standby_execute(char* name, struct art* nodes)
       memset(&elapsed[0], 0, sizeof(elapsed));
       sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-      pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
+      pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
    }
 
    free(old_manifest);

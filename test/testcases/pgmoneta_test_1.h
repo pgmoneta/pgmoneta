@@ -40,6 +40,6 @@
  * @return The result
  */
 Suite*
-pgmoneta_test1_suite();
+pgmoneta_test1_suite(char* dir);
 
 #endif // PGMONETA_TEST1_H

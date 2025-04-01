@@ -38,8 +38,6 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
-#define NAME "keep"
-
 static void keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload);
 
 void
@@ -69,9 +67,9 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    struct backup** backups = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -124,19 +122,19 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       }
    }
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[srv].name, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[srv].name, ValueString);
 
    if (backup_index == -1)
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, NAME, compression, encryption, payload);
-         pgmoneta_log_warn("Retain: No identifier for %s/%s", config->common.servers[srv].name, backup_id);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, compression, encryption, payload);
+         pgmoneta_log_warn("Retain: No identifier for %s/%s", config->servers[srv].name, backup_id);
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, NAME, compression, encryption, payload);
-         pgmoneta_log_warn("Expunge: No identifier for %s/%s", config->common.servers[srv].name, backup_id);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, compression, encryption, payload);
+         pgmoneta_log_warn("Expunge: No identifier for %s/%s", config->servers[srv].name, backup_id);
       }
 
       goto error;
@@ -165,12 +163,12 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_RETAIN_NETWORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_RETAIN_NETWORK, compression, encryption, payload);
          pgmoneta_log_error("Retain: Error sending response");
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_EXPUNGE_NETWORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_EXPUNGE_NETWORK, compression, encryption, payload);
          pgmoneta_log_error("Expunge: Error sending response");
       }
 
@@ -179,7 +177,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("%s: %s/%s (Elapsed: %s)", prefix, config->common.servers[srv].name, backups[backup_index]->label, elapsed);
+   pgmoneta_log_info("%s: %s/%s (Elapsed: %s)", prefix, config->servers[srv].name, backups[backup_index]->label, elapsed);
 
    for (int i = 0; i < number_of_backups; i++)
    {

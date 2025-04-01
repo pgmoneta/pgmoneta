@@ -45,14 +45,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "gzip"
 #define BUFFER_LENGTH 8192
 
 static int gz_compress(char* from, int level, char* to);
 static int gz_decompress(char* from, char* to);
 
-static void do_gz_compress(struct worker_common* wc);
-static void do_gz_decompress(struct worker_common* wc);
+static void do_gz_compress(struct worker_input* wi);
+static void do_gz_decompress(struct worker_input* wi);
 
 int
 pgmoneta_gzip_data(char* directory, struct workers* workers)
@@ -63,9 +62,9 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
    struct dirent* entry;
    int level;
    struct worker_input* wi = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -84,6 +83,11 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+      {
+         continue;
+      }
+
       if (entry->d_type == DT_DIR)
       {
          char path[1024];
@@ -99,13 +103,7 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
       }
       else if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, "backup_manifest") ||
-             pgmoneta_ends_with(entry->d_name, "backup_label"))
-         {
-            continue;
-         }
-
-         if (!pgmoneta_is_compressed(entry->d_name) && !pgmoneta_is_encrypted(entry->d_name))
+         if (!pgmoneta_is_compressed_archive(entry->d_name) && !pgmoneta_is_encrypted_archive(entry->d_name))
          {
             from = pgmoneta_append(from, directory);
             from = pgmoneta_append(from, "/");
@@ -122,12 +120,12 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_gz_compress, (struct worker_common*)wi);
+                     pgmoneta_workers_add(workers, do_gz_compress, wi);
                   }
                }
                else
                {
-                  do_gz_compress((struct worker_common*)wi);
+                  do_gz_compress(wi);
                }
             }
             else
@@ -165,10 +163,8 @@ error:
 }
 
 static void
-do_gz_compress(struct worker_common* wc)
+do_gz_compress(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->from))
    {
       if (gz_compress(wi->from, wi->level, wi->to))
@@ -223,9 +219,9 @@ pgmoneta_gzip_wal(char* directory)
    DIR* dir;
    struct dirent* entry;
    int level;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -250,8 +246,8 @@ pgmoneta_gzip_wal(char* directory)
       }
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_compressed(entry->d_name) ||
-             pgmoneta_is_encrypted(entry->d_name) ||
+         if (pgmoneta_is_compressed_archive(entry->d_name) ||
+             pgmoneta_is_encrypted_archive(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))
          {
@@ -323,7 +319,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("GZip: No file for %s", from);
       goto error;
    }
@@ -332,14 +328,14 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    to = pgmoneta_append(to, ".gz");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
 
    if (pgmoneta_gzip_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error gzip %s", from);
       goto error;
    }
@@ -355,7 +351,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
@@ -366,7 +362,7 @@ pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
@@ -392,9 +388,9 @@ int
 pgmoneta_gzip_file(char* from, char* to)
 {
    int level;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    level = config->compression_level;
    if (level < 1)
@@ -449,7 +445,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("GZip: No file for %s", from);
       goto error;
    }
@@ -458,14 +454,14 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
    to = pgmoneta_remove_suffix(orig, ".gz");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
 
    if (pgmoneta_gunzip_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_ERROR, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error gunzip %s", from);
       goto error;
    }
@@ -481,7 +477,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("GZip: Allocation error");
       goto error;
    }
@@ -492,7 +488,7 @@ pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_GZIP_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("GZip: Error sending response");
       goto error;
    }
@@ -606,12 +602,12 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_gz_decompress, (struct worker_common*)wi);
+                     pgmoneta_workers_add(workers, do_gz_decompress, wi);
                   }
                }
                else
                {
-                  do_gz_decompress((struct worker_common*)wi);
+                  do_gz_decompress(wi);
                }
             }
             else
@@ -816,10 +812,8 @@ pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size,
 }
 
 static void
-do_gz_decompress(struct worker_common* wc)
+do_gz_decompress(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->from))
    {
       if (gz_decompress(wi->from, wi->to))

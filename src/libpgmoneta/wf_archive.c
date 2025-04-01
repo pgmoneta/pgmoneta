@@ -94,31 +94,28 @@ archive_execute(char* name, struct art* nodes)
    char* src = NULL;
    char* dst = NULL;
    char* d_name = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    root = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 
-   pgmoneta_log_debug("Archive (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Archive (execute): %s/%s", config->servers[server].name, label);
 
    src = pgmoneta_append(src, base);
 
@@ -128,12 +125,12 @@ archive_execute(char* name, struct art* nodes)
       dst = pgmoneta_append(dst, "/");
    }
    dst = pgmoneta_append(dst, "archive-");
-   dst = pgmoneta_append(dst, config->common.servers[server].name);
+   dst = pgmoneta_append(dst, config->servers[server].name);
    dst = pgmoneta_append(dst, "-");
    dst = pgmoneta_append(dst, label);
    dst = pgmoneta_append(dst, ".tar");
 
-   d_name = pgmoneta_append(d_name, config->common.servers[server].name);
+   d_name = pgmoneta_append(d_name, config->servers[server].name);
    d_name = pgmoneta_append(d_name, "-");
    d_name = pgmoneta_append(d_name, label);
 
@@ -173,28 +170,25 @@ archive_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* destination = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Archive (teardown): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Archive (teardown): %s/%s", config->servers[server].name, label);
 
    destination = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
 

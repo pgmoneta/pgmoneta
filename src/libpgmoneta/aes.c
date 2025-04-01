@@ -37,7 +37,6 @@
 /* System */
 #include <dirent.h>
 
-#define NAME "aes"
 #define ENC_BUF_SIZE (1024 * 1024)
 
 static int encrypt_file(char* from, char* to, int enc);
@@ -47,8 +46,8 @@ static int aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* k
 static const EVP_CIPHER* (*get_cipher(int mode))(void);
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void);
 
-static void do_encrypt_file(struct worker_common* wc);
-static void do_decrypt_file(struct worker_common* wc);
+static void do_encrypt_file(struct worker_input* wi);
+static void do_decrypt_file(struct worker_input* wi);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
@@ -107,12 +106,12 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
                   {
                      if (workers->outcome)
                      {
-                        pgmoneta_workers_add(workers, do_encrypt_file, (struct worker_common*)wi);
+                        pgmoneta_workers_add(workers, do_encrypt_file, wi);
                      }
                   }
                   else
                   {
-                     do_encrypt_file((struct worker_common*)wi);
+                     do_encrypt_file(wi);
                   }
                }
             }
@@ -141,10 +140,8 @@ error:
 }
 
 static void
-do_encrypt_file(struct worker_common* wc)
+do_encrypt_file(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (!encrypt_file(wi->from, wi->to, 1))
    {
       if (pgmoneta_exists(wi->from))
@@ -204,9 +201,9 @@ pgmoneta_encrypt_wal(char* d)
    DIR* dir;
    struct dirent* entry;
    char* compress_suffix = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
    switch (config->compression_type)
    {
       case COMPRESSION_CLIENT_GZIP:
@@ -297,7 +294,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: No file for %s", from);
       goto error;
    }
@@ -307,7 +304,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (encrypt_file(from, to, 1))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Error encrypting %s", from);
       goto error;
    }
@@ -323,7 +320,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Allocation error");
       goto error;
    }
@@ -334,7 +331,7 @@ pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Encrypt: Error sending response");
       goto error;
    }
@@ -404,10 +401,7 @@ pgmoneta_decrypt_file(char* from, char* to)
 
    if (!to)
    {
-      if (pgmoneta_strip_extension(from, &to))
-      {
-         return 1;
-      }
+      pgmoneta_basename_file(from, &to);
       flag = 1;
    }
 
@@ -488,12 +482,12 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common*)wi);
+                     pgmoneta_workers_add(workers, do_decrypt_file, wi);
                   }
                }
                else
                {
-                  do_decrypt_file((struct worker_common*)wi);
+                  do_decrypt_file(wi);
                }
             }
             else
@@ -526,10 +520,8 @@ error:
 }
 
 static void
-do_decrypt_file(struct worker_common* wc)
+do_decrypt_file(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (!encrypt_file(wi->from, wi->to, 0))
    {
       if (pgmoneta_exists(wi->from))
@@ -568,7 +560,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: No file for %s", from);
       goto error;
    }
@@ -576,7 +568,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
    to = malloc(strlen(from) - 3);
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
@@ -586,7 +578,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (encrypt_file(from, to, 0))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Error decrypting %s", from);
       goto error;
    }
@@ -602,7 +594,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
@@ -613,7 +605,7 @@ pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Decrypt: Error sending response");
       goto error;
    }
@@ -849,7 +841,7 @@ encrypt_file(char* from, char* to, int enc)
    unsigned char iv[EVP_MAX_IV_LENGTH];
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
    const EVP_CIPHER* (* cipher_fp)(void) = NULL;
    int cipher_block_size = 0;
    int inbuf_size = 0;
@@ -860,7 +852,7 @@ encrypt_file(char* from, char* to, int enc)
    int outl = 0;
    int f_len = 0;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
    cipher_fp = get_cipher(config->encryption);
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
    inbuf_size = ENC_BUF_SIZE;

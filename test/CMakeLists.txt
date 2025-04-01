@@ -28,42 +28,20 @@
 if (check)
 
   set(SOURCES
-    tsclient.c
+    testcases/common.c
     testcases/pgmoneta_test_1.c
     testcases/pgmoneta_test_2.c
-    runner.c
+    testcases/runner.c
   )
 
-  add_compile_options(-O0)
-  add_compile_options(-DDEBUG)
-  
-  if (CMAKE_BUILD_TYPE MATCHES Debug)
-    if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-      if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")
-        if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-          add_compile_options(-fsanitize=address)
-          add_compile_options(-fsanitize=undefined)
-          add_compile_options(-fno-sanitize-recover=all)
-          add_compile_options(-fsanitize=float-divide-by-zero)
-          add_compile_options(-fsanitize=float-cast-overflow)
-          add_compile_options(-fno-sanitize=null)
-          add_compile_options(-fno-sanitize=alignment)
-
-          set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment")
-        endif()
-      endif()
-    endif()
-  endif()
-
   add_executable(pgmoneta_test ${SOURCES})
-  target_include_directories(pgmoneta_test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
 
   if(EXISTS "/etc/debian_version")
-    target_link_libraries(pgmoneta_test Check::check subunit pthread rt m pgmoneta)
+    target_link_libraries(pgmoneta_test Check::check subunit pthread rt m)
   elseif(APPLE)
-    target_link_libraries(pgmoneta_test Check::check m pgmoneta)
+    target_link_libraries(pgmoneta_test Check::check m)
   else()
-    target_link_libraries(pgmoneta_test Check::check pthread rt m pgmoneta)
+    target_link_libraries(pgmoneta_test Check::check pthread rt m)
   endif()
 
   add_custom_target(custom_clean

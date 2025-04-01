@@ -135,27 +135,24 @@ ssh_storage_setup(char* name, struct art* nodes)
    size_t hash_length;
    int rc;
    enum ssh_known_hosts_e state;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->servers[server].name, label);
 
    homedir = getenv("HOME");
    pubkey_path = "/.ssh/id_rsa.pub";
@@ -319,29 +316,26 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
    int next_newest = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (execute): %s/%s", config->servers[server].name, label);
 
    remote_root = get_remote_server_backup_identifier(server, label);
 
@@ -454,27 +448,24 @@ ssh_storage_wal_shipping_execute(char* name, struct art* nodes)
    char* label = NULL;
    char* local_root = NULL;
    char* remote_root = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/execute): %s/%s", config->servers[server].name, label);
 
    remote_root = get_remote_server_wal(server);
    local_root = pgmoneta_get_server_wal(server);
@@ -505,27 +496,24 @@ ssh_storage_backup_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* root = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (teardown): %s/%s", config->servers[server].name, label);
 
    if (!is_error)
    {
@@ -556,27 +544,24 @@ ssh_storage_wal_shipping_teardown(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("SSH storage engine (WAL shipping/teardown): %s/%s", config->servers[server].name, label);
 
    sftp_free(sftp);
 
@@ -919,16 +904,16 @@ static char*
 get_remote_server_basepath(int server)
 {
    char* d = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    d = pgmoneta_append(d, config->ssh_base_dir);
    if (!pgmoneta_ends_with(config->ssh_base_dir, "/"))
    {
       d = pgmoneta_append(d, "/");
    }
-   d = pgmoneta_append(d, config->common.servers[server].name);
+   d = pgmoneta_append(d, config->servers[server].name);
    d = pgmoneta_append(d, "/");
 
    return d;

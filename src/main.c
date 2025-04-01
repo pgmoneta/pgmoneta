@@ -32,7 +32,6 @@
 #include <aes.h>
 #include <backup.h>
 #include <bzip2_compression.h>
-#include <cmd.h>
 #include <configuration.h>
 #include <delete.h>
 #include <gzip_compression.h>
@@ -62,6 +61,7 @@
 #include <errno.h>
 #include <ev.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,11 +76,10 @@
 #include <sys/types.h>
 
 #include <openssl/crypto.h>
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
 #include <systemd/sd-daemon.h>
 #endif
 
-#define NAME "main"
 #define MAX_FDS 64
 #define OFFLINE 1000
 
@@ -137,9 +136,9 @@ start_mgt(void)
 static void
 shutdown_mgt(void)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    ev_io_stop(main_loop, (struct ev_io*)&io_mgt);
    pgmoneta_disconnect(unix_management_socket);
@@ -249,106 +248,91 @@ main(int argc, char** argv)
    struct ev_periodic wal_streaming;
    size_t shmem_size;
    size_t prometheus_cache_shmem_size = 0;
-   struct main_configuration* config = NULL;
+   struct configuration* config = NULL;
    int ret;
-   char* os = NULL;
-   int kernel_major, kernel_minor, kernel_patch;
+   int c;
+
    argv_ptr = argv;
-   char* filepath = NULL;
-   int optind = 0;
-   int num_options = 0;
-   int num_results = 0;
 
-   cli_option options[] = {
-      {"c", "config", true},
-      {"u", "users", true},
-      {"A", "admins", true},
-      {"d", "daemon", false},
-      {"", "offline", false},
-      {"V", "version", false},
-      {"?", "help", false},
-   };
-
-   num_options = sizeof(options) / sizeof(options[0]);
-
-   cli_result results[num_options];
-
-   num_results = cmd_parse(argc, argv, options, num_options, results, num_options, false, &filepath, &optind);
-
-   if (num_results < 0)
+   while (1)
    {
-      errx(1, "Error parsing command line\n");
-      return 1;
-   }
+      static struct option long_options[] =
+      {
+         {"config", required_argument, 0, 'c'},
+         {"users", required_argument, 0, 'u'},
+         {"admins", required_argument, 0, 'A'},
+         {"daemon", no_argument, 0, 'd'},
+         {"offline", no_argument, 0, OFFLINE},
+         {"version", no_argument, 0, 'V'},
+         {"help", no_argument, 0, '?'}
+      };
+      int option_index = 0;
 
-   for (int i = 0; i < num_results; i++)
-   {
-      char* optname = results[i].option_name;
-      char* optarg = results[i].argument;
+      c = getopt_long (argc, argv, "dV?c:u:A:",
+                       long_options, &option_index);
 
-      if (optname == NULL)
+      if (c == -1)
       {
          break;
       }
-      else if (strcmp(optname, "c") == 0 || strcmp(optname, "config") == 0)
+
+      switch (c)
       {
-         configuration_path = optarg;
-      }
-      else if (strcmp(optname, "u") == 0 || strcmp(optname, "users") == 0)
-      {
-         users_path = optarg;
-      }
-      else if (strcmp(optname, "A") == 0 || strcmp(optname, "admins") == 0)
-      {
-         admins_path = optarg;
-      }
-      else if (strcmp(optname, "d") == 0 || strcmp(optname, "daemon") == 0)
-      {
-         daemon = true;
-      }
-      else if (strcmp(optname, "offline") == 0)
-      {
-         offline = true;
-      }
-      else if (strcmp(optname, "V") == 0 || strcmp(optname, "version") == 0)
-      {
-         version();
-      }
-      else if (strcmp(optname, "?") == 0 || strcmp(optname, "help") == 0)
-      {
-         usage();
-         exit(0);
+         case 'c':
+            configuration_path = optarg;
+            break;
+         case 'u':
+            users_path = optarg;
+            break;
+         case 'A':
+            admins_path = optarg;
+            break;
+         case 'd':
+            daemon = true;
+            break;
+         case OFFLINE:
+            offline = true;
+            break;
+         case 'V':
+            version();
+            break;
+         case '?':
+            usage();
+            exit(1);
+            break;
+         default:
+            break;
       }
    }
 
    if (getuid() == 0)
    {
       warnx("pgmoneta: Using the root account is not allowed");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Using the root account is not allowed");
 #endif
       exit(1);
    }
 
-   shmem_size = sizeof(struct main_configuration);
+   shmem_size = sizeof(struct configuration);
    if (pgmoneta_create_shared_memory(shmem_size, HUGEPAGE_OFF, &shmem))
    {
       warnx("pgmoneta: Error in creating shared memory");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Error in creating shared memory");
 #endif
       goto error;
    }
 
-   pgmoneta_init_main_configuration(shmem);
-   config = (struct main_configuration*)shmem;
+   pgmoneta_init_configuration(shmem);
+   config = (struct configuration*)shmem;
 
    if (configuration_path != NULL)
    {
-      if (pgmoneta_read_main_configuration(shmem, configuration_path))
+      if (pgmoneta_read_configuration(shmem, configuration_path))
       {
          warnx("pgmoneta: Configuration not found: %s", configuration_path);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Configuration not found: %s", configuration_path);
 #endif
          goto error;
@@ -356,10 +340,10 @@ main(int argc, char** argv)
    }
    else
    {
-      if (pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
+      if (pgmoneta_read_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
       {
          warnx("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #endif
          goto error;
@@ -374,7 +358,7 @@ main(int argc, char** argv)
       if (ret == 1)
       {
          warnx("pgmoneta: USERS configuration not found: %s", users_path);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
 #endif
          goto error;
@@ -382,16 +366,16 @@ main(int argc, char** argv)
       else if (ret == 2)
       {
          warnx("pgmoneta: Invalid master key file");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
          goto error;
       }
       else if (ret == 3)
       {
-         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
-#ifdef HAVE_SYSTEMD
-         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
+#ifdef HAVE_LINUX
+         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->number_of_users, NUMBER_OF_USERS);
 #endif
          goto error;
       }
@@ -413,7 +397,7 @@ main(int argc, char** argv)
       if (ret == 1)
       {
          warnx("pgmoneta: ADMINS configuration not found: %s", admins_path);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=ADMINS configuration not found: %s", admins_path);
 #endif
          goto error;
@@ -421,16 +405,16 @@ main(int argc, char** argv)
       else if (ret == 2)
       {
          warnx("pgmoneta: Invalid master key file");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Invalid master key file");
 #endif
          goto error;
       }
       else if (ret == 3)
       {
-         warnx("pgmoneta: ADMINS: Too many admins defined %d (max %d)", config->common.number_of_admins, NUMBER_OF_ADMINS);
-#ifdef HAVE_SYSTEMD
-         sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->common.number_of_admins, NUMBER_OF_ADMINS);
+         warnx("pgmoneta: ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
+#ifdef HAVE_LINUX
+         sd_notifyf(0, "STATUS=ADMINS: Too many admins defined %d (max %d)", config->number_of_admins, NUMBER_OF_ADMINS);
 #endif
          goto error;
       }
@@ -448,7 +432,7 @@ main(int argc, char** argv)
 
    if (pgmoneta_init_logging())
    {
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Failed to init logging");
 #endif
       goto error;
@@ -456,42 +440,42 @@ main(int argc, char** argv)
 
    if (pgmoneta_start_logging())
    {
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Failed to start logging");
 #endif
       goto error;
    }
 
-   if (pgmoneta_validate_main_configuration(shmem))
+   if (pgmoneta_validate_configuration(shmem))
    {
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid configuration");
 #endif
       goto error;
    }
    if (pgmoneta_validate_users_configuration(shmem))
    {
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid USERS configuration");
 #endif
       goto error;
    }
    if (pgmoneta_validate_admins_configuration(shmem))
    {
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid ADMINS configuration");
 #endif
       goto error;
    }
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!offline && daemon)
    {
-      if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+      if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
          warnx("pgmoneta: Daemon mode can't be used with console logging");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Daemon mode can't be used with console logging");
 #endif
          goto error;
@@ -502,7 +486,7 @@ main(int argc, char** argv)
       if (pid < 0)
       {
          warnx("pgmoneta: Daemon mode failed");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notify(0, "STATUS=Daemon mode failed");
 #endif
          goto error;
@@ -537,7 +521,7 @@ main(int argc, char** argv)
 
    if (pgmoneta_init_prometheus_cache(&prometheus_cache_shmem_size, &prometheus_cache_shmem))
    {
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Error in creating and initializing prometheus cache shared memory");
 #endif
       errx(1, "Error in creating and initializing prometheus cache shared memory");
@@ -547,7 +531,7 @@ main(int argc, char** argv)
    if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
    {
       pgmoneta_log_fatal("Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
 #endif
       goto error;
@@ -559,7 +543,7 @@ main(int argc, char** argv)
    {
       pgmoneta_log_fatal("No loop implementation (%x) (%x)",
                          pgmoneta_libev(config->libev), ev_supported_backends());
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notifyf(0, "STATUS=No loop implementation (%x) (%x)", pgmoneta_libev(config->libev), ev_supported_backends());
 #endif
       goto error;
@@ -580,7 +564,7 @@ main(int argc, char** argv)
    if (pgmoneta_tls_valid())
    {
       pgmoneta_log_fatal("Invalid TLS configuration");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
       sd_notify(0, "STATUS=Invalid TLS configuration");
 #endif
       goto error;
@@ -595,7 +579,7 @@ main(int argc, char** argv)
       if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
       {
          pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->metrics);
 #endif
          goto error;
@@ -604,7 +588,7 @@ main(int argc, char** argv)
       if (metrics_fds_length > MAX_FDS)
       {
          pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Too many descriptors %d", metrics_fds_length);
 #endif
          goto error;
@@ -620,7 +604,7 @@ main(int argc, char** argv)
       if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
       {
          pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->management);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->management);
 #endif
          goto error;
@@ -629,7 +613,7 @@ main(int argc, char** argv)
       if (management_fds_length > MAX_FDS)
       {
          pgmoneta_log_fatal("Too many descriptors %d", management_fds_length);
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
          sd_notifyf(0, "STATUS=Too many descriptors %d", management_fds_length);
 #endif
          goto error;
@@ -698,14 +682,10 @@ main(int argc, char** argv)
    pgmoneta_log_debug("libev engine: %s", pgmoneta_libev_engine(ev_backend(main_loop)));
    pgmoneta_log_debug("%s", OpenSSL_version(OPENSSL_VERSION));
    pgmoneta_log_debug("Configuration size: %lu", shmem_size);
-   pgmoneta_log_debug("Known users: %d", config->common.number_of_users);
-   pgmoneta_log_debug("Known admins: %d", config->common.number_of_admins);
+   pgmoneta_log_debug("Known users: %d", config->number_of_users);
+   pgmoneta_log_debug("Known admins: %d", config->number_of_admins);
 
-   pgmoneta_os_kernel_version(&os, &kernel_major, &kernel_minor, &kernel_patch);
-
-   free(os);
-
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
    sd_notifyf(0,
               "READY=1\n"
               "STATUS=Running\n"
@@ -718,7 +698,7 @@ main(int argc, char** argv)
    }
 
    pgmoneta_log_info("Shutdown");
-#ifdef HAVE_SYSTEMD
+#ifdef HAVE_LINUX
    sd_notify(0, "STOPPING=1");
 #endif
 
@@ -808,7 +788,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    struct json* payload = NULL;
    struct json* header = NULL;
    struct json* request = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
    uint8_t compression = MANAGEMENT_COMPRESSION_NONE;
    uint8_t encryption = MANAGEMENT_ENCRYPTION_NONE;
 
@@ -818,7 +798,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       return;
    }
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
    ai = (struct accept_io*)watcher;
 
    client_addr_length = sizeof(client_addr);
@@ -852,7 +832,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    /* Process internal management request */
    if (pgmoneta_management_read_json(NULL, client_fd, &compression, &encryption, &payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, NAME, compression, encryption, NULL);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BAD_PAYLOAD, compression, encryption, NULL);
       pgmoneta_log_error("Management: Bad payload (%d)", MANAGEMENT_ERROR_BAD_PAYLOAD);
       goto error;
    }
@@ -872,9 +852,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       if (!offline)
       {
          srv = -1;
-         for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+         for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
          {
-            if (!strcmp(config->common.servers[i].name, server))
+            if (!strcmp(config->servers[i].name, server))
             {
                srv = i;
             }
@@ -885,7 +865,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pid = fork();
             if (pid == -1)
             {
-               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, NAME, compression, encryption, payload);
+               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, compression, encryption, payload);
                pgmoneta_log_error("Backup: No fork (%d)", MANAGEMENT_ERROR_BACKUP_NOFORK);
                goto error;
             }
@@ -897,13 +877,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
                pgmoneta_json_clone(payload, &pyl);
 
-               pgmoneta_set_proc_title(1, ai->argv, "backup", config->common.servers[srv].name);
+               pgmoneta_set_proc_title(1, ai->argv, "backup", config->servers[srv].name);
                pgmoneta_backup(client_fd, srv, compression, encryption, pyl);
             }
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, compression, encryption, payload);
             pgmoneta_log_error("Backup: No server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_NOSERVER);
             goto error;
          }
@@ -912,7 +892,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          pgmoneta_log_warn("Can not create backups in offline mode");
 
-         pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER), MANAGEMENT_ERROR_BACKUP_OFFLINE, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER), MANAGEMENT_ERROR_BACKUP_OFFLINE, compression, encryption, payload);
          pgmoneta_log_error("Offline: Server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_OFFLINE);
       }
    }
@@ -921,9 +901,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -934,7 +914,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("List backup: No fork %s (%d)", server, MANAGEMENT_ERROR_LIST_BACKUP_NOFORK);
             goto error;
          }
@@ -946,13 +926,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "list-backup", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "list-backup", config->servers[srv].name);
             pgmoneta_list_backup(client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("List backup: No server %s (%d)", server, MANAGEMENT_ERROR_LIST_BACKUP_NOSERVER);
          goto error;
       }
@@ -962,9 +942,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -975,7 +955,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Delete: No fork %s (%d)", server, MANAGEMENT_ERROR_DELETE_NOFORK);
             goto error;
          }
@@ -987,14 +967,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "delete", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "delete", config->servers[srv].name);
             pgmoneta_delete_backup(client_fd, srv, compression, encryption, pyl);
             pgmoneta_delete_wal(srv);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DELETE_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Delete: No server %s (%d)", server, MANAGEMENT_ERROR_DELETE_NOSERVER);
          goto error;
       }
@@ -1004,9 +984,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1017,7 +997,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Restore: No fork %s (%d)", server, MANAGEMENT_ERROR_RESTORE_NOFORK);
             goto error;
          }
@@ -1029,13 +1009,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "restore", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "restore", config->servers[srv].name);
             pgmoneta_restore(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RESTORE_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Restore: No server %s (%d)", server, MANAGEMENT_ERROR_RESTORE_NOSERVER);
          goto error;
       }
@@ -1045,9 +1025,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1058,7 +1038,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Verify: No fork %s (%d)", server, MANAGEMENT_ERROR_VERIFY_NOFORK);
             goto error;
          }
@@ -1070,13 +1050,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "verify", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "verify", config->servers[srv].name);
             pgmoneta_verify(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_VERIFY_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Restore: No server %s (%d)", server, MANAGEMENT_ERROR_VERIFY_NOSERVER);
          goto error;
       }
@@ -1086,9 +1066,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1099,7 +1079,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Archive: No fork %s (%d)", server, MANAGEMENT_ERROR_ARCHIVE_NOFORK);
             goto error;
          }
@@ -1111,13 +1091,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "archive", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "archive", config->servers[srv].name);
             pgmoneta_archive(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Archive: No server %s (%d)", server, MANAGEMENT_ERROR_ARCHIVE_NOSERVER);
          goto error;
       }
@@ -1195,7 +1175,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Conf Get: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_GET_NOFORK);
          goto error;
       }
@@ -1216,7 +1196,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Conf Set: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_SET_NOFORK);
          goto error;
       }
@@ -1237,7 +1217,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Status: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_NOFORK);
          goto error;
       }
@@ -1258,7 +1238,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Details: No fork %s (%d)", server, MANAGEMENT_ERROR_STATUS_DETAILS_NOFORK);
          goto error;
       }
@@ -1279,9 +1259,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1292,7 +1272,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Retain: No fork %s (%d)", server, MANAGEMENT_ERROR_RETAIN_NOFORK);
             goto error;
          }
@@ -1304,13 +1284,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "retain", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "retain", config->servers[srv].name);
             pgmoneta_retain_backup(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_RETAIN_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Retain: No server %s (%d)", server, MANAGEMENT_ERROR_RETAIN_NOSERVER);
          goto error;
       }
@@ -1320,9 +1300,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1333,7 +1313,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Expunge: No fork %s (%d)", server, MANAGEMENT_ERROR_EXPUNGE_NOFORK);
             goto error;
          }
@@ -1345,13 +1325,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "expunge", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "expunge", config->servers[srv].name);
             pgmoneta_expunge_backup(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Expunge: No server %s (%d)", server, MANAGEMENT_ERROR_EXPUNGE_NOSERVER);
          goto error;
       }
@@ -1361,7 +1341,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECRYPT_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Decrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_DECRYPT_NOFORK);
          goto error;
       }
@@ -1382,7 +1362,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ENCRYPT_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Encrypt: No fork %s (%d)", server, MANAGEMENT_ERROR_ENCRYPT_NOFORK);
          goto error;
       }
@@ -1403,7 +1383,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Decompress: No fork %s (%d)", server, MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          goto error;
       }
@@ -1437,7 +1417,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, compression, encryption, payload);
             pgmoneta_log_error("Decompress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          }
       }
@@ -1447,7 +1427,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pid = fork();
       if (pid == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_COMPRESS_NOFORK, compression, encryption, payload);
          pgmoneta_log_error("Compress: No fork %s (%d)", server, MANAGEMENT_ERROR_COMPRESS_NOFORK);
          goto error;
       }
@@ -1481,7 +1461,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, compression, encryption, payload);
             pgmoneta_log_error("Compress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
          }
       }
@@ -1491,9 +1471,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1504,7 +1484,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Info: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
             goto error;
          }
@@ -1516,13 +1496,13 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "info", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "info", config->servers[srv].name);
             pgmoneta_info_request(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_INFO_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Info: No server %s (%d)", server, MANAGEMENT_ERROR_INFO_NOSERVER);
          goto error;
       }
@@ -1532,9 +1512,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
       srv = -1;
-      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      for (int i = 0; srv == -1 && i < config->number_of_servers; i++)
       {
-         if (!strcmp(config->common.servers[i].name, server))
+         if (!strcmp(config->servers[i].name, server))
          {
             srv = i;
          }
@@ -1545,7 +1525,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pid = fork();
          if (pid == -1)
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, compression, encryption, payload);
             pgmoneta_log_error("Annotate: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
             goto error;
          }
@@ -1557,20 +1537,20 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
             pgmoneta_json_clone(payload, &pyl);
 
-            pgmoneta_set_proc_title(1, ai->argv, "annotate", config->common.servers[srv].name);
+            pgmoneta_set_proc_title(1, ai->argv, "annotate", config->servers[srv].name);
             pgmoneta_annotate_request(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, compression, encryption, payload);
          pgmoneta_log_error("Annotate: No server %s (%d)", server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER);
          goto error;
       }
    }
    else
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_UNKNOWN_COMMAND, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_UNKNOWN_COMMAND, compression, encryption, payload);
       pgmoneta_log_error("Unknown: %s (%d)", pgmoneta_json_to_string(payload, FORMAT_JSON, NULL, 0), MANAGEMENT_ERROR_UNKNOWN_COMMAND);
       goto error;
    }
@@ -1596,7 +1576,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    struct sockaddr_in6 client_addr;
    socklen_t client_addr_length;
    int client_fd;
-   struct main_configuration* config;
+   struct configuration* config;
 
    if (EV_ERROR & revents)
    {
@@ -1605,7 +1585,7 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       return;
    }
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
@@ -1666,7 +1646,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    socklen_t client_addr_length;
    int client_fd;
    char address[INET6_ADDRSTRLEN];
-   struct main_configuration* config;
+   struct configuration* config;
 
    if (EV_ERROR & revents)
    {
@@ -1677,7 +1657,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
    memset(&address, 0, sizeof(address));
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    client_addr_length = sizeof(client_addr);
    client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
@@ -1740,9 +1720,9 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 static void
 shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    pgmoneta_log_debug("shutdown requested (%p, %p, %d)", loop, w, revents);
    ev_break(loop, EVBREAK_ALL);
@@ -1761,16 +1741,15 @@ static void
 coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
    pgmoneta_log_info("core dump requested (%p, %p, %d)", loop, w, revents);
-   remove_pidfile();
    abort();
 }
 
 static void
 wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (EV_ERROR & revents)
    {
@@ -1778,7 +1757,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       return;
    }
 
-   for (int i = 0; i < config->common.number_of_servers; i++)
+   for (int i = 0; i < config->number_of_servers; i++)
    {
       /* Compression is always in a fork() */
       if (!fork())
@@ -1786,11 +1765,11 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
          bool active = false;
          char* d = NULL;
 
-         pgmoneta_set_proc_title(1, argv_ptr, "wal", config->common.servers[i].name);
+         pgmoneta_set_proc_title(1, argv_ptr, "wal", config->servers[i].name);
 
          shutdown_ports();
 
-         if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
+         if (atomic_compare_exchange_strong(&config->servers[i].wal, &active, true))
          {
             d = pgmoneta_get_server_wal(i);
 
@@ -1818,7 +1797,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 
             free(d);
 
-            atomic_store(&config->common.servers[i].repository, false);
+            atomic_store(&config->servers[i].wal, false);
          }
 
          exit(0);
@@ -1846,9 +1825,9 @@ retention_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 static void
 valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (EV_ERROR & revents)
    {
@@ -1862,11 +1841,11 @@ valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       pgmoneta_start_logging();
       pgmoneta_memory_init();
 
-      for (int i = 0; i < config->common.number_of_servers; i++)
+      for (int i = 0; i < config->number_of_servers; i++)
       {
-         pgmoneta_log_trace("Valid - Server %d Valid %d WAL %d", i, config->common.servers[i].valid, config->common.servers[i].wal_streaming);
+         pgmoneta_log_trace("Valid - Server %d Valid %d WAL %d", i, config->servers[i].valid, config->servers[i].wal_streaming);
 
-         if (keep_running && !config->common.servers[i].valid)
+         if (keep_running && !config->servers[i].valid)
          {
             pgmoneta_server_info(i);
          }
@@ -1884,9 +1863,9 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 {
    bool start = false;
    int follow;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (EV_ERROR & revents)
    {
@@ -1894,23 +1873,23 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
       return;
    }
 
-   for (int i = 0; i < config->common.number_of_servers; i++)
+   for (int i = 0; i < config->number_of_servers; i++)
    {
       pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d CHECKSUMS %d SUMMARIZE_WAL %d",
-                         i, config->common.servers[i].valid, config->common.servers[i].wal_streaming,
-                         config->common.servers[i].checksums, config->common.servers[i].summarize_wal);
+                         i, config->servers[i].valid, config->servers[i].wal_streaming,
+                         config->servers[i].checksums, config->servers[i].summarize_wal);
 
-      if (keep_running && !config->common.servers[i].wal_streaming)
+      if (keep_running && !config->servers[i].wal_streaming)
       {
          start = false;
 
-         if (strlen(config->common.servers[i].follow) == 0)
+         if (strlen(config->servers[i].follow) == 0)
          {
             follow = -1;
 
-            for (int j = 0; follow == -1 && j < config->common.number_of_servers; j++)
+            for (int j = 0; follow == -1 && j < config->number_of_servers; j++)
             {
-               if (!strcmp(config->common.servers[j].follow, config->common.servers[i].name))
+               if (!strcmp(config->servers[j].follow, config->servers[i].name))
                {
                   follow = j;
                }
@@ -1920,16 +1899,16 @@ wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
             {
                start = true;
             }
-            else if (!config->common.servers[follow].wal_streaming)
+            else if (!config->servers[follow].wal_streaming)
             {
                start = true;
             }
          }
          else
          {
-            for (int j = 0; !start && j < config->common.number_of_servers; j++)
+            for (int j = 0; !start && j < config->number_of_servers; j++)
             {
-               if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name) && !config->common.servers[j].wal_streaming)
+               if (!strcmp(config->servers[i].follow, config->servers[j].name) && !config->servers[j].wal_streaming)
                {
                   start = true;
                }
@@ -1985,9 +1964,9 @@ reload_configuration(void)
    bool restart = false;
    int old_metrics;
    int old_management;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    old_metrics = config->metrics;
    old_management = config->management;
@@ -2065,13 +2044,13 @@ static void
 init_receivewals(void)
 {
    int active = 0;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   for (int i = 0; i < config->common.number_of_servers; i++)
+   for (int i = 0; i < config->number_of_servers; i++)
    {
-      if (strlen(config->common.servers[i].follow) == 0)
+      if (strlen(config->servers[i].follow) == 0)
       {
          pid_t pid;
 
@@ -2110,20 +2089,20 @@ init_replication_slots(void)
    int ret = 0;
    struct message* slot_request_msg = NULL;
    struct message* slot_response_msg = NULL;
-   struct main_configuration* config = NULL;
+   struct configuration* config = NULL;
    bool create_slot = false;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    pgmoneta_memory_init();
 
-   for (int srv = 0; srv < config->common.number_of_servers; srv++)
+   for (int srv = 0; srv < config->number_of_servers; srv++)
    {
       usr = -1;
 
-      for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
+      for (int i = 0; usr == -1 && i < config->number_of_users; i++)
       {
-         if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
+         if (!strcmp(config->servers[srv].username, config->users[i].username))
          {
             usr = i;
          }
@@ -2131,10 +2110,10 @@ init_replication_slots(void)
 
       if (usr != -1)
       {
-         create_slot = config->common.servers[srv].create_slot == CREATE_SLOT_YES ||
-                       (config->create_slot == CREATE_SLOT_YES && config->common.servers[srv].create_slot != CREATE_SLOT_NO);
+         create_slot = config->servers[srv].create_slot == CREATE_SLOT_YES ||
+                       (config->create_slot == CREATE_SLOT_YES && config->servers[srv].create_slot != CREATE_SLOT_NO);
          socket = 0;
-         auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket);
+         auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket);
 
          if (auth == AUTH_SUCCESS)
          {
@@ -2142,37 +2121,37 @@ init_replication_slots(void)
 
             if (!pgmoneta_server_valid(srv))
             {
-               pgmoneta_log_fatal("Could not get version for server %s", config->common.servers[srv].name);
+               pgmoneta_log_fatal("Could not get version for server %s", config->servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
-            if (config->common.servers[srv].version < POSTGRESQL_MIN_VERSION)
+            if (config->servers[srv].version < POSTGRESQL_MIN_VERSION)
             {
-               pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->common.servers[srv].name);
+               pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
-            if (config->common.servers[srv].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
-                                                             config->compression_type == COMPRESSION_SERVER_ZSTD ||
-                                                             config->compression_type == COMPRESSION_SERVER_LZ4))
+            if (config->servers[srv].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
+                                                      config->compression_type == COMPRESSION_SERVER_ZSTD ||
+                                                      config->compression_type == COMPRESSION_SERVER_LZ4))
             {
-               pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->common.servers[srv].name);
+               pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
-            if (config->common.servers[srv].version >= 17 && !config->common.servers[srv].summarize_wal)
+            if (config->servers[srv].version >= 17 && !config->servers[srv].summarize_wal)
             {
                pgmoneta_log_fatal("PostgreSQL %d or higher requires summarize_wal for server %s",
-                                  config->common.servers[srv].version, config->common.servers[srv].name);
+                                  config->servers[srv].version, config->servers[srv].name);
                ret = 1;
                goto server_done;
             }
 
             /* Verify replication slot */
-            slot_status = verify_replication_slot(config->common.servers[srv].wal_slot, srv, ssl, socket);
+            slot_status = verify_replication_slot(config->servers[srv].wal_slot, srv, ssl, socket);
             if (slot_status == VALID_SLOT)
             {
                /* Ok */
@@ -2181,19 +2160,19 @@ init_replication_slots(void)
             {
                if (slot_status == SLOT_NOT_FOUND)
                {
-                  pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->common.servers[srv].wal_slot, config->common.servers[srv].name);
+                  pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->servers[srv].wal_slot, config->servers[srv].name);
                   ret = 1;
                }
                else if (slot_status == INCORRECT_SLOT_TYPE)
                {
-                  pgmoneta_log_fatal("Replication slot '%s' should be physical", config->common.servers[srv].wal_slot);
+                  pgmoneta_log_fatal("Replication slot '%s' should be physical", config->servers[srv].wal_slot);
                   ret = 1;
                }
             }
          }
          else
          {
-            pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[srv].name);
+            pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
             ret = 1;
          }
 
@@ -2203,27 +2182,27 @@ init_replication_slots(void)
 
          if (create_slot && slot_status == SLOT_NOT_FOUND)
          {
-            auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, true, &ssl, &socket);
+            auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
 
             if (auth == AUTH_SUCCESS)
             {
-               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->common.servers[srv].name, config->common.servers[srv].wal_slot);
+               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->servers[srv].name, config->servers[srv].wal_slot);
 
-               pgmoneta_create_replication_slot_message(config->common.servers[srv].wal_slot, &slot_request_msg, config->common.servers[srv].version);
+               pgmoneta_create_replication_slot_message(config->servers[srv].wal_slot, &slot_request_msg, config->servers[srv].version);
                if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
                {
                   if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                   {
-                     pgmoneta_log_info("Created replication slot %s on %s", config->common.servers[srv].wal_slot, config->common.servers[srv].name);
+                     pgmoneta_log_info("Created replication slot %s on %s", config->servers[srv].wal_slot, config->servers[srv].name);
                   }
                   else
                   {
-                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->common.servers[srv].name);
+                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->servers[srv].name);
                   }
                }
                else
                {
-                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->common.servers[srv].name);
+                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->servers[srv].name);
                }
 
                pgmoneta_free_message(slot_request_msg);
@@ -2234,7 +2213,7 @@ init_replication_slots(void)
             }
             else
             {
-               pgmoneta_log_error("Authentication failed for user on %s", config->common.servers[srv].name);
+               pgmoneta_log_error("Authentication failed for user on %s", config->servers[srv].name);
             }
 
 server_done:
@@ -2244,7 +2223,7 @@ server_done:
       }
       else
       {
-         pgmoneta_log_error("Invalid user for %s", config->common.servers[srv].name);
+         pgmoneta_log_error("Invalid user for %s", config->servers[srv].name);
       }
    }
 
@@ -2259,15 +2238,15 @@ verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket)
    int ret = VALID_SLOT;
    struct message* query;
    struct query_response* response;
-   struct main_configuration* config = NULL;
+   struct configuration* config = NULL;
    struct tuple* current = NULL;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    pgmoneta_create_search_replication_slot_message(slot_name, &query);
    if (pgmoneta_query_execute(ssl, socket, query, &response) || response == NULL)
    {
-      pgmoneta_log_error("Could not execute verify replication slot query for %s", config->common.servers[srv].name);
+      pgmoneta_log_error("Could not execute verify replication slot query for %s", config->servers[srv].name);
    }
    else
    {
@@ -2295,9 +2274,9 @@ create_pidfile(void)
    pid_t pid;
    int r;
    int fd;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (strlen(config->pidfile) == 0)
    {
@@ -2360,9 +2339,9 @@ error:
 static void
 remove_pidfile(void)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (strlen(config->pidfile) > 0 && access(config->pidfile, F_OK) == 0)
    {
@@ -2373,9 +2352,9 @@ remove_pidfile(void)
 static void
 shutdown_ports(void)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (config->metrics > 0)
    {

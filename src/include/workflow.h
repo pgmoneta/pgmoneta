@@ -47,7 +47,7 @@ extern "C" {
 #define WORKFLOW_TYPE_WAL_SHIPPING          5
 #define WORKFLOW_TYPE_VERIFY                6
 #define WORKFLOW_TYPE_INCREMENTAL_BACKUP    7
-#define WORKFLOW_TYPE_COMBINE               8
+#define WORKFLOW_TYPE_RESTORE_INCREMENTAL   8
 
 #define PERMISSION_TYPE_BACKUP              0
 #define PERMISSION_TYPE_RESTORE             1
@@ -57,30 +57,25 @@ extern "C" {
 
 #define NODE_ALL               "all"               /* All the files in a manifest */
 #define NODE_BACKUP            "backup"            /* The backup structure */
-#define NODE_COPY_WAL          "copy_wal"          /* Whether to copy WAL */
+#define NODE_BACKUPS           "backups"           /* A list of backups */
 #define NODE_BACKUP_BASE       "backup_base"       /* The base directory of the backup */
 #define NODE_BACKUP_DATA       "backup_data"       /* The data directory of the backup */
 #define NODE_FAILED            "failed"            /* The failed files in a manifest */
+#define NODE_FILES             "files"             /* The files */
+#define NODE_IDENTIFIER        "identifier"        /* The backup identifier (oldest, newest, <timestamp>) */
 #define NODE_INCREMENTAL_BASE  "incremental_base"  /* The base directory of incremental */
 #define NODE_INCREMENTAL_LABEL "incremental_label" /* The label of the incremental backup */
 #define NODE_LABEL             "label"             /* The backup label */
-#define NODE_LABELS            "labels"            /* A list of backup labels */
 #define NODE_MANIFEST          "manifest"          /* The manifest */
+#define NODE_POSITION          "position"          /* The recovery positions */
 #define NODE_PRIMARY           "primary"           /* Is the server a primary */
 #define NODE_RECOVERY_INFO     "recovery_info"     /* The recovery information */
+#define NODE_SERVER            "server"            /* The server number */
 #define NODE_SERVER_BACKUP     "server_backup"     /* The backup directory of the server */
 #define NODE_SERVER_BASE       "server_base"       /* The base directory of the server */
-#define NODE_SERVER_ID         "server_id"         /* The server number */
 #define NODE_TARGET_BASE       "target_base"       /* The target base directory */
 #define NODE_TARGET_FILE       "target_file"       /* The target file */
 #define NODE_TARGET_ROOT       "target_root"       /* The target root directory */
-
-/* Supplied by the user */
-#define USER_DIRECTORY         "directory"         /* The target root directory */
-#define USER_FILES             "files"             /* The files that should be checked */
-#define USER_IDENTIFIER        "identifier"        /* The backup identifier (oldest, newest, <timestamp>) */
-#define USER_POSITION          "position"          /* The recovery positions */
-#define USER_SERVER            "server"            /* The server name */
 
 typedef char* (*name)(void);
 typedef int (*setup)(char*, struct art*);
@@ -92,12 +87,10 @@ typedef int (*teardown)(char*, struct art*);
  */
 struct workflow
 {
-   int type;         /**< The type */
-
-   name name;        /**< The name */
+   name name;        /**< The setup  function pointer */
    setup setup;      /**< The setup  function pointer */
    execute execute;  /**< The execute function pointer */
-   teardown teardown; /**< The teardown function pointer */
+   teardown teardown; /**< The taerdown function pointer */
 
    struct workflow* next; /**< The next workflow */
 };
@@ -122,22 +115,6 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup);
  */
 int
 pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct backup** backup);
-
-/**
- * Execute a workflow
- * @param workflow The workflow
- * @param nodes The nodes
- * @param server The server
- * @param client_fd The client socket
- * @param compression The compression level
- * @param encryption The encryption level
- * @param payload The payload
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
-                          int server, int client_fd, uint8_t compression,
-                          uint8_t encryption, struct json* payload);
 
 /**
  * Destroy the workflow

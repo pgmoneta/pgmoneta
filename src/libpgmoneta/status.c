@@ -35,8 +35,6 @@
 #include <status.h>
 #include <utils.h>
 
-#define NAME "status"
-
 void
 pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
 {
@@ -61,11 +59,11 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
    struct backup** backups = NULL;
    struct json* response = NULL;
    struct json* servers = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -93,35 +91,35 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_OFFLINE, (uintptr_t)offline, ValueBool);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt32);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->common.number_of_servers, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->number_of_servers, ValueInt32);
 
    pgmoneta_json_create(&servers);
 
-   for (int i = 0; i < config->common.number_of_servers; i++)
+   for (int i = 0; i < config->number_of_servers; i++)
    {
       struct json* js = NULL;
 
       pgmoneta_json_create(&js);
 
-      retention_days = config->common.servers[i].retention_days;
+      retention_days = config->servers[i].retention_days;
       if (retention_days <= 0)
       {
          retention_days = config->retention_days;
       }
 
-      retention_weeks = config->common.servers[i].retention_weeks;
+      retention_weeks = config->servers[i].retention_weeks;
       if (retention_weeks <= 0)
       {
          retention_weeks = config->retention_weeks;
       }
 
-      retention_months = config->common.servers[i].retention_months;
+      retention_months = config->servers[i].retention_months;
       if (retention_months <= 0)
       {
          retention_months = config->retention_months;
       }
 
-      retention_years = config->common.servers[i].retention_years;
+      retention_years = config->servers[i].retention_years;
       if (retention_years <= 0)
       {
          retention_years = config->retention_years;
@@ -149,18 +147,14 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
       free(d);
       d = NULL;
 
-      if (strlen(config->common.servers[i].workspace) > 0)
-      {
-         workspace_size = pgmoneta_directory_size(config->common.servers[i].workspace);
-      }
-      else
-      {
-         workspace_size = 0;
-      }
+      d = pgmoneta_get_server_workspace(i);
+      workspace_size = pgmoneta_free_space(d);
+      free(d);
+      d = NULL;
 
-      if (strlen(config->common.servers[i].hot_standby) > 0)
+      if (strlen(config->servers[i].hot_standby) > 0)
       {
-         hot_standby_size = pgmoneta_directory_size(config->common.servers[i].hot_standby);
+         hot_standby_size = pgmoneta_directory_size(config->servers[i].hot_standby);
       }
       else
       {
@@ -171,11 +165,11 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE, (uintptr_t)hot_standby_size, ValueUInt64);
 
-      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[i].name, ValueString);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[i].name, ValueString);
 
-      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->common.servers[i].workers != -1 ? config->common.servers[i].workers : config->workers), ValueInt32);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->servers[i].workers != -1 ? config->servers[i].workers : config->workers), ValueInt32);
 
-      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->common.servers[i].checksums, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->servers[i].checksums, ValueBool);
 
       pgmoneta_json_append(servers, (uintptr_t)js, ValueJSON);
 
@@ -203,7 +197,7 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Status: Error sending response");
 
       goto error;
@@ -267,11 +261,11 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
    struct json* response = NULL;
    struct json* servers = NULL;
    struct json* bcks = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -299,11 +293,11 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_OFFLINE, (uintptr_t)offline, ValueBool);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt32);
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->common.number_of_servers, ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->number_of_servers, ValueInt32);
 
    pgmoneta_json_create(&servers);
 
-   for (int i = 0; i < config->common.number_of_servers; i++)
+   for (int i = 0; i < config->number_of_servers; i++)
    {
       char* wal_dir = NULL;
       struct json* js = NULL;
@@ -312,25 +306,25 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
       pgmoneta_json_create(&js);
 
-      retention_days = config->common.servers[i].retention_days;
+      retention_days = config->servers[i].retention_days;
       if (retention_days <= 0)
       {
          retention_days = config->retention_days;
       }
 
-      retention_weeks = config->common.servers[i].retention_weeks;
+      retention_weeks = config->servers[i].retention_weeks;
       if (retention_weeks <= 0)
       {
          retention_weeks = config->retention_weeks;
       }
 
-      retention_months = config->common.servers[i].retention_months;
+      retention_months = config->servers[i].retention_months;
       if (retention_months <= 0)
       {
          retention_months = config->retention_months;
       }
 
-      retention_years = config->common.servers[i].retention_years;
+      retention_years = config->servers[i].retention_years;
       if (retention_years <= 0)
       {
          retention_years = config->retention_years;
@@ -350,21 +344,14 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
       free(d);
       d = NULL;
 
-      if (strlen(config->common.servers[i].workspace) > 0)
-      {
-         d = pgmoneta_get_server_workspace(i);
-         workspace_size = pgmoneta_free_space(d);
-         free(d);
-         d = NULL;
-      }
-      else
-      {
-         workspace_size = 0;
-      }
+      d = pgmoneta_get_server_workspace(i);
+      workspace_size = pgmoneta_free_space(d);
+      free(d);
+      d = NULL;
 
-      if (strlen(config->common.servers[i].hot_standby) > 0)
+      if (strlen(config->servers[i].hot_standby) > 0)
       {
-         hot_standby_size = pgmoneta_directory_size(config->common.servers[i].hot_standby);
+         hot_standby_size = pgmoneta_directory_size(config->servers[i].hot_standby);
       }
       else
       {
@@ -375,11 +362,11 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE, (uintptr_t)hot_standby_size, ValueUInt64);
 
-      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[i].name, ValueString);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[i].name, ValueString);
 
-      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->common.servers[i].workers != -1 ? config->common.servers[i].workers : config->workers), ValueInt32);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)(config->servers[i].workers != -1 ? config->servers[i].workers : config->workers), ValueInt32);
 
-      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->common.servers[i].checksums, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_CHECKSUMS, (uintptr_t)config->servers[i].checksums, ValueBool);
 
       free(d);
       d = NULL;
@@ -417,7 +404,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)backups[j]->encryption, ValueInt32);
 
             wal = pgmoneta_number_of_wal_files(wal_dir, &backups[j]->wal[0], NULL);
-            wal *= config->common.servers[i].wal_size;
+            wal *= config->servers[i].wal_size;
 
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)wal, ValueUInt64);
 
@@ -425,7 +412,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
             if (j > 0)
             {
                delta = pgmoneta_number_of_wal_files(wal_dir, &backups[j - 1]->wal[0], &backups[j]->wal[0]);
-               delta *= config->common.servers[i].wal_size;
+               delta *= config->servers[i].wal_size;
             }
 
             pgmoneta_json_put(bck, MANAGEMENT_ARGUMENT_DELTA, (uintptr_t)delta, ValueUInt64);
@@ -465,7 +452,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Status details: Error sending response");
 
       goto error;

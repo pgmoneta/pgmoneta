@@ -62,9 +62,9 @@ static int get_column_name(struct message* msg, int index, char** name);
 
 static bool is_server_side_compression(void);
 
-static unsigned char* decode_base64(char* base64_data, int* decoded_len);
-static char** get_paths(char* data, int* count);
-static void extract_file_name(char* path, char* file_name, char* file_path);
+static unsigned char* decode_base64(const char* base64_data, int* decoded_len);
+static char** get_paths(const char* data, int* count);
+static void extract_file_name(const char* path, char* file_name, char* file_path);
 
 int
 pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
@@ -1058,7 +1058,7 @@ pgmoneta_create_query_message(char* query, struct message** msg)
 }
 
 int
-pgmoneta_send_copy_data(SSL* ssl, int socket, char* buffer, size_t nbytes)
+pgmoneta_send_copy_data(SSL* ssl, int socket, const char* buffer, size_t nbytes)
 {
    struct message* msg = NULL;
    size_t size = 1 + 4 + nbytes;
@@ -1372,9 +1372,9 @@ error:
 static bool
 is_server_side_compression(void)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
    return config->compression_type == COMPRESSION_SERVER_GZIP || config->compression_type == COMPRESSION_SERVER_LZ4 || config->compression_type == COMPRESSION_SERVER_ZSTD;
 }
 
@@ -1483,7 +1483,7 @@ read_message(int socket, bool block, int timeout, struct message** msg)
    {
       tv.tv_sec = timeout;
       tv.tv_usec = 0;
-      setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
+      setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
    }
 
    do
@@ -1502,7 +1502,7 @@ read_message(int socket, bool block, int timeout, struct message** msg)
          {
             tv.tv_sec = 0;
             tv.tv_usec = 0;
-            setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
+            setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
          }
 
          return MESSAGE_STATUS_OK;
@@ -1522,7 +1522,7 @@ read_message(int socket, bool block, int timeout, struct message** msg)
             {
                tv.tv_sec = 0;
                tv.tv_usec = 0;
-               setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
+               setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
             }
 
             return MESSAGE_STATUS_ZERO;
@@ -1549,7 +1549,7 @@ read_message(int socket, bool block, int timeout, struct message** msg)
    {
       tv.tv_sec = 0;
       tv.tv_usec = 0;
-      setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
+      setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
 
       pgmoneta_memory_free();
    }
@@ -1816,9 +1816,9 @@ pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer)
    int numbytes = 0;
    bool keep_read = false;
    int err;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    /*
     * if buffer is still too full,
@@ -2044,9 +2044,9 @@ pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* b
    bool keep_read = false;
    int status;
    int length;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
    do
    {
       while (config->running && buffer->cursor >= buffer->end)
@@ -2175,9 +2175,9 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
    struct message* msg = (struct message*)malloc(sizeof (struct message));
    struct tuple* current = NULL;
    struct query_response* r = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (msg == NULL)
    {
@@ -3019,7 +3019,7 @@ error:
 }
 
 static char**
-get_paths(char* data, int* count)
+get_paths(const char* data, int* count)
 {
    if (data == NULL || count == NULL)
    {
@@ -3095,9 +3095,9 @@ error:
 }
 
 static void
-extract_file_name(char* path, char* file_name, char* file_path)
+extract_file_name(const char* path, char* file_name, char* file_path)
 {
-   char* last_slash;
+   const char* last_slash;
 
    last_slash = strrchr(path, '/');
 
@@ -3122,7 +3122,7 @@ extract_file_name(char* path, char* file_name, char* file_path)
 }
 
 static unsigned char*
-decode_base64(char* base64_data, int* decoded_len)
+decode_base64(const char* base64_data, int* decoded_len)
 {
    size_t base64_len;
    size_t max_decoded_len;
@@ -3134,7 +3134,7 @@ decode_base64(char* base64_data, int* decoded_len)
    decoded_data = (unsigned char*)malloc(max_decoded_len);
 
    // Perform base64 decoding using OpenSSL
-   actual_decoded_len = EVP_DecodeBlock(decoded_data, (unsigned char*)base64_data, base64_len);
+   actual_decoded_len = EVP_DecodeBlock(decoded_data, (const unsigned char*)base64_data, base64_len);
 
    // Handle padding
    if (base64_data[base64_len - 1] == '=')

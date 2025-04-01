@@ -129,13 +129,13 @@ static int  create_ssl_ctx(bool client, SSL_CTX** ctx);
 static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
 static int  create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl);
 
-static int create_hash_file(char* filename, char* algorithm, char** hash);
+static int create_hash_file(char* filename, const char* algorithm, char** hash);
 
 int
 pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
 {
    int status = MESSAGE_STATUS_ERROR;
-   struct main_configuration* config;
+   struct configuration* config;
    struct message* msg = NULL;
    struct message* request_msg = NULL;
    int32_t request;
@@ -145,7 +145,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
    char* password = NULL;
    SSL* c_ssl = NULL;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    *client_ssl = NULL;
 
@@ -853,14 +853,14 @@ client_scram256(SSL* c_ssl, int client_fd, char* password, int slot)
    size_t server_signature_calc_length = 0;
    char* base64_server_signature_calc = NULL;
    size_t base64_server_signature_calc_length;
-   struct main_configuration* config;
+   struct configuration* config;
    struct message* msg = NULL;
    struct message* sasl_continue = NULL;
    struct message* sasl_final = NULL;
 
    pgmoneta_log_debug("client_scram256 %d %d", client_fd, slot);
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    status = pgmoneta_write_auth_scram256(c_ssl, client_fd);
    if (status != MESSAGE_STATUS_OK)
@@ -1073,31 +1073,31 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
    struct message* ssl_msg = NULL;
    struct message* startup_msg = NULL;
    struct message* msg = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    *ssl = NULL;
    *fd = -1;
 
    auth_type = SECURITY_INVALID;
    server_fd = -1;
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    for (int i = 0; i < NUMBER_OF_SECURITY_MESSAGES; i++)
    {
       memset(&security_messages[i], 0, SECURITY_BUFFER_SIZE);
    }
 
-   if (config->common.servers[server].host[0] == '/')
+   if (config->servers[server].host[0] == '/')
    {
       char pgsql[MISC_LENGTH];
 
       memset(&pgsql, 0, sizeof(pgsql));
-      snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->common.servers[server].port);
-      ret = pgmoneta_connect_unix_socket(config->common.servers[server].host, &pgsql[0], &server_fd);
+      snprintf(&pgsql[0], sizeof(pgsql), ".s.PGSQL.%d", config->servers[server].port);
+      ret = pgmoneta_connect_unix_socket(config->servers[server].host, &pgsql[0], &server_fd);
    }
    else
    {
-      ret = pgmoneta_connect(config->common.servers[server].host, config->common.servers[server].port, &server_fd);
+      ret = pgmoneta_connect(config->servers[server].host, config->servers[server].port, &server_fd);
    }
 
    if (ret != 0)
@@ -1132,11 +1132,11 @@ pgmoneta_server_authenticate(int server, char* database, char* username, char* p
          goto error;
       }
 
-      pgmoneta_log_trace("%s: Key file @ %s", config->common.servers[server].name, config->common.servers[server].tls_key_file);
-      pgmoneta_log_trace("%s: Certificate file @ %s", config->common.servers[server].name, config->common.servers[server].tls_cert_file);
-      pgmoneta_log_trace("%s: CA file @ %s", config->common.servers[server].name, config->common.servers[server].tls_ca_file);
+      pgmoneta_log_trace("%s: Key file @ %s", config->servers[server].name, config->servers[server].tls_key_file);
+      pgmoneta_log_trace("%s: Certificate file @ %s", config->servers[server].name, config->servers[server].tls_cert_file);
+      pgmoneta_log_trace("%s: CA file @ %s", config->servers[server].name, config->servers[server].tls_ca_file);
 
-      if (create_ssl_client(ctx, config->common.servers[server].tls_key_file, config->common.servers[server].tls_cert_file, config->common.servers[server].tls_ca_file, server_fd, &c_ssl))
+      if (create_ssl_client(ctx, config->servers[server].tls_key_file, config->servers[server].tls_cert_file, config->servers[server].tls_ca_file, server_fd, &c_ssl))
       {
          goto error;
       }
@@ -1732,15 +1732,15 @@ error:
 static char*
 get_admin_password(char* username)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   for (int i = 0; i < config->common.number_of_admins; i++)
+   for (int i = 0; i < config->number_of_admins; i++)
    {
-      if (!strcmp(&config->common.admins[i].username[0], username))
+      if (!strcmp(&config->admins[i].username[0], username))
       {
-         return &config->common.admins[i].password[0];
+         return &config->admins[i].password[0];
       }
    }
 
@@ -1835,10 +1835,10 @@ error:
 int
 pgmoneta_tls_valid(void)
 {
-   struct main_configuration* config;
+   struct configuration* config;
    struct stat st = {0};
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (config->tls)
    {
@@ -2651,9 +2651,9 @@ create_ssl_server(SSL_CTX* ctx, int socket, SSL** ssl)
 {
    SSL* s = NULL;
    STACK_OF(X509_NAME) * root_cert_list = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (strlen(config->tls_cert_file) == 0)
    {
@@ -2748,7 +2748,7 @@ error:
 }
 
 static int
-create_hash_file(char* filename, char* algorithm, char** hash)
+create_hash_file(char* filename, const char* algorithm, char** hash)
 {
    EVP_MD_CTX* md_ctx;
    const EVP_MD* md;
@@ -2984,7 +2984,7 @@ pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc)
    #else
    uint32_t crc_int = ~(*crc);
 
-   static uint32_t crc32_tab[256] = {
+   static const uint32_t crc32_tab[256] = {
       0x00000000L, 0xF26B8303L, 0xE13B70F7L, 0x1350F3F4L,
       0xC79A971FL, 0x35F1141CL, 0x26A1E7E8L, 0xD4CA64EBL,
       0x8AD958CFL, 0x78B2DBCCL, 0x6BE22838L, 0x9989AB3BL,
@@ -3190,47 +3190,4 @@ pgmoneta_get_hash_algorithm(char* algorithm)
    }
 
    return HASH_ALGORITHM_SHA256;
-}
-
-int
-pgmoneta_extract_server_parameters(struct deque** server_parameters)
-{
-   int i;
-   char* data = NULL;
-   ssize_t data_length;
-   size_t offset;
-   char* name = NULL;
-   char* value = NULL;
-   struct message* msg = NULL;
-   struct deque* sp = NULL;
-   *server_parameters = NULL;
-
-   if (pgmoneta_deque_create(false, &sp))
-   {
-      return 1;
-   }
-
-   for (i = 0; i < NUMBER_OF_SECURITY_MESSAGES; ++i)
-   {
-      if ((data_length = security_lengths[i]) > 0)
-      {
-         data = &security_messages[i][0];
-         offset = 0;
-
-         while (offset < data_length)
-         {
-            offset = pgmoneta_extract_message_offset(offset, data, &msg);
-            if (msg->kind == 'S')
-            {
-               name = pgmoneta_read_string(msg->data + 5); // 1 byte for kind + 4 bytes for length
-               value = pgmoneta_read_string(msg->data + strlen(name) + 6);
-               pgmoneta_deque_add(sp, name, (uintptr_t)value, ValueString);
-            }
-            pgmoneta_free_message(msg);
-         }
-      }
-   }
-
-   *server_parameters = sp;
-   return 0;
 }

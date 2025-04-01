@@ -48,7 +48,7 @@
 static char* verify_name(void);
 static int verify_execute(char*, struct art*);
 
-static void do_verify(struct worker_common* wc);
+static void do_verify(struct worker_input* wi);
 
 struct workflow*
 pgmoneta_create_verify(void)
@@ -93,28 +93,24 @@ verify_execute(char* name, struct art* nodes)
    struct deque* all_deque = NULL;
    struct csv_reader* csv = NULL;
    struct workers* workers = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   assert(pgmoneta_art_contains_key(nodes, USER_FILES));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Verify (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Verify (execute): %s/%s", config->servers[server].name, label);
 
    base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
 
@@ -139,7 +135,7 @@ verify_execute(char* name, struct art* nodes)
       goto error;
    }
 
-   if (!strcasecmp((char*)pgmoneta_art_search(nodes, USER_FILES), NODE_ALL))
+   if (!strcasecmp((char*)pgmoneta_art_search(nodes, NODE_FILES), NODE_ALL))
    {
       if (pgmoneta_deque_create(true, &all_deque))
       {
@@ -186,12 +182,12 @@ verify_execute(char* name, struct art* nodes)
       {
          if (workers->outcome)
          {
-            pgmoneta_workers_add(workers, do_verify, (struct worker_common*)payload);
+            pgmoneta_workers_add(workers, do_verify, payload);
          }
       }
       else
       {
-         do_verify((struct worker_common*)payload);
+         do_verify(payload);
       }
 
       free(columns);
@@ -249,9 +245,8 @@ error:
 }
 
 static void
-do_verify(struct worker_common* wc)
+do_verify(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
    char* f = NULL;
    char* hash_cal = NULL;
    bool failed = false;

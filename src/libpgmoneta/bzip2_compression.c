@@ -45,15 +45,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "bzip2"
 #define BUFFER_LENGTH 8192
 
 static int bzip2_compress(char* from, int level, char* to);
 static int bzip2_decompress(char* from, char* to);
 static int bzip2_decompress_file(char* from, char* to);
 
-static void do_bzip2_compress(struct worker_common* wc);
-static void do_bzip2_decompress(struct worker_common* wc);
+static void do_bzip2_compress(struct worker_input* wi);
+static void do_bzip2_decompress(struct worker_input* wi);
 
 int
 pgmoneta_bzip2_data(char* directory, struct workers* workers)
@@ -65,9 +64,9 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
    struct dirent* entry;
    int level;
    struct worker_input* wi = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -86,6 +85,11 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+      {
+         continue;
+      }
+
       if (entry->d_type == DT_DIR)
       {
          char path[MAX_PATH];
@@ -101,13 +105,11 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
       }
       else if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, "backup_manifest") ||
-             pgmoneta_ends_with(entry->d_name, "backup_label"))
+         if (pgmoneta_ends_with(entry->d_name, "backup_label"))
          {
             continue;
          }
-
-         if (!pgmoneta_is_compressed(entry->d_name) && !pgmoneta_is_encrypted(entry->d_name))
+         if (!pgmoneta_is_compressed_archive(entry->d_name) && !pgmoneta_is_encrypted_archive(entry->d_name))
          {
             from = pgmoneta_append(from, directory);
             from = pgmoneta_append(from, "/");
@@ -124,12 +126,12 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_bzip2_compress, (struct worker_common*)wi);
+                     pgmoneta_workers_add(workers, do_bzip2_compress, wi);
                   }
                }
                else
                {
-                  do_bzip2_compress((struct worker_common*)wi);
+                  do_bzip2_compress(wi);
                }
             }
             else
@@ -167,10 +169,8 @@ error:
 }
 
 static void
-do_bzip2_compress(struct worker_common* wc)
+do_bzip2_compress(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->from))
    {
       if (bzip2_compress(wi->from, wi->level, wi->to))
@@ -227,9 +227,9 @@ pgmoneta_bzip2_wal(char* directory)
    DIR* dir;
    struct dirent* entry;
    int level;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -250,8 +250,8 @@ pgmoneta_bzip2_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_compressed(entry->d_name) ||
-             pgmoneta_is_encrypted(entry->d_name) ||
+         if (pgmoneta_is_compressed_archive(entry->d_name) ||
+             pgmoneta_is_encrypted_archive(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))
          {
@@ -350,11 +350,11 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_bzip2_decompress, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_bzip2_decompress, (void*)wi);
                }
                else
                {
-                  do_bzip2_decompress((struct worker_common*)wi);
+                  do_bzip2_decompress(wi);
                }
             }
             else
@@ -415,7 +415,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("BZIP: No file for %s", from);
       goto error;
    }
@@ -424,14 +424,14 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
    to = pgmoneta_remove_suffix(orig, ".bz2");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
 
    if (bzip2_decompress(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error bunzip2 %s", from);
       goto error;
    }
@@ -447,7 +447,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
@@ -458,7 +458,7 @@ pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error sending response");
       goto error;
    }
@@ -483,10 +483,8 @@ error:
 }
 
 static void
-do_bzip2_decompress(struct worker_common* wc)
+do_bzip2_decompress(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->from))
    {
       if (bzip2_decompress(wi->from, wi->to))
@@ -521,7 +519,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("BZIP: No file for %s", from);
       goto error;
    }
@@ -530,14 +528,14 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
    to = pgmoneta_append(to, ".bz2");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
 
    if (pgmoneta_bzip2_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_ERROR, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error bzip2 %s", from);
       goto error;
    }
@@ -553,7 +551,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Allocation error");
       goto error;
    }
@@ -564,7 +562,7 @@ pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t enc
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_BZIP2_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("BZIP: Error sending response");
       goto error;
    }
@@ -590,9 +588,9 @@ int
 pgmoneta_bzip2_file(char* from, char* to)
 {
    int level;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct configuration*) shmem;
 
    level = config->compression_level;
    if (level < 1)

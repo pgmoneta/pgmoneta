@@ -36,49 +36,65 @@
 void
 pgmoneta_retention(char** argv)
 {
-   int server = 0;
    struct workflow* workflow = NULL;
+   struct workflow* current = NULL;
    struct art* nodes = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    pgmoneta_set_proc_title(1, argv, "retention", NULL);
 
-   for (server = 0; server < config->common.number_of_servers; server++)
+   if (atomic_load(&config->active_restores) == 0 &&
+       atomic_load(&config->active_archives) == 0)
    {
-      bool active = false;
-
-      if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+      for (int i = 0; i < config->number_of_servers; i++)
       {
-         pgmoneta_log_info("Retention: Server %s is active", config->common.servers[server].name);
-         continue;
+         workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, i, NULL);
+
+         if (pgmoneta_art_create(&nodes))
+         {
+            goto error;
+         }
+
+         current = workflow;
+         while (current != NULL)
+         {
+            if (current->setup(current->name(), nodes))
+            {
+               goto error;
+            }
+            current = current->next;
+         }
+
+         current = workflow;
+         while (current != NULL)
+         {
+            if (current->execute(current->name(), nodes))
+            {
+               goto error;
+            }
+            current = current->next;
+         }
+
+         current = workflow;
+         while (current != NULL)
+         {
+            if (current->teardown(current->name(), nodes))
+            {
+               goto error;
+            }
+            current = current->next;
+         }
+
+         pgmoneta_art_destroy(nodes);
+         pgmoneta_workflow_destroy(workflow);
+
+         nodes = NULL;
+         workflow = NULL;
       }
-
-      config->common.servers[server].active_retention = true;
-
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, server, NULL);
-
-      if (pgmoneta_art_create(&nodes))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_workflow_execute(workflow, nodes, server, -1, 0, 0, NULL))
-      {
-         goto error;
-      }
-
-      pgmoneta_art_destroy(nodes);
-      pgmoneta_workflow_destroy(workflow);
-
-      nodes = NULL;
-      workflow = NULL;
-
-      config->common.servers[server].active_retention = false;
-      atomic_store(&config->common.servers[server].repository, false);
    }
 
    pgmoneta_stop_logging();
@@ -89,9 +105,6 @@ error:
 
    pgmoneta_art_destroy(nodes);
    pgmoneta_workflow_destroy(workflow);
-
-   config->common.servers[server].active_retention = false;
-   atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_stop_logging();
 

@@ -53,6 +53,13 @@ struct workflow*
 pgmoneta_create_restore(void);
 
 /**
+ * Create a workflow for batch restore relay
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_create_batch_restore_relay(void);
+
+/**
  * Create a workflow for restoring incremental backup
  * @return The workflow
  */
@@ -132,9 +139,6 @@ pgmoneta_create_bzip2(bool compress);
  */
 struct workflow*
 pgmoneta_create_link(void);
-
-struct workflow*
-pgmoneta_create_copy_wal(void);
 
 /**
  * Create a workflow for recovery info

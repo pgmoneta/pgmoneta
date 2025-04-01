@@ -29,7 +29,6 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
-#include <cmd.h>
 #include <json.h>
 #include <logging.h>
 #include <management.h>
@@ -52,7 +51,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NAME "admin"
 #define DEFAULT_PASSWORD_LENGTH 64
 
 static char CHARS[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -70,7 +68,7 @@ static int list_users(char* users_path, int32_t output_format);
 static char* generate_password(int pwd_length);
 static int create_response(char* users_path, struct json* json, struct json** response);
 
-struct pgmoneta_command command_table[] =
+const struct pgmoneta_command command_table[] =
 {
    {
       .command = "master-key",
@@ -156,98 +154,83 @@ usage(void)
 int
 main(int argc, char** argv)
 {
+   int c;
    char* username = NULL;
    char* password = NULL;
    char* file_path = NULL;
    bool generate_pwd = false;
    int pwd_length = DEFAULT_PASSWORD_LENGTH;
+   int option_index = 0;
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
    int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
-   int num_results = 0;
-   char* filepath = NULL;
-   int optind = 0;
-   int num_options = 0;
-
-   cli_option options[] = {
-      {"U", "user", true},
-      {"P", "password", true},
-      {"f", "file", true},
-      {"g", "generate", false},
-      {"l", "length", true},
-      {"V", "version", false},
-      {"F", "format", true},
-      {"?", "help", false},
-   };
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
    setbuf(stdout, NULL);
 
-   num_options = sizeof(options) / sizeof(options[0]);
-
-   cli_result results[num_options];
-
-   num_results = cmd_parse(argc, argv, options, num_options, results, num_options, false, &filepath, &optind);
-
-   if (num_results < 0)
+   while (1)
    {
-      errx(1, "Error parsing command line\n");
-      return 1;
-   }
+      static struct option long_options[] =
+      {
+         {"user", required_argument, 0, 'U'},
+         {"password", required_argument, 0, 'P'},
+         {"file", required_argument, 0, 'f'},
+         {"generate", no_argument, 0, 'g'},
+         {"length", required_argument, 0, 'l'},
+         {"version", no_argument, 0, 'V'},
+         {"format", required_argument, 0, 'F'},
+         {"help", no_argument, 0, '?'}
+      };
 
-   for (int i = 0; i < num_results; i++)
-   {
-      char* optname = results[i].option_name;
-      char* optarg = results[i].argument;
+      c = getopt_long(argc, argv, "gV?f:U:P:l:F:",
+                      long_options, &option_index);
 
-      if (optname == NULL)
+      if (c == -1)
       {
          break;
       }
-      else if (!strcmp(optname, "U") || !strcmp(optname, "user"))
+
+      switch (c)
       {
-         username = optarg;
-      }
-      else if (!strcmp(optname, "P") || !strcmp(optname, "password"))
-      {
-         password = optarg;
-      }
-      else if (!strcmp(optname, "f") || !strcmp(optname, "file"))
-      {
-         file_path = optarg;
-      }
-      else if (!strcmp(optname, "g") || !strcmp(optname, "generate"))
-      {
-         generate_pwd = true;
-      }
-      else if (!strcmp(optname, "l") || !strcmp(optname, "length"))
-      {
-         pwd_length = atoi(optarg);
-      }
-      else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
-      {
-         version();
-      }
-      else if (!strcmp(optname, "F") || !strcmp(optname, "format"))
-      {
-         if (!strncmp(optarg, "json", MISC_LENGTH))
-         {
-            output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
-         }
-         else if (!strncmp(optarg, "text", MISC_LENGTH))
-         {
-            output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
-         }
-         else
-         {
-            warnx("pgmoneta-cli: Format type is not correct");
+         case 'U':
+            username = optarg;
+            break;
+         case 'P':
+            password = optarg;
+            break;
+         case 'f':
+            file_path = optarg;
+            break;
+         case 'g':
+            generate_pwd = true;
+            break;
+         case 'l':
+            pwd_length = atoi(optarg);
+            break;
+         case 'V':
+            version();
+            break;
+         case 'F':
+            if (!strncmp(optarg, "json", MISC_LENGTH))
+            {
+               output_format = MANAGEMENT_OUTPUT_FORMAT_JSON;
+            }
+            else if (!strncmp(optarg, "text", MISC_LENGTH))
+            {
+               output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
+            }
+            else
+            {
+               warnx("pgmoneta-cli: Format type is not correct");
+               exit(1);
+            }
+            break;
+         case '?':
+            usage();
             exit(1);
-         }
-      }
-      else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
-      {
-         usage();
-         exit(0);
+            break;
+         default:
+            break;
       }
    }
 
@@ -411,12 +394,6 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       goto error;
    }
 
-   #if defined(HAVE_DARWIN) || defined(HAVE_OSX)
-      #define GET_ENV(name) getenv(name)
-   #else
-      #define GET_ENV(name) secure_getenv(name)
-   #endif
-
    if (password == NULL)
    {
       if (generate_pwd)
@@ -426,7 +403,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       }
       else
       {
-         password = GET_ENV("PGMONETA_PASSWORD");
+         password = secure_getenv("PGMONETA_PASSWORD");
 
          if (password == NULL)
          {
@@ -508,7 +485,7 @@ error:
       file = NULL;
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -655,7 +632,7 @@ password:
       }
       else
       {
-         password = GET_ENV("PGMONETA_PASSWORD");
+         password = secure_getenv("PGMONETA_PASSWORD");
 
          if (password == NULL)
          {
@@ -771,7 +748,7 @@ error:
       users_file = NULL;
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -890,7 +867,7 @@ password:
             }
             else
             {
-               password = GET_ENV("PGMONETA_PASSWORD");
+               password = secure_getenv("PGMONETA_PASSWORD");
 
                if (password == NULL)
                {
@@ -1036,7 +1013,7 @@ error:
       remove(tmpfilename);
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -1186,7 +1163,7 @@ error:
       remove(tmpfilename);
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
@@ -1274,7 +1251,7 @@ error:
       users_file = NULL;
    }
 
-   pgmoneta_management_create_outcome_failure(j, 1, NAME, &outcome);
+   pgmoneta_management_create_outcome_failure(j, 1, &outcome);
 
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {

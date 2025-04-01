@@ -44,7 +44,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "zstd"
 #define ZSTD_DEFAULT_NUMBER_OF_WORKERS 4
 
 static int zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
@@ -64,9 +63,9 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
    struct dirent* entry;
    int level;
    int ws;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -102,6 +101,11 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+      {
+         continue;
+      }
+
       if (entry->d_type == DT_DIR)
       {
          char path[1024];
@@ -117,14 +121,12 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
       }
       else if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, "backup_manifest") ||
-             pgmoneta_ends_with(entry->d_name, "backup_label"))
+         if (pgmoneta_ends_with(entry->d_name, "backup_label"))
          {
             continue;
          }
-
-         if (!pgmoneta_is_compressed(entry->d_name) &&
-             !pgmoneta_is_encrypted(entry->d_name))
+         if (!pgmoneta_is_compressed_archive(entry->d_name) &&
+             !pgmoneta_is_encrypted_archive(entry->d_name))
          {
             from = NULL;
 
@@ -240,9 +242,9 @@ pgmoneta_zstandardc_wal(char* directory)
    struct dirent* entry;
    int level;
    int workers;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (!(dir = opendir(directory)))
    {
@@ -280,8 +282,8 @@ pgmoneta_zstandardc_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_compressed(entry->d_name) ||
-             pgmoneta_is_encrypted(entry->d_name) ||
+         if (pgmoneta_is_compressed_archive(entry->d_name) ||
+             pgmoneta_is_encrypted_archive(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))
          {
@@ -377,7 +379,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: No file for %s", from);
       goto error;
    }
@@ -386,14 +388,14 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
    to = pgmoneta_remove_suffix(orig, ".zstd");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
 
    if (pgmoneta_zstandardd_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error ztsd %s", from);
       goto error;
    }
@@ -409,7 +411,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
@@ -420,7 +422,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error sending response");
       goto error;
    }
@@ -670,7 +672,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: No file for %s", from);
       goto error;
    }
@@ -679,14 +681,14 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
    to = pgmoneta_append(to, ".zstd");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
 
    if (pgmoneta_zstandardc_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_ERROR, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error ztsd %s", from);
       goto error;
    }
@@ -702,7 +704,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Allocation error");
       goto error;
    }
@@ -713,7 +715,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ZSTD_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("ZSTD: Error sending response");
       goto error;
    }
@@ -745,9 +747,9 @@ pgmoneta_zstandardc_file(char* from, char* to)
    ZSTD_CCtx* cctx = NULL;
    int level;
    int workers;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    level = config->compression_level;
    if (level < 1)
@@ -914,11 +916,6 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
       {
          ZSTD_outBuffer output = {zout, zout_size, 0};
          size_t remaining = ZSTD_compressStream2(cctx, &output, &input, mode);
-         if (ZSTD_isError(remaining))
-         {
-            pgmoneta_log_error("ZSTD: Compression error: %s", ZSTD_getErrorName(remaining));
-            goto error;
-         }
          fwrite(zout, sizeof(char), output.pos, fout);
          finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
       }
@@ -966,7 +963,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       goto error;
    }
 
-   fout = fopen(to, "wb");
+   fout = fopen(to, "wb");;
 
    if (fout == NULL)
    {
@@ -981,11 +978,6 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       {
          ZSTD_outBuffer output = {zout, zout_size, 0};
          size_t ret = ZSTD_decompressStream(dctx, &output, &input);
-         if (ZSTD_isError(ret))
-         {
-            pgmoneta_log_error("ZSTD: Decompression error: %s", ZSTD_getErrorName(ret));
-            goto error;
-         }
          fwrite(zout, sizeof(char), output.pos, fout);
          lastRet = ret;
       }
@@ -993,7 +985,6 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
 
    if (lastRet != 0)
    {
-      pgmoneta_log_error("ZSTD: Incomplete or corrupted frame");
       goto error;
    }
 

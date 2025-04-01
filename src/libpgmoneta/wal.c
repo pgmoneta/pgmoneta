@@ -87,6 +87,8 @@ pgmoneta_wal(int srv, char** argv)
    int hdrlen = 1 + 8 + 8 + 8;
    size_t bytes_left = 0;
    char* xlogpos = NULL;
+   char* remain_buffer = NULL;
+   size_t remain_buffer_alloc_size = 0;
    char cmd[MISC_LENGTH];
    size_t xlogpos_size = 0;
    size_t xlogptr = 0;
@@ -106,18 +108,18 @@ pgmoneta_wal(int srv, char** argv)
    struct query_response* end_of_timeline_response = NULL;
    struct message* start_replication_msg = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));;
-   struct main_configuration* config;
+   struct configuration* config;
    struct stream_buffer* buffer = NULL;
    struct workflow* head = NULL;
    struct workflow* current = NULL;
    struct art* nodes = NULL;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct configuration*) shmem;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
 
-   pgmoneta_set_proc_title(1, argv, "wal", config->common.servers[srv].name);
+   pgmoneta_set_proc_title(1, argv, "wal", config->servers[srv].name);
 
    if (msg == NULL)
    {
@@ -126,15 +128,15 @@ pgmoneta_wal(int srv, char** argv)
 
    memset(msg, 0, sizeof(struct message));
 
-   if (config->common.servers[srv].wal_streaming)
+   if (config->servers[srv].wal_streaming)
    {
       goto error;
    }
 
    usr = -1;
-   for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
+   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
    {
-      if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
+      if (!strcmp(config->servers[srv].username, config->users[i].username))
       {
          usr = i;
       }
@@ -142,21 +144,21 @@ pgmoneta_wal(int srv, char** argv)
 
    if (usr == -1)
    {
-      pgmoneta_log_trace("Invalid user for %s", config->common.servers[srv].name);
+      pgmoneta_log_trace("Invalid user for %s", config->servers[srv].name);
       goto error;
    }
    pgmoneta_server_info(srv);
 
-   if (config->common.servers[srv].checksums)
+   if (config->servers[srv].checksums)
    {
-      pgmoneta_log_debug("Server %s has checksums enabled", config->common.servers[srv].name);
+      pgmoneta_log_debug("Server %s has checksums enabled", config->servers[srv].name);
    }
    else
    {
-      pgmoneta_log_warn("Server %s has checksums disabled. Use initdb -k or pg_checksums to enable", config->common.servers[srv].name);
+      pgmoneta_log_warn("Server %s has checksums disabled. Use initdb -k or pg_checksums to enable", config->servers[srv].name);
    }
 
-   segsize = config->common.servers[srv].wal_size;
+   segsize = config->servers[srv].wal_size;
    d = pgmoneta_get_server_wal(srv);
    pgmoneta_mkdir(d);
 
@@ -165,7 +167,7 @@ pgmoneta_wal(int srv, char** argv)
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_SERVER_ID, (uintptr_t)srv, ValueInt32))
+   if (pgmoneta_art_insert(nodes, NODE_SERVER, (uintptr_t)srv, ValueInt32))
    {
       goto error;
    }
@@ -202,17 +204,17 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_log_warn("Unable to create WAL shipping directory");
    }
 
-   auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, true, &ssl, &socket);
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, true, &ssl, &socket);
 
    if (auth != AUTH_SUCCESS)
    {
-      pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[srv].name);
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
       goto error;
    }
 
    pgmoneta_memory_stream_buffer_init(&buffer);
 
-   config->common.servers[srv].wal_streaming = true;
+   config->servers[srv].wal_streaming = true;
    pgmoneta_create_identify_system_message(&identify_system_msg);
    if (pgmoneta_query_execute(ssl, socket, identify_system_msg, &identify_system_response))
    {
@@ -231,17 +233,17 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_log_error("identify system: timeline should at least be 1, getting %d", timeline);
       goto error;
    }
-   config->common.servers[srv].cur_timeline = cur_timeline;
+   config->servers[srv].cur_timeline = cur_timeline;
 
    wal_find_streaming_start(d, segsize, &timeline, &high32, &low32);
    if (timeline == 0)
    {
-      read_replication = (config->common.servers[srv].version >= 15) ? 1 : 0;
+      read_replication = (config->servers[srv].version >= 15) ? 1 : 0;
 
       // query the replication slot to get the starting LSN and timeline ID
       if (read_replication)
       {
-         if (wal_read_replication_slot(ssl, socket, config->common.servers[srv].wal_slot, config->common.servers[srv].name, segsize, &high32, &low32, &timeline))
+         if (wal_read_replication_slot(ssl, socket, config->servers[srv].wal_slot, config->servers[srv].name, segsize, &high32, &low32, &timeline))
          {
             read_replication = 0;   // Fallback if not PostgreSQL 15+
          }
@@ -282,19 +284,19 @@ pgmoneta_wal(int srv, char** argv)
 
       snprintf(cmd, sizeof(cmd), "%X/%X", high32, low32);
 
-      pgmoneta_create_start_replication_message(cmd, timeline, config->common.servers[srv].wal_slot, &start_replication_msg);
+      pgmoneta_create_start_replication_message(cmd, timeline, config->servers[srv].wal_slot, &start_replication_msg);
 
       ret = pgmoneta_write_message(ssl, socket, start_replication_msg);
 
       if (ret != MESSAGE_STATUS_OK)
       {
-         pgmoneta_log_error("Error during START_REPLICATION for server %s", config->common.servers[srv].name);
+         pgmoneta_log_error("Error during START_REPLICATION for server %s", config->servers[srv].name);
          goto error;
       }
 
       // assign xlogpos at the beginning of the streaming to LSN
-      memset(config->common.servers[srv].current_wal_lsn, 0, MISC_LENGTH);
-      snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
+      memset(config->servers[srv].current_wal_lsn, 0, MISC_LENGTH);
+      snprintf(config->servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
 
       type = 0;
 
@@ -363,35 +365,53 @@ pgmoneta_wal(int srv, char** argv)
 
                   if (wal_file == NULL)
                   {
-                     if (xlogoff != 0)
+                     if (xlogoff != 0 && bytes_left != xlogoff)
                      {
                         pgmoneta_log_error("Received WAL record of offset %d with no file open", xlogoff);
                         goto error;
                      }
-                     // new wal file
-                     segno = xlogptr / segsize;
-                     curr_xlogoff = 0;
-                     filename = wal_file_name(timeline, segno, segsize);
-                     if ((wal_file = wal_open(d, filename, segsize)) == NULL)
+                     else
                      {
-                        pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
-                        goto error;
-                     }
-                     memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
-                     snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
-                     if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
-                     {
-                        if (wal_shipping != NULL)
+                        // new wal file
+                        segno = xlogptr / segsize;
+                        curr_xlogoff = 0;
+                        filename = wal_file_name(timeline, segno, segsize);
+                        if ((wal_file = wal_open(d, filename, segsize)) == NULL)
                         {
-                           pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
-                        }
-                     }
-                     if (config->storage_engine & STORAGE_ENGINE_SSH)
-                     {
-                        if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
-                        {
-                           pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
+                           pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
                            goto error;
+                        }
+                        memset(config->servers[srv].current_wal_filename, 0, MISC_LENGTH);
+                        snprintf(config->servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
+                        if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
+                        {
+                           if (wal_shipping != NULL)
+                           {
+                              pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
+                           }
+                        }
+                        if (config->storage_engine & STORAGE_ENGINE_SSH)
+                        {
+                           if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
+                           {
+                              pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
+                              goto error;
+                           }
+                        }
+
+                        if (bytes_left > 0)
+                        {
+                           curr_xlogoff += bytes_left;
+                           fwrite(remain_buffer, 1, bytes_left, wal_file);
+                           if (sftp_wal_file != NULL)
+                           {
+                              sftp_write(sftp_wal_file, remain_buffer, bytes_left);
+                           }
+                           if (wal_shipping_file != NULL)
+                           {
+                              fwrite(remain_buffer, 1, bytes_left, wal_shipping_file);
+                           }
+                           bytes_left = 0;
                         }
                      }
                   }
@@ -462,43 +482,19 @@ pgmoneta_wal(int srv, char** argv)
 
                         if (bytes_left > 0)
                         {
-                           /* Write the rest of the data for the next WAL segment */
-                           segno = xlogptr / segsize;
-                           curr_xlogoff = 0;
-                           filename = wal_file_name(timeline, segno, segsize);
-                           if ((wal_file = wal_open(d, filename, segsize)) == NULL)
+                           /* Save the rest of the data for the next WAL segment */
+                           if (remain_buffer == NULL)
                            {
-                              pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
-                              goto error;
+                              remain_buffer = malloc(bytes_left);
+                              remain_buffer_alloc_size = bytes_left;
                            }
-                           memset(config->common.servers[srv].current_wal_filename, 0, MISC_LENGTH);
-                           snprintf(config->common.servers[srv].current_wal_filename, MISC_LENGTH, "%s.partial", filename);
-                           if ((wal_shipping_file = wal_open(wal_shipping, filename, segsize)) == NULL)
+                           else if (bytes_left > remain_buffer_alloc_size)
                            {
-                              if (wal_shipping != NULL)
-                              {
-                                 pgmoneta_log_warn("Could not create or open WAL segment file at %s", wal_shipping);
-                              }
+                              remain_buffer = realloc(remain_buffer, bytes_left);
+                              remain_buffer_alloc_size = bytes_left;
                            }
-                           if (config->storage_engine & STORAGE_ENGINE_SSH)
-                           {
-                              if (pgmoneta_sftp_wal_open(srv, filename, segsize, &sftp_wal_file) == 1)
-                              {
-                                 pgmoneta_log_error("Could not create or open WAL segment file on remote ssh storage engine");
-                                 goto error;
-                              }
-                           }
-                           curr_xlogoff += bytes_left;
-                           fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_file);
-                           if (sftp_wal_file != NULL)
-                           {
-                              sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_left);
-                           }
-                           if (wal_shipping_file != NULL)
-                           {
-                              fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_shipping_file);
-                           }
-                           bytes_left = 0;
+                           memset(remain_buffer, 0, remain_buffer_alloc_size);
+                           memcpy(remain_buffer, msg->data + bytes_written, bytes_left);
                         }
                         break;
                      }
@@ -575,7 +571,7 @@ pgmoneta_wal(int srv, char** argv)
       start_replication_msg = NULL;
    }
 
-   config->common.servers[srv].wal_streaming = false;
+   config->servers[srv].wal_streaming = false;
    pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
@@ -617,6 +613,7 @@ pgmoneta_wal(int srv, char** argv)
 
    pgmoneta_art_destroy(nodes);
 
+   free(remain_buffer);
    free(d);
    free(wal_shipping);
    free(filename);
@@ -624,7 +621,7 @@ pgmoneta_wal(int srv, char** argv)
    exit(0);
 
 error:
-   config->common.servers[srv].wal_streaming = false;
+   config->servers[srv].wal_streaming = false;
    pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
@@ -665,6 +662,7 @@ error:
 
    pgmoneta_art_destroy(nodes);
 
+   free(remain_buffer);
    free(d);
    free(wal_shipping);
    free(filename);
@@ -730,11 +728,11 @@ error:
 static void
 update_wal_lsn(int srv, size_t xlogptr)
 {
-   struct main_configuration* config = (struct main_configuration*) shmem;
+   struct configuration* config = (struct configuration*) shmem;
    uint32_t low32 = xlogptr & 0xffffffff;
    uint32_t high32 = xlogptr >> 32 & 0xffffffff;
-   memset(config->common.servers[srv].current_wal_lsn, 0, MISC_LENGTH);
-   snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%X/%X", high32, low32);
+   memset(config->servers[srv].current_wal_lsn, 0, MISC_LENGTH);
+   snprintf(config->servers[srv].current_wal_lsn, MISC_LENGTH, "%X/%X", high32, low32);
 }
 
 int

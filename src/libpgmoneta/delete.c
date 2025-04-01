@@ -56,6 +56,7 @@ int
 pgmoneta_delete(int srv, char* label)
 {
    struct workflow* workflow = NULL;
+   struct workflow* current = NULL;
    struct art* nodes = NULL;
    struct backup* backup = NULL;
 
@@ -71,12 +72,36 @@ pgmoneta_delete(int srv, char* label)
       goto error;
    }
 
-   if (pgmoneta_workflow_execute(workflow, nodes, srv, -1, 0, 0, NULL))
+   current = workflow;
+   while (current != NULL)
    {
-      goto error;
+      if (current->setup(current->name(), nodes))
+      {
+         goto error;
+      }
+      current = current->next;
    }
 
-   free(backup);
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->execute(current->name(), nodes))
+      {
+         goto error;
+      }
+      current = current->next;
+   }
+
+   current = workflow;
+   while (current != NULL)
+   {
+      if (current->teardown(current->name(), nodes))
+      {
+         goto error;
+      }
+      current = current->next;
+   }
+
    pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);
@@ -85,7 +110,6 @@ pgmoneta_delete(int srv, char* label)
 
 error:
 
-   free(backup);
    pgmoneta_art_destroy(nodes);
 
    pgmoneta_workflow_destroy(workflow);

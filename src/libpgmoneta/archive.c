@@ -45,18 +45,14 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <dirent.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-
-#define NAME "archive"
 
 static void write_tar_file(struct archive* a, char* src, char* dst);
 
 void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
-   bool active = false;
    char* identifier = NULL;
    char* position = NULL;
    char* directory = NULL;
@@ -70,26 +66,20 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    char* filename = NULL;
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
+   struct workflow* current = NULL;
    struct art* nodes = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    pgmoneta_start_logging();
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
-   {
-      pgmoneta_log_info("Archive: Server %s is active", config->common.servers[server].name);
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_ACTIVE, NAME, compression, encryption, payload);
-
-      goto done;
-   }
-
-   config->common.servers[server].active_archive = true;
+   atomic_fetch_add(&config->active_archives, 1);
+   atomic_fetch_add(&config->servers[server].archiving, 1);
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -101,7 +91,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, USER_POSITION, (uintptr_t)position, ValueString))
+   if (pgmoneta_art_insert(nodes, NODE_POSITION, (uintptr_t)position, ValueString))
    {
       goto error;
    }
@@ -113,16 +103,16 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                         MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->common.servers[server].name, identifier);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name,
+                                         MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, compression, encryption, payload);
+      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
    if (backup == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->common.servers[server].name, identifier);
+      pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, compression, encryption, payload);
+      pgmoneta_log_warn("Archive: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
@@ -131,7 +121,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       real_directory = pgmoneta_append_char(real_directory, '/');
    }
-   real_directory = pgmoneta_append(real_directory, config->common.servers[server].name);
+   real_directory = pgmoneta_append(real_directory, config->servers[server].name);
    real_directory = pgmoneta_append_char(real_directory, '-');
    real_directory = pgmoneta_append(real_directory, backup->label);
 
@@ -151,14 +141,39 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    {
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, server, backup);
 
-      if (pgmoneta_workflow_execute(workflow, nodes, server, client_fd, compression, encryption, payload))
+      current = workflow;
+      while (current != NULL)
       {
-         goto error;
+         if (current->setup(current->name(), nodes))
+         {
+            goto error;
+         }
+         current = current->next;
+      }
+
+      current = workflow;
+      while (current != NULL)
+      {
+         if (current->execute(current->name(), nodes))
+         {
+            goto error;
+         }
+         current = current->next;
+      }
+
+      current = workflow;
+      while (current != NULL)
+      {
+         if (current->teardown(current->name(), nodes))
+         {
+            goto error;
+         }
+         current = current->next;
       }
 
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
 
          goto error;
       }
@@ -186,7 +201,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
          filename = pgmoneta_append(filename, ".aes");
       }
 
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)label, ValueString);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)filename, ValueString);
 
@@ -194,15 +209,15 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->common.servers[server].name, identifier);
+         pgmoneta_management_response_error(NULL, client_fd, config->servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, compression, encryption, payload);
+         pgmoneta_log_error("Archive: Error sending response for %s/%s", config->servers[server].name, identifier);
 
          goto error;
       }
 
       elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, elapsed);
+      pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->servers[server].name, label, elapsed);
    }
 
    pgmoneta_art_destroy(nodes);
@@ -213,10 +228,8 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    pgmoneta_disconnect(client_fd);
 
-   config->common.servers[server].active_archive = false;
-   atomic_store(&config->common.servers[server].repository, false);
-
-done:
+   atomic_fetch_sub(&config->servers[server].archiving, 1);
+   atomic_fetch_sub(&config->active_archives, 1);
 
    pgmoneta_stop_logging();
 
@@ -236,8 +249,8 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
-   config->common.servers[server].active_archive = false;
-   atomic_store(&config->common.servers[server].repository, false);
+   atomic_fetch_sub(&config->servers[server].archiving, 1);
+   atomic_fetch_sub(&config->active_archives, 1);
 
    pgmoneta_stop_logging();
 
@@ -254,9 +267,9 @@ pgmoneta_extract_tar_file(char* file_path, char* destination)
    char* archive_name = NULL;
    struct archive* a;
    struct archive_entry* entry;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    a = archive_read_new();
    archive_read_support_format_tar(a);

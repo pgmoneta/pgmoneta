@@ -34,7 +34,6 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
-#include <deque.h>
 
 #include <stdlib.h>
 
@@ -199,14 +198,6 @@ pgmoneta_close_ssl(SSL* ssl);
  */
 int
 pgmoneta_get_hash_algorithm(char* algorithm);
-
-/**
- * Extract server parameters recevied during the latest authentication
- * @param server_parameters The resulting non-thread-safe deque
- * @return 0 on success, otherwise 1
- */
-int
-pgmoneta_extract_server_parameters(struct deque** server_parameters);
 
 #ifdef __cplusplus
 }

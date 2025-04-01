@@ -112,8 +112,6 @@ extern "C" {
 #define STORAGE_ENGINE_S3    1 << 2
 #define STORAGE_ENGINE_AZURE 1 << 3
 
-#define DEFAULT_BLOCKING_TIMEOUT 30
-
 #define UPDATE_PROCESS_TITLE_NEVER   0
 #define UPDATE_PROCESS_TITLE_STRICT  1
 #define UPDATE_PROCESS_TITLE_MINIMAL 2
@@ -223,12 +221,11 @@ struct server
    int retention_months;                    /**< The retention months for the server */
    int retention_years;                     /**< The retention years for the server */
    int create_slot;                         /**< Create a slot */
-   atomic_bool repository;                  /**< Repository lock */
-   bool active_backup;                      /**< Is there an active backup */
-   bool active_restore;                     /**< Is there an active restore */
-   bool active_archive;                     /**< Is there an active archive */
-   bool active_delete;                      /**< Is there an active delete */
-   bool active_retention;                   /**< Is there an active retention */
+   atomic_bool backup;                      /**< Is there an active backup */
+   atomic_ulong restore;                    /**< Is there an active restore */
+   atomic_ulong archiving;                  /**< Is there an active archiving */
+   atomic_bool delete;                      /**< Is there an active delete */
+   atomic_bool wal;                         /**< Is there an active wal */
    int wal_size;                            /**< The size of the WAL files */
    size_t block_size;                       /**< The size of a block in relation files*/
    size_t segment_size;                     /**< The max size of a relation file segment*/
@@ -303,36 +300,11 @@ struct prometheus
    atomic_ulong logging_fatal; /**< Logging: FATAL */
 } __attribute__ ((aligned (64)));
 
-/** @struct common_configuration
- * Defines configurations that are common between all tools
+/** @struct configuration
+ * Defines the configuration and state of pgmoneta
  */
-struct common_configuration
+struct configuration
 {
-   int log_type;                      /**< The logging type */
-   int log_level;                     /**< The logging level */
-   char log_path[MISC_LENGTH];        /**< The logging path */
-   int log_mode;                      /**< The logging mode */
-   int log_rotation_size;             /**< bytes to force log rotation */
-   int log_rotation_age;              /**< minutes for log rotation */
-   char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
-   atomic_schar log_lock;             /**< The logging lock */
-
-   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
-   struct user users[NUMBER_OF_USERS];             /**< The users */
-   struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
-
-   int number_of_servers;        /**< The number of servers */
-   int number_of_users;          /**< The number of users */
-   int number_of_admins;         /**< The number of admins */
-} __attribute__ ((aligned (64)));
-
-/** @struct main_configuration
- * Defines the main configuration list
- */
-struct main_configuration
-{
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
-
    bool running; /**< Is pgmoneta running */
 
    char configuration_path[MAX_PATH]; /**< The configuration path */
@@ -380,6 +352,15 @@ struct main_configuration
 
    char workspace[MAX_PATH]; /**< A workspace for combining incremental backups */
 
+   int log_type;                      /**< The logging type */
+   int log_level;                     /**< The logging level */
+   char log_path[MISC_LENGTH];        /**< The logging path */
+   int log_mode;                      /**< The logging mode */
+   int log_rotation_size;             /**< bytes to force log rotation */
+   int log_rotation_age;              /**< minutes for log rotation */
+   char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
+   atomic_schar log_lock;             /**< The logging lock */
+
    bool tls;                        /**< Is TLS enabled */
    char tls_cert_file[MISC_LENGTH]; /**< TLS certificate path */
    char tls_key_file[MISC_LENGTH];  /**< TLS key path */
@@ -390,6 +371,9 @@ struct main_configuration
    char pidfile[MAX_PATH];     /**< File containing the PID */
 
    int workers;                /**< The number of workers */
+
+   atomic_ulong active_restores; /**< The number of active restores */
+   atomic_ulong active_archives; /**< The number of active archives */
 
    unsigned int update_process_title;  /**< Behaviour for updating the process title */
 
@@ -402,6 +386,10 @@ struct main_configuration
 
    char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain Socket */
 
+   int number_of_servers;        /**< The number of servers */
+   int number_of_users;          /**< The number of users */
+   int number_of_admins;         /**< The number of admins */
+
    int backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
@@ -411,15 +399,10 @@ struct main_configuration
    bool link; /**< Do linking */
 #endif
 
+   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
+   struct user users[NUMBER_OF_USERS];             /**< The users */
+   struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
    struct prometheus prometheus;                   /**< The Prometheus metrics */
-} __attribute__ ((aligned (64)));
-
-/** @struct walinfo_configuration
- * Defines the walinfo configuration list
- */
-struct walinfo_configuration
-{
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
 } __attribute__ ((aligned (64)));
 
 #ifdef __cplusplus

@@ -49,19 +49,13 @@ create_xl_commit_ts_truncate()
 void
 xl_commit_ts_truncate_parse_v16(struct xl_commit_ts_truncate* wrapper, char* rec)
 {
-   char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v16.pageno, ptr, sizeof(int64_t));
-   ptr += sizeof(int64_t);
-   memcpy(&wrapper->data.v16.oldestXid, ptr, sizeof(transaction_id));
+   memcpy(&wrapper->data.v16, rec, sizeof(struct xl_commit_ts_truncate_16));
 }
 
 void
 xl_commit_ts_truncate_parse_v17(struct xl_commit_ts_truncate* wrapper, char* rec)
 {
-   char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v17.pageno, ptr, sizeof(int));
-   ptr += sizeof(int);
-   memcpy(&wrapper->data.v17.oldestXid, ptr, sizeof(transaction_id));
+   memcpy(&wrapper->data.v17, rec, sizeof(struct xl_commit_ts_truncate_17));
 }
 
 char*

@@ -47,6 +47,27 @@ jobs:
       run: sudo apt install net-tools
     - name: Install check
       run: sudo apt install check
+    - name: GCC/mkdir
+      run: mkdir build
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/
+    - name: GCC/cmake
+      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+    - name: GCC/make
+      run: make
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+    - name: rm -Rf
+      run: rm -Rf build/
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/
+    - name: CLANG/mkdir
+      run: mkdir build
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/
+    - name: CLANG/cmake
+      run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+    - name: CLANG/make
+      run: make
+      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
     - name: Install PostgreSQL
       run: |
         sudo apt install curl ca-certificates
@@ -59,59 +80,17 @@ jobs:
       run: |
         echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
         echo $PATH
-    - name: CLANG/Release/mkdir
-      run: mkdir build
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/Release/cmake
-      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Release ..
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/Release/make
-      run: make
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/Release/rm -Rf
-      run: rm -Rf build/
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: GCC/mkdir
-      run: mkdir build
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: GCC/cmake
-      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: GCC/make
-      run: make
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: GCC/Testsuite
-      id: gcc-test
+    - name: Run Test Suite
       run: $(which bash) ./testsuite.sh
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: GCC/Testsuite Clean
-      run: $(which bash) ./testsuite.sh clean
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: GCC/rm -Rf
-      run: rm -Rf build/
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/mkdir
-      run: mkdir build
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/cmake
-      run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/make
-      run: make
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/Testsuite
-      id: clang-test
-      run: $(which bash) ./testsuite.sh
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: CLANG/Testsuite Clean
+    - name: Cleanup
       run: $(which bash) ./testsuite.sh clean
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: Show logs
-      if: failure() && (steps.gcc-test.outcome == 'failure' || steps.clang-test.outcome == 'failure')
+      if: failure()
       run: |
         cat ./log/logfile
         cat ./log/pgmoneta.log
-        $(which bash) ./testsuite.sh clean
       working-directory: /home/runner/work/pgmoneta/pgmoneta/build
     - name: Upload artifact for failed workflow
       if: failure()

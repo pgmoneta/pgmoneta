@@ -88,29 +88,26 @@ manifest_execute(char* name, struct art* nodes)
    struct csv_writer* writer = NULL;
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
-   struct main_configuration* config;
+   struct configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Manifest (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Manifest (execute): %s/%s", config->servers[server].name, label);
 
    if (pgmoneta_workflow_nodes(server, label, nodes, &backup))
    {

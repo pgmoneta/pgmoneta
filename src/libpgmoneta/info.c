@@ -43,7 +43,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#define NAME "info"
 #define INFO_BUFFER_SIZE 8192
 
 void
@@ -52,9 +51,9 @@ pgmoneta_create_info(char* directory, char* label, int status)
    char buffer[INFO_BUFFER_SIZE];
    char* s = NULL;
    FILE* sfile = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    s = pgmoneta_append(s, directory);
    s = pgmoneta_append(s, "/backup.info");
@@ -811,9 +810,9 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct backup* bck = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    *backup = NULL;
 
@@ -870,7 +869,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
    if (id == NULL)
    {
-      pgmoneta_log_warn("No identifier for %s/%s", config->common.servers[server].name, identifier);
+      pgmoneta_log_warn("No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
@@ -879,7 +878,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
 
    if (pgmoneta_get_backup(root, id, &bck))
    {
-      pgmoneta_log_error("Unable to get backup for %s/%s", config->common.servers[server].name, id);
+      pgmoneta_log_error("Unable to get backup for %s/%s", config->servers[server].name, id);
       goto error;
    }
 
@@ -1374,9 +1373,9 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    struct json* tablespaces = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct main_configuration* config = NULL;
+   struct configuration* config = NULL;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -1392,7 +1391,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    if (number_of_backups == 0)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, compression, encryption, payload);
       pgmoneta_log_warn("Info: No backups");
 
       goto error;
@@ -1419,14 +1418,14 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    if (bck == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, NAME, compression, encryption, payload);
-      pgmoneta_log_warn("Info: No identifier for %s/%s", config->common.servers[server].name, identifier);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NOBACKUP, compression, encryption, payload);
+      pgmoneta_log_warn("Info: No identifier for %s/%s", config->servers[server].name, identifier);
       goto error;
    }
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Info: Allocation error");
 
       goto error;
@@ -1448,7 +1447,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    if (pgmoneta_json_create(&tablespaces))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Info: Allocation error");
 
       goto error;
@@ -1460,7 +1459,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
       if (pgmoneta_json_create(&tablespaces))
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
          pgmoneta_log_error("Info: Allocation error");
 
          goto error;
@@ -1489,7 +1488,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_INFO_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Info: Error sending response");
 
       goto error;
@@ -1497,7 +1496,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("Info: %s/%s (Elapsed: %s)", config->common.servers[server].name, bck->label, elapsed);
+   pgmoneta_log_info("Info: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
 
    pgmoneta_json_destroy(payload);
 
@@ -1555,9 +1554,9 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    struct json* tablespaces = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
-   struct main_configuration* config = NULL;
+   struct configuration* config = NULL;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
@@ -1570,7 +1569,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    if (number_of_backups == 0)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NOBACKUP, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NOBACKUP, compression, encryption, payload);
       pgmoneta_log_warn("Annotate: No backups");
 
       goto error;
@@ -1603,7 +1602,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    if (bck == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NOBACKUP, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NOBACKUP, compression, encryption, payload);
       pgmoneta_log_warn("Annotate: No backup (%s)", backup);
 
       goto error;
@@ -1611,7 +1610,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    if (pgmoneta_update_info_annotate(server, bck, action, key, comment))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_FAILED, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_FAILED, compression, encryption, payload);
       pgmoneta_log_error("Annotate: Failed annotate (%s)", backup);
 
       goto error;
@@ -1619,7 +1618,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Annotate: Allocation error");
 
       goto error;
@@ -1641,7 +1640,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    if (pgmoneta_json_create(&tablespaces))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("Annotate: Allocation error");
 
       goto error;
@@ -1653,7 +1652,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
       if (pgmoneta_json_create(&tablespaces))
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
          pgmoneta_log_error("Annotate: Allocation error");
 
          goto error;
@@ -1682,7 +1681,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ANNOTATE_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("Annotate: Error sending response");
 
       goto error;
@@ -1690,7 +1689,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("Annotate: %s/%s (Elapsed: %s)", config->common.servers[server].name, bck->label, elapsed);
+   pgmoneta_log_info("Annotate: %s/%s (Elapsed: %s)", config->servers[server].name, bck->label, elapsed);
 
    pgmoneta_json_destroy(payload);
 

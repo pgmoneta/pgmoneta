@@ -50,11 +50,11 @@ static int restore_execute(char*, struct art*);
 static char* combine_incremental_name(void);
 static int combine_incremental_execute(char*, struct art*);
 
+static char* batch_restore_relay_name(void);
+static int batch_restore_relay_execute(char*, struct art*);
+
 static char*recovery_info_name(void);
 static int recovery_info_execute(char*, struct art*);
-
-static char* copy_wal_name(void);
-static int copy_wal_execute(char*, struct art*);
 
 static char*restore_excluded_files_name(void);
 static int restore_excluded_files_execute(char*, struct art*);
@@ -106,7 +106,7 @@ pgmoneta_create_combine_incremental(void)
 }
 
 struct workflow*
-pgmoneta_create_copy_wal(void)
+pgmoneta_create_batch_restore_relay(void)
 {
    struct workflow* wf = NULL;
 
@@ -117,9 +117,9 @@ pgmoneta_create_copy_wal(void)
       return NULL;
    }
 
-   wf->name = &copy_wal_name;
+   wf->name = &batch_restore_relay_name;
    wf->setup = &pgmoneta_common_setup;
-   wf->execute = &copy_wal_execute;
+   wf->execute = &batch_restore_relay_execute;
    wf->teardown = &pgmoneta_common_teardown;
    wf->next = NULL;
 
@@ -178,6 +178,7 @@ static int
 restore_execute(char* name, struct art* nodes)
 {
    int server = -1;
+   char* position = NULL;
    char* directory = NULL;
    struct backup* backup = NULL;
    char* label = NULL;
@@ -188,36 +189,51 @@ restore_execute(char* name, struct art* nodes)
    char* waltarget = NULL;
    int number_of_workers = 0;
    struct workers* workers = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   assert(pgmoneta_art_contains_key(nodes, USER_POSITION));
+   assert(pgmoneta_art_contains_key(nodes, NODE_POSITION));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
-   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   position = (char*)pgmoneta_art_search(nodes, NODE_POSITION);
    directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-   pgmoneta_log_debug("Restore (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Restore (execute): %s/%s", config->servers[server].name, label);
 
    from = pgmoneta_get_server_backup_identifier_data(server, label);
    to = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
+
+   if (to == NULL)
+   {
+      to = pgmoneta_append(to, directory);
+      if (!pgmoneta_ends_with(to, "/"))
+      {
+         to = pgmoneta_append(to, "/");
+      }
+      to = pgmoneta_append(to, config->servers[server].name);
+      to = pgmoneta_append(to, "-");
+      to = pgmoneta_append(to, label);
+      to = pgmoneta_append(to, "/");
+
+      if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)to, ValueString))
+      {
+         goto error;
+      }
+   }
 
    pgmoneta_delete_directory(to);
 
@@ -227,10 +243,103 @@ restore_execute(char* name, struct art* nodes)
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->common.servers[server].name, label, backup, workers))
+   if (pgmoneta_copy_postgresql_restore(from, to, directory, config->servers[server].name, label, backup, workers))
    {
-      pgmoneta_log_error("Restore: Could not restore %s/%s", config->common.servers[server].name, label);
+      pgmoneta_log_error("Restore: Could not restore %s/%s", config->servers[server].name, label);
       goto error;
+   }
+   else
+   {
+      if (position != NULL && strlen(position) > 0)
+      {
+         char tokens[512];
+         bool primary = true;
+         bool copy_wal = false;
+         char* ptr = NULL;
+
+         memset(&tokens[0], 0, sizeof(tokens));
+         memcpy(&tokens[0], position, strlen(position));
+
+         ptr = strtok(&tokens[0], ",");
+
+         while (ptr != NULL)
+         {
+            char key[256];
+            char value[256];
+            char* equal = NULL;
+
+            memset(&key[0], 0, sizeof(key));
+            memset(&value[0], 0, sizeof(value));
+
+            equal = strchr(ptr, '=');
+
+            if (equal == NULL)
+            {
+               memcpy(&key[0], ptr, strlen(ptr));
+            }
+            else
+            {
+               memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
+               memcpy(&value[0], equal + 1, strlen(equal) - 1);
+            }
+
+            if (!strcmp(&key[0], "current") ||
+                !strcmp(&key[0], "immediate") ||
+                !strcmp(&key[0], "name") ||
+                !strcmp(&key[0], "xid") ||
+                !strcmp(&key[0], "lsn") ||
+                !strcmp(&key[0], "time"))
+            {
+               copy_wal = true;
+            }
+            else if (!strcmp(&key[0], "primary"))
+            {
+               primary = true;
+            }
+            else if (!strcmp(&key[0], "replica"))
+            {
+               primary = false;
+            }
+            else if (!strcmp(&key[0], "inclusive") || !strcmp(&key[0], "timeline") || !strcmp(&key[0], "action"))
+            {
+               /* Ok */
+            }
+
+            ptr = strtok(NULL, ",");
+         }
+
+         if (pgmoneta_art_insert(nodes, NODE_PRIMARY, primary, ValueBool))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, true, ValueBool))
+         {
+            goto error;
+         }
+
+         if (copy_wal)
+         {
+            origwal = pgmoneta_get_server_backup_identifier_data_wal(server, label);
+            waldir = pgmoneta_get_server_wal(server);
+
+            waltarget = pgmoneta_append(waltarget, directory);
+            waltarget = pgmoneta_append(waltarget, "/");
+            waltarget = pgmoneta_append(waltarget, config->servers[server].name);
+            waltarget = pgmoneta_append(waltarget, "-");
+            waltarget = pgmoneta_append(waltarget, label);
+            waltarget = pgmoneta_append(waltarget, "/pg_wal/");
+
+            pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
+         }
+      }
+      else
+      {
+         if (pgmoneta_art_insert(nodes, NODE_RECOVERY_INFO, false, ValueBool))
+         {
+            goto error;
+         }
+      }
    }
 
    if (number_of_workers > 0)
@@ -244,6 +353,7 @@ restore_execute(char* name, struct art* nodes)
    }
 
    free(from);
+   free(to);
    free(origwal);
    free(waldir);
    free(waltarget);
@@ -258,6 +368,7 @@ error:
    }
 
    free(from);
+   free(to);
    free(origwal);
    free(waldir);
    free(waltarget);
@@ -276,58 +387,53 @@ combine_incremental_execute(char* name, struct art* nodes)
 {
    int server = -1;
    char* identifier = NULL;
-   char* label = NULL;
-   struct deque* prior_labels = NULL;
+   struct deque* prior_backups = NULL;
    char* input_dir = NULL;
-   char* output_dir;
+   char output_dir[MAX_PATH];
    char* base = NULL;
    struct backup* bck = NULL;
    struct json* manifest = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABELS));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUPS));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_MANIFEST));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   identifier = (char*)pgmoneta_art_search(nodes, NODE_IDENTIFIER);
 
-   pgmoneta_log_debug("Combine incremental (execute): %s/%s", config->common.servers[server].name, identifier);
+   pgmoneta_log_debug("Combine incremental (execute): %s/%s", config->servers[server].name, identifier);
    bck = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-   prior_labels = (struct deque*)pgmoneta_art_search(nodes, NODE_LABELS);
-   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
-   if (prior_labels == NULL || pgmoneta_deque_size(prior_labels) < 1)
+   prior_backups = (struct deque*)pgmoneta_art_search(nodes, NODE_BACKUPS);
+   if (prior_backups == NULL || pgmoneta_deque_size(prior_backups) < 2)
    {
-      pgmoneta_log_error("Combine incremental: should have at least 1 previous backup");
+      pgmoneta_log_error("Combine incremental: should have at least 2 backups");
       goto error;
    }
-
-   input_dir = pgmoneta_get_server_backup_identifier_data(server, label);
+   input_dir = (char*)pgmoneta_deque_poll(prior_backups, NULL);
    base = (char*) pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
-   output_dir = (char*) pgmoneta_art_search(nodes, NODE_TARGET_BASE);
+
    manifest = (struct json*)pgmoneta_art_search(nodes, NODE_MANIFEST);
    if (manifest == NULL)
    {
       goto error;
    }
 
+   memset(output_dir, 0, MAX_PATH);
+   snprintf(output_dir, MAX_PATH, "%s/%s-%s", base, config->servers[server].name, &bck->label[0]);
    if (pgmoneta_exists(output_dir))
    {
       pgmoneta_delete_directory(output_dir);
@@ -338,14 +444,19 @@ combine_incremental_execute(char* name, struct art* nodes)
       char tblspc[MAX_PATH];
       memset(tblspc, 0, MAX_PATH);
       snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s",
-               base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
+               base, config->servers[server].name, bck->label, bck->tablespaces[i]);
       if (pgmoneta_exists(tblspc))
       {
          pgmoneta_delete_directory(tblspc);
       }
    }
 
-   if (pgmoneta_combine_backups(server, label, base, input_dir, output_dir, prior_labels, bck, manifest))
+   if (pgmoneta_combine_backups(server, base, input_dir, output_dir, prior_backups, bck, manifest))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)output_dir, ValueString))
    {
       goto error;
    }
@@ -355,6 +466,98 @@ combine_incremental_execute(char* name, struct art* nodes)
 
 error:
    free(input_dir);
+   return 1;
+}
+
+static char*
+batch_restore_relay_name(void)
+{
+   return "Batch restore relay";
+}
+
+static int
+batch_restore_relay_execute(char* name, struct art* nodes)
+{
+   int server = -1;
+   char* identifier = NULL;
+   struct deque* prior_backups = NULL;
+   char* label = NULL;
+   struct backup* bck = NULL;
+   struct art_iterator* iter = NULL;
+   struct configuration* config;
+   char* server_dir = NULL;
+
+   config = (struct configuration*)shmem;
+
+#ifdef DEBUG
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
+   assert(nodes != NULL);
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   free(a);
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   identifier = (char*)pgmoneta_art_search(nodes, NODE_IDENTIFIER);
+
+   server_dir = pgmoneta_get_server_backup(server);
+
+   pgmoneta_log_debug("Batch restore relay (execute): %s/%s", config->servers[server].name, identifier);
+
+   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
+
+   // This isn't ideal because we have read the backup info previously when constructing the workflow,
+   // but for now we have no choice but to read a second time
+   if (pgmoneta_get_backup(server_dir, label, &bck))
+   {
+      goto error;
+   }
+
+   prior_backups = (struct deque*)pgmoneta_art_search(nodes, NODE_BACKUPS);
+   if (prior_backups == NULL)
+   {
+      pgmoneta_deque_create(false, &prior_backups);
+      pgmoneta_art_insert(nodes, NODE_BACKUPS, (uintptr_t)prior_backups, ValueDeque);
+   }
+
+   pgmoneta_deque_add(prior_backups, NULL, pgmoneta_art_search(nodes, NODE_TARGET_BASE), ValueString);
+
+   pgmoneta_art_iterator_create(nodes, &iter);
+   while (pgmoneta_art_iterator_next(iter))
+   {
+      // Keep the directory, position, prior_backups
+      // since they'll remain unchanged. Purge the rest in case they unexpectedly
+      // affect the next restore workflow
+      if (pgmoneta_compare_string(iter->key, NODE_TARGET_ROOT) ||
+          pgmoneta_compare_string(iter->key, NODE_POSITION) ||
+          pgmoneta_compare_string(iter->key, NODE_BACKUPS) ||
+          pgmoneta_compare_string(iter->key, NODE_BACKUP) ||
+          pgmoneta_compare_string(iter->key, NODE_MANIFEST))
+      {
+         continue;
+      }
+      pgmoneta_art_iterator_remove(iter);
+   }
+
+   // restore stops at full backup
+   if (bck->type != TYPE_FULL)
+   {
+      pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)bck->parent_label, ValueString);
+   }
+
+   // free the label since adding to deque makes a copy of it
+   free(bck);
+   free(server_dir);
+   pgmoneta_art_iterator_destroy(iter);
+
+   return 0;
+
+error:
+   free(bck);
+   free(server_dir);
+   pgmoneta_art_iterator_destroy(iter);
    return 1;
 }
 
@@ -383,27 +586,24 @@ recovery_info_execute(char* name, struct art* nodes)
    char* path = NULL;
    bool mode = false;
    char* ptr = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   identifier = (char*)pgmoneta_art_search(nodes, NODE_IDENTIFIER);
 
-   pgmoneta_log_debug("Recovery (execute): %s/%s", config->common.servers[server].name, identifier);
+   pgmoneta_log_debug("Recovery (execute): %s/%s", config->servers[server].name, identifier);
 
    is_recovery_info = (bool)pgmoneta_art_search(nodes, NODE_RECOVERY_INFO);
 
@@ -419,7 +619,7 @@ recovery_info_execute(char* name, struct art* nodes)
       goto error;
    }
 
-   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
+   position = (char*)pgmoneta_art_search(nodes, NODE_POSITION);
    primary = (bool)pgmoneta_art_search(nodes, NODE_PRIMARY);
 
    if (!primary)
@@ -491,12 +691,12 @@ recovery_info_execute(char* name, struct art* nodes)
 
          memset(&line[0], 0, sizeof(line));
          snprintf(&line[0], sizeof(line), "primary_conninfo = \'host=%s port=%d user=%s password=%s application_name=%s\'\n",
-                  config->common.servers[server].host, config->common.servers[server].port, config->common.servers[server].username,
-                  get_user_password(config->common.servers[server].username), config->common.servers[server].wal_slot);
+                  config->servers[server].host, config->servers[server].port, config->servers[server].username,
+                  get_user_password(config->servers[server].username), config->servers[server].wal_slot);
          fputs(&line[0], tfile);
 
          memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->common.servers[server].wal_slot);
+         snprintf(&line[0], sizeof(line), "primary_slot_name = \'%s\'\n", config->servers[server].wal_slot);
          fputs(&line[0], tfile);
 
          ptr = strtok(&tokens[0], ",");
@@ -725,92 +925,6 @@ error:
 }
 
 static char*
-copy_wal_name(void)
-{
-   return "Copy WAL";
-}
-
-static int
-copy_wal_execute(char* name, struct art* nodes)
-{
-   char* origwal = NULL;
-   char* waldir = NULL;
-   char* waltarget = NULL;
-   char* directory = NULL;
-   bool copy_wal = false;
-   int server = 0;
-   char* label = NULL;
-   struct backup* backup = NULL;
-   int number_of_workers = 0;
-   struct workers* workers = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-#ifdef DEBUG
-   assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
-   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
-#endif
-
-   copy_wal = (bool) pgmoneta_art_search(nodes, NODE_COPY_WAL);
-   if (!copy_wal)
-   {
-      return 0;
-   }
-
-   number_of_workers = pgmoneta_get_number_of_workers(server);
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_initialize(number_of_workers, &workers);
-   }
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
-   directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
-   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
-
-   origwal = pgmoneta_get_server_backup_identifier_data_wal(server, label);
-   waldir = pgmoneta_get_server_wal(server);
-
-   waltarget = pgmoneta_append(waltarget, directory);
-   waltarget = pgmoneta_append(waltarget, "/");
-   waltarget = pgmoneta_append(waltarget, config->common.servers[server].name);
-   waltarget = pgmoneta_append(waltarget, "-");
-   waltarget = pgmoneta_append(waltarget, label);
-   waltarget = pgmoneta_append(waltarget, "/pg_wal/");
-
-   pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
-
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
-      pgmoneta_workers_destroy(workers);
-   }
-
-   free(origwal);
-   free(waldir);
-   free(waltarget);
-   return 0;
-
-error:
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_destroy(workers);
-   }
-   free(origwal);
-   free(waldir);
-   free(waltarget);
-   return 1;
-}
-
-static char*
 restore_excluded_files_name(void)
 {
    return "Recovery excluded files";
@@ -828,25 +942,22 @@ restore_excluded_files_execute(char* name, struct art* nodes)
    struct workers* workers = NULL;
    int number_of_workers = 0;
    char** restore_last_files_names = NULL;
-   struct main_configuration* config = (struct main_configuration*)shmem;
+   struct configuration* config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   identifier = (char*)pgmoneta_art_search(nodes, NODE_IDENTIFIER);
 
-   pgmoneta_log_debug("Excluded (execute): %s/%s", config->common.servers[server].name, identifier);
+   pgmoneta_log_debug("Excluded (execute): %s/%s", config->servers[server].name, identifier);
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
    {
@@ -990,27 +1101,24 @@ restore_excluded_files_teardown(char* name, struct art* nodes)
    char* to = NULL;
    char* suffix = NULL;
    struct backup* backup = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_IDENTIFIER));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
+   identifier = (char*)pgmoneta_art_search(nodes, NODE_IDENTIFIER);
 
-   pgmoneta_log_debug("Excluded (teardown): %s/%s", config->common.servers[server].name, identifier);
+   pgmoneta_log_debug("Excluded (teardown): %s/%s", config->servers[server].name, identifier);
 
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
@@ -1116,15 +1224,15 @@ error:
 static char*
 get_user_password(char* username)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   for (int i = 0; i < config->common.number_of_users; i++)
+   for (int i = 0; i < config->number_of_users; i++)
    {
-      if (!strcmp(&config->common.users[i].username[0], username))
+      if (!strcmp(&config->users[i].username[0], username))
       {
-         return &config->common.users[i].password[0];
+         return &config->users[i].password[0];
       }
    }
 

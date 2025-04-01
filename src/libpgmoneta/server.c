@@ -28,7 +28,6 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <deque.h>
 #include <extension.h>
 #include <logging.h>
 #include <message.h>
@@ -47,11 +46,11 @@
 static int get_wal_level(SSL* ssl, int socket, int server, bool* replica);
 static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
 static int get_checksums(SSL* ssl, int socket, int server, bool* checksums);
+static int get_version(SSL* ssl, int socket, int server, int* major, int* minor);
 static int get_ext_version(SSL* ssl, int socket, char** version);
 static int get_segment_size(SSL* ssl, int socket, int server, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, int server, size_t* blocksz);
 static int get_summarize_wal(SSL* ssl, int socket, int server, bool* sw);
-static int process_server_parameters(int server, struct deque* server_parameters);
 
 static bool is_valid_response(struct query_response* response);
 
@@ -62,25 +61,26 @@ pgmoneta_server_info(int srv)
    int auth;
    SSL* ssl = NULL;
    int socket = -1;
+   int major = 0;
+   int minor = 0;
    bool replica;
    bool checksums;
    int ws;
    size_t blocksz = 0;
    size_t segsz = 0;
    bool sw = false;
-   struct main_configuration* config;
+   struct configuration* config;
    char* ext_version = NULL;
-   struct deque* server_parameters = NULL;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   config->common.servers[srv].valid = false;
-   config->common.servers[srv].checksums = false;
+   config->servers[srv].valid = false;
+   config->servers[srv].checksums = false;
 
    usr = -1;
-   for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
+   for (int i = 0; usr == -1 && i < config->number_of_users; i++)
    {
-      if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
+      if (!strcmp(config->servers[srv].username, config->users[i].username))
       {
          usr = i;
       }
@@ -91,76 +91,75 @@ pgmoneta_server_info(int srv)
       goto done;
    }
 
-   auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket);
+   auth = pgmoneta_server_authenticate(srv, "postgres", config->users[usr].username, config->users[usr].password, false, &ssl, &socket);
 
    if (auth != AUTH_SUCCESS)
    {
-      pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[srv].name);
+      pgmoneta_log_error("Authentication failed for user %s on %s", config->users[usr].username, config->servers[srv].name);
       goto done;
    }
 
-   if (pgmoneta_extract_server_parameters(&server_parameters))
+   if (get_version(ssl, socket, srv, &major, &minor))
    {
-      pgmoneta_log_error("Unable to extract server parameters for %s", config->common.servers[srv].name);
+      pgmoneta_log_error("Unable to get version for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
       goto done;
    }
-
-   if (process_server_parameters(srv, server_parameters))
+   else
    {
-      pgmoneta_log_error("Unable to process server_parameters for %s", config->common.servers[srv].name);
-      goto done;
+      config->servers[srv].version = major;
+      config->servers[srv].minor_version = minor;
    }
 
-   pgmoneta_log_debug("%s/version %d.%d", config->common.servers[srv].name,
-                      config->common.servers[srv].version, config->common.servers[srv].minor_version);
+   pgmoneta_log_debug("%s %d.%d", config->servers[srv].name, config->servers[srv].version, config->servers[srv].minor_version);
 
    if (get_wal_level(ssl, socket, srv, &replica))
    {
-      pgmoneta_log_error("Unable to get wal_level for %s", config->common.servers[srv].name);
-      config->common.servers[srv].valid = false;
+      pgmoneta_log_error("Unable to get wal_level for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
       goto done;
    }
    else
    {
-      config->common.servers[srv].valid = replica;
+      config->servers[srv].valid = replica;
    }
 
-   pgmoneta_log_debug("%s/wal_level %s", config->common.servers[srv].name, config->common.servers[srv].valid ? "Yes" : "No");
+   pgmoneta_log_debug("%s/wal_level %s", config->servers[srv].name, config->servers[srv].valid ? "Yes" : "No");
 
    if (get_checksums(ssl, socket, srv, &checksums))
    {
-      pgmoneta_log_error("Unable to get data_checksums for %s", config->common.servers[srv].name);
-      config->common.servers[srv].checksums = false;
+      pgmoneta_log_error("Unable to get data_checksums for %s", config->servers[srv].name);
+      config->servers[srv].checksums = false;
       goto done;
    }
    else
    {
-      config->common.servers[srv].checksums = checksums;
+      config->servers[srv].checksums = checksums;
    }
 
-   pgmoneta_log_debug("%s/data_checksums %s", config->common.servers[srv].name, config->common.servers[srv].checksums ? "Yes" : "No");
+   pgmoneta_log_debug("%s/data_checksums %s", config->servers[srv].name, config->servers[srv].checksums ? "Yes" : "No");
 
    if (get_wal_size(ssl, socket, srv, &ws))
    {
-      pgmoneta_log_error("Unable to get wal_segment_size for %s", config->common.servers[srv].name);
-      config->common.servers[srv].valid = false;
+      pgmoneta_log_error("Unable to get wal_segment_size for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
       goto done;
    }
    else
    {
-      config->common.servers[srv].wal_size = ws;
+      config->servers[srv].wal_size = ws;
    }
-   pgmoneta_log_debug("%s/wal_segment_size %d", config->common.servers[srv].name, config->common.servers[srv].wal_size);
+   pgmoneta_log_debug("%s/wal_segment_size %d", config->servers[srv].name, config->servers[srv].wal_size);
 
    if (get_ext_version(ssl, socket, &ext_version))
    {
-      pgmoneta_log_warn("Unable to get extionsion version for %s", config->common.servers[srv].name);
-      config->common.servers[srv].ext_valid = false;
+      pgmoneta_log_warn("Unable to get extionsion version for %s", config->servers[srv].name);
+      config->servers[srv].ext_valid = false;
    }
    else
    {
-      config->common.servers[srv].ext_valid = true;
-      strcpy(config->common.servers[srv].ext_version, ext_version);
+      config->servers[srv].ext_valid = true;
+      strcpy(config->servers[srv].ext_version, ext_version);
    }
    if (ext_version != NULL)
    {
@@ -168,90 +167,89 @@ pgmoneta_server_info(int srv)
    }
 
    pgmoneta_log_debug("%s ext_valid: %s, ext_version: %s",
-                      config->common.servers[srv].name,
-                      config->common.servers[srv].ext_valid ? "true" : "false",
-                      config->common.servers[srv].ext_valid ? config->common.servers[srv].ext_version : "N/A");
+                      config->servers[srv].name,
+                      config->servers[srv].ext_valid ? "true" : "false",
+                      config->servers[srv].ext_valid ? config->servers[srv].ext_version : "N/A");
    if (get_segment_size(ssl, socket, srv, &segsz))
    {
-      pgmoneta_log_error("Unable to get segment_size for %s", config->common.servers[srv].name);
-      config->common.servers[srv].valid = false;
+      pgmoneta_log_error("Unable to get segment_size for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
       goto done;
    }
    else
    {
-      config->common.servers[srv].segment_size = segsz;
+      config->servers[srv].segment_size = segsz;
    }
-   pgmoneta_log_debug("%s/segment_size %d", config->common.servers[srv].name, config->common.servers[srv].segment_size);
+   pgmoneta_log_debug("%s/segment_size %d", config->servers[srv].name, config->servers[srv].segment_size);
 
    if (get_block_size(ssl, socket, srv, &blocksz))
    {
-      pgmoneta_log_error("Unable to get block_size for %s", config->common.servers[srv].name);
-      config->common.servers[srv].valid = false;
+      pgmoneta_log_error("Unable to get block_size for %s", config->servers[srv].name);
+      config->servers[srv].valid = false;
       goto done;
    }
    else
    {
-      config->common.servers[srv].block_size = blocksz;
+      config->servers[srv].block_size = blocksz;
    }
-   pgmoneta_log_debug("%s/block_size %d", config->common.servers[srv].name, config->common.servers[srv].block_size);
+   pgmoneta_log_debug("%s/block_size %d", config->servers[srv].name, config->servers[srv].block_size);
 
-   config->common.servers[srv].relseg_size = config->common.servers[srv].segment_size / config->common.servers[srv].block_size;
+   config->servers[srv].relseg_size = config->servers[srv].segment_size / config->servers[srv].block_size;
 
-   if (config->common.servers[srv].version >= 17)
+   if (config->servers[srv].version >= 17)
    {
       if (get_summarize_wal(ssl, socket, srv, &sw))
       {
-         pgmoneta_log_error("Unable to get summarize_wal for %s", config->common.servers[srv].name);
-         config->common.servers[srv].summarize_wal = false;
+         pgmoneta_log_error("Unable to get summarize_wal for %s", config->servers[srv].name);
+         config->servers[srv].summarize_wal = false;
          goto done;
       }
       else
       {
-         config->common.servers[srv].summarize_wal = sw;
+         config->servers[srv].summarize_wal = sw;
       }
    }
-   pgmoneta_log_debug("%s/summarize_wal %d", config->common.servers[srv].name, config->common.servers[srv].summarize_wal);
+   pgmoneta_log_debug("%s/summarize_wal %d", config->servers[srv].name, config->servers[srv].summarize_wal);
 
    pgmoneta_write_terminate(ssl, socket);
 
 done:
 
-   pgmoneta_deque_destroy(server_parameters);
    pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
       pgmoneta_disconnect(socket);
    }
 
-   if (!config->common.servers[srv].valid)
+   if (!config->servers[srv].valid)
    {
-      pgmoneta_log_error("Server %s need wal_level at replica or logical", config->common.servers[srv].name);
+      pgmoneta_log_error("Server %s need wal_level at replica or logical", config->servers[srv].name);
    }
 }
 
 bool
 pgmoneta_server_valid(int srv)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   if (!config->common.servers[srv].valid)
+   if (!config->servers[srv].valid)
    {
       return false;
    }
 
-   if (config->common.servers[srv].version == 0)
+   if (config->servers[srv].version == 0)
    {
       return false;
    }
 
-   if (config->common.servers[srv].wal_size == 0)
+   if (config->servers[srv].wal_size == 0)
    {
       return false;
    }
 
-   if (config->common.servers[srv].segment_size == 0 || config->common.servers[srv].block_size == 0)
+   if (config->servers[srv].segment_size == 0 || config->servers[srv].block_size == 0)
    {
       return false;
    }
@@ -458,6 +456,81 @@ q:
 error:
 
    pgmoneta_log_error("Error getting data_checksums");
+
+   pgmoneta_query_response_debug(response);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_version(SSL* ssl, int socket, int server, int* major, int* minor)
+{
+   int q = 0;
+   int ret;
+   char maj[3];
+   char min[3];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   *major = 0;
+   *minor = 0;
+
+   ret = pgmoneta_create_query_message("SELECT split_part(split_part(version(), ' ', 2), '.', 1) AS major, "
+                                       "split_part(split_part(version(), ' ', 2), '.', 2) AS minor;",
+                                       &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&maj[0], 0, sizeof(maj));
+   memset(&min[0], 0, sizeof(min));
+
+   snprintf(&maj[0], sizeof(maj), "%s", response->tuples->data[0]);
+   if (response->tuples->data[1] != NULL && strlen(response->tuples->data[1]) > 0)
+   {
+      snprintf(&min[0], sizeof(min), "%s", response->tuples->data[1]);
+   }
+
+   *major = pgmoneta_atoi(maj);
+   if (response->tuples->data[1] != NULL && strlen(response->tuples->data[1]) > 0)
+   {
+      *minor = pgmoneta_atoi(min);
+   }
+   else
+   {
+      *minor = 0;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
 
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
@@ -739,50 +812,4 @@ is_valid_response(struct query_response* response)
    }
 
    return true;
-}
-
-static int
-process_server_parameters(int server, struct deque* server_parameters)
-{
-   int status = 0;
-   int major = 0;
-   int minor = 0;
-   struct deque_iterator* iter = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   config->common.servers[server].version = 0;
-   config->common.servers[server].minor_version = 0;
-
-   pgmoneta_deque_iterator_create(server_parameters, &iter);
-   while (pgmoneta_deque_iterator_next(iter))
-   {
-      pgmoneta_log_debug("%s/process server_parameter '%s'", config->common.servers[server].name, iter->tag);
-      if (!strcmp("server_version", iter->tag))
-      {
-         char* server_version = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
-         if (sscanf(server_version, "%d.%d", &major, &minor) == 2)
-         {
-            config->common.servers[server].version = major;
-            config->common.servers[server].minor_version = minor;
-         }
-         else if ((major = atoi(server_version)) > 0)
-         {
-            config->common.servers[server].version = major;
-            config->common.servers[server].minor_version = 0;
-         }
-         else
-         {
-            pgmoneta_log_error("Unable to parse server_version '%s' for %s",
-                               server_version, config->common.servers[server].name);
-            config->common.servers[server].valid = false;
-            status = 1;
-         }
-         free(server_version);
-      }
-   }
-
-   pgmoneta_deque_iterator_destroy(iter);
-   return status;
 }

@@ -42,9 +42,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-static void do_link(struct worker_common* wc);
-static void do_relink(struct worker_common* wc);
-static void do_comparefiles(struct worker_common* wc);
+static void do_link(struct worker_input* wi);
+static void do_relink(struct worker_input* wi);
+static void do_comparefiles(struct worker_input* wi);
 static char* trim_suffix(char* str);
 
 int
@@ -108,12 +108,12 @@ pgmoneta_link_manifest(char* base_from, char* base_to, char* from, struct art* c
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_link, (struct worker_common*)wi);
+                     pgmoneta_workers_add(workers, do_link, wi);
                   }
                }
                else
                {
-                  do_link((struct worker_common*)wi);
+                  do_link(wi);
                }
             }
          }
@@ -150,10 +150,8 @@ error:
 }
 
 static void
-do_link(struct worker_common* wc)
+do_link(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->to))
    {
       if (pgmoneta_exists(wi->from))
@@ -227,33 +225,23 @@ pgmoneta_relink(char* from, char* to, struct workers* workers)
          else
          {
             struct worker_input* wi = NULL;
-            char* link = NULL;
 
-            link = pgmoneta_get_symlink(from_entry);
-            if (pgmoneta_is_symlink(from_entry) && pgmoneta_is_directory(link))
+            if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
             {
-               pgmoneta_relink(from_entry, to_entry, workers);
+               goto error;
+            }
+
+            if (workers != NULL)
+            {
+               if (workers->outcome)
+               {
+                  pgmoneta_workers_add(workers, do_relink, wi);
+               }
             }
             else
             {
-               if (pgmoneta_create_worker_input(NULL, from_entry, to_entry, 0, workers, &wi))
-               {
-                  goto error;
-               }
-
-               if (workers != NULL)
-               {
-                  if (workers->outcome)
-                  {
-                     pgmoneta_workers_add(workers, do_relink, (struct worker_common*)wi);
-                  }
-               }
-               else
-               {
-                  do_relink((struct worker_common*)wi);
-               }
+               do_relink(wi);
             }
-            free(link);
          }
       }
 
@@ -295,9 +283,8 @@ error:
 }
 
 static void
-do_relink(struct worker_common* wc)
+do_relink(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
    char* link = NULL;
 
 #ifdef DEBUG
@@ -331,7 +318,7 @@ do_relink(struct worker_common* wc)
          {
             pgmoneta_log_debug("%s doesn't exists", wi->to);
          }
-         pgmoneta_copy_file(wi->from, wi->to, wi->common.workers);
+         pgmoneta_copy_file(wi->from, wi->to, wi->workers);
       }
       else
       {
@@ -352,6 +339,7 @@ do_relink(struct worker_common* wc)
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", wi->to, pgmoneta_is_symlink_valid(wi->to) ? "Yes " : "No  ");
             pgmoneta_log_trace("FILETRACKER | Lnk | %s | %s |", link, pgmoneta_is_symlink_valid(link) ? "Yes " : "No  ");
 #endif
+
             free(link);
          }
          else
@@ -422,12 +410,12 @@ pgmoneta_link_comparefiles(char* from, char* to, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_comparefiles, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_comparefiles, wi);
                }
             }
             else
             {
-               do_comparefiles((struct worker_common*)wi);
+               do_comparefiles(wi);
             }
          }
       }
@@ -457,9 +445,8 @@ error:
 }
 
 static void
-do_comparefiles(struct worker_common* wc)
+do_comparefiles(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
    bool equal;
 
    equal = pgmoneta_compare_files(wi->from, wi->to);
@@ -484,9 +471,9 @@ static char*
 trim_suffix(char* str)
 {
    char* res = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct configuration*) shmem;
    int len = 0;
    if (str == NULL)
    {

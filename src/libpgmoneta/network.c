@@ -51,13 +51,13 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-static int bind_host(char* hostname, int port, int** fds, int* length);
+static int bind_host(const char* hostname, int port, int** fds, int* length);
 
 /**
  *
  */
 int
-pgmoneta_bind(char* hostname, int port, int** fds, int* length)
+pgmoneta_bind(const char* hostname, int port, int** fds, int* length)
 {
    struct ifaddrs* ifaddr, * ifa;
    struct sockaddr_in* sa4;
@@ -141,15 +141,15 @@ pgmoneta_bind(char* hostname, int port, int** fds, int* length)
  *
  */
 int
-pgmoneta_bind_unix_socket(char* directory, char* file, int* fd)
+pgmoneta_bind_unix_socket(const char* directory, const char* file, int* fd)
 {
    int status;
    char buf[107];
    struct stat st = {0};
    struct sockaddr_un addr;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if ((*fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
    {
@@ -211,7 +211,7 @@ error:
  *
  */
 int
-pgmoneta_remove_unix_socket(char* directory, char* file)
+pgmoneta_remove_unix_socket(const char* directory, const char* file)
 {
    char buf[MISC_LENGTH];
 
@@ -227,7 +227,7 @@ pgmoneta_remove_unix_socket(char* directory, char* file)
  *
  */
 int
-pgmoneta_connect(char* hostname, int port, int* fd)
+pgmoneta_connect(const char* hostname, int port, int* fd)
 {
    struct addrinfo hints = {0};
    struct addrinfo* servinfo = NULL;
@@ -238,9 +238,9 @@ pgmoneta_connect(char* hostname, int port, int* fd)
    int rv;
    char sport[6];
    int error = 0;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    memset(&sport, 0, sizeof(sport));
    sprintf(&sport[0], "%d", port);
@@ -356,8 +356,11 @@ error:
    return 1;
 }
 
+/**
+ *
+ */
 int
-pgmoneta_connect_unix_socket(char* directory, char* file, int* fd)
+pgmoneta_connect_unix_socket(const char* directory, const char* file, int* fd)
 {
    char buf[107];
    struct sockaddr_un addr;
@@ -365,7 +368,8 @@ pgmoneta_connect_unix_socket(char* directory, char* file, int* fd)
    if ((*fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
    {
       pgmoneta_log_warn("pgmoneta_connect_unix_socket: socket: %s %s", directory, strerror(errno));
-      goto error;
+      errno = 0;
+      return 1;
    }
 
    memset(&addr, 0, sizeof(addr));
@@ -378,21 +382,11 @@ pgmoneta_connect_unix_socket(char* directory, char* file, int* fd)
 
    if (connect(*fd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
    {
-      pgmoneta_log_warn("pgmoneta_connect_unix_socket: %d %s", *fd, strerror(errno));
-      goto error;
+      errno = 0;
+      return 1;
    }
 
    return 0;
-
-error:
-
-   errno = 0;
-
-   pgmoneta_disconnect(*fd);
-
-   *fd = -1;
-
-   return 1;
 }
 
 bool
@@ -519,11 +513,11 @@ error:
 int
 pgmoneta_tcp_nodelay(int fd)
 {
-   struct main_configuration* config;
+   struct configuration* config;
    int yes = 1;
    socklen_t optlen = sizeof(int);
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    if (config->nodelay)
    {
@@ -565,7 +559,7 @@ pgmoneta_socket_buffers(int fd)
  *
  */
 static int
-bind_host(char* hostname, int port, int** fds, int* length)
+bind_host(const char* hostname, int port, int** fds, int* length)
 {
    int* result = NULL;
    int index, size;
@@ -574,9 +568,9 @@ bind_host(char* hostname, int port, int** fds, int* length)
    int yes = 1;
    int rv;
    char* sport;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    index = 0;
    size = 0;
@@ -696,13 +690,13 @@ error:
 int
 pgmoneta_get_network_max_rate(int server)
 {
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   if (config->common.servers[server].network_max_rate != -1)
+   if (config->servers[server].network_max_rate != -1)
    {
-      return config->common.servers[server].network_max_rate;
+      return config->servers[server].network_max_rate;
    }
 
    return config->network_max_rate;

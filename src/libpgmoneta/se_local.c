@@ -81,24 +81,21 @@ local_storage_execute(char* name, struct art* nodes)
    int minutes;
    double seconds;
    char elapsed[128];
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
@@ -111,7 +108,7 @@ local_storage_execute(char* name, struct art* nodes)
    memset(&elapsed[0], 0, sizeof(elapsed));
    sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-   pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
+   pgmoneta_log_debug("Local storage engine (execute): %s/%s (Elapsed: %s)", config->servers[server].name, label, &elapsed[0]);
 
    return 0;
 }

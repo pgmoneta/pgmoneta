@@ -84,9 +84,9 @@ azure_storage_setup(char* name, struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    curl = curl_easy_init();
    if (curl == NULL)
@@ -95,21 +95,18 @@ azure_storage_setup(char* name, struct art* nodes)
    }
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Azure storage engine (setup): %s/%s", config->servers[server].name, label);
 
    return 0;
 
@@ -127,29 +124,26 @@ azure_storage_execute(char* name, struct art* nodes)
    double remote_azure_elapsed_time;
    char* local_root = NULL;
    char* azure_root = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
-   pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->servers[server].name, label);
 
    local_root = pgmoneta_get_server_backup_identifier(server, label);
    azure_root = azure_get_basepath(server, label);
@@ -183,24 +177,21 @@ azure_storage_teardown(char* name, struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* root = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
+   char* a = NULL;
+   a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("(Tree)\n%s", a);
    assert(nodes != NULL);
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   free(a);
 #endif
 
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    root = pgmoneta_get_server_backup_identifier_data(server, label);
@@ -209,7 +200,7 @@ azure_storage_teardown(char* name, struct art* nodes)
 
    curl_easy_cleanup(curl);
 
-   pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->common.servers[server].name, label);
+   pgmoneta_log_debug("Azure storage engine (teardown): %s/%s", config->servers[server].name, label);
 
    free(root);
 
@@ -334,9 +325,9 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
    struct stat file_info;
    CURLcode res = -1;
    struct curl_slist* chunk = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    local_path = pgmoneta_append(local_path, local_root);
    local_path = pgmoneta_append(local_path, relative_path);
@@ -520,9 +511,9 @@ static char*
 azure_get_host()
 {
    char* host = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    host = pgmoneta_append(host, config->azure_storage_account);
    host = pgmoneta_append(host, ".blob.core.windows.net/");
@@ -535,16 +526,16 @@ static char*
 azure_get_basepath(int server, char* identifier)
 {
    char* d = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    d = pgmoneta_append(d, config->azure_base_dir);
    if (!pgmoneta_ends_with(config->azure_base_dir, "/"))
    {
       d = pgmoneta_append(d, "/");
    }
-   d = pgmoneta_append(d, config->common.servers[server].name);
+   d = pgmoneta_append(d, config->servers[server].name);
    d = pgmoneta_append(d, "/backup/");
    d = pgmoneta_append(d, identifier);
 

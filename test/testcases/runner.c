@@ -26,10 +26,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <tsclient.h>
 
-#include "testcases/pgmoneta_test_1.h"
-#include "testcases/pgmoneta_test_2.h"
+#include "pgmoneta_test_1.h"
+#include "pgmoneta_test_2.h"
 
 int
 main(int argc, char* argv[])
@@ -46,13 +45,8 @@ main(int argc, char* argv[])
    Suite* s2;
    SRunner* sr;
 
-   if (pgmoneta_tsclient_init(argv[1]))
-   {
-      goto done;
-   }
-
-   s1 = pgmoneta_test1_suite();
-   s2 = pgmoneta_test2_suite();
+   s1 = pgmoneta_test1_suite(argv[1]);
+   s2 = pgmoneta_test2_suite(argv[1]);
 
    sr = srunner_create(s1);
    srunner_add_suite(sr, s2);
@@ -61,9 +55,6 @@ main(int argc, char* argv[])
    srunner_run_all(sr, CK_VERBOSE);
    number_failed = srunner_ntests_failed(sr);
    srunner_free(sr);
-
-done:
-   pgmoneta_tsclient_destroy();
 
    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

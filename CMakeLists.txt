@@ -231,7 +231,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   if (SYSTEMD_FOUND)
     message(STATUS "systemd found")
   else ()
-    message(STATUS "systemd not found; building without systemd support")
+    message(FATAL_ERROR "systemd needed")
   endif()
 endif()
 

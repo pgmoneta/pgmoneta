@@ -36,7 +36,6 @@
 #include <lz4_compression.h>
 #include <management.h>
 #include <utils.h>
-#include <value.h>
 #include <zstandard_compression.h>
 
 /* system */
@@ -90,7 +89,7 @@ error:
 }
 
 int
-pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -106,8 +105,6 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char
    }
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
-   
-   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SORT, (uintptr_t)(sort_order != NULL ? sort_order : "asc"), ValueString);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {
@@ -845,9 +842,9 @@ int
 pgmoneta_management_create_response(struct json* json, int server, struct json** response)
 {
    struct json* r = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
    *response = NULL;
 
@@ -860,9 +857,9 @@ pgmoneta_management_create_response(struct json* json, int server, struct json**
 
    if (server >= 0)
    {
-      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)config->common.servers[server].version, ValueInt32);
-      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)config->common.servers[server].minor_version, ValueInt32);
-      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MAJOR_VERSION, (uintptr_t)config->servers[server].version, ValueInt32);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_MINOR_VERSION, (uintptr_t)config->servers[server].minor_version, ValueInt32);
+      pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->servers[server].name, ValueString);
    }
 
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_SERVER_VERSION, (uintptr_t)VERSION, ValueString);
@@ -901,26 +898,25 @@ error:
 }
 
 int
-pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, char* workflow,
-                                   uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_management_response_error(SSL* ssl, int socket, char* server, int32_t error, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    int srv = -1;
    struct json* response = NULL;
    struct json* outcome = NULL;
-   struct main_configuration* config;
+   struct configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct configuration*)shmem;
 
-   if (pgmoneta_management_create_outcome_failure(payload, error, workflow, &outcome))
+   if (pgmoneta_management_create_outcome_failure(payload, error, &outcome))
    {
       goto error;
    }
 
    if (server != NULL && strlen(server) > 0)
    {
-      for (int i = 0; i < config->common.number_of_servers; i++)
+      for (int i = 0; i < config->number_of_servers; i++)
       {
-         if (!strcmp(server, config->common.servers[i].name))
+         if (!strcmp(server, config->servers[i].name))
          {
             srv = i;
          }
@@ -1763,7 +1759,7 @@ error:
 }
 
 int
-pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, char* workflow, struct json** outcome)
+pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, struct json** outcome)
 {
    struct json* r = NULL;
 
@@ -1776,7 +1772,6 @@ pgmoneta_management_create_outcome_failure(struct json* json, int32_t error, cha
 
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_STATUS, (uintptr_t)false, ValueBool);
    pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_ERROR, (uintptr_t)error, ValueInt32);
-   pgmoneta_json_put(r, MANAGEMENT_ARGUMENT_WORKFLOW, (uintptr_t)workflow, ValueString);
 
    pgmoneta_json_put(json, MANAGEMENT_CATEGORY_OUTCOME, (uintptr_t)r, ValueJSON);
 

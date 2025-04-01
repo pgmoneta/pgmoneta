@@ -80,6 +80,14 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 int
 pgmoneta_get_backup_max_rate(int server);
 
+struct backup_context {
+    char* base_path;          // Path for backup
+    int total_wal_files;      // Total WAL files to process
+    int processed_wal_files;  // Current count of processed WAL files
+    time_t start_time;        // Start time for ETA calculation
+};
+
+bool perform_backup(struct backup_context* ctx);
 /**
  * Extract a file from a backup
  * @param server The server

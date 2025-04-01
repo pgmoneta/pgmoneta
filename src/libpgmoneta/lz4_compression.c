@@ -46,13 +46,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "lz4"
-
 static int lz4_compress(char* from, char* to);
 static int lz4_decompress(char* from, char* to);
 
-static void do_lz4_compress(struct worker_common* wc);
-static void do_lz4_decompress(struct worker_common* wc);
+static void do_lz4_compress(struct worker_input* wi);
+static void do_lz4_decompress(struct worker_input* wi);
 
 int
 pgmoneta_lz4c_data(char* directory, struct workers* workers)
@@ -70,6 +68,11 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_manifest"))
+      {
+         continue;
+      }
+
       if (entry->d_type == DT_DIR)
       {
          char path[1024];
@@ -85,8 +88,7 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
       }
       else if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_ends_with(entry->d_name, "backup_manifest") ||
-             pgmoneta_ends_with(entry->d_name, "backup_label"))
+         if (pgmoneta_ends_with(entry->d_name, "backup_label"))
          {
             continue;
          }
@@ -106,12 +108,12 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_lz4_compress, wi);
                }
             }
             else
             {
-               do_lz4_compress((struct worker_common*)wi);
+               do_lz4_compress(wi);
             }
          }
          else
@@ -148,10 +150,8 @@ error:
 }
 
 static void
-do_lz4_compress(struct worker_common* wc)
+do_lz4_compress(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->from))
    {
       if (lz4_compress(wi->from, wi->to))
@@ -184,8 +184,8 @@ pgmoneta_lz4c_wal(char* directory)
    {
       if (entry->d_type == DT_REG)
       {
-         if (pgmoneta_is_compressed(entry->d_name) ||
-             pgmoneta_is_encrypted(entry->d_name) ||
+         if (pgmoneta_is_compressed_archive(entry->d_name) ||
+             pgmoneta_is_encrypted_archive(entry->d_name) ||
              pgmoneta_ends_with(entry->d_name, ".partial") ||
              pgmoneta_ends_with(entry->d_name, ".history"))
          {
@@ -318,12 +318,12 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_lz4_decompress, wi);
                }
             }
             else
             {
-               do_lz4_decompress((struct worker_common*)wi);
+               do_lz4_decompress(wi);
             }
          }
          else
@@ -364,10 +364,8 @@ error:
 }
 
 static void
-do_lz4_decompress(struct worker_common* wc)
+do_lz4_decompress(struct worker_input* wi)
 {
-   struct worker_input* wi = (struct worker_input*)wc;
-
    if (pgmoneta_exists(wi->from))
    {
       if (lz4_decompress(wi->from, wi->to))
@@ -403,7 +401,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("LZ4: No file for %s", from);
       goto error;
    }
@@ -412,14 +410,14 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    to = pgmoneta_remove_suffix(orig, ".lz4");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
 
    if (pgmoneta_lz4d_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error lz4 %s", from);
       goto error;
    }
@@ -435,7 +433,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
@@ -446,7 +444,7 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error sending response");
       goto error;
    }
@@ -521,7 +519,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NOFILE, compression, encryption, payload);
       pgmoneta_log_error("LZ4: No file for %s", from);
       goto error;
    }
@@ -530,14 +528,14 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    to = pgmoneta_append(to, ".lz4");
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
 
    if (pgmoneta_lz4c_file(from, to))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_ERROR, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error lz4 %s", from);
       goto error;
    }
@@ -553,7 +551,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Allocation error");
       goto error;
    }
@@ -564,7 +562,7 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_LZ4_NETWORK, compression, encryption, payload);
       pgmoneta_log_error("LZ4: Error sending response");
       goto error;
    }
@@ -797,7 +795,7 @@ pgmoneta_lz4d_string(unsigned char* compressed_buffer, size_t compressed_size, c
       return 1;
    }
 
-   decompressed_size = LZ4_decompress_safe((char*)compressed_buffer, *output_string, compressed_size, max_decompressed_size);
+   decompressed_size = LZ4_decompress_safe((const char*)compressed_buffer, *output_string, compressed_size, max_decompressed_size);
    if (decompressed_size < 0)
    {
       pgmoneta_log_error("LZ4: Decompress failed");

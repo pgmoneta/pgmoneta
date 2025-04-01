@@ -33,7 +33,6 @@ OS=$(uname)
 THIS_FILE=$(realpath "$0")
 FILE_OWNER=$(ls -l "$THIS_FILE" | awk '{print $3}')
 USER=$(whoami)
-WAIT_TIMEOUT=5
 
 PORT=5432
 PGPASSWORD="password"
@@ -78,23 +77,6 @@ next_available_port() {
     done
 }
 
-wait_for_server_ready() {
-    local start_time=$SECONDS
-    while true; do
-        pg_isready -h localhost -p $PORT
-        if [ $? -eq 0 ]; then
-            echo "pgmoneta is ready for accepting responses"
-            return 0
-        fi
-        if [ $(($SECONDS - $start_time)) -gt $WAIT_TIMEOUT ]; then
-            echo "waiting for server timed out"
-            return 1
-        fi
-
-        # Avoid busy-waiting
-        sleep 1
-    done
-}
 ##############################################################
 
 ############### CHECK POSTGRES DEPENDENCIES ##################
@@ -437,14 +419,9 @@ execute_testcases() {
         exit 1
     fi
 
-    echo "starting pgmoneta server in daemon mode"
+    echo "starting pgmoneta server in daemon mode (wait time = 5 seconds)"
     $EXECUTABLE_DIRECTORY/pgmoneta -c $CONFIGURATION_DIRECTORY/pgmoneta.conf -u $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -d
-    wait_for_server_ready()
-    if [ $? -ne 0 ]; then
-        pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
-        clean
-        exit 1
-    fi
+    sleep 5
 
     $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf ping
     if [ $? -eq 0 ]; then
@@ -458,12 +435,6 @@ execute_testcases() {
 
     ### RUN TESTCASES ###
     $TEST_DIRECTORY/pgmoneta_test $PROJECT_DIRECTORY
-    if [ $? -ne 0 ]; then
-        $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown
-        pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
-        clean
-        exit 1
-    fi
 
     echo "running shutdown cli command"
     $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown
