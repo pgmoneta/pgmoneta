@@ -57,6 +57,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
@@ -83,8 +84,8 @@ static int copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappin
 
 static int get_permissions(char* from, int* permissions);
 
-static void do_copy_file(struct worker_input* wi);
-static void do_delete_file(struct worker_input* wi);
+static void do_copy_file(struct worker_common* wc);
+static void do_delete_file(struct worker_common* wc);
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -972,9 +973,9 @@ void
 pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 {
    char title[MAX_PROCESS_TITLE_LENGTH];
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
    memset(&title, 0, sizeof(title));
 
    // sanity check: if the user does not want to
@@ -1793,12 +1794,12 @@ pgmoneta_delete_file(char* file, struct workers* workers)
    {
       if (workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_delete_file, fi);
+         pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi);
       }
    }
    else
    {
-      do_delete_file(fi);
+      do_delete_file((struct worker_common*)fi);
    }
 
    return 0;
@@ -1809,8 +1810,9 @@ error:
 }
 
 static void
-do_delete_file(struct worker_input* fi)
+do_delete_file(struct worker_common* wc)
 {
+   struct worker_input* fi = (struct worker_input*)wc;
    int ret = unlink(fi->from);
 
    if (ret != 0)
@@ -1927,6 +1929,11 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
       goto error;
    }
 
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+   }
+
    if (restore_last_files_names != NULL)
    {
       for (int i = 0; restore_last_files_names[i] != NULL; i++)
@@ -1939,6 +1946,12 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
    return 0;
 
 error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+   }
+
    if (restore_last_files_names != NULL)
    {
       for (int i = 0; restore_last_files_names[i] != NULL; i++)
@@ -2439,12 +2452,12 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    {
       if (workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_copy_file, fi);
+         pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi);
       }
    }
    else
    {
-      do_copy_file(fi);
+      do_copy_file((struct worker_common*)fi);
    }
 
    return 0;
@@ -2455,13 +2468,16 @@ error:
 }
 
 static void
-do_copy_file(struct worker_input* fi)
+do_copy_file(struct worker_common* wc)
 {
+   struct worker_input* fi = (struct worker_input*)wc;
    int fd_from = -1;
    int fd_to = -1;
    char buffer[8192];
    ssize_t nread = -1;
    int permissions = -1;
+   char* dn = NULL;
+   char* to = NULL;
 
    fd_from = open(fi->from, O_RDONLY);
 
@@ -2477,11 +2493,20 @@ do_copy_file(struct worker_input* fi)
       goto error;
    }
 
-   fd_to = open(fi->to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
+   to = strdup(fi->to);
+   dn = strdup(dirname(fi->to));
+
+   if (pgmoneta_mkdir(dn))
+   {
+      pgmoneta_log_error("Could not create directory: %s", dn);
+      goto error;
+   }
+
+   fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
 
    if (fd_to < 0)
    {
-      pgmoneta_log_error("Unable to create file: %s", fi->to);
+      pgmoneta_log_error("Unable to create file: %s", to);
       goto error;
    }
 
@@ -2523,6 +2548,13 @@ do_copy_file(struct worker_input* fi)
    pgmoneta_log_trace("FILETRACKER | Copy | %s | %s |", fi->from, fi->to);
 #endif
 
+   if (fi->common.workers != NULL)
+   {
+      fi->common.workers->outcome = true;
+   }
+
+   free(dn);
+   free(to);
    free(fi);
 
    return;
@@ -2544,6 +2576,13 @@ error:
 
    errno = 0;
 
+   if (fi->common.workers != NULL)
+   {
+      fi->common.workers->outcome = false;
+   }
+
+   free(dn);
+   free(to);
    free(fi);
 }
 
@@ -2564,19 +2603,18 @@ pgmoneta_move_file(char* from, char* to)
 }
 
 int
-pgmoneta_basename_file(char* s, char** basename)
+pgmoneta_strip_extension(char* s, char** name)
 {
    size_t size;
    char* ext = NULL;
    char* r = NULL;
 
-   *basename = NULL;
+   *name = NULL;
 
    ext = strrchr(s, '.');
    if (ext != NULL)
    {
       size = ext - s + 1;
-
       r = (char*)malloc(size);
       if (r == NULL)
       {
@@ -2588,23 +2626,19 @@ pgmoneta_basename_file(char* s, char** basename)
    }
    else
    {
-      size = strlen(s) + 1;
-
-      r = (char*)malloc(size);
+      r = pgmoneta_append(r, s);
       if (r == NULL)
       {
          goto error;
       }
-
-      memset(r, 0, size);
-      memcpy(r, s, strlen(s));
    }
 
-   *basename = r;
+   *name = r;
 
    return 0;
 
 error:
+
    return 1;
 }
 
@@ -2944,11 +2978,32 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
 
    for (int i = 0; i < number_of_wal_files; i++)
    {
-      pgmoneta_basename_file(wal_files[i], &basename);
-
-      if (strcmp(wal_files[i], start) >= 0)
+      if (pgmoneta_is_encrypted(wal_files[i]))
       {
-         if (pgmoneta_ends_with(wal_files[i], ".partial"))
+         if (pgmoneta_strip_extension(wal_files[i], &basename))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         basename = pgmoneta_append(basename, wal_files[i]);
+      }
+
+      if (pgmoneta_is_compressed(basename))
+      {
+         char* bn = basename;
+         basename = NULL;
+         if (pgmoneta_strip_extension(bn, &basename))
+         {
+            goto error;
+         }
+         free(bn);
+      }
+
+      if (strcmp(basename, start) >= 0)
+      {
+         if (pgmoneta_ends_with(basename, ".partial"))
          {
             ff = pgmoneta_append(ff, from);
             if (!pgmoneta_ends_with(ff, "/"))
@@ -3000,6 +3055,16 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
    free(wal_files);
 
    return 0;
+
+error:
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return 1;
 }
 
 int
@@ -3016,7 +3081,28 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
 
    for (int i = 0; i < number_of_wal_files; i++)
    {
-      pgmoneta_basename_file(wal_files[i], &basename);
+      if (pgmoneta_is_encrypted(wal_files[i]))
+      {
+         if (pgmoneta_strip_extension(wal_files[i], &basename))
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         basename = pgmoneta_append(basename, wal_files[i]);
+      }
+
+      if (pgmoneta_is_compressed(basename))
+      {
+         char* bn = basename;
+         basename = NULL;
+         if (pgmoneta_strip_extension(bn, &basename))
+         {
+            goto error;
+         }
+         free(bn);
+      }
 
       if (strcmp(basename, from) >= 0)
       {
@@ -3037,6 +3123,16 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
    free(wal_files);
 
    return result;
+
+error:
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
+
+   return 0;
 }
 
 unsigned long
@@ -3475,7 +3571,7 @@ error:
 static int
 string_compare(const void* a, const void* b)
 {
-   return strcmp(*(const char**)a, *(const char**)b);
+   return strcmp(*(char**)a, *(char**)b);
 }
 
 static bool
@@ -3525,17 +3621,17 @@ pgmoneta_get_server_wal(int server)
 char*
 pgmoneta_get_server_wal_shipping(int server)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    char* ws = NULL;
-   config = (struct configuration*) shmem;
-   if (strlen(config->servers[server].wal_shipping) > 0)
+   config = (struct main_configuration*) shmem;
+   if (strlen(config->common.servers[server].wal_shipping) > 0)
    {
-      ws = pgmoneta_append(ws, config->servers[server].wal_shipping);
+      ws = pgmoneta_append(ws, config->common.servers[server].wal_shipping);
       if (!pgmoneta_ends_with(ws, "/"))
       {
          ws = pgmoneta_append(ws, "/");
       }
-      ws = pgmoneta_append(ws, config->servers[server].name);
+      ws = pgmoneta_append(ws, config->common.servers[server].name);
       return ws;
    }
    return NULL;
@@ -3561,14 +3657,14 @@ pgmoneta_get_server_wal_shipping_wal(int server)
 char*
 pgmoneta_get_server_workspace(int server)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    char* ws = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
-   if (strlen(config->servers[server].workspace) > 0)
+   if (strlen(config->common.servers[server].workspace) > 0)
    {
-      ws = pgmoneta_append(ws, config->servers[server].workspace);
+      ws = pgmoneta_append(ws, config->common.servers[server].workspace);
 
       if (!pgmoneta_ends_with(ws, "/"))
       {
@@ -3605,24 +3701,52 @@ error:
    return NULL;
 }
 
+int
+pgmoneta_delete_server_workspace(int server, char* label)
+{
+   char* ws = NULL;
+
+   ws = pgmoneta_get_server_workspace(server);
+
+   if (label != NULL && strlen(label) > 0)
+   {
+      ws = pgmoneta_append(ws, label);
+   }
+
+   if (pgmoneta_delete_directory(ws))
+   {
+      goto error;
+   }
+
+   free(ws);
+
+   return 0;
+
+error:
+
+   free(ws);
+
+   return 1;
+}
+
 char*
 pgmoneta_get_server_hot_standby(int server)
 {
-   struct configuration* config;
+   struct main_configuration* config;
    char* hs = NULL;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
-   if (strlen(config->servers[server].hot_standby) > 0)
+   if (strlen(config->common.servers[server].hot_standby) > 0)
    {
-      hs = pgmoneta_append(hs, config->servers[server].hot_standby);
+      hs = pgmoneta_append(hs, config->common.servers[server].hot_standby);
 
       if (!pgmoneta_ends_with(hs, "/"))
       {
          hs = pgmoneta_append(hs, "/");
       }
 
-      hs = pgmoneta_append(hs, config->servers[server].name);
+      hs = pgmoneta_append(hs, config->common.servers[server].name);
 
       return hs;
    }
@@ -3858,16 +3982,16 @@ static char*
 get_server_basepath(int server)
 {
    char* d = NULL;
-   struct configuration* config;
+   struct main_configuration* config;
 
-   config = (struct configuration*)shmem;
+   config = (struct main_configuration*)shmem;
 
    d = pgmoneta_append(d, config->base_dir);
    if (!pgmoneta_ends_with(config->base_dir, "/"))
    {
       d = pgmoneta_append(d, "/");
    }
-   d = pgmoneta_append(d, config->servers[server].name);
+   d = pgmoneta_append(d, config->common.servers[server].name);
    d = pgmoneta_append(d, "/");
 
    return d;
@@ -4036,7 +4160,7 @@ pgmoneta_get_file_size(char* file_path)
 }
 
 bool
-pgmoneta_is_encrypted_archive(char* file_path)
+pgmoneta_is_encrypted(char* file_path)
 {
    if (pgmoneta_ends_with(file_path, ".aes"))
    {
@@ -4047,7 +4171,7 @@ pgmoneta_is_encrypted_archive(char* file_path)
 }
 
 bool
-pgmoneta_is_compressed_archive(char* file_path)
+pgmoneta_is_compressed(char* file_path)
 {
    if (pgmoneta_ends_with(file_path, ".zstd") ||
        pgmoneta_ends_with(file_path, ".lz4") ||
@@ -4066,7 +4190,7 @@ parse_command(int argc,
               char** argv,
               int offset,
               struct pgmoneta_parsed_command* parsed,
-              const struct pgmoneta_command command_table[],
+              struct pgmoneta_command command_table[],
               size_t command_count)
 {
    char* command = NULL;
@@ -4318,7 +4442,7 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens)
 }
 
 char*
-pgmoneta_format_and_append(char* buf, const char* format, ...)
+pgmoneta_format_and_append(char* buf, char* format, ...)
 {
    va_list args;
    va_start(args, format);
@@ -4343,7 +4467,7 @@ pgmoneta_format_and_append(char* buf, const char* format, ...)
 }
 
 int
-pgmoneta_atoi(const char* input)
+pgmoneta_atoi(char* input)
 {
    if (input == NULL)
    {
@@ -4507,3 +4631,103 @@ pgmoneta_backtrace(void)
 }
 
 #endif
+
+int
+pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int* kernel_patch)
+{
+   bool bsd = false;
+   *os = NULL;
+   *kernel_major = 0;
+   *kernel_minor = 0;
+   *kernel_patch = 0;
+
+#if defined(HAVE_LINUX) || defined(HAVE_FREEBSD) || defined(HAVE_OPENBSD) || defined(HAVE_OSX)
+   struct utsname buffer;
+
+   if (uname(&buffer) != 0)
+   {
+      pgmoneta_log_debug("Failed to retrieve system information.");
+      goto error;
+   }
+
+   // Copy system name using pgmoneta_append (dynamically allocated)
+   *os = pgmoneta_append(NULL, buffer.sysname);
+   if (*os == NULL)
+   {
+      pgmoneta_log_debug("Failed to allocate memory for OS name.");
+      goto error;
+   }
+
+   // Parse kernel version based on OS
+#if defined(HAVE_LINUX)
+   if (sscanf(buffer.release, "%d.%d.%d", kernel_major, kernel_minor, kernel_patch) < 2)
+   {
+      pgmoneta_log_debug("Failed to parse Linux kernel version.");
+      goto error;
+   }
+#elif defined(HAVE_FREEBSD) || defined(HAVE_OPENBSD)
+   if (sscanf(buffer.release, "%d.%d", kernel_major, kernel_minor) < 2)
+   {
+      pgmoneta_log_debug("Failed to parse BSD OS kernel version.");
+      goto error;
+   }
+   *kernel_patch = 0; // BSD doesn't use patch version
+   bsd = true;
+#elif defined(HAVE_OSX)
+   if (sscanf(buffer.release, "%d.%d.%d", kernel_major, kernel_minor, kernel_patch) < 2)
+   {
+      pgmoneta_log_debug("Failed to parse macOS kernel version.");
+      goto error;
+   }
+#endif
+
+   if (!bsd)
+
+   {
+
+      pgmoneta_log_debug("OS: %s | Kernel Version: %d.%d.%d", *os, *kernel_major, *kernel_minor, *kernel_patch);
+
+   }
+
+   else
+
+   {
+
+      pgmoneta_log_debug("OS: %s | Version: %d.%d", *os, *kernel_major, *kernel_minor);
+
+   }
+
+   return 0;
+
+error:
+   //Free memory if already allocated
+   if (*os != NULL)
+   {
+      free(*os);
+      *os = NULL;
+   }
+
+   *os = pgmoneta_append(NULL, "Unknown");
+   if (*os == NULL)
+   {
+      pgmoneta_log_debug("Failed to allocate memory for unknown OS name.");
+   }
+
+   pgmoneta_log_debug("Unable to retrieve OS and kernel version.");
+
+   *kernel_major = 0;
+   *kernel_minor = 0;
+   *kernel_patch = 0;
+   return 1;
+
+#else
+   *os = pgmoneta_append(NULL, "Unknown");
+   if (*os == NULL)
+   {
+      pgmoneta_log_debug("Failed to allocate memory for unknown OS name.");
+   }
+
+   pgmoneta_log_debug("Kernel version not available.");
+   return 1;
+#endif
+}

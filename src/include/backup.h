@@ -88,6 +88,27 @@ struct backup_context {
 };
 
 bool perform_backup(struct backup_context* ctx);
+/**
+ * Extract a file from a backup
+ * @param server The server
+ * @param label The label
+ * @param relative_file_path The file path relative to the backup data directory
+ * @param target_directory The target root directory
+ * @param target_file The target file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file);
+
+/**
+ * Strip the compression/encryption suffix from a file path
+ * @param file The file path
+ * @param basename [out] The base file path with its compression/encryption suffix stripped,
+ * or a copy of the original path if it has none of the suffix
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_file_basename(char* file, char** basename);
 
 #ifdef __cplusplus
 }

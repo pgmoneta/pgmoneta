@@ -100,19 +100,19 @@ struct signal_info
  */
 struct pgmoneta_command
 {
-   const char* command;                            /**< The command */
-   const char* subcommand;                         /**< The subcommand if there is one */
-   const int accepted_argument_count[MISC_LENGTH]; /**< The argument count */
+   char* command;                            /**< The command */
+   char* subcommand;                         /**< The subcommand if there is one */
+   int accepted_argument_count[MISC_LENGTH]; /**< The argument count */
 
-   const int action;                               /**< The specific action */
-   const char* default_argument;                   /**< The default argument */
-   const char* log_message;                        /**< The log message used */
+   int action;                               /**< The specific action */
+   char* default_argument;                   /**< The default argument */
+   char* log_message;                        /**< The log message used */
 
    /* Deprecation information */
    bool deprecated;                                /**< Is the command deprecated */
    unsigned int deprecated_since_major;            /**< Deprecated since major version */
    unsigned int deprecated_since_minor;            /**< Deprecated since minor version */
-   const char* deprecated_by;                      /**< Deprecated by this command */
+   char* deprecated_by;                      /**< Deprecated by this command */
 };
 
 /** @struct pgmoneta_parsed_command
@@ -124,7 +124,7 @@ struct pgmoneta_command
  */
 struct pgmoneta_parsed_command
 {
-   const struct pgmoneta_command* cmd; /**< The command */
+   struct pgmoneta_command* cmd; /**< The command */
    char* args[MISC_LENGTH];            /**< The arguments */
 };
 
@@ -165,7 +165,7 @@ parse_command(int argc,
               char** argv,
               int offset,
               struct pgmoneta_parsed_command* parsed,
-              const struct pgmoneta_command command_table[],
+              struct pgmoneta_command command_table[],
               size_t command_count);
 
 /**
@@ -764,13 +764,22 @@ int
 pgmoneta_move_file(char* from, char* to);
 
 /**
- * Get basename of a file
+ * Strip the extension of a file
  * @param s The string
- * @param basename The basename of the file
+ * @param name The name of the file
  * @return The result
  */
 int
-pgmoneta_basename_file(char* s, char** basename);
+pgmoneta_strip_extension(char* s, char** name);
+
+/**
+ * Get basename from a file path
+ * @param path The file path
+ * @param basename The resulting basename
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_file_basename(char* path, char** basename);
 
 /**
  * Get the translated size of a file
@@ -1036,6 +1045,15 @@ char*
 pgmoneta_get_server_workspace(int server);
 
 /**
+ * Delete the workspace directory for a server
+ * @param server The server
+ * @param label An optional label
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_delete_server_workspace(int server, char* label);
+
+/**
  * Get the hot standby directory for a server
  * @param server The server
  * @return The hot standby directory
@@ -1197,18 +1215,18 @@ pgmoneta_get_file_size(char* file_path);
 /**
  * Is the file encrypted
  * @param file_path The file path
- * @return True if archive, otherwise false
+ * @return True if encrypted, otherwise false
  */
 bool
-pgmoneta_is_encrypted_archive(char* file_path);
+pgmoneta_is_encrypted(char* file_path);
 
 /**
  * Is the file compressed
  * @param file_path The file path
- * @return True if archive, otherwise false
+ * @return True if compressed, otherwise false
  */
 bool
-pgmoneta_is_compressed_archive(char* file_path);
+pgmoneta_is_compressed(char* file_path);
 
 /**
  * Init a token bucket
@@ -1260,7 +1278,7 @@ pgmoneta_token_bucket_once(struct token_bucket* tb, unsigned long tokens);
  * @return The resulting string
  */
 char*
-pgmoneta_format_and_append(char* buf, const char* format, ...);
+pgmoneta_format_and_append(char* buf, char* format, ...);
 
 /**
  * Wrapper for the atoi() function, which provides NULL input check
@@ -1268,7 +1286,7 @@ pgmoneta_format_and_append(char* buf, const char* format, ...);
  * @return 0 if input is NULL, otherwise what atoi() returns
  */
 int
-pgmoneta_atoi(const char* input);
+pgmoneta_atoi(char* input);
 
 /**
  * Indent a string
@@ -1323,6 +1341,19 @@ int
 pgmoneta_backtrace(void);
 
 #endif
+
+/**
+ * Get the OS name and kernel version.
+ *
+ * @param os            Pointer to store the OS name (e.g., "Linux", "FreeBSD", "OpenBSD").
+ *                      Memory will be allocated internally and should be freed by the caller.
+ * @param kernel_major  Pointer to store the kernel major version.
+ * @param kernel_minor  Pointer to store the kernel minor version.
+ * @param kernel_patch  Pointer to store the kernel patch version.
+ * @return              0 on success, 1 on error.
+ */
+int
+pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int* kernel_patch);
 
 #ifdef __cplusplus
 }
