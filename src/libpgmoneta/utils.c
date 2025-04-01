@@ -4466,6 +4466,22 @@ pgmoneta_is_incremental_path(char* path)
    return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
 }
 
+time_t get_current_time(void) {
+   return time(NULL);
+}
+
+double calculate_elapsed_time(time_t start, time_t end) {
+   return difftime(end, start);
+}
+
+char* format_time_remaining(double seconds) {
+   char* result = (char*)malloc(50 * sizeof(char));
+   if (!result) return NULL;
+   int minutes = (int)(seconds / 60);
+   int secs = (int)(seconds - minutes * 60);
+   snprintf(result, 50, "%d minutes %d seconds", minutes, secs);
+   return result;
+}
 #ifdef DEBUG
 
 int

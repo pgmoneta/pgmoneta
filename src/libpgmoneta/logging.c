@@ -34,6 +34,7 @@
 
 /* system */
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -329,7 +330,7 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
       return;
    }
 
-   if (level >= config->log_level)
+   if (level >= config->log_level || level == PGMONETA_LOGGING_LEVEL_PROGRESS)
    {
       switch (level)
       {
@@ -383,12 +384,21 @@ retry:
          if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
          {
             buf[strftime(buf, sizeof(buf), config->log_line_prefix, tm)] = '\0';
-            fprintf(stdout, "%s %s%-5s\x1b[0m \x1b[90m%s:%d\x1b[0m ",
-                    buf, colors[level - 1], levels[level - 1],
-                    filename, line);
-            vfprintf(stdout, fmt, vl);
-            fprintf(stdout, "\n");
-            fflush(stdout);
+                if (level == PGMONETA_LOGGING_LEVEL_PROGRESS)
+                {
+                    fprintf(stdout, "\r"); 
+                    vfprintf(stdout, fmt, vl);
+                    fflush(stdout);
+                }
+                else
+                {
+                    fprintf(stdout, "%s %s%-5s\x1b[0m \x1b[90m%s:%d\x1b[0m ",
+                            buf, colors[level - 1], levels[level - 1],
+                            filename, line);
+                    vfprintf(stdout, fmt, vl);
+                    fprintf(stdout, "\n");
+                    fflush(stdout);
+                }
          }
          else if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
          {
@@ -425,6 +435,9 @@ retry:
                   break;
                case PGMONETA_LOGGING_LEVEL_FATAL:
                   vsyslog(LOG_CRIT, fmt, vl);
+                  break;
+               case PGMONETA_LOGGING_LEVEL_PROGRESS:
+                  vsyslog(LOG_INFO, fmt, vl);
                   break;
                default:
                   vsyslog(LOG_INFO, fmt, vl);

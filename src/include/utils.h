@@ -40,7 +40,7 @@ extern "C" {
 #include <info.h>
 #include <message.h>
 #include <workers.h>
-
+#include <time.h>
 #include <stdlib.h>
 
 #define SHORT_TIME_LENGHT 8 + 1
@@ -1303,6 +1303,15 @@ pgmoneta_lsn_to_string(uint64_t lsn);
  */
 bool
 pgmoneta_is_incremental_path(char* path);
+
+// Get current time in seconds
+time_t get_current_time(void);
+
+// Calculate elapsed time in seconds
+double calculate_elapsed_time(time_t start, time_t end);
+
+// Format time in seconds to a readable string (e.g., "10 minutes")
+char* format_time_remaining(double seconds);
 
 #ifdef DEBUG
 

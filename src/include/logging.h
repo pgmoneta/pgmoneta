@@ -49,6 +49,7 @@ extern "C" {
 #define PGMONETA_LOGGING_LEVEL_WARN    4
 #define PGMONETA_LOGGING_LEVEL_ERROR   5
 #define PGMONETA_LOGGING_LEVEL_FATAL   6
+#define PGMONETA_LOGGING_LEVEL_PROGRESS 7
 
 #define PGMONETA_LOGGING_MODE_CREATE 0
 #define PGMONETA_LOGGING_MODE_APPEND 1
@@ -63,6 +64,7 @@ extern "C" {
 #define pgmoneta_log_warn(...)  pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_WARN, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_error(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
 #define pgmoneta_log_fatal(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_FATAL, __FILE__, __LINE__, __VA_ARGS__)
+#define pgmoneta_log_progress(...) pgmoneta_log_line(PGMONETA_LOGGING_LEVEL_PROGRESS, __FILE__, __LINE__, __VA_ARGS__) 
 
 /**
  * Initialize the logging system

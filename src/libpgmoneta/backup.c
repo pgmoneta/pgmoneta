@@ -741,3 +741,50 @@ pgmoneta_get_backup_max_rate(int server)
 
    return config->backup_max_rate;
 }
+
+bool perform_backup(struct backup_context* ctx) {
+   if (!ctx) {
+       pgmoneta_log_info("Error: Backup context is NULL");
+       return false;
+   }
+
+   // Initialize progress tracking
+   ctx->processed_wal_files = 0;
+   ctx->start_time = get_current_time();
+
+   // Simulate getting total WAL files (replace with actual logic)
+   ctx->total_wal_files = 50; // Example: 50 WAL files to process
+
+   // Simulate processing WAL files (replace with actual WAL loop)
+   for (int i = 0; i < ctx->total_wal_files; i++) {
+       // Simulate processing a WAL file
+       ctx->processed_wal_files++;
+
+       // Calculate progress
+       double percentage = (double)ctx->processed_wal_files / ctx->total_wal_files * 100;
+
+       // Estimate time remaining
+       time_t current_time = get_current_time();
+       double elapsed = calculate_elapsed_time(ctx->start_time, current_time);
+       double avg_time_per_file = elapsed / ctx->processed_wal_files;
+       double remaining_files = ctx->total_wal_files - ctx->processed_wal_files;
+       double estimated_remaining = avg_time_per_file * remaining_files;
+
+       char* time_str = format_time_remaining(estimated_remaining);
+       if (!time_str) {
+           pgmoneta_log_info("Error: Failed to format time remaining");
+           continue;
+       }
+
+       // Log progress using the new macro
+       pgmoneta_log_progress("Incremental backup %.2f%% complete, processing WAL file %d of %d, estimated %s remaining",
+                             percentage, ctx->processed_wal_files, ctx->total_wal_files, time_str);
+       free(time_str);
+
+       // Simulate work (replace with actual WAL processing)
+       sleep(1);
+   }
+
+   pgmoneta_log_info("Incremental backup completed successfully");
+   return true;
+}
