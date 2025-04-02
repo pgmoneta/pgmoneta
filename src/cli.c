@@ -416,8 +416,6 @@ struct pgmoneta_command command_table[] = {
    }
 };
 
-
-
 int
 main(int argc, char** argv)
 {

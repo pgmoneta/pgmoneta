@@ -308,22 +308,22 @@ struct prometheus
  */
 struct common_configuration
 {
-   int log_type;                      /**< The logging type */
-   int log_level;                     /**< The logging level */
-   char log_path[MISC_LENGTH];        /**< The logging path */
-   int log_mode;                      /**< The logging mode */
-   int log_rotation_size;             /**< bytes to force log rotation */
-   int log_rotation_age;              /**< minutes for log rotation */
-   char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
-   atomic_schar log_lock;             /**< The logging lock */
+   int log_type;                                   /**< The logging type */
+   int log_level;                                  /**< The logging level */
+   char log_path[MISC_LENGTH];                     /**< The logging path */
+   int log_mode;                                   /**< The logging mode */
+   int log_rotation_size;                          /**< bytes to force log rotation */
+   int log_rotation_age;                           /**< minutes for log rotation */
+   char log_line_prefix[MISC_LENGTH];              /**< The logging prefix */
+   atomic_schar log_lock;                          /**< The logging lock */
+
+   int number_of_servers;                          /**< The number of servers */
+   int number_of_users;                            /**< The number of users */
+   int number_of_admins;                           /**< The number of admins */
 
    struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
    struct user users[NUMBER_OF_USERS];             /**< The users */
    struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
-
-   int number_of_servers;        /**< The number of servers */
-   int number_of_users;          /**< The number of users */
-   int number_of_admins;         /**< The number of admins */
 } __attribute__ ((aligned (64)));
 
 /** @struct main_configuration

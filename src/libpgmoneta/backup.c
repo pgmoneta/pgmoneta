@@ -397,7 +397,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
       goto error;
    }
-   
+
    request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    if (request != NULL)
    {
@@ -420,14 +420,14 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
 
             goto error;
          }
-         
+
          // Sort the backups array based on timestamps (label)
          for (int i = 0; i < number_of_backups - 1; i++)
          {
             for (int j = i + 1; j < number_of_backups; j++)
             {
                comp_result = strcmp(backups[i]->label, backups[j]->label);
-               
+
                // Swap if needed based on sort order
                if ((sort_desc && comp_result < 0) || (!sort_desc && comp_result > 0))
                {
@@ -439,7 +439,6 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
          }
       }
    }
-   
 
    for (int i = 0; i < number_of_backups; i++)
    {
