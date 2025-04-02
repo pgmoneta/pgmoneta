@@ -26,12 +26,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* pgmoneta */
 #include <logging.h>
 #include <utils.h>
+#include <wal.h>
 #include <walfile.h>
 #include <walfile/rmgr.h>
 #include <walfile/wal_reader.h>
 
+/* system */
 #include <assert.h>
 #include <libgen.h>
 #include <stdint.h>
@@ -48,7 +51,7 @@ static int magic_value_to_postgres_version(uint16_t magic_value);
 static bool is_included(char* rm, struct deque* rms,
                         uint64_t s_lsn, uint64_t start_lsn,
                         uint64_t e_lsn, uint64_t end_lsn,
-                        uint32_t xid, struct deque* xids);
+                        uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc);
 
 bool
 is_bimg_apply(uint8_t bimg_info)
@@ -185,6 +188,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    xlog_seg_no logSegNo = 0;
    xlog_rec_ptr base;
    int wal_segz_bytes = DEFAULT_WAL_SEGZ_BYTES;
+   char* temp_buffer = NULL;
 
    config = (struct walinfo_configuration*) shmem;
 
@@ -203,7 +207,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    MALLOC(long_header, SIZE_OF_XLOG_LONG_PHD);
    size_t bytes_read = fread(long_header, SIZE_OF_XLOG_LONG_PHD, 1, file);
 
-   if (bytes_read < 0)
+   if (bytes_read < 1)
    {
       pgmoneta_log_error("Error: Failed to read the complete data");
       goto error;
@@ -225,11 +229,19 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    if (long_header->std.xlp_rem_len > 0)
    {
       decoded = malloc(sizeof(struct decoded_xlog_record));
+      if (decoded == NULL)
+      {
+         pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
+         goto error;
+      }
       decoded->partial = true;
       if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
       {
+         free(decoded);
+         decoded = NULL;
          goto error;
       }
+      decoded = NULL;
    }
 
    uint32_t next_record = MAXALIGN(
@@ -239,8 +251,9 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       );
    int page_number = 0;
    wal_file->long_phd = long_header;
+   long_header = NULL;
 
-   read_all_page_headers(file, long_header, wal_file);
+   read_all_page_headers(file, wal_file->long_phd, wal_file);
    fseek(file, next_record, SEEK_SET);
 
    if (xlog_from_file_name(basename(path), &tli, &logSegNo, wal_segz_bytes))
@@ -253,41 +266,56 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    while (true)
    {
       // Check if next record is beyond the current page
-      if (next_record >= (long_header->xlp_xlog_blcksz * (page_number + 1)))
+      if (next_record >= (wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1)))
       {
          page_number++;
-         fseek(file, page_number * long_header->xlp_xlog_blcksz, SEEK_SET);
+         fseek(file, page_number * wal_file->long_phd->xlp_xlog_blcksz, SEEK_SET);
          MALLOC(page_header, SIZE_OF_XLOG_SHORT_PHD);
-         size_t bytes_read = fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
+         bytes_read = fread(page_header, SIZE_OF_XLOG_SHORT_PHD, 1, file);
          if (feof(file))
          {
             decoded = calloc(1, sizeof(struct decoded_xlog_record));
+            if (decoded == NULL)
+            {
+               pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
+               free(page_header);
+               page_header = NULL;
+               goto error;
+            }
             decoded->partial = true;
             if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
             {
+               free(decoded);
+               decoded = NULL;
+               free(page_header);
+               page_header = NULL;
                goto error;
             }
+            decoded = NULL;
             free(page_header);
+            page_header = NULL;
             goto finish;
          }
-         if (bytes_read <= 0)
+         if (bytes_read < 1)
          {
             pgmoneta_log_error("Error: Failed to read the complete data");
+            free(page_header);
+            page_header = NULL;
             goto error;
          }
          next_record = MAXALIGN(ftell(file) + page_header->xlp_rem_len);
          free(page_header);
+         page_header = NULL;
          continue;
       }
       fseek(file, next_record, SEEK_SET);
 
       // Check if record crosses the page boundary
-      if (ftell(file) + SIZE_OF_XLOG_RECORD > long_header->xlp_xlog_blcksz * (page_number + 1))
+      if (ftell(file) + SIZE_OF_XLOG_RECORD > wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1))
       {
-         char* temp_buffer = NULL;
-         MALLOC(temp_buffer, SIZE_OF_XLOG_RECORD)
-         uint32_t end_of_page = (page_number + 1) * long_header->xlp_xlog_blcksz;
-         size_t bytes_read = fread(temp_buffer, 1, end_of_page - ftell(file), file);
+         MALLOC(temp_buffer, SIZE_OF_XLOG_RECORD);
+         uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
+         bytes_read = fread(temp_buffer, 1, end_of_page - ftell(file), file);
 
          fseek(file, SIZE_OF_XLOG_SHORT_PHD, SEEK_CUR);
          bytes_read += fread(temp_buffer + bytes_read, 1, SIZE_OF_XLOG_RECORD - bytes_read, file);
@@ -295,24 +323,34 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          if (feof(file) && bytes_read != SIZE_OF_XLOG_RECORD)
          {
             free(temp_buffer);
+            temp_buffer = NULL;
             decoded = calloc(1, sizeof(struct decoded_xlog_record));
+            if (decoded == NULL)
+            {
+               pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
+               goto error;
+            }
             decoded->partial = true;
             if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
             {
+               free(decoded);
+               decoded = NULL;
                goto error;
             }
+            decoded = NULL;
             goto finish;
          }
 
          assert(bytes_read == SIZE_OF_XLOG_RECORD);
          record = (struct xlog_record*) temp_buffer;
+         temp_buffer = NULL;
          page_number++;
       }
       else
       {
-         MALLOC(record, SIZE_OF_XLOG_RECORD)
-         size_t bytes_read = fread(record, SIZE_OF_XLOG_RECORD, 1, file);
-         if (bytes_read < 0)
+         MALLOC(record, SIZE_OF_XLOG_RECORD);
+         bytes_read = fread(record, SIZE_OF_XLOG_RECORD, 1, file);
+         if (bytes_read < 1)
          {
             pgmoneta_log_error("Error: Failed to read the complete data");
             goto error;
@@ -322,14 +360,15 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       if (record->xl_tot_len == 0)
       {
          free(record);
+         record = NULL;
          break;
       }
       uint32_t data_length = record->xl_tot_len - SIZE_OF_XLOG_RECORD;
       xlog_rec_ptr lsn = ftell(file) + base - SIZE_OF_XLOG_RECORD;
       next_record = ftell(file) + MAXALIGN(record->xl_tot_len - SIZE_OF_XLOG_RECORD);
-      uint32_t end_of_page = (page_number + 1) * long_header->xlp_xlog_blcksz;
+      uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
 
-      MALLOC(buffer, data_length)
+      MALLOC(buffer, data_length);
 
       // Read record data, possibly across page boundaries
       if (data_length + ftell(file) >= end_of_page)
@@ -345,18 +384,32 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             if (feof(file))
             {
                free(record);
+               record = NULL;
                decoded = calloc(1, sizeof(struct decoded_xlog_record));
+               if (decoded == NULL)
+               {
+                  pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
+                  free(buffer);
+                  buffer = NULL;
+                  goto error;
+               }
                decoded->partial = true;
                if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
                {
+                  free(decoded);
+                  decoded = NULL;
+                  free(buffer);
+                  buffer = NULL;
                   goto error;
                }
+               decoded = NULL;
                free(buffer);
+               buffer = NULL;
                goto finish;
             }
             fseek(file, SIZE_OF_XLOG_SHORT_PHD, SEEK_CUR);
             bytes_read = fread(buffer + total_bytes_read, 1,
-                               MIN(remaining_data_length, long_header->xlp_xlog_blcksz - SIZE_OF_XLOG_SHORT_PHD), file);
+                               MIN(remaining_data_length, wal_file->long_phd->xlp_xlog_blcksz - SIZE_OF_XLOG_SHORT_PHD), file);
             remaining_data_length -= bytes_read;
             total_bytes_read += bytes_read;
          }
@@ -364,7 +417,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       }
       else
       {
-         size_t bytes_read = fread(buffer, 1, data_length, file);
+         bytes_read = fread(buffer, 1, data_length, file);
 
          if (bytes_read != data_length)
          {
@@ -374,28 +427,50 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       }
 
       decoded = calloc(1, sizeof(struct decoded_xlog_record));
-
-      if (decode_xlog_record(buffer, decoded, record, long_header->xlp_xlog_blcksz, long_header->std.xlp_magic, lsn))
+      if (decoded == NULL)
       {
+         pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
+         goto error;
+      }
+
+      if (decode_xlog_record(buffer, decoded, record, wal_file->long_phd->xlp_xlog_blcksz, wal_file->long_phd->std.xlp_magic, lsn))
+      {
+         free(decoded);
+         decoded = NULL;
          goto error;
       }
       else
       {
          if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
          {
+            free(decoded);
+            decoded = NULL;
             goto error;
          }
+         decoded = NULL;
       }
       free(buffer);
+      buffer = NULL;
       free(record);
+      record = NULL;
    }
 finish:
    fclose(file);
    return 0;
 
 error:
+   // Cleanup all allocated resources
+   free(long_header);
+   free(page_header);
+   free(temp_buffer);
+   free(buffer);
+   free(record);
+   free(decoded);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
    pgmoneta_log_fatal("Error: Could not parse WAL file");
-   fclose(file);
    return 1;
 }
 
@@ -718,6 +793,10 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
       buf = pgmoneta_format_and_append(buf, "\n");
    }
 
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
+
    for (block_id = 0; block_id <= record->max_block_id; block_id++)
    {
       struct rel_file_locator rlocator;
@@ -742,9 +821,24 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf, " ");
          }
 
-         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %u/%u/%u forknum %d blk %u",
+         if (pgmoneta_get_database_name(rlocator.dbOid, &dbname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_relation_name(rlocator.relNumber, &relname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_tablespace_name(rlocator.spcOid, &spcname))
+         {
+            goto error;
+         }
+
+         buf = pgmoneta_format_and_append(buf, "blkref #%d: rel %s/%s/%s forknum %d blk %u",
                                           block_id,
-                                          rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                          spcname, dbname, relname,
                                           forknum,
                                           blk);
 
@@ -811,12 +905,27 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
       {
          /* Get block references in short format. */
 
+         if (pgmoneta_get_database_name(rlocator.dbOid, &dbname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_relation_name(rlocator.relNumber, &relname))
+         {
+            goto error;
+         }
+
+         if (pgmoneta_get_tablespace_name(rlocator.spcOid, &spcname))
+         {
+            goto error;
+         }
+
          if (forknum != MAIN_FORKNUM)
          {
             buf = pgmoneta_format_and_append(buf,
                                              ", blkref #%d: rel %u/%u/%u fork %d blk %u",
                                              block_id,
-                                             rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                             spcname, dbname, relname,
                                              forknum,
                                              blk);
          }
@@ -825,7 +934,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             buf = pgmoneta_format_and_append(buf,
                                              ", blkref #%d: rel %u/%u/%u blk %u",
                                              block_id,
-                                             rlocator.spcOid, rlocator.dbOid, rlocator.relNumber,
+                                             spcname, dbname, relname,
                                              blk);
          }
 
@@ -847,14 +956,25 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
             }
          }
       }
+
+      if (!detailed_format && pretty)
+      {
+         buf = pgmoneta_format_and_append(buf, "\n");
+      }
+
+      free(dbname);
+      free(spcname);
+      free(relname);
    }
 
-   if (!detailed_format && pretty)
-   {
-      buf = pgmoneta_format_and_append(buf, "\n");
-   }
    return buf;
 
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+   free(buf);
+   return NULL;
 }
 
 static bool
@@ -890,7 +1010,7 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
 
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
-                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit)
+                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, char** included_objects)
 {
    static uint32_t current_limit = 0;
    char* header_str = NULL;
@@ -903,12 +1023,22 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    uint32_t rec_len = 0;
    uint32_t fpi_len = 0;
 
-   if (!is_included(RmgrTable[record->header.xl_rmid].name, rms,
-                    record->header.xl_prev, start_lsn,
-                    record->lsn, end_lsn,
-                    record->header.xl_xid, xids))
+   if (!record->partial)
    {
-      return;
+      rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
+      backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+
+      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
+
+      if (!is_included(RmgrTable[record->header.xl_rmid].name, rms,
+                       record->header.xl_prev, start_lsn,
+                       record->lsn, end_lsn,
+                       record->header.xl_xid, xids, included_objects, record_desc))
+      {
+         free(record_desc);
+         return;
+      }
+      free(record_desc);
    }
 
    current_limit++;
@@ -978,9 +1108,6 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                                                     record->header.xl_xid);
          }
 
-         rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
-         backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
-
          if (color)
          {
             fprintf(out, "%s%s%s | %s%s %s%s\n",
@@ -1006,7 +1133,7 @@ static bool
 is_included(char* rm, struct deque* rms,
             uint64_t s_lsn, uint64_t start_lsn,
             uint64_t e_lsn, uint64_t end_lsn,
-            uint32_t xid, struct deque* xids)
+            uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc)
 {
    struct deque_iterator* rms_iter = NULL;
    struct deque_iterator* xids_iter = NULL;
@@ -1077,13 +1204,77 @@ is_included(char* rm, struct deque* rms,
       }
    }
 
+   if (included_objects != NULL && rm_desc != NULL)
+   {
+      char* oid = NULL;
+      bool included = false;
+
+      for (int i = 0; included_objects[i] != NULL; i++)
+      {
+         // If the object name is already there
+         if (pgmoneta_is_substring(included_objects[i], rm_desc))
+         {
+            included = true;
+            free(oid);
+            break;
+         }
+
+         // If the object name is not in rm_desc, then we need to get its oid
+         // and try to find it in the rm_desc again
+
+         // 1. The object maybe a relation
+         if (!pgmoneta_get_relation_oid(included_objects[i], &oid))
+         {
+            // If oid == included_objects[i], then the object was not found
+            // and we don't need to check for substring
+            if (oid != included_objects[i] && pgmoneta_is_substring(rm_desc, oid))
+            {
+               included = true;
+               free(oid);
+               break;
+            }
+         }
+
+         // 2. The object maybe a database
+         if (!pgmoneta_get_database_oid(included_objects[i], &oid))
+         {
+            // If oid == included_objects[i], then the object was not found
+            // and we don't need to check for substring
+            if (oid != included_objects[i] && pgmoneta_is_substring(rm_desc, oid))
+            {
+               included = true;
+               free(oid);
+               break;
+            }
+         }
+
+         // 3. The object maybe a tablespace
+         if (!pgmoneta_get_tablespace_oid(included_objects[i], &oid))
+         {
+            // If oid == included_objects[i], then the object was not found
+            // and we don't need to check for substring
+            if (oid != included_objects[i] && pgmoneta_is_substring(rm_desc, oid))
+            {
+               included = true;
+               free(oid);
+               break;
+            }
+         }
+
+         if (!included)
+         {
+            free(oid);
+            goto no;
+         }
+      }
+   }
+
    pgmoneta_deque_iterator_destroy(rms_iter);
    pgmoneta_deque_iterator_destroy(xids_iter);
 
    return true;
 
 no:
-
    pgmoneta_deque_iterator_destroy(rms_iter);
    pgmoneta_deque_iterator_destroy(xids_iter);
 
@@ -1093,7 +1284,6 @@ no:
 static void
 record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value)
 {
-
    char* rm_desc = NULL;
    char* backup_str = NULL;
    struct json* record_json = NULL;

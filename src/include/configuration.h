@@ -37,8 +37,9 @@ extern "C" {
 
 #include <stdlib.h>
 
-/* The path of pgmoneta's main configuration file */
-#define PGMONETA_MAIN_CONFIG_FILE_PATH                "/etc/pgmoneta/pgmoneta.conf"
+#define PGMONETA_DEFAULT_CONFIG_FILE_PATH          "/etc/pgmoneta/pgmoneta.conf"
+#define PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH  "/etc/pgmoneta/pgmoneta_walinfo.conf"
+#define PGMONETA_DEFAULT_USERS_FILE_PATH           "/etc/pgmoneta/pgmoneta_users.conf"
 
 /* Main configuration fields */
 #define CONFIGURATION_ARGUMENT_HOST                   "host"
@@ -105,6 +106,9 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_USER_CONF_PATH          "users_configuration_path"
 #define CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH         "admin_configuration_path"
 
+#define CONFIGURATION_TYPE_MAIN 0
+#define CONFIGURATION_TYPE_WALINFO 1
+
 /**
  * Initialize the configuration structure
  * @param shmem The shared memory segment
@@ -129,6 +133,31 @@ pgmoneta_read_main_configuration(void* shmem, char* filename);
  */
 int
 pgmoneta_validate_main_configuration(void* shmem);
+
+/**
+ * Initialize the WALINFO configuration structure
+ * @param shmem The shared memory segment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_init_walinfo_configuration(void* shmem);
+
+/**
+ * Read the WALINFO configuration from a file
+ * @param shmem The shared memory segment
+ * @param filename The file name
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_read_walinfo_configuration(void* shmem, char* filename);
+
+/**
+ * Validate the WALINFO configuration
+ * @param shmem The shared memory segment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_validate_walinfo_configuration(void* shmem);
 
 /**
  * Read the USERS configuration from a file

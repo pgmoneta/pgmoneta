@@ -1321,6 +1321,38 @@ bool
 pgmoneta_is_incremental_path(char* path);
 
 /**
+ * Splits a string into an array of strings separated by a delimeter
+ *
+ * @param string The string to split
+ * @param results The array of strings to store the results
+ * @param count The number of strings the string splitted into
+ * @param delimeter The delimeter to split the string by
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_split(const char* string, char*** results, int* count, char delimiter);
+
+/**
+ * Merges an array of strings into a single string
+ *
+ * @param lists The arrays of strings to merge
+ * @param out_list The resulting merged array
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_merge_string_arrays(char** lists[], char*** out_list);
+
+/**
+ * Checks if string 'a' is a substring of 'b'.
+ *
+ * @param a The substring to search for
+ * @param b The string to search within
+ * @return 1 if found, 0 otherwise
+ */
+int
+pgmoneta_is_substring(char* a, char* b);
+
+/**
  * Generate a backtrace in the log
  * @return 0 if success, otherwise 1
  */

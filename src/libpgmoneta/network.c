@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include <configuration.h>
 #include <pgmoneta.h>
 #include <logging.h>
 #include <network.h>
@@ -223,9 +224,6 @@ pgmoneta_remove_unix_socket(char* directory, char* file)
    return 0;
 }
 
-/**
- *
- */
 int
 pgmoneta_connect(char* hostname, int port, int* fd)
 {
@@ -273,7 +271,7 @@ pgmoneta_connect(char* hostname, int port, int* fd)
 
       if (*fd != -1)
       {
-         if (config != NULL && config->keep_alive)
+         if (config != NULL && config->common.keep_alive)
          {
             if (setsockopt(*fd, SOL_SOCKET, SO_KEEPALIVE, &yes, optlen) == -1)
             {
@@ -285,7 +283,7 @@ pgmoneta_connect(char* hostname, int port, int* fd)
             }
          }
 
-         if (config != NULL && config->nodelay)
+         if (config != NULL && config->common.nodelay)
          {
             if (setsockopt(*fd, IPPROTO_TCP, TCP_NODELAY, &yes, optlen) == -1)
             {
@@ -337,7 +335,7 @@ pgmoneta_connect(char* hostname, int port, int* fd)
    freeaddrinfo(servinfo);
 
    /* Set O_NONBLOCK on the socket */
-   if (config != NULL && config->non_blocking)
+   if (config != NULL && config->common.non_blocking)
    {
       pgmoneta_socket_nonblocking(*fd, true);
    }
@@ -525,7 +523,7 @@ pgmoneta_tcp_nodelay(int fd)
 
    config = (struct main_configuration*)shmem;
 
-   if (config->nodelay)
+   if (config->common.nodelay)
    {
       if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, optlen) == -1)
       {
@@ -636,7 +634,7 @@ bind_host(char* hostname, int port, int** fds, int* length)
          continue;
       }
 
-      if (config->non_blocking)
+      if (config->common.non_blocking)
       {
          if (pgmoneta_socket_nonblocking(sockfd, true))
          {

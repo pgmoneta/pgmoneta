@@ -26,11 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* pgmoneta */
 #include <walfile/rm_btree.h>
 #include <walfile/wal_reader.h>
 #include <walfile/transaction.h>
 #include <utils.h>
+#include <wal.h>
 
+/* system */
 #include <assert.h>
 #include <stdbool.h>
 
@@ -97,34 +100,127 @@ char*
 pgmoneta_wal_format_xl_btree_reuse_page_v13(struct xl_btree_reuse_page* wrapper, char* buf)
 {
    struct xl_btree_reuse_page_v13* xlrec = &wrapper->data.v13;
-   buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; latestRemovedXid %u",
-                                    xlrec->node.spcNode, xlrec->node.dbNode,
-                                    xlrec->node.relNode, xlrec->latest_removed_xid);
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
+
+   if (pgmoneta_get_database_name(xlrec->node.dbNode, &dbname))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_relation_name(xlrec->node.relNode, &relname))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_tablespace_name(xlrec->node.spcNode, &spcname))
+   {
+      goto error;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; latestRemovedXid %u",
+                                    spcname, dbname,
+                                    relname, xlrec->latest_removed_xid);
+
+   free(dbname);
+   free(spcname);
+   free(relname);
    return buf;
+
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+   return NULL;
 }
 
 char*
 pgmoneta_wal_format_xl_btree_reuse_page_v15(struct xl_btree_reuse_page* wrapper, char* buf)
 {
    struct xl_btree_reuse_page_v15* xlrec = &wrapper->data.v15;
-   buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; latestRemovedXid %u:%u",
-                                    xlrec->node.spcNode, xlrec->node.dbNode,
-                                    xlrec->node.relNode,
+
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
+
+   if (pgmoneta_get_database_name(xlrec->node.dbNode, &dbname))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_relation_name(xlrec->node.relNode, &relname))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_tablespace_name(xlrec->node.spcNode, &spcname))
+   {
+      goto error;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; latestRemovedXid %u:%u",
+                                    spcname, dbname,
+                                    relname,
                                     EPOCH_FROM_FULL_TRANSACTION_ID(xlrec->latest_removed_full_xid),
                                     XID_FROM_FULL_TRANSACTION_ID(xlrec->latest_removed_full_xid));
+
+   free(dbname);
+   free(spcname);
+   free(relname);
+
    return buf;
+
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+
+   return NULL;
 }
 
 char*
 pgmoneta_wal_format_xl_btree_reuse_page_v16(struct xl_btree_reuse_page* wrapper, char* buf)
 {
    struct xl_btree_reuse_page_v16* xlrec = &wrapper->data.v16;
-   buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; snapshot_conflict_horizon_id %u:%u",
-                                    xlrec->locator.spcOid, xlrec->locator.dbOid,
-                                    xlrec->locator.relNumber,
+
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
+
+   if (pgmoneta_get_database_name(xlrec->locator.dbOid, &dbname))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_relation_name(xlrec->locator.relNumber, &relname))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_get_tablespace_name(xlrec->locator.spcOid, &spcname))
+   {
+      goto error;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; snapshot_conflict_horizon_id %u:%u",
+                                    spcname, dbname,
+                                    relname,
                                     EPOCH_FROM_FULL_TRANSACTION_ID(xlrec->snapshot_conflict_horizon_id),
                                     XID_FROM_FULL_TRANSACTION_ID(xlrec->snapshot_conflict_horizon_id));
+
+   free(dbname);
+   free(spcname);
+   free(relname);
+
    return buf;
+
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+
+   return NULL;
 }
 
 struct xl_btree_delete*

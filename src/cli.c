@@ -698,6 +698,7 @@ main(int argc, char** argv)
          config = (struct main_configuration*)shmem;
       }
    }
+
    if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
    {
       if (argc > optind)

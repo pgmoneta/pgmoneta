@@ -317,13 +317,23 @@ struct common_configuration
    char log_line_prefix[MISC_LENGTH];              /**< The logging prefix */
    atomic_schar log_lock;                          /**< The logging lock */
 
+   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
+   struct user users[NUMBER_OF_USERS];             /**< The users */
+   struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
+
    int number_of_servers;                          /**< The number of servers */
    int number_of_users;                            /**< The number of users */
    int number_of_admins;                           /**< The number of admins */
 
-   struct server servers[NUMBER_OF_SERVERS];       /**< The servers */
-   struct user users[NUMBER_OF_USERS];             /**< The users */
-   struct user admins[NUMBER_OF_ADMINS];           /**< The admins */
+   char configuration_path[MAX_PATH];              /**< The configuration path */
+   char users_path[MAX_PATH];                      /**< The users path */
+   char admins_path[MAX_PATH];                     /**< The admins path */
+
+   bool keep_alive;                                /**< Use keep alive */
+   bool nodelay;                                   /**< Use NODELAY */
+   bool non_blocking;                              /**< Use non blocking */
+
+   struct prometheus prometheus;                   /**< The Prometheus metrics */
 } __attribute__ ((aligned (64)));
 
 /** @struct main_configuration
@@ -331,87 +341,78 @@ struct common_configuration
  */
 struct main_configuration
 {
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+   struct common_configuration common;          /**< Common configurations that are shared across multiple tools */
 
-   bool running; /**< Is pgmoneta running */
+   bool running;                                /**< Is pgmoneta running */
 
-   char configuration_path[MAX_PATH]; /**< The configuration path */
-   char users_path[MAX_PATH];         /**< The users path */
-   char admins_path[MAX_PATH];        /**< The admins path */
+   char host[MISC_LENGTH];                      /**< The host */
+   int metrics;                                 /**< The metrics port */
+   int metrics_cache_max_age;                   /**< Number of seconds to cache the Prometheus response */
+   int metrics_cache_max_size;                  /**< Number of bytes max to cache the Prometheus response */
+   int management;                              /**< The management port */
 
-   char host[MISC_LENGTH];     /**< The host */
-   int metrics;                /**< The metrics port */
-   int metrics_cache_max_age;  /**< Number of seconds to cache the Prometheus response */
-   int metrics_cache_max_size; /**< Number of bytes max to cache the Prometheus response */
-   int management;             /**< The management port */
+   char base_dir[MAX_PATH];                     /**< The base directory */
 
-   char base_dir[MAX_PATH];  /**< The base directory */
+   int compression_type;                        /**< The compression type */
+   int compression_level;                       /**< The compression level */
 
-   int compression_type;  /**< The compression type */
-   int compression_level; /**< The compression level */
+   int create_slot;                             /**< Create a slot */
 
-   int create_slot;                    /**< Create a slot */
+   int storage_engine;                          /**< The storage engine */
 
-   int storage_engine;  /**< The storage engine */
+   int encryption;                              /**< The AES encryption mode */
 
-   int encryption; /**< The AES encryption mode */
+   char ssh_hostname[MISC_LENGTH];              /**< The SSH hostname */
+   char ssh_username[MISC_LENGTH];              /**< The SSH username */
+   char ssh_base_dir[MAX_PATH];                 /**< The SSH base directory */
+   char ssh_ciphers[MISC_LENGTH];               /**< The SSH supported ciphers */
 
-   char ssh_hostname[MISC_LENGTH]; /**< The SSH hostname */
-   char ssh_username[MISC_LENGTH]; /**< The SSH username */
-   char ssh_base_dir[MAX_PATH];    /**< The SSH base directory */
-   char ssh_ciphers[MISC_LENGTH];  /**< The SSH supported ciphers */
+   char s3_aws_region[MISC_LENGTH];             /**< The AWS region */
+   char s3_access_key_id[MISC_LENGTH];          /**< The IAM Access Key ID */
+   char s3_secret_access_key[MISC_LENGTH];      /**< The IAM Secret Access Key */
+   char s3_bucket[MISC_LENGTH];                 /**< The S3 bucket */
+   char s3_base_dir[MAX_PATH];                  /**< The S3 base directory */
 
-   char s3_aws_region[MISC_LENGTH];         /**< The AWS region */
-   char s3_access_key_id[MISC_LENGTH];      /**< The IAM Access Key ID */
-   char s3_secret_access_key[MISC_LENGTH];  /**< The IAM Secret Access Key */
-   char s3_bucket[MISC_LENGTH];          /**< The S3 bucket */
-   char s3_base_dir[MAX_PATH];           /**< The S3 base directory */
+   char azure_storage_account[MISC_LENGTH];     /**< The Azure storage account name */
+   char azure_container[MISC_LENGTH];           /**< The Azure container name */
+   char azure_shared_key[MISC_LENGTH];          /**< The Azure storage account key */
+   char azure_base_dir[MAX_PATH];               /**< The Azure base directory */
 
-   char azure_storage_account[MISC_LENGTH];    /**< The Azure storage account name */
-   char azure_container[MISC_LENGTH];          /**< The Azure container name */
-   char azure_shared_key[MISC_LENGTH];         /**< The Azure storage account key */
-   char azure_base_dir[MAX_PATH];              /**< The Azure base directory */
+   int retention_days;                          /**< The retention days for the server */
+   int retention_weeks;                         /**< The retention weeks for the server */
+   int retention_months;                        /**< The retention months for the server */
+   int retention_years;                         /**< The retention years for the server */
+   int retention_interval;                      /**< The retention interval */
 
-   int retention_days;                  /**< The retention days for the server */
-   int retention_weeks;                 /**< The retention weeks for the server */
-   int retention_months;                /**< The retention months for the server */
-   int retention_years;                 /**< The retention years for the server */
-   int retention_interval;              /**< The retention interval */
+   char workspace[MAX_PATH];                    /**< A workspace for combining incremental backups */
 
-   char workspace[MAX_PATH]; /**< A workspace for combining incremental backups */
+   bool tls;                                    /**< Is TLS enabled */
+   char tls_cert_file[MISC_LENGTH];             /**< TLS certificate path */
+   char tls_key_file[MISC_LENGTH];              /**< TLS key path */
+   char tls_ca_file[MISC_LENGTH];               /**< TLS CA certificate path */
 
-   bool tls;                        /**< Is TLS enabled */
-   char tls_cert_file[MISC_LENGTH]; /**< TLS certificate path */
-   char tls_key_file[MISC_LENGTH];  /**< TLS key path */
-   char tls_ca_file[MISC_LENGTH];   /**< TLS CA certificate path */
+   int blocking_timeout;                        /**< The blocking timeout in seconds */
+   int authentication_timeout;                  /**< The authentication timeout in seconds */
+   char pidfile[MAX_PATH];                      /**< File containing the PID */
 
-   int blocking_timeout;       /**< The blocking timeout in seconds */
-   int authentication_timeout; /**< The authentication timeout in seconds */
-   char pidfile[MAX_PATH];     /**< File containing the PID */
+   int workers;                                 /**< The number of workers */
 
-   int workers;                /**< The number of workers */
+   unsigned int update_process_title;           /**< Behaviour for updating the process title */
 
-   unsigned int update_process_title;  /**< Behaviour for updating the process title */
+   char libev[MISC_LENGTH];                     /**< Name of libev mode */
+   int backlog;                                 /**< The backlog for listen */
+   unsigned char hugepage;                      /**< Huge page support */
 
-   char libev[MISC_LENGTH]; /**< Name of libev mode */
-   bool keep_alive;         /**< Use keep alive */
-   bool nodelay;            /**< Use NODELAY */
-   bool non_blocking;       /**< Use non blocking */
-   int backlog;             /**< The backlog for listen */
-   unsigned char hugepage;  /**< Huge page support */
+   char unix_socket_dir[MISC_LENGTH];           /**< The directory for the Unix Domain Socket */
 
-   char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain Socket */
+   int backup_max_rate;                         /**< Number of tokens added to the bucket with each replenishment for backup. */
+   int network_max_rate;                        /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
-   int backup_max_rate; /**< Number of tokens added to the bucket with each replenishment for backup. */
-   int network_max_rate;    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
-
-   int manifest;  /**< The manifest hash algorithm */
+   int manifest;                                /**< The manifest hash algorithm */
 
 #ifdef DEBUG
-   bool link; /**< Do linking */
+   bool link;                                   /**< Do linking */
 #endif
-
-   struct prometheus prometheus;                   /**< The Prometheus metrics */
 } __attribute__ ((aligned (64)));
 
 /** @struct walinfo_configuration
@@ -419,7 +420,7 @@ struct main_configuration
  */
 struct walinfo_configuration
 {
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+   struct common_configuration common;          /**< Common configurations that are shared across multiple tools */
 } __attribute__ ((aligned (64)));
 
 #ifdef __cplusplus

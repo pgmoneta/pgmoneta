@@ -45,6 +45,7 @@
 #include <libgen.h>
 #include <pwd.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -4589,12 +4590,159 @@ pgmoneta_is_incremental_path(char* path)
    name = path + (len - seglen);
    return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
 }
+
+int
+pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
+{
+   char delim_str[2] = {delimiter, '\0'};
+   char* temp = strdup(string);
+   char** temp_results = NULL;
+   int num_objects = 0;
+   char* token = NULL;
+
+   *results = NULL;
+   *count = 0;
+
+   if (!string || !results || !count || !temp)
+   {
+      goto error;
+   }
+
+   if (strlen(string) == 0)
+   {
+      temp_results = calloc(1, sizeof(char*));
+      if (!temp_results)
+      {
+         goto error;
+      }
+      temp_results[0] = NULL;
+      *results = temp_results;
+      temp_results = NULL;
+      return 0;
+   }
+
+   token = strtok(temp, delim_str);
+   while (token)
+   {
+      num_objects++;
+      token = strtok(NULL, delim_str);
+   }
+
+   temp_results = calloc(num_objects + 1, sizeof(char*));
+   if (!temp_results)
+   {
+      goto error;
+   }
+
+   temp = strdup(string);
+   if (!temp)
+   {
+      free(temp_results);
+      goto error;
+   }
+
+   token = strtok(temp, delim_str);
+   for (int i = 0; i < num_objects; i++)
+   {
+      temp_results[i] = strdup(token);
+      if (!temp_results[i])
+      {
+         goto error;
+      }
+      token = strtok(NULL, delim_str);
+   }
+
+   temp_results[num_objects] = NULL;
+   *count = num_objects;
+
+   *results = temp_results;
+   temp_results = NULL;
+
+   free(temp);
+   return 0;
+
+error:
+   free(temp);
+
+   if (temp_results)
+   {
+      for (int i = 0; i < num_objects; i++)
+      {
+         if (temp_results[i])
+         {
+            free(temp_results[i]);
+         }
+      }
+      free(temp_results);
+   }
+
+   return -1;
+}
+
+int
+pgmoneta_merge_string_arrays(char** lists[], char*** out_list)
+{
+   if (!lists || !out_list)
+   {
+      return -1;
+   }
+
+   int total = 0;
+   char*** current;
+   char** merged = NULL;
+   int index = 0;
+
+   for (current = lists; *current; current++)
+   {
+      for (char** str = *current; *str; str++)
+      {
+         total++;
+      }
+   }
+
+   merged = calloc(total + 1, sizeof(char*));
+   if (!merged)
+   {
+      return -1;
+   }
+
+   for (current = lists; *current; current++)
+   {
+      for (char** str = *current; *str; str++)
+      {
+         merged[index] = strdup(*str);
+         if (!merged[index])
+         {
+            for (int i = 0; i < index; i++)
+            {
+               free(merged[i]);
+            }
+            free(merged);
+            return -1;
+         }
+         index++;
+      }
+   }
+
+   *out_list = merged;
+   return 0;
+}
+
+int
+pgmoneta_is_substring(char* a, char* b)
+{
+   if (!a || !b || *a == '\0')
+   {
+      return 0;
+   }
+   return strstr(b, a) != NULL;
+}
+
 __attribute__((unused))
 static bool
 calculate_offset(uint64_t addr, uint64_t* offset, char** filepath)
 {
 #ifdef HAVE_LINUX
-
    char line[256];
    char* start, * end, * base_offset, * filepath_ptr;
    uint64_t start_addr, end_addr, base_offset_value;

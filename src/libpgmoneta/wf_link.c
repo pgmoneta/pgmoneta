@@ -182,9 +182,9 @@ link_execute(char* name, struct art* nodes)
          }
 
 #ifdef HAVE_FREEBSD
-	 clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+         clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
 #else
-	 clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+         clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
          linking_elapsed_time = pgmoneta_compute_duration(start_t, end_t);

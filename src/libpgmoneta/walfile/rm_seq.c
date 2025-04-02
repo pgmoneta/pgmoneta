@@ -26,9 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <walfile/rm.h>
-#include <walfile/rm_seq.h>
-#include <utils.h>
+ #include <utils.h>
+ #include <wal.h>
+ #include <walfile/rm.h>
+ #include <walfile/rm_seq.h>
 
 char*
 pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
@@ -36,12 +37,43 @@ pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
    char* rec = XLOG_REC_GET_DATA(record);
    uint8_t info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
    struct xl_seq_rec* xlrec = (struct xl_seq_rec*) rec;
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
 
    if (info == XLOG_SEQ_LOG)
    {
-      buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u",
-                                       xlrec->node.spcNode, xlrec->node.dbNode,
-                                       xlrec->node.relNode);
+
+      if (pgmoneta_get_database_name(xlrec->node.dbNode, &dbname))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_get_relation_name(xlrec->node.relNode, &relname))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_get_tablespace_name(xlrec->node.spcNode, &spcname))
+      {
+         goto error;
+      }
+
+      buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s",
+                                       spcname, dbname,
+                                       relname);
+
    }
+
+   free(dbname);
+   free(spcname);
+   free(relname);
    return buf;
+
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+
+   return NULL;
 }

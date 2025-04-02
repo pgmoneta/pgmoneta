@@ -16,22 +16,34 @@ In addition to standard WAL files, `pgmoneta-walinfo` also supports encrypted (*
 #### Usage
 
 ```bash
-pgmoneta-walinfo
+pgmoneta-walinfo 0.16.0
   Command line utility to read and display Write-Ahead Log (WAL) files
 
 Usage:
   pgmoneta-walinfo <file>
 
 Options:
-  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
-  -o, --output FILE        Output file
-  -F, --format             Output format (raw, json)
-  -L, --logfile FILE       Set the log file
-  -q, --quiet              No output only result
-      --color              Use colors (on, off)
-  -v, --verbose            Output result
-  -V, --version            Display version information
-  -?, --help               Display help
+  -c,   --config      Set the path to the pgmoneta_walinfo.conf file
+  -u,   --users       Set the path to the pgmoneta_users.conf file
+  -RT, --tablespaces  Filter on tablspaces
+  -RD, --databases    Filter on databases
+  -RT, --relations    Filter on relations
+  -R,   --filter      Combination of -RT, -RD, -RR
+  -o,   --output      Output file
+  -F,   --format      Output format (raw, json)
+  -L,   --logfile     Set the log file
+  -q,   --quiet       No output only result
+        --color       Use colors (on, off)
+  -r,   --rmgr        Filter on a resource manager
+  -s,   --start       Filter on a start LSN
+  -e,   --end         Filter on an end LSN
+  -x,   --xid         Filter on an XID
+  -l,   --limit       Limit number of outputs
+  -v,   --verbose     Output result
+  -V,   --version     Display version information
+  -m,   --mapping     Provide mappings file for OID translation
+  -t,   --translate   Translate OIDs to object names in XLOG records
+  -?,   --help        Display help
 ```
 
 #### Raw Output Format
@@ -60,11 +72,74 @@ This format makes it easy to visually distinguish different parts of the WAL fil
 
 #### Example
 
-To view WAL file details in JSON format:
+1. To view WAL file details in JSON format:
 
 ```bash
 pgmoneta-walinfo -F json /path/to/walfile
 ```
+
+2. To view WAL file details with OIDs in the records translated to object names:
+
+Currently, `pgmoneta-walinfo` supports translating OIDs in two ways,
+1. If the user provided `pgmoneta_user.conf` file, the tool will use it to get the needed credentials to connect to the database cluster and fetch the object names. directly from it.
+```bash
+pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -u /path/to/pgmoneta_user.conf /path/to/walfile
+```
+
+2. If the user provided a mapping file that contains the OIDs and the corresponding object names, the tool will use it to translate the OIDs to the object names. This option helps if the user doesn't have the `pgmoneta_user.conf` file or doesn't want to use it.
+```bash
+pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -m /path/to/mapping.json /path/to/walfile
+```
+
+User can get the needed info to create the file using these queries:
+```sql
+SELECT spcname, oid FROM pg_tablespace
+SELECT datname, oid FROM pg_database
+SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid
+```
+
+In either ways, the user should use the `-t` flag to enable the translation. If user provided `pgmoneta_user.conf` file or the mapping file, the tool will do nothing if the `-t` flag is not provided. 
+
+User can create the `pgmoneta_user.conf` file by following the instructions in the [DEVELOPER.md]('../DEVELOPERS.md').
+
+After using this translation feature, the output will change XLOG records from something like this
+`
+Heap2 | 1/D8FFD1C0 | 1/D8FFEB50 | 59 | 59 | 958 | cutoff xid 0 flags 0x03 blkref #0: rel 1663/16399/16733 forknum 2 blk 0 blkref #1: rel 1663/16399/16733 forknum 0 blk 27597
+`
+
+to this
+`
+Heap2 | 1/D8FFD1C0 | 1/D8FFEB50 | 59 | 59 | 958 | cutoff xid 0 flags 0x03 blkref #0: rel pg_default/mydb/test_tbl forknum 2 blk 0 blkref #1: rel pg_default/mydb/16733 forknum 0 blk 27597
+`
+
+Example of `mappings.json` file:
+```json
+{
+    "tablespaces": [
+        {"name1": "oid1"},
+        {"name2": "oid2"},
+        ...
+    ],
+    "databases": [
+        {"name1": "oid1"},
+        {"name2": "oid2"},
+        ...
+    ],
+    "relations": [
+        {"name1": "oid1"},
+        {"name2": "oid2"},
+        ...
+    ],
+}
+```
+
+which is basically three sections, each section contains array key value pairs. The key is the object name and the value is the oid.
+
+*Note 1: If both files (`pgmoneta_users.conf` & `mappings.json`) are provided, the tool will use the mapping file.*
+*Note 2: If there is an OID that wasn't in the server/mapping (whichever the user choose at that time), the oid will be written as it is.*
+
+e.g. `rel pg_default/mydb/16733` will be written as `rel pg_default/mydb/16733` if the OID `16733` wasn't in the server/mapping.
+
 
 ## High-Level API Overview
 

@@ -26,10 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* pgmoneta */
 #include <utils.h>
 #include <walfile/rm_heap.h>
 #include <walfile/wal_reader.h>
+#include <wal.h>
 
+/* system */
 #include <assert.h>
 
 struct xl_heap_freeze_page*
@@ -222,6 +225,9 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
 {
    char* rec = record->main_data;
    uint8_t info = record->header.xl_info & ~XLR_INFO_MASK;
+   char* dbname = NULL;
+   char* relname = NULL;
+   char* spcname = NULL;
 
    info &= XLOG_HEAP_OPMASK;
 
@@ -339,16 +345,42 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    {
       struct xl_heap_new_cid* xlrec = (struct xl_heap_new_cid*) rec;
 
-      buf = pgmoneta_format_and_append(buf, "rel %u/%u/%u; tid %u/%u",
-                                       xlrec->target_node.spcNode,
-                                       xlrec->target_node.dbNode,
-                                       xlrec->target_node.relNode,
+      if (pgmoneta_get_database_name(xlrec->target_node.dbNode, &dbname))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_get_relation_name(xlrec->target_node.relNode, &relname))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_get_tablespace_name(xlrec->target_node.spcNode, &spcname))
+      {
+         goto error;
+      }
+
+      buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s; tid %u/%u",
+                                       spcname,
+                                       dbname,
+                                       relname,
                                        ITEM_POINTER_GET_BLOCK_NUMBER(&(xlrec->target_tid)),
                                        ITEM_POINTER_GET_OFFSET_NUMBER(&(xlrec->target_tid)));
       buf = pgmoneta_format_and_append(buf, "; cmin: %u, cmax: %u, combo: %u",
                                        xlrec->cmin, xlrec->cmax, xlrec->combocid);
+
    }
+
+   free(dbname);
+   free(spcname);
+   free(relname);
    return buf;
+
+error:
+   free(dbname);
+   free(spcname);
+   free(relname);
+   return NULL;
 }
 void
 heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
@@ -468,6 +500,15 @@ redirect_elem_desc(char* buf, void* offset, void* data)
 char*
 oid_elem_desc(char* buf, void* relid, void* data)
 {
-   buf = pgmoneta_format_and_append(buf, "%u", *(oid*) relid);
+   char* relname = NULL;
+
+   if (pgmoneta_get_relation_name(*(oid*) relid, &relname))
+   {
+      free(relname);
+      return NULL;
+   }
+
+   buf = pgmoneta_format_and_append(buf, "rel %s", relname);
+   free(relname);
    return buf;
 }
