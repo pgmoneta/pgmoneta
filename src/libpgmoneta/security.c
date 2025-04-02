@@ -68,7 +68,7 @@ typedef uint32_t pg_crc32c;
 
 #ifdef HAVE_CRC32C
 #ifdef __aarch64__
-[[maybe_unused]]
+__attribute__((unused))
 static inline uint32_t
 _mm_crc32_u64(uint32_t crc, uint64_t value)
 {
@@ -77,8 +77,7 @@ _mm_crc32_u64(uint32_t crc, uint64_t value)
             : [v] "r" (value));
    return crc;
 }
-
-[[maybe_unused]]
+__attribute__((unused))
 static inline uint32_t
 _mm_crc32_u8(uint32_t crc, uint8_t value)
 {

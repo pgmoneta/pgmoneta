@@ -112,6 +112,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY
     )
+
 endif()
 
 find_package(Check)

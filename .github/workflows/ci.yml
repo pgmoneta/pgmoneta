@@ -3,189 +3,173 @@ name: CI
 on:
   push:
     branches:
-    - main
-    - 0.15.x
+      - main
+      - 0.15.x
   pull_request:
     branches:
-    - main
-    - 0.15.x
+      - main
+      - 0.15.x
 
 jobs:
   build-linux:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Update system
-      run: sudo apt update -y
-    - name: Install libev
-      run: sudo apt install -y libev4 libev-dev
-    - name: Install systemd
-      run: sudo apt install -y libsystemd-dev
-    - name: Install rst2man
-      run: sudo apt install -y python3-docutils
-    - name: Install zstd
-      run: sudo apt install -y libzstd-dev
-    - name: Install lz4
-      run: sudo apt install -y liblz4-dev
-    - name: Install bzip2
-      run: sudo apt install -y libbz2-dev
-    - name: Install libssh
-      run: sudo apt install -y libssh-dev
-    - name: Install libarchive
-      run: sudo apt install -y libarchive-dev
-    - name: Install libcurl
-      run: sudo apt install -y libcurl4-openssl-dev
-    - name: Install clang
-      run: sudo apt install -y clang
-    - name: Install graphviz
-      run: sudo apt install graphviz
-    - name: Install doxygen
-      run: sudo apt install doxygen
-    - name: Install net-tools
-      run: sudo apt install net-tools
-    - name: Install check
-      run: sudo apt install check
-    - name: Install PostgreSQL
-      run: |
-        sudo apt install curl ca-certificates
-        sudo install -d /usr/share/postgresql-common/pgdg
-        sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-        sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-        sudo apt update
-        sudo apt install -y postgresql-17
-    - name: Set Env Path Variable
-      run: |
-        echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
-        echo $PATH
-    - name: CLANG/Release/mkdir
-      run: mkdir build
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/Release/cmake
-      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Release ..
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/Release/make
-      run: make
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/Release/rm -Rf
-      run: rm -Rf build/
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: GCC/mkdir
-      run: mkdir build
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: GCC/cmake
-      run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: GCC/make
-      run: make
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: GCC/Testsuite
-      id: gcc-test
-      run: $(which bash) ./testsuite.sh
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: GCC/Testsuite Clean
-      run: $(which bash) ./testsuite.sh clean
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: GCC/rm -Rf
-      run: rm -Rf build/
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/mkdir
-      run: mkdir build
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/
-    - name: CLANG/cmake
-      run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/make
-      run: make
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-    - name: CLANG/Testsuite
-      id: clang-test
-      run: $(which bash) ./testsuite.sh
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: CLANG/Testsuite Clean
-      run: $(which bash) ./testsuite.sh clean
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: Show logs
-      if: failure() && (steps.gcc-test.outcome == 'failure' || steps.clang-test.outcome == 'failure')
-      run: |
-        cat ./log/logfile
-        cat ./log/pgmoneta.log
-        $(which bash) ./testsuite.sh clean
-      working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-    - name: Upload artifact for failed workflow
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Logs
-        path: |
-          /tmp/*.log
+      - uses: actions/checkout@v4
+      - name: Update system
+        run: sudo apt update -y
+      - name: Install libev
+        run: sudo apt install -y libev4 libev-dev
+      - name: Install systemd
+        run: sudo apt install -y libsystemd-dev
+      - name: Install rst2man
+        run: sudo apt install -y python3-docutils
+      - name: Install zstd
+        run: sudo apt install -y libzstd-dev
+      - name: Install lz4
+        run: sudo apt install -y liblz4-dev
+      - name: Install bzip2
+        run: sudo apt install -y libbz2-dev
+      - name: Install libssh
+        run: sudo apt install -y libssh-dev
+      - name: Install libarchive
+        run: sudo apt install -y libarchive-dev
+      - name: Install libcurl
+        run: sudo apt install -y libcurl4-openssl-dev
+      - name: Install clang
+        run: sudo apt install -y clang
+      - name: Install graphviz
+        run: sudo apt install graphviz
+      - name: Install doxygen
+        run: sudo apt install doxygen
+      - name: Install net-tools
+        run: sudo apt install net-tools
+      - name: Install check
+        run: sudo apt install check
+      - name: Install PostgreSQL
+        run: |
+          sudo apt install curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt update
+          sudo apt install -y postgresql-17
+      - name: Set Env Path Variable
+        run: |
+          echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
+          echo $PATH
+      - name: CLANG/Release/mkdir
+        run: mkdir build
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/
+      - name: CLANG/Release/cmake
+        run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Release ..
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      - name: CLANG/Release/make
+        run: make
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      - name: CLANG/Release/rm -Rf
+        run: rm -Rf build/
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/
+      - name: GCC/mkdir
+        run: mkdir build
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/
+      - name: GCC/cmake
+        run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      - name: GCC/make
+        run: make
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      - name: GCC/Testsuite
+        id: gcc-test
+        run: $(which bash) ./testsuite.sh
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+      - name: GCC/Testsuite Clean
+        run: $(which bash) ./testsuite.sh clean
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+      - name: GCC/rm -Rf
+        run: rm -Rf build/
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/
+      - name: CLANG/mkdir
+        run: mkdir build
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/
+      - name: CLANG/cmake
+        run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      - name: CLANG/make
+        run: make
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      - name: CLANG/Testsuite
+        id: clang-test
+        run: $(which bash) ./testsuite.sh
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+      - name: CLANG/Testsuite Clean
+        run: $(which bash) ./testsuite.sh clean
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+      - name: Show logs
+        if: failure() && (steps.gcc-test.outcome == 'failure' || steps.clang-test.outcome == 'failure')
+        run: |
+          cat ./log/logfile
+          cat ./log/pgmoneta.log
+          $(which bash) ./testsuite.sh clean
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+      - name: Upload artifact for failed workflow
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Logs
+          path: |
+            /tmp/*.log
 
-  # build-macos:
-
-  #   runs-on: macos-latest
-
-  #   steps:
-  #   - uses: actions/checkout@v4
-  #   - name: Install Homebrew
-  #     run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-  #   - name: Update system
-  #     run: brew update
-  #   - name: Install libev
-  #     run: brew install libev
-  #   - name: Install rst2man
-  #     run: brew install docutils
-  #   - name: Install libarchive
-  #     run: brew install --ignore-dependencies libarchive
-  #   - name: Install clang
-  #     run: brew install llvm
-  #   - name: Install check
-  #     run: brew install check
-  #   - name: Install PostgreSQL
-  #     run: brew install postgresql@17
-  #   - name: Install libssh
-  #     run: brew install libssh
-  #   - name: GCC/mkdir
-  #     run: mkdir build
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-  #   - name: GCC/cmake
-  #     run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: GCC/make
-  #     run: make
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: rm -Rf
-  #     run: rm -Rf build/
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-  #   - name: CLANG/mkdir
-  #     run: mkdir build
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/
-  #   - name: CLANG/cmake
-  #     run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: CLANG/make
-  #     run: make
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: Set Env Path Variable
-  #     run: |
-  #       echo "$(brew --prefix postgresql@17)/bin" >> $GITHUB_PATH
-  #       echo $PATH
-  #   - name: Run Test Suite
-  #     run: /bin/sh ./testsuite.sh
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: Cleanup
-  #     run: /bin/sh ./testsuite.sh clean
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: Show logs
-  #     if: failure()
-  #     run: |
-  #       cat ./log/logfile
-  #       cat ./log/pgmoneta.log
-  #     working-directory: /Users/runner/work/pgmoneta/pgmoneta/build/
-  #   - name: Upload artifact for failed workflow
-  #     if: failure()
-  #     uses: actions/upload-artifact@v4
-  #     with:
-  #       name: Logs
-  #       path: |
-  #         /tmp/*.log
+  build-macos:
+    runs-on: macos-latest
+    env:
+      PGMONETA_ROOT: ${{ github.workspace }}
+      BUILD_DIR: ${{ github.workspace }}/build
+      POSTGRESQL_VERSION: "@17"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install \
+            libev \
+            docutils \
+            libarchive \
+            check \
+            postgresql${POSTGRESQL_VERSION} \
+            libssh
+      - name: Add PostgreSQL to PATH
+        run: |
+          echo "$(brew --prefix postgresql${POSTGRESQL_VERSION})/bin" >> $GITHUB_PATH
+      - name: Build with Clang
+        run: |
+          mkdir -p $BUILD_DIR
+          cd $BUILD_DIR
+          export CC=$(xcrun -find clang)
+          cmake -DCMAKE_BUILD_TYPE=Debug ..
+          make -j$(sysctl -n hw.ncpu)
+      - name: Run tests with Clang build
+        working-directory: ${{ env.BUILD_DIR }}
+        run: $(which bash) ./testsuite.sh
+      - name: Clean up after Clang tests
+        working-directory: ${{ env.BUILD_DIR }}
+        run: $(which bash) ./testsuite.sh clean
+      - name: Show logs on failure
+        if: failure()
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          cat ./log/logfile || echo "logfile not found"
+          cat ./log/pgmoneta.log || echo "pgmoneta.log not found"
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-logs
+          path: |
+            ${{ env.BUILD_DIR }}/log/
+            /tmp/*.log
+          retention-days: 7

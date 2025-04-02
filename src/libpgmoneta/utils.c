@@ -4589,8 +4589,7 @@ pgmoneta_is_incremental_path(char* path)
    name = path + (len - seglen);
    return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
 }
-
-[[maybe_unused]]
+__attribute__((unused))
 static bool
 calculate_offset(uint64_t addr, uint64_t* offset, char** filepath)
 {
