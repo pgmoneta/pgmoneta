@@ -41,8 +41,6 @@ extern "C" {
 #include <message.h>
 #include <workers.h>
 
-#include <stdlib.h>
-
 #define SHORT_TIME_LENGHT 8 + 1
 #define LONG_TIME_LENGHT  16 + 1
 #define UTC_TIME_LENGTH   29 + 1
@@ -1322,16 +1320,12 @@ pgmoneta_lsn_to_string(uint64_t lsn);
 bool
 pgmoneta_is_incremental_path(char* path);
 
-#ifdef DEBUG
-
 /**
  * Generate a backtrace in the log
  * @return 0 if success, otherwise 1
  */
 int
 pgmoneta_backtrace(void);
-
-#endif
 
 /**
  * Get the OS name and kernel version.

@@ -38,6 +38,7 @@ Tejas Tyagi <tejastyagi.tt@gmail.com>
 Aryan Arora <aryanarora.w1@gmail.com>
 Arshdeep Singh <balarsh535@gmail.com>
 Din Xin Chen <s990346@gmail.com>
+Mingzhuo Yin <yinmingzhuo@gmail.com>
 ```
 
 ## Committers
