@@ -38,7 +38,6 @@
 #include <utils.h>
 
 /* system */
-#include <nmmintrin.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -47,7 +46,6 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <wmmintrin.h>
 #include <arpa/inet.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -2961,6 +2959,8 @@ error:
 }
 
 #if HAVE_PCLMUL
+#include <wmmintrin.h>
+#include <nmmintrin.h>
 __attribute__((target("pclmul,sse4.2")))
 static int
 pgmoneta_crc32c_pclmul(const void* buffer, size_t size, uint32_t* crc)
