@@ -122,7 +122,11 @@ bzip2_execute_compress(char* name, struct art* nodes)
 
    pgmoneta_log_debug("BZip2 (compress): %s/%s", config->common.servers[server].name, label);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
@@ -170,7 +174,12 @@ bzip2_execute_compress(char* name, struct art* nodes)
       ret = pgmoneta_bzip2_file(tarfile, d);
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    compression_bzip2_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    hours = compression_bzip2_elapsed_time / 3600;
@@ -222,6 +231,12 @@ bzip2_execute_uncompress(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
@@ -236,8 +251,6 @@ bzip2_execute_uncompress(char* name, struct art* nodes)
    {
       base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    }
-
-   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    number_of_workers = pgmoneta_get_number_of_workers(server);
    if (number_of_workers > 0)
@@ -257,7 +270,12 @@ bzip2_execute_uncompress(char* name, struct art* nodes)
       pgmoneta_workers_destroy(workers);
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    decompression_bzip2_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    hours = decompression_bzip2_elapsed_time / 3600;

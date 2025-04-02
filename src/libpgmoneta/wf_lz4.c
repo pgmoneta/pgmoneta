@@ -119,7 +119,11 @@ lz4_execute_compress(char* name, struct art* nodes)
 
    pgmoneta_log_debug("LZ4 (compress): %s/%s", config->common.servers[server].name, label);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
@@ -167,7 +171,12 @@ lz4_execute_compress(char* name, struct art* nodes)
       }
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    compression_lz4_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    hours = compression_lz4_elapsed_time / 3600;

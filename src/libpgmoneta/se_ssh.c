@@ -321,7 +321,11 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
    struct backup** backups = NULL;
    struct main_configuration* config;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    config = (struct main_configuration*)shmem;
 
@@ -414,7 +418,12 @@ ssh_storage_backup_execute(char* name, struct art* nodes)
       free(latest_backup_sha256);
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    remote_ssh_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    pgmoneta_update_info_double(local_root, INFO_REMOTE_SSH_ELAPSED, remote_ssh_elapsed_time);

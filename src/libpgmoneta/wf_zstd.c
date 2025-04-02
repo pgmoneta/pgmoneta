@@ -115,12 +115,16 @@ zstd_execute_compress(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("ZSTD (compress): %s/%s", config->common.servers[server].name, label);
-
-   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
@@ -165,7 +169,12 @@ zstd_execute_compress(char* name, struct art* nodes)
       pgmoneta_zstandardc_file(tarfile, d);
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    compression_zstd_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    hours = compression_zstd_elapsed_time / 3600;

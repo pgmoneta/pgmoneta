@@ -1378,7 +1378,11 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    config = (struct main_configuration*)shmem;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    d = pgmoneta_get_server_backup(server);
 
@@ -1485,7 +1489,11 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)bck->comments, ValueString);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
@@ -1559,7 +1567,11 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    config = (struct main_configuration*)shmem;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    d = pgmoneta_get_server_backup(server);
 
@@ -1678,7 +1690,11 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)bck->comments, ValueString);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {

@@ -132,7 +132,11 @@ hot_standby_execute(char* name, struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
       clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
       base = pgmoneta_get_server_backup(server);
 
@@ -315,7 +319,11 @@ hot_standby_execute(char* name, struct art* nodes)
          pgmoneta_workers_destroy(workers);
       }
 
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
       clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       hot_standby_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
       hours = (int)hot_standby_elapsed_time / 3600;

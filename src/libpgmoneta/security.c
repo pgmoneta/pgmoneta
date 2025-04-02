@@ -38,7 +38,9 @@
 #include <utils.h>
 
 /* system */
+#ifdef HAVE_PCLMUL
 #include <nmmintrin.h>
+#endif
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -47,7 +49,9 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#ifdef HAVE_PCLMUL
 #include <wmmintrin.h>
+#endif
 #include <arpa/inet.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -64,6 +68,7 @@ typedef uint32_t pg_crc32c;
 
 #ifdef HAVE_CRC32C
 #ifdef __aarch64__
+[[maybe_unused]]
 static inline uint32_t
 _mm_crc32_u64(uint32_t crc, uint64_t value)
 {
@@ -73,6 +78,7 @@ _mm_crc32_u64(uint32_t crc, uint64_t value)
    return crc;
 }
 
+[[maybe_unused]]
 static inline uint32_t
 _mm_crc32_u8(uint32_t crc, uint8_t value)
 {

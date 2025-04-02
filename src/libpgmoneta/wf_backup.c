@@ -150,7 +150,12 @@ basebackup_execute(char* name, struct art* nodes)
 
    pgmoneta_log_debug("Basebackup (execute): %s", config->common.servers[server].name, label);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
    incremental = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_BASE);
    incremental_label = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_LABEL);
 
@@ -376,7 +381,11 @@ basebackup_execute(char* name, struct art* nodes)
    // receive and ignore the last result set, it's just a summary
    pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    basebackup_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
    hours = (int)basebackup_elapsed_time / 3600;

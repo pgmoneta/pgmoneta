@@ -255,7 +255,11 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    config = (struct main_configuration*)shmem;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
    {
@@ -324,7 +328,11 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_INCREMENTAL, (uintptr_t)backup->type, ValueBool);
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_INCREMENTAL_PARENT, (uintptr_t)backup->parent_label, ValueString);
 
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
       clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {

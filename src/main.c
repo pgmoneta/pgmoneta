@@ -1124,9 +1124,17 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_SHUTDOWN)
    {
-      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
 
@@ -1139,21 +1147,37 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    {
       struct json* response = NULL;
 
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
       clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
       pgmoneta_management_create_response(payload, -1, &response);
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
    else if (id == MANAGEMENT_RESET)
    {
-      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
       pgmoneta_prometheus_reset();
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
@@ -1162,7 +1186,11 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       bool restart = false;
       struct json* response = NULL;
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
       restart = reload_configuration();
 
@@ -1170,7 +1198,11 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTART, (uintptr_t)restart, ValueBool);
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }
@@ -1178,7 +1210,11 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    {
       struct json* response = NULL;
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
       pgmoneta_management_create_response(payload, -1, &response);
 
@@ -1186,7 +1222,11 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->users_path, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->admins_path, ValueString);
 
-      clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#ifdef HAVE_FREEBSD
+     clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+     clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
       pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload);
    }

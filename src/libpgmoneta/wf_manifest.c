@@ -90,7 +90,11 @@ manifest_execute(char* name, struct art* nodes)
    char* info[MANIFEST_COLUMN_COUNT];
    struct main_configuration* config;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    config = (struct main_configuration*)shmem;
 
@@ -169,7 +173,12 @@ manifest_execute(char* name, struct art* nodes)
    free(manifest);
    free(manifest_orig);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    pgmoneta_update_info_double(backup_base, INFO_MANIFEST_ELAPSED, manifest_elapsed_time);

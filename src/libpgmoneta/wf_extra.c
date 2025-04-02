@@ -107,6 +107,12 @@ extra_execute(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
@@ -120,8 +126,6 @@ extra_execute(char* name, struct art* nodes)
 
    // Create the root directory
    root = pgmoneta_get_server_extra_identifier(server, label);
-
-   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    pgmoneta_memory_init();
 
@@ -165,7 +169,11 @@ extra_execute(char* name, struct art* nodes)
       }
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    extra_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
    hours = (int)extra_elapsed_time / 3600;

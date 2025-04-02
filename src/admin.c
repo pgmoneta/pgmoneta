@@ -330,7 +330,11 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    struct timespec start_t;
    struct timespec end_t;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_header(MANAGEMENT_MASTER_KEY, 0, 0, output_format, &j))
    {
@@ -459,7 +463,11 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       }
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_create_outcome_success(j, start_t, end_t, &outcome))
    {
@@ -578,7 +586,11 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
    struct timespec start_t;
    struct timespec end_t;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_header(MANAGEMENT_ADD_USER, 0, 0, output_format, &j))
    {
@@ -728,7 +740,11 @@ password:
    fclose(users_file);
    users_file = NULL;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_create_outcome_success(j, start_t, end_t, &outcome))
    {
@@ -813,7 +829,11 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
    struct timespec start_t;
    struct timespec end_t;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_header(MANAGEMENT_UPDATE_USER, 0, 0, output_format, &j))
    {
@@ -983,7 +1003,11 @@ password:
 
    rename(tmpfilename, users_path);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_create_outcome_success(j, start_t, end_t, &outcome))
    {
@@ -1069,7 +1093,11 @@ remove_user(char* users_path, char* username, int32_t output_format)
    struct timespec start_t;
    struct timespec end_t;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_header(MANAGEMENT_REMOVE_USER, 0, 0, output_format, &j))
    {
@@ -1142,7 +1170,11 @@ username:
 
    rename(tmpfilename, users_path);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_create_outcome_success(j, start_t, end_t, &outcome))
    {
@@ -1214,7 +1246,11 @@ list_users(char* users_path, int32_t output_format)
    struct timespec start_t;
    struct timespec end_t;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_header(MANAGEMENT_LIST_USERS, 0, 0, output_format, &j))
    {
@@ -1241,7 +1277,11 @@ list_users(char* users_path, int32_t output_format)
    fclose(users_file);
    users_file = NULL;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_create_outcome_success(j, start_t, end_t, &outcome))
    {

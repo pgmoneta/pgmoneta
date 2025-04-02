@@ -120,14 +120,18 @@ encryption_execute(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("Encryption (execute): %s/%s", config->common.servers[server].name, label);
 
    tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
-
-   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 
    if (tarfile == NULL)
    {
@@ -206,7 +210,12 @@ encryption_execute(char* name, struct art* nodes)
       }
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    encryption_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    hours = encryption_elapsed_time / 3600;

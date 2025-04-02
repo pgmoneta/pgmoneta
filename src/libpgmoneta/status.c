@@ -67,7 +67,11 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    config = (struct main_configuration*)shmem;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -199,7 +203,11 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVERS, (uintptr_t)servers, ValueJSON);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
@@ -273,7 +281,11 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
    config = (struct main_configuration*)shmem;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -461,7 +473,11 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVERS, (uintptr_t)servers, ValueJSON);
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {

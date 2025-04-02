@@ -129,7 +129,11 @@ azure_storage_execute(char* name, struct art* nodes)
    char* azure_root = NULL;
    struct main_configuration* config;
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
    config = (struct main_configuration*)shmem;
 
@@ -159,7 +163,12 @@ azure_storage_execute(char* name, struct art* nodes)
       goto error;
    }
 
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
    remote_azure_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
    pgmoneta_update_info_double(local_root, INFO_REMOTE_AZURE_ELAPSED, remote_azure_elapsed_time);
