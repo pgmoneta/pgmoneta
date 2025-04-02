@@ -48,6 +48,8 @@ extern "C" {
 #define WORKFLOW_TYPE_VERIFY                6
 #define WORKFLOW_TYPE_INCREMENTAL_BACKUP    7
 #define WORKFLOW_TYPE_COMBINE               8
+#define WORKFLOW_TYPE_COMBINE_AS_IS         9
+#define WORKFLOW_TYPE_POST_ROLLUP          10
 
 #define PERMISSION_TYPE_BACKUP              0
 #define PERMISSION_TYPE_RESTORE             1
@@ -55,25 +57,27 @@ extern "C" {
 
 #define CLEANUP_TYPE_RESTORE                0
 
-#define NODE_ALL               "all"               /* All the files in a manifest */
-#define NODE_BACKUP            "backup"            /* The backup structure */
-#define NODE_COPY_WAL          "copy_wal"          /* Whether to copy WAL */
-#define NODE_BACKUP_BASE       "backup_base"       /* The base directory of the backup */
-#define NODE_BACKUP_DATA       "backup_data"       /* The data directory of the backup */
-#define NODE_FAILED            "failed"            /* The failed files in a manifest */
-#define NODE_INCREMENTAL_BASE  "incremental_base"  /* The base directory of incremental */
-#define NODE_INCREMENTAL_LABEL "incremental_label" /* The label of the incremental backup */
-#define NODE_LABEL             "label"             /* The backup label */
-#define NODE_LABELS            "labels"            /* A list of backup labels */
-#define NODE_MANIFEST          "manifest"          /* The manifest */
-#define NODE_PRIMARY           "primary"           /* Is the server a primary */
-#define NODE_RECOVERY_INFO     "recovery_info"     /* The recovery information */
-#define NODE_SERVER_BACKUP     "server_backup"     /* The backup directory of the server */
-#define NODE_SERVER_BASE       "server_base"       /* The base directory of the server */
-#define NODE_SERVER_ID         "server_id"         /* The server number */
-#define NODE_TARGET_BASE       "target_base"       /* The target base directory */
-#define NODE_TARGET_FILE       "target_file"       /* The target file */
-#define NODE_TARGET_ROOT       "target_root"       /* The target root directory */
+#define NODE_ALL                 "all"                  /* All the files in a manifest */
+#define NODE_BACKUP              "backup"               /* The backup structure */
+#define NODE_COMBINE_AS_IS       "combine_as_is"        /* Whether to combine the backups as is*/
+#define NODE_COPY_WAL            "copy_wal"             /* Whether to copy WAL */
+#define NODE_BACKUP_BASE         "backup_base"          /* The base directory of the backup */
+#define NODE_BACKUP_DATA         "backup_data"          /* The data directory of the backup */
+#define NODE_FAILED              "failed"               /* The failed files in a manifest */
+#define NODE_INCREMENTAL_BASE    "incremental_base"     /* The base directory of incremental */
+#define NODE_INCREMENTAL_COMBINE "incremental_combine"  /* Whether to combine into one incremental backup */
+#define NODE_INCREMENTAL_LABEL   "incremental_label"    /* The label of the incremental backup */
+#define NODE_LABEL               "label"                /* The backup label */
+#define NODE_LABELS              "labels"               /* A list of backup labels */
+#define NODE_MANIFEST            "manifest"             /* The manifest */
+#define NODE_PRIMARY             "primary"              /* Is the server a primary */
+#define NODE_RECOVERY_INFO       "recovery_info"        /* The recovery information */
+#define NODE_SERVER_BACKUP       "server_backup"        /* The backup directory of the server */
+#define NODE_SERVER_BASE         "server_base"          /* The base directory of the server */
+#define NODE_SERVER_ID           "server_id"            /* The server number */
+#define NODE_TARGET_BASE         "target_base"          /* The target base directory */
+#define NODE_TARGET_FILE         "target_file"          /* The target file */
+#define NODE_TARGET_ROOT         "target_root"          /* The target root directory */
 
 /* Supplied by the user */
 #define USER_DIRECTORY         "directory"         /* The target root directory */

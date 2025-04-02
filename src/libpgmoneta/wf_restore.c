@@ -275,6 +275,8 @@ static int
 combine_incremental_execute(char* name, struct art* nodes)
 {
    int server = -1;
+   bool incremental = false;
+   bool combine_as_is = true;
    char* identifier = NULL;
    char* label = NULL;
    struct deque* prior_labels = NULL;
@@ -303,10 +305,13 @@ combine_incremental_execute(char* name, struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_ROOT));
    assert(pgmoneta_art_contains_key(nodes, NODE_MANIFEST));
+   assert(pgmoneta_art_contains_key(nodes, NODE_COMBINE_AS_IS));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
+   incremental = (bool)pgmoneta_art_search(nodes, NODE_INCREMENTAL_COMBINE);
+   combine_as_is = (bool)pgmoneta_art_search(nodes, NODE_COMBINE_AS_IS);
 
    pgmoneta_log_debug("Combine incremental (execute): %s/%s", config->common.servers[server].name, identifier);
    bck = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
@@ -337,15 +342,22 @@ combine_incremental_execute(char* name, struct art* nodes)
    {
       char tblspc[MAX_PATH];
       memset(tblspc, 0, MAX_PATH);
-      snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s",
-               base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
+      if (!combine_as_is)
+      {
+         snprintf(tblspc, MAX_PATH, "%s/%s-%s-%s",
+                  base, config->common.servers[server].name, bck->label, bck->tablespaces[i]);
+      }
+      else
+      {
+         snprintf(tblspc, MAX_PATH, "%s/%s", base, bck->tablespaces[i]);
+      }
       if (pgmoneta_exists(tblspc))
       {
          pgmoneta_delete_directory(tblspc);
       }
    }
 
-   if (pgmoneta_combine_backups(server, label, base, input_dir, output_dir, prior_labels, bck, manifest))
+   if (pgmoneta_combine_backups(server, label, base, input_dir, output_dir, prior_labels, bck, manifest, incremental, combine_as_is))
    {
       goto error;
    }

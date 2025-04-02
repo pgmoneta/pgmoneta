@@ -97,6 +97,7 @@ link_execute(char* name, struct art* nodes)
    double seconds;
    char elapsed[128];
    int number_of_workers = 0;
+   int index = 0;
    struct workers* workers = NULL;
    struct main_configuration* config;
    struct art* deleted_files = NULL;
@@ -135,7 +136,15 @@ link_execute(char* name, struct art* nodes)
 
    if (number_of_backups >= 2)
    {
-      for (int j = number_of_backups - 2; j >= 0 && next_newest == -1; j--)
+      for (int j = number_of_backups - 1; j >= 0; j--)
+      {
+         if (pgmoneta_compare_string(backups[j]->label, label))
+         {
+            index = j;
+            break;
+         }
+      }
+      for (int j = index - 1; j >= 0 && next_newest == -1; j--)
       {
          if (backups[j]->valid == VALID_TRUE && backups[j]->major_version == backups[number_of_backups - 1]->major_version)
          {

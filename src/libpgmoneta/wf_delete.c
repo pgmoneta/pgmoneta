@@ -33,6 +33,7 @@
 #include <info.h>
 #include <link.h>
 #include <logging.h>
+#include <restore.h>
 #include <utils.h>
 #include <workers.h>
 #include <workflow.h>
@@ -46,8 +47,7 @@
 static char* delete_name(void);
 static int delete_backup_execute(char*, struct art*);
 
-static int delete_full_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
-static int delete_incremental_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
+static int delete_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups);
 
 struct workflow*
 pgmoneta_create_delete_backup(void)
@@ -152,28 +152,20 @@ delete_backup_execute(char* name, struct art* nodes)
       goto error;
    }
 
-   if (backups[backup_index]->type == TYPE_FULL)
+   pgmoneta_get_backup_child(server, backups[backup_index], &child);
+   if (child != NULL)
    {
-      if (delete_full_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
+      if (pgmoneta_roll_up(server, child->label, label))
       {
-         pgmoneta_log_error("Delete: Full backup error for %s/%s", config->common.servers[server].name, label);
+         pgmoneta_log_error("Delete: Unable to roll up backup %s to %s", label, child->label);
          goto error;
       }
    }
-   else
-   {
-      pgmoneta_get_backup_child(server, backups[backup_index], &child);
-      if (child != NULL)
-      {
-         pgmoneta_log_error("Delete: Backup has a child incremental backup %s", child->label);
-         goto error;
-      }
 
-      if (delete_incremental_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
-      {
-         pgmoneta_log_error("Delete: Incremental backup error for %s/%s", config->common.servers[server].name, label);
-         goto error;
-      }
+   if (delete_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
+   {
+      pgmoneta_log_error("Delete: Full backup error for %s/%s", config->common.servers[server].name, label);
+      goto error;
    }
 
 done:
@@ -255,7 +247,7 @@ error:
 }
 
 static int
-delete_full_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups)
+delete_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups)
 {
    int prev_index = -1;
    int next_index = -1;
@@ -409,47 +401,5 @@ error:
    free(d);
    free(from);
    free(to);
-   return 1;
-}
-
-static int
-delete_incremental_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups)
-{
-   struct backup* parent = NULL;
-   struct backup* child = NULL;
-
-   if (pgmoneta_get_backup_parent(server, backup, &parent))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_get_backup_child(server, backup, &child))
-   {
-      goto error;
-   }
-
-   if (child != NULL)
-   {
-      pgmoneta_log_error("Incremental backup %s has a child %s", backup->label, child->label);
-      goto error;
-   }
-
-   // TODO: For now it'll behave just like deleting full backup because we don't allow deleting backup with a child
-   // We will later implement backup rollup to address this
-   if (delete_full_backup(server, index, backup, number_of_backups, backups))
-   {
-      goto error;
-   }
-
-   free(parent);
-   free(child);
-
-   return 0;
-
-error:
-
-   free(parent);
-   free(child);
-
    return 1;
 }

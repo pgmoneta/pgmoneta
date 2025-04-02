@@ -51,11 +51,12 @@
 static struct workflow* wf_backup(struct backup* backup);
 static struct workflow* wf_incremental_backup(void);
 static struct workflow* wf_restore(struct backup* backup);
-static struct workflow* wf_combine(int server, struct backup* backup);
+static struct workflow* wf_combine(int server, struct backup* backup, bool combine_as_is);
 static struct workflow* wf_verify(struct backup* backup);
 static struct workflow* wf_archive(struct backup* backup);
 static struct workflow* wf_delete_backup(struct backup* backup);
 static struct workflow* wf_retention(struct backup* backup);
+static struct workflow* wf_post_rollup(int server, struct backup* backup);
 
 static int get_error_code(int type, int flow);
 
@@ -74,7 +75,13 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
          return wf_restore(backup);
          break;
       case WORKFLOW_TYPE_COMBINE:
-         return wf_combine(server, backup);
+         return wf_combine(server, backup, false);
+         break;
+      case WORKFLOW_TYPE_COMBINE_AS_IS:
+         return wf_combine(server, backup, true);
+         break;
+      case WORKFLOW_TYPE_POST_ROLLUP:
+         return wf_post_rollup(server, backup);
          break;
       case WORKFLOW_TYPE_VERIFY:
          return wf_verify(backup);
@@ -567,7 +574,7 @@ wf_restore(struct backup* backup)
 }
 
 static struct workflow*
-wf_combine(int server, struct backup* backup)
+wf_combine(int server, struct backup* backup, bool combine_as_is)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -575,17 +582,20 @@ wf_combine(int server, struct backup* backup)
    head = pgmoneta_create_combine_incremental();
    current = head;
 
-   current->next = pgmoneta_create_copy_wal();
-   current = current->next;
+   if (!combine_as_is)
+   {
+      current->next = pgmoneta_create_copy_wal();
+      current = current->next;
 
-   current->next = pgmoneta_create_recovery_info();
-   current = current->next;
+      current->next = pgmoneta_create_recovery_info();
+      current = current->next;
 
-   current->next = pgmoneta_create_permissions(PERMISSION_TYPE_RESTORE);
-   current = current->next;
+      current->next = pgmoneta_create_permissions(PERMISSION_TYPE_RESTORE);
+      current = current->next;
 
-   current->next = pgmoneta_create_cleanup(CLEANUP_TYPE_RESTORE);
-   current = current->next;
+      current->next = pgmoneta_create_cleanup(CLEANUP_TYPE_RESTORE);
+      current = current->next;
+   }
 
 #ifdef DEBUG
    current = head;
@@ -599,6 +609,100 @@ wf_combine(int server, struct backup* backup)
    }
 #endif
 
+   return head;
+}
+
+static struct workflow*
+wf_post_rollup(int server, struct backup* backup)
+{
+   struct workflow* head = NULL;
+   struct workflow* current = NULL;
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   head = pgmoneta_create_manifest();
+   current = head;
+
+   current->next = pgmoneta_create_extra();
+   current = current->next;
+
+   current->next = pgmoneta_storage_create_local();
+   current = current->next;
+
+   if (backup->compression == COMPRESSION_CLIENT_GZIP || backup->compression == COMPRESSION_SERVER_GZIP)
+   {
+      current->next = pgmoneta_create_gzip(true);
+      current = current->next;
+   }
+   else if (backup->compression == COMPRESSION_CLIENT_ZSTD || backup->compression == COMPRESSION_SERVER_ZSTD)
+   {
+      current->next = pgmoneta_create_zstd(true);
+      current = current->next;
+   }
+   else if (backup->compression == COMPRESSION_CLIENT_LZ4 || backup->compression == COMPRESSION_SERVER_LZ4)
+   {
+      current->next = pgmoneta_create_lz4(true);
+      current = current->next;
+   }
+   else if (backup->compression == COMPRESSION_CLIENT_BZIP2)
+   {
+      current->next = pgmoneta_create_bzip2(true);
+      current = current->next;
+   }
+
+   if (backup->encryption != ENCRYPTION_NONE)
+   {
+      current->next = pgmoneta_encryption(true);
+      current = current->next;
+   }
+
+#ifdef DEBUG
+   if (config->link)
+   {
+      current->next = pgmoneta_create_link();
+      current = current->next;
+   }
+#else
+   current->next = pgmoneta_create_link();
+   current = current->next;
+#endif
+
+   current->next = pgmoneta_create_permissions(PERMISSION_TYPE_BACKUP);
+   current = current->next;
+
+   if (config->storage_engine & STORAGE_ENGINE_SSH)
+   {
+      current->next = pgmoneta_create_sha256();
+      current = current->next;
+
+      current->next = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_BACKUP);
+      current = current->next;
+   }
+
+   if (config->storage_engine & STORAGE_ENGINE_S3)
+   {
+      current->next = pgmoneta_storage_create_s3();
+      current = current->next;
+   }
+
+   if (config->storage_engine & STORAGE_ENGINE_AZURE)
+   {
+      current->next = pgmoneta_storage_create_azure();
+      current = current->next;
+   }
+
+#ifdef DEBUG
+   current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
    return head;
 }
 

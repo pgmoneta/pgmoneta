@@ -2142,7 +2142,7 @@ copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* i
             pgmoneta_mkdir(to_directory);
             pgmoneta_symlink_at_file(to_oid, relative_directory);
 
-            pgmoneta_copy_directory(&path[0], to_directory, NULL, workers);
+            pgmoneta_copy_directory(link, to_directory, NULL, workers);
 
             free(to_oid);
             free(to_directory);

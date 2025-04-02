@@ -53,7 +53,7 @@ struct workflow*
 pgmoneta_create_restore(void);
 
 /**
- * Create a workflow for restoring incremental backup
+ * Create a workflow for combining incremental backup
  * @return The workflow
  */
 struct workflow*

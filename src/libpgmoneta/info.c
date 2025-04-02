@@ -366,7 +366,14 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
       if (!strcmp(key, &k[0]))
       {
          memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
+         if (value == NULL)
+         {
+            snprintf(&line[0], sizeof(line), "%s=\n", key);
+         }
+         else
+         {
+            snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
+         }
          fputs(&line[0], dfile);
          found = true;
       }
@@ -380,7 +387,14 @@ pgmoneta_update_info_string(char* directory, char* key, char* value)
    {
       memset(&line[0], 0, sizeof(line));
       pgmoneta_log_trace("%s=%s", key, value);
-      snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
+      if (value == NULL)
+      {
+         snprintf(&line[0], sizeof(line), "%s=\n", key);
+      }
+      else
+      {
+         snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
+      }
       fputs(&line[0], dfile);
    }
 
@@ -1318,7 +1332,7 @@ pgmoneta_get_backup_child(int server, struct backup* backup, struct backup** chi
    {
       if (!strcmp(backup->label, backups[j]->parent_label))
       {
-         c_identifier = pgmoneta_append(c_identifier, backups[j]->parent_label);
+         c_identifier = pgmoneta_append(c_identifier, backups[j]->label);
       }
    }
 

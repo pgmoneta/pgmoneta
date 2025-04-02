@@ -88,11 +88,23 @@ pgmoneta_restore_backup(struct art* nodes);
  * @param prior_labels The labels of prior incremental/full backups, from newest to oldest
  * @param bck The backup to be restored
  * @param manifest The manifest of the incremental backup to be combined
+ * @param incremental Whether to combine the backups into an incremental backup
+ * @param combine_as_is Whether to alter the resulting backup
  * @return 0 on success, 1 if otherwise
  */
 int
 pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, char* output_dir, struct deque* prior_labels,
-                         struct backup* bck, struct json* manifest);
+                         struct backup* bck, struct json* manifest, bool incremental, bool combine_as_is);
+
+/**
+ * Rollup backups into a new backup
+ * @param server The server
+ * @param newest_label The newest backup label
+ * @param oldest_label The oldest backup label
+ * @return
+ */
+int
+pgmoneta_roll_up(int server, char* newest_label, char* oldest_label);
 
 #ifdef __cplusplus
 }
