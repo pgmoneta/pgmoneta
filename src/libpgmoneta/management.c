@@ -106,7 +106,7 @@ pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char
    }
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
-   
+
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SORT, (uintptr_t)(sort_order != NULL ? sort_order : "asc"), ValueString);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
