@@ -54,6 +54,11 @@ RESTORE_DIRECTORY=$PGMONETA_OPERATION_DIR/restore
 BACKUP_DIRECTORY=$PGMONETA_OPERATION_DIR/backup
 CONFIGURATION_DIRECTORY=$PGMONETA_OPERATION_DIR/conf
 
+PSQL_USER=$USER
+if [ "$OS" = "FreeBSD" ]; then
+  PSQL_USER=postgres
+fi
+
 ########################### UTILS ############################
 is_port_in_use() {
    local port=$1
@@ -61,6 +66,8 @@ is_port_in_use() {
       ss -tuln | grep $port >/dev/null 2>&1
    elif [[ "$OS" == "Darwin" ]]; then
       lsof -i:$port >/dev/null 2>&1
+   elif [[ "$OS" == "FreeBSD" ]]; then
+      sockstat -4 -l | grep $port >/dev/null 2>&1
    fi
    return $?
 }
@@ -97,10 +104,10 @@ wait_for_server_ready() {
 }
 
 function sed_i() {
-   if [[ "$OS" == "Darwin" ]]; then
-      sed -i '' "$@"
+   if [[ "$OS" == "Darwin" || "$OS" == "FreeBSD" ]]; then
+      sed -i '' -E "$@"
    else
-      sed -i "$@"
+      sed -i -E "$@"
    fi
 }
 
@@ -125,6 +132,22 @@ check_pg_ctl() {
       echo "check pg_ctl in path ... not ok"
       return 1
    fi
+}
+
+stop_pgctl(){
+   if [[ "$OS" == "FreeBSD" ]]; then
+      su - postgres -c "$PGCTL_PATH -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop"
+   else
+      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+   fi
+}
+
+run_as_postgres() {
+  if [[ "$OS" == "FreeBSD" ]]; then
+    su - postgres -c "$*"
+  else
+    eval "$@"
+  fi
 }
 
 check_psql() {
@@ -188,9 +211,39 @@ initialize_log_files() {
 create_cluster() {
    local port=$1
    echo -e "\e[34mInitializing Cluster \e[0m"
-   initdb -k -D $DATA_DIRECTORY 2>/dev/null
+
+   if [ "$OS" = "FreeBSD" ]; then
+    mkdir -p "$POSTGRES_OPERATION_DIR"
+    mkdir -p "$DATA_DIRECTORY"
+    mkdir -p $BACKUP_DIRECTORY
+    mkdir -p $CONFIGURATION_DIRECTORY
+    if ! pw user show postgres >/dev/null 2>&1; then
+        pw groupadd -n postgres -g 770
+        pw useradd -n postgres -u 770 -g postgres -d /var/db/postgres -s /bin/sh
+    fi
+    chown postgres:postgres $PGCTL_LOG_FILE
+    chown -R postgres:postgres "$DATA_DIRECTORY"
+    chown -R postgres:postgres $BACKUP_DIRECTORY
+    chown -R postgres:postgres $CONFIGURATION_DIRECTORY
+
+   fi
+
+   echo $DATA_DIRECTORY
+   
+   INITDB_PATH=$(command -v initdb)
+
+   if [ -z "$INITDB_PATH" ]; then
+      echo "Error: initdb not found!" >&2
+      exit 1
+   fi
+   run_as_postgres "$INITDB_PATH -k -D $DATA_DIRECTORY"
+   echo "initdb exit code: $?"
+   echo "initialize database ... ok"
    set +e
-   error_out=$(sed_i "s/^#\s*password_encryption\s*=\s*\(md5\|scram-sha-256\)/password_encryption = scram-sha-256/" $DATA_DIRECTORY/postgresql.conf 2>&1)
+   echo "setting postgresql.conf"
+
+   error_out=$(sed_i "s/^#[[:space:]]*password_encryption[[:space:]]*=[[:space:]]*(md5|scram-sha-256)/password_encryption = scram-sha-256/" "$DATA_DIRECTORY/postgresql.conf" 2>&1)
+
    if [ $? -ne 0 ]; then
       echo "setting password_encryption ... $error_out"
       clean
@@ -310,7 +363,12 @@ initialize_hba_configuration() {
 initialize_cluster() {
    echo -e "\e[34mInitializing Cluster \e[0m"
    set +e
-   pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start
+   PGCTL_PATH=$(command -v pg_ctl)
+   if [ -z "$PGCTL_PATH" ]; then
+      echo "Error: pg_ctl not found!" >&2
+      exit 1
+   fi
+   run_as_postgres "$PGCTL_PATH -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start"
    if [ $? -ne 0 ]; then
       clean
       exit 1
@@ -323,44 +381,44 @@ initialize_cluster() {
       clean
       exit 1
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $USER -d postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD '$PGPASSWORD';" 2>&1)
+   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD '$PGPASSWORD';" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create role repl ... $err_out"
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      stop_pgctl
       clean
       exit 1
    else
       echo "create role repl ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $USER -d postgres -c "SELECT pg_create_physical_replication_slot('repl', true, false);" 2>&1)
+   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "SELECT pg_create_physical_replication_slot('repl', true, false);" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create replication slot for repl ... $err_out"
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      stop_pgctl
       clean
       exit 1
    else
       echo "create replication slot for repl ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $USER -d postgres -c "CREATE USER myuser WITH PASSWORD '$PGPASSWORD';" 2>&1)
+   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE USER myuser WITH PASSWORD '$PGPASSWORD';" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create user myuser ... $err_out"
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      stop_pgctl
       clean
       exit 1
    else
       echo "create user myuser ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $USER -d postgres -c "CREATE DATABASE mydb WITH OWNER myuser ENCODING 'UTF8';" 2>&1)
+   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE DATABASE mydb WITH OWNER myuser ENCODING 'UTF8';" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create database mydb with owner myuser ... $err_out"
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      stop_pgctl
       clean
       exit 1
    else
       echo "create database mydb with owner myuser ... ok"
    fi
    set -e
-   pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+   stop_pgctl
    echo ""
 }
 
@@ -425,8 +483,12 @@ user = repl
 wal_slot = repl
 EOF
    echo "add test configuration to pgmoneta.conf ... ok"
-   $EXECUTABLE_DIRECTORY/pgmoneta-admin master-key -P $PGPASSWORD || true
-   $EXECUTABLE_DIRECTORY/pgmoneta-admin -f $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -U repl -P $PGPASSWORD user add
+   if [[ "$OS" == "FreeBSD" ]]; then
+    chown -R postgres:postgres $CONFIGURATION_DIRECTORY
+    chown -R postgres:postgres $PGMONETA_LOG_FILE
+   fi
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-admin master-key -P $PGPASSWORD || true"
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-admin -f $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -U repl -P $PGPASSWORD user add"
    echo "add user repl to pgmoneta_users.conf file ... ok"
    echo ""
 }
@@ -434,45 +496,46 @@ EOF
 execute_testcases() {
    echo -e "\e[34mExecute Testcases \e[0m"
    set +e
-   pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start
+   run_as_postgres "pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start"
    pg_isready -h localhost -p $PORT
    if [ $? -eq 0 ]; then
       echo "postgres server accepting requests ... ok"
    else
       echo "postgres server is not accepting response ... not ok"
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      stop_pgctl
       clean
       exit 1
    fi
    echo "starting pgmoneta server in daemon mode"
-   $EXECUTABLE_DIRECTORY/pgmoneta -c $CONFIGURATION_DIRECTORY/pgmoneta.conf -u $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -d
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta -c $CONFIGURATION_DIRECTORY/pgmoneta.conf -u $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -d"
    wait_for_server_ready
    if [ $? -ne 0 ]; then
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      echo "pgmoneta server not ready ... not ok"
+      stop_pgctl
       clean
       exit 1
    fi
-   $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf ping
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf ping"
    if [ $? -eq 0 ]; then
       echo "pgmoneta server started ... ok"
    else
       echo "pgmoneta server not started ... not ok"
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      stop_pgctl
       clean
       exit 1
    fi
    ### RUN TESTCASES ###
    $TEST_DIRECTORY/pgmoneta_test $PROJECT_DIRECTORY
    if [ $? -ne 0 ]; then
-      $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown
-      pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+      run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown"
+      stop_pgctl
       clean
       exit 1
    fi
    echo "running shutdown cli command"
-   $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown"
    echo "shutdown pgmoneta server ... ok"
-   pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
+   stop_pgctl
    set -e
    echo ""
 }
