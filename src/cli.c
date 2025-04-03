@@ -641,6 +641,23 @@ main(int argc, char** argv)
    }
    pgmoneta_init_main_configuration(shmem);
 
+   if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
+   {
+      if (argc > optind)
+      {
+         char* command = argv[optind];
+         display_helper(command);
+      }
+      else
+      {
+         usage();
+      }
+      exit_code = 1;
+      goto done;
+   }
+
+   need_server_conn = parsed.cmd->action != MANAGEMENT_COMPRESS && parsed.cmd->action != MANAGEMENT_DECOMPRESS && parsed.cmd->action != MANAGEMENT_ENCRYPT && parsed.cmd->action != MANAGEMENT_DECRYPT;
+
    if (configuration_path != NULL)
    {
       ret = pgmoneta_read_main_configuration(shmem, configuration_path);
@@ -671,7 +688,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
       if (ret)
       {
-         if (host == NULL || port == NULL)
+         if (need_server_conn && (host == NULL || port == NULL))
          {
             warnx("pgmoneta-cli: Missing required arguments: Both '--host' (-h) and '--port' (-p) must be provided.");
             exit(1);
@@ -699,23 +716,6 @@ main(int argc, char** argv)
       }
    }
 
-   if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
-   {
-      if (argc > optind)
-      {
-         char* command = argv[optind];
-         display_helper(command);
-      }
-      else
-      {
-         usage();
-      }
-      exit_code = 1;
-      goto done;
-   }
-
-   need_server_conn = parsed.cmd->action != MANAGEMENT_COMPRESS && parsed.cmd->action != MANAGEMENT_DECOMPRESS && parsed.cmd->action != MANAGEMENT_ENCRYPT && parsed.cmd->action != MANAGEMENT_DECRYPT;
-
    if (configuration_path != NULL)
    {
       /* Local connection */
@@ -735,6 +735,12 @@ main(int argc, char** argv)
    }
    else
    {
+      /* Local command */
+      if (!need_server_conn)
+      {
+         goto execute;
+      }
+      
       /* Remote connection */
       if (pgmoneta_connect(host, atoi(port), &socket))
       {
@@ -940,7 +946,8 @@ execute:
       }
       else
       {
-         exit_code = compress_data_client(parsed.args[0], config->compression_type);
+         uint8_t local_compression = config ? config->compression_type : COMPRESSION_CLIENT_ZSTD;
+         exit_code = compress_data_client(parsed.args[0], local_compression);
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_INFO)
