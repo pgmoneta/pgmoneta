@@ -100,7 +100,8 @@ SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c
 
 In either ways, the user should use the `-t` flag to enable the translation. If user provided `pgmoneta_user.conf` file or the mapping file, the tool will do nothing if the `-t` flag is not provided. 
 
-User can create the `pgmoneta_user.conf` file by following the instructions in the [DEVELOPER.md]('../DEVELOPERS.md').
+User can create the `pgmoneta_user.conf` file by following the instructions in the [`DEVELOPER.md`](https://github.com/pgmoneta/pgmoneta/blob/main/doc/DEVELOPERS.md)
+
 
 After using this translation feature, the output will change XLOG records from something like this
 `
@@ -117,20 +118,18 @@ Example of `mappings.json` file:
 {
     "tablespaces": [
         {"name1": "oid1"},
-        {"name2": "oid2"},
-        ...
+        {"name2": "oid2"}
     ],
     "databases": [
         {"name1": "oid1"},
-        {"name2": "oid2"},
-        ...
+        {"name2": "oid2"}
     ],
     "relations": [
         {"name1": "oid1"},
-        {"name2": "oid2"},
-        ...
-    ],
+        {"name2": "oid2"}
+    ]
 }
+
 ```
 
 which is basically three sections, each section contains array key value pairs. The key is the object name and the value is the oid.

@@ -9,43 +9,42 @@ on:
     branches:
       - main
       - 0.15.x
+  workflow_dispatch:
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+      fail-fast: false
+
     steps:
       - uses: actions/checkout@v4
-      - name: Update system
-        run: sudo apt update -y
-      - name: Install libev
-        run: sudo apt install -y libev4 libev-dev
-      - name: Install systemd
-        run: sudo apt install -y libsystemd-dev
-      - name: Install rst2man
-        run: sudo apt install -y python3-docutils
-      - name: Install zstd
-        run: sudo apt install -y libzstd-dev
-      - name: Install lz4
-        run: sudo apt install -y liblz4-dev
-      - name: Install bzip2
-        run: sudo apt install -y libbz2-dev
-      - name: Install libssh
-        run: sudo apt install -y libssh-dev
-      - name: Install libarchive
-        run: sudo apt install -y libarchive-dev
-      - name: Install libcurl
-        run: sudo apt install -y libcurl4-openssl-dev
-      - name: Install clang
-        run: sudo apt install -y clang
-      - name: Install graphviz
-        run: sudo apt install graphviz
-      - name: Install doxygen
-        run: sudo apt install doxygen
-      - name: Install net-tools
-        run: sudo apt install net-tools
-      - name: Install check
-        run: sudo apt install check
+      - name: Install Dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y \
+          git gcc clang clang-tools cmake make \
+          libev4 libev-dev libssl-dev libsystemd-dev \
+          zlib1g zlib1g-dev libzstd-dev liblz4-dev \
+          libssh-dev libcurl4-openssl-dev libatomic1 \
+          python3-docutils libbz2-dev libarchive-dev \
+          bzip2 net-tools check graphviz doxygen \
+          pandoc texlive texlive-latex-extra \
+          texlive-fonts-extra texlive-xetex texlive-luatex \
+          texlive-science texlive-extra-utils texlive-lang-all
+             
+      - name: Install Eisvogel template for Pandoc
+        run: |
+          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/2.4.2/Eisvogel-2.4.2.tar.gz
+          tar -xzf Eisvogel-2.4.2.tar.gz
+          mkdir -p ~/.local/share/pandoc/templates
+          mv eisvogel.latex ~/.local/share/pandoc/templates/
+
+       
       - name: Install PostgreSQL
         run: |
           sudo apt install curl ca-certificates
@@ -58,67 +57,48 @@ jobs:
         run: |
           echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
           echo $PATH
-      - name: CLANG/Release/mkdir
-        run: mkdir build
+      - name: Build Project
+        run: |
+            mkdir build
+            cd build
+            if [ "${{ matrix.compiler }}" = "gcc" ]; then
+              export CC=/usr/bin/gcc
+            else
+              export CC=/usr/bin/clang
+            fi
+             
+            cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ..
+             make -j$(nproc)
         working-directory: /home/runner/work/pgmoneta/pgmoneta/
-      - name: CLANG/Release/cmake
-        run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Release ..
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-      - name: CLANG/Release/make
-        run: make
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-      - name: CLANG/Release/rm -Rf
-        run: rm -Rf build/
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/
-      - name: GCC/mkdir
-        run: mkdir build
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/
-      - name: GCC/cmake
-        run: export CC=/usr/bin/gcc && cmake -DCMAKE_BUILD_TYPE=Debug ..
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-      - name: GCC/make
-        run: make
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
+      
       - name: GCC/Testsuite
         id: gcc-test
         run: $(which bash) ./testsuite.sh
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-      - name: GCC/Testsuite Clean
-        run: $(which bash) ./testsuite.sh clean
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-      - name: GCC/rm -Rf
-        run: rm -Rf build/
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/
-      - name: CLANG/mkdir
-        run: mkdir build
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/
-      - name: CLANG/cmake
-        run: export CC=/usr/bin/clang && cmake -DCMAKE_BUILD_TYPE=Debug ..
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-      - name: CLANG/make
-        run: make
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build/
-      - name: CLANG/Testsuite
-        id: clang-test
-        run: $(which bash) ./testsuite.sh
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+      
+      - name: Upload Build and Run Logs as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path:  /home/runner/work/pgmoneta/pgmoneta/build/log
+          retention-days: 90
+       
       - name: CLANG/Testsuite Clean
         run: $(which bash) ./testsuite.sh clean
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-      - name: Show logs
-        if: failure() && (steps.gcc-test.outcome == 'failure' || steps.clang-test.outcome == 'failure')
-        run: |
-          cat ./log/logfile
-          cat ./log/pgmoneta.log
-          $(which bash) ./testsuite.sh clean
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-      - name: Upload artifact for failed workflow
-        if: failure()
+
+      - name: Upload Generated Documentation Artifact
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
-          name: Logs
-          path: |
-            /tmp/*.log
+          name: generated-docs
+          path: /home/runner/work/pgmoneta/pgmoneta/build/doc
+          retention-days: 90
+          
+      
+      
+      
 
   build-macos:
     runs-on: macos-latest
@@ -155,15 +135,18 @@ jobs:
       - name: Run tests with Clang build
         working-directory: ${{ env.BUILD_DIR }}
         run: $(which bash) ./testsuite.sh
+
       - name: Clean up after Clang tests
         working-directory: ${{ env.BUILD_DIR }}
         run: $(which bash) ./testsuite.sh clean
+      
       - name: Show logs on failure
         if: failure()
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           cat ./log/logfile || echo "logfile not found"
           cat ./log/pgmoneta.log || echo "pgmoneta.log not found"
+      
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -173,3 +156,5 @@ jobs:
             ${{ env.BUILD_DIR }}/log/
             /tmp/*.log
           retention-days: 7
+
+     
