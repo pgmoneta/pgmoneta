@@ -27,10 +27,8 @@
  */
 
 #include <pgmoneta.h>
-#include <deque.h>
 #include <logging.h>
 #include <workers.h>
-#include <value.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -46,11 +44,17 @@ static int worker_init(struct workers* workers, struct worker** worker);
 static void* worker_do(struct worker* worker);
 static void worker_destroy(struct worker* worker);
 
+static int queue_init(struct queue* queue);
+static void queue_clear(struct queue* queue);
+static void queue_push(struct queue* queue, struct task* task);
+static struct task* queue_pull(struct queue* queue);
+static void queue_destroy(struct queue* queue);
+
 static int semaphore_init(struct semaphore* semaphore, int value);
+static void semaphore_reset(struct semaphore* semaphore);
 static void semaphore_post(struct semaphore* semaphore);
 static void semaphore_post_all(struct semaphore* semaphore);
 static void semaphore_wait(struct semaphore* semaphore);
-static void destroy_data_wrapper(uintptr_t data);
 
 int
 pgmoneta_workers_initialize(int num, struct workers** workers)
@@ -77,21 +81,9 @@ pgmoneta_workers_initialize(int num, struct workers** workers)
    w->number_of_working = 0;
    w->outcome = true;
 
-   if (pgmoneta_deque_create(true, &w->queue)) {
-      pgmoneta_log_error("Could not allocate memory for deque");
-      goto error;
-   }
-
-   w->has_tasks = (struct semaphore*)malloc(sizeof(struct semaphore));
-   if (w->has_tasks == NULL)
+   if (queue_init(&w->queue))
    {
-      pgmoneta_log_error("Could not allocate memory for task semaphore");
-      goto error;
-   }
-
-   if (semaphore_init(w->has_tasks, 0))
-   {  
-      pgmoneta_log_error("Could not initialize task semaphore");
+      pgmoneta_log_error("Could not allocate memory for queue");
       goto error;
    }
 
@@ -123,8 +115,7 @@ error:
 
    if (w != NULL)
    {
-      pgmoneta_deque_destroy(w->queue);
-      free(w->has_tasks);
+      queue_destroy(&w->queue);
       free(w);
    }
 
@@ -134,26 +125,21 @@ error:
 int
 pgmoneta_workers_add(struct workers* workers, void (*function)(struct worker_common*), struct worker_common* wc)
 {
-   struct worker_common* task_wc = NULL;
+   struct task* t = NULL;
 
    if (workers != NULL)
    {
-      task_wc = (struct worker_common*)malloc(sizeof(struct worker_common));
-      if (task_wc == NULL)
+      t = (struct task*)malloc(sizeof(struct task));
+      if (t == NULL)
       {
          pgmoneta_log_error("Could not allocate memory for task");
          goto error;
       }
 
-      memcpy(task_wc, wc, sizeof(struct worker_common));
-      task_wc->function = function;
+      t->function = function;
+      t->wc = wc;
 
-      struct value_config config = {0};
-      config.destroy_data = destroy_data_wrapper;
-      
-      pgmoneta_deque_add_with_config(workers->queue, NULL, (uintptr_t)task_wc, &config);
-      
-      semaphore_post(workers->has_tasks);
+      queue_push(&workers->queue, t);
 
       return 0;
    }
@@ -170,7 +156,7 @@ pgmoneta_workers_wait(struct workers* workers)
    {
       pthread_mutex_lock(&workers->worker_lock);
 
-      while (pgmoneta_deque_size(workers->queue) || workers->number_of_working)
+      while (workers->queue.number_of_tasks || workers->number_of_working)
       {
          pthread_cond_wait(&workers->worker_all_idle, &workers->worker_lock);
       }
@@ -196,19 +182,18 @@ pgmoneta_workers_destroy(struct workers* workers)
       time (&start);
       while (tpassed < timeout && workers->number_of_alive)
       {
-         semaphore_post_all(workers->has_tasks);
+         semaphore_post_all(workers->queue.has_tasks);
          time(&end);
          tpassed = difftime(end, start);
       }
 
       while (workers->number_of_alive)
       {
-         semaphore_post_all(workers->has_tasks);
+         semaphore_post_all(workers->queue.has_tasks);
          SLEEP(1000000000L);
       }
 
-      pgmoneta_deque_destroy(workers->queue);
-      free(workers->has_tasks);
+      queue_destroy(&workers->queue);
 
       for (int n = 0; n < worker_total; n++)
       {
@@ -324,7 +309,8 @@ error:
 static void*
 worker_do(struct worker* worker)
 {
-   struct worker_common* task_wc;
+   void (*func_ref)(struct worker_common*);
+   struct task* t;
    struct workers* workers = worker->workers;
 
    pthread_mutex_lock(&workers->worker_lock);
@@ -333,7 +319,7 @@ worker_do(struct worker* worker)
 
    while (worker_keepalive)
    {
-      semaphore_wait(workers->has_tasks);
+      semaphore_wait(workers->queue.has_tasks);
 
       if (worker_keepalive)
       {
@@ -341,11 +327,13 @@ worker_do(struct worker* worker)
          workers->number_of_working++;
          pthread_mutex_unlock(&workers->worker_lock);
 
-         task_wc = (struct worker_common*)pgmoneta_deque_poll(workers->queue, NULL);
-         
-         if (task_wc)
+         t = queue_pull(&workers->queue);
+         if (t)
          {
-            task_wc->function(task_wc);
+            func_ref = t->function;
+            func_ref(t->wc);
+
+            free(t);
          }
 
          pthread_mutex_lock(&workers->worker_lock);
@@ -372,6 +360,108 @@ worker_destroy(struct worker* w)
 }
 
 static int
+queue_init(struct queue* queue)
+{
+   queue->number_of_tasks = 0;
+   queue->front = NULL;
+   queue->rear = NULL;
+
+   queue->has_tasks = (struct semaphore*)malloc(sizeof(struct semaphore));
+   if (queue->has_tasks == NULL)
+   {
+      return 1;
+   }
+
+   pthread_mutex_init(&(queue->rwmutex), NULL);
+   if (semaphore_init(queue->has_tasks, 0))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static void
+queue_clear(struct queue* queue)
+{
+   while (queue->number_of_tasks)
+   {
+      free(queue_pull(queue));
+   }
+
+   queue->front = NULL;
+   queue->rear = NULL;
+   semaphore_reset(queue->has_tasks);
+   queue->number_of_tasks = 0;
+
+}
+
+static void
+queue_push(struct queue* queue, struct task* task)
+{
+
+   pthread_mutex_lock(&queue->rwmutex);
+   task->previous = NULL;
+
+   switch (queue->number_of_tasks)
+   {
+      case 0:
+         queue->front = task;
+         queue->rear = task;
+         break;
+
+      default:
+         queue->rear->previous = task;
+         queue->rear = task;
+
+   }
+   queue->number_of_tasks++;
+
+   semaphore_post(queue->has_tasks);
+   pthread_mutex_unlock(&queue->rwmutex);
+}
+
+static struct task*
+queue_pull(struct queue* queue)
+{
+   struct task* task = NULL;
+
+   pthread_mutex_lock(&queue->rwmutex);
+   task = queue->front;
+
+   switch (queue->number_of_tasks)
+   {
+      case 0:
+         break;
+
+      case 1:
+         queue->front = NULL;
+         queue->rear = NULL;
+         queue->number_of_tasks = 0;
+         break;
+
+      default:
+         queue->front = task->previous;
+         queue->number_of_tasks--;
+         semaphore_post(queue->has_tasks);
+   }
+
+   pthread_mutex_unlock(&queue->rwmutex);
+   return task;
+}
+
+static void
+queue_destroy(struct queue* queue)
+{
+   queue_clear(queue);
+   free(queue->has_tasks);
+}
+
+static int
 semaphore_init(struct semaphore* semaphore, int value)
 {
    if (value < 0 || value > 1 || semaphore == NULL)
@@ -389,6 +479,14 @@ semaphore_init(struct semaphore* semaphore, int value)
 error:
 
    return 1;
+}
+
+static void
+semaphore_reset(struct semaphore* semaphore)
+{
+   pthread_mutex_destroy(&(semaphore->mutex));
+   pthread_cond_destroy(&(semaphore->cond));
+   semaphore_init(semaphore, 0);
 }
 
 static void
@@ -419,10 +517,4 @@ semaphore_wait(struct semaphore* semaphore)
    }
    semaphore->value = 0;
    pthread_mutex_unlock(&semaphore->mutex);
-}
-
-static void
-destroy_data_wrapper(uintptr_t data)
-{
-   free((void*)data);
 }
