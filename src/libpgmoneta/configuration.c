@@ -1381,6 +1381,11 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
             else
             {
                warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
+
+               free(key);
+               free(value);
+               key = NULL;
+               value = NULL;
             }
          }
       }
@@ -3597,7 +3602,8 @@ error:
 }
 
 /**
- * Given a line of text extracts the key part and the value.
+ * Given a line of text extracts the key part and the value
+ * and expands environment variables in the value (like $HOME).
  * Valid lines must have the form <key> = <value>.
  *
  * The key must be unquoted and cannot have any spaces
@@ -3660,6 +3666,8 @@ extract_syskey_value(char* str, char** key, char** value)
    // empty value
    if (c == length)
    {
+      free(k);
+      k = NULL;
       return 0;
    }
 
@@ -3674,6 +3682,22 @@ extract_syskey_value(char* str, char** key, char** value)
    {
       v = pgmoneta_append_char(v, str[i]);
    }
+
+   char* resolved_path = NULL;
+
+   if (pgmoneta_resolve_path(v, &resolved_path))
+   {
+      free(k);
+      free(v);
+      free(resolved_path);
+      k = NULL;
+      v = NULL;
+      resolved_path = NULL;
+      goto error;
+   }
+
+   free(v);
+   v = resolved_path;
 
    *key = k;
    *value = v;
