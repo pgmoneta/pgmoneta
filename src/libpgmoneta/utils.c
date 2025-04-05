@@ -4738,6 +4738,119 @@ pgmoneta_is_substring(char* a, char* b)
    return strstr(b, a) != NULL;
 }
 
+int
+pgmoneta_resolve_path(char* orig_path, char** new_path)
+{
+   #if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+      #define GET_ENV(name) getenv(name)
+   #else
+      #define GET_ENV(name) secure_getenv(name)
+   #endif
+
+   char* res = NULL;
+   char* env_res = NULL;
+   int len = strlen(orig_path);
+   int res_len = 0;
+   bool double_quote = false;
+   bool single_quote = false;
+   bool in_env = false;
+
+   *new_path = NULL;
+
+   if (orig_path == NULL)
+   {
+      goto error;
+   }
+
+   for (int idx = 0; idx < len; idx++)
+   {
+      char* ch = NULL;
+
+      bool valid_env_char = orig_path[idx] == '_'
+                            || (orig_path[idx] >= 'A' && orig_path[idx] <= 'Z')
+                            || (orig_path[idx] >= 'a' && orig_path[idx] <= 'z')
+                            || (orig_path[idx] >= '0' && orig_path[idx] <= '9');
+      if (in_env && !valid_env_char)
+      {
+         in_env = false;
+         if (env_res == NULL)
+         {
+            return 1;
+         }
+         char* env_value = GET_ENV(env_res);
+         free(env_res);
+         if (env_value == NULL)
+         {
+            return 1;
+         }
+         res = pgmoneta_append(res, env_value);
+         res_len += strlen(env_value);
+         env_res = NULL;
+      }
+
+      if (orig_path[idx] == '\"' && !single_quote)
+      {
+         double_quote = !double_quote;
+         continue;
+      }
+      else if (orig_path[idx] == '\'' && !double_quote)
+      {
+         single_quote = !single_quote;
+         continue;
+      }
+
+      if (orig_path[idx] == '\\')
+      {
+         if (idx + 1 < len)
+         {
+            ch = pgmoneta_append_char(ch, orig_path[idx + 1]);
+            idx++;
+         }
+         else
+         {
+            return 1;
+         }
+      }
+      else if (orig_path[idx] == '$')
+      {
+         if (single_quote)
+         {
+            ch = pgmoneta_append_char(ch, '$');
+         }
+         else
+         {
+            in_env = true;
+         }
+      }
+      else
+      {
+         ch = pgmoneta_append_char(ch, orig_path[idx]);
+      }
+
+      if (in_env)
+      {
+         env_res = pgmoneta_append(env_res, ch);
+      }
+      else
+      {
+         res = pgmoneta_append(res, ch);
+         ++res_len;
+      }
+
+      free(ch);
+   }
+
+   if (res_len > MAX_PATH)
+   {
+      goto error;
+   }
+   *new_path = res;
+   return 0;
+
+error:
+   return 1;
+}
+
 __attribute__((unused))
 static bool
 calculate_offset(uint64_t addr, uint64_t* offset, char** filepath)

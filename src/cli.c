@@ -740,7 +740,7 @@ main(int argc, char** argv)
       {
          goto execute;
       }
-      
+
       /* Remote connection */
       if (pgmoneta_connect(host, atoi(port), &socket))
       {

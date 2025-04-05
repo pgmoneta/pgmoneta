@@ -1353,6 +1353,18 @@ int
 pgmoneta_is_substring(char* a, char* b);
 
 /**
+ * Resolve path.
+ * The function will resolve the path by expanding environment
+ * variables (e.g., $HOME) in subpaths that are either surrounded
+ * by double quotes (") or not surrounded by any quotes.
+ * @param orig_path The original path
+ * @param new_path Reference to the resolved path
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_resolve_path(char* orig_path, char** new_path);
+
+/**
  * Generate a backtrace in the log
  * @return 0 if success, otherwise 1
  */
