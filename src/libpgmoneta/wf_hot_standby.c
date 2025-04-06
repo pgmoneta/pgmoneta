@@ -32,6 +32,7 @@
 #include <hot_standby.h>
 #include <logging.h>
 #include <manifest.h>
+#include <restore.h>
 #include <utils.h>
 #include <workers.h>
 #include <workflow.h>
@@ -78,10 +79,12 @@ hot_standby_execute(char* name, struct art* nodes)
    char* label = NULL;
    char* root = NULL;
    char* base = NULL;
+   char* source_root = NULL;
    char* source = NULL;
    char* destination = NULL;
    char* old_manifest = NULL;
    char* new_manifest = NULL;
+   bool incremental = false;
    struct timespec start_t;
    struct timespec end_t;
    double hot_standby_elapsed_time;
@@ -121,6 +124,7 @@ hot_standby_execute(char* name, struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   incremental = (bool)pgmoneta_art_contains_key(nodes, NODE_INCREMENTAL_BASE);
 
    pgmoneta_log_debug("Hot standby (execute): %s/%s", config->common.servers[server].name, label);
 
@@ -151,7 +155,7 @@ hot_standby_execute(char* name, struct art* nodes)
       destination = pgmoneta_append(destination, root);
       destination = pgmoneta_append(destination, config->common.servers[server].name);
 
-      if (pgmoneta_exists(destination) && number_of_backups >= 2)
+      if (!incremental && pgmoneta_exists(destination) && number_of_backups >= 2)
       {
          source = pgmoneta_append(source, base);
          if (!pgmoneta_ends_with(source, "/"))
@@ -268,15 +272,26 @@ hot_standby_execute(char* name, struct art* nodes)
       }
       else
       {
+         if (incremental)
+         {
+            if (pgmoneta_extract_incremental_backup(server, label, &source_root, &source))
+            {
+               pgmoneta_log_error("Hotstandby: Unable to extract backup %s", label);
+               goto error;
+            }
+         }
+         else
+         {
+            source = pgmoneta_append(source, base);
+            source = pgmoneta_append(source, label);
+            source = pgmoneta_append_char(source, '/');
+            source = pgmoneta_append(source, "data");
+         }
+
          if (pgmoneta_exists(destination))
          {
             pgmoneta_delete_directory(destination);
          }
-
-         source = pgmoneta_append(source, base);
-         source = pgmoneta_append(source, label);
-         source = pgmoneta_append_char(source, '/');
-         source = pgmoneta_append(source, "data");
 
          pgmoneta_mkdir(root);
          pgmoneta_mkdir(destination);
@@ -339,6 +354,12 @@ hot_standby_execute(char* name, struct art* nodes)
    free(old_manifest);
    free(new_manifest);
 
+   if (source_root != NULL)
+   {
+      pgmoneta_delete_directory(source_root);
+      free(source_root);
+   }
+
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
@@ -364,6 +385,12 @@ error:
 
    free(old_manifest);
    free(new_manifest);
+
+   if (source_root != NULL)
+   {
+      pgmoneta_delete_directory(source_root);
+      free(source_root);
+   }
 
    for (int i = 0; i < number_of_backups; i++)
    {

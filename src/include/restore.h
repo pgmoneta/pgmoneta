@@ -101,10 +101,21 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
  * @param server The server
  * @param newest_label The newest backup label
  * @param oldest_label The oldest backup label
- * @return
+ * @return 0 on success, 1 if otherwise
  */
 int
-pgmoneta_roll_up(int server, char* newest_label, char* oldest_label);
+pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label);
+
+/**
+ * Extract and restore the incremental backup into workspace
+ * @param server The server
+ * @param label The label
+ * @param [out] root The root directory backup is extracted to
+ * @param [out] base The base data directory backup is extracted to
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_extract_incremental_backup(int server, char* label, char** root, char** base);
 
 #ifdef __cplusplus
 }

@@ -904,3 +904,45 @@ error:
    free(b);
    return 1;
 }
+
+int
+pgmoneta_file_finalname(char* file, int encryption, int compression, char** finalname)
+{
+   char* final = NULL;
+
+   *finalname = NULL;
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   final = pgmoneta_append(final, file);
+   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
+   {
+      final = pgmoneta_append(final, ".gz");
+   }
+   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
+   {
+      final = pgmoneta_append(final, ".zstd");
+   }
+   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
+   {
+      final = pgmoneta_append(final, ".lz4");
+   }
+   else if (compression == COMPRESSION_CLIENT_BZIP2)
+   {
+      final = pgmoneta_append(final, ".bz2");
+   }
+
+   if (encryption != ENCRYPTION_NONE)
+   {
+      final = pgmoneta_append(final, ".aes");
+   }
+
+   *finalname = final;
+   return 0;
+
+error:
+   free(final);
+   return 1;
+}

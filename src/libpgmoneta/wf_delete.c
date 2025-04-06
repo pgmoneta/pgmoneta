@@ -155,7 +155,7 @@ delete_backup_execute(char* name, struct art* nodes)
    pgmoneta_get_backup_child(server, backups[backup_index], &child);
    if (child != NULL)
    {
-      if (pgmoneta_roll_up(server, child->label, label))
+      if (pgmoneta_rollup_backups(server, child->label, label))
       {
          pgmoneta_log_error("Delete: Unable to roll up backup %s to %s", label, child->label);
          goto error;

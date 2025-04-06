@@ -727,9 +727,8 @@ wf_incremental_backup(void)
    current->next = pgmoneta_storage_create_local();
    current = current->next;
 
-   // TODO: use a new pgmoneta_create_hot_standby_incremental instead since we need to combine backup first
-   // current->next = pgmoneta_create_hot_standby();
-   // current = current->next;
+   current->next = pgmoneta_create_hot_standby();
+   current = current->next;
 
    if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
