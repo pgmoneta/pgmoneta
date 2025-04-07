@@ -291,6 +291,7 @@ void
 pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
+   bool locked = false;
    int ret = RESTORE_OK;
    char* identifier = NULL;
    char* position = NULL;
@@ -321,10 +322,11 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       pgmoneta_log_info("Restore: Server %s is active", config->common.servers[server].name);
       pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_ACTIVE, NAME, compression, encryption, payload);
 
-      goto done;
+      goto error;
    }
 
    config->common.servers[server].active_restore = true;
+   locked = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -416,8 +418,6 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    config->common.servers[server].active_restore = false;
    atomic_store(&config->common.servers[server].repository, false);
 
-done:
-
    pgmoneta_json_destroy(payload);
 
    pgmoneta_disconnect(client_fd);
@@ -437,6 +437,12 @@ error:
    pgmoneta_disconnect(client_fd);
 
    pgmoneta_stop_logging();
+
+   if (locked)
+   {
+      config->common.servers[server].active_restore = false;
+      atomic_store(&config->common.servers[server].repository, false);
+   }
 
    free(backup);
    free(elapsed);
