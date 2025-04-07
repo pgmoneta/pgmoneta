@@ -131,11 +131,6 @@ hot_standby_execute(char* name, struct art* nodes)
    if (strlen(config->common.servers[server].hot_standby) > 0)
    {
       number_of_workers = pgmoneta_get_number_of_workers(server);
-      if (number_of_workers > 0)
-      {
-         pgmoneta_workers_initialize(number_of_workers, &workers);
-      }
-
 #ifdef HAVE_FREEBSD
       clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
 #else
@@ -157,6 +152,11 @@ hot_standby_execute(char* name, struct art* nodes)
 
       if (!incremental && pgmoneta_exists(destination) && number_of_backups >= 2)
       {
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_initialize(number_of_workers, &workers);
+         }
+
          source = pgmoneta_append(source, base);
          if (!pgmoneta_ends_with(source, "/"))
          {
@@ -286,6 +286,10 @@ hot_standby_execute(char* name, struct art* nodes)
             source = pgmoneta_append(source, label);
             source = pgmoneta_append_char(source, '/');
             source = pgmoneta_append(source, "data");
+         }
+         if (number_of_workers > 0)
+         {
+            pgmoneta_workers_initialize(number_of_workers, &workers);
          }
 
          if (pgmoneta_exists(destination))

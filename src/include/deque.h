@@ -280,6 +280,13 @@ pgmoneta_deque_to_string(struct deque* deque, int32_t format, char* tag, int ind
 void
 pgmoneta_deque_destroy(struct deque* deque);
 
+/**
+ * Set the deque to be thread safe
+ * @param deque The deque
+ */
+void
+pgmoneta_deque_set_thread_safe(struct deque* deque);
+
 #ifdef __cplusplus
 }
 #endif

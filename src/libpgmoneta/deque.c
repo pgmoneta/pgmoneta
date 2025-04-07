@@ -395,6 +395,17 @@ pgmoneta_deque_destroy(struct deque* deque)
    free(deque);
 }
 
+void
+pgmoneta_deque_set_thread_safe(struct deque* deque)
+{
+   if (deque->thread_safe)
+   {
+      return;
+   }
+   deque->thread_safe = true;
+   pthread_rwlock_init(&deque->mutex, NULL);
+}
+
 char*
 pgmoneta_deque_to_string(struct deque* deque, int32_t format, char* tag, int indent)
 {
