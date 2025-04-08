@@ -330,9 +330,9 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
 {
    int status = MESSAGE_STATUS_ERROR;
    SSL* ssl = NULL;
-   char key_file[MISC_LENGTH];
-   char cert_file[MISC_LENGTH];
-   char root_file[MISC_LENGTH];
+   char key_file[2 * MAX_PATH];
+   char cert_file[2 * MAX_PATH];
+   char root_file[2 * MAX_PATH];
    struct stat st = {0};
    char* salt = NULL;
    size_t salt_length = 0;
@@ -1761,7 +1761,7 @@ int
 pgmoneta_get_master_key(char** masterkey)
 {
    FILE* master_key_file = NULL;
-   char buf[MISC_LENGTH];
+   char buf[2 * MAX_PATH];
    char line[MISC_LENGTH];
    char* mk = NULL;
    size_t mk_length = 0;
