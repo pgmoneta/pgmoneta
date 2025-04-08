@@ -56,7 +56,8 @@ RUN apk add --no-cache \
     libcurl \
     curl-dev \
     libssh \
-    libssh-dev \
+    libssh-dev 
+
 WORKDIR /src
 
 COPY . .
@@ -85,7 +86,10 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     libpq \
     libatomic \
     zstd \
-    lz4-libs
+    lz4-libs \
+    libarchive \
+    libssh \
+    libcurl 
 
 RUN adduser -D -s /bin/sh pgmoneta
 
@@ -99,12 +103,11 @@ COPY contrib/docker/pgmoneta.conf /etc/pgmoneta/pgmoneta.conf
 RUN chown -R pgmoneta:pgmoneta /pgmoneta /etc/pgmoneta
 RUN chmod +x /usr/local/bin/pgmoneta /usr/local/bin/pgmoneta-cli /usr/local/bin/pgmoneta-admin
 
-EXPOSE 5002
+EXPOSE 5001
 
 USER pgmoneta
 
-RUN echo "pgmoneta" | /usr/local/bin/pgmoneta-admin master-key && \
-    printf "pgmoneta\npgmoneta\npgmoneta\n" | /usr/local/bin/pgmoneta-admin -f /etc/pgmoneta/pgmoneta_users.conf user add
-
+RUN echo "pgmoneta" | /usr/local/bin/pgmoneta-admin master-key
+RUN /usr/local/bin/pgmoneta-admin -f /etc/pgmoneta/pgmoneta_users.conf -U repl -P secretpassword user add
 
 CMD ["/usr/local/bin/pgmoneta", "-c", "/etc/pgmoneta/pgmoneta.conf", "-u","/etc/pgmoneta/pgmoneta_users.conf"]
