@@ -101,7 +101,7 @@ COPY contrib/docker/pgmoneta.conf /etc/pgmoneta/pgmoneta.conf
 RUN chown -R pgmoneta:pgmoneta /pgmoneta /etc/pgmoneta
 RUN chmod +x /usr/local/bin/pgmoneta /usr/local/bin/pgmoneta-cli /usr/local/bin/pgmoneta-admin
 
-EXPOSE 5002
+EXPOSE 5001
 
 USER pgmoneta
 
