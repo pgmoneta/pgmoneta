@@ -667,6 +667,7 @@ password:
       if (generate_pwd)
       {
          password = generate_password(pwd_length);
+         do_free = true;
          do_verify = false;
          printf("Password : %s", password);
       }

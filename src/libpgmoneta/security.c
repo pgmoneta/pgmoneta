@@ -1765,13 +1765,25 @@ pgmoneta_get_master_key(char** masterkey)
    char line[MISC_LENGTH];
    char* mk = NULL;
    size_t mk_length = 0;
+   char* home_dir = NULL;
+   bool do_free = false;
    struct stat st = {0};
    struct common_configuration* config;
 
    config = (struct common_configuration*)shmem;
 
+   if (config == NULL || strlen(config->home_dir) == 0)
+   {
+      home_dir = pgmoneta_get_home_directory();
+      do_free = true;
+   }
+   else
+   {
+      home_dir = config->home_dir;
+   }
+
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", config->home_dir);
+   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
@@ -1792,7 +1804,7 @@ pgmoneta_get_master_key(char** masterkey)
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", config->home_dir);
+   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
@@ -1833,11 +1845,21 @@ pgmoneta_get_master_key(char** masterkey)
 
    *masterkey = mk;
 
+   if (do_free)
+   {
+      free(home_dir);
+   }
+
    fclose(master_key_file);
 
    return 0;
 
 error:
+
+   if (do_free)
+   {
+      free(home_dir);
+   }
 
    free(mk);
 
