@@ -106,6 +106,7 @@ basebackup_execute(char* name, struct art* nodes)
    char* incremental = NULL;
    char* incremental_label = NULL;
    char* manifest_path = NULL;
+   char* old_manifest_path = NULL;
    char version[10];
    char minor_version[10];
    char* wal = NULL;
@@ -273,11 +274,28 @@ basebackup_execute(char* name, struct art* nodes)
       }
       manifest_path = pgmoneta_append(NULL, incremental);
       manifest_path = pgmoneta_append(manifest_path, "data/backup_manifest");
-      if (upload_manifest(ssl, socket, manifest_path))
+      old_manifest_path = pgmoneta_append(NULL, incremental);
+      old_manifest_path = pgmoneta_append(old_manifest_path, "backup_manifest.old");
+
+      // use the old manifest because postgres doesn't recognize our own manifest,
+      // we can remove this when we have a format converter
+      if (pgmoneta_exists(old_manifest_path))
       {
-         pgmoneta_log_error("Fail to upload manifest to server %s", config->common.servers[server].name);
-         goto error;
+         if (upload_manifest(ssl, socket, old_manifest_path))
+         {
+            pgmoneta_log_error("Fail to upload manifest to server %s", config->common.servers[server].name);
+            goto error;
+         }
       }
+      else
+      {
+         if (upload_manifest(ssl, socket, manifest_path))
+         {
+            pgmoneta_log_error("Fail to upload manifest to server %s", config->common.servers[server].name);
+            goto error;
+         }
+      }
+
       // receive and ignore the result set for UPLOAD_MANIFEST
       if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
       {
@@ -481,6 +499,7 @@ basebackup_execute(char* name, struct art* nodes)
    free(backup_base);
    free(backup_data);
    free(manifest_path);
+   free(old_manifest_path);
    free(chkptpos);
    free(tag);
    free(wal);
@@ -516,6 +535,7 @@ error:
    free(backup_base);
    free(backup_data);
    free(manifest_path);
+   free(old_manifest_path);
    free(chkptpos);
    free(tag);
    free(wal);

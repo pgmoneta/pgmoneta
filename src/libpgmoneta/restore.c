@@ -830,6 +830,9 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    char* backup_dir = NULL;
    char backup_info_path[MAX_PATH];
    char tmp_backup_info_path[MAX_PATH];
+   char* manifest_path = NULL;
+   char* tmp_old_manifest_path = NULL;
+   char* old_manifest_path = NULL;
    struct workflow* workflow = NULL;
 
    memset(backup_info_path, 0, MAX_PATH);
@@ -867,6 +870,40 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    tmp_backup_root = pgmoneta_append(tmp_backup_root, "_");
    tmp_backup_root = pgmoneta_append(tmp_backup_root, newest_label);
    backup_dir = pgmoneta_get_server_backup_identifier(server, newest_label);
+
+   // keep the old manifest since postgres doesn't reconize our home-made manifest,
+   // this should be removed when we have a format converter
+   tmp_old_manifest_path = pgmoneta_append(tmp_old_manifest_path, tmp_backup_root);
+   tmp_old_manifest_path = pgmoneta_append(tmp_old_manifest_path, "/");
+   tmp_old_manifest_path = pgmoneta_append(tmp_old_manifest_path, "backup_manifest.old");
+   old_manifest_path = pgmoneta_append(old_manifest_path, backup_dir);
+   old_manifest_path = pgmoneta_append(old_manifest_path, "backup_manifest.old");
+   manifest_path = pgmoneta_get_server_backup_identifier_data(server, newest_label);
+   manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
+
+   if (!pgmoneta_exists(manifest_path))
+   {
+      pgmoneta_log_error("Rollup: unable to find backup manifest at %s", manifest_path);
+      goto error;
+   }
+
+   if (!pgmoneta_exists(old_manifest_path))
+   {
+      printf("copy %s to %s\n", manifest_path, tmp_old_manifest_path);
+      if (pgmoneta_copy_file(manifest_path, tmp_old_manifest_path, NULL))
+      {
+         pgmoneta_log_error("Rollup: unable to copy backup manifest from %s to %s", manifest_path, tmp_old_manifest_path);
+         goto error;
+      }
+   }
+   else
+   {
+      if (pgmoneta_copy_file(old_manifest_path, tmp_old_manifest_path, NULL))
+      {
+         pgmoneta_log_error("Rollup: unable to copy backup manifest from %s to %s", manifest_path, tmp_old_manifest_path);
+         goto error;
+      }
+   }
 
    pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)tmp_backup_root, ValueString);
    pgmoneta_art_insert(nodes, NODE_INCREMENTAL_COMBINE, (uintptr_t)incremental, ValueBool);
@@ -915,6 +952,9 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    free(oldest_backup);
    free(tmp_backup_root);
    free(backup_dir);
+   free(manifest_path);
+   free(old_manifest_path);
+   free(tmp_old_manifest_path);
    return 0;
 
 error:
@@ -928,6 +968,9 @@ error:
    free(oldest_backup);
    free(tmp_backup_root);
    free(backup_dir);
+   free(manifest_path);
+   free(old_manifest_path);
+   free(tmp_old_manifest_path);
    return 1;
 }
 
