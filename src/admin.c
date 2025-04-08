@@ -321,6 +321,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
 {
    FILE* file = NULL;
    char buf[MISC_LENGTH];
+   char* home_dir = NULL;
    char* encoded = NULL;
    size_t encoded_length;
    struct stat st = {0};
@@ -346,7 +347,8 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       do_free = false;
    }
 
-   if (pgmoneta_get_home_directory() == NULL)
+   home_dir = pgmoneta_get_home_directory();
+   if (home_dir == NULL)
    {
       char* username = pgmoneta_get_user_name();
 
@@ -363,7 +365,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", pgmoneta_get_home_directory());
+   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
@@ -383,7 +385,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", pgmoneta_get_home_directory());
+   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", home_dir);
 
    if (pgmoneta_exists(&buf[0]))
    {
@@ -487,6 +489,8 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
    fputs(encoded, file);
    free(encoded);
 
+   free(home_dir);
+
    pgmoneta_json_destroy(j);
 
    if (do_free)
@@ -503,6 +507,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
 
 error:
 
+   free(home_dir);
    free(encoded);
 
    if (do_free)

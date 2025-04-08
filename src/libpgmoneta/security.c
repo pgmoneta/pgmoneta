@@ -362,22 +362,20 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    struct message* sasl_continue_response = NULL;
    struct message* sasl_final = NULL;
    struct message* msg = NULL;
+   struct common_configuration* config;
 
    pgmoneta_memory_init();
 
-   if (pgmoneta_get_home_directory() == NULL)
-   {
-      goto error;
-   }
+   config = (struct common_configuration*)shmem;
 
    memset(&key_file, 0, sizeof(key_file));
-   snprintf(&key_file[0], sizeof(key_file), "%s/.pgmoneta/pgmoneta.key", pgmoneta_get_home_directory());
+   snprintf(&key_file[0], sizeof(key_file), "%s/.pgmoneta/pgmoneta.key", config->home_dir);
 
    memset(&cert_file, 0, sizeof(cert_file));
-   snprintf(&cert_file[0], sizeof(cert_file), "%s/.pgmoneta/pgmoneta.crt", pgmoneta_get_home_directory());
+   snprintf(&cert_file[0], sizeof(cert_file), "%s/.pgmoneta/pgmoneta.crt", config->home_dir);
 
    memset(&root_file, 0, sizeof(root_file));
-   snprintf(&root_file[0], sizeof(root_file), "%s/.pgmoneta/root.crt", pgmoneta_get_home_directory());
+   snprintf(&root_file[0], sizeof(root_file), "%s/.pgmoneta/root.crt", config->home_dir);
 
    if (stat(&key_file[0], &st) == 0)
    {
@@ -1768,17 +1766,16 @@ pgmoneta_get_master_key(char** masterkey)
    char* mk = NULL;
    size_t mk_length = 0;
    struct stat st = {0};
+   struct common_configuration* config;
 
-   if (pgmoneta_get_home_directory() == NULL)
-   {
-      goto error;
-   }
+   config = (struct common_configuration*)shmem;
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", pgmoneta_get_home_directory());
+   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta", config->home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
+      pgmoneta_log_debug("No stat for directory: %s", &buf[0]);
       goto error;
    }
    else
@@ -1789,15 +1786,17 @@ pgmoneta_get_master_key(char** masterkey)
       }
       else
       {
+         pgmoneta_log_debug("Directory is incorrect: %d", st.st_mode);
          goto error;
       }
    }
 
    memset(&buf, 0, sizeof(buf));
-   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", pgmoneta_get_home_directory());
+   snprintf(&buf[0], sizeof(buf), "%s/.pgmoneta/master.key", config->home_dir);
 
    if (stat(&buf[0], &st) == -1)
    {
+      pgmoneta_log_debug("No stat for master key: %s", &buf[0]);
       goto error;
    }
    else
@@ -1808,6 +1807,7 @@ pgmoneta_get_master_key(char** masterkey)
       }
       else
       {
+         pgmoneta_log_debug("File is incorrect: %d", st.st_mode);
          goto error;
       }
    }
@@ -1821,10 +1821,15 @@ pgmoneta_get_master_key(char** masterkey)
    memset(&line, 0, sizeof(line));
    if (fgets(line, sizeof(line), master_key_file) == NULL)
    {
+      pgmoneta_log_debug("Can't read line");
       goto error;
    }
 
-   pgmoneta_base64_decode(&line[0], strlen(&line[0]), (void**)&mk, &mk_length);
+   if (pgmoneta_base64_decode(&line[0], strlen(&line[0]), (void**)&mk, &mk_length))
+   {
+      pgmoneta_log_debug("Can't decode master key");
+      goto error;
+   }
 
    *masterkey = mk;
 

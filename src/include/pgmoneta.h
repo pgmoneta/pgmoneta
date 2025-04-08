@@ -308,6 +308,8 @@ struct prometheus
  */
 struct common_configuration
 {
+   char home_dir[MAX_PATH];                        /**< The home directory */
+
    int log_type;                                   /**< The logging type */
    int log_level;                                  /**< The logging level */
    char log_path[MISC_LENGTH];                     /**< The logging path */

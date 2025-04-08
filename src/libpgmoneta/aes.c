@@ -886,20 +886,20 @@ encrypt_file(char* from, char* to, int enc)
 
    if (pgmoneta_get_master_key(&master_key))
    {
-      pgmoneta_log_fatal("pgmoneta_get_master_key: Invalid master key");
+      pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
       goto error;
    }
    memset(&key, 0, sizeof(key));
    memset(&iv, 0, sizeof(iv));
    if (derive_key_iv(master_key, key, iv, config->encryption) != 0)
    {
-      pgmoneta_log_fatal("derive_key_iv: Failed to derive key and iv");
+      pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
       goto error;
    }
 
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
-      pgmoneta_log_fatal("EVP_CIPHER_CTX_new: Failed to get context");
+      pgmoneta_log_error("EVP_CIPHER_CTX_new: Failed to get context");
       goto error;
    }
 
@@ -1097,10 +1097,7 @@ error:
       EVP_CIPHER_CTX_free(ctx);
    }
 
-   if (master_key)
-   {
-      free(master_key);
-   }
+   free(master_key);
 
    return 1;
 }

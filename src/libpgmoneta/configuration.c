@@ -98,6 +98,7 @@ static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* c
 int
 pgmoneta_init_main_configuration(void* shm)
 {
+   char* home_dir = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shm;
@@ -124,6 +125,9 @@ pgmoneta_init_main_configuration(void* shm)
    config->blocking_timeout = DEFAULT_BLOCKING_TIMEOUT;
    config->authentication_timeout = 5;
 
+   home_dir = pgmoneta_get_home_directory();
+   memcpy(&config->common.home_dir, home_dir, strlen(home_dir));
+
    config->common.keep_alive = true;
    config->common.nodelay = true;
    config->common.non_blocking = true;
@@ -145,6 +149,8 @@ pgmoneta_init_main_configuration(void* shm)
 #ifdef DEBUG
    config->link = true;
 #endif
+
+   free(home_dir);
 
    return 0;
 }

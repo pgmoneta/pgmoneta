@@ -814,14 +814,17 @@ pgmoneta_libev_engine(unsigned int val)
 char*
 pgmoneta_get_home_directory(void)
 {
-   struct passwd* pw = getpwuid(getuid());
+   char* dir = NULL;
 
-   if (pw == NULL)
-   {
-      return NULL;
-   }
+#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+   #define GET_ENV(name) getenv(name)
+#else
+   #define GET_ENV(name) secure_getenv(name)
+#endif
 
-   return pw->pw_dir;
+   dir = pgmoneta_append(dir, GET_ENV("HOME"));
+
+   return dir;
 }
 
 char*
