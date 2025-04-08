@@ -140,13 +140,13 @@ You can stop the container using
 - **Using Docker**
 
 ```sh
-docker stop ppgmoneta
+docker stop pgmoneta
 ```
 
 - **Using Podman**
 
 ```sh
-podman stop ppgmoneta
+podman stop pgmoneta
 ```
 
 You can exec into the container and run the cli commands as
