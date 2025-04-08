@@ -428,7 +428,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       if (generate_pwd)
       {
          password = generate_password(pwd_length);
-         do_free = false;
+         do_free = true;
       }
       else
       {
