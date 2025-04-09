@@ -39,7 +39,6 @@
 #include <err.h>
 #include <errno.h>
 #include <ev.h>
-#include <execinfo.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <libgen.h>
@@ -66,6 +65,10 @@
 
 #ifndef EVBACKEND_IOURING
 #define EVBACKEND_IOURING  0x00000080U
+#endif
+
+#ifdef  HAVE_EXECINFO_H
+#include <execinfo.h>
 #endif
 
 extern char** environ;
@@ -4923,7 +4926,7 @@ error:
 int
 pgmoneta_backtrace(void)
 {
-#ifdef HAVE_LINUX
+#ifdef  HAVE_EXECINFO_H
    void* bt[1024];
    char* log_str = NULL;
    size_t bt_size;

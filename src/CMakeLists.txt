@@ -13,7 +13,11 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
   add_compile_options(-DHAVE_LINUX)
   add_compile_options(-D_POSIX_C_SOURCE=200809L)
-
+  
+  check_include_file("execinfo.h" HAVE_EXECINFO_H)
+  if (HAVE_EXECINFO_H)
+    add_compile_options(-DHAVE_EXECINFO_H)
+  endif()
   #
   # Include directories
   #
