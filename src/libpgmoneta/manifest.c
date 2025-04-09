@@ -363,3 +363,83 @@ build_tree(struct art* tree, struct csv_reader* reader, char** f)
       free(entry);
    }
 }
+
+char*
+pgmoneta_convert_manifest_to_pg_format(char* manifest_path)
+{
+   struct json_reader* reader = NULL;
+   struct json* file = NULL;
+   char* output = NULL;
+   size_t output_size = 4096;
+   char* key_path[1] = {"Files"};
+
+   output = malloc(output_size);
+   if (!output)
+   {
+      pgmoneta_log_error("Failed to allocate memory for converted manifest");
+      return NULL;
+   }
+   memset(output, 0, output_size);
+
+   if (pgmoneta_json_reader_init(manifest_path, &reader))
+   {
+      pgmoneta_log_error("Unable to open manifest JSON file: %s", manifest_path);
+      free(output);
+      return NULL;
+   }
+
+   if (pgmoneta_json_locate(reader, key_path, 1))
+   {
+      pgmoneta_log_error("Missing 'Files' array in manifest JSON");
+      pgmoneta_json_reader_close(reader);
+      free(output);
+      return NULL;
+   }
+
+   while (pgmoneta_json_next_array_item(reader, &file))
+   {
+      char* path = (char*)pgmoneta_json_get(file, "Path");
+      char* size = (char*)pgmoneta_json_get(file, "Size");
+      char* checksum = (char*)pgmoneta_json_get(file, "Checksum");
+
+      if (!path || !size || !checksum)
+      {
+         pgmoneta_log_error("Missing required field in manifest entry");
+         pgmoneta_json_destroy(file);
+         continue;
+      }
+
+      char line[512];
+      snprintf(line, sizeof(line), "%s,%s,%s\n", path, size, checksum);
+
+      if (strlen(output) + strlen(line) >= output_size - 1)
+      {
+         output_size += 4096; 
+         char* new_output = realloc(output, output_size);
+         if (!new_output)
+         {
+            pgmoneta_log_error("Memory reallocation failed during manifest conversion");
+            pgmoneta_json_reader_close(reader);
+            free(output);
+            return NULL;
+         }
+         output = new_output;
+         memset(output + strlen(output), 0, output_size - strlen(output)); 
+      }
+
+      strncat(output, line, output_size - strlen(output) - 1);
+      pgmoneta_json_destroy(file);
+      file = NULL;
+   }
+
+   size_t len = strlen(output);
+   if (len > 0 && output[len - 1] == '\n')
+   {
+      output[len - 1] = '\0';
+   }
+
+   pgmoneta_json_reader_close(reader);
+   return output;
+}
+
+
