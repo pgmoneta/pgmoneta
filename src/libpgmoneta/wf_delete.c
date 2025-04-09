@@ -305,15 +305,12 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
 
          pgmoneta_relink(from, to, workers);
 
-         if (number_of_workers > 0)
+         pgmoneta_workers_wait(workers);
+         if (workers != NULL && !workers->outcome)
          {
-            pgmoneta_workers_wait(workers);
-            if (!workers->outcome)
-            {
-               goto error;
-            }
-            pgmoneta_workers_destroy(workers);
+            goto error;
          }
+         pgmoneta_workers_destroy(workers);
 
          /* Delete from */
          pgmoneta_delete_directory(d);
@@ -344,15 +341,12 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
 
          pgmoneta_relink(from, to, workers);
 
-         if (number_of_workers > 0)
+         pgmoneta_workers_wait(workers);
+         if (workers != NULL && !workers->outcome)
          {
-            pgmoneta_workers_wait(workers);
-            if (!workers->outcome)
-            {
-               goto error;
-            }
-            pgmoneta_workers_destroy(workers);
+            goto error;
          }
+         pgmoneta_workers_destroy(workers);
 
          /* Delete from */
          pgmoneta_delete_directory(d);

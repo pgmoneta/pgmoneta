@@ -144,15 +144,12 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
       pgmoneta_gzip_tablespaces(backup_base, workers);
 
-      if (number_of_workers > 0)
+      pgmoneta_workers_wait(workers);
+      if (workers != NULL && !workers->outcome)
       {
-         pgmoneta_workers_wait(workers);
-         if (!workers->outcome)
-         {
-            goto error;
-         }
-         pgmoneta_workers_destroy(workers);
+         goto error;
       }
+      pgmoneta_workers_destroy(workers);
    }
    else
    {
@@ -262,11 +259,8 @@ gzip_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_gunzip_data(base, workers);
 
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_wait(workers);
-      pgmoneta_workers_destroy(workers);
-   }
+   pgmoneta_workers_wait(workers);
+   pgmoneta_workers_destroy(workers);
 
    total_seconds = (int)difftime(time(NULL), decompress_time);
    hours = total_seconds / 3600;

@@ -303,13 +303,10 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_log_debug("hot_standby source:      %s", source);
       pgmoneta_log_debug("hot_standby destination: %s", destination);
 
-      if (number_of_workers > 0)
+      pgmoneta_workers_wait(workers);
+      if (workers != NULL && !workers->outcome)
       {
-         pgmoneta_workers_wait(workers);
-         if (!workers->outcome)
-         {
-            goto error;
-         }
+         goto error;
       }
 
       if (strlen(config->common.servers[server].hot_standby_overrides) > 0 &&
@@ -325,15 +322,12 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
                                  workers);
       }
 
-      if (number_of_workers > 0)
+      pgmoneta_workers_wait(workers);
+      if (workers != NULL && !workers->outcome)
       {
-         pgmoneta_workers_wait(workers);
-         if (!workers->outcome)
-         {
-            goto error;
-         }
-         pgmoneta_workers_destroy(workers);
+         goto error;
       }
+      pgmoneta_workers_destroy(workers);
 
 #ifdef HAVE_FREEBSD
       clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -386,6 +380,8 @@ error:
 
    free(old_manifest);
    free(new_manifest);
+
+   pgmoneta_workers_destroy(workers);
 
    if (source_root != NULL)
    {

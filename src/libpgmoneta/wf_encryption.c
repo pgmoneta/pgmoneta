@@ -147,15 +147,12 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
 
-      if (number_of_workers > 0)
+      pgmoneta_workers_wait(workers);
+      if (workers != NULL && !workers->outcome)
       {
-         pgmoneta_workers_wait(workers);
-         if (!workers->outcome)
-         {
-            goto error;
-         }
-         pgmoneta_workers_destroy(workers);
+         goto error;
       }
+      pgmoneta_workers_destroy(workers);
    }
    else
    {
@@ -297,11 +294,8 @@ decryption_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_decrypt_directory(base, workers);
 
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_wait(workers);
-      pgmoneta_workers_destroy(workers);
-   }
+   pgmoneta_workers_wait(workers);
+   pgmoneta_workers_destroy(workers);
 
    total_seconds = (int)difftime(time(NULL), decrypt_time);
    hours = total_seconds / 3600;

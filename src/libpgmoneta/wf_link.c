@@ -176,15 +176,12 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_compare_manifests(to_manifest, from_manifest, &deleted_files, &changed_files, &added_files);
          pgmoneta_link_manifest(from, to, from, changed_files, added_files, workers);
 
-         if (number_of_workers > 0)
+         pgmoneta_workers_wait(workers);
+         if (workers != NULL && !workers->outcome)
          {
-            pgmoneta_workers_wait(workers);
-            if (!workers->outcome)
-            {
-               goto error;
-            }
-            pgmoneta_workers_destroy(workers);
+            goto error;
          }
+         pgmoneta_workers_destroy(workers);
 
 #ifdef HAVE_FREEBSD
          clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -229,10 +226,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
 
 error:
 
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_destroy(workers);
-   }
+   pgmoneta_workers_destroy(workers);
 
    for (int i = 0; i < number_of_backups; i++)
    {

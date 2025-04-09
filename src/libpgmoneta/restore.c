@@ -34,6 +34,7 @@
 #include <restore.h>
 #include <security.h>
 #include <utils.h>
+#include <workers.h>
 #include <workflow.h>
 
 /* system */
@@ -45,8 +46,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
-
-#include "backup.h"
 
 #define NAME "restore"
 #define RESTORE_OK            0
@@ -682,13 +681,11 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       goto error;
    }
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
+      goto error;
    }
 
    // round 2 for each tablespaces
@@ -740,14 +737,11 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       }
    }
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
-      pgmoneta_workers_destroy(workers);
+      goto error;
    }
 
    if (incremental)
@@ -772,16 +766,14 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       goto error;
    }
 
+   pgmoneta_workers_destroy(workers);
    pgmoneta_art_destroy(backups);
    pgmoneta_deque_iterator_destroy(iter);
    free(server_dir);
    return 0;
 
 error:
-   if (number_of_workers > 0)
-   {
-      pgmoneta_workers_destroy(workers);
-   }
+   pgmoneta_workers_destroy(workers);
    pgmoneta_art_destroy(backups);
    pgmoneta_deque_iterator_destroy(iter);
    free(server_dir);
@@ -1120,10 +1112,7 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
       goto error;
    }
 
-   if (workers != NULL)
-   {
-      pgmoneta_workers_wait(workers);
-   }
+   pgmoneta_workers_wait(workers);
 
    if (restore_last_files_names != NULL)
    {
@@ -1133,15 +1122,14 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
       }
       free(restore_last_files_names);
    }
+
+   pgmoneta_workers_destroy(workers);
 
    return 0;
 
 error:
 
-   if (workers != NULL)
-   {
-      pgmoneta_workers_wait(workers);
-   }
+   pgmoneta_workers_wait(workers);
 
    if (restore_last_files_names != NULL)
    {
@@ -1151,6 +1139,8 @@ error:
       }
       free(restore_last_files_names);
    }
+
+   pgmoneta_workers_destroy(workers);
 
    return 1;
 }

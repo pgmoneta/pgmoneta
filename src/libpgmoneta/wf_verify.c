@@ -194,15 +194,12 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
       columns = NULL;
    }
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
-      pgmoneta_workers_destroy(workers);
+      goto error;
    }
+   pgmoneta_workers_destroy(workers);
 
    pgmoneta_deque_list(failed_deque);
    pgmoneta_deque_list(all_deque);

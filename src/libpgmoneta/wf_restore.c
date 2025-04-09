@@ -228,15 +228,12 @@ restore_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
-      pgmoneta_workers_destroy(workers);
+      goto error;
    }
+   pgmoneta_workers_destroy(workers);
 
    free(from);
    free(origwal);
@@ -791,15 +788,12 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_copy_wal_files(waldir, waltarget, &backup->wal[0], workers);
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
-      pgmoneta_workers_destroy(workers);
+      goto error;
    }
+   pgmoneta_workers_destroy(workers);
 
    free(origwal);
    free(waldir);
@@ -948,15 +942,12 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
       to_file = NULL;
    }
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         goto error;
-      }
-      pgmoneta_workers_destroy(workers);
+      goto error;
    }
+   pgmoneta_workers_destroy(workers);
 
    for (int i = 0; restore_last_files_names[i] != NULL; i++)
    {

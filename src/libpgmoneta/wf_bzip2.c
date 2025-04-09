@@ -141,15 +141,12 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_bzip2_data(backup_data, workers);
       pgmoneta_bzip2_tablespaces(backup_base, workers);
 
-      if (number_of_workers > 0)
+      pgmoneta_workers_wait(workers);
+      if (workers != NULL && !workers->outcome)
       {
-         pgmoneta_workers_wait(workers);
-         if (!workers->outcome)
-         {
-            ret = 1;
-         }
-         pgmoneta_workers_destroy(workers);
+         ret = 1;
       }
+      pgmoneta_workers_destroy(workers);
    }
    else
    {
@@ -257,15 +254,12 @@ bzip2_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
 
    ret = pgmoneta_bunzip2_data(base, workers);
 
-   if (number_of_workers > 0)
+   pgmoneta_workers_wait(workers);
+   if (workers != NULL && !workers->outcome)
    {
-      pgmoneta_workers_wait(workers);
-      if (!workers->outcome)
-      {
-         ret = 1;
-      }
-      pgmoneta_workers_destroy(workers);
+      ret = 1;
    }
+   pgmoneta_workers_destroy(workers);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
