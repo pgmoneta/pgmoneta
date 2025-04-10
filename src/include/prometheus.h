@@ -35,6 +35,7 @@ extern "C" {
 
 #include <ev.h>
 #include <stdlib.h>
+#include <openssl/ssl.h>
 
 /*
  * Value to disable the Prometheus cache,
@@ -59,10 +60,11 @@ extern "C" {
 
 /**
  * Create a prometheus instance
+ * @param client_ssl The client SSL structure
  * @param fd The client descriptor
  */
 void
-pgmoneta_prometheus(int fd);
+pgmoneta_prometheus(SSL* client_ssl, int fd);
 
 /**
  * Reset the counters and histograms
