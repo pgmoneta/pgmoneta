@@ -117,6 +117,21 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label);
 int
 pgmoneta_extract_incremental_backup(int server, char* label, char** root, char** base);
 
+/**
+ * Get an approximate size of a backup repository
+ * The goal is to iterate over all file entries in the manifest. If an entry represents an incremental 
+ * file, retrieve its block_length using the file’s truncated_block_length (which indicates the total 
+ * number of blocks in the fully restored file). For non-incremental files, simply use the size value 
+ * directly from the file entry in the manifest.
+ * @param server The server
+ * @param label The label
+ * @param size [out] The size of the incremental backup
+ * @param biggest_file_size [out] The size of the biggest file in the incremental backup
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size);
+
 #ifdef __cplusplus
 }
 #endif
