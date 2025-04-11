@@ -46,6 +46,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
+#include <libgen.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -240,7 +241,7 @@ static uint32_t
 find_reconstructed_block_length(struct rfile* s);
 
 static int
-rfile_create(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile);
+rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
 
 static void
 rfile_destroy(struct rfile* rf);
@@ -249,7 +250,7 @@ static void
 rfile_destroy_cb(uintptr_t data);
 
 static int
-incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile);
+incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
 
 static bool
 is_full_file(struct rfile* rf);
@@ -301,6 +302,18 @@ create_workspace_directories(int server, struct deque* labels, char* relative_pr
  */
 static int
 construct_backup_label_chain(int server, char* newest_label, char* oldest_label, bool inclusive, struct deque** labels);
+
+/**
+ * Best effort to split a file path into a relative path and a bare file name
+ * a wrapper around `dirname()`
+ * @note The function will not modify the input path as we are dealing with a copy
+ * @param path The file path
+ * @param relative_path [out] The relative path
+ * @param bare_file_name [out] The bare file name
+ * @return 0 on success, 1 if otherwise
+ */
+static int
+split_file_path(char* path, char** relative_path, char** bare_file_name);
 
 int
 pgmoneta_get_restore_last_files_names(char*** output)
@@ -815,6 +828,101 @@ error:
    pgmoneta_art_destroy(backups);
    pgmoneta_deque_iterator_destroy(iter);
    free(server_dir);
+   return 1;
+}
+
+int
+pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size)
+{
+   struct json* manifest_read = NULL;
+   struct json* files = NULL;
+   struct main_configuration* config = NULL;
+   struct json_iterator *iter = NULL;
+   char* manifest_path = NULL;
+   unsigned long sz = 0;
+   uint64_t biggest_file_sz = 0;
+
+   config = (struct main_configuration*)shmem;
+
+   // read and traverse the manifest of the incremental backup
+   manifest_path = pgmoneta_get_server_backup_identifier_data(server, label);
+   manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
+   if (pgmoneta_json_read_file(manifest_path, &manifest_read))
+   {
+      pgmoneta_log_error("Unable to read manifest %s", manifest_path);
+      goto error;
+   }
+
+   files = (struct json*)pgmoneta_json_get(manifest_read, MANIFEST_FILES);
+
+   if (files == NULL)
+   {
+      goto error;
+   }
+
+   pgmoneta_json_iterator_create(files, &iter);
+   while (pgmoneta_json_iterator_next(iter))
+   {
+      struct json* file = NULL;
+      char* file_path = NULL;
+      uint64_t file_size = 0;
+
+      file = (struct json*)pgmoneta_value_data(iter->value);
+      file_path = (char*)pgmoneta_json_get(file, "Path");
+      /* for incremental files get the `truncated_block_length` */
+      if (pgmoneta_is_incremental_path(file_path))
+      {  
+         struct rfile* rf = NULL;
+         uint32_t block_length = 0;
+         char* relative_path = NULL;
+         char* bare_file_name = NULL;
+
+         if (split_file_path(file_path, &relative_path, &bare_file_name))
+         {
+            pgmoneta_log_error("Unable to split file path %s", file_path);
+            goto error;
+         }
+
+         if (incremental_rfile_initialize(server, label, relative_path, bare_file_name, ENCRYPTION_NONE, COMPRESSION_NONE, &rf))
+         {
+            pgmoneta_log_error("Unable to create rfile %s", bare_file_name);
+            goto error;
+         }
+         block_length = find_reconstructed_block_length(rf);
+         if (block_length == 0)
+         {
+            pgmoneta_log_error("Unable to find block length for %s", bare_file_name);
+            goto error;
+         }
+         file_size = block_length * config->common.servers[server].block_size;
+         rfile_destroy(rf);
+         free(relative_path);
+         free(bare_file_name);
+      }
+      /* for non-incremental files get the file size from manifest itself */
+      else
+      {
+         file_size = (uint64_t)pgmoneta_json_get(file, "Size");
+      }
+
+      if (file_size > biggest_file_sz)
+      {
+         biggest_file_sz = file_size;
+      }
+      sz += file_size;
+   }
+   pgmoneta_json_iterator_destroy(iter);
+
+   *size = sz;
+   *biggest_file_size = biggest_file_sz;
+
+   pgmoneta_json_destroy(manifest_read);
+   free(manifest_path);
+   return 0;
+
+error:
+   pgmoneta_json_destroy(manifest_read);
+   free(manifest_path);
    return 1;
 }
 
@@ -1335,8 +1443,8 @@ reconstruct_backup_file(int server,
    memset(incr_file_name, 0, MAX_PATH);
    snprintf(incr_file_name, MAX_PATH, "%s%s", INCREMENTAL_PREFIX, base_file_name);
    // handle the latest file specially, it is the only file that can only be incremental
-   if (incremental_rfile_initialize(server, label, relative_dir, incr_file_name,
-                                    (struct backup*)pgmoneta_art_search(backups, label), &latest_source))
+   bck = (struct backup*)pgmoneta_art_search(backups, label);
+   if (incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, &latest_source))
    {
       goto error;
    }
@@ -1394,9 +1502,9 @@ reconstruct_backup_file(int server,
       // 2. final base name (with compression/encryption suffix, no incremental prefix)
       // 3. base incr name (without compression/encryption suffix, with incremental prefix)
       // 4. final incr name (with compression/encryption suffix, and incremental prefix)
-      if (rfile_create(server, prior_label, relative_dir, base_file_name, bck, &rf))
+      if (rfile_create(server, prior_label, relative_dir, base_file_name, bck->encryption, bck->compression, &rf))
       {
-         if (incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck, &rf))
+         if (incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck->encryption, bck->compression, &rf))
          {
             goto error;
          }
@@ -1615,7 +1723,7 @@ find_reconstructed_block_length(struct rfile* s)
 }
 
 static int
-rfile_create(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile)
+rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
 {
    struct rfile* rf = NULL;
    char* extracted_file_path = NULL;
@@ -1638,7 +1746,7 @@ rfile_create(int server, char* label, char* relative_dir, char* base_file_name, 
    {
       free(extracted_file_path);
       extracted_file_path = NULL;
-      pgmoneta_file_finalname(base_relative_path, backup->encryption, backup->compression, &final_relative_path);
+      pgmoneta_file_finalname(base_relative_path, encryption, compression, &final_relative_path);
       if (pgmoneta_extract_backup_file(server, label, final_relative_path, NULL, &extracted_file_path))
       {
          goto error;
@@ -1696,7 +1804,7 @@ rfile_destroy_cb(uintptr_t data)
 }
 
 static int
-incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile)
+incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
 {
    uint32_t magic = 0;
    int nread = 0;
@@ -1719,7 +1827,7 @@ incremental_rfile_initialize(int server, char* label, char* relative_dir, char* 
     */
 
    // create rfile after file is opened successfully
-   if (rfile_create(server, label, relative_dir, base_file_name, backup, &rf))
+   if (rfile_create(server, label, relative_dir, base_file_name, encryption, compression, &rf))
    {
       pgmoneta_log_error("rfile initialize: failed to open incremental backup (label %s) file at %s/%s", label, relative_dir, base_file_name);
       goto error;
@@ -1790,6 +1898,52 @@ incremental_rfile_initialize(int server, char* label, char* relative_dir, char* 
 error:
    // contains fp closing logic
    rfile_destroy(rf);
+   return 1;
+}
+
+static int
+split_file_path(char* path, char** relative_path, char** bare_file_name)
+{
+   int relative_path_len = 0;
+   
+   char* path_copy = NULL;
+   char* rel_path = NULL;
+   char* file_name = NULL;
+
+   path_copy = pgmoneta_append(path_copy, path);
+
+   if (path_copy == NULL || !strcmp(path_copy, ".") || !strcmp(path_copy, ".."))
+   {
+      goto error;
+   }
+
+   rel_path = dirname(path_copy);
+
+   /* don't use path_copy from this point onwards */
+   relative_path_len = strlen(rel_path);
+
+   /* path is only the filename (doesn't contain any '/') */
+   if (!strcmp(rel_path, "."))
+   {
+      file_name = pgmoneta_append(file_name, path);
+   }
+
+   /* path is the root directory */
+   if (!strcmp(rel_path, "/"))
+   {
+      file_name = pgmoneta_append(file_name, path + relative_path_len);
+   }
+
+   if (file_name == NULL)
+   {
+      file_name = pgmoneta_append(file_name, path + relative_path_len + 1);
+   }
+   *relative_path = rel_path;
+   *bare_file_name = file_name;
+
+   return 0;
+error:
+   free(path_copy);
    return 1;
 }
 
@@ -2344,6 +2498,8 @@ restore_backup_incremental(struct art* nodes)
    struct json* manifest = NULL;
    struct workflow* workflow = NULL;
    struct main_configuration* config;
+   uint64_t free_space = 0;
+   uint64_t required_space = 0;
 
    config = (struct main_configuration*)shmem;
 
@@ -2381,7 +2537,27 @@ restore_backup_incremental(struct art* nodes)
    }
    pgmoneta_art_insert(nodes, NODE_MANIFEST, (uintptr_t)manifest, ValueJSON);
 
-   //TODO: free space check during incr restore should be handled specially
+   free_space = pgmoneta_free_space(target_root_combine);
+   required_space =
+      backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+   
+   if (free_space < required_space)
+   {
+      char* f = NULL;
+      char* r = NULL;
+
+      f = pgmoneta_translate_file_size(free_space);
+      r = pgmoneta_translate_file_size(required_space);
+
+      pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
+                         config->common.servers[server].name, backup->label, target_root_combine, f, r);
+
+      free(f);
+      free(r);
+
+      ret = RESTORE_NO_DISK_SPACE;
+      goto error;
+   }
 
    pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root_combine, ValueString);
    pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_combine, ValueString);
