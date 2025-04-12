@@ -72,6 +72,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct json* req = NULL;
    struct json* response = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
    pgmoneta_start_logging();
 
@@ -235,8 +236,10 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
 
    size = pgmoneta_directory_size(d);
-   pgmoneta_update_info_unsigned_long(root, INFO_BACKUP, size);
-
+   pgmoneta_get_backup(root, NULL, &temp_backup);
+   temp_backup->backup_size = size;
+   pgmoneta_save_info(root, NULL, temp_backup);
+   temp_backup = NULL;
    if (pgmoneta_management_create_response(payload, server, &response))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;
@@ -268,7 +271,13 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_update_info_double(root, INFO_ELAPSED, total_seconds);
+   if (pgmoneta_get_backup(root, NULL, &temp_backup))
+   {
+      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+      goto error;
+   }
+   temp_backup->total_elapsed_time = total_seconds;
+   pgmoneta_save_info(root, NULL, temp_backup);
    pgmoneta_update_sha512(root, "backup.info");
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
@@ -294,6 +303,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    {
       free(backups[i]);
    }
+   free(temp_backup);
    free(backups);
    free(backup);
    free(child);

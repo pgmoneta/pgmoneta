@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
+#include <info.h>
 
 /* system */
 #include <dirent.h>
