@@ -302,6 +302,12 @@ create_workspace_directories(int server, struct deque* labels, char* relative_pr
 static int
 construct_backup_label_chain(int server, char* newest_label, char* oldest_label, bool inclusive, struct deque** labels);
 
+static int
+file_base_name(char* file, char** basename);
+
+static int
+file_final_name(char* file, int encryption, int compression, char** finalname);
+
 int
 pgmoneta_get_restore_last_files_names(char*** output)
 {
@@ -1328,7 +1334,7 @@ reconstruct_backup_file(int server,
    pgmoneta_deque_create(false, &sources);
 
    // either bare_file_name nor base_file_name contains the incremental prefix
-   pgmoneta_file_basename(bare_file_name, &base_file_name);
+   file_base_name(bare_file_name, &base_file_name);
 
    // Note that we are working directly on backup archive, so bare file name could include compression/encryption suffix
    // and bare file name is alway stripped from the INCREMENTAL. prefix
@@ -1563,7 +1569,7 @@ copy_backup_file(int server,
       }
    }
 
-   pgmoneta_file_basename(file_name, &base_file_name);
+   file_base_name(file_name, &base_file_name);
 
    if (excluded && exclude)
    {
@@ -1638,7 +1644,7 @@ rfile_create(int server, char* label, char* relative_dir, char* base_file_name, 
    {
       free(extracted_file_path);
       extracted_file_path = NULL;
-      pgmoneta_file_finalname(base_relative_path, backup->encryption, backup->compression, &final_relative_path);
+      file_final_name(base_relative_path, backup->encryption, backup->compression, &final_relative_path);
       if (pgmoneta_extract_backup_file(server, label, final_relative_path, NULL, &extracted_file_path))
       {
          goto error;
@@ -2751,4 +2757,92 @@ create_copy_backup_file_input(
    memcpy(input->file_name, file_name, strlen(file_name));
    input->exclude = exclude;
    *wi = input;
+}
+
+static int
+file_base_name(char* file, char** basename)
+{
+   char* b = NULL;
+
+   *basename = NULL;
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   b = pgmoneta_append(b, file);
+   if (pgmoneta_is_encrypted(b))
+   {
+      char* new_b = NULL;
+
+      if (pgmoneta_strip_extension(b, &new_b))
+      {
+         goto error;
+      }
+
+      free(b);
+      b = new_b;
+   }
+
+   if (pgmoneta_is_compressed(b))
+   {
+      char* new_b = NULL;
+
+      if (pgmoneta_strip_extension(b, &new_b))
+      {
+         goto error;
+      }
+
+      free(b);
+      b = new_b;
+   }
+
+   *basename = b;
+   return 0;
+
+   error:
+      free(b);
+   return 1;
+}
+
+static int
+file_final_name(char* file, int encryption, int compression, char** finalname)
+{
+   char* final = NULL;
+
+   *finalname = NULL;
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   final = pgmoneta_append(final, file);
+   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
+   {
+      final = pgmoneta_append(final, ".gz");
+   }
+   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
+   {
+      final = pgmoneta_append(final, ".zstd");
+   }
+   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
+   {
+      final = pgmoneta_append(final, ".lz4");
+   }
+   else if (compression == COMPRESSION_CLIENT_BZIP2)
+   {
+      final = pgmoneta_append(final, ".bz2");
+   }
+
+   if (encryption != ENCRYPTION_NONE)
+   {
+      final = pgmoneta_append(final, ".aes");
+   }
+
+   *finalname = final;
+   return 0;
+
+   error:
+      free(final);
+   return 1;
 }

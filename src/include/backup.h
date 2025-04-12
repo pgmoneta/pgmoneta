@@ -92,27 +92,6 @@ pgmoneta_get_backup_max_rate(int server);
 int
 pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file);
 
-/**
- * Strip the compression/encryption suffix from a file path
- * @param file The file path
- * @param basename [out] The base file path with its compression/encryption suffix stripped,
- * or a copy of the original path if it has none of the suffix
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_file_basename(char* file, char** basename);
-
-/**
- * Add the compression/encryption suffix into a file path
- * @param file The base file path
- * @param encryption The encryption method
- * @param compression The compression method
- * @param finalname [out] The base file path with its compression/encryption suffix added
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_file_finalname(char* file, int encryption, int compression, char** finalname);
-
 #ifdef __cplusplus
 }
 #endif

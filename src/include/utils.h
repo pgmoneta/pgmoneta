@@ -771,15 +771,6 @@ int
 pgmoneta_strip_extension(char* s, char** name);
 
 /**
- * Get basename from a file path
- * @param path The file path
- * @param basename The resulting basename
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_file_basename(char* path, char** basename);
-
-/**
  * Get the translated size of a file
  * @param size The size
  * @return The result
