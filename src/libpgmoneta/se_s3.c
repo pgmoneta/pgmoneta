@@ -293,8 +293,8 @@ error:
 static int
 s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 {
-   char short_date[SHORT_TIME_LENGHT];
-   char long_date[LONG_TIME_LENGHT];
+   char short_date[SHORT_TIME_LENGTH];
+   char long_date[LONG_TIME_LENGTH];
    char* canonical_request = NULL;
    char* auth_value = NULL;
    char* string_to_sign = NULL;
@@ -365,7 +365,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    key = pgmoneta_append(key, "AWS4");
    key = pgmoneta_append(key, config->s3_secret_access_key);
 
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGHT - 1, &date_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
    {
       goto error;
    }

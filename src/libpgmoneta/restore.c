@@ -308,6 +308,15 @@ file_base_name(char* file, char** basename);
 static int
 file_final_name(char* file, int encryption, int compression, char** finalname);
 
+static int copy_tablespaces_restore(char *from, char *to, char *base,
+                                    char *server, char *id,
+                                    struct backup *backup,
+                                    struct workers *workers);
+static int copy_tablespaces_hotstandby(char *from, char *to,
+                                       char *tblspc_mappings,
+                                       struct backup *backup,
+                                       struct workers *workers);
+
 int
 pgmoneta_get_restore_last_files_names(char*** output)
 {
@@ -1048,6 +1057,213 @@ error:
    free(backup_root);
    pgmoneta_art_destroy(nodes);
    free(backup);
+   return 1;
+}
+
+int
+pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)
+{
+   DIR* d = opendir(from);
+   char* from_buffer = NULL;
+   char* to_buffer = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+   char** restore_last_files_names = NULL;
+
+   if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))
+   {
+      goto error;
+   }
+
+   if (restore_last_files_names != NULL)
+   {
+      for (int i = 0; restore_last_files_names[i] != NULL; i++)
+      {
+         char* temp = NULL;
+         temp = (char*)malloc((strlen(restore_last_files_names[i]) + strlen(from)) * sizeof(char) + 1);
+
+         if (temp == NULL)
+         {
+            goto error;
+         }
+         snprintf(temp, strlen(from) + strlen(restore_last_files_names[i]) + 1, "%s%s", from, restore_last_files_names[i]);
+         free(restore_last_files_names[i]);
+
+         restore_last_files_names[i] = temp;
+      }
+   }
+
+   pgmoneta_mkdir(to);
+
+   if (d)
+   {
+      while ((entry = readdir(d)))
+      {
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         from_buffer = pgmoneta_append(from_buffer, from);
+         if (!pgmoneta_ends_with(from_buffer, "/"))
+         {
+            from_buffer = pgmoneta_append(from_buffer, "/");
+         }
+         from_buffer = pgmoneta_append(from_buffer, entry->d_name);
+
+         to_buffer = pgmoneta_append(to_buffer, to);
+         if (!pgmoneta_ends_with(to_buffer, "/"))
+         {
+            to_buffer = pgmoneta_append(to_buffer, "/");
+         }
+         to_buffer = pgmoneta_append(to_buffer, entry->d_name);
+
+         if (!stat(from_buffer, &statbuf))
+         {
+            if (S_ISDIR(statbuf.st_mode))
+            {
+               if (!strcmp(entry->d_name, "pg_tblspc"))
+               {
+                  copy_tablespaces_restore(from, to, base, server, id, backup, workers);
+               }
+               else
+               {
+                  pgmoneta_copy_directory(from_buffer, to_buffer, restore_last_files_names, workers);
+               }
+            }
+            else
+            {
+               bool file_is_excluded = false;
+               if (restore_last_files_names != NULL)
+               {
+                  for (int i = 0; restore_last_files_names[i] != NULL; i++)
+                  {
+                     file_is_excluded = !strcmp(from_buffer, restore_last_files_names[i]);
+                  }
+                  if (!file_is_excluded)
+                  {
+                     pgmoneta_copy_file(from_buffer, to_buffer, workers);
+                  }
+               }
+               else
+               {
+                  pgmoneta_copy_file(from_buffer, to_buffer, workers);
+               }
+            }
+         }
+
+         free(from_buffer);
+         free(to_buffer);
+
+         from_buffer = NULL;
+         to_buffer = NULL;
+      }
+      closedir(d);
+   }
+   else
+   {
+      goto error;
+   }
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+   }
+
+   if (restore_last_files_names != NULL)
+   {
+      for (int i = 0; restore_last_files_names[i] != NULL; i++)
+      {
+         free(restore_last_files_names[i]);
+      }
+      free(restore_last_files_names);
+   }
+
+   return 0;
+
+error:
+
+   if (workers != NULL)
+   {
+      pgmoneta_workers_wait(workers);
+   }
+
+   if (restore_last_files_names != NULL)
+   {
+      for (int i = 0; restore_last_files_names[i] != NULL; i++)
+      {
+         free(restore_last_files_names[i]);
+      }
+      free(restore_last_files_names);
+   }
+
+   return 1;
+}
+
+int
+pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
+{
+   DIR* d = opendir(from);
+   char* from_buffer = NULL;
+   char* to_buffer = NULL;
+   struct dirent* entry;
+   struct stat statbuf;
+
+   pgmoneta_mkdir(to);
+
+   if (d)
+   {
+      while ((entry = readdir(d)))
+      {
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         from_buffer = pgmoneta_append(from_buffer, from);
+         from_buffer = pgmoneta_append(from_buffer, "/");
+         from_buffer = pgmoneta_append(from_buffer, entry->d_name);
+
+         to_buffer = pgmoneta_append(to_buffer, to);
+         to_buffer = pgmoneta_append(to_buffer, "/");
+         to_buffer = pgmoneta_append(to_buffer, entry->d_name);
+
+         if (!stat(from_buffer, &statbuf))
+         {
+            if (S_ISDIR(statbuf.st_mode))
+            {
+               if (!strcmp(entry->d_name, "pg_tblspc"))
+               {
+                  copy_tablespaces_hotstandby(from, to, tblspc_mappings, backup, workers);
+               }
+               else
+               {
+                  pgmoneta_copy_directory(from_buffer, to_buffer, NULL, workers);
+               }
+            }
+            else
+            {
+               pgmoneta_copy_file(from_buffer, to_buffer, workers);
+            }
+         }
+
+         free(from_buffer);
+         free(to_buffer);
+
+         from_buffer = NULL;
+         to_buffer = NULL;
+      }
+      closedir(d);
+   }
+   else
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
    return 1;
 }
 
@@ -2844,5 +3060,276 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
 
    error:
       free(final);
+   return 1;
+}
+
+
+static int
+copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)
+{
+   char* from_tblspc = NULL;
+   char* to_tblspc = NULL;
+   int idx = -1;
+   DIR* d = NULL;
+   ssize_t size;
+   struct dirent* entry;
+
+   from_tblspc = pgmoneta_append(from_tblspc, from);
+   if (!pgmoneta_ends_with(from_tblspc, "/"))
+   {
+      from_tblspc = pgmoneta_append(from_tblspc, "/");
+   }
+   from_tblspc = pgmoneta_append(from_tblspc, "pg_tblspc/");
+
+   to_tblspc = pgmoneta_append(to_tblspc, to);
+   if (!pgmoneta_ends_with(to_tblspc, "/"))
+   {
+      to_tblspc = pgmoneta_append(to_tblspc, "/");
+   }
+   to_tblspc = pgmoneta_append(to_tblspc, "pg_tblspc/");
+
+   pgmoneta_mkdir(to_tblspc);
+
+   if (backup->number_of_tablespaces > 0)
+   {
+      d = opendir(from_tblspc);
+
+      if (d == NULL)
+      {
+         pgmoneta_log_error("Could not open the %s directory", from_tblspc);
+         goto error;
+      }
+
+      while ((entry = readdir(d)))
+      {
+         char tmp_tblspc_name[MISC_LENGTH];
+         char* link = NULL;
+         char path[MAX_PATH];
+         char* tblspc_name = NULL;
+
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+         {
+            continue;
+         }
+
+         link = pgmoneta_append(link, from_tblspc);
+         link = pgmoneta_append(link, entry->d_name);
+
+         memset(&path[0], 0, sizeof(path));
+         size = readlink(link, &path[0], sizeof(path));
+         if (size == -1)
+         {
+            goto error;
+         }
+
+         if (pgmoneta_ends_with(&path[0], "/"))
+         {
+            memset(&tmp_tblspc_name[0], 0, sizeof(tmp_tblspc_name));
+            memcpy(&tmp_tblspc_name[0], &path[0], strlen(&path[0]) - 1);
+
+            tblspc_name = strrchr(&tmp_tblspc_name[0], '/') + 1;
+         }
+         else
+         {
+            tblspc_name = strrchr(&path[0], '/') + 1;
+         }
+
+         for (uint64_t i = 0; idx == -1 && i < backup->number_of_tablespaces; i++)
+         {
+            if (!strcmp(tblspc_name, backup->tablespaces[i]))
+            {
+               idx = i;
+            }
+         }
+
+         if (idx >= 0)
+         {
+            char* to_oid = NULL;
+            char* to_directory = NULL;
+            char* relative_directory = NULL;
+
+            pgmoneta_log_trace("Tablespace %s -> %s was found in the backup", entry->d_name, &path[0]);
+
+            to_oid = pgmoneta_append(to_oid, to_tblspc);
+            to_oid = pgmoneta_append(to_oid, entry->d_name);
+
+            to_directory = pgmoneta_append(to_directory, base);
+            to_directory = pgmoneta_append(to_directory, "/");
+            to_directory = pgmoneta_append(to_directory, server);
+            to_directory = pgmoneta_append(to_directory, "-");
+            to_directory = pgmoneta_append(to_directory, id);
+            to_directory = pgmoneta_append(to_directory, "-");
+            to_directory = pgmoneta_append(to_directory, tblspc_name);
+            to_directory = pgmoneta_append(to_directory, "/");
+
+            relative_directory = pgmoneta_append(relative_directory, "../../");
+            relative_directory = pgmoneta_append(relative_directory, server);
+            relative_directory = pgmoneta_append(relative_directory, "-");
+            relative_directory = pgmoneta_append(relative_directory, id);
+            relative_directory = pgmoneta_append(relative_directory, "-");
+            relative_directory = pgmoneta_append(relative_directory, tblspc_name);
+            relative_directory = pgmoneta_append(relative_directory, "/");
+
+            pgmoneta_delete_directory(to_directory);
+            pgmoneta_mkdir(to_directory);
+            pgmoneta_symlink_at_file(to_oid, relative_directory);
+
+            pgmoneta_copy_directory(link, to_directory, NULL, workers);
+
+            free(to_oid);
+            free(to_directory);
+            free(relative_directory);
+
+            to_oid = NULL;
+            to_directory = NULL;
+         }
+         else
+         {
+            pgmoneta_log_trace("Tablespace %s -> %s was not found in the backup", entry->d_name, &path[0]);
+         }
+
+         free(link);
+         link = NULL;
+      }
+
+      closedir(d);
+   }
+
+   free(from_tblspc);
+   free(to_tblspc);
+
+   return 0;
+
+error:
+
+   free(from_tblspc);
+   free(to_tblspc);
+
+   return 1;
+}
+
+static int
+copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
+{
+   char* from_tblspc = NULL;
+   char* to_tblspc = NULL;
+
+   from_tblspc = pgmoneta_append(from_tblspc, from);
+   if (!pgmoneta_ends_with(from_tblspc, "/"))
+   {
+      from_tblspc = pgmoneta_append(from_tblspc, "/");
+   }
+   from_tblspc = pgmoneta_append(from_tblspc, "pg_tblspc/");
+
+   to_tblspc = pgmoneta_append(to_tblspc, to);
+   if (!pgmoneta_ends_with(to_tblspc, "/"))
+   {
+      to_tblspc = pgmoneta_append(to_tblspc, "/");
+   }
+   to_tblspc = pgmoneta_append(to_tblspc, "pg_tblspc/");
+
+   pgmoneta_mkdir(to_tblspc);
+
+   if (backup->number_of_tablespaces > 0)
+   {
+      for (unsigned long i = 0; i < backup->number_of_tablespaces; i++)
+      {
+         char* src = NULL;
+         char* dst = NULL;
+         char* link = NULL;
+         bool found = false;
+         char* copied_tblspc_mappings = NULL;
+         char* token = NULL;
+
+         src = pgmoneta_append(src, from_tblspc);
+         src = pgmoneta_append(src, backup->tablespaces_oids[i]);
+
+         link = pgmoneta_append(link, to_tblspc);
+         link = pgmoneta_append(link, backup->tablespaces_oids[i]);
+
+         if (strcmp(tblspc_mappings, ""))
+         {
+            copied_tblspc_mappings = (char*)malloc(strlen(tblspc_mappings) + 1);
+
+            if (copied_tblspc_mappings == NULL)
+            {
+               goto error;
+            }
+
+            memset(copied_tblspc_mappings, 0, strlen(tblspc_mappings) + 1);
+            memcpy(copied_tblspc_mappings, tblspc_mappings, strlen(tblspc_mappings));
+
+            token = strtok(copied_tblspc_mappings, ",");
+
+            if (token == NULL)
+            {
+               free(copied_tblspc_mappings);
+               goto error;
+            }
+
+            while (token != NULL)
+            {
+               char* k = NULL;
+               char* v = NULL;
+
+               k = strtok(token, "->");
+               k = pgmoneta_remove_whitespace(k);
+               v = strtok(NULL, "->");
+               v = pgmoneta_remove_whitespace(v);
+
+               if (!strcmp(k, backup->tablespaces_oids[i]) || !strcmp(k, backup->tablespaces_paths[i]))
+               {
+                  dst = pgmoneta_append(dst, v);
+                  found = true;
+               }
+
+               token = strtok(NULL, ",");
+               free(k);
+               free(v);
+            }
+
+            free(copied_tblspc_mappings);
+         }
+
+         if (!found)
+         {
+            dst = pgmoneta_append(dst, backup->tablespaces_paths[i]);
+            dst = pgmoneta_append(dst, "hs");
+         }
+
+         if (!pgmoneta_exists(dst))
+         {
+            if (pgmoneta_mkdir(dst))
+            {
+               goto error;
+            }
+         }
+
+         if (!pgmoneta_exists(link))
+         {
+            if (pgmoneta_symlink_file(link, dst))
+            {
+               goto error;
+            }
+         }
+
+         pgmoneta_copy_directory(src, dst, NULL, workers);
+
+         free(src);
+         free(dst);
+         free(link);
+      }
+   }
+
+   free(from_tblspc);
+   free(to_tblspc);
+
+   return 0;
+
+error:
+
+   free(from_tblspc);
+   free(to_tblspc);
+
    return 1;
 }

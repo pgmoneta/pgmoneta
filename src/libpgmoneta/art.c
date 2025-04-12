@@ -27,6 +27,7 @@
  */
 
 #include <art.h>
+#include <json.h>
 #include <logging.h>
 #include <utils.h>
 

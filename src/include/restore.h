@@ -37,6 +37,7 @@ extern "C" {
 #include <deque.h>
 #include <info.h>
 #include <json.h>
+#include <workers.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -116,6 +117,37 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label);
  */
 int
 pgmoneta_extract_incremental_backup(int server, char* label, char** root, char** base);
+
+
+/**
+ * Copy a PostgreSQL installation
+ * @param from The from directory
+ * @param to The to directory
+ * @param base The base directory
+ * @param server The server name
+ * @param id The identifier
+ * @param backup The backup
+ * @param workers The optional workers
+ * @return The result
+ */
+int pgmoneta_copy_postgresql_restore(char *from, char *to, char *base,
+                                     char *server, char *id,
+                                     struct backup *backup,
+                                     struct workers *workers);
+
+/**
+ * Copy a PostgreSQL installation
+ * @param from The from directory
+ * @param to The to directory
+ * @param tblspc_mapping The tablespace mapping
+ * @param backup The backup
+ * @param workers The optional workers
+ * @return The result
+ */
+int pgmoneta_copy_postgresql_hotstandby(char *from, char *to,
+                                        char *tblspc_mapping,
+                                        struct backup *backup,
+                                        struct workers *workers);
 
 #ifdef __cplusplus
 }

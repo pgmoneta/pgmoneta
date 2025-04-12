@@ -27,6 +27,8 @@
  */
 
 /* pgmoneta */
+#include <pgmoneta.h>
+#include <json.h>
 #include <logging.h>
 #include <utils.h>
 #include <wal.h>
