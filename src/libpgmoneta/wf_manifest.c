@@ -76,6 +76,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    struct timespec end_t;
    double manifest_elapsed_time;
    char* backup_base = NULL;
+   char* backup_dir = NULL;
    char* backup_data = NULL;
    char* manifest_orig = NULL;
    char* manifest = NULL;
@@ -120,6 +121,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+   backup_dir = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
    manifest = pgmoneta_append(manifest, backup_base);
@@ -169,7 +171,6 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
-   free(backup);
    free(manifest);
    free(manifest_orig);
 
@@ -180,8 +181,17 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+   if (pgmoneta_load_info(backup_dir, backup->label, &backup))
+   {
+      goto error;
+   }
+   backup->manifest_elapsed_time = manifest_elapsed_time;
+   if (pgmoneta_save_info(backup_dir, backup))
+   {
+      goto error;
+   }
 
-   pgmoneta_update_info_double(backup_base, INFO_MANIFEST_ELAPSED, manifest_elapsed_time);
+   free(backup);
    return 0;
 
 error:

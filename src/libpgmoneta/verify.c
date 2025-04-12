@@ -351,7 +351,7 @@ pgmoneta_sha512_verification(char** argv)
 
       backup_dir = pgmoneta_get_server_backup(server);
 
-      if (pgmoneta_get_backups(backup_dir, &number_of_backups, &backups))
+      if (pgmoneta_load_infos(backup_dir, &number_of_backups, &backups))
       {
          pgmoneta_log_error("Verification: %s: Unable to get backups", config->common.servers[server].name);
          err = 1;

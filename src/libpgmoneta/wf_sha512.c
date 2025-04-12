@@ -258,9 +258,21 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
    source_file = fopen(sha512_path, "r");
    if (source_file == NULL)
    {
-      pgmoneta_log_error("Could not open file %s due to %s", sha512_path, strerror(errno));
-      errno = 0;
-      goto error;
+      source_file = fopen(sha512_path, "w");
+      if (source_file == NULL)
+      {
+         pgmoneta_log_error("Could not create file %s due to %s", sha512_path, strerror(errno));
+         errno = 0;
+         goto error;
+      }
+      fclose(source_file);
+      source_file = fopen(sha512_path, "r");
+      if (source_file == NULL)
+      {
+         pgmoneta_log_error("Could not open file %s due to %s", sha512_path, strerror(errno));
+         errno = 0;
+         goto error;
+      }
    }
 
    dest_file = fopen(sha512_tmp_path, "w");

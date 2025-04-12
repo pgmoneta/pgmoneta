@@ -2361,7 +2361,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       data = pgmoneta_append(data, "pgmoneta_backup_oldest{");
 
@@ -2413,7 +2413,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       data = pgmoneta_append(data, "pgmoneta_backup_newest{");
 
@@ -2457,7 +2457,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       data = pgmoneta_append(data, "pgmoneta_backup_valid{");
 
@@ -2505,7 +2505,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       data = pgmoneta_append(data, "pgmoneta_backup_invalid{");
 
@@ -2553,7 +2553,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2610,7 +2610,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2675,7 +2675,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2724,7 +2724,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2773,7 +2773,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2822,7 +2822,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2871,7 +2871,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2920,7 +2920,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -2969,7 +2969,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3018,7 +3018,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3067,7 +3067,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3116,7 +3116,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3166,7 +3166,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3216,7 +3216,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3266,7 +3266,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3315,7 +3315,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3364,7 +3364,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3422,7 +3422,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3479,7 +3479,7 @@ backup_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3560,7 +3560,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       data = pgmoneta_append(data, "pgmoneta_restore_newest_size{");
 
@@ -3612,7 +3612,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       data = pgmoneta_append(data, "pgmoneta_backup_newest_size{");
 
@@ -3664,7 +3664,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3724,7 +3724,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3791,7 +3791,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3848,7 +3848,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3915,7 +3915,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -3981,7 +3981,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4047,7 +4047,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4113,7 +4113,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4179,7 +4179,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4245,7 +4245,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4311,7 +4311,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4377,7 +4377,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4443,7 +4443,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4509,7 +4509,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4575,7 +4575,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4641,7 +4641,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -4707,7 +4707,7 @@ size_information(SSL* client_ssl, int client_fd)
       number_of_backups = 0;
       backups = NULL;
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {

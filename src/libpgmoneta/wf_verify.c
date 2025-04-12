@@ -80,7 +80,6 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    int server = -1;
    char* label = NULL;
    char* base = NULL;
-   char* info_file = NULL;
    char* manifest_file = NULL;
    int number_of_columns = 0;
    char** columns = NULL;
@@ -113,23 +112,21 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Verify (execute): %s/%s", config->common.servers[server].name, label);
 
-   base = pgmoneta_get_server_backup_identifier(server, (char*)pgmoneta_art_search(nodes, NODE_LABEL));
-
-   info_file = pgmoneta_append(info_file, base);
-   if (!pgmoneta_ends_with(info_file, "/"))
-   {
-      info_file = pgmoneta_append(info_file, "/");
-   }
-   info_file = pgmoneta_append(info_file, "backup.info");
+   base = pgmoneta_get_server_backup(server);
 
    manifest_file = pgmoneta_append(manifest_file, base);
    if (!pgmoneta_ends_with(manifest_file, "/"))
    {
       manifest_file = pgmoneta_append(manifest_file, "/");
    }
+   manifest_file = pgmoneta_append(manifest_file, label);
+   manifest_file = pgmoneta_append(manifest_file, "/");
    manifest_file = pgmoneta_append(manifest_file, "backup.manifest");
-
-   pgmoneta_get_backup_file(info_file, &backup);
+   
+   if (pgmoneta_load_info(base, label, &backup))
+   {
+      goto error;
+   }
 
    if (pgmoneta_deque_create(true, &failed_deque))
    {
@@ -213,7 +210,6 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    free(backup);
 
    free(base);
-   free(info_file);
    free(manifest_file);
 
    return 0;
@@ -236,7 +232,6 @@ error:
    free(backup);
 
    free(base);
-   free(info_file);
    free(manifest_file);
 
    return 1;

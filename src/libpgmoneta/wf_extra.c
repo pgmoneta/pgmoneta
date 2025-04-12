@@ -89,6 +89,7 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
    SSL* ssl = NULL;
    struct main_configuration* config;
    struct query_response* qr = NULL;
+   struct backup* backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -183,17 +184,25 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   info_root = pgmoneta_get_server_backup_identifier(server, label);
-
+   info_root = pgmoneta_get_server_backup(server);
+   if (pgmoneta_load_info(info_root, label, &backup))
+   {
+      goto error;
+   }
    if (info_extra == NULL)
    {
-      pgmoneta_update_info_string(info_root, INFO_EXTRA, "");
+      memset(backup->extra, 0, sizeof(backup->extra));
    }
    else
    {
-      pgmoneta_update_info_string(info_root, INFO_EXTRA, info_extra);
+      snprintf(backup->extra, sizeof(backup->extra), "%s", info_extra);
    }
-
+   pgmoneta_log_debug("backup->label: %s", backup->label);
+   if (pgmoneta_save_info(info_root, backup))
+   {
+      goto error;
+   }
+   free(backup);
    free(root);
    free(info_root);
    if (info_extra != NULL)

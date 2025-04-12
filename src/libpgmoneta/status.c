@@ -142,7 +142,7 @@ pgmoneta_status(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption
 
       d = pgmoneta_get_server_backup(i);
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS, (uintptr_t)number_of_backups, ValueInt32);
 
       free(d);
@@ -400,7 +400,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
 
       d = pgmoneta_get_server_backup(i);
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS, (uintptr_t)number_of_backups, ValueInt32);
 
