@@ -98,6 +98,7 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    int number_of_workers = 0;
    struct workers* workers = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -218,8 +219,14 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Encryption: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   pgmoneta_update_info_double(backup_base, INFO_ENCRYPTION_ELAPSED, encryption_elapsed_time);
+   if (pgmoneta_get_backup(backup_base, NULL, &temp_backup))
+   {
+      goto error;
+   }
+   temp_backup->encryption_elapsed_time = encryption_elapsed_time;
+   pgmoneta_save_info(backup_base, NULL, temp_backup);
 
+   free(temp_backup);
    free(d);
    free(enc_file);
 
@@ -232,6 +239,7 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
+   free(temp_backup);
    free(d);
    free(enc_file);
 

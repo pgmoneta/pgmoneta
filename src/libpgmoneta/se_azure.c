@@ -113,6 +113,7 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    char* local_root = NULL;
    char* azure_root = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -155,9 +156,15 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    remote_azure_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+   pgmoneta_get_backup(local_root, NULL, &temp_backup);
+   if (temp_backup != NULL)
+   {
+      temp_backup->remote_azure_elapsed_time = remote_azure_elapsed_time;
+   }
+   temp_backup->remote_azure_elapsed_time = remote_azure_elapsed_time;
+   pgmoneta_save_info(local_root, NULL, temp_backup);
 
-   pgmoneta_update_info_double(local_root, INFO_REMOTE_AZURE_ELAPSED, remote_azure_elapsed_time);
-
+   free(temp_backup);
    free(local_root);
    free(azure_root);
 
