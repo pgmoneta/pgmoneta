@@ -908,6 +908,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                pgmoneta_json_clone(payload, &pyl);
 
                pgmoneta_set_proc_title(1, ai->argv, "backup", config->common.servers[srv].name);
+               pgmoneta_log_debug("backup: %s", config->common.servers[srv].name);
                pgmoneta_backup(client_fd, srv, compression, encryption, pyl);
             }
          }
@@ -957,6 +958,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_json_clone(payload, &pyl);
 
             pgmoneta_set_proc_title(1, ai->argv, "list-backup", config->common.servers[srv].name);
+            pgmoneta_log_debug("list-backup: %s", config->common.servers[srv].name);
             pgmoneta_list_backup(client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -998,6 +1000,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_json_clone(payload, &pyl);
 
             pgmoneta_set_proc_title(1, ai->argv, "delete", config->common.servers[srv].name);
+            pgmoneta_log_debug("delete: %s", config->common.servers[srv].name);
             pgmoneta_delete_backup(client_fd, srv, compression, encryption, pyl);
             pgmoneta_delete_wal(srv);
          }
@@ -1040,6 +1043,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_json_clone(payload, &pyl);
 
             pgmoneta_set_proc_title(1, ai->argv, "restore", config->common.servers[srv].name);
+            pgmoneta_log_debug("restore: %s", config->common.servers[srv].name);
             pgmoneta_restore(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
@@ -1122,6 +1126,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_json_clone(payload, &pyl);
 
             pgmoneta_set_proc_title(1, ai->argv, "archive", config->common.servers[srv].name);
+            pgmoneta_log_debug("archive: %s", config->common.servers[srv].name);
             pgmoneta_archive(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }

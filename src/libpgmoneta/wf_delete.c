@@ -121,7 +121,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    config->common.servers[server].active_delete = true;
 
    d = pgmoneta_get_server_backup(server);
-
+   pgmoneta_log_trace("Delete: %s", d);
    if (pgmoneta_get_backups(d, &number_of_backups, &backups))
    {
       pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_NOBACKUPS, ValueInt32);
@@ -154,6 +154,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
+   pgmoneta_log_trace("Delete trace: %s", d);
    pgmoneta_get_backup_child(server, backups[backup_index], &child);
    if (child != NULL)
    {
@@ -263,6 +264,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
    int number_of_workers = 0;
    struct workers* workers = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -327,13 +329,25 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = NULL;
 
          /* Recalculate to */
-         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+         d = pgmoneta_get_server_backup(server);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+         if (pgmoneta_load_backup(d, backups[next_index]->label, &temp_backup))
+         {
+            pgmoneta_log_error("Unable to get backup for directory %s", d);
+            goto error;
+         }
+         temp_backup->backup_size = size;
+         if (pgmoneta_save_info(d, temp_backup))
+         {
+            pgmoneta_log_error("Unable to save backup info for directory %s", d);
+            goto error;
+         }
 
+         free(temp_backup);
          free(from);
          free(to);
+         temp_backup = NULL;
          from = NULL;
          to = NULL;
       }
@@ -363,13 +377,25 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = NULL;
 
          /* Recalculate to */
-         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+         d = pgmoneta_get_server_backup(server);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+         if (pgmoneta_load_backup(d, backups[next_index]->label, &temp_backup))
+         {
+            pgmoneta_log_error("Unable to get backup for directory %s", d);
+            goto error;
+         }
+         temp_backup->backup_size = size;
+         if (pgmoneta_save_info(d, temp_backup))
+         {
+            pgmoneta_log_error("Unable to save backup info for directory %s", d);
+            goto error;
+         }
 
+         free(temp_backup);
          free(from);
          free(to);
+         temp_backup = NULL;
          from = NULL;
          to = NULL;
       }
@@ -385,6 +411,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
       pgmoneta_delete_directory(d);
    }
 
+   free(temp_backup);
    free(d);
    free(from);
    free(to);
@@ -397,6 +424,7 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
+   free(temp_backup);
    free(d);
    free(from);
    free(to);

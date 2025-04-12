@@ -90,6 +90,7 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    char* d = NULL;
    char* backup_base = NULL;
    char* backup_data = NULL;
+   char* server_backup = NULL;
    char* tarfile = NULL;
    int hours;
    int minutes;
@@ -98,6 +99,7 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    int number_of_workers = 0;
    struct workers* workers = NULL;
    struct main_configuration* config;
+   struct backup* backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -136,7 +138,9 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       }
 
       backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+      server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
       backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
+      backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
       pgmoneta_bzip2_data(backup_data, workers);
       pgmoneta_bzip2_tablespaces(backup_base, workers);
@@ -185,7 +189,9 @@ bzip2_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_BZIP2_ELAPSED, compression_bzip2_elapsed_time);
+   backup->compression_bzip2_elapsed_time = compression_bzip2_elapsed_time;
+   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   pgmoneta_save_info(server_backup, backup);
 
    free(d);
 

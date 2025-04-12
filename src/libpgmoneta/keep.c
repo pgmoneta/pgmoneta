@@ -150,9 +150,19 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
    if (backups[backup_index]->valid == VALID_TRUE && backups[backup_index]->type == TYPE_FULL)
    {
-      d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
-
-      pgmoneta_update_info_bool(d, INFO_KEEP, k);
+      d = pgmoneta_get_server_backup(srv);
+      if (pgmoneta_load_backup(d, backups[backup_index]->label, &backups[backup_index]))
+      {
+         pgmoneta_log_error("Unable to get backup for directory %s", d);
+         goto error;
+      }
+      backups[backup_index]->keep = k;
+      if (pgmoneta_save_info(d, backups[backup_index]))
+      {
+         pgmoneta_log_error("Unable to save backup info for directory %s", d);
+         goto error;
+      }
+      d = pgmoneta_append(d, backups[backup_index]->label);
       pgmoneta_update_sha512(d, "backup.info");
 
       kr = k;
