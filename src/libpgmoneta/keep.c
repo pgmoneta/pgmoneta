@@ -149,7 +149,9 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
    {
       d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
 
-      pgmoneta_update_info_bool(d, INFO_KEEP, k);
+      pgmoneta_get_backup(d, backups[backup_index]->label, &backups[backup_index]);
+      backups[backup_index]->keep = k;
+      pgmoneta_save_info(d, backups[backup_index]->label, backups[backup_index]);
 
       kr = k;
 

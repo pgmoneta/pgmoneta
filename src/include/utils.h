@@ -1349,6 +1349,15 @@ pgmoneta_backtrace(void);
 int
 pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int* kernel_patch);
 
+/**
+ * Write info to a file
+ * @param sfile The file to write to
+ * @param fmt The format string
+ * @param ... The arguments to be formatted
+ */
+void
+pgmoneta_write_info(FILE* sfile, const char* fmt, ...);
+
 #ifdef __cplusplus
 }
 #endif
