@@ -317,6 +317,7 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
    int number_of_backups = 0;
    struct backup** backups = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -356,7 +357,7 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
 
    server_path = pgmoneta_get_server_backup(server);
 
-   pgmoneta_get_backups(server_path, &number_of_backups, &backups);
+   pgmoneta_load_infos(server_path, &number_of_backups, &backups);
 
    if (number_of_backups >= 2)
    {
@@ -423,8 +424,19 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
 
    remote_ssh_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
-   pgmoneta_update_info_double(local_root, INFO_REMOTE_SSH_ELAPSED, remote_ssh_elapsed_time);
+   if (pgmoneta_load_info(server_path, label, &temp_backup))
+   {
+      pgmoneta_log_error("Unable to get backup for directory %s", server_path);
+      goto error;
+   }
+   temp_backup->remote_ssh_elapsed_time = remote_ssh_elapsed_time;
+   if (pgmoneta_save_info(server_path, temp_backup))
+   {
+      pgmoneta_log_error("Unable to save backup info for directory %s", server_path);
+      goto error;
+   }
 
+   free(temp_backup);
    free(server_path);
    free(remote_root);
    free(local_root);
@@ -446,6 +458,7 @@ error:
       free(latest_backup_sha256);
    }
 
+   free(temp_backup);
    free(server_path);
    free(remote_root);
    free(local_root);

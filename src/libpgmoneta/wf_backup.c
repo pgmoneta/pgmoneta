@@ -86,6 +86,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    struct timespec end_t;
    int status;
    char* backup_base = NULL;
+   char* backup_dir = NULL;
    char* backup_data = NULL;
    unsigned long size = 0;
    int usr;
@@ -96,7 +97,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    int minutes;
    double seconds;
    char elapsed[128];
-   int number_of_tablespaces = 0;
    char* tag = NULL;
    char* incremental = NULL;
    char* incremental_label = NULL;
@@ -123,6 +123,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    struct tuple* tup = NULL;
    struct token_bucket* bucket = NULL;
    struct token_bucket* network_bucket = NULL;
+   struct backup* backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -307,15 +308,31 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    // create the root dir
    backup_base = pgmoneta_get_server_backup_identifier(server, label);
+   backup_dir = pgmoneta_get_server_backup(server);
 
    pgmoneta_mkdir(backup_base);
+
+   backup = (struct backup*)malloc(sizeof(struct backup));
+   if (backup == NULL)
+   {
+      pgmoneta_log_error("Backup: Could not create backup %s", label);
+      goto error;
+   }
+   memset(backup, 0, sizeof(struct backup));
+
    if (config->common.servers[server].version < 15)
    {
       if (pgmoneta_receive_archive_files(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
-         pgmoneta_create_info(backup_base, label, 0);
+         backup->valid = VALID_FALSE;
+         snprintf(backup->label, sizeof(backup->label), "%s", label);
+         if (pgmoneta_save_info(backup_dir, backup))
+         {
+            pgmoneta_log_error("Backup: Could not save backup %s", label);
+            goto error;
+         }
 
          goto error;
       }
@@ -326,7 +343,13 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
-         pgmoneta_create_info(backup_base, label, 0);
+         backup->valid = VALID_FALSE;
+         snprintf(backup->label, sizeof(backup->label), "%s", label);
+         if (pgmoneta_save_info(backup_dir, backup))
+         {
+            pgmoneta_log_error("Backup: Could not save backup %s", label);
+            goto error;
+         }
 
          goto error;
       }
@@ -413,56 +436,56 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   pgmoneta_create_info(backup_base, label, 1);
-   pgmoneta_update_info_string(backup_base, INFO_WAL, wal);
-   pgmoneta_update_info_unsigned_long(backup_base, INFO_RESTORE, size);
-   pgmoneta_update_info_unsigned_long(backup_base, INFO_BIGGEST_FILE, biggest_file_size);
-   pgmoneta_update_info_string(backup_base, INFO_MAJOR_VERSION, version);
-   pgmoneta_update_info_string(backup_base, INFO_MINOR_VERSION, minor_version);
-   pgmoneta_update_info_bool(backup_base, INFO_KEEP, false);
-   pgmoneta_update_info_string(backup_base, INFO_START_WALPOS, startpos);
-   pgmoneta_update_info_string(backup_base, INFO_END_WALPOS, endpos);
-   pgmoneta_update_info_unsigned_long(backup_base, INFO_START_TIMELINE, start_timeline);
-   pgmoneta_update_info_unsigned_long(backup_base, INFO_END_TIMELINE, end_timeline);
-   pgmoneta_update_info_string(backup_base, INFO_HASH_ALGORITHM, "SHA512");
-   pgmoneta_update_info_double(backup_base, INFO_BASEBACKUP_ELAPSED, basebackup_elapsed_time);
+   backup->valid = VALID_TRUE;
+   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   backup->number_of_tablespaces = 0;
+   backup->compression = config->compression_type;
+   backup->encryption = config->encryption;
+   snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
+   backup->restore_size = size;
+   backup->biggest_file_size = biggest_file_size;
+   backup->major_version = atoi(version);
+   backup->minor_version = atoi(minor_version);
+   backup->keep = false;
+   sscanf(startpos, "%X/%X", &backup->start_lsn_hi32, &backup->start_lsn_lo32);
+   sscanf(endpos, "%X/%X", &backup->end_lsn_hi32, &backup->end_lsn_lo32);
+   backup->start_timeline = start_timeline;
+   backup->end_timeline = end_timeline;
+   backup->basebackup_elapsed_time = basebackup_elapsed_time;
 
    if (incremental != NULL)
    {
-      pgmoneta_update_info_unsigned_long(backup_base, INFO_TYPE, TYPE_INCREMENTAL);
-      pgmoneta_update_info_string(backup_base, INFO_PARENT, incremental_label);
+      backup->type = TYPE_INCREMENTAL;
+      snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
    }
    else
    {
-      pgmoneta_update_info_unsigned_long(backup_base, INFO_TYPE, TYPE_FULL);
+      backup->type = TYPE_FULL;
    }
    // in case of parsing error
    if (chkptpos != NULL)
    {
-      pgmoneta_update_info_string(backup_base, INFO_CHKPT_WALPOS, chkptpos);
+      sscanf(chkptpos, "%X/%X", &backup->checkpoint_lsn_hi32, &backup->checkpoint_lsn_lo32);
    }
 
    current_tablespace = tablespaces;
-   while (current_tablespace != NULL)
+   backup->number_of_tablespaces = 0;
+
+   while (current_tablespace != NULL && backup->number_of_tablespaces < MAX_NUMBER_OF_TABLESPACES)
    {
-      char key[MISC_LENGTH];
-      char tblname[MAX_PATH];
+      int i = backup->number_of_tablespaces;
 
-      snprintf(&tblname[0], MAX_PATH, "tblspc_%s", current_tablespace->name);
+      snprintf(backup->tablespaces[i], sizeof(backup->tablespaces[i]), "tblspc_%s", current_tablespace->name);
+      snprintf(backup->tablespaces_oids[i], sizeof(backup->tablespaces_oids[i]), "%u", current_tablespace->oid);
+      snprintf(backup->tablespaces_paths[i], sizeof(backup->tablespaces_paths[i]), "%s", current_tablespace->path);
 
-      number_of_tablespaces++;
-      pgmoneta_update_info_unsigned_long(backup_base, INFO_TABLESPACES, number_of_tablespaces);
-
-      snprintf(key, sizeof(key) - 1, "TABLESPACE%d", number_of_tablespaces);
-      pgmoneta_update_info_string(backup_base, key, tblname);
-
-      snprintf(key, sizeof(key) - 1, "TABLESPACE_OID%d", number_of_tablespaces);
-      pgmoneta_update_info_unsigned_long(backup_base, key, current_tablespace->oid);
-
-      snprintf(key, sizeof(key) - 1, "TABLESPACE_PATH%d", number_of_tablespaces);
-      pgmoneta_update_info_string(backup_base, key, current_tablespace->path);
-
+      backup->number_of_tablespaces++;
       current_tablespace = current_tablespace->next;
+   }
+   if (pgmoneta_save_info(backup_dir, backup))
+   {
+      pgmoneta_log_error("Backup: Could not save backup %s", label);
+      goto error;
    }
    pgmoneta_close_ssl(ssl);
    if (socket != -1)
@@ -477,6 +500,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
+   free(backup);
    free(backup_base);
    free(backup_data);
    free(manifest_path);

@@ -88,6 +88,7 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    double compression_gzip_elapsed_time;
    char* d = NULL;
    char* backup_base = NULL;
+   char* server_backup = NULL;
    char* backup_data = NULL;
    char* tarfile = NULL;
    int hours;
@@ -97,6 +98,7 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    int number_of_workers = 0;
    struct workers* workers = NULL;
    struct main_configuration* config;
+   struct backup* backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -135,7 +137,9 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       }
 
       backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+      server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
       backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
+      backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
       if (pgmoneta_gzip_data(backup_data, workers))
       {
@@ -185,8 +189,13 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   pgmoneta_update_info_double(backup_base, INFO_COMPRESSION_GZIP_ELAPSED, compression_gzip_elapsed_time);
+   backup->compression_gzip_elapsed_time = compression_gzip_elapsed_time;
+   if (pgmoneta_save_info(server_backup, backup))
+   {
+      goto error;
+   }
 
+   free(backup);
    free(d);
 
    return 0;
@@ -198,6 +207,7 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
+   free(backup);
    free(d);
 
    return 1;

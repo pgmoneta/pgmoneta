@@ -36,6 +36,7 @@
 #include <management.h>
 #include <network.h>
 #include <utils.h>
+#include <security.h>
 
 /* system */
 #include <errno.h>
@@ -46,7 +47,15 @@
 #include <unistd.h>
 
 #define NAME "info"
-#define INFO_BUFFER_SIZE 8192
+
+/**
+ * Create a backup information file
+ * @param directory The backup directory
+ * @param label The label
+ * @param status The status
+ */
+static void __attribute__((unused))
+create_info(char* directory, char* label, int status);
 
 static int
 file_final_name(char* file, int encryption, int compression, char** finalname);
@@ -63,8 +72,11 @@ file_final_name(char* file, int encryption, int compression, char** finalname);
 static int
 split_file_path(char* path, char** relative_path, char** bare_file_name);
 
-void
-pgmoneta_create_info(char* directory, char* label, int status)
+static void
+write_info(FILE* sfile, const char* fmt, ...);
+
+static void
+create_info(char* directory, char* label, int status)
 {
    char buffer[INFO_BUFFER_SIZE];
    char* s = NULL;
@@ -136,318 +148,6 @@ error:
    free(s);
 }
 
-void
-pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long value)
-{
-   char buffer[INFO_BUFFER_SIZE];
-   char line[INFO_BUFFER_SIZE];
-   bool found = false;
-   char* s = NULL;
-   FILE* sfile = NULL;
-   char* d = NULL;
-   FILE* dfile = NULL;
-
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, "/backup.info");
-
-   d = pgmoneta_append(d, directory);
-   d = pgmoneta_append(d, "/backup.info.tmp");
-
-   sfile = fopen(s, "r");
-   if (sfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-   dfile = fopen(d, "w");
-   if (dfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", d, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-
-   while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
-   {
-      char k[INFO_BUFFER_SIZE];
-      char v[INFO_BUFFER_SIZE];
-      char* ptr = NULL;
-
-      memset(&k[0], 0, sizeof(k));
-      memset(&v[0], 0, sizeof(v));
-
-      memset(&line[0], 0, sizeof(line));
-      memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
-
-      ptr = strtok(&buffer[0], "=");
-      memcpy(&k[0], ptr, strlen(ptr));
-
-      ptr = strtok(NULL, "=");
-      memcpy(&v[0], ptr, strlen(ptr) - 1);
-
-      if (!strcmp(key, &k[0]))
-      {
-         memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "%s=%lu\n", key, value);
-         fputs(&line[0], dfile);
-         found = true;
-      }
-      else
-      {
-         fputs(&line[0], dfile);
-      }
-   }
-
-   if (!found)
-   {
-      memset(&line[0], 0, sizeof(line));
-      pgmoneta_log_trace("%s=%lu", key, value);
-      snprintf(&line[0], sizeof(line), "%s=%lu\n", key, value);
-      fputs(&line[0], dfile);
-   }
-
-   if (sfile != NULL)
-   {
-      fsync(fileno(sfile));
-      fclose(sfile);
-   }
-
-   if (dfile != NULL)
-   {
-      fsync(fileno(dfile));
-      fclose(dfile);
-   }
-
-   pgmoneta_move_file(d, s);
-   pgmoneta_permission(s, 6, 0, 0);
-
-   free(s);
-   free(d);
-
-   return;
-
-error:
-
-   free(s);
-   free(d);
-}
-
-void
-pgmoneta_update_info_double(char* directory, char* key, double value)
-{
-   char buffer[INFO_BUFFER_SIZE];
-   char line[INFO_BUFFER_SIZE];
-   bool found = false;
-   char* s = NULL;
-   FILE* sfile = NULL;
-   char* d = NULL;
-   FILE* dfile = NULL;
-
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, "/backup.info");
-
-   d = pgmoneta_append(d, directory);
-   d = pgmoneta_append(d, "/backup.info.tmp");
-
-   sfile = fopen(s, "r");
-   if (sfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-   dfile = fopen(d, "w");
-   if (dfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", d, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-
-   while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
-   {
-      char k[INFO_BUFFER_SIZE];
-      char v[INFO_BUFFER_SIZE];
-      char* ptr = NULL;
-
-      memset(&k[0], 0, sizeof(k));
-      memset(&v[0], 0, sizeof(v));
-
-      memset(&line[0], 0, sizeof(line));
-      memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
-
-      ptr = strtok(&buffer[0], "=");
-      memcpy(&k[0], ptr, strlen(ptr));
-
-      ptr = strtok(NULL, "=");
-      memcpy(&v[0], ptr, strlen(ptr) - 1);
-
-      if (!strcmp(key, &k[0]))
-      {
-         memset(&line[0], 0, sizeof(line));
-         snprintf(&line[0], sizeof(line), "%s=%.4f\n", key, value);
-         fputs(&line[0], dfile);
-         found = true;
-      }
-      else
-      {
-         fputs(&line[0], dfile);
-      }
-   }
-
-   if (!found)
-   {
-      memset(&line[0], 0, sizeof(line));
-      pgmoneta_log_trace("%s=%.4f", key, value);
-      snprintf(&line[0], sizeof(line), "%s=%.4f\n", key, value);
-      fputs(&line[0], dfile);
-   }
-
-   if (sfile != NULL)
-   {
-      fsync(fileno(sfile));
-      fclose(sfile);
-   }
-
-   if (dfile != NULL)
-   {
-      fsync(fileno(dfile));
-      fclose(dfile);
-   }
-
-   pgmoneta_move_file(d, s);
-   pgmoneta_permission(s, 6, 0, 0);
-
-   free(s);
-   free(d);
-
-   return;
-
-error:
-
-   free(s);
-   free(d);
-}
-
-void
-pgmoneta_update_info_string(char* directory, char* key, char* value)
-{
-   char buffer[INFO_BUFFER_SIZE];
-   char line[INFO_BUFFER_SIZE];
-   bool found = false;
-   char* s = NULL;
-   FILE* sfile = NULL;
-   char* d = NULL;
-   FILE* dfile = NULL;
-
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, "/backup.info");
-
-   d = pgmoneta_append(d, directory);
-   d = pgmoneta_append(d, "/backup.info.tmp");
-
-   sfile = fopen(s, "r");
-   if (sfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-   dfile = fopen(d, "w");
-   if (dfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", d, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-
-   while ((fgets(&buffer[0], sizeof(buffer), sfile)) != NULL)
-   {
-      char k[INFO_BUFFER_SIZE];
-      char v[INFO_BUFFER_SIZE];
-      char* ptr = NULL;
-
-      memset(&k[0], 0, sizeof(k));
-      memset(&v[0], 0, sizeof(v));
-
-      memset(&line[0], 0, sizeof(line));
-      memcpy(&line[0], &buffer[0], strlen(&buffer[0]));
-
-      ptr = strtok(&buffer[0], "=");
-      memcpy(&k[0], ptr, strlen(ptr));
-
-      ptr = strtok(NULL, "=");
-      memcpy(&v[0], ptr, strlen(ptr) - 1);
-
-      if (!strcmp(key, &k[0]))
-      {
-         memset(&line[0], 0, sizeof(line));
-         if (value == NULL)
-         {
-            snprintf(&line[0], sizeof(line), "%s=\n", key);
-         }
-         else
-         {
-            snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
-         }
-         fputs(&line[0], dfile);
-         found = true;
-      }
-      else
-      {
-         fputs(&line[0], dfile);
-      }
-   }
-
-   if (!found)
-   {
-      memset(&line[0], 0, sizeof(line));
-      pgmoneta_log_trace("%s=%s", key, value);
-      if (value == NULL)
-      {
-         snprintf(&line[0], sizeof(line), "%s=\n", key);
-      }
-      else
-      {
-         snprintf(&line[0], sizeof(line), "%s=%s\n", key, value);
-      }
-      fputs(&line[0], dfile);
-   }
-
-   if (sfile != NULL)
-   {
-      fsync(fileno(sfile));
-      fclose(sfile);
-   }
-
-   if (dfile != NULL)
-   {
-      fsync(fileno(dfile));
-      fclose(dfile);
-   }
-
-   pgmoneta_move_file(d, s);
-   pgmoneta_permission(s, 6, 0, 0);
-
-   free(s);
-   free(d);
-
-   return;
-
-error:
-
-   free(s);
-   free(d);
-}
-
-void
-pgmoneta_update_info_bool(char* directory, char* key, bool value)
-{
-   pgmoneta_log_trace("%s=%d", key, value ? 1 : 0);
-   pgmoneta_update_info_unsigned_long(directory, key, value ? 1 : 0);
-}
-
 int
 pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, char* key, char* comment)
 {
@@ -457,6 +157,7 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
    char* new_comments = NULL;
    bool found = false;
    bool fail = false;
+   struct backup* temp_backup = NULL;
 
    old_comments = pgmoneta_append(old_comments, backup->comments);
 
@@ -681,73 +382,40 @@ pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, c
    {
       dir = pgmoneta_append(dir, "/");
    }
-   dir = pgmoneta_append(dir, backup->label);
-   dir = pgmoneta_append(dir, "/");
 
-   pgmoneta_update_info_string(dir, INFO_COMMENTS, new_comments);
+   if (pgmoneta_load_info(dir, backup->label, &temp_backup))
+   {
+      pgmoneta_log_error("Unable to find backup in directory %s", dir);
+      goto error;
+   }
+
+   snprintf(temp_backup->comments, sizeof(temp_backup->comments), "%s", new_comments);
+   if (pgmoneta_save_info(dir, temp_backup))
+   {
+      pgmoneta_log_error("Unable to save backup info for directory %s", dir);
+      goto error;
+   }
 
    memset(backup->comments, 0, sizeof(backup->comments));
    memcpy(backup->comments, new_comments, strlen(new_comments));
-
+   free(temp_backup);
    free(d);
    free(dir);
    free(old_comments);
    free(new_comments);
 
    return 0;
-}
-
-int
-pgmoneta_get_info_string(struct backup* backup, char* key, char** value)
-{
-   char* result = NULL;
-
-   if (!strcmp(INFO_LABEL, key))
-   {
-      result = pgmoneta_append(result, backup->label);
-   }
-   else if (!strcmp(INFO_WAL, key))
-   {
-      result = pgmoneta_append(result, backup->wal);
-   }
-   else if (pgmoneta_starts_with(key, "TABLESPACE_OID"))
-   {
-      unsigned long number = strtoul(key + 14, NULL, 10);
-
-      result = pgmoneta_append(result, backup->tablespaces_oids[number - 1]);
-   }
-   else if (pgmoneta_starts_with(key, "TABLESPACE_PATH"))
-   {
-      unsigned long number = strtoul(key + 15, NULL, 10);
-
-      result = pgmoneta_append(result, backup->tablespaces_paths[number - 1]);
-   }
-   else if (pgmoneta_starts_with(key, "TABLESPACE"))
-   {
-      unsigned long number = strtoul(key + 10, NULL, 10);
-
-      result = pgmoneta_append(result, backup->tablespaces[number - 1]);
-   }
-   else if (!strcmp(INFO_COMMENTS, key))
-   {
-      result = pgmoneta_append(result, backup->comments);
-   }
-   else
-   {
-      goto error;
-   }
-
-   *value = result;
-
-   return 0;
-
 error:
-
+   free(temp_backup);
+   free(d);
+   free(dir);
+   free(old_comments);
+   free(new_comments);
    return 1;
 }
 
 int
-pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** backups)
+pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** backups)
 {
    char* d = NULL;
    struct backup** bcks = NULL;
@@ -775,8 +443,9 @@ pgmoneta_get_backups(char* directory, int* number_of_backups, struct backup*** b
    {
       d = pgmoneta_append(d, directory);
 
-      if (pgmoneta_get_backup(d, dirs[i], &bcks[i]))
+      if (pgmoneta_load_info(d, dirs[i], &bcks[i]))
       {
+         pgmoneta_log_error("pgmoneta_load_infos: Unable to load backup for %s", d);
          goto error;
       }
 
@@ -812,147 +481,20 @@ error:
 }
 
 int
-pgmoneta_get_backup(char* directory, char* label, struct backup** backup)
+pgmoneta_load_info(char* directory, char* label, struct backup** backup)
 {
    char* fn = NULL;
-   int ret = 0;
-
-   *backup = NULL;
-
-   fn = NULL;
-   fn = pgmoneta_append(fn, directory);
-   fn = pgmoneta_append(fn, "/");
-   fn = pgmoneta_append(fn, label);
-   fn = pgmoneta_append(fn, "/backup.info");
-
-   ret = pgmoneta_get_backup_file(fn, backup);
-
-   free(fn);
-
-   return ret;
-}
-
-int
-pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
-{
-   char* d = NULL;
-   char* id = NULL;
-   char* root = NULL;
-   char* base = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
-   struct backup* bck = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   *backup = NULL;
-
-   d = pgmoneta_get_server_backup(server);
-
-   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
-   {
-      goto error;
-   }
-
-   if (!strcmp(identifier, "oldest"))
-   {
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (pgmoneta_is_backup_struct_valid(server, backups[i]))
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
-   {
-      for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
-      {
-         if (pgmoneta_is_backup_struct_valid(server, backups[i]))
-         {
-            id = backups[i]->label;
-         }
-      }
-   }
-   else
-   {
-      /* Explicit search */
-      for (int i = 0; id == NULL && i < number_of_backups; i++)
-      {
-         if (!strcmp(backups[i]->label, identifier) && pgmoneta_is_backup_struct_valid(server, backups[i]))
-         {
-            id = backups[i]->label;
-         }
-      }
-
-      if (id == NULL)
-      {
-         /* Prefix search */
-         for (int i = 0; id == NULL && i < number_of_backups; i++)
-         {
-            if (pgmoneta_starts_with(backups[i]->label, identifier) &&
-                pgmoneta_is_backup_struct_valid(server, backups[i]))
-            {
-               id = backups[i]->label;
-            }
-         }
-      }
-   }
-
-   if (id == NULL)
-   {
-      pgmoneta_log_warn("No identifier for %s/%s", config->common.servers[server].name, identifier);
-      goto error;
-   }
-
-   root = pgmoneta_get_server_backup(server);
-   base = pgmoneta_get_server_backup_identifier(server, id);
-
-   if (pgmoneta_get_backup(root, id, &bck))
-   {
-      pgmoneta_log_error("Unable to get backup for %s/%s", config->common.servers[server].name, id);
-      goto error;
-   }
-
-   *backup = bck;
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(root);
-   free(base);
-   free(d);
-
-   return 0;
-
-error:
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   free(root);
-   free(base);
-   free(d);
-
-   return 1;
-}
-
-int
-pgmoneta_get_backup_file(char* fn, struct backup** backup)
-{
    char buffer[INFO_BUFFER_SIZE];
    FILE* file = NULL;
    int tbl_idx = 0;
    struct backup* bck = NULL;
 
    *backup = NULL;
+
+   fn = NULL;
+   fn = pgmoneta_append(fn, directory);
+   fn = pgmoneta_append(fn, label);
+   fn = pgmoneta_append(fn, "/backup.info");
 
    file = fopen(fn, "r");
    if (file == NULL)
@@ -1176,6 +718,8 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
       fclose(file);
    }
 
+   free(fn);
+
    return 0;
 
 error:
@@ -1187,6 +731,8 @@ error:
       fsync(fileno(file));
       fclose(file);
    }
+
+   free(fn);
 
    return 1;
 }
@@ -1205,7 +751,7 @@ pgmoneta_get_number_of_valid_backups(int server)
       goto error;
    }
 
-   if (pgmoneta_get_backups(server_path, &number_of_backups, &backups))
+   if (pgmoneta_load_infos(server_path, &number_of_backups, &backups))
    {
       goto error;
    }
@@ -1253,7 +799,7 @@ pgmoneta_get_backup_parent(int server, struct backup* backup, struct backup** pa
 
    d = pgmoneta_get_server_backup(server);
 
-   if (pgmoneta_get_backup(d, backup->parent_label, &p))
+   if (pgmoneta_load_info(d, backup->parent_label, &p))
    {
       goto error;
    }
@@ -1337,7 +883,7 @@ pgmoneta_get_backup_child(int server, struct backup* backup, struct backup** chi
 
    d = pgmoneta_get_server_backup(server);
 
-   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   if (pgmoneta_load_infos(d, &number_of_backups, &backups))
    {
       goto error;
    }
@@ -1352,7 +898,7 @@ pgmoneta_get_backup_child(int server, struct backup* backup, struct backup** chi
 
    if (c_identifier != NULL)
    {
-      if (pgmoneta_get_backup_server(server, c_identifier, &c))
+      if (pgmoneta_load_info(d, c_identifier, &c))
       {
          goto error;
       }
@@ -1422,7 +968,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
 
-   pgmoneta_get_backups(d, &number_of_backups, &backups);
+   pgmoneta_load_infos(d, &number_of_backups, &backups);
 
    if (number_of_backups == 0)
    {
@@ -1609,7 +1155,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    number_of_backups = 0;
    backups = NULL;
 
-   pgmoneta_get_backups(d, &number_of_backups, &backups);
+   pgmoneta_load_infos(d, &number_of_backups, &backups);
 
    if (number_of_backups == 0)
    {
@@ -1781,6 +1327,90 @@ error:
    pgmoneta_stop_logging();
 
    exit(1);
+}
+
+int
+pgmoneta_save_info(char* directory, struct backup* backup)
+{
+   char buffer[INFO_BUFFER_SIZE];
+   char* s = NULL;
+   FILE* sfile = NULL;
+
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, backup->label);
+   s = pgmoneta_append(s, "/backup.info");
+
+   sfile = fopen(s, "w");
+   if (sfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   write_info(sfile, "%s=%d\n", INFO_STATUS, backup->valid == VALID_TRUE ? 1 : 0);
+   write_info(sfile, "%s=%s\n", INFO_LABEL, backup->label);
+   write_info(sfile, "%s=%s\n", INFO_WAL, backup->wal);
+   write_info(sfile, "%s=%lu\n", INFO_BACKUP, backup->backup_size);
+   write_info(sfile, "%s=%lu\n", INFO_RESTORE, backup->restore_size);
+   write_info(sfile, "%s=%lu\n", INFO_BIGGEST_FILE, backup->biggest_file_size);
+   write_info(sfile, "%s=%.4f\n", INFO_ELAPSED, backup->total_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_BASEBACKUP_ELAPSED, backup->basebackup_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_LZ4_ELAPSED, backup->compression_lz4_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_ENCRYPTION_ELAPSED, backup->encryption_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_LINKING_ELAPSED, backup->linking_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED, backup->remote_ssh_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_S3_ELAPSED, backup->remote_s3_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_AZURE_ELAPSED, backup->remote_azure_elapsed_time);
+   write_info(sfile, "%s=%d\n", INFO_MAJOR_VERSION, backup->major_version);
+   write_info(sfile, "%s=%d\n", INFO_MINOR_VERSION, backup->minor_version);
+   write_info(sfile, "%s=%d\n", INFO_KEEP, backup->keep ? 1 : 0);
+   write_info(sfile, "%s=%lu\n", INFO_TABLESPACES, backup->number_of_tablespaces);
+
+   for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
+   {
+      write_info(sfile, "TABLESPACE%lu=%s\n", i + 1, backup->tablespaces[i]);
+      write_info(sfile, "TABLESPACE_OID%lu=%s\n", i + 1, backup->tablespaces_oids[i]);
+      write_info(sfile, "TABLESPACE_PATH%lu=%s\n", i + 1, backup->tablespaces_paths[i]);
+   }
+
+   write_info(sfile, "%s=%X/%X\n", INFO_START_WALPOS, backup->start_lsn_hi32, backup->start_lsn_lo32);
+   write_info(sfile, "%s=%X/%X\n", INFO_END_WALPOS, backup->end_lsn_hi32, backup->end_lsn_lo32);
+   write_info(sfile, "%s=%X/%X\n", INFO_CHKPT_WALPOS, backup->checkpoint_lsn_hi32, backup->checkpoint_lsn_lo32);
+
+   write_info(sfile, "%s=%u\n", INFO_START_TIMELINE, backup->start_timeline);
+   write_info(sfile, "%s=%u\n", INFO_END_TIMELINE, backup->end_timeline);
+   write_info(sfile, "%s=%s\n", INFO_PARENT, backup->parent_label);
+   write_info(sfile, "%s=%s\n", INFO_COMMENTS, backup->comments);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%.1024s\n", INFO_EXTRA, backup->extra);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=%s", INFO_EXTRA, backup->extra);
+
+   pgmoneta_permission(s, 6, 0, 0);
+
+   fsync(fileno(sfile));
+   fclose(sfile);
+
+   s = NULL;
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, backup->label);
+   pgmoneta_log_trace("Updating SHA512 for %s", s);
+   pgmoneta_update_sha512(s, "backup.info");
+
+   free(s);
+   return 0;
+
+error:
+
+   if (sfile != NULL)
+   {
+      fclose(sfile);
+   }
+
+   free(s);
+   return 1;
 }
 
 int
@@ -2242,4 +1872,22 @@ split_file_path(char* path, char** relative_path, char** bare_file_name)
 error:
    free(path_copy);
    return 1;
+}
+
+static void
+write_info(FILE* sfile, const char* fmt, ...)
+{
+   char buffer[INFO_BUFFER_SIZE];
+   va_list args;
+
+   memset(buffer, 0, sizeof(buffer));
+
+   va_start(args, fmt);
+   vsnprintf(buffer, sizeof(buffer), fmt, args);
+   va_end(args);
+
+   if (sfile != NULL)
+   {
+      fputs(buffer, sfile);
+   }
 }

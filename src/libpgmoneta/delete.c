@@ -109,7 +109,7 @@ pgmoneta_delete_wal(int srv)
    /* Find the oldest backup */
    d = pgmoneta_get_server_backup(srv);
 
-   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   if (pgmoneta_load_infos(d, &number_of_backups, &backups))
    {
       goto error;
    }

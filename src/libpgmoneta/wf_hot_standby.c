@@ -125,7 +125,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
       base = pgmoneta_get_server_backup(server);
 
-      pgmoneta_get_backups(base, &number_of_backups, &backups);
+      pgmoneta_load_infos(base, &number_of_backups, &backups);
 
       for (int i = 0; i < config->common.servers[server].number_of_hot_standbys; i++)
       {

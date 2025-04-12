@@ -636,7 +636,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       struct backup* b = NULL;
       char* l = NULL;
       l = (char*)pgmoneta_value_data(iter->value);
-      pgmoneta_get_backup(server_dir, l, &b);
+      pgmoneta_load_info(server_dir, l, &b);
       if (b == NULL)
       {
          pgmoneta_log_error("Unable to find backup %s", l);
@@ -783,14 +783,17 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    struct art* nodes = NULL;
    struct backup* newest_backup = NULL;
    struct backup* oldest_backup = NULL;
+   struct backup* tmp_backup = NULL;
    bool incremental = false;
    struct deque* labels = NULL;
+   char* tmp_backup_dir = NULL;
    char* tmp_backup_root = NULL;
+   char* tmp_backup_label = NULL;
    char* backup_dir = NULL;
    char backup_info_path[MAX_PATH];
    char tmp_backup_info_path[MAX_PATH];
    struct workflow* workflow = NULL;
-
+   pgmoneta_log_trace("Rollup: %s", newest_label);
    memset(backup_info_path, 0, MAX_PATH);
    memset(tmp_backup_info_path, 0, MAX_PATH);
 
@@ -800,7 +803,12 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
       goto error;
    }
 
-   pgmoneta_get_backup_server(server, oldest_label, &oldest_backup);
+   tmp_backup_dir = pgmoneta_get_server_backup(server);
+   if (pgmoneta_load_info(tmp_backup_dir, oldest_label, &oldest_backup))
+   {
+      pgmoneta_log_error("Unable to find the oldest backup %s", oldest_label);
+      goto error;
+   }
    if (oldest_backup == NULL)
    {
       pgmoneta_log_error("Unable to find the oldest backup %s", oldest_label);
@@ -821,10 +829,10 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    pgmoneta_art_insert(nodes, NODE_LABELS, (uintptr_t)labels, ValueDeque);
 
    // USER DIRECTORY
-   tmp_backup_root = pgmoneta_get_server_backup(server);
-   tmp_backup_root = pgmoneta_append(tmp_backup_root, TMP_SUFFIX);
-   tmp_backup_root = pgmoneta_append(tmp_backup_root, "_");
-   tmp_backup_root = pgmoneta_append(tmp_backup_root, newest_label);
+   tmp_backup_label = pgmoneta_append(tmp_backup_label, TMP_SUFFIX);
+   tmp_backup_label = pgmoneta_append(tmp_backup_label, "_");
+   tmp_backup_label = pgmoneta_append(tmp_backup_label, newest_label);
+   tmp_backup_root = pgmoneta_append(tmp_backup_dir, tmp_backup_label);
    backup_dir = pgmoneta_get_server_backup_identifier(server, newest_label);
 
    pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)tmp_backup_root, ValueString);
@@ -844,17 +852,25 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
       pgmoneta_log_error("Unable to copy %s to %s", backup_info_path, tmp_backup_info_path);
       goto error;
    }
-
+   if (pgmoneta_load_info(tmp_backup_dir, tmp_backup_label, &tmp_backup))
+   {
+      pgmoneta_log_error("Unable to get backup for directory %s", tmp_backup_root);
+      goto error;
+   }
    if (!incremental)
    {
-      pgmoneta_update_info_unsigned_long(tmp_backup_root, INFO_TYPE, TYPE_FULL);
-      pgmoneta_update_info_string(tmp_backup_root, INFO_PARENT, NULL);
+      tmp_backup->type = TYPE_FULL;
+      memset(tmp_backup->parent_label, 0, sizeof(tmp_backup->parent_label));
    }
    else
    {
-      pgmoneta_update_info_string(tmp_backup_root, INFO_PARENT, oldest_backup->parent_label);
+      snprintf(tmp_backup->parent_label, sizeof(tmp_backup->parent_label), "%s", oldest_backup->parent_label);
    }
-
+   if (pgmoneta_save_info(tmp_backup_dir, tmp_backup))
+   {
+      pgmoneta_log_error("Unable to save backup info for directory %s", tmp_backup_root);
+      goto error;
+   }
    pgmoneta_delete_directory(backup_dir);
    if (rename(tmp_backup_root, backup_dir) != 0)
    {
@@ -870,8 +886,11 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
 
    pgmoneta_workflow_destroy(workflow);
    pgmoneta_art_destroy(nodes);
+   free(tmp_backup);
    free(newest_backup);
    free(oldest_backup);
+   free(tmp_backup_dir);
+   free(tmp_backup_label);
    free(tmp_backup_root);
    free(backup_dir);
    return 0;
@@ -885,6 +904,8 @@ error:
    pgmoneta_art_destroy(nodes);
    free(newest_backup);
    free(oldest_backup);
+   free(tmp_backup_dir);
+   free(tmp_backup_label);
    free(tmp_backup_root);
    free(backup_dir);
    return 1;
@@ -2506,7 +2527,7 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
    server_dir = pgmoneta_get_server_backup(server);
    pgmoneta_deque_create(false, &l);
 
-   pgmoneta_get_backup(server_dir, newest_label, &bck);
+   pgmoneta_load_info(server_dir, newest_label, &bck);
    if (bck == NULL)
    {
       pgmoneta_log_error("Unable to find backup %s", newest_label);
@@ -2533,7 +2554,7 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
          free(bck);
          bck = NULL;
 
-         pgmoneta_get_backup(server_dir, label, &bck);
+         pgmoneta_load_info(server_dir, label, &bck);
 
          if (bck == NULL)
          {
@@ -2553,7 +2574,7 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
          free(bck);
          bck = NULL;
 
-         pgmoneta_get_backup(server_dir, label, &bck);
+         pgmoneta_load_info(server_dir, label, &bck);
 
          if (bck == NULL)
          {

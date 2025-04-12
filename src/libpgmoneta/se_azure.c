@@ -111,8 +111,10 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    struct timespec end_t;
    double remote_azure_elapsed_time;
    char* local_root = NULL;
+   char* base_dir = NULL;
    char* azure_root = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -141,6 +143,7 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_log_debug("Azure storage engine (execute): %s/%s", config->common.servers[server].name, label);
 
    local_root = pgmoneta_get_server_backup_identifier(server, label);
+   base_dir = pgmoneta_get_server_backup(server);
    azure_root = azure_get_basepath(server, label);
 
    if (azure_upload_files(local_root, azure_root, ""))
@@ -155,9 +158,19 @@ azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    remote_azure_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+   if (pgmoneta_load_info(base_dir, label, &temp_backup))
+   {
+      pgmoneta_log_error("Unable to get backup for directory %s", base_dir);
+      goto error;
+   }
+   temp_backup->remote_azure_elapsed_time = remote_azure_elapsed_time;
+   if (pgmoneta_save_info(base_dir, temp_backup))
+   {
+      pgmoneta_log_error("Unable to save backup info for directory %s", base_dir);
+      goto error;
+   }
 
-   pgmoneta_update_info_double(local_root, INFO_REMOTE_AZURE_ELAPSED, remote_azure_elapsed_time);
-
+   free(temp_backup);
    free(local_root);
    free(azure_root);
 

@@ -164,7 +164,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
 
       d = pgmoneta_get_server_backup(i);
 
-      pgmoneta_get_backups(d, &number_of_backups, &backups);
+      pgmoneta_load_infos(d, &number_of_backups, &backups);
 
       if (number_of_backups > 0)
       {
@@ -207,7 +207,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
 
          srv = pgmoneta_get_server_backup(i);
 
-         if (!pgmoneta_get_backups(d, &number_of_backups, &backups))
+         if (!pgmoneta_load_infos(d, &number_of_backups, &backups))
          {
             if (number_of_backups == 0)
             {
