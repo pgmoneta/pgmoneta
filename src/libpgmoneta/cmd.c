@@ -26,11 +26,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- #include <cmd.h>
- #include <string.h>
- #include <stdio.h>
- #include <err.h>
- #include <stdlib.h>
+#include <cmd.h>
+
+#include <err.h>
 
 static bool
 option_requires_arg(char* option_name, cli_option* options, int num_options, bool is_long_option)

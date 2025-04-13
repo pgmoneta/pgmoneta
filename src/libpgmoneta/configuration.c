@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
 #include <configuration.h>
 #include <logging.h>
 #include <management.h>
@@ -35,7 +36,6 @@
 #include <security.h>
 #include <shmem.h>
 #include <utils.h>
-#include <aes.h>
 
 /* system */
 #include <ctype.h>

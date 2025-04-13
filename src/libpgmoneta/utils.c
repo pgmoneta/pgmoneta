@@ -28,11 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <info.h>
 #include <logging.h>
-#include <restore.h>
 #include <utils.h>
-#include <workers.h>
 
 /* system */
 #include <dirent.h>

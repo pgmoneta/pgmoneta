@@ -33,13 +33,12 @@
 extern "C" {
 #endif
 
-#include <memory.h>
 #include <pgmoneta.h>
+#include <memory.h>
 #include <tablespace.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
-
 #include <openssl/ssl.h>
 
 #define MESSAGE_STATUS_ZERO  0

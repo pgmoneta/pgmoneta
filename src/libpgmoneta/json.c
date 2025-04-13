@@ -31,8 +31,8 @@
 #include <art.h>
 #include <logging.h>
 #include <json.h>
-#include <message.h>
 #include <utils.h>
+
 /* System */
 #include <ctype.h>
 #include <errno.h>

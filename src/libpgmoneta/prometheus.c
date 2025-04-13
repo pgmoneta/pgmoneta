@@ -28,11 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <configuration.h>
 #include <info.h>
 #include <logging.h>
-#include <memory.h>
-#include <message.h>
 #include <network.h>
 #include <prometheus.h>
 #include <shmem.h>

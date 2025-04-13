@@ -28,14 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <deque.h>
-#include <info.h>
 #include <logging.h>
 #include <restore.h>
-#include <string.h>
 #include <utils.h>
-#include <workers.h>
 #include <workflow.h>
 
 /* system */

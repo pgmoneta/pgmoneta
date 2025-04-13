@@ -27,10 +27,8 @@
  */
 
 #include <pgmoneta.h>
-#include <art.h>
 #include <extension.h>
 #include <logging.h>
-#include <message.h>
 #include <network.h>
 #include <security.h>
 #include <utils.h>

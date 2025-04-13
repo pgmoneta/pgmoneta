@@ -28,13 +28,10 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <hot_standby.h>
 #include <logging.h>
 #include <manifest.h>
 #include <restore.h>
 #include <utils.h>
-#include <workers.h>
 #include <workflow.h>
 
 /* system */

@@ -32,8 +32,6 @@
 #include <extension.h>
 #include <logging.h>
 #include <manifest.h>
-#include <memory.h>
-#include <message.h>
 #include <network.h>
 #include <security.h>
 #include <utils.h>

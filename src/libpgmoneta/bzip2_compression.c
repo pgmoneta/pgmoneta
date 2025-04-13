@@ -32,7 +32,6 @@
 #include <logging.h>
 #include <management.h>
 #include <utils.h>
-#include <workers.h>
 
 /* system */
 #include <bzlib.h>

@@ -28,11 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <achv.h>
-#include <art.h>
 #include <gzip_compression.h>
-#include <info.h>
-#include <json.h>
 #include <logging.h>
 #include <lz4_compression.h>
 #include <management.h>

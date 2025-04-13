@@ -27,7 +27,6 @@
  */
 
 /* pgmoneta */
-#include <configuration.h>
 #include <pgmoneta.h>
 #include <logging.h>
 #include <network.h>

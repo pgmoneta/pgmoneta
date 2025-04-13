@@ -28,16 +28,9 @@
 
 #include <aes.h>
 #include <compression.h>
-#include <deque.h>
-#include <json.h>
 #include <logging.h>
 #include <utils.h>
 #include <walfile.h>
-#include <walfile/wal_reader.h>
-
-#include <libgen.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 /**
  * Validate if a WAL file exists and is accessible before processing.

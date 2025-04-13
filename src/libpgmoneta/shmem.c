@@ -28,7 +28,6 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <shmem.h>
 
 /* system */
 #include <errno.h>

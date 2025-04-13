@@ -28,11 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
 #include <logging.h>
 #include <utils.h>
 #include <zstandard_compression.h>
-#include <workers.h>
 #include <workflow.h>
 
 /* system */

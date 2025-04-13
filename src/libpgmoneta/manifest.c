@@ -29,7 +29,6 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <csv.h>
-#include <deque.h>
 #include <json.h>
 #include <logging.h>
 #include <manifest.h>

@@ -29,12 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
-#include <art.h>
-#include <deque.h>
-#include <info.h>
 #include <logging.h>
-#include <management.h>
-#include <network.h>
 #include <utils.h>
 #include <workflow.h>
 

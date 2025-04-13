@@ -29,9 +29,6 @@
 #ifndef PGMONETA_UTILS_H
 #define PGMONETA_UTILS_H
 
-#include <stdbool.h>
-#include <openssl/asn1.h>
-#include <sys/types.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,6 +36,10 @@ extern "C" {
 #include <pgmoneta.h>
 #include <message.h>
 #include <workers.h>
+
+#include <stdbool.h>
+#include <openssl/asn1.h>
+#include <sys/types.h>
 
 #define SHORT_TIME_LENGTH  8 + 1
 #define LONG_TIME_LENGTH  16 + 1

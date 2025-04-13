@@ -28,8 +28,6 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <deque.h>
 #include <logging.h>
 #include <security.h>
 #include <utils.h>

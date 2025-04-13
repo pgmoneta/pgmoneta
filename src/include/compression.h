@@ -29,6 +29,8 @@
 #ifndef PGMONETA_COMPRESSION_H
 #define PGMONETA_COMPRESSION_H
 
+#include <pgmoneta.h>
+
 typedef int (*compression_func)(char*, char*);
 
 /**

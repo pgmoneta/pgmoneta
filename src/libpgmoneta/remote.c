@@ -30,10 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <management.h>
-#include <memory.h>
-#include <message.h>
 #include <network.h>
-#include <remote.h>
 #include <security.h>
 #include <utils.h>
 

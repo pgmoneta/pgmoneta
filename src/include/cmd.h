@@ -29,6 +29,8 @@
 #ifndef CMD_H
 #define CMD_H
 
+#include <pgmoneta.h>
+
 #include <stdbool.h>
 
 /**

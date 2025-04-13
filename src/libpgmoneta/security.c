@@ -29,12 +29,8 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
-#include <memory.h>
-#include <message.h>
 #include <network.h>
-#include <prometheus.h>
 #include <security.h>
-#include <shmem.h>
 #include <utils.h>
 
 /* system */

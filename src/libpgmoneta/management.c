@@ -31,12 +31,10 @@
 #include <aes.h>
 #include <bzip2_compression.h>
 #include <gzip_compression.h>
-#include <json.h>
 #include <logging.h>
 #include <lz4_compression.h>
 #include <management.h>
 #include <utils.h>
-#include <value.h>
 #include <zstandard_compression.h>
 
 /* system */

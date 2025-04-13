@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 /* pgmoneta */
+#include <pgmoneta.h>
 #include <workflow.h>
 
 /* system */

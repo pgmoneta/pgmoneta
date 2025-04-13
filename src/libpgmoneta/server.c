@@ -28,13 +28,10 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <deque.h>
 #include <extension.h>
 #include <logging.h>
-#include <message.h>
 #include <network.h>
 #include <security.h>
-#include <server.h>
 #include <utils.h>
 
 /* system */

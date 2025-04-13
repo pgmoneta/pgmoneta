@@ -29,14 +29,8 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
-#include <art.h>
-#include <deque.h>
-#include <info.h>
-#include <link.h>
 #include <logging.h>
-#include <pgmoneta.h>
 #include <utils.h>
-#include <workers.h>
 #include <workflow.h>
 
 /* system */

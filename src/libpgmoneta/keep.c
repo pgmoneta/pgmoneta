@@ -29,7 +29,6 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <info.h>
-#include <keep.h>
 #include <logging.h>
 #include <management.h>
 #include <utils.h>

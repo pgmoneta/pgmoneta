@@ -27,10 +27,8 @@
  */
 /* pgmoneta */
 #include <art.h>
-#include <deque.h>
 #include <json.h>
 #include <utils.h>
-#include <value.h>
 
 /* System */
 #include <inttypes.h>

@@ -37,7 +37,6 @@ extern "C" {
 #include <deque.h>
 
 #include <stdlib.h>
-
 #include <openssl/ssl.h>
 
 #define HASH_ALGORITHM_DEFAULT 0

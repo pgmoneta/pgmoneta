@@ -28,15 +28,11 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
 #include <csv.h>
-#include <deque.h>
 #include <logging.h>
 #include <management.h>
 #include <security.h>
 #include <utils.h>
-#include <verify.h>
-#include <workers.h>
 #include <workflow.h>
 
 /* system */

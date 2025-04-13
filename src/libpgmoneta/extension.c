@@ -30,10 +30,6 @@
 #include <pgmoneta.h>
 #include <extension.h>
 #include <logging.h>
-#include <memory.h>
-#include <network.h>
-#include <security.h>
-#include <utils.h>
 
 /* system */
 #include <stdlib.h>

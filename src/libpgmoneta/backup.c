@@ -27,29 +27,14 @@
  */
 
 /* pgmoneta */
-#include "aes.h"
-#include "compression.h"
 #include <pgmoneta.h>
-#include <art.h>
-#include <backup.h>
-#include <info.h>
-#include <json.h>
+#include <aes.h>
+#include <compression.h>
 #include <logging.h>
 #include <management.h>
-#include <message.h>
 #include <network.h>
-#include <stdint.h>
-#include <string.h>
 #include <utils.h>
-#include <value.h>
 #include <workflow.h>
-
-/* system */
-#include <err.h>
-#include <stdatomic.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <time.h>
 
 #define NAME "backup"
 

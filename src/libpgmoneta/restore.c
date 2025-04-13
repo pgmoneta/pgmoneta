@@ -28,18 +28,12 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <deque.h>
-#include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
 #include <restore.h>
 #include <security.h>
-#include <string.h>
 #include <utils.h>
-#include <value.h>
-#include <workers.h>
 #include <workflow.h>
 
 /* system */

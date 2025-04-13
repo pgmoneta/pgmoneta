@@ -28,10 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <workflow.h>
 #include <logging.h>
-#include <retention.h>
 #include <utils.h>
+#include <workflow.h>
 
 void
 pgmoneta_retention(char** argv)

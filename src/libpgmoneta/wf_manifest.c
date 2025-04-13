@@ -26,9 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <pgmoneta.h>
-#include <art.h>
 #include <csv.h>
-#include <json.h>
 #include <logging.h>
 #include <manifest.h>
 #include <utils.h>

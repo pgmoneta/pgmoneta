@@ -30,7 +30,6 @@
 #include <deque.h>
 #include <logging.h>
 #include <utils.h>
-#include <value.h>
 
 #include <stdlib.h>
 #include <string.h>

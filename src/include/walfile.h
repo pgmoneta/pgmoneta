@@ -29,9 +29,10 @@
 #ifndef PGMONETA_WALFILE_H
 #define PGMONETA_WALFILE_H
 
+#include <pgmoneta.h>
 #include <deque.h>
-#include <walfile/wal_reader.h>
 #include <wal.h>
+#include <walfile/wal_reader.h>
 
 /* Return Codes */
 #define PGMONETA_WAL_SUCCESS      0   /**< WAL operation succeeded */

@@ -28,22 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <extension.h>
-#include <json.h>
 #include <logging.h>
-#include <management.h>
-#include <memory.h>
-#include <message.h>
 #include <network.h>
-#include <prometheus.h>
 #include <security.h>
 #include <server.h>
 #include <storage.h>
 #include <utils.h>
-#include <value.h>
 #include <wal.h>
-#include <workflow.h>
 
 /* system */
 #include <ctype.h>

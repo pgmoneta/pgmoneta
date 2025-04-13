@@ -29,16 +29,18 @@
 #ifndef PGMONETA_HTTP_H
 #define PGMONETA_HTTP_H
 
-#include <stdint.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <curl/curl.h>
+#include <pgmoneta.h>
+
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <curl/curl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define HTTP_GET 0
 #define HTTP_PUT 1

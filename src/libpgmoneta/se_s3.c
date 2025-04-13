@@ -28,12 +28,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
 #include <http.h>
-#include <info.h>
 #include <logging.h>
 #include <security.h>
-#include <storage.h>
 #include <utils.h>
 #include <workflow.h>
 

@@ -30,13 +30,9 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <info.h>
 #include <logging.h>
-#include <string.h>
-#include <utils.h>
 #include <security.h>
-#include <storage.h>
+#include <utils.h>
 #include <workflow.h>
 
 /* system */

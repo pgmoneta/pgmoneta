@@ -28,19 +28,15 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <art.h>
-#include <dirent.h>
 #include <http.h>
-#include <info.h>
 #include <logging.h>
 #include <security.h>
-#include <stdio.h>
-#include <storage.h>
 #include <utils.h>
 #include <workflow.h>
 
 /* system */
 #include <assert.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 
