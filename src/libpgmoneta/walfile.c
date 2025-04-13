@@ -32,6 +32,8 @@
 #include <utils.h>
 #include <walfile.h>
 
+#include <libgen.h>
+
 /**
  * Validate if a WAL file exists and is accessible before processing.
  * Returns PGMONETA_WAL_SUCCESS if valid, otherwise an error code.
