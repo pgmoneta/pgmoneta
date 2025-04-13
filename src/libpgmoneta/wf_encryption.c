@@ -78,7 +78,7 @@ encryption_name(void)
 }
 
 static int
-encryption_execute(char* name, struct art* nodes)
+encryption_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -242,7 +242,7 @@ error:
 }
 
 static int
-decryption_execute(char* name, struct art* nodes)
+decryption_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

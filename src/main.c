@@ -1807,7 +1807,7 @@ coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
 }
 
 static void
-wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
+wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute__((unused)), int revents)
 {
    struct main_configuration* config;
 
@@ -1868,7 +1868,7 @@ wal_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 }
 
 static void
-retention_cb(struct ev_loop* loop, ev_periodic* w, int revents)
+retention_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute__((unused)), int revents)
 {
    if (EV_ERROR & revents)
    {
@@ -1885,7 +1885,7 @@ retention_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 }
 
 static void
-valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
+valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute__((unused)), int revents)
 {
    struct main_configuration* config;
 
@@ -1921,7 +1921,7 @@ valid_cb(struct ev_loop* loop, ev_periodic* w, int revents)
 }
 
 static void
-wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents)
+wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute__((unused)), int revents)
 {
    bool start = false;
    int follow;

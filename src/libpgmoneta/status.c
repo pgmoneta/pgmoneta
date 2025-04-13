@@ -37,7 +37,7 @@
 #define NAME "status"
 
 void
-pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_status(SSL* ssl __attribute__((unused)), int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -248,7 +248,7 @@ error:
 }
 
 void
-pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_status_details(SSL* ssl __attribute__((unused)), int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;

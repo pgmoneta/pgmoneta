@@ -41,7 +41,7 @@
 #define NAME "verify"
 
 void
-pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_verify(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* identifier = NULL;
    char* directory = NULL;

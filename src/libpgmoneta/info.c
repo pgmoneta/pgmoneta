@@ -1370,7 +1370,7 @@ error:
 }
 
 void
-pgmoneta_info_request(SSL* ssl, int client_fd, int server,
+pgmoneta_info_request(SSL* ssl __attribute__((unused)), int client_fd, int server,
                       uint8_t compression, uint8_t encryption,
                       struct json* payload)
 {
@@ -1558,7 +1558,7 @@ error:
 }
 
 void
-pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_annotate_request(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* backup = NULL;
    char* action = NULL;

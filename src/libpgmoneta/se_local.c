@@ -67,7 +67,7 @@ local_storage_name(void)
 }
 
 static int
-local_storage_execute(char* name, struct art* nodes)
+local_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

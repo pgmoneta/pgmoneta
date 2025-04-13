@@ -124,7 +124,7 @@ error:
 }
 
 int
-pgmoneta_write_walfile(struct walfile* wf, int server, char* path)
+pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), char* path)
 {
    int error_code = PGMONETA_WAL_SUCCESS;
    FILE* file = NULL;

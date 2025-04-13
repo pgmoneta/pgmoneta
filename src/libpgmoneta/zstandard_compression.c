@@ -357,7 +357,7 @@ error:
 }
 
 void
-pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_zstandardd_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;
@@ -659,7 +659,7 @@ error:
 }
 
 void
-pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_zstandardc_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;

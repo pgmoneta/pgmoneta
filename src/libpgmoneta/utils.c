@@ -1822,7 +1822,6 @@ do_delete_file(struct worker_common* wc)
    free(fi);
 }
 
-
 int
 pgmoneta_copy_directory(char* from, char* to, char** restore_last_files_names, struct workers* workers)
 {
@@ -4455,7 +4454,7 @@ pgmoneta_backtrace(void)
    log_str = pgmoneta_append(log_str, "Backtrace:\n");
 
    // the first element is ___interceptor_backtrace, so we skip it
-   for (int i = 1; i < bt_size; i++)
+   for (size_t i = 1; i < bt_size; i++)
    {
       uint64_t addr = (uint64_t)bt[i];
       uint64_t offset;
@@ -4491,7 +4490,7 @@ pgmoneta_backtrace(void)
       {
          found_main = true;
       }
-      snprintf(log_buffer, sizeof(log_buffer), "#%d  0x%lx in ", i - 1, addr);
+      snprintf(log_buffer, sizeof(log_buffer), "#%zu  0x%lx in ", i - 1, addr);
       log_str = pgmoneta_append(log_str, log_buffer);
       log_str = pgmoneta_append(log_str, buffer);
       log_str = pgmoneta_append(log_str, "\n");

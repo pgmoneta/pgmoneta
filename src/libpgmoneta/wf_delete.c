@@ -73,7 +73,7 @@ delete_name(void)
 }
 
 static int
-delete_backup_execute(char* name, struct art* nodes)
+delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    bool active = false;
@@ -243,7 +243,7 @@ error:
 }
 
 static int
-delete_backup(int server, int index, struct backup* backup, int number_of_backups, struct backup** backups)
+delete_backup(int server, int index, struct backup* backup __attribute__((unused)), int number_of_backups, struct backup** backups)
 {
    int prev_index = -1;
    int next_index = -1;

@@ -76,7 +76,7 @@ basebackup_name(void)
 }
 
 static int
-basebackup_execute(char* name, struct art* nodes)
+basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

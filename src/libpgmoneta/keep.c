@@ -54,7 +54,7 @@ pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, uint8_t compression
 }
 
 static void
-keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload)
+keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* elapsed = NULL;
    struct timespec start_t;

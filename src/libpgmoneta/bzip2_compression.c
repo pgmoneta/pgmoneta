@@ -395,7 +395,7 @@ error:
 }
 
 void
-pgmoneta_bunzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_bunzip2_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;
@@ -510,7 +510,7 @@ do_bzip2_decompress(struct worker_common* wc)
 }
 
 void
-pgmoneta_bzip2_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_bzip2_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;

@@ -74,7 +74,7 @@ cleanup_name(void)
 }
 
 static int
-cleanup_execute_restore(char* name, struct art* nodes)
+cleanup_execute_restore(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

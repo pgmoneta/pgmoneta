@@ -170,7 +170,7 @@ restore_name(void)
 }
 
 static int
-restore_execute(char* name, struct art* nodes)
+restore_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* directory = NULL;
@@ -267,7 +267,7 @@ combine_incremental_name(void)
 }
 
 static int
-combine_incremental_execute(char* name, struct art* nodes)
+combine_incremental_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    bool incremental = false;
@@ -333,7 +333,7 @@ combine_incremental_execute(char* name, struct art* nodes)
       pgmoneta_delete_directory(output_dir);
    }
 
-   for (int i = 0; i < bck->number_of_tablespaces; i++)
+   for (uint64_t i = 0; i < bck->number_of_tablespaces; i++)
    {
       char tblspc[MAX_PATH];
       memset(tblspc, 0, MAX_PATH);
@@ -372,7 +372,7 @@ recovery_info_name(void)
 }
 
 static int
-recovery_info_execute(char* name, struct art* nodes)
+recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* identifier = NULL;
@@ -738,7 +738,7 @@ copy_wal_name(void)
 }
 
 static int
-copy_wal_execute(char* name, struct art* nodes)
+copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    char* origwal = NULL;
    char* waldir = NULL;
@@ -824,7 +824,7 @@ restore_excluded_files_name(void)
 }
 
 static int
-restore_excluded_files_execute(char* name, struct art* nodes)
+restore_excluded_files_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* identifier = NULL;
@@ -989,7 +989,7 @@ error:
 }
 
 static int
-restore_excluded_files_teardown(char* name, struct art* nodes)
+restore_excluded_files_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* identifier = NULL;

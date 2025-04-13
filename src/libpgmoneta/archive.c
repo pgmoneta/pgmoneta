@@ -50,7 +50,7 @@
 static void write_tar_file(struct archive* a, char* src, char* dst);
 
 void
-pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
    char* identifier = NULL;

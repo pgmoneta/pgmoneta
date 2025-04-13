@@ -68,7 +68,7 @@ manifest_name(void)
 }
 
 static int
-manifest_execute(char* name, struct art* nodes)
+manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

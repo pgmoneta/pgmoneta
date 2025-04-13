@@ -76,7 +76,7 @@ azure_storage_name(void)
 }
 
 static int
-azure_storage_setup(char* name, struct art* nodes)
+azure_storage_setup(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -114,7 +114,7 @@ error:
 }
 
 static int
-azure_storage_execute(char* name, struct art* nodes)
+azure_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -183,7 +183,7 @@ error:
 }
 
 static int
-azure_storage_teardown(char* name, struct art* nodes)
+azure_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

@@ -302,14 +302,14 @@ file_base_name(char* file, char** basename);
 static int
 file_final_name(char* file, int encryption, int compression, char** finalname);
 
-static int copy_tablespaces_restore(char *from, char *to, char *base,
-                                    char *server, char *id,
-                                    struct backup *backup,
-                                    struct workers *workers);
-static int copy_tablespaces_hotstandby(char *from, char *to,
-                                       char *tblspc_mappings,
-                                       struct backup *backup,
-                                       struct workers *workers);
+static int copy_tablespaces_restore(char* from, char* to, char* base,
+                                    char* server, char* id,
+                                    struct backup* backup,
+                                    struct workers* workers);
+static int copy_tablespaces_hotstandby(char* from, char* to,
+                                       char* tblspc_mappings,
+                                       struct backup* backup,
+                                       struct workers* workers);
 
 int
 pgmoneta_get_restore_last_files_names(char*** output)
@@ -353,7 +353,7 @@ pgmoneta_is_restore_last_name(char* file_name)
 }
 
 void
-pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
    bool locked = false;
@@ -731,7 +731,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    }
 
    // round 2 for each tablespaces
-   for (int i = 0; i < bck->number_of_tablespaces; i++)
+   for (uint64_t i = 0; i < bck->number_of_tablespaces; i++)
    {
       tsoid = parse_oid(bck->tablespaces_oids[i]);
 
@@ -1576,7 +1576,7 @@ reconstruct_backup_file(int server,
    // it could be in an incremental file, or a full file.
    // Blocks included in the latest incremental backup can of course
    // be sourced from there directly.
-   for (int i = 0; i < latest_source->num_blocks; i++)
+   for (uint32_t i = 0; i < latest_source->num_blocks; i++)
    {
       // the block number of blocks inside latest incr file
       b = latest_source->relative_block_numbers[i];
@@ -1651,7 +1651,7 @@ reconstruct_backup_file(int server,
          break;
       }
       // as for an incremental file, source blocks we don't have yet from it
-      for (int i = 0; i < rf->num_blocks; i++)
+      for (uint32_t i = 0; i < rf->num_blocks; i++)
       {
          b = rf->relative_block_numbers[i];
          // only the latest source may contain blocks exceeding the latest truncation block length
@@ -1819,7 +1819,7 @@ find_reconstructed_block_length(struct rfile* s)
       return 0;
    }
    block_length = s->truncation_block_length;
-   for (int i = 0; i < s->num_blocks; i++)
+   for (uint32_t i = 0; i < s->num_blocks; i++)
    {
       if (s->relative_block_numbers[i] >= block_length)
       {
@@ -2058,7 +2058,7 @@ write_reconstructed_file_full(char* output_file_path,
       pgmoneta_log_error("reconstruct: unable to open file for reconstruction at %s", output_file_path);
       goto error;
    }
-   for (int i = 0; i < block_length; i++)
+   for (uint32_t i = 0; i < block_length; i++)
    {
       memset(buffer, 0, blocksz);
       s = source_map[i];
@@ -2121,7 +2121,7 @@ write_reconstructed_file_incremental(char* output_file_path,
    pgmoneta_log_debug("reconstruct incremental file %s", output_file_path);
 
    // build header
-   for (int i = 0; i < block_length; i++)
+   for (uint32_t i = 0; i < block_length; i++)
    {
       if (source_map[i] != NULL)
       {
@@ -2168,7 +2168,7 @@ write_reconstructed_file_incremental(char* output_file_path,
       goto error;
    }
 
-   for (int i = 0; i < block_length; i++)
+   for (uint32_t i = 0; i < block_length; i++)
    {
       memset(buffer, 0, blocksz);
       s = source_map[i];
@@ -2652,7 +2652,7 @@ error:
 
    pgmoneta_delete_directory(target_base_combine);
    // purge each table space
-   for (int i = 0; i < backup->number_of_tablespaces; i++)
+   for (uint32_t i = 0; i < backup->number_of_tablespaces; i++)
    {
       char tblspc[MAX_PATH];
       memset(tblspc, 0, MAX_PATH);
@@ -3010,8 +3010,8 @@ file_base_name(char* file, char** basename)
    *basename = b;
    return 0;
 
-   error:
-      free(b);
+error:
+   free(b);
    return 1;
 }
 
@@ -3052,11 +3052,10 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
    *finalname = final;
    return 0;
 
-   error:
-      free(final);
+error:
+   free(final);
    return 1;
 }
-
 
 static int
 copy_tablespaces_restore(char* from, char* to, char* base, char* server, char* id, struct backup* backup, struct workers* workers)

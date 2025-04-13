@@ -257,7 +257,7 @@ pgmoneta_server_valid(int srv)
 }
 
 static int
-get_wal_size(SSL* ssl, int socket, int server, int* ws)
+get_wal_size(SSL* ssl, int socket, int server __attribute__((unused)), int* ws)
 {
    int q = 0;
    bool mb = true;
@@ -337,7 +337,7 @@ error:
 }
 
 static int
-get_wal_level(SSL* ssl, int socket, int server, bool* replica)
+get_wal_level(SSL* ssl, int socket, int server __attribute__((unused)), bool* replica)
 {
    int q = 0;
    int ret;
@@ -400,7 +400,7 @@ error:
 }
 
 static int
-get_checksums(SSL* ssl, int socket, int server, bool* checksums)
+get_checksums(SSL* ssl, int socket, int server __attribute__((unused)), bool* checksums)
 {
    int q = 0;
    int ret;
@@ -506,7 +506,7 @@ error:
 }
 
 static int
-get_segment_size(SSL* ssl, int socket, int server, size_t* segsz)
+get_segment_size(SSL* ssl, int socket, int server __attribute__((unused)), size_t* segsz)
 {
    int q = 0;
    bool mb = true;
@@ -585,7 +585,7 @@ error:
 }
 
 static int
-get_block_size(SSL* ssl, int socket, int server, size_t* blocksz)
+get_block_size(SSL* ssl, int socket, int server __attribute__((unused)), size_t* blocksz)
 {
    int q = 0;
    int ret;
@@ -643,7 +643,7 @@ error:
 }
 
 static int
-get_summarize_wal(SSL* ssl, int socket, int server, bool* sw)
+get_summarize_wal(SSL* ssl, int socket, int server __attribute__((unused)), bool* sw)
 {
    int q = 0;
    int ret;

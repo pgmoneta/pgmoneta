@@ -225,7 +225,7 @@ error:
 }
 
 static char*
-out_gistxlogPageUpdate(char* buf, struct gist_xlog_page_update* xlrec)
+out_gistxlogPageUpdate(char* buf, struct gist_xlog_page_update* xlrec __attribute__((unused)))
 {
    return buf;
 }

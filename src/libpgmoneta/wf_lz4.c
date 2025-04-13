@@ -78,7 +78,7 @@ lz4_name(void)
 }
 
 static int
-lz4_execute_compress(char* name, struct art* nodes)
+lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -205,7 +205,7 @@ error:
 }
 
 static int
-lz4_execute_uncompress(char* name, struct art* nodes)
+lz4_execute_uncompress(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

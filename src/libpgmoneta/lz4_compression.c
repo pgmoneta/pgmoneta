@@ -383,7 +383,7 @@ do_lz4_decompress(struct worker_common* wc)
 }
 
 void
-pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_lz4d_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;
@@ -510,7 +510,7 @@ error:
 }
 
 void
-pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_lz4c_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;

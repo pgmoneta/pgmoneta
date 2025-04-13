@@ -75,7 +75,7 @@ retention_name(void)
 }
 
 static int
-retention_setup(char* name, struct art* nodes)
+retention_setup(char* name __attribute__((unused)), struct art* nodes)
 {
    struct main_configuration* config;
 
@@ -101,7 +101,7 @@ retention_setup(char* name, struct art* nodes)
 }
 
 static int
-retention_execute(char* name, struct art* nodes)
+retention_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    char* d;
    int number_of_backups = 0;
@@ -239,7 +239,7 @@ retention_execute(char* name, struct art* nodes)
 }
 
 static int
-retention_teardown(char* name, struct art* nodes)
+retention_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    struct main_configuration* config;
 

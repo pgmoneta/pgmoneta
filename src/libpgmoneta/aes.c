@@ -279,7 +279,7 @@ pgmoneta_encrypt_wal(char* d)
 }
 
 void
-pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -558,7 +558,7 @@ do_decrypt_file(struct worker_common* wc)
 }
 
 void
-pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;

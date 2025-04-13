@@ -52,7 +52,7 @@ pgmoneta_wal_logicalmsg_desc(char* buf, struct decoded_xlog_record* record)
                                        xlrec->transactional ? "transactional" : "non-transactional",
                                        prefix, xlrec->message_size);
       /* Write message payload as a series of hex bytes */
-      for (int cnt = 0; cnt < xlrec->message_size; cnt++)
+      for (size_t cnt = 0; cnt < xlrec->message_size; cnt++)
       {
          buf = pgmoneta_format_and_append(buf, "%s%02X", sep, (unsigned char) message[cnt]);
          sep = " ";

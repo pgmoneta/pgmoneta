@@ -118,7 +118,7 @@ struct to_string_param
 {
    char* str;
    int indent;
-   int cnt;
+   uint64_t cnt;
    char* tag;
    struct art* t;
 };

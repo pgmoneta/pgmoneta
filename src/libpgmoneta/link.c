@@ -31,7 +31,7 @@
 #include <link.h>
 #include <logging.h>
 #include <utils.h>
-          
+
 /* system */
 #include <dirent.h>
 #include <stdio.h>

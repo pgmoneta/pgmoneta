@@ -82,7 +82,7 @@ permissions_name(void)
 }
 
 static int
-permissions_execute_backup(char* name, struct art* nodes)
+permissions_execute_backup(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -119,7 +119,7 @@ permissions_execute_backup(char* name, struct art* nodes)
 }
 
 static int
-permissions_execute_restore(char* name, struct art* nodes)
+permissions_execute_restore(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -164,7 +164,7 @@ permissions_execute_restore(char* name, struct art* nodes)
 }
 
 static int
-permissions_execute_archive(char* name, struct art* nodes)
+permissions_execute_archive(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

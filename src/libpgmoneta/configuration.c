@@ -1917,7 +1917,7 @@ error:
 }
 
 int
-pgmoneta_validate_walinfo_configuration(void* shmem)
+pgmoneta_validate_walinfo_configuration(void* shmem __attribute__((unused)))
 {
    /**
     * Currently this function is useless because
@@ -2484,7 +2484,7 @@ add_servers_configuration_response(struct json* res)
 }
 
 void
-pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    struct json* response = NULL;
    char* elapsed = NULL;
@@ -2548,7 +2548,7 @@ error:
 }
 
 void
-pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    struct json* response = NULL;
    struct json* request = NULL;
@@ -2598,7 +2598,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    memset(section, 0, MISC_LENGTH);
    memset(key, 0, MISC_LENGTH);
 
-   for (int i = 0; i < strlen(config_key); i++)
+   for (size_t i = 0; i < strlen(config_key); i++)
    {
       if (config_key[i] == '.')
       {

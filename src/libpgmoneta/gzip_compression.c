@@ -303,7 +303,7 @@ pgmoneta_gzip_wal(char* directory)
 }
 
 void
-pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_gzip_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
@@ -436,7 +436,7 @@ error:
 }
 
 void
-pgmoneta_gunzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_gunzip_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* orig = NULL;

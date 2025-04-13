@@ -181,7 +181,7 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    else if (info == XLOG_HEAP_TRUNCATE)
    {
       struct xl_heap_truncate* xlrec = (struct xl_heap_truncate*) rec;
-      int i;
+      size_t i;
 
       if (xlrec->flags & XLH_TRUNCATE_CASCADE)
       {
@@ -462,7 +462,7 @@ heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
 }
 
 char*
-offset_elem_desc(char* buf, void* offset, void* data)
+offset_elem_desc(char* buf, void* offset, void* data __attribute__((unused)))
 {
    buf = pgmoneta_format_and_append(buf, "%u", *(offset_number*) offset);
    return buf;
@@ -489,7 +489,7 @@ plan_elem_desc(char* buf, void* plan, void* data)
 }
 
 char*
-redirect_elem_desc(char* buf, void* offset, void* data)
+redirect_elem_desc(char* buf, void* offset, void* data __attribute__((unused)))
 {
    offset_number* new_offset = (offset_number*) offset;
 
@@ -498,7 +498,7 @@ redirect_elem_desc(char* buf, void* offset, void* data)
 }
 
 char*
-oid_elem_desc(char* buf, void* relid, void* data)
+oid_elem_desc(char* buf, void* relid, void* data __attribute__((unused)))
 {
    char* relname = NULL;
 

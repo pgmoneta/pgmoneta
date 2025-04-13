@@ -73,7 +73,17 @@ jobs:
       
       - name: GCC/Testsuite
         id: gcc-test
-        run: $(which bash) ./testsuite.sh
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
+            ASAN_LIB=$(gcc -print-file-name=libasan.so)
+            if [ -n "$ASAN_LIB" ] && [ -f "$ASAN_LIB" ]; then
+              echo "Using GCC AddressSanitizer preload for Debug build"
+              export ASAN_OPTIONS=verify_asan_link_order=0
+              export LD_PRELOAD=$ASAN_LIB
+              export ASAN_OPTIONS=detect_leaks=0,verify_asan_link_order=0
+            fi
+          fi
+          $(which bash) ./testsuite.sh
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
       
       - name: Upload Build and Run Logs as Artifacts

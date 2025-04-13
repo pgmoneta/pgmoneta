@@ -114,7 +114,7 @@ ssh_storage_name(void)
 }
 
 static int
-ssh_storage_setup(char* name, struct art* nodes)
+ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -301,7 +301,7 @@ error:
 }
 
 static int
-ssh_storage_backup_execute(char* name, struct art* nodes)
+ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -453,7 +453,7 @@ error:
 }
 
 static int
-ssh_storage_wal_shipping_execute(char* name, struct art* nodes)
+ssh_storage_wal_shipping_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -505,7 +505,7 @@ error:
 }
 
 static int
-ssh_storage_backup_teardown(char* name, struct art* nodes)
+ssh_storage_backup_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -557,7 +557,7 @@ ssh_storage_backup_teardown(char* name, struct art* nodes)
 }
 
 static int
-ssh_storage_wal_shipping_teardown(char* name, struct art* nodes)
+ssh_storage_wal_shipping_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

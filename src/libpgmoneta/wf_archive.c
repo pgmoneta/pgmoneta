@@ -80,7 +80,7 @@ archive_name(void)
 }
 
 static int
-archive_execute(char* name, struct art* nodes)
+archive_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
@@ -163,7 +163,7 @@ error:
 }
 
 static int
-archive_teardown(char* name, struct art* nodes)
+archive_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

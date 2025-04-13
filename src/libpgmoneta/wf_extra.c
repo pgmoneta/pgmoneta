@@ -70,7 +70,7 @@ extra_name(void)
 }
 
 static int
-extra_execute(char* name, struct art* nodes)
+extra_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

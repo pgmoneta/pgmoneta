@@ -40,6 +40,7 @@ Arshdeep Singh <balarsh535@gmail.com>
 Din Xin Chen <s990346@gmail.com>
 Mingzhuo Yin <yinmingzhuo@gmail.com>
 Vanes Angelo <k124k3n@gmail.com>
+Bassam Adnan <mailbassam@gmail.com>
 ```
 
 ## Committers

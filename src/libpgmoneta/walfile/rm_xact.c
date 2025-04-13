@@ -137,7 +137,7 @@ pgmoneta_wal_parse_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, void* re
  * Formats a version 14 xl_xact_prepare record.
  */
 char*
-pgmoneta_wal_format_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, char* rec, char* buf)
+pgmoneta_wal_format_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {
    return buf;
 }
@@ -146,7 +146,7 @@ pgmoneta_wal_format_xl_xact_prepare_v14(struct xl_xact_prepare* wrapper, char* r
  * Formats a version 15 xl_xact_prepare record.
  */
 char*
-pgmoneta_wal_format_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper, char* rec, char* buf)
+pgmoneta_wal_format_xl_xact_prepare_v15(struct xl_xact_prepare* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {
    return buf;
 }
@@ -279,14 +279,14 @@ pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, void* 
 
 /* Format commit record for version 14 */
 char*
-pgmoneta_wal_format_xact_commit_v14(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf)
+pgmoneta_wal_format_xact_commit_v14(struct xl_xact_parsed_commit* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {
    return buf;
 }
 
 /* Format commit record for version 15 */
 char*
-pgmoneta_wal_format_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf)
+pgmoneta_wal_format_xact_commit_v15(struct xl_xact_parsed_commit* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {
    return buf;
 }
@@ -373,13 +373,13 @@ pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper
 }
 
 char*
-pgmoneta_wal_format_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf)
+pgmoneta_wal_format_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {
    return buf;
 }
 
 char*
-pgmoneta_wal_format_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf)
+pgmoneta_wal_format_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {
    return buf;
 }
@@ -742,7 +742,7 @@ parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 }
 
 void
-parse_prepare_record_v14(uint8_t info, struct xl_xact_prepare_v14* xlrec, xl_xact_parsed_prepare_v14* parsed)
+parse_prepare_record_v14(uint8_t info __attribute__((unused)), struct xl_xact_prepare_v14* xlrec, xl_xact_parsed_prepare_v14* parsed)
 {
    char* bufptr;
 
@@ -971,7 +971,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
  * ParsePrepareRecord
  */
 void
-parse_prepare_record_v15(uint8_t info, struct xl_xact_prepare_v15* xlrec, xl_xact_parsed_prepare_v15* parsed)
+parse_prepare_record_v15(uint8_t info __attribute__((unused)), struct xl_xact_prepare_v15* xlrec, xl_xact_parsed_prepare_v15* parsed)
 {
    char* bufptr;
 

@@ -403,7 +403,7 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
 }
 
 static struct workflow*
-wf_backup(struct backup* backup)
+wf_backup(struct backup* backup __attribute__((unused)))
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -570,7 +570,7 @@ wf_restore(struct backup* backup)
 }
 
 static struct workflow*
-wf_combine(int server, struct backup* backup, bool combine_as_is)
+wf_combine(int server __attribute__((unused)), struct backup* backup __attribute__((unused)), bool combine_as_is)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -609,7 +609,7 @@ wf_combine(int server, struct backup* backup, bool combine_as_is)
 }
 
 static struct workflow*
-wf_post_rollup(int server, struct backup* backup)
+wf_post_rollup(int server __attribute__((unused)), struct backup* backup)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -912,7 +912,7 @@ wf_archive(struct backup* backup)
 }
 
 static struct workflow*
-wf_retention(struct backup* backup)
+wf_retention(struct backup* backup __attribute__((unused)))
 {
    struct workflow* head = NULL;
 
@@ -935,7 +935,7 @@ wf_retention(struct backup* backup)
 }
 
 static struct workflow*
-wf_delete_backup(struct backup* backup)
+wf_delete_backup(struct backup* backup __attribute__((unused)))
 {
    struct workflow* head = NULL;
 

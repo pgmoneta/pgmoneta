@@ -67,7 +67,7 @@ sha256_name(void)
 }
 
 static int
-sha256_execute(char* name, struct art* nodes)
+sha256_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;

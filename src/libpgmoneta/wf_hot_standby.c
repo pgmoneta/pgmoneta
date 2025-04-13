@@ -70,7 +70,7 @@ hot_standby_name(void)
 }
 
 static int
-hot_standby_execute(char* name, struct art* nodes)
+hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
