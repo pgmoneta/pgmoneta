@@ -28,11 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <achv.h>
 #include <backup.h>
 #include <logging.h>
 #include <network.h>
 #include <security.h>
 #include <server.h>
+#include <tablespace.h>
 #include <utils.h>
 #include <workflow.h>
 

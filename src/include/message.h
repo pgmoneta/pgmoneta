@@ -35,7 +35,6 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <memory.h>
-#include <tablespace.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -519,36 +518,6 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
  */
 int
 pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response);
-
-/**
- * Receive backup tar files from the copy stream and write to disk
- * This functionality is for server version < 15
- * @param ssl The SSL structure
- * @param socket The socket
- * @param buffer The stream buffer
- * @param basedir The base directory for the backup data
- * @param tablespaces The user level tablespaces
- * @param bucket The rate limit bucket
- * @param network_bucket The network rate limit bucket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
-
-/**
- * Receive backup tar files from the copy stream and write to disk
- * This functionality is for server version >= 15
- * @param ssl The SSL structure
- * @param socket The socket
- * @param buffer The stream buffer
- * @param basedir The base directory for the backup data
- * @param tablespaces The user level tablespaces
- * @param bucket The rate limit bucket
- * @param network_bucket The network rate limit bucket
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 /**
  * Receive mainfest file from the copy stream and write to disk

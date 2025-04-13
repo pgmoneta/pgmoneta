@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
+#include <backup.h>
 #include <compression.h>
 #include <logging.h>
 #include <management.h>
