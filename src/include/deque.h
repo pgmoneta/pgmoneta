@@ -33,7 +33,6 @@
 extern "C" {
 #endif
 
-#include <pgmoneta.h>
 #include <value.h>
 
 #include <pthread.h>

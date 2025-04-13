@@ -33,8 +33,6 @@
 extern "C" {
 #endif
 
-#include <pgmoneta.h>
-
 #include <inttypes.h>
 #include <stdbool.h>
 
