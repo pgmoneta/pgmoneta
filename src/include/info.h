@@ -83,6 +83,35 @@ extern "C" {
 #define VALID_FALSE    0
 #define VALID_TRUE     1
 
+#define INCREMENTAL_MAGIC 0xd3ae1f0d
+#define INCREMENTAL_PREFIX_LENGTH (sizeof(INCREMENTAL_PREFIX) - 1)
+#define MANIFEST_FILES "Files"
+
+/**
+ * @struct rfile
+ * An rfile stores the metadata we need to use a file on disk for reconstruction.
+ * For full backup file in the chain, only file name and file pointer are initialized.
+ *
+ * extracted flag indicates if the file is a copy extracted from the original file
+ * num_blocks is the number of blocks present inside an incremental file.
+ * These are the blocks that have changed since the last checkpoint.
+ * truncation_block_length is basically the shortest length this file has been between this and last checkpoint.
+ * Note that truncation_block_length could be even greater than the number of blocks the original file has.
+ * Because the tables are not locked during the backup, so blocks could be truncated during the process,
+ * while truncation_block_length only reflects length until the checkpoint before backup starts.
+ * relative_block_numbers are the relative BlockNumber of each block in the file. Relative here means relative to
+ * the starting BlockNumber of this file.
+ */
+struct rfile
+{
+   char* filepath;                     /**< The path of the backup file  */
+   FILE* fp;                           /**< The file descriptor corresponding to the backup file */
+   size_t header_length;               /**< The header length */
+   uint32_t num_blocks;                /**< The number of blocks present inside an incremental file */
+   uint32_t* relative_block_numbers;   /**< relative_block_numbers are the relative BlockNumber of each block in the file */
+   uint32_t truncation_block_length;   /**< truncation_block_length only reflects length until the checkpoint before backup starts. */
+};
+
 /** @struct backup
  * Defines a backup
  */
@@ -297,6 +326,68 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
  */
 void
 pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
+ * Create an rfile structure of a backup file
+ * @param server The server
+ * @param label The label of the backup
+ * @param relative_dir The relative path inside the data directory (excluding the filename)
+ * @param base_file_name The file name
+ * @param encryption The encryption method
+ * @param compression The compression method
+ * @param rfile [out] The rfile
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
+
+/**
+ * Destroy the rfile structure
+ * @param rfile The rfile to be destroyed
+ */
+void
+pgmoneta_rfile_destroy(struct rfile* rf);
+
+/**
+ * Initialize an rfile structure of an incremental file by reading the incremental file headers
+ * @param server The server
+ * @param label The label of the backup
+ * @param relative_dir The relative path inside the data directory (excluding the filename)
+ * @param base_file_name The file name
+ * @param encryption The encryption method
+ * @param compression The compression method
+ * @param rfile [out] The rfile
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
+
+/**
+ * Extract a file from a backup
+ * @param server The server
+ * @param label The label
+ * @param relative_file_path The file path relative to the backup data directory
+ * @param target_directory The target root directory
+ * @param target_file The target file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file);
+
+/**
+ * Get an approximate size of a backup repository
+ * The goal is to iterate over all file entries in the manifest. If an entry represents an incremental 
+ * file, retrieve its block_length using the file’s truncated_block_length (which indicates the total 
+ * number of blocks in the fully restored file). For non-incremental files, simply use the size value 
+ * directly from the file entry in the manifest.
+ * @param server The server
+ * @param label The label
+ * @param size [out] The size of the incremental backup
+ * @param biggest_file_size [out] The size of the biggest file in the incremental backup
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size);
 
 #ifdef __cplusplus
 }

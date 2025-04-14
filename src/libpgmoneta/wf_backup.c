@@ -412,10 +412,21 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    backup_data = pgmoneta_get_server_backup_identifier_data(server, label);
 
-   size = pgmoneta_directory_size(backup_data);
+   if (!incremental)
+   {
+      size = pgmoneta_directory_size(backup_data);
+      biggest_file_size = pgmoneta_biggest_file(backup_data);
+   }
+   else
+   {
+      if (pgmoneta_backup_size(server, label, &size, &biggest_file_size))
+      {
+         pgmoneta_log_error("Backup: Could not get incremental size for %s", config->common.servers[server].name);
+         goto error;
+      }
+   }
    pgmoneta_read_wal(backup_data, &wal);
    pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
-   biggest_file_size = pgmoneta_biggest_file(backup_data);
 
    if (pgmoneta_art_insert(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
    {

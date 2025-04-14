@@ -80,18 +80,6 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 int
 pgmoneta_get_backup_max_rate(int server);
 
-/**
- * Extract a file from a backup
- * @param server The server
- * @param label The label
- * @param relative_file_path The file path relative to the backup data directory
- * @param target_directory The target root directory
- * @param target_file The target file
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file);
-
 #ifdef __cplusplus
 }
 #endif

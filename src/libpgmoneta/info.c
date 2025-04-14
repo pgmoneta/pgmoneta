@@ -28,6 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
+#include <compression.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
@@ -36,6 +38,7 @@
 
 /* system */
 #include <errno.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +46,21 @@
 
 #define NAME "info"
 #define INFO_BUFFER_SIZE 8192
+
+static int
+file_final_name(char* file, int encryption, int compression, char** finalname);
+
+/**
+ * Best effort to split a file path into a relative path and a bare file name
+ * a wrapper around `dirname()`
+ * @note The function will not modify the input path as we are dealing with a copy
+ * @param path The file path
+ * @param relative_path [out] The relative path
+ * @param bare_file_name [out] The bare file name
+ * @return 0 on success, 1 if otherwise
+ */
+static int
+split_file_path(char* path, char** relative_path, char** bare_file_name);
 
 void
 pgmoneta_create_info(char* directory, char* label, int status)
@@ -1756,4 +1774,465 @@ error:
    pgmoneta_stop_logging();
 
    exit(1);
+}
+
+int
+pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
+{
+   struct rfile* rf = NULL;
+   char* extracted_file_path = NULL;
+   char* final_relative_path = NULL;
+   char base_relative_path[MAX_PATH];
+   FILE* fp = NULL;
+
+   memset(base_relative_path, 0, MAX_PATH);
+   if (pgmoneta_ends_with(relative_dir, "/"))
+   {
+      snprintf(base_relative_path, MAX_PATH, "%s%s", relative_dir, base_file_name);
+   }
+   else
+   {
+      snprintf(base_relative_path, MAX_PATH, "%s/%s", relative_dir, base_file_name);
+   }
+
+   // try both base and final relative path
+   if (pgmoneta_extract_backup_file(server, label, base_relative_path, NULL, &extracted_file_path))
+   {
+      free(extracted_file_path);
+      extracted_file_path = NULL;
+      file_final_name(base_relative_path, encryption, compression, &final_relative_path);
+      if (pgmoneta_extract_backup_file(server, label, final_relative_path, NULL, &extracted_file_path))
+      {
+         goto error;
+      }
+   }
+   fp = fopen(extracted_file_path, "r");
+
+   if (fp == NULL)
+   {
+      goto error;
+   }
+   rf = (struct rfile*) malloc(sizeof(struct rfile));
+   memset(rf, 0, sizeof(struct rfile));
+
+   rf->fp = fp;
+   rf->filepath = extracted_file_path;
+   *rfile = rf;
+
+   free(final_relative_path);
+   return 0;
+
+error:
+   free(extracted_file_path);
+   free(final_relative_path);
+   pgmoneta_rfile_destroy(rf);
+   return 1;
+}
+
+void
+pgmoneta_rfile_destroy(struct rfile* rf)
+{
+   if (rf == NULL)
+   {
+      return;
+   }
+   if (rf->fp != NULL)
+   {
+      fclose(rf->fp);
+   }
+   if (rf->filepath != NULL)
+   {
+      // this is the extracted file, we should delete it
+      pgmoneta_delete_file(rf->filepath, NULL);
+   }
+
+   free(rf->filepath);
+   free(rf->relative_block_numbers);
+   free(rf);
+}
+
+int
+pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
+{
+   uint32_t magic = 0;
+   int nread = 0;
+   struct rfile* rf = NULL;
+   struct main_configuration* config;
+   size_t relsegsz = 0;
+   size_t blocksz = 0;
+
+   config = (struct main_configuration*)shmem;
+
+   relsegsz = config->common.servers[server].relseg_size;
+   blocksz = config->common.servers[server].block_size;
+
+   /*
+    * Header structure:
+    * magic number(uint32)
+    * num blocks (number of changed blocks, uint32)
+    * truncation block length (uint32)
+    * relative_block_numbers (uint32 * (num blocks))
+    */
+
+   // create rfile after file is opened successfully
+   if (pgmoneta_rfile_create(server, label, relative_dir, base_file_name, encryption, compression, &rf))
+   {
+      pgmoneta_log_error("rfile initialize: failed to open incremental backup (label %s) file at %s/%s", label, relative_dir, base_file_name);
+      goto error;
+   }
+
+   // read magic number from header
+   nread = fread(&magic, 1, sizeof(uint32_t), rf->fp);
+   if (nread != sizeof(uint32_t))
+   {
+      pgmoneta_log_error("rfile initialize: incomplete file header at %s, cannot read magic number", rf->filepath);
+      goto error;
+   }
+
+   if (magic != INCREMENTAL_MAGIC)
+   {
+      pgmoneta_log_error("rfile initialize: incorrect magic number, getting %X, expecting %X", magic, INCREMENTAL_MAGIC);
+      goto error;
+   }
+
+   // read number of blocks
+   nread = fread(&rf->num_blocks, 1, sizeof(uint32_t), rf->fp);
+   if (nread != sizeof(uint32_t))
+   {
+      pgmoneta_log_error("rfile initialize: incomplete file header at %s%s, cannot read block count", relative_dir, base_file_name);
+      goto error;
+   }
+   if (rf->num_blocks > relsegsz)
+   {
+      pgmoneta_log_error("rfile initialize: file has %d blocks which is more than server's segment size", rf->num_blocks);
+      goto error;
+   }
+
+   // read truncation block length
+   nread = fread(&rf->truncation_block_length, 1, sizeof(uint32_t), rf->fp);
+   if (nread != sizeof(uint32_t))
+   {
+      pgmoneta_log_error("rfile initialize: incomplete file header at %s%s, cannot read truncation block length", relative_dir, base_file_name);
+      goto error;
+   }
+   if (rf->truncation_block_length > relsegsz)
+   {
+      pgmoneta_log_error("rfile initialize: file has truncation block length of %d which is more than server's segment size", rf->truncation_block_length);
+      goto error;
+   }
+
+   if (rf->num_blocks > 0)
+   {
+      rf->relative_block_numbers = malloc(sizeof(uint32_t) * rf->num_blocks);
+      nread = fread(rf->relative_block_numbers, sizeof(uint32_t), rf->num_blocks, rf->fp);
+      if (nread != rf->num_blocks)
+      {
+         pgmoneta_log_error("rfile initialize: incomplete file header at %s, cannot read relative block numbers", rf->filepath);
+         goto error;
+      }
+   }
+
+   // magic + block num + truncation block length + relative block numbers
+   rf->header_length = sizeof(uint32_t) * (1 + 1 + 1 + rf->num_blocks);
+   // round header length to multiple of block size, since the actual file data are aligned
+   // only needed when the file actually has data
+   if (rf->num_blocks > 0 && rf->header_length % blocksz != 0)
+   {
+      rf->header_length += (blocksz - (rf->header_length % blocksz));
+   }
+
+   *rfile = rf;
+   return 0;
+error:
+   // contains fp closing logic
+   pgmoneta_rfile_destroy(rf);
+   return 1;
+}
+
+int
+pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file)
+{
+   char* from = NULL;
+   char* to = NULL;
+
+   *target_file = NULL;
+
+   from = pgmoneta_get_server_backup_identifier_data(server, label);
+
+   if (!pgmoneta_ends_with(from, "/"))
+   {
+      from = pgmoneta_append_char(from, '/');
+   }
+   from = pgmoneta_append(from, relative_file_path);
+
+   if (!pgmoneta_exists(from))
+   {
+      goto error;
+   }
+
+   if (target_directory == NULL || strlen(target_directory) == 0)
+   {
+      to = pgmoneta_get_server_workspace(server);
+      to = pgmoneta_append(to, label);
+      to = pgmoneta_append(to, "/");
+   }
+   else
+   {
+      to = pgmoneta_append(to, target_directory);
+   }
+
+   if (!pgmoneta_ends_with(to, "/"))
+   {
+      from = pgmoneta_append_char(to, '/');
+   }
+   to = pgmoneta_append(to, relative_file_path);
+
+   if (pgmoneta_copy_file(from, to, NULL))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_is_encrypted(to))
+   {
+      char* new_to = NULL;
+
+      if (pgmoneta_strip_extension(to, &new_to))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_decrypt_file(to, new_to))
+      {
+         free(new_to);
+         goto error;
+      }
+
+      free(to);
+      to = new_to;
+   }
+
+   if (pgmoneta_is_compressed(to))
+   {
+      char* new_to = NULL;
+
+      if (pgmoneta_strip_extension(to, &new_to))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_decompress(to, new_to))
+      {
+         free(new_to);
+         goto error;
+      }
+
+      free(to);
+      to = new_to;
+   }
+
+   pgmoneta_log_trace("Extract: %s -> %s", from, to);
+
+   *target_file = to;
+
+   free(from);
+
+   return 0;
+
+error:
+
+   free(from);
+   free(to);
+
+   return 1;
+}
+
+int
+pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size)
+{
+   struct json* manifest_read = NULL;
+   struct json* files = NULL;
+   struct main_configuration* config = NULL;
+   struct json_iterator *iter = NULL;
+   char* manifest_path = NULL;
+   unsigned long sz = 0;
+   uint64_t biggest_file_sz = 0;
+
+   config = (struct main_configuration*)shmem;
+
+   // read and traverse the manifest of the incremental backup
+   manifest_path = pgmoneta_get_server_backup_identifier_data(server, label);
+   manifest_path = pgmoneta_append(manifest_path, "backup_manifest");
+   if (pgmoneta_json_read_file(manifest_path, &manifest_read))
+   {
+      pgmoneta_log_error("Unable to read manifest %s", manifest_path);
+      goto error;
+   }
+
+   files = (struct json*)pgmoneta_json_get(manifest_read, MANIFEST_FILES);
+
+   if (files == NULL)
+   {
+      goto error;
+   }
+
+   pgmoneta_json_iterator_create(files, &iter);
+   while (pgmoneta_json_iterator_next(iter))
+   {
+      struct json* file = NULL;
+      char* file_path = NULL;
+      uint64_t file_size = 0;
+
+      file = (struct json*)pgmoneta_value_data(iter->value);
+      file_path = (char*)pgmoneta_json_get(file, "Path");
+      /* for incremental files get the `truncated_block_length` */
+      if (pgmoneta_is_incremental_path(file_path))
+      {  
+         struct rfile* rf = NULL;
+         uint32_t block_length = 0;
+         char* relative_path = NULL;
+         char* bare_file_name = NULL;
+
+         if (split_file_path(file_path, &relative_path, &bare_file_name))
+         {
+            pgmoneta_log_error("Unable to split file path %s", file_path);
+            goto error;
+         }
+
+         if (pgmoneta_incremental_rfile_initialize(server, label, relative_path, bare_file_name, ENCRYPTION_NONE, COMPRESSION_NONE, &rf))
+         {
+            pgmoneta_log_error("Unable to create rfile %s", bare_file_name);
+            goto error;
+         }
+         block_length = rf->truncation_block_length;
+         for (int i = 0; i < rf->num_blocks; i++)
+         {
+            if (rf->relative_block_numbers[i] >= block_length)
+            {
+               block_length = rf->relative_block_numbers[i] + 1;
+            }
+         }
+
+         if (block_length == 0)
+         {
+            pgmoneta_log_error("Unable to find block length for %s", bare_file_name);
+            goto error;
+         }
+         file_size = block_length * config->common.servers[server].block_size;
+         pgmoneta_rfile_destroy(rf);
+         free(relative_path);
+         free(bare_file_name);
+      }
+      /* for non-incremental files get the file size from manifest itself */
+      else
+      {
+         file_size = (uint64_t)pgmoneta_json_get(file, "Size");
+      }
+
+      if (file_size > biggest_file_sz)
+      {
+         biggest_file_sz = file_size;
+      }
+      sz += file_size;
+   }
+   pgmoneta_json_iterator_destroy(iter);
+
+   *size = sz;
+   *biggest_file_size = biggest_file_sz;
+
+   pgmoneta_json_destroy(manifest_read);
+   free(manifest_path);
+   return 0;
+
+error:
+   pgmoneta_json_destroy(manifest_read);
+   free(manifest_path);
+   return 1;
+}
+
+static int
+file_final_name(char* file, int encryption, int compression, char** finalname)
+{
+   char* final = NULL;
+
+   *finalname = NULL;
+   if (file == NULL)
+   {
+      goto error;
+   }
+
+   final = pgmoneta_append(final, file);
+   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
+   {
+      final = pgmoneta_append(final, ".gz");
+   }
+   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
+   {
+      final = pgmoneta_append(final, ".zstd");
+   }
+   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
+   {
+      final = pgmoneta_append(final, ".lz4");
+   }
+   else if (compression == COMPRESSION_CLIENT_BZIP2)
+   {
+      final = pgmoneta_append(final, ".bz2");
+   }
+
+   if (encryption != ENCRYPTION_NONE)
+   {
+      final = pgmoneta_append(final, ".aes");
+   }
+
+   *finalname = final;
+   return 0;
+
+   error:
+      free(final);
+   return 1;
+}
+
+static int
+split_file_path(char* path, char** relative_path, char** bare_file_name)
+{
+   int relative_path_len = 0;
+   
+   char* path_copy = NULL;
+   char* rel_path = NULL;
+   char* file_name = NULL;
+
+   path_copy = pgmoneta_append(path_copy, path);
+
+   if (path_copy == NULL || !strcmp(path_copy, ".") || !strcmp(path_copy, ".."))
+   {
+      goto error;
+   }
+
+   rel_path = dirname(path_copy);
+
+   /* don't use path_copy from this point onwards */
+   relative_path_len = strlen(rel_path);
+
+   /* path is only the filename (doesn't contain any '/') */
+   if (!strcmp(rel_path, "."))
+   {
+      file_name = pgmoneta_append(file_name, path);
+   }
+
+   /* path is the root directory */
+   if (!strcmp(rel_path, "/"))
+   {
+      file_name = pgmoneta_append(file_name, path + relative_path_len);
+   }
+
+   if (file_name == NULL)
+   {
+      file_name = pgmoneta_append(file_name, path + relative_path_len + 1);
+   }
+   *relative_path = rel_path;
+   *bare_file_name = file_name;
+
+   return 0;
+error:
+   free(path_copy);
+   return 1;
 }

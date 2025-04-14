@@ -54,35 +54,8 @@
 #define RESTORE_NO_DISK_SPACE 2
 #define RESTORE_TYPE_UNKNOWN  3
 #define RESTORE_ERROR         4
-#define INCREMENTAL_MAGIC 0xd3ae1f0d
-#define INCREMENTAL_PREFIX_LENGTH (sizeof(INCREMENTAL_PREFIX) - 1)
-#define MANIFEST_FILES "Files"
 #define MAX_PATH_CONCAT (MAX_PATH * 2)
 #define TMP_SUFFIX ".tmp"
-
-/**
- * An rfile stores the metadata we need to use a file on disk for reconstruction.
- * For full backup file in the chain, only file name and file pointer are initialized.
- *
- * extracted flag indicates if the file is a copy extracted from the original file
- * num_blocks is the number of blocks present inside an incremental file.
- * These are the blocks that have changed since the last checkpoint.
- * truncation_block_length is basically the shortest length this file has been between this and last checkpoint.
- * Note that truncation_block_length could be even greater than the number of blocks the original file has.
- * Because the tables are not locked during the backup, so blocks could be truncated during the process,
- * while truncation_block_length only reflects length until the checkpoint before backup starts.
- * relative_block_numbers are the relative BlockNumber of each block in the file. Relative here means relative to
- * the starting BlockNumber of this file.
- */
-struct rfile
-{
-   char* filepath;
-   FILE* fp;
-   size_t header_length;
-   uint32_t num_blocks;
-   uint32_t* relative_block_numbers;
-   uint32_t truncation_block_length;
-};
 
 struct build_backup_file_input
 {
@@ -233,17 +206,8 @@ create_copy_backup_file_input(
 static uint32_t
 find_reconstructed_block_length(struct rfile* s);
 
-static int
-rfile_create(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile);
-
-static void
-rfile_destroy(struct rfile* rf);
-
 static void
 rfile_destroy_cb(uintptr_t data);
-
-static int
-incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile);
 
 static bool
 is_full_file(struct rfile* rf);
@@ -299,17 +263,14 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
 static int
 file_base_name(char* file, char** basename);
 
-static int
-file_final_name(char* file, int encryption, int compression, char** finalname);
-
-static int copy_tablespaces_restore(char* from, char* to, char* base,
-                                    char* server, char* id,
-                                    struct backup* backup,
-                                    struct workers* workers);
-static int copy_tablespaces_hotstandby(char* from, char* to,
-                                       char* tblspc_mappings,
-                                       struct backup* backup,
-                                       struct workers* workers);
+static int copy_tablespaces_restore(char *from, char *to, char *base,
+                                    char *server, char *id,
+                                    struct backup *backup,
+                                    struct workers *workers);
+static int copy_tablespaces_hotstandby(char *from, char *to,
+                                       char *tblspc_mappings,
+                                       struct backup *backup,
+                                       struct workers *workers);
 
 int
 pgmoneta_get_restore_last_files_names(char*** output)
@@ -1551,8 +1512,8 @@ reconstruct_backup_file(int server,
    memset(incr_file_name, 0, MAX_PATH);
    snprintf(incr_file_name, MAX_PATH, "%s%s", INCREMENTAL_PREFIX, base_file_name);
    // handle the latest file specially, it is the only file that can only be incremental
-   if (incremental_rfile_initialize(server, label, relative_dir, incr_file_name,
-                                    (struct backup*)pgmoneta_art_search(backups, label), &latest_source))
+   bck = (struct backup*)pgmoneta_art_search(backups, label);
+   if (pgmoneta_incremental_rfile_initialize(server, label, relative_dir, incr_file_name, bck->encryption, bck->compression, &latest_source))
    {
       goto error;
    }
@@ -1610,9 +1571,9 @@ reconstruct_backup_file(int server,
       // 2. final base name (with compression/encryption suffix, no incremental prefix)
       // 3. base incr name (without compression/encryption suffix, with incremental prefix)
       // 4. final incr name (with compression/encryption suffix, and incremental prefix)
-      if (rfile_create(server, prior_label, relative_dir, base_file_name, bck, &rf))
+      if (pgmoneta_rfile_create(server, prior_label, relative_dir, base_file_name, bck->encryption, bck->compression, &rf))
       {
-         if (incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck, &rf))
+         if (pgmoneta_incremental_rfile_initialize(server, prior_label, relative_dir, incr_file_name, bck->encryption, bck->compression, &rf))
          {
             goto error;
          }
@@ -1830,183 +1791,10 @@ find_reconstructed_block_length(struct rfile* s)
    return block_length;
 }
 
-static int
-rfile_create(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile)
-{
-   struct rfile* rf = NULL;
-   char* extracted_file_path = NULL;
-   char* final_relative_path = NULL;
-   char base_relative_path[MAX_PATH];
-   FILE* fp = NULL;
-
-   memset(base_relative_path, 0, MAX_PATH);
-   if (pgmoneta_ends_with(relative_dir, "/"))
-   {
-      snprintf(base_relative_path, MAX_PATH, "%s%s", relative_dir, base_file_name);
-   }
-   else
-   {
-      snprintf(base_relative_path, MAX_PATH, "%s/%s", relative_dir, base_file_name);
-   }
-
-   // try both base and final relative path
-   if (pgmoneta_extract_backup_file(server, label, base_relative_path, NULL, &extracted_file_path))
-   {
-      free(extracted_file_path);
-      extracted_file_path = NULL;
-      file_final_name(base_relative_path, backup->encryption, backup->compression, &final_relative_path);
-      if (pgmoneta_extract_backup_file(server, label, final_relative_path, NULL, &extracted_file_path))
-      {
-         goto error;
-      }
-   }
-   fp = fopen(extracted_file_path, "r");
-
-   if (fp == NULL)
-   {
-      goto error;
-   }
-   rf = (struct rfile*) malloc(sizeof(struct rfile));
-   memset(rf, 0, sizeof(struct rfile));
-
-   rf->fp = fp;
-   rf->filepath = extracted_file_path;
-   *rfile = rf;
-
-   free(final_relative_path);
-   return 0;
-
-error:
-   free(extracted_file_path);
-   free(final_relative_path);
-   rfile_destroy(rf);
-   return 1;
-}
-
-static void
-rfile_destroy(struct rfile* rf)
-{
-   if (rf == NULL)
-   {
-      return;
-   }
-   if (rf->fp != NULL)
-   {
-      fclose(rf->fp);
-   }
-   if (rf->filepath != NULL)
-   {
-      // this is the extracted file, we should delete it
-      pgmoneta_delete_file(rf->filepath, NULL);
-   }
-
-   free(rf->filepath);
-   free(rf->relative_block_numbers);
-   free(rf);
-}
-
 static void
 rfile_destroy_cb(uintptr_t data)
 {
-   rfile_destroy((struct rfile*) data);
-}
-
-static int
-incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, struct backup* backup, struct rfile** rfile)
-{
-   uint32_t magic = 0;
-   int nread = 0;
-   struct rfile* rf = NULL;
-   struct main_configuration* config;
-   size_t relsegsz = 0;
-   size_t blocksz = 0;
-
-   config = (struct main_configuration*)shmem;
-
-   relsegsz = config->common.servers[server].relseg_size;
-   blocksz = config->common.servers[server].block_size;
-
-   /*
-    * Header structure:
-    * magic number(uint32)
-    * num blocks (number of changed blocks, uint32)
-    * truncation block length (uint32)
-    * relative_block_numbers (uint32 * (num blocks))
-    */
-
-   // create rfile after file is opened successfully
-   if (rfile_create(server, label, relative_dir, base_file_name, backup, &rf))
-   {
-      pgmoneta_log_error("rfile initialize: failed to open incremental backup (label %s) file at %s/%s", label, relative_dir, base_file_name);
-      goto error;
-   }
-
-   // read magic number from header
-   nread = fread(&magic, 1, sizeof(uint32_t), rf->fp);
-   if (nread != sizeof(uint32_t))
-   {
-      pgmoneta_log_error("rfile initialize: incomplete file header at %s, cannot read magic number", rf->filepath);
-      goto error;
-   }
-
-   if (magic != INCREMENTAL_MAGIC)
-   {
-      pgmoneta_log_error("rfile initialize: incorrect magic number, getting %X, expecting %X", magic, INCREMENTAL_MAGIC);
-      goto error;
-   }
-
-   // read number of blocks
-   nread = fread(&rf->num_blocks, 1, sizeof(uint32_t), rf->fp);
-   if (nread != sizeof(uint32_t))
-   {
-      pgmoneta_log_error("rfile initialize: incomplete file header at %s%s, cannot read block count", relative_dir, base_file_name);
-      goto error;
-   }
-   if (rf->num_blocks > relsegsz)
-   {
-      pgmoneta_log_error("rfile initialize: file has %d blocks which is more than server's segment size", rf->num_blocks);
-      goto error;
-   }
-
-   // read truncation block length
-   nread = fread(&rf->truncation_block_length, 1, sizeof(uint32_t), rf->fp);
-   if (nread != sizeof(uint32_t))
-   {
-      pgmoneta_log_error("rfile initialize: incomplete file header at %s%s, cannot read truncation block length", relative_dir, base_file_name);
-      goto error;
-   }
-   if (rf->truncation_block_length > relsegsz)
-   {
-      pgmoneta_log_error("rfile initialize: file has truncation block length of %d which is more than server's segment size", rf->truncation_block_length);
-      goto error;
-   }
-
-   if (rf->num_blocks > 0)
-   {
-      rf->relative_block_numbers = malloc(sizeof(uint32_t) * rf->num_blocks);
-      nread = fread(rf->relative_block_numbers, sizeof(uint32_t), rf->num_blocks, rf->fp);
-      if (nread != rf->num_blocks)
-      {
-         pgmoneta_log_error("rfile initialize: incomplete file header at %s, cannot read relative block numbers", rf->filepath);
-         goto error;
-      }
-   }
-
-   // magic + block num + truncation block length + relative block numbers
-   rf->header_length = sizeof(uint32_t) * (1 + 1 + 1 + rf->num_blocks);
-   // round header length to multiple of block size, since the actual file data are aligned
-   // only needed when the file actually has data
-   if (rf->num_blocks > 0 && rf->header_length % blocksz != 0)
-   {
-      rf->header_length += (blocksz - (rf->header_length % blocksz));
-   }
-
-   *rfile = rf;
-   return 0;
-error:
-   // contains fp closing logic
-   rfile_destroy(rf);
-   return 1;
+   pgmoneta_rfile_destroy((struct rfile*) data);
 }
 
 static bool
@@ -2497,6 +2285,15 @@ restore_backup_full(struct art* nodes)
       pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
    }
 
+   if (!pgmoneta_exists(target_root))
+   {
+      if (pgmoneta_mkdir(target_root))
+      {
+         pgmoneta_log_error("Unable to create target root directory %s", target_root);
+         goto error;
+      }
+   }
+
    free_space = pgmoneta_free_space(target_root);
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
@@ -2560,6 +2357,8 @@ restore_backup_incremental(struct art* nodes)
    struct json* manifest = NULL;
    struct workflow* workflow = NULL;
    struct main_configuration* config;
+   uint64_t free_space = 0;
+   uint64_t required_space = 0;
 
    config = (struct main_configuration*)shmem;
 
@@ -2597,7 +2396,36 @@ restore_backup_incremental(struct art* nodes)
    }
    pgmoneta_art_insert(nodes, NODE_MANIFEST, (uintptr_t)manifest, ValueJSON);
 
-   //TODO: free space check during incr restore should be handled specially
+   if (!pgmoneta_exists(target_root_combine))
+   {
+      if (pgmoneta_mkdir(target_root_combine))
+      {
+         pgmoneta_log_error("Unable to create target root directory %s", target_root_combine);
+         goto error;
+      }
+   }
+
+   free_space = pgmoneta_free_space(target_root_combine);
+   required_space =
+      backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+   
+   if (free_space < required_space)
+   {
+      char* f = NULL;
+      char* r = NULL;
+
+      f = pgmoneta_translate_file_size(free_space);
+      r = pgmoneta_translate_file_size(required_space);
+
+      pgmoneta_log_error("Restore: Not enough disk space for %s/%s on %s (Available: %s, Required: %s)",
+                         config->common.servers[server].name, backup->label, target_root_combine, f, r);
+
+      free(f);
+      free(r);
+
+      ret = RESTORE_NO_DISK_SPACE;
+      goto error;
+   }
 
    pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root_combine, ValueString);
    pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base_combine, ValueString);
@@ -3012,48 +2840,6 @@ file_base_name(char* file, char** basename)
 
 error:
    free(b);
-   return 1;
-}
-
-static int
-file_final_name(char* file, int encryption, int compression, char** finalname)
-{
-   char* final = NULL;
-
-   *finalname = NULL;
-   if (file == NULL)
-   {
-      goto error;
-   }
-
-   final = pgmoneta_append(final, file);
-   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
-   {
-      final = pgmoneta_append(final, ".gz");
-   }
-   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
-   {
-      final = pgmoneta_append(final, ".zstd");
-   }
-   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
-   {
-      final = pgmoneta_append(final, ".lz4");
-   }
-   else if (compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      final = pgmoneta_append(final, ".bz2");
-   }
-
-   if (encryption != ENCRYPTION_NONE)
-   {
-      final = pgmoneta_append(final, ".aes");
-   }
-
-   *finalname = final;
-   return 0;
-
-error:
-   free(final);
    return 1;
 }
 
