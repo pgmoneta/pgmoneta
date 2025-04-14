@@ -200,6 +200,28 @@ int
 pgmoneta_get_hash_algorithm(char* algorithm);
 
 /**
+ * Create a SSL context
+ * @param client True if client, false if server
+ * @param ctx The SSL context
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_ssl_ctx(bool client, SSL_CTX** ctx);
+
+/**
+ * Create a SSL server
+ * @param ctx The SSL context
+ * @param key The key file path
+ * @param cert The certificate file path
+ * @param root The root file path
+ * @param socket The socket
+ * @param ssl The SSL structure
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_create_ssl_server(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
+
+/**
  * Extract server parameters recevied during the latest authentication
  * @param server_parameters The resulting non-thread-safe deque
  * @return 0 on success, otherwise 1

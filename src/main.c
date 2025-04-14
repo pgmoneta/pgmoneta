@@ -1638,6 +1638,8 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    socklen_t client_addr_length;
    int client_fd;
    struct main_configuration* config;
+   SSL_CTX* ctx = NULL;
+   SSL* client_ssl = NULL;
 
    if (EV_ERROR & revents)
    {
@@ -1693,10 +1695,25 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    {
       ev_loop_fork(loop);
       shutdown_ports();
+      if (strlen(config->metrics_cert_file) > 0 && strlen(config->metrics_key_file) > 0)
+      {
+         if (pgmoneta_create_ssl_ctx(false, &ctx))
+         {
+            pgmoneta_log_error("Could not create metrics SSL context");
+            return;
+         }
+
+         if (pgmoneta_create_ssl_server(ctx, config->metrics_key_file, config->metrics_cert_file, config->metrics_ca_file, client_fd, &client_ssl))
+         {
+            pgmoneta_log_error("Could not create metrics SSL server");
+            return;
+         }
+      }
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
-      pgmoneta_prometheus(client_fd);
+      pgmoneta_prometheus(client_ssl, client_fd);
    }
 
+   pgmoneta_close_ssl(client_ssl);
    pgmoneta_disconnect(client_fd);
 }
 
