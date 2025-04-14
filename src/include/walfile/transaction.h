@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 // Typedefs
 typedef uint32_t transaction_id;
 typedef transaction_id multi_xact_id;
