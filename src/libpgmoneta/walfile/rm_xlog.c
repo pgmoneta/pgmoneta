@@ -93,15 +93,15 @@ create_check_point(void)
    }
    else
    {
-      wrapper->parse = check_point_parse_v16;
-      wrapper->format = check_point_format_v16;
+      wrapper->parse = check_point_parse_v13;
+      wrapper->format = check_point_format_v13;
    }
    return wrapper;
 }
 char*
-check_point_format_v16(struct check_point* wrapper, char* buf)
+check_point_format_v13(struct check_point* wrapper, char* buf)
 {
-   struct check_point_v16 checkpoint = wrapper->data.v16;
+   struct check_point_v13 checkpoint = wrapper->data.v13;
 
    char* oldest_xid_db = NULL;
    char* oldest_multi_db = NULL;
@@ -204,38 +204,38 @@ error:
 }
 
 void
-check_point_parse_v16(struct check_point* wrapper, void* rec)
+check_point_parse_v13(struct check_point* wrapper, void* rec)
 {
    char* ptr = (char*)rec;
-   memcpy(&wrapper->data.v16.redo, ptr, sizeof(xlog_rec_ptr));
+   memcpy(&wrapper->data.v13.redo, ptr, sizeof(xlog_rec_ptr));
    ptr += sizeof(xlog_rec_ptr);
-   memcpy(&wrapper->data.v16.this_timeline_id, ptr, sizeof(uint32_t));
+   memcpy(&wrapper->data.v13.this_timeline_id, ptr, sizeof(uint32_t));
    ptr += sizeof(uint32_t);
-   memcpy(&wrapper->data.v16.prev_timeline_id, ptr, sizeof(uint32_t));
+   memcpy(&wrapper->data.v13.prev_timeline_id, ptr, sizeof(uint32_t));
    ptr += sizeof(uint32_t);
-   memcpy(&wrapper->data.v16.full_page_writes, ptr, sizeof(bool));
+   memcpy(&wrapper->data.v13.full_page_writes, ptr, sizeof(bool));
    ptr += sizeof(bool);
-   memcpy(&wrapper->data.v16.next_xid, ptr, sizeof(struct full_transaction_id));
+   memcpy(&wrapper->data.v13.next_xid, ptr, sizeof(struct full_transaction_id));
    ptr += sizeof(struct full_transaction_id);
-   memcpy(&wrapper->data.v16.next_oid, ptr, sizeof(oid));
+   memcpy(&wrapper->data.v13.next_oid, ptr, sizeof(oid));
    ptr += sizeof(oid);
-   memcpy(&wrapper->data.v16.next_multi, ptr, sizeof(multi_xact_id));
+   memcpy(&wrapper->data.v13.next_multi, ptr, sizeof(multi_xact_id));
    ptr += sizeof(multi_xact_id);
-   memcpy(&wrapper->data.v16.next_multi_offset, ptr, sizeof(multi_xact_offset));
+   memcpy(&wrapper->data.v13.next_multi_offset, ptr, sizeof(multi_xact_offset));
    ptr += sizeof(multi_xact_offset);
-   memcpy(&wrapper->data.v16.oldest_xid, ptr, sizeof(transaction_id));
+   memcpy(&wrapper->data.v13.oldest_xid, ptr, sizeof(transaction_id));
    ptr += sizeof(transaction_id);
-   memcpy(&wrapper->data.v16.oldest_xid_db, ptr, sizeof(oid));
+   memcpy(&wrapper->data.v13.oldest_xid_db, ptr, sizeof(oid));
    ptr += sizeof(oid);
-   memcpy(&wrapper->data.v16.oldest_multi, ptr, sizeof(multi_xact_id));
+   memcpy(&wrapper->data.v13.oldest_multi, ptr, sizeof(multi_xact_id));
    ptr += sizeof(multi_xact_id);
-   memcpy(&wrapper->data.v16.oldest_multi_db, ptr, sizeof(oid));
+   memcpy(&wrapper->data.v13.oldest_multi_db, ptr, sizeof(oid));
    ptr += sizeof(oid);
-   memcpy(&wrapper->data.v16.oldest_commit_ts_xid, ptr, sizeof(transaction_id));
+   memcpy(&wrapper->data.v13.oldest_commit_ts_xid, ptr, sizeof(transaction_id));
    ptr += sizeof(transaction_id);
-   memcpy(&wrapper->data.v16.newest_commit_ts_xid, ptr, sizeof(transaction_id));
+   memcpy(&wrapper->data.v13.newest_commit_ts_xid, ptr, sizeof(transaction_id));
    ptr += sizeof(transaction_id);
-   memcpy(&wrapper->data.v16.oldest_active_xid, ptr, sizeof(transaction_id));
+   memcpy(&wrapper->data.v13.oldest_active_xid, ptr, sizeof(transaction_id));
 }
 
 void

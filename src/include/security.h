@@ -229,6 +229,31 @@ pgmoneta_create_ssl_server(SSL_CTX* ctx, char* key, char* cert, char* root, int 
 int
 pgmoneta_extract_server_parameters(struct deque** server_parameters);
 
+/**
+ * Initialize a CRC32C checksum
+ * @param crc The CRC32C value to initialize
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_init_crc32c(uint32_t* crc);
+
+/**
+ * Compare two CRC32C values
+ * @param c1 First CRC32C value
+ * @param c2 Second CRC32C value
+ * @return true if equal, otherwise false
+ */
+bool
+pgmoneta_compare_crc32c(uint32_t c1, uint32_t c2);
+
+/**
+ * Finalize a CRC32C checksum
+ * @param crc The CRC32C value to finalize
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_finalize_crc32c(uint32_t* crc);
+
 #ifdef __cplusplus
 }
 #endif
