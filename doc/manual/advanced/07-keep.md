@@ -81,9 +81,6 @@ Response:
 
 and you can see that the backup has a `Keep` flag of `true`.
 
-Note that `Keep` currently only works on full backups, we will
-support keeping incremental backups in later releases.
-
 ## Describe a backup
 
 Now, you may want to add a description to your backup, and as you can see

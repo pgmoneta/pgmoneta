@@ -27,8 +27,6 @@ hot_standby_overrides = /your/local/hot/standby/overrides/
 
 to override files in the `hot_standby` directory.
 
-Note that currently hot standby doesn't work with incremental backups, this will be supported in later releases.
-
 ### Tablespaces
 
 By default tablespaces will be mapped to a similar path than the original one, for example `/tmp/mytblspc` becomes `/tmp/mytblspchs`.

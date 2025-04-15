@@ -7,6 +7,7 @@
 ## Features
 
 * Full backup
+* Incremental backup (PostgreSQL 17+)
 * Restore
 * Compression (gzip, zstd, lz4, bzip2)
 * AES encryption support

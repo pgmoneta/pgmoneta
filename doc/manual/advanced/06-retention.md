@@ -31,9 +31,7 @@ This is a very hard property to configure since it depends on the size of the da
 
 If you want to restore from the latest backup plus the Write-Ahead Log (WAL) then the default [**pgmoneta**](pgmoneta) policy maybe is enough.
 
-Note that currently if a backup has an incremental backup child that depends on it, it will be kept even if it doesn't
-
-fall under retention policy. We will support incremental backup deletion in later releases.
+Note that if a backup has an incremental backup child that depends on it, its data will be rolled up to its child before getting deleted.
 
 ## Retention check
 
