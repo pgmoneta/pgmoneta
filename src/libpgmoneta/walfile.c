@@ -157,8 +157,6 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
    if (fwrite(wf->long_phd, SIZE_OF_XLOG_LONG_PHD, 1, file) != 1)
    {
       pgmoneta_log_error("Failed to write WAL header to file: %s", path);
-      pgmoneta_deque_iterator_destroy(page_header_iterator);
-      pgmoneta_deque_iterator_destroy(record_iterator);
       error_code = PGMONETA_WAL_ERR_IO;
       goto error;
    }
@@ -171,8 +169,6 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       fwrite(page_header, sizeof(struct xlog_page_header_data), 1, file);
       page_number++;
    }
-
-   pgmoneta_deque_iterator_destroy(page_header_iterator);
 
    page_number = 0;
    fseek(file, SIZE_OF_XLOG_LONG_PHD, SEEK_SET);
@@ -214,10 +210,16 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       free(encoded_record);
    }
 
-   pgmoneta_deque_iterator_destroy(record_iterator);
-
    /* Fill the rest of the file until xlp_seg_size with zeros */
    long num_zeros = wf->long_phd->xlp_seg_size - ftell(file);
+
+   if (wf->long_phd->xlp_seg_size > 1 * 1024 * 1024 * 1024 /* 1GB */)
+   {
+      pgmoneta_log_error("Corrupted WAL segment size: %lu", wf->long_phd->xlp_seg_size);
+      error_code = PGMONETA_WAL_ERR_FORMAT;
+      goto error;
+   }
+
    if (num_zeros > 0)
    {
       char* zeros = (char*)calloc(num_zeros, sizeof(char));
@@ -228,6 +230,8 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       }
    }
 
+   pgmoneta_deque_iterator_destroy(page_header_iterator);
+   pgmoneta_deque_iterator_destroy(record_iterator);
    fclose(file);
    return PGMONETA_WAL_SUCCESS;
 

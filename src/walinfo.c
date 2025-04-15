@@ -34,10 +34,12 @@
 #include <management.h>
 #include <pgmoneta.h>
 #include <security.h>
+#include <server.h>
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
+#include <walfile/wal_reader.h>
 
 /* system */
 #include <err.h>
@@ -90,6 +92,253 @@ usage(void)
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
+}
+
+static int compare_walfile(struct walfile* wf1, struct walfile* wf2);
+static bool compare_long_page_headers(struct xlog_long_page_header_data* h1, struct xlog_long_page_header_data* h2);
+static bool compare_deque(struct deque* dq1, struct deque* dq2, bool (*compare)(void*, void*));
+static bool compare_xlog_page_header(void* a, void* b);
+static bool compare_xlog_record(void* a, void* b);
+
+static int
+compare_walfile(struct walfile* wf1, struct walfile* wf2)
+{
+   // Handle NULL cases
+   if (wf1 == NULL || wf2 == NULL)
+   {
+      return (wf1 == wf2) ? 0 : -1;
+   }
+
+   // Compare magic number (already in your code)
+   // if (wf1->magic_number != wf2->magic_number)
+   // {
+   //    printf("Magic number mismatch: %u != %u\n", wf1->magic_number, wf2->magic_number);
+   //    return -1;
+   // }
+
+   // Compare long page headers (long_phd)
+   if (!compare_long_page_headers(wf1->long_phd, wf2->long_phd))
+   {
+      printf("Long page header mismatch\n");
+      return -1;
+   }
+
+   // Compare page headers deque
+   if (!compare_deque(wf1->page_headers, wf2->page_headers, compare_xlog_page_header))
+   {
+      printf("Page headers deque mismatch\n");
+      return -1;
+   }
+
+   // Compare records deque
+   if (!compare_deque(wf1->records, wf2->records, compare_xlog_record))
+   {
+      printf("Records deque mismatch\n");
+      return -1;
+   }
+
+   return 0;
+}
+
+// Helper: Compare XLogLongPageHeaderData
+static bool
+compare_long_page_headers(struct xlog_long_page_header_data* h1, struct xlog_long_page_header_data* h2)
+{
+   if (h1 == NULL || h2 == NULL)
+   {
+      return (h1 == h2);
+   }
+
+   return (h1->std.xlp_magic == h2->std.xlp_magic &&
+           h1->std.xlp_info == h2->std.xlp_info &&
+           h1->std.xlp_tli == h2->std.xlp_tli &&
+           h1->std.xlp_pageaddr == h2->std.xlp_pageaddr &&
+           h1->xlp_seg_size == h2->xlp_seg_size &&
+           h1->xlp_xlog_blcksz == h2->xlp_xlog_blcksz);
+}
+
+// Helper: Generic deque comparison with custom comparator
+static bool
+compare_deque(struct deque* dq1, struct deque* dq2, bool (*compare)(void*, void*))
+{
+   if (dq1 == NULL || dq2 == NULL)
+   {
+      return (dq1 == dq2);
+   }
+
+   if (pgmoneta_deque_size(dq1) != pgmoneta_deque_size(dq2))
+   {
+      printf("Deque sizes mismatch: %u != %u\n", pgmoneta_deque_size(dq1), pgmoneta_deque_size(dq2));
+      return false;
+   }
+
+   struct deque_iterator* iter1 = NULL;
+   struct deque_iterator* iter2 = NULL;
+   bool equal = true;
+
+   if (pgmoneta_deque_iterator_create(dq1, &iter1) != 0 ||
+       pgmoneta_deque_iterator_create(dq2, &iter2) != 0)
+   {
+      equal = false;
+      goto cleanup;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter1) && pgmoneta_deque_iterator_next(iter2))
+   {
+      uintptr_t data1 = iter1->value->data;
+      uintptr_t data2 = iter2->value->data;
+
+      if (!compare((void*) data1, (void*) data2))
+      {
+         printf("Deque elements mismatch: %p != %p\n", (void*)data1, (void*)data2);
+         equal = false;
+         goto cleanup;
+      }
+   }
+
+   // Ensure both iterators are exhausted
+   if (pgmoneta_deque_iterator_next(iter1) || pgmoneta_deque_iterator_next(iter2))
+   {
+      equal = false;
+   }
+
+cleanup:
+   pgmoneta_deque_iterator_destroy(iter1);
+   pgmoneta_deque_iterator_destroy(iter2);
+   return equal;
+}
+
+// Helper: Compare individual XLogPageHeaderData
+static bool
+compare_xlog_page_header(void* a, void* b)
+{
+   struct xlog_page_header_data* ph1 = (struct xlog_page_header_data*)a;
+   struct xlog_page_header_data* ph2 = (struct xlog_page_header_data*)b;
+
+   return (ph1->xlp_magic == ph2->xlp_magic &&
+           ph1->xlp_info == ph2->xlp_info &&
+           ph1->xlp_tli == ph2->xlp_tli &&
+           ph1->xlp_pageaddr == ph2->xlp_pageaddr);
+}
+
+// Helper: Compare decoded XLogRecord and its data
+static bool
+compare_xlog_record(void* a, void* b)
+{
+   struct decoded_xlog_record* rec1 = (struct decoded_xlog_record*)a;
+   struct decoded_xlog_record* rec2 = (struct decoded_xlog_record*)b;
+
+   // Compare header
+   if (memcmp(&rec1->header, &rec2->header, sizeof(struct xlog_record)) != 0)
+   {
+      printf("xlog_record header mismatch\n");
+      return false;
+   }
+
+   if (rec1->main_data_len != rec2->main_data_len)
+   {
+      printf("xlog_record length mismatch\n");
+      return false;
+   }
+
+   // Compare data payload
+   if (rec1->main_data_len != 0 && memcmp(rec1->main_data, rec2->main_data, rec1->main_data_len) != 0)
+   {
+      printf("xlog_record data mismatch\n");
+      return false;
+   }
+
+   return true;
+}
+
+void
+test_walfile(char* path)
+{
+// 1. Prepare walfile structure
+   struct walfile* wf = NULL;
+   struct xlog_long_page_header_data* long_phd = NULL;
+   struct deque* page_headers = NULL; // deque of xlog_page_header_data
+   struct deque* records = NULL; // deque of decoded_xlog_record
+
+// Allocate and initialize walfile
+   wf = malloc(sizeof(struct walfile));
+   memset(wf, 0, sizeof(struct walfile));
+
+// Initialize long page header
+   long_phd = malloc(sizeof(struct xlog_long_page_header_data));
+   long_phd->std.xlp_magic = 0xD116;
+   long_phd->std.xlp_info = 0;
+   long_phd->std.xlp_tli = 1;
+   long_phd->std.xlp_pageaddr = 0x0000000100000001;
+   long_phd->std.xlp_rem_len = 0;
+   long_phd->xlp_xlog_blcksz = DEFAULT_WAL_SEGZ_BYTES;   // 16MB block size
+   long_phd->xlp_seg_size = 1234;
+   wf->long_phd = long_phd;
+
+   // Initialize page headers deque with sample data
+   if (pgmoneta_deque_create(false, &page_headers))
+   {
+      errx(1, "Error creating page headers deque\n");
+      return;
+   }
+
+   struct xlog_page_header_data* ph = malloc(sizeof(struct xlog_page_header_data));
+   ph->xlp_magic = XLOG_PAGE_MAGIC;
+   ph->xlp_info = 0;
+   ph->xlp_tli = 1;
+   ph->xlp_pageaddr = 0x0000000100000001;
+   ph->xlp_rem_len = 0;
+   pgmoneta_deque_add(page_headers, NULL, (uintptr_t)ph, ValueRef);
+   wf->page_headers = page_headers;
+
+   // Initialize records deque with a sample record
+   if (pgmoneta_deque_create(false, &records))
+   {
+      errx(1, "Error creating records deque\n");
+      return;
+   }
+
+   struct decoded_xlog_record* rec = calloc(1, sizeof(struct decoded_xlog_record));
+   rec->header.xl_rmid = 0;                              // Sample resource manager (XLOG)
+   rec->header.xl_tot_len = SIZE_OF_XLOG_RECORD;
+   rec->lsn = 0x0000000100000001;
+   rec->partial = false;
+   char* temp = "Sample data for the main data section";
+   rec->main_data_len = strlen(temp);
+   rec->main_data = malloc(rec->main_data_len);
+   memcpy(rec->main_data, temp, rec->main_data_len);
+   pgmoneta_deque_add(records, NULL, (uintptr_t)rec, ValueRef);
+   wf->records = records;
+
+   printf("Walfile structure prepared\n");
+
+   // 2. Write this structure to disk
+   if (pgmoneta_write_walfile(wf, 0, path))
+   {
+      errx(1, "Error writing walfile to disk\n");
+      return;
+   }
+
+   printf("Walfile written to disk\n");
+
+   // 3. Read the walfile from disk
+   struct walfile* read_wf = NULL;
+   if (pgmoneta_read_walfile(0, path, &read_wf))
+   {
+      errx(1, "Error reading walfile from disk\n");
+      return;
+   }
+
+   printf("Walfile read from disk\n");
+
+   // 4. Validate the read data against the original walfile structure
+   if (compare_walfile(wf, read_wf) != 0)
+   {
+      errx(1, "Walfile data mismatch\n");
+      return;
+   }
+
+   printf("Walfile data match\n");
 }
 
 int
@@ -165,11 +414,11 @@ main(int argc, char** argv)
    num_options = sizeof(options) / sizeof(options[0]);
    cli_result results[num_options];
 
-   if (argc < 2)
-   {
-      usage();
-      goto error;
-   }
+   // if (argc < 2)
+   // {
+   //    usage();
+   //    goto error;
+   // }
 
    num_results = cmd_parse(argc, argv, options, num_options, results, num_options, true, &filepath, &optind);
 
@@ -426,6 +675,13 @@ main(int argc, char** argv)
          memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
       }
    }
+
+   pgmoneta_memory_init();
+   pgmoneta_server_info(0);
+
+   char* p = "/home/pgmoneta/00000001000000000000001D";
+   test_walfile(p);
+   return 0;
 
    if (enable_mapping)
    {
