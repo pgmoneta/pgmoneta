@@ -81,6 +81,8 @@ pgmoneta_manifest_checksum_verify(char* root);
 int
 pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** deleted_files, struct art** changed_files, struct art** added_files);
 
+char* pgmoneta_convert_manifest_to_pg_format(char* manifest_path);
+
 #ifdef __cplusplus
 }
 #endif
