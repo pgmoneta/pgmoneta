@@ -95,6 +95,22 @@ pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position)
 int
 pgmoneta_tsclient_execute_delete(char* server, char* backup_id);
 
+/**
+ * Generate a new xlog checkpoint shutdown record for testing
+ * @return a pointer to the generated walfile structure
+ */
+struct walfile*
+generate_xlog_checkpoint_shutdown();
+
+/**
+ * Test the generation and reading of a walfile for a specific record type
+ * 
+ * @param generate a function pointer to the walfile generation function
+ * @return 0 if the test passes, otherwise 1
+ */
+int
+test_walfile(struct walfile* (*generate)(void));
+
 #ifdef __cplusplus
 }
 #endif

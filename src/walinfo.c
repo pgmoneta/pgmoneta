@@ -34,10 +34,12 @@
 #include <management.h>
 #include <pgmoneta.h>
 #include <security.h>
+#include <server.h>
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
+#include <walfile/wal_reader.h>
 
 /* system */
 #include <err.h>
@@ -426,6 +428,9 @@ main(int argc, char** argv)
          memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
       }
    }
+
+   pgmoneta_memory_init();
+   pgmoneta_server_info(0);
 
    if (enable_mapping)
    {
