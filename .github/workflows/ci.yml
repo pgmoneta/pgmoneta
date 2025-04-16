@@ -36,15 +36,14 @@ jobs:
           pandoc texlive texlive-latex-extra \
           texlive-fonts-extra texlive-xetex texlive-luatex \
           texlive-science texlive-extra-utils texlive-lang-all
-             
+
       - name: Install Eisvogel template for Pandoc
         run: |
-          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/2.4.2/Eisvogel-2.4.2.tar.gz
-          tar -xzf Eisvogel-2.4.2.tar.gz
+          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/3.1.0/Eisvogel-3.1.0.tar.gz
+          tar -xzf Eisvogel-3.1.0.tar.gz
           mkdir -p ~/.local/share/pandoc/templates
           mv eisvogel.latex ~/.local/share/pandoc/templates/
 
-       
       - name: Install PostgreSQL
         run: |
           sudo apt install curl ca-certificates
@@ -66,11 +65,11 @@ jobs:
             else
               export CC=/usr/bin/clang
             fi
-             
+
             cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ..
-             make -j$(nproc)
+            make -j$(nproc)
         working-directory: /home/runner/work/pgmoneta/pgmoneta/
-      
+
       - name: GCC/Testsuite
         id: gcc-test
         run: |
@@ -85,7 +84,7 @@ jobs:
           fi
           $(which bash) ./testsuite.sh
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-      
+
       - name: Upload Build and Run Logs as Artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -93,7 +92,7 @@ jobs:
           name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
           path:  /home/runner/work/pgmoneta/pgmoneta/build/log
           retention-days: 90
-       
+
       - name: CLANG/Testsuite Clean
         run: $(which bash) ./testsuite.sh clean
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
@@ -105,10 +104,6 @@ jobs:
           name: generated-docs
           path: /home/runner/work/pgmoneta/pgmoneta/build/doc
           retention-days: 90
-          
-      
-      
-      
 
   build-macos:
     runs-on: macos-latest
@@ -149,14 +144,14 @@ jobs:
       - name: Clean up after Clang tests
         working-directory: ${{ env.BUILD_DIR }}
         run: $(which bash) ./testsuite.sh clean
-      
+
       - name: Show logs on failure
         if: failure()
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           cat ./log/logfile || echo "logfile not found"
           cat ./log/pgmoneta.log || echo "pgmoneta.log not found"
-      
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -226,7 +221,7 @@ jobs:
               hs-pandoc \
               texlive-base \
               texlive-texmf \
-              graphviz 
+              graphviz
 
       - name: Build Project
         shell: freebsd {0}
@@ -235,13 +230,12 @@ jobs:
           cd $GITHUB_WORKSPACE/build
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} "$GITHUB_WORKSPACE"
           make -j$(sysctl -n hw.ncpu)
-        
 
       - name: Debug Testsuite Path
         shell: freebsd {0}
         run: |
           cd "${GITHUB_WORKSPACE}/build"
-          bash ./testsuite.sh 
+          bash ./testsuite.sh
 
       - name: Clean Testsuite
         shell: freebsd {0}
