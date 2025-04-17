@@ -3381,3 +3381,35 @@ pgmoneta_extract_server_parameters(struct deque** server_parameters)
    *server_parameters = sp;
    return 0;
 }
+
+int
+pgmoneta_init_crc32c(uint32_t* crc)
+{
+   if (crc == NULL)
+   {
+      return 1;
+   }
+
+   *crc = 0xFFFFFFFF;
+
+   return 0;
+}
+
+bool
+pgmoneta_compare_crc32c(uint32_t c1, uint32_t c2)
+{
+   return c1 == c2;
+}
+
+int
+pgmoneta_finalize_crc32c(uint32_t* crc)
+{
+   if (crc == NULL)
+   {
+      return 1;
+   }
+
+   *crc ^= 0xFFFFFFFF;
+
+   return 0;
+}
