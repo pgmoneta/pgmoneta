@@ -263,14 +263,14 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
 static int
 file_base_name(char* file, char** basename);
 
-static int copy_tablespaces_restore(char *from, char *to, char *base,
-                                    char *server, char *id,
-                                    struct backup *backup,
-                                    struct workers *workers);
-static int copy_tablespaces_hotstandby(char *from, char *to,
-                                       char *tblspc_mappings,
-                                       struct backup *backup,
-                                       struct workers *workers);
+static int copy_tablespaces_restore(char* from, char* to, char* base,
+                                    char* server, char* id,
+                                    struct backup* backup,
+                                    struct workers* workers);
+static int copy_tablespaces_hotstandby(char* from, char* to,
+                                       char* tblspc_mappings,
+                                       struct backup* backup,
+                                       struct workers* workers);
 
 int
 pgmoneta_get_restore_last_files_names(char*** output)
@@ -794,6 +794,7 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    struct art* nodes = NULL;
    struct backup* newest_backup = NULL;
    struct backup* oldest_backup = NULL;
+   struct backup* tmp_backup = NULL;
    bool incremental = false;
    struct deque* labels = NULL;
    char* tmp_backup_root = NULL;
@@ -892,17 +893,17 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
       pgmoneta_log_error("Unable to copy %s to %s", backup_info_path, tmp_backup_info_path);
       goto error;
    }
-
+   pgmoneta_get_backup(tmp_backup_info_path, newest_label, &tmp_backup);
    if (!incremental)
    {
-      pgmoneta_update_info_unsigned_long(tmp_backup_root, INFO_TYPE, TYPE_FULL);
-      pgmoneta_update_info_string(tmp_backup_root, INFO_PARENT, NULL);
+      tmp_backup->type = TYPE_FULL;
+      memset(tmp_backup->parent_label, 0, sizeof(tmp_backup->parent_label));
    }
    else
    {
-      pgmoneta_update_info_string(tmp_backup_root, INFO_PARENT, oldest_backup->parent_label);
+      snprintf(tmp_backup->parent_label, sizeof(tmp_backup->parent_label), "%s", oldest_backup->parent_label);
    }
-
+   pgmoneta_save_info(tmp_backup_info_path, newest_label, tmp_backup);
    pgmoneta_delete_directory(backup_dir);
    if (rename(tmp_backup_root, backup_dir) != 0)
    {
@@ -918,6 +919,7 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
 
    pgmoneta_workflow_destroy(workflow);
    pgmoneta_art_destroy(nodes);
+   free(tmp_backup);
    free(newest_backup);
    free(oldest_backup);
    free(tmp_backup_root);
@@ -2408,7 +2410,7 @@ restore_backup_incremental(struct art* nodes)
    free_space = pgmoneta_free_space(target_root_combine);
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
-   
+
    if (free_space < required_space)
    {
       char* f = NULL;
