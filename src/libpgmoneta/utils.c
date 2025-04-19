@@ -1795,7 +1795,7 @@ pgmoneta_delete_file(char* file, struct workers* workers)
    {
       if (workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi);
+         pgmoneta_workers_add(workers, do_delete_file, (struct worker_common*)fi, "do_delete_file");
       }
    }
    else
@@ -1976,7 +1976,7 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers)
    {
       if (workers->outcome)
       {
-         pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi);
+         pgmoneta_workers_add(workers, do_copy_file, (struct worker_common*)fi, "do_copy_file");
       }
    }
    else

@@ -105,7 +105,7 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi, "do_lz4_compress");
                }
             }
             else
@@ -317,7 +317,7 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
             {
                if (workers->outcome)
                {
-                  pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi, "do_lz4_decompress");
                }
             }
             else

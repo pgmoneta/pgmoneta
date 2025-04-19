@@ -182,7 +182,7 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
       {
          if (workers->outcome)
          {
-            pgmoneta_workers_add(workers, do_verify, (struct worker_common*)payload);
+            pgmoneta_workers_add(workers, do_verify, (struct worker_common*)payload, "do_verify");
          }
       }
       else

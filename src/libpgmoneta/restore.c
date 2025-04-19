@@ -1391,7 +1391,7 @@ combine_backups_recursive(uint32_t tsoid,
                                                     files,
                                                     workers,
                                                     &wi);
-               pgmoneta_workers_add(workers, do_reconstruct_backup_file, (struct worker_common*)wi);
+               pgmoneta_workers_add(workers, do_reconstruct_backup_file, (struct worker_common*)wi, "do_reconstruct_backup_file");
             }
             else
             {
@@ -1425,7 +1425,7 @@ combine_backups_recursive(uint32_t tsoid,
             if (workers->outcome)
             {
                create_copy_backup_file_input(server, label, ofulldir, relative_prefix, entry->d_name, exclude, workers, &wi);
-               pgmoneta_workers_add(workers, do_copy_backup_file, (struct worker_common*)wi);
+               pgmoneta_workers_add(workers, do_copy_backup_file, (struct worker_common*)wi, "do_copy_backup_file");
             }
             else
             {

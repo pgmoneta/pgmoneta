@@ -387,6 +387,8 @@ error:
    free(old_manifest);
    free(new_manifest);
 
+   pgmoneta_workers_destroy(workers);
+
    if (source_root != NULL)
    {
       pgmoneta_delete_directory(source_root);

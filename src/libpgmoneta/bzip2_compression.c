@@ -123,7 +123,7 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
                {
                   if (workers->outcome)
                   {
-                     pgmoneta_workers_add(workers, do_bzip2_compress, (struct worker_common*)wi);
+                     pgmoneta_workers_add(workers, do_bzip2_compress, (struct worker_common*)wi, "do_bzip2_compress");
                   }
                }
                else
@@ -349,7 +349,7 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_bzip2_decompress, (struct worker_common*)wi);
+                  pgmoneta_workers_add(workers, do_bzip2_decompress, (struct worker_common*)wi, "do_bzip2_decompress");
                }
                else
                {
