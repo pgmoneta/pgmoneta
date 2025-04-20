@@ -2052,7 +2052,7 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
    struct json* manifest_read = NULL;
    struct json* files = NULL;
    struct main_configuration* config = NULL;
-   struct json_iterator *iter = NULL;
+   struct json_iterator* iter = NULL;
    char* manifest_path = NULL;
    unsigned long sz = 0;
    uint64_t biggest_file_sz = 0;
@@ -2086,7 +2086,7 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
       file_path = (char*)pgmoneta_json_get(file, "Path");
       /* for incremental files get the `truncated_block_length` */
       if (pgmoneta_is_incremental_path(file_path))
-      {  
+      {
          struct rfile* rf = NULL;
          uint32_t block_length = 0;
          char* relative_path = NULL;
@@ -2186,8 +2186,8 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
    *finalname = final;
    return 0;
 
-   error:
-      free(final);
+error:
+   free(final);
    return 1;
 }
 
@@ -2195,7 +2195,7 @@ static int
 split_file_path(char* path, char** relative_path, char** bare_file_name)
 {
    int relative_path_len = 0;
-   
+
    char* path_copy = NULL;
    char* rel_path = NULL;
    char* file_name = NULL;

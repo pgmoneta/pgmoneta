@@ -376,9 +376,9 @@ pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, 
 
 /**
  * Get an approximate size of a backup repository
- * The goal is to iterate over all file entries in the manifest. If an entry represents an incremental 
- * file, retrieve its block_length using the file’s truncated_block_length (which indicates the total 
- * number of blocks in the fully restored file). For non-incremental files, simply use the size value 
+ * The goal is to iterate over all file entries in the manifest. If an entry represents an incremental
+ * file, retrieve its block_length using the file’s truncated_block_length (which indicates the total
+ * number of blocks in the fully restored file). For non-incremental files, simply use the size value
  * directly from the file entry in the manifest.
  * @param server The server
  * @param label The label

@@ -263,14 +263,14 @@ construct_backup_label_chain(int server, char* newest_label, char* oldest_label,
 static int
 file_base_name(char* file, char** basename);
 
-static int copy_tablespaces_restore(char *from, char *to, char *base,
-                                    char *server, char *id,
-                                    struct backup *backup,
-                                    struct workers *workers);
-static int copy_tablespaces_hotstandby(char *from, char *to,
-                                       char *tblspc_mappings,
-                                       struct backup *backup,
-                                       struct workers *workers);
+static int copy_tablespaces_restore(char* from, char* to, char* base,
+                                    char* server, char* id,
+                                    struct backup* backup,
+                                    struct workers* workers);
+static int copy_tablespaces_hotstandby(char* from, char* to,
+                                       char* tblspc_mappings,
+                                       struct backup* backup,
+                                       struct workers* workers);
 
 int
 pgmoneta_get_restore_last_files_names(char*** output)
@@ -2408,7 +2408,7 @@ restore_backup_incremental(struct art* nodes)
    free_space = pgmoneta_free_space(target_root_combine);
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
-   
+
    if (free_space < required_space)
    {
       char* f = NULL;
