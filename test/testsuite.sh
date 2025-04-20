@@ -331,6 +331,19 @@ create_cluster() {
    else
       echo "setting summarize_wal ... on"
    fi
+
+     LOG_ABS_PATH=$(realpath "$LOG_DIRECTORY")
+   sed_i "s/^#*logging_collector.*/logging_collector = on/" "$DATA_DIRECTORY/postgresql.conf"
+   sed_i "s/^#*log_destination.*/log_destination = 'stderr'/" "$DATA_DIRECTORY/postgresql.conf"
+   sed_i "s|^#*log_directory.*|log_directory = '$LOG_ABS_PATH'|" "$DATA_DIRECTORY/postgresql.conf"
+   sed_i "s/^#*log_filename.*/log_filename = 'logfile'/" "$DATA_DIRECTORY/postgresql.conf"
+
+   # If any of the above settings are missing, append them
+   grep -q "^logging_collector" "$DATA_DIRECTORY/postgresql.conf" || echo "logging_collector = on" >> "$DATA_DIRECTORY/postgresql.conf"
+   grep -q "^log_destination" "$DATA_DIRECTORY/postgresql.conf" || echo "log_destination = 'stderr'" >> "$DATA_DIRECTORY/postgresql.conf"
+   grep -q "^log_directory" "$DATA_DIRECTORY/postgresql.conf" || echo "log_directory = '$LOG_ABS_PATH'" >> "$DATA_DIRECTORY/postgresql.conf"
+   grep -q "^log_filename" "$DATA_DIRECTORY/postgresql.conf" || echo "log_filename = 'logfile'" >> "$DATA_DIRECTORY/postgresql.conf"
+
    # Uncomment if pgmoneta_ext is enabled
    # error_out=$(sed_i "s/#shared_preload_libraries = ''/shared_preload_libraries = 'pgmoneta_ext'/" $DATA_DIRECTORY/postgresql.conf 2>&1)
    # if [ $? -ne 0 ]; then
@@ -340,9 +353,12 @@ create_cluster() {
    # else
    #   echo "setting shared_preload_libraries ... 'pgmoneta_ext'"
    # fi
+  # ...existing code in create_cluster()...
+
    set -e
    echo ""
 }
+
 
 initialize_hba_configuration() {
    echo -e "\e[34mCreate HBA Configuration \e[0m"
@@ -370,6 +386,8 @@ initialize_cluster() {
    fi
    run_as_postgres "$PGCTL_PATH -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start"
    if [ $? -ne 0 ]; then
+      echo "PostgreSQL failed to start. Printing log:"
+      cat $PGCTL_LOG_FILE
       clean
       exit 1
    fi
@@ -408,7 +426,7 @@ initialize_cluster() {
    else
       echo "create user myuser ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE DATABASE mydb WITH OWNER myuser ENCODING 'UTF8';" 2>&1)
+   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE DATABASE mydb WITH OWNER myuser ENCODING 'UTF8' TEMPLATE template0;" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create database mydb with owner myuser ... $err_out"
       stop_pgctl
@@ -540,6 +558,8 @@ execute_testcases() {
    echo ""
 }
 
+
+
 execute_pgmoneta_ext_suite() {
    echo -e "\e[34mExecute pgmoneta_ext Testcases \e[0m"
    set +e
@@ -599,7 +619,6 @@ run_tests() {
       pgmoneta_initialize_configuration
       # execute_pgmoneta_ext_suite Uncomment when pgmoneta_ext is enabled
       execute_testcases
-
       # clean cluster
       clean
    else

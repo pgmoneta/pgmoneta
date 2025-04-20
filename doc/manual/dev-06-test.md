@@ -98,3 +98,44 @@ Also remember to link the new test suite in [CMakeLists](https://github.com/pgmo
 34:    testcases/runner.c
 35:  )
 ```
+
+
+### Running Containerized Tests
+
+The test suite supports containerized testing environments. When you run the C tests in the `build` directory, a Docker (or Podman) container is automatically started, and the test script is executed inside it. This ensures a consistent and isolated environment for testing.
+
+> **Note:** The containerized test option (`ctest`) is only available if Docker or Podman is installed on your system. The CMake configuration will detect this and enable the container test target accordingly.
+
+You have two main options to run the tests:
+
+#### 1. Using CTest (with Docker/Podman)
+
+From the `build` directory, simply run:
+
+```sh
+ctest -V
+```
+
+This will:
+- Spin up the Docker/Podman container
+- Execute all test scripts inside the container
+- Collect logs, coverage, and test outputs
+
+#### 2. Using coverage.sh
+
+Alternatively, you can run the coverage script directly:
+
+```sh
+./coverage.sh
+```
+
+This will:
+- Run all tests in the container
+- Generate code coverage reports
+
+#### Artifacts
+
+After running the tests, you will find:
+- **Test logs:** `build/log/`
+- **Coverage reports:** `build/coverage/`
+- **CTest logs:** `build/testing/`

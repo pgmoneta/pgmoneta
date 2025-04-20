@@ -89,6 +89,23 @@ Download dependencies
     dnf install graphviz doxygen
     ```
 
+#### Generating Code Coverage
+
+Code coverage is automatically enabled **only for GCC builds** if both `gcov` and `gcovr` are installed on your system.  
+To install the required tools, run:
+
+```sh
+dnf install gcovr gcc
+```
+
+> **Note:** In many distributions, `gcovr` may not be available as a DNF package. In such cases, you can install it using pip:
+> ```sh
+> pip3 install gcovr
+> ```
+
+When these tools are present and the compiler is set to GCC, the build system will detect them and enable code coverage generation automatically during the build process.  
+If you use Clang as the compiler, code coverage will not be enabled by default.
+
 ### Build
 
 ``` sh
@@ -409,7 +426,7 @@ Options:
   -?,   --help        Display help
 ```
 
-For more details, please refer to the [wal documentation](./manual/dev-07-wal.md).
+For more details, please refer to the [wal documentation](./manual/dev-08-wal.md).
 
 ## End
 

@@ -23,6 +23,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Install Dependencies
         run: |
           sudo apt update -y
@@ -35,7 +36,9 @@ jobs:
           bzip2 net-tools check graphviz doxygen \
           pandoc texlive texlive-latex-extra \
           texlive-fonts-extra texlive-xetex texlive-luatex \
-          texlive-science texlive-extra-utils texlive-lang-all
+          texlive-science texlive-extra-utils \
+          texlive-lang-all \
+          gcovr
 
       - name: Install Eisvogel template for Pandoc
         run: |
@@ -52,48 +55,83 @@ jobs:
           sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt update
           sudo apt install -y postgresql-17
+
       - name: Set Env Path Variable
         run: |
           echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
           echo $PATH
+
       - name: Build Project
         run: |
-            mkdir build
-            cd build
-            if [ "${{ matrix.compiler }}" = "gcc" ]; then
-              export CC=/usr/bin/gcc
-            else
-              export CC=/usr/bin/clang
-            fi
-
-            cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ..
-            make -j$(nproc)
+          mkdir build
+          cd build
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            export CC=/usr/bin/gcc
+          else
+            export CC=/usr/bin/clang
+          fi
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}  ..
+          make -j$(nproc)
         working-directory: /home/runner/work/pgmoneta/pgmoneta/
 
-      - name: GCC/Testsuite
-        id: gcc-test
+      - name: Run Tests
         run: |
           if [ "${{ matrix.compiler }}" = "gcc" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
             ASAN_LIB=$(gcc -print-file-name=libasan.so)
-            if [ -n "$ASAN_LIB" ] && [ -f "$ASAN_LIB" ]; then
-              echo "Using GCC AddressSanitizer preload for Debug build"
               export ASAN_OPTIONS=verify_asan_link_order=0
               export LD_PRELOAD=$ASAN_LIB
               export ASAN_OPTIONS=detect_leaks=0,verify_asan_link_order=0
-            fi
           fi
           $(which bash) ./testsuite.sh
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+
+ # === Generate coverage reports ===
+      - name: Generate Detailed HTML Coverage Report
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+        uses: threeal/gcovr-action@v1.1.0
+        with:
+          root: /home/runner/work/pgmoneta/pgmoneta
+          html-details: true
+          html-out: coverage.html
+
+      - name: Generate Cobertura Report
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+        uses: threeal/gcovr-action@v1.1.0
+        with:
+          xml-out: cobertura.xml
+
+      - name: Generate Coveralls JSON Report and Upload
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+        uses: threeal/gcovr-action@v1.1.0
+        with:
+          root: /home/runner/work/pgmoneta/pgmoneta
+          coveralls-out: coveralls.json
+
+      - name: Bundle All Coverage Reports
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+        run: |
+          mkdir -p coverage-report
+          mv *.html coverage-report/
+          mv cobertura.xml coverage-report/
+          mv coveralls.json coverage-report/
+
+      - name: Upload All Coverage Reports as Artifact
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: coverage-report
+          retention-days: 90
 
       - name: Upload Build and Run Logs as Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
-          path:  /home/runner/work/pgmoneta/pgmoneta/build/log
+          path: /home/runner/work/pgmoneta/pgmoneta/build/log
           retention-days: 90
 
-      - name: CLANG/Testsuite Clean
+      - name: Clean Testsuite
         run: $(which bash) ./testsuite.sh clean
         working-directory: /home/runner/work/pgmoneta/pgmoneta/build
 

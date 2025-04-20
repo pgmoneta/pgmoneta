@@ -5,6 +5,8 @@ FILE(GLOB_RECURSE SOURCE_FILES "libpgmoneta/*.c")
 FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
 
 set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
+# Always default to OFF
+set(ENABLE_COVERAGE OFF)
 
 #
 # OS
@@ -35,6 +37,16 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${THREAD_INCLUDE_DIRS}
   )
 
+  find_program(GCOV_PATH gcov)
+  find_program(GCOVR_PATH gcovr)
+  # Enable coverage only if both gcov and gcovr are found and compiler is GCC
+ if(GCOV_PATH AND GCOVR_PATH AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set(ENABLE_COVERAGE ON)
+  message(STATUS "Coverage tools (gcov and gcovr) found and compiler is GCC: Code coverage ENABLED")
+ else()
+  message(STATUS "Coverage tools not found or compiler is not GCC: Code coverage SKIPPED")
+ endif()
+ 
   #
   # Library directories
   #
@@ -173,6 +185,15 @@ add_compile_options(-Wno-deprecated)
 add_compile_options(-Wno-deprecated-declarations)
 add_compile_options(-Wunused)
 add_compile_options(-Wunused-result)
+
+if(ENABLE_COVERAGE)
+  add_compile_options(--coverage -O0 -g)
+  add_link_options(--coverage)
+  message(STATUS "Building with coverage enabled")
+else()
+  message(STATUS "Building without coverage")
+endif()
+
 
 #
 # version number and string management
