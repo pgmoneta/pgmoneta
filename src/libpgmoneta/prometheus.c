@@ -2460,7 +2460,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2476,7 +2476,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2520,7 +2520,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", major=\"");
                data = pgmoneta_append_int(data, backups[j]->major_version);
@@ -2538,7 +2538,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2582,7 +2582,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2598,7 +2598,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2634,7 +2634,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2650,7 +2650,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2686,7 +2686,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2702,7 +2702,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2738,7 +2738,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2754,7 +2754,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2790,7 +2790,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2806,7 +2806,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2842,7 +2842,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2858,7 +2858,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2894,7 +2894,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2910,7 +2910,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2946,7 +2946,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -2962,7 +2962,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2998,7 +2998,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3014,7 +3014,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3050,7 +3050,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3066,7 +3066,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3103,7 +3103,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3119,7 +3119,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3156,7 +3156,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3172,7 +3172,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3209,7 +3209,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3225,7 +3225,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3261,7 +3261,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3277,7 +3277,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3315,7 +3315,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", ");
 
@@ -3336,7 +3336,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\", ");
+         data = pgmoneta_append(data, "\", label=\"0\", ");
          data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3374,7 +3374,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", ");
 
@@ -3395,7 +3395,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\", ");
+         data = pgmoneta_append(data, "\", label=\"0\", ");
          data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3434,7 +3434,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\", ");
 
@@ -3455,7 +3455,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\", ");
+         data = pgmoneta_append(data, "\", label=\"0\", ");
          data = pgmoneta_append(data, "walpos=\"0/0\"} 0");
 
          data = pgmoneta_append(data, "\n");
@@ -3618,7 +3618,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3634,7 +3634,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3678,7 +3678,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3701,7 +3701,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3745,7 +3745,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3761,7 +3761,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3805,7 +3805,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3828,7 +3828,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3872,7 +3872,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3894,7 +3894,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3938,7 +3938,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -3960,7 +3960,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4004,7 +4004,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4026,7 +4026,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4070,7 +4070,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4092,7 +4092,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4136,7 +4136,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4158,7 +4158,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4202,7 +4202,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4224,7 +4224,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4268,7 +4268,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4290,7 +4290,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4334,7 +4334,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4356,7 +4356,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4400,7 +4400,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4422,7 +4422,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4466,7 +4466,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4488,7 +4488,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4532,7 +4532,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4554,7 +4554,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4598,7 +4598,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4620,7 +4620,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -4664,7 +4664,7 @@ size_information(SSL* client_ssl, int client_fd)
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\",label=\"");
+               data = pgmoneta_append(data, "\", label=\"");
                data = pgmoneta_append(data, backups[j]->label);
                data = pgmoneta_append(data, "\"} ");
 
@@ -4680,7 +4680,7 @@ size_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\",label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
