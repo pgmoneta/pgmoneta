@@ -1539,7 +1539,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
-      data = pgmoneta_append(data, "parameter= \"days\"");
+      data = pgmoneta_append(data, "parameter=\"days\"");
       data = pgmoneta_append(data, "} ");
       retention = config->common.servers[i].retention_days;
       if (retention <= 0)
@@ -1554,7 +1554,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
-      data = pgmoneta_append(data, "parameter= \"weeks\"");
+      data = pgmoneta_append(data, "parameter=\"weeks\"");
       data = pgmoneta_append(data, "} ");
       retention = config->common.servers[i].retention_weeks;
       if (retention <= 0)
@@ -1569,7 +1569,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
-      data = pgmoneta_append(data, "parameter= \"months\"");
+      data = pgmoneta_append(data, "parameter=\"months\"");
       data = pgmoneta_append(data, "} ");
       retention = config->common.servers[i].retention_months;
       if (retention <= 0)
@@ -1584,7 +1584,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"");
       data = pgmoneta_append(data, ", ");
-      data = pgmoneta_append(data, "parameter= \"years\"");
+      data = pgmoneta_append(data, "parameter=\"years\"");
       data = pgmoneta_append(data, "} ");
       retention = config->common.servers[i].retention_years;
       if (retention <= 0)
