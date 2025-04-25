@@ -5,10 +5,10 @@
 For RPM based distributions such as Fedora and RHEL you can add the
 [PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
 
-**Fedora 40**
+**Fedora 42**
 
 ```sh
-rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/F-40-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/F-42-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 ```
 
 **RHEL 9.x / Rocky Linux 9.x**
@@ -29,14 +29,14 @@ rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-aarch64/pgd
 dnf config-manager --set-enabled crb
 ```
 
-**PostgreSQL 13**
+**PostgreSQL 17**
 
 ``` sh
 dnf -qy module disable postgresql
-dnf install -y postgresql13 postgresql13-server postgresql13-contrib postgresql13-libs
+dnf install -y postgresql17 postgresql17-server postgresql17-contrib postgresql17-libs
 ```
 
-This will install PostgreSQL 13.
+This will install PostgreSQL 17.
 
 ## Install pgmoneta
 
@@ -229,7 +229,7 @@ to test
 #### Add users and a database
 
 ``` sh
-export PATH=/usr/pgsql-13/bin:$PATH
+export PATH=/usr/pgsql-17/bin:$PATH
 createuser -P myuser
 createdb -E UTF8 -O myuser mydb
 ```
@@ -386,18 +386,30 @@ Usage:
   pgmoneta-walinfo <file>
 
 Options:
-  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
-  -o, --output FILE        Output file
-  -F, --format             Output format (raw, json)
-  -L, --logfile FILE       Set the log file
-  -q, --quiet              No output only result
-      --color              Use colors (on, off)
-  -v, --verbose            Output result
-  -V, --version            Display version information
-  -?, --help               Display help
+  -c,   --config      Set the path to the pgmoneta_walinfo.conf file
+  -u,   --users       Set the path to the pgmoneta_users.conf file
+  -RT, --tablespaces  Filter on tablspaces
+  -RD, --databases    Filter on databases
+  -RT, --relations    Filter on relations
+  -R,   --filter      Combination of -RT, -RD, -RR
+  -o,   --output      Output file
+  -F,   --format      Output format (raw, json)
+  -L,   --logfile     Set the log file
+  -q,   --quiet       No output only result
+        --color       Use colors (on, off)
+  -r,   --rmgr        Filter on a resource manager
+  -s,   --start       Filter on a start LSN
+  -e,   --end         Filter on an end LSN
+  -x,   --xid         Filter on an XID
+  -l,   --limit       Limit number of outputs
+  -v,   --verbose     Output result
+  -V,   --version     Display version information
+  -m,   --mapping     Provide mappings file for OID translation
+  -t,   --translate   Translate OIDs to object names in XLOG records
+  -?,   --help        Display help
 ```
 
-For more details, please refer to the [wal documentation](./manual/dev-06-wal.md).
+For more details, please refer to the [wal documentation](./manual/dev-07-wal.md).
 
 ## End
 
