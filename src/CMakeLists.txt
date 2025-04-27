@@ -13,7 +13,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
   add_compile_options(-DHAVE_LINUX)
   add_compile_options(-D_POSIX_C_SOURCE=200809L)
-  
+
   check_include_file("execinfo.h" HAVE_EXECINFO_H)
   if (HAVE_EXECINFO_H)
     add_compile_options(-DHAVE_EXECINFO_H)
@@ -197,29 +197,29 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
         if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.2)
           add_compile_options(-fsanitize=address)
           add_compile_options(-fno-sanitize=null)
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.3)
             add_compile_options(-fsanitize=undefined)
             add_compile_options(-fsanitize=float-divide-by-zero)
             add_compile_options(-fsanitize=float-cast-overflow)
           endif()
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.6)
             add_compile_options(-fno-sanitize-recover=all)
           endif()
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.8)
             add_compile_options(-fsanitize-recover=address)
           endif()
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.9)
             add_compile_options(-fsanitize-address-use-after-scope)
           endif()
-          
+
           add_compile_options(-fno-sanitize=alignment)
 
           set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment")
-          set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment")        
+          set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment")
         endif()
       endif()
     endif()
@@ -228,38 +228,38 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
       if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
         if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 4.8)
           add_compile_options(-fsanitize=address)
-          
+
           set(TEMP_EXE_LINKER_FLAGS "-fsanitize=address")
           set(TEMP_SHARED_LINKER_FLAGS "-fsanitize=address")
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 4.9)
             add_compile_options(-fsanitize=undefined)
             set(TEMP_EXE_LINKER_FLAGS "${TEMP_EXE_LINKER_FLAGS} -fsanitize=undefined")
             set(TEMP_SHARED_LINKER_FLAGS "${TEMP_SHARED_LINKER_FLAGS} -fsanitize=undefined")
           endif()
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 5.1)
             add_compile_options(-fno-sanitize=alignment)
             add_compile_options(-fno-sanitize-recover=all)
             add_compile_options(-fsanitize=float-cast-overflow)
             add_compile_options(-fsanitize=float-divide-by-zero)
-            
+
             set(TEMP_EXE_LINKER_FLAGS "${TEMP_EXE_LINKER_FLAGS} -fno-sanitize=alignment -fno-sanitize-recover=all -fsanitize=float-cast-overflow -fsanitize=float-divide-by-zero")
             set(TEMP_SHARED_LINKER_FLAGS "${TEMP_SHARED_LINKER_FLAGS} -fno-sanitize=alignment -fno-sanitize-recover=all -fsanitize=float-cast-overflow -fsanitize=float-divide-by-zero")
           endif()
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 6.0)
             add_compile_options(-fsanitize-recover=address)
             set(TEMP_EXE_LINKER_FLAGS "${TEMP_EXE_LINKER_FLAGS} -fsanitize-recover=address")
             set(TEMP_SHARED_LINKER_FLAGS "${TEMP_SHARED_LINKER_FLAGS} -fsanitize-recover=address")
           endif()
-          
+
           if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 7.0)
             add_compile_options(-fsanitize-address-use-after-scope)
             set(TEMP_EXE_LINKER_FLAGS "${TEMP_EXE_LINKER_FLAGS} -fsanitize-address-use-after-scope")
             set(TEMP_SHARED_LINKER_FLAGS "${TEMP_SHARED_LINKER_FLAGS} -fsanitize-address-use-after-scope")
           endif()
-          
+
           set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${TEMP_EXE_LINKER_FLAGS}")
           set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${TEMP_SHARED_LINKER_FLAGS}")
         endif()
@@ -271,12 +271,12 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
   if (HAS_NO_OMIT_FRAME_POINTER)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer")
   endif()
-  
+
   check_c_compiler_flag(-Wextra HAS_WEXTRA)
   if (HAS_WEXTRA)
     if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" AND NOT ${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
       add_compile_options(-Wextra)
-      
+
       check_c_compiler_flag(-Wno-sign-compare HAS_NO_SIGN_COMPARE)
       if (HAS_NO_SIGN_COMPARE)
         add_compile_options(-Wno-sign-compare)
