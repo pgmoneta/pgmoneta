@@ -41,7 +41,7 @@
 #define NAME "verify"
 
 void
-pgmoneta_verify(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* identifier = NULL;
    char* directory = NULL;
@@ -189,14 +189,14 @@ pgmoneta_verify(SSL* ssl __attribute__((unused)), int client_fd, int server, uin
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
       goto error;
    }
 
    if (pgmoneta_json_create(&filesj))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
 
       goto error;
    }
@@ -216,9 +216,9 @@ pgmoneta_verify(SSL* ssl __attribute__((unused)), int client_fd, int server, uin
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_VERIFY_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("Verify: Error sending response for %s/%s", config->common.servers[server].name, identifier);
 
       goto error;

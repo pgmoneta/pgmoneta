@@ -60,6 +60,8 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
    struct timespec start_t;
    struct timespec end_t;
    double total_seconds;
+   char* en = NULL;
+   int ec = -1;
    char* backup_id = NULL;
    char* d = NULL;
    int backup_index = -1;
@@ -133,12 +135,12 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name, MANAGEMENT_ERROR_RETAIN_NOBACKUP, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_RETAIN_NOBACKUP;
          pgmoneta_log_warn("Retain: No identifier for %s/%s", config->common.servers[srv].name, backup_id);
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[srv].name, MANAGEMENT_ERROR_EXPUNGE_NOBACKUP, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_EXPUNGE_NOBACKUP;
          pgmoneta_log_warn("Expunge: No identifier for %s/%s", config->common.servers[srv].name, backup_id);
       }
 
@@ -172,12 +174,12 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
    {
       if (k)
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_RETAIN_NETWORK, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_RETAIN_NETWORK;
          pgmoneta_log_error("Retain: Error sending response");
       }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_EXPUNGE_NETWORK, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_EXPUNGE_NETWORK;
          pgmoneta_log_error("Expunge: Error sending response");
       }
 
@@ -200,6 +202,19 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
    exit(0);
 
 error:
+
+   if (k)
+   {
+      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[srv].name,
+                                         ec != -1 ? ec : MANAGEMENT_ERROR_RETAIN_ERROR, en != NULL ? en : NAME,
+                                         compression, encryption, payload);
+   }
+   else
+   {
+      pgmoneta_management_response_error(ssl, client_fd, config->common.servers[srv].name,
+                                         ec != -1 ? ec : MANAGEMENT_ERROR_EXPUNGE_ERROR, en != NULL ? en : NAME,
+                                         compression, encryption, payload);
+   }
 
    for (int i = 0; i < number_of_backups; i++)
    {

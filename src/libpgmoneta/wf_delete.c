@@ -27,6 +27,9 @@
  */
 
 /* pgmoneta */
+#include "art.h"
+#include "management.h"
+#include "value.h"
 #include <pgmoneta.h>
 #include <link.h>
 #include <logging.h>
@@ -121,6 +124,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (pgmoneta_get_backups(d, &number_of_backups, &backups))
    {
+      pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_NOBACKUPS, ValueInt32);
       goto error;
    }
 
@@ -138,13 +142,15 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (backup_index == -1)
    {
+      pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_NOBACKUP, ValueInt32);
       pgmoneta_log_error("Delete: No identifier for %s/%s", config->common.servers[server].name, label);
       goto error;
    }
 
    if (backups[backup_index]->keep)
    {
-      pgmoneta_log_error("Delete: Backup is retained for %s/%s", config->common.servers[server].name, label);
+      pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_RETAINED, ValueInt32);
+      pgmoneta_log_warn("Delete: Backup is retained for %s/%s", config->common.servers[server].name, label);
       goto error;
    }
 
@@ -153,6 +159,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    {
       if (pgmoneta_rollup_backups(server, child->label, label))
       {
+         pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_ROLLUP, ValueInt32);
          pgmoneta_log_error("Delete: Unable to roll up backup %s to %s", label, child->label);
          goto error;
       }
@@ -160,6 +167,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (delete_backup(server, backup_index, backups[backup_index], number_of_backups, backups))
    {
+      pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_FULL, ValueInt32);
       pgmoneta_log_error("Delete: Full backup error for %s/%s", config->common.servers[server].name, label);
       goto error;
    }

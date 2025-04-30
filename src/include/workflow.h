@@ -64,6 +64,7 @@ extern "C" {
 #define NODE_COPY_WAL            "copy_wal"             /* Whether to copy WAL */
 #define NODE_BACKUP_BASE         "backup_base"          /* The base directory of the backup */
 #define NODE_BACKUP_DATA         "backup_data"          /* The data directory of the backup */
+#define NODE_ERROR_CODE          "error_code"           /* The error code */
 #define NODE_FAILED              "failed"               /* The failed files in a manifest */
 #define NODE_INCREMENTAL_BASE    "incremental_base"     /* The base directory of incremental */
 #define NODE_INCREMENTAL_COMBINE "incremental_combine"  /* Whether to combine into one incremental backup */
@@ -132,17 +133,13 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
  * Execute a workflow
  * @param workflow The workflow
  * @param nodes The nodes
- * @param server The server
- * @param client_fd The client socket
- * @param compression The compression level
- * @param encryption The encryption level
- * @param payload The payload
+ * @param error_name The error name if set
+ * @param error_code The error code if set
  * @return 0 upon success, otherwise 1
  */
 int
 pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
-                          int server, int client_fd, uint8_t compression,
-                          uint8_t encryption, struct json* payload);
+                          char** error_name, int* error_code);
 
 /**
  * Destroy the workflow

@@ -55,7 +55,7 @@ static bool is_server_side_compression(void);
 static void write_tar_file(struct archive* a, char* src, char* dst);
 
 void
-pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
    char* identifier = NULL;
@@ -69,6 +69,8 @@ pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    char* label = NULL;
    char* output = NULL;
    char* filename = NULL;
+   char* en = NULL;
+   int ec = -1;
    struct backup* backup = NULL;
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
@@ -88,10 +90,9 @@ pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
    if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
    {
+      ec = MANAGEMENT_ERROR_ARCHIVE_ACTIVE;
       pgmoneta_log_info("Archive: Server %s is active", config->common.servers[server].name);
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_ACTIVE, NAME, compression, encryption, payload);
-
-      goto done;
+      goto error;
    }
 
    config->common.servers[server].active_archive = true;
@@ -118,15 +119,14 @@ pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                         MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ARCHIVE_NOBACKUP;
       pgmoneta_log_warn("Archive: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
 
    if (backup == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NOBACKUP, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ARCHIVE_NOBACKUP;
       pgmoneta_log_warn("Archive: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
@@ -156,15 +156,14 @@ pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    {
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, server, backup);
 
-      if (pgmoneta_workflow_execute(workflow, nodes, server, client_fd, compression, encryption, payload))
+      if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
       {
          goto error;
       }
 
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
-
+         ec = MANAGEMENT_ERROR_ALLOCATION;
          goto error;
       }
 
@@ -203,9 +202,8 @@ pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ARCHIVE_NETWORK, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_ARCHIVE_NETWORK;
          pgmoneta_log_error("Archive: Error sending response for %s/%s", config->common.servers[server].name, identifier);
-
          goto error;
       }
 
@@ -225,8 +223,6 @@ pgmoneta_archive(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    config->common.servers[server].active_archive = false;
    atomic_store(&config->common.servers[server].repository, false);
 
-done:
-
    pgmoneta_stop_logging();
 
    free(label);
@@ -236,6 +232,11 @@ done:
    exit(0);
 
 error:
+
+   pgmoneta_management_response_error(ssl, client_fd,
+                                      config->common.servers[server].name,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_ARCHIVE_ERROR, en != NULL ? en : NAME,
+                                      compression, encryption, payload);
 
    pgmoneta_art_destroy(nodes);
 
