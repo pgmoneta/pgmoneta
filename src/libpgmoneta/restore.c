@@ -313,7 +313,7 @@ pgmoneta_is_restore_last_name(char* file_name)
 }
 
 void
-pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    bool active = false;
    bool locked = false;
@@ -326,6 +326,8 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    struct timespec end_t;
    double total_seconds = 0;
    char* output = NULL;
+   char* en = NULL;
+   int ec = -1;
    struct backup* backup = NULL;
    struct art* nodes = NULL;
    struct json* req = NULL;
@@ -344,9 +346,8 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
    if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
    {
+      ec = MANAGEMENT_ERROR_RESTORE_ACTIVE;
       pgmoneta_log_info("Restore: Server %s is active", config->common.servers[server].name);
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_ACTIVE, NAME, compression, encryption, payload);
-
       goto error;
    }
 
@@ -360,8 +361,7 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
    if (identifier == NULL || strlen(identifier) == 0)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                         MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
       goto error;
    }
 
@@ -372,8 +372,7 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                         MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
       goto error;
    }
 
@@ -392,8 +391,7 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    {
       if (pgmoneta_management_create_response(payload, server, &response))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
-
+         ec = MANAGEMENT_ERROR_ALLOCATION;
          goto error;
       }
 
@@ -418,9 +416,8 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
 
       if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
       {
-         pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_NETWORK, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_RESTORE_NETWORK;
          pgmoneta_log_error("Restore: Error sending response for %s", config->common.servers[server].name);
-
          goto error;
       }
 
@@ -429,14 +426,13 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    }
    else if (ret == RESTORE_MISSING_LABEL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_NOBACKUP, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
       pgmoneta_log_warn("Restore: No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
    else
    {
-      pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name, MANAGEMENT_ERROR_RESTORE_NODISK, NAME,
-                                         compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_RESTORE_NODISK;
       goto error;
    }
 
@@ -456,6 +452,10 @@ pgmoneta_restore(SSL* ssl __attribute__((unused)), int client_fd, int server, ui
    exit(0);
 
 error:
+
+   pgmoneta_management_response_error(ssl, client_fd, config->common.servers[server].name,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_ANNOTATE_ERROR, en != NULL ? en : NAME,
+                                      compression, encryption, payload);
 
    pgmoneta_json_destroy(payload);
 

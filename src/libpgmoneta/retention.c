@@ -29,13 +29,18 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <logging.h>
+#include <management.h>
 #include <utils.h>
 #include <workflow.h>
+
+#define NAME "retention"
 
 void
 pgmoneta_retention(char** argv)
 {
    int server = 0;
+   int ec = -1;
+   char* en = NULL;
    struct workflow* workflow = NULL;
    struct art* nodes = NULL;
    struct main_configuration* config;
@@ -65,7 +70,7 @@ pgmoneta_retention(char** argv)
          goto error;
       }
 
-      if (pgmoneta_workflow_execute(workflow, nodes, server, -1, 0, 0, NULL))
+      if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
       {
          goto error;
       }
@@ -85,6 +90,8 @@ pgmoneta_retention(char** argv)
    exit(0);
 
 error:
+
+   pgmoneta_log_error("Retention: %s (%d)", en != NULL ? en : NAME, ec != -1 ? ec : MANAGEMENT_ERROR_RETENTION_ERROR);
 
    pgmoneta_art_destroy(nodes);
    pgmoneta_workflow_destroy(workflow);

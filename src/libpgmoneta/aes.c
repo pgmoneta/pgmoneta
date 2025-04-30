@@ -279,10 +279,12 @@ pgmoneta_encrypt_wal(char* d)
 }
 
 void
-pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
+   char* en = NULL;
+   int ec = -1;
    char* elapsed = NULL;
    struct timespec start_t;
    struct timespec end_t;
@@ -301,7 +303,7 @@ pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NOFILE, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ENCRYPT_NOFILE;
       pgmoneta_log_error("Encrypt: No file for %s", from);
       goto error;
    }
@@ -311,7 +313,7 @@ pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (encrypt_file(from, to, 1))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_ERROR, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ENCRYPT_ERROR;
       pgmoneta_log_error("Encrypt: Error encrypting %s", from);
       goto error;
    }
@@ -327,7 +329,7 @@ pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ALLOCATION;
       pgmoneta_log_error("Encrypt: Allocation error");
       goto error;
    }
@@ -342,7 +344,7 @@ pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ENCRYPT_NETWORK, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ENCRYPT_NETWORK;
       pgmoneta_log_error("Encrypt: Error sending response");
       goto error;
    }
@@ -357,6 +359,10 @@ pgmoneta_encrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
    exit(0);
 
 error:
+
+   pgmoneta_management_response_error(ssl, client_fd, NULL,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_ENCRYPT_ERROR, en != NULL ? en : NAME,
+                                      compression, encryption, payload);
 
    free(to);
    free(elapsed);
@@ -558,10 +564,12 @@ do_decrypt_file(struct worker_common* wc)
 }
 
 void
-pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_decrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
    char* to = NULL;
+   char* en = NULL;
+   int ec = -1;
    char* elapsed = NULL;
    struct timespec start_t;
    struct timespec end_t;
@@ -580,7 +588,7 @@ pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (!pgmoneta_exists(from))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NOFILE, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_DECRYPT_NOFILE;
       pgmoneta_log_error("Decrypt: No file for %s", from);
       goto error;
    }
@@ -588,7 +596,7 @@ pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
    to = malloc(strlen(from) - 3);
    if (to == NULL)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ALLOCATION;
       pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
@@ -598,7 +606,7 @@ pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (encrypt_file(from, to, 0))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_ERROR, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_DECRYPT_ERROR;
       pgmoneta_log_error("Decrypt: Error decrypting %s", from);
       goto error;
    }
@@ -614,7 +622,7 @@ pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_ALLOCATION, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_ALLOCATION;
       pgmoneta_log_error("Decrypt: Allocation error");
       goto error;
    }
@@ -629,7 +637,7 @@ pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECRYPT_NETWORK, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_DECRYPT_NETWORK;
       pgmoneta_log_error("Decrypt: Error sending response");
       goto error;
    }
@@ -644,6 +652,10 @@ pgmoneta_decrypt_request(SSL* ssl __attribute__((unused)), int client_fd, uint8_
    exit(0);
 
 error:
+
+   pgmoneta_management_response_error(ssl, client_fd, NULL,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_DECRYPT_ERROR, en != NULL ? en : NAME,
+                                      compression, encryption, payload);
 
    free(to);
    free(elapsed);

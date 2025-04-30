@@ -37,7 +37,7 @@
 #define NAME "status"
 
 void
-pgmoneta_status(SSL* ssl __attribute__((unused)), int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -208,9 +208,9 @@ pgmoneta_status(SSL* ssl __attribute__((unused)), int client_fd, bool offline, u
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(ssl, client_fd, NULL, MANAGEMENT_ERROR_STATUS_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("Status: Error sending response");
 
       goto error;
@@ -248,7 +248,7 @@ error:
 }
 
 void
-pgmoneta_status_details(SSL* ssl __attribute__((unused)), int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -478,9 +478,9 @@ pgmoneta_status_details(SSL* ssl __attribute__((unused)), int client_fd, bool of
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_management_response_error(ssl, client_fd, NULL, MANAGEMENT_ERROR_STATUS_DETAILS_NETWORK, NAME, compression, encryption, payload);
       pgmoneta_log_error("Status details: Error sending response");
 
       goto error;

@@ -2570,6 +2570,8 @@ add_servers_configuration_response(struct json* res)
 void
 pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
+   char* en = NULL;
+   int ec = -1;
    struct json* response = NULL;
    char* elapsed = NULL;
    struct timespec start_t;
@@ -2586,7 +2588,7 @@ pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_GET_ERROR, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_CONF_GET_ERROR;
       pgmoneta_log_error("Conf Get: Error creating json object (%d)", MANAGEMENT_ERROR_CONF_GET_ERROR);
       goto error;
    }
@@ -2602,7 +2604,7 @@ pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_GET_NETWORK, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_CONF_GET_NETWORK;
       pgmoneta_log_error("Conf Get: Error sending response");
 
       goto error;
@@ -2619,7 +2621,11 @@ pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
    pgmoneta_stop_logging();
 
    exit(0);
+
 error:
+
+   pgmoneta_management_response_error(ssl, client_fd, NULL, ec != -1 ? ec : MANAGEMENT_ERROR_CONF_GET_ERROR,
+                                      en != NULL ? en : NAME, compression, encryption, payload);
 
    pgmoneta_json_destroy(payload);
 
@@ -2634,6 +2640,8 @@ error:
 void
 pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
+   char* en = NULL;
+   int ec = -1;
    struct json* response = NULL;
    struct json* request = NULL;
    char* config_key = NULL;
@@ -2663,7 +2671,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
    request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    if (!request)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_NOREQUEST, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_CONF_SET_NOREQUEST;
       pgmoneta_log_error("Conf Set: No request category found in payload (%d)", MANAGEMENT_ERROR_CONF_SET_NOREQUEST);
       goto error;
    }
@@ -2673,7 +2681,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
 
    if (!config_key || !config_value)
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE;
       pgmoneta_log_error("Conf Set: No config key or config value in request (%d)", MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE);
       goto error;
    }
@@ -2714,7 +2722,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
    {
       if (pgmoneta_json_create(&server_j))
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_ERROR, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_CONF_SET_ERROR;
          pgmoneta_log_error("Conf Set: Error creating json object (%d)", MANAGEMENT_ERROR_CONF_SET_ERROR);
          goto error;
       }
@@ -2729,7 +2737,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
       }
       if (server_index == -1)
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_UNKNOWN_SERVER, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_CONF_SET_UNKNOWN_SERVER;
          pgmoneta_log_error("Conf Set: Unknown server value parsed (%d)", MANAGEMENT_ERROR_CONF_SET_UNKNOWN_SERVER);
          goto error;
       }
@@ -2737,7 +2745,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_ERROR, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_CONF_SET_ERROR;
       pgmoneta_log_error("Conf Set: Error creating json object (%d)", MANAGEMENT_ERROR_CONF_SET_ERROR);
       goto error;
    }
@@ -3534,7 +3542,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
 
       if (unknown)
       {
-         pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_UNKNOWN_CONFIGURATION_KEY, NAME, compression, encryption, payload);
+         ec = MANAGEMENT_ERROR_CONF_SET_UNKNOWN_CONFIGURATION_KEY;
          pgmoneta_log_error("Conf Set: Unknown configuration key found (%d)", MANAGEMENT_ERROR_CONF_SET_UNKNOWN_CONFIGURATION_KEY);
          goto error;
       }
@@ -3548,7 +3556,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
-      pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_CONF_SET_NETWORK, NAME, compression, encryption, payload);
+      ec = MANAGEMENT_ERROR_CONF_SET_NETWORK;
       pgmoneta_log_error("Conf Set: Error sending response");
       goto error;
    }
@@ -3564,7 +3572,11 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
    pgmoneta_stop_logging();
 
    exit(0);
+
 error:
+
+   pgmoneta_management_response_error(ssl, client_fd, NULL, ec != -1 ? ec : MANAGEMENT_ERROR_CONF_SET_ERROR,
+                                      en != NULL ? en : NAME, compression, encryption, payload);
 
    pgmoneta_json_destroy(payload);
 

@@ -28,11 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <hot_standby.h>
 #include <logging.h>
 #include <management.h>
 #include <storage.h>
 #include <utils.h>
+#include <workflow.h>
 #include <workflow_funcs.h>
 
 /* system */
@@ -54,7 +56,7 @@ static struct workflow* wf_delete_backup(struct backup* backup);
 static struct workflow* wf_retention(struct backup* backup);
 static struct workflow* wf_post_rollup(int server, struct backup* backup);
 
-static int get_error_code(int type, int flow);
+static int get_error_code(int type, int flow, struct art* nodes);
 
 struct workflow*
 pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
@@ -65,31 +67,31 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
    switch (workflow_type)
    {
       case WORKFLOW_TYPE_BACKUP:
-         return wf_backup(backup);
+         w = wf_backup(backup);
          break;
       case WORKFLOW_TYPE_RESTORE:
-         return wf_restore(backup);
+         w = wf_restore(backup);
          break;
       case WORKFLOW_TYPE_COMBINE:
-         return wf_combine(server, backup, false);
+         w = wf_combine(server, backup, false);
          break;
       case WORKFLOW_TYPE_COMBINE_AS_IS:
-         return wf_combine(server, backup, true);
+         w = wf_combine(server, backup, true);
          break;
       case WORKFLOW_TYPE_POST_ROLLUP:
-         return wf_post_rollup(server, backup);
+         w = wf_post_rollup(server, backup);
          break;
       case WORKFLOW_TYPE_VERIFY:
-         return wf_verify(backup);
+         w = wf_verify(backup);
          break;
       case WORKFLOW_TYPE_ARCHIVE:
-         return wf_archive(backup);
+         w = wf_archive(backup);
          break;
       case WORKFLOW_TYPE_DELETE_BACKUP:
-         return wf_delete_backup(backup);
+         w = wf_delete_backup(backup);
          break;
       case WORKFLOW_TYPE_RETENTION:
-         return wf_retention(backup);
+         w = wf_retention(backup);
          break;
       case WORKFLOW_TYPE_INCREMENTAL_BACKUP:
          w = wf_incremental_backup();
@@ -251,26 +253,22 @@ error:
 
 int
 pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
-                          int server, int client_fd, uint8_t compression,
-                          uint8_t encryption, struct json* payload)
+                          char** error_name, int* error_code)
 {
+   char* en = NULL;
+   int ec = -1;
    struct workflow* current = NULL;
-   struct main_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   *error_name = en;
+   *error_code = ec;
 
    current = workflow;
    while (current != NULL)
    {
       if (current->setup(current->name(), nodes))
       {
-         if (client_fd > 0)
-         {
-            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                               get_error_code(current->type, SETUP), current->name(),
-                                               compression, encryption, payload);
-         }
-
+         en = current->name();
+         ec = get_error_code(current->type, SETUP, nodes);
          goto error;
       }
       current = current->next;
@@ -281,13 +279,8 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    {
       if (current->execute(current->name(), nodes))
       {
-         if (client_fd > 0)
-         {
-            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                               get_error_code(current->type, EXECUTE), current->name(),
-                                               compression, encryption, payload);
-         }
-
+         en = current->name();
+         ec = get_error_code(current->type, EXECUTE, nodes);
          goto error;
       }
       current = current->next;
@@ -298,13 +291,8 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    {
       if (current->teardown(current->name(), nodes))
       {
-         if (client_fd > 0)
-         {
-            pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
-                                               get_error_code(current->type, TEARDOWN), current->name(),
-                                               compression, encryption, payload);
-         }
-
+         en = current->name();
+         ec = get_error_code(current->type, TEARDOWN, nodes);
          goto error;
       }
       current = current->next;
@@ -313,6 +301,9 @@ pgmoneta_workflow_execute(struct workflow* workflow, struct art* nodes,
    return 0;
 
 error:
+
+   *error_name = en;
+   *error_code = ec;
 
    return 1;
 }
@@ -971,8 +962,14 @@ wf_delete_backup(struct backup* backup __attribute__((unused)))
 }
 
 static int
-get_error_code(int type, int flow)
+get_error_code(int type, int flow, struct art* nodes)
 {
+
+   if (pgmoneta_art_contains_key(nodes, NODE_ERROR_CODE))
+   {
+      return (int)pgmoneta_art_search(nodes, NODE_ERROR_CODE);
+   }
+
    if (type == WORKFLOW_TYPE_BACKUP)
    {
       if (flow == SETUP)
