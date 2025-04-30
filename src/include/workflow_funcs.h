@@ -89,6 +89,13 @@ struct workflow*
 pgmoneta_create_sha256(void);
 
 /**
+ * Create a workflow for the SHA-256
+ * @return The workflow
+ */
+struct workflow*
+pgmoneta_create_sha512(void);
+
+/**
  * Create a workflow for the delete backups
  * @return The workflow
  */

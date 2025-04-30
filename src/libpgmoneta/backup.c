@@ -34,6 +34,7 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <security.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -269,6 +270,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_update_info_double(root, INFO_ELAPSED, total_seconds);
+   pgmoneta_update_sha512(root, "backup.info");
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {

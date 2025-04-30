@@ -31,6 +31,7 @@
 #include <info.h>
 #include <logging.h>
 #include <management.h>
+#include <security.h>
 #include <utils.h>
 
 /* system */
@@ -150,6 +151,7 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
       d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
 
       pgmoneta_update_info_bool(d, INFO_KEEP, k);
+      pgmoneta_update_sha512(d, "backup.info");
 
       kr = k;
 

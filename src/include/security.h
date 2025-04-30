@@ -133,6 +133,15 @@ int
 pgmoneta_create_sha512_file(char* filename, char** sha512);
 
 /**
+ * Update the SHA512 hash for a specific file in the backup.sha512 file
+ * @param root_dir The root directory of the backup
+ * @param filename The relative path of the file to update
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_update_sha512(char* root_dir, char* filename);
+
+/**
  * Generate SHA256 for a string.
  * @param filename The string.
  * @param sha256 The hash value.

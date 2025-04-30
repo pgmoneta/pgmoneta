@@ -488,6 +488,9 @@ wf_backup(struct backup* backup __attribute__((unused)))
       current = current->next;
    }
 
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
+
 #ifdef DEBUG
    current = head;
    while (current != NULL)
@@ -688,6 +691,9 @@ wf_post_rollup(int server __attribute__((unused)), struct backup* backup)
       current = current->next;
    }
 
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
+
 #ifdef DEBUG
    current = head;
    while (current != NULL)
@@ -779,6 +785,9 @@ wf_incremental_backup(void)
       current->next = pgmoneta_storage_create_azure();
       current = current->next;
    }
+
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
 
 #ifdef DEBUG
    current = head;
@@ -938,11 +947,15 @@ static struct workflow*
 wf_delete_backup(struct backup* backup __attribute__((unused)))
 {
    struct workflow* head = NULL;
+   struct workflow* current = NULL;
 
    head = pgmoneta_create_delete_backup();
+   current = head;
+
+   current->next = pgmoneta_create_sha512();
+   current = current->next;
 
 #ifdef DEBUG
-   struct workflow* current = NULL;
    current = head;
    while (current != NULL)
    {
