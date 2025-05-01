@@ -164,6 +164,8 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
       entry = NULL;
    }
 
+   pgmoneta_permission(manifest, 6, 0, 0);
+
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
