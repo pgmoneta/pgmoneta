@@ -1388,7 +1388,7 @@ error:
 }
 
 void
-pgmoneta_info_request(SSL* ssl __attribute__((unused)), int client_fd, int server,
+pgmoneta_info_request(SSL* ssl, int client_fd, int server,
                       uint8_t compression, uint8_t encryption,
                       struct json* payload)
 {
@@ -1523,7 +1523,7 @@ pgmoneta_info_request(SSL* ssl __attribute__((unused)), int client_fd, int serve
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_INFO_NETWORK;
       pgmoneta_log_error("Info: Error sending response");
@@ -1577,7 +1577,7 @@ error:
 }
 
 void
-pgmoneta_annotate_request(SSL* ssl __attribute__((unused)), int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* backup = NULL;
    char* action = NULL;
@@ -1723,7 +1723,7 @@ pgmoneta_annotate_request(SSL* ssl __attribute__((unused)), int client_fd, int s
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_ANNOTATE_NETWORK;
       pgmoneta_log_error("Annotate: Error sending response");

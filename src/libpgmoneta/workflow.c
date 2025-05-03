@@ -46,20 +46,20 @@
 #define EXECUTE  1
 #define TEARDOWN 2
 
-static struct workflow* wf_backup(struct backup* backup);
+static struct workflow* wf_backup(void);
 static struct workflow* wf_incremental_backup(void);
 static struct workflow* wf_restore(struct backup* backup);
-static struct workflow* wf_combine(int server, struct backup* backup, bool combine_as_is);
+static struct workflow* wf_combine(bool combine_as_is);
 static struct workflow* wf_verify(struct backup* backup);
 static struct workflow* wf_archive(struct backup* backup);
-static struct workflow* wf_delete_backup(struct backup* backup);
-static struct workflow* wf_retention(struct backup* backup);
-static struct workflow* wf_post_rollup(int server, struct backup* backup);
+static struct workflow* wf_delete_backup(void);
+static struct workflow* wf_retention(void);
+static struct workflow* wf_post_rollup(struct backup* backup);
 
 static int get_error_code(int type, int flow, struct art* nodes);
 
 struct workflow*
-pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
+pgmoneta_workflow_create(int workflow_type, struct backup* backup)
 {
    struct workflow* w = NULL;
    struct workflow* c = NULL;
@@ -67,19 +67,19 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
    switch (workflow_type)
    {
       case WORKFLOW_TYPE_BACKUP:
-         w = wf_backup(backup);
+         w = wf_backup();
          break;
       case WORKFLOW_TYPE_RESTORE:
          w = wf_restore(backup);
          break;
       case WORKFLOW_TYPE_COMBINE:
-         w = wf_combine(server, backup, false);
+         w = wf_combine(false);
          break;
       case WORKFLOW_TYPE_COMBINE_AS_IS:
-         w = wf_combine(server, backup, true);
+         w = wf_combine(true);
          break;
       case WORKFLOW_TYPE_POST_ROLLUP:
-         w = wf_post_rollup(server, backup);
+         w = wf_post_rollup(backup);
          break;
       case WORKFLOW_TYPE_VERIFY:
          w = wf_verify(backup);
@@ -88,10 +88,10 @@ pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup)
          w = wf_archive(backup);
          break;
       case WORKFLOW_TYPE_DELETE_BACKUP:
-         w = wf_delete_backup(backup);
+         w = wf_delete_backup();
          break;
       case WORKFLOW_TYPE_RETENTION:
-         w = wf_retention(backup);
+         w = wf_retention();
          break;
       case WORKFLOW_TYPE_INCREMENTAL_BACKUP:
          w = wf_incremental_backup();
@@ -394,7 +394,7 @@ pgmoneta_common_teardown(char* name, struct art* nodes)
 }
 
 static struct workflow*
-wf_backup(struct backup* backup __attribute__((unused)))
+wf_backup(void)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -564,7 +564,7 @@ wf_restore(struct backup* backup)
 }
 
 static struct workflow*
-wf_combine(int server __attribute__((unused)), struct backup* backup __attribute__((unused)), bool combine_as_is)
+wf_combine(bool combine_as_is)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -603,7 +603,7 @@ wf_combine(int server __attribute__((unused)), struct backup* backup __attribute
 }
 
 static struct workflow*
-wf_post_rollup(int server __attribute__((unused)), struct backup* backup)
+wf_post_rollup(struct backup* backup)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;
@@ -912,7 +912,7 @@ wf_archive(struct backup* backup)
 }
 
 static struct workflow*
-wf_retention(struct backup* backup __attribute__((unused)))
+wf_retention(void)
 {
    struct workflow* head = NULL;
 
@@ -935,7 +935,7 @@ wf_retention(struct backup* backup __attribute__((unused)))
 }
 
 static struct workflow*
-wf_delete_backup(struct backup* backup __attribute__((unused)))
+wf_delete_backup(void)
 {
    struct workflow* head = NULL;
    struct workflow* current = NULL;

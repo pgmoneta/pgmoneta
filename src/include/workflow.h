@@ -111,12 +111,11 @@ struct workflow
 /**
  * Create a workflow
  * @param workflow_type The workflow type
- * @param server The server
  * @param backup The backup
  * @return The workflow
  */
 struct workflow*
-pgmoneta_workflow_create(int workflow_type, int server, struct backup* backup);
+pgmoneta_workflow_create(int workflow_type, struct backup* backup);
 
 /**
  * Create standard workflow nodes

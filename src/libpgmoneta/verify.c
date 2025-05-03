@@ -106,7 +106,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       goto error;
    }
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_VERIFY, server, backup);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_VERIFY, backup);
 
    current = workflow;
    while (current != NULL)

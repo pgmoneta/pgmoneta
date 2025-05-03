@@ -55,7 +55,7 @@ pgmoneta_expunge_backup(SSL* ssl, int client_fd, int server, uint8_t compression
 }
 
 static void
-keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload)
+keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* elapsed = NULL;
    struct timespec start_t;
@@ -172,7 +172,7 @@ keep(char* prefix, SSL* ssl __attribute__((unused)), int client_fd, int srv, boo
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       if (k)
       {
