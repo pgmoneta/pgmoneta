@@ -41,13 +41,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int get_wal_level(SSL* ssl, int socket, int server, bool* replica);
-static int get_wal_size(SSL* ssl, int socket, int server, int* ws);
-static int get_checksums(SSL* ssl, int socket, int server, bool* checksums);
+static int get_wal_level(SSL* ssl, int socket, bool* replica);
+static int get_wal_size(SSL* ssl, int socket, int* ws);
+static int get_checksums(SSL* ssl, int socket, bool* checksums);
 static int get_ext_version(SSL* ssl, int socket, char** version);
-static int get_segment_size(SSL* ssl, int socket, int server, size_t* segsz);
-static int get_block_size(SSL* ssl, int socket, int server, size_t* blocksz);
-static int get_summarize_wal(SSL* ssl, int socket, int server, bool* sw);
+static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
+static int get_block_size(SSL* ssl, int socket, size_t* blocksz);
+static int get_summarize_wal(SSL* ssl, int socket, bool* sw);
 static int process_server_parameters(int server, struct deque* server_parameters);
 
 static bool is_valid_response(struct query_response* response);
@@ -111,7 +111,7 @@ pgmoneta_server_info(int srv)
    pgmoneta_log_debug("%s/version %d.%d", config->common.servers[srv].name,
                       config->common.servers[srv].version, config->common.servers[srv].minor_version);
 
-   if (get_wal_level(ssl, socket, srv, &replica))
+   if (get_wal_level(ssl, socket, &replica))
    {
       pgmoneta_log_error("Unable to get wal_level for %s", config->common.servers[srv].name);
       config->common.servers[srv].valid = false;
@@ -124,7 +124,7 @@ pgmoneta_server_info(int srv)
 
    pgmoneta_log_debug("%s/wal_level %s", config->common.servers[srv].name, config->common.servers[srv].valid ? "Yes" : "No");
 
-   if (get_checksums(ssl, socket, srv, &checksums))
+   if (get_checksums(ssl, socket, &checksums))
    {
       pgmoneta_log_error("Unable to get data_checksums for %s", config->common.servers[srv].name);
       config->common.servers[srv].checksums = false;
@@ -137,7 +137,7 @@ pgmoneta_server_info(int srv)
 
    pgmoneta_log_debug("%s/data_checksums %s", config->common.servers[srv].name, config->common.servers[srv].checksums ? "Yes" : "No");
 
-   if (get_wal_size(ssl, socket, srv, &ws))
+   if (get_wal_size(ssl, socket, &ws))
    {
       pgmoneta_log_error("Unable to get wal_segment_size for %s", config->common.servers[srv].name);
       config->common.servers[srv].valid = false;
@@ -168,7 +168,7 @@ pgmoneta_server_info(int srv)
                       config->common.servers[srv].name,
                       config->common.servers[srv].ext_valid ? "true" : "false",
                       config->common.servers[srv].ext_valid ? config->common.servers[srv].ext_version : "N/A");
-   if (get_segment_size(ssl, socket, srv, &segsz))
+   if (get_segment_size(ssl, socket, &segsz))
    {
       pgmoneta_log_error("Unable to get segment_size for %s", config->common.servers[srv].name);
       config->common.servers[srv].valid = false;
@@ -180,7 +180,7 @@ pgmoneta_server_info(int srv)
    }
    pgmoneta_log_debug("%s/segment_size %d", config->common.servers[srv].name, config->common.servers[srv].segment_size);
 
-   if (get_block_size(ssl, socket, srv, &blocksz))
+   if (get_block_size(ssl, socket, &blocksz))
    {
       pgmoneta_log_error("Unable to get block_size for %s", config->common.servers[srv].name);
       config->common.servers[srv].valid = false;
@@ -196,7 +196,7 @@ pgmoneta_server_info(int srv)
 
    if (config->common.servers[srv].version >= 17)
    {
-      if (get_summarize_wal(ssl, socket, srv, &sw))
+      if (get_summarize_wal(ssl, socket, &sw))
       {
          pgmoneta_log_error("Unable to get summarize_wal for %s", config->common.servers[srv].name);
          config->common.servers[srv].summarize_wal = false;
@@ -257,7 +257,7 @@ pgmoneta_server_valid(int srv)
 }
 
 static int
-get_wal_size(SSL* ssl, int socket, int server __attribute__((unused)), int* ws)
+get_wal_size(SSL* ssl, int socket, int* ws)
 {
    int q = 0;
    bool mb = true;
@@ -337,7 +337,7 @@ error:
 }
 
 static int
-get_wal_level(SSL* ssl, int socket, int server __attribute__((unused)), bool* replica)
+get_wal_level(SSL* ssl, int socket, bool* replica)
 {
    int q = 0;
    int ret;
@@ -400,7 +400,7 @@ error:
 }
 
 static int
-get_checksums(SSL* ssl, int socket, int server __attribute__((unused)), bool* checksums)
+get_checksums(SSL* ssl, int socket, bool* checksums)
 {
    int q = 0;
    int ret;
@@ -506,7 +506,7 @@ error:
 }
 
 static int
-get_segment_size(SSL* ssl, int socket, int server __attribute__((unused)), size_t* segsz)
+get_segment_size(SSL* ssl, int socket, size_t* segsz)
 {
    int q = 0;
    bool mb = true;
@@ -585,7 +585,7 @@ error:
 }
 
 static int
-get_block_size(SSL* ssl, int socket, int server __attribute__((unused)), size_t* blocksz)
+get_block_size(SSL* ssl, int socket, size_t* blocksz)
 {
    int q = 0;
    int ret;
@@ -643,7 +643,7 @@ error:
 }
 
 static int
-get_summarize_wal(SSL* ssl, int socket, int server __attribute__((unused)), bool* sw)
+get_summarize_wal(SSL* ssl, int socket, bool* sw)
 {
    int q = 0;
    int ret;

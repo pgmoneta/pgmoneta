@@ -1998,7 +1998,7 @@ error:
 }
 
 int
-pgmoneta_validate_walinfo_configuration(void* shmem __attribute__((unused)))
+pgmoneta_validate_walinfo_configuration(void)
 {
    /**
     * Currently this function is useless because
@@ -2568,7 +2568,7 @@ add_servers_configuration_response(struct json* res)
 }
 
 void
-pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* en = NULL;
    int ec = -1;
@@ -2602,7 +2602,7 @@ pgmoneta_conf_get(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_CONF_GET_NETWORK;
       pgmoneta_log_error("Conf Get: Error sending response");
@@ -2638,7 +2638,7 @@ error:
 }
 
 void
-pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* en = NULL;
    int ec = -1;
@@ -3554,7 +3554,7 @@ pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compr
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_CONF_SET_NETWORK;
       pgmoneta_log_error("Conf Set: Error sending response");

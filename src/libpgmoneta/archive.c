@@ -154,7 +154,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 
    if (!pgmoneta_restore_backup(nodes))
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, server, backup);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_ARCHIVE, backup);
 
       if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
       {

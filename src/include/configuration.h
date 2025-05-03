@@ -157,11 +157,10 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename);
 
 /**
  * Validate the WALINFO configuration
- * @param shmem The shared memory segment
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_validate_walinfo_configuration(void* shmem);
+pgmoneta_validate_walinfo_configuration(void);
 
 /**
  * Read the USERS configuration from a file

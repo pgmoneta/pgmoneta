@@ -387,7 +387,7 @@ main(int argc, char** argv)
       }
    }
 
-   if (pgmoneta_validate_walinfo_configuration(shmem))
+   if (pgmoneta_validate_walinfo_configuration())
    {
       goto error;
    }

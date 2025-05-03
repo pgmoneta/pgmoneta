@@ -902,7 +902,7 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
       goto error;
    }
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, server, newest_backup);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, newest_backup);
    if (carry_out_workflow(workflow, nodes) != RESTORE_OK)
    {
       goto error;
@@ -2309,7 +2309,7 @@ restore_backup_full(struct art* nodes)
    pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString);
    pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base, ValueString);
    pgmoneta_log_trace("Full backup restore: %s", backup->label);
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, server, backup);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, backup);
    if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
    {
       goto error;
@@ -2422,11 +2422,11 @@ restore_backup_incremental(struct art* nodes)
 
    if (!combine_as_is)
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE, server, backup);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE, backup);
    }
    else
    {
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE_AS_IS, server, backup);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_COMBINE_AS_IS, backup);
    }
 
    if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))

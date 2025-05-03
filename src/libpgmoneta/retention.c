@@ -63,7 +63,7 @@ pgmoneta_retention(char** argv)
 
       config->common.servers[server].active_retention = true;
 
-      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, server, NULL);
+      workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, NULL);
 
       if (pgmoneta_art_create(&nodes))
       {

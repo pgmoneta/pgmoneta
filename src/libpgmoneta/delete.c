@@ -57,7 +57,7 @@ pgmoneta_delete(int srv, char* label)
    struct art* nodes = NULL;
    struct backup* backup = NULL;
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, srv, NULL);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_DELETE_BACKUP, NULL);
 
    if (pgmoneta_art_create(&nodes))
    {
