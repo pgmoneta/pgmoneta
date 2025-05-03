@@ -230,24 +230,6 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       server_config = &config->common.servers[server];
    }
 
-   if (long_header->std.xlp_rem_len > 0)
-   {
-      decoded = malloc(sizeof(struct decoded_xlog_record));
-      if (decoded == NULL)
-      {
-         pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
-         goto error;
-      }
-      decoded->partial = true;
-      if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
-      {
-         free(decoded);
-         decoded = NULL;
-         goto error;
-      }
-      decoded = NULL;
-   }
-
    uint32_t next_record = MAXALIGN(
       ftell(file) +
       ((long_header->std.xlp_rem_len / long_header->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
@@ -255,10 +237,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       );
    int page_number = 0;
    wal_file->long_phd = long_header;
-   long_header = NULL;
 
    read_all_page_headers(file, wal_file->long_phd, wal_file);
-   fseek(file, next_record, SEEK_SET);
 
    if (xlog_from_file_name(basename(path), &tli, &logSegNo, wal_segz_bytes))
    {
@@ -267,6 +247,32 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    }
    XLOG_SEG_NO_OFFEST_TO_REC_PTR(logSegNo, 0, wal_segz_bytes, base);
 
+   if (long_header->std.xlp_rem_len > 0)
+   {
+      if (partial_record->total_bytes_read == 0)
+      {
+         decoded = malloc(sizeof(struct decoded_xlog_record));
+         if (decoded == NULL)
+         {
+            pgmoneta_log_fatal("Error: Could not allocate memory for decoded");
+            goto error;
+         }
+         decoded->partial = true;
+         if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
+         {
+            free(decoded);
+            decoded = NULL;
+            goto error;
+         }
+         decoded = NULL;
+      }
+      else
+      {
+         next_record = SIZE_OF_XLOG_LONG_PHD;
+      }
+   }
+   long_header = NULL;
+   fseek(file, next_record, SEEK_SET);
    while (true)
    {
       // Check if next record is beyond the current page
@@ -312,8 +318,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          page_header = NULL;
          continue;
       }
-      fseek(file, next_record, SEEK_SET);
 
+      fseek(file, next_record, SEEK_SET);
       // Check if record crosses the page boundary
       if (ftell(file) + SIZE_OF_XLOG_RECORD > wal_file->long_phd->xlp_xlog_blcksz * (page_number + 1))
       {
@@ -352,12 +358,22 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       }
       else
       {
-         MALLOC(record, SIZE_OF_XLOG_RECORD);
-         bytes_read = fread(record, SIZE_OF_XLOG_RECORD, 1, file);
-         if (bytes_read < 1)
+         if (partial_record->xlog_record != NULL)
          {
-            pgmoneta_log_error("Error: Failed to read the complete data");
-            goto error;
+            MALLOC(record, SIZE_OF_XLOG_RECORD);
+            memcpy(record, partial_record->xlog_record, SIZE_OF_XLOG_RECORD);
+            free(partial_record->xlog_record);
+            partial_record->xlog_record = NULL;
+         }
+         else
+         {
+            MALLOC(record, SIZE_OF_XLOG_RECORD);
+            bytes_read = fread(record, SIZE_OF_XLOG_RECORD, 1, file);
+            if (bytes_read < 1)
+            {
+               pgmoneta_log_error("Error: Failed to read the complete data");
+               goto error;
+            }
          }
       }
 
@@ -373,14 +389,30 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       uint32_t end_of_page = (page_number + 1) * wal_file->long_phd->xlp_xlog_blcksz;
 
       MALLOC(buffer, data_length);
-
       // Read record data, possibly across page boundaries
       if (data_length + ftell(file) >= end_of_page)
       {
          size_t bytes_read = 0;
          size_t total_bytes_read = 0;
          uint32_t remaining_data_length = data_length;
-         bytes_read = fread(buffer, 1, end_of_page - ftell(file), file);
+         if (partial_record->total_bytes_read != 0)
+         {
+            // Copy partial data from previous file
+            memcpy(buffer, partial_record->data_buffer, partial_record->total_bytes_read);
+            free(partial_record->data_buffer);
+            partial_record->data_buffer = NULL;
+
+            total_bytes_read = bytes_read = partial_record->total_bytes_read;
+            remaining_data_length = data_length - bytes_read;
+
+            bytes_read = fread(buffer + partial_record->total_bytes_read, 1, end_of_page - ftell(file), file);
+
+            partial_record->total_bytes_read = 0;
+         }
+         else
+         {
+            bytes_read = fread(buffer, 1, end_of_page - ftell(file), file);
+         }
          total_bytes_read += bytes_read;
          remaining_data_length -= bytes_read;
          while (remaining_data_length != 0)
@@ -421,12 +453,26 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       }
       else
       {
-         bytes_read = fread(buffer, 1, data_length, file);
-
-         if (bytes_read != data_length)
+         if (partial_record->total_bytes_read != 0)
          {
-            pgmoneta_log_error("Error: Actual bytes read do not match the expected length");
-            goto error;
+            // Copy partial data from previous file
+            memcpy(buffer, partial_record->data_buffer, partial_record->total_bytes_read);
+            free(partial_record->data_buffer);
+            partial_record->data_buffer = NULL;
+
+            uint32_t bytes_needed = data_length - partial_record->total_bytes_read;
+            bytes_read = fread(buffer + partial_record->total_bytes_read, 1, bytes_needed, file);
+
+            partial_record->total_bytes_read = 0;
+         }
+         else
+         {
+            bytes_read = fread(buffer, 1, data_length, file);
+            if (bytes_read != data_length)
+            {
+               pgmoneta_log_error("Error: Actual bytes read do not match the expected length");
+               goto error;
+            }
          }
       }
 
@@ -452,6 +498,23 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             goto error;
          }
          decoded = NULL;
+      }
+      if (record != NULL && record->xl_tot_len - SIZE_OF_XLOG_RECORD > wal_segz_bytes - ftell(file))
+      {
+         // Save record header
+         MALLOC(partial_record->xlog_record, SIZE_OF_XLOG_RECORD);
+         memcpy(partial_record->xlog_record, record, SIZE_OF_XLOG_RECORD);
+
+         // Save partial data
+         MALLOC(partial_record->data_buffer, wal_segz_bytes - ftell(file));
+         bytes_read = fread(partial_record->data_buffer, 1, wal_segz_bytes - ftell(file), file);
+         partial_record->total_bytes_read = bytes_read;
+
+         free(buffer);
+         buffer = NULL;
+         free(record);
+         record = NULL;
+         goto finish;
       }
       free(buffer);
       buffer = NULL;

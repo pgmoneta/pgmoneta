@@ -207,6 +207,26 @@ struct xlog_record
 };
 
 /**
+ * @struct partial_xlog_record
+ * @brief Represents a partial xlog record.
+ *
+ * Contains both header and data portions, along with tracking information
+ * for proper record reconstruction.
+ *
+ * Fields:
+ * - data_buffer: Buffer containing the record's data portion
+ * - xlog_record: Pointer to the record's header structure
+ * - total_bytes_read: Total number of bytes read for this record so far
+ */
+
+struct partial_xlog_record
+{
+   char* data_buffer;                    // Data portion of the record
+   struct xlog_record* xlog_record;      // Pointer to the xlog record
+   uint32_t total_bytes_read;            // Length of the total data read so far
+};
+
+/**
  * @struct rel_file_locator
  * @brief Identifies a relation file.
  *

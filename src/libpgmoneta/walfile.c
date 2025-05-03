@@ -33,6 +33,9 @@
 #include <walfile.h>
 
 #include <libgen.h>
+#include <dirent.h>
+
+struct partial_xlog_record* partial_record = NULL;
 
 /**
  * Validate if a WAL file exists and is accessible before processing.
@@ -457,5 +460,68 @@ error:
    free(wal_path);
    pgmoneta_destroy_walfile(wf);
    pgmoneta_deque_iterator_destroy(record_iterator);
+   return 1;
+}
+
+int
+pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output, bool quiet, bool color,
+                                        struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                                        uint32_t limit, char** included_objects)
+{
+   DIR* dir;
+   struct dirent* entry;
+   struct deque* wal_files;
+   struct deque_iterator* iterator = NULL;
+
+   pgmoneta_deque_create(true, &wal_files);
+
+   dir = opendir(dir_path);
+   if (dir == NULL)
+   {
+      pgmoneta_log_fatal("Failed to open directory %s", dir_path);
+      goto error;
+   }
+
+   // Collect WAL files in a single pass
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (pgmoneta_is_wal_file(entry->d_name))
+      {
+         char* file_path = malloc(PATH_MAX);
+         snprintf(file_path, PATH_MAX, "%s/%s", dir_path, entry->d_name);
+         pgmoneta_deque_add(wal_files, NULL, (uintptr_t)file_path, ValueRef);
+      }
+   }
+   closedir(dir);
+
+   // Process WAL files
+   if (pgmoneta_deque_iterator_create(wal_files, &iterator))
+   {
+      pgmoneta_log_fatal("Failed to create iterator");
+      pgmoneta_deque_destroy(wal_files);
+      return 1;
+   }
+
+   while (pgmoneta_deque_iterator_next(iterator))
+   {
+      char* file_path = (char*)iterator->value->data;
+
+      if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
+                                    rms, start_lsn, end_lsn, xids, limit, included_objects))
+      {
+         free(file_path);
+         goto error;
+      }
+      free(file_path);
+   }
+
+   pgmoneta_deque_destroy(wal_files);
+   pgmoneta_deque_iterator_destroy(iterator);
+   return 0;
+
+error:
+
+   pgmoneta_deque_destroy(wal_files);
+   if (iterator) pgmoneta_deque_iterator_destroy(iterator);
    return 1;
 }

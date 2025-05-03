@@ -1,4 +1,3 @@
-
 \newpage
 # WAL Reader
 
@@ -231,7 +230,83 @@ if (result == 0) {
 pgmoneta_destroy_walfile(wf);
 ```
 
+#### `pgmoneta_describe_walfile`
+
+```c
+int pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
+                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                           uint32_t limit, char** included_objects);
+```
+
+##### Description:
+This function reads a single WAL file at the specified `path`, filters its records based on provided parameters, and writes the formatted output to `output`.
+
+##### Parameters:
+- **path**: Path to the WAL file to be described
+- **type**: Output format type (raw or JSON)
+- **output**: File path for output; if NULL, prints to stdout
+- **quiet**: If true, suppresses detailed output
+- **color**: If true, enables colored output for better readability
+- **rms**: Deque of resource managers to filter on
+- **start_lsn**: Starting LSN to filter records (0 for no filter)
+- **end_lsn**: Ending LSN to filter records (0 for no filter)
+- **xids**: Deque of transaction IDs to filter on
+- **limit**: Maximum number of records to output (0 for no limit)
+- **included_objects**: Array of object names to filter on (NULL for all objects)
+
+##### Return:
+- Returns `0` on success or `1` on failure
+
+```
+
+#### `pgmoneta_describe_walfiles_in_directory`
+
+```c
+int pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output, 
+                                          bool quiet, bool color, struct deque* rms, 
+                                          uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                                          uint32_t limit, char** included_objects);
+```
+
+##### Description:
+This function processes all WAL files in the directory specified by `dir_path`, applies the same filtering logic as `pgmoneta_describe_walfile`, and writes aggregated results to `output`.
+
+##### Parameters:
+- **dir_path**: Path to the directory containing WAL files
+- **type**: Output format type (raw or JSON)
+- **output**: File path for output; if NULL, prints to stdout
+- **quiet**: If true, suppresses detailed output
+- **color**: If true, enables colored output for better readability
+- **rms**: Deque of resource managers to filter on
+- **start_lsn**: Starting LSN to filter records (0 for no filter)
+- **end_lsn**: Ending LSN to filter records (0 for no filter)
+- **xids**: Deque of transaction IDs to filter on
+- **limit**: Maximum number of records to output (0 for no limit)
+- **included_objects**: Array of object names to filter on (NULL for all objects)
+
+##### Return:
+- Returns `0` on success or `1` on failure
+
+
 ## Internal API Overview
+
+### struct partial_xlog_record
+The partial_xlog_record struct represents an incomplete WAL XLOG record encountered during parsing. It is used to manage records that span multiple WAL files.
+
+```c
+struct partial_xlog_record
+{
+   char* data_buffer;                    // Buffer containing the record's data portion
+   struct xlog_record* xlog_record;      // Pointer to the record's header structure
+   uint32_t total_bytes_read;            // Length of the total data read so far
+};
+```
+
+##### Fields:
+- **data_buffer**: Contains the data portion of the partially read WAL record.
+- **xlog_record**: Points to the header structure containing metadata about the WAL record.
+- **total_bytes_read**: Tracks how many bytes have been read for the current record.
+
 
 ### parse_wal_file
 

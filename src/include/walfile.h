@@ -34,6 +34,8 @@
 #include <wal.h>
 #include <walfile/wal_reader.h>
 
+extern struct partial_xlog_record* partial_record;
+
 /* Return Codes */
 #define PGMONETA_WAL_SUCCESS      0   /**< WAL operation succeeded */
 #define PGMONETA_WAL_ERR_IO       1   /**< I/O error (e.g., file read/write failure) */
@@ -140,5 +142,26 @@ int
 pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
                           uint32_t limit, char** included_objects);
+
+/**
+ * Describe WAL files in a directory
+ * @param dir_path The path to the WAL files directory
+ * @param type The type of output description
+ * @param output The output descriptor
+ * @param quiet Is the WAL file printed
+ * @param color Are colors used
+ * @param rms The resource managers
+ * @param start_lsn The start LSN
+ * @param end_lsn The end LSN
+ * @param xids The XIDs
+ * @param limit The limit
+ * @param included_objects The objects to include the wal records for, if NULL, all objects are included
+ * @return 0 upon success, otherwise 1
+ */
+
+int
+pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output, bool quiet, bool color,
+                                        struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                                        uint32_t limit, char** included_objects);
 
 #endif //PGMONETA_WALFILE_H
