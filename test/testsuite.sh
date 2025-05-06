@@ -161,7 +161,7 @@ check_psql() {
 }
 
 check_postgres_version() {
-   version=$(psql --version | awk '{print $3}')
+   version=$(psql --version | awk '{print $3}' | sed -E 's/^([0-9]+(\.[0-9]+)?).*/\1/')
    major_version=$(echo "$version" | cut -d'.' -f1)
    required_major_version=$1
    if [ "$major_version" -ge "$required_major_version" ]; then
