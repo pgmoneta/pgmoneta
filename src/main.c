@@ -92,6 +92,7 @@ static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void wal_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
+static void verification_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
@@ -247,6 +248,7 @@ main(int argc, char** argv)
    struct ev_periodic retention;
    struct ev_periodic valid;
    struct ev_periodic wal_streaming;
+   struct ev_periodic verification;
    size_t shmem_size;
    size_t prometheus_cache_shmem_size = 0;
    struct main_configuration* config = NULL;
@@ -676,6 +678,13 @@ main(int argc, char** argv)
       /* Start backup retention policy */
       ev_periodic_init(&retention, retention_cb, 0., config->retention_interval, 0);
       ev_periodic_start(main_loop, &retention);
+   }
+
+   if (!offline)
+   {
+      /* Start SHA512 verification job */
+      ev_periodic_init(&verification, verification_cb, 0., config->verification, 0);
+      ev_periodic_start(main_loop, &verification);
    }
 
    if (!offline)
@@ -1898,6 +1907,23 @@ retention_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attr
    {
       shutdown_ports();
       pgmoneta_retention(argv_ptr);
+   }
+}
+
+static void
+verification_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute__((unused)), int revents)
+{
+   if (EV_ERROR & revents)
+   {
+      pgmoneta_log_trace("verification_cb: got invalid event: %s", strerror(errno));
+      errno = 0;
+      return;
+   }
+
+   if (!fork())
+   {
+      shutdown_ports();
+      pgmoneta_sha512_verification(argv_ptr);
    }
 }
 

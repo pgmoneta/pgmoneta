@@ -109,6 +109,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_MAIN_CONF_PATH          "main_configuration_path"
 #define CONFIGURATION_ARGUMENT_USER_CONF_PATH          "users_configuration_path"
 #define CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH         "admin_configuration_path"
+#define CONFIGURATION_ARGUMENT_VERIFICATION            "verification"
 
 #define CONFIGURATION_TYPE_MAIN 0
 #define CONFIGURATION_TYPE_WALINFO 1
