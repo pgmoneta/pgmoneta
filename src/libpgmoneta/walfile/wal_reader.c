@@ -81,6 +81,8 @@ magic_value_to_postgres_version(uint16_t magic_value)
          return 16;
       case 0xD116:
          return 17;
+      case 0xD118:
+         return 18;
       default:
          return -1;
    }
