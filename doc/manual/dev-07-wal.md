@@ -290,6 +290,7 @@ Below are the commit hashes for the officially supported magic values in each Po
 3. PostgreSQL 15 - 0xD110: [https://github.com/postgres/postgres/commit/8b1dccd37c71ed2ff016294d8f9053a32b02b19e](https://github.com/postgres/postgres/commit/8b1dccd37c71ed2ff016294d8f9053a32b02b19e)
 4. PostgreSQL 16 - 0xD113: [https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179](https://github.com/postgres/postgres/commit/6af1793954e8c5e753af83c3edb37ed3267dd179)
 5. PostgreSQL 17 - 0xD116: [https://github.com/postgres/postgres/commit/402b586d0a9caae9412d25fcf1b91dae45375833](https://github.com/postgres/postgres/commit/402b586d0a9caae9412d25fcf1b91dae45375833)
+6. PostgreSQL 18 - 0xD118: [https://github.com/postgres/postgres/commit/243e9b40f1b2dd09d6e5bf91ebf6e822a2cd3704](https://github.com/postgres/postgres/commit/243e9b40f1b2dd09d6e5bf91ebf6e822a2cd3704)
 
 
 `xl_end_of_recovery` is an example of how we handle different versions of structures with a wrapper struct and a factory pattern.
