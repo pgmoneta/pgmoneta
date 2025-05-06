@@ -38,49 +38,112 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <curl/curl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define HTTP_GET 0
-#define HTTP_PUT 1
+/* HTTP method definitions */
+#define PGMONETA_HTTP_GET  0
+#define PGMONETA_HTTP_POST 1
+#define PGMONETA_HTTP_PUT  2
 
-/**
- * Add a header
- * @param chunk A linked list of strings
- * @param header The header
- * @param value The header's value
- * @return A new list pointer
+/** @struct http
+ * Defines a HTTP interaction
  */
-struct curl_slist*
-pgmoneta_http_add_header(struct curl_slist* chunk, char* header, char* value);
+struct http
+{
+   int endpoint;           /**< The endpoint */
+   int socket;             /**< The socket descriptor */
+   char* body;             /**< The HTTP response body */
+   char* headers;          /**< The HTTP response headers */
+   char* request_headers;  /**< The HTTP request headers */
+   SSL* ssl;               /**< The SSL connection (NULL for non-secure) */
+};
 
 /**
- * set HTTP headers
- * @param handle A CURL easy handle
- * @param headers A pointer to a linked list of HTTP headers
+ * Connect to an HTTP/HTTPS server
+ * @param hostname The host to connect to
+ * @param port The port number
+ * @param secure Use SSL if true
+ * @param result The resulting HTTP structure
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_http_set_header_option(CURL* handle, struct curl_slist* chunk);
+pgmoneta_http_connect(char* hostname, int port, bool secure, struct http** result);
 
 /**
- * set HTTP request
- * @param handle A CURL easy handle
- * @param request_type A http request type
+ * Disconnect and clean up HTTP resources
+ * @param http The HTTP structure
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_http_set_request_option(CURL* handle, bool request_type);
+pgmoneta_http_disconnect(struct http* http);
 
 /**
- * set the URL
- * @param handle A CURL easy handle
- * @param url A URL for the transfer
+ * Add a header to the HTTP request
+ * @param http The HTTP structure
+ * @param name The header name
+ * @param value The header value
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_http_set_url_option(CURL* handle, char* url);
+pgmoneta_http_add_header(struct http* http, char* name, char* value);
+
+/**
+ * Read response data directly from a socket
+ * @param ssl SSL connection (can be NULL for non-secure connections)
+ * @param socket The socket to read from
+ * @param response_text Pointer to store the response text
+ * @return MESSAGE_STATUS_OK on success, MESSAGE_STATUS_ERROR otherwise
+ */
+int
+pgmoneta_http_read(SSL* ssl, int socket, char** response_text);
+
+/**
+ * Perform HTTP GET request
+ * @param http The HTTP structure
+ * @param hostname The hostname for the Host header
+ * @param path The path for the request
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_http_get(struct http* http, char* hostname, char* path);
+
+/**
+ * Perform HTTP POST request
+ * @param http The HTTP structure
+ * @param hostname The hostname for the Host header
+ * @param path The path for the request
+ * @param data The data to send
+ * @param length The length of the data
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_http_post(struct http* http, char* hostname, char* path, char* data, size_t length);
+
+/**
+ * Perform HTTP PUT request
+ * @param http The HTTP structure
+ * @param hostname The hostname for the Host header
+ * @param path The path for the request
+ * @param data The data to upload
+ * @param length The length of the data
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_http_put(struct http* http, char* hostname, char* path, const void* data, size_t length);
+
+/**
+ * Perform HTTP PUT request with a file
+ * @param http The HTTP structure
+ * @param hostname The hostname for the Host header
+ * @param path The path for the request
+ * @param file The file to upload
+ * @param file_size The size of the file
+ * @param content_type The content type of the file (can be NULL for default)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_http_put_file(struct http* http, char* hostname, char* path, FILE* file, size_t file_size, char* content_type);
 
 #ifdef __cplusplus
 }

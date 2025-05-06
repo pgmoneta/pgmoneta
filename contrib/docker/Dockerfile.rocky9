@@ -60,7 +60,6 @@ RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.
         libarchive \
         libarchive-devel \
         libssh-devel \
-        libcurl-devel \
         libasan \
         libasan-static \
         yaml-cpp-devel && \
