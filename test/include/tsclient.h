@@ -95,6 +95,41 @@ pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position)
 int
 pgmoneta_tsclient_execute_delete(char* server, char* backup_id);
 
+/**
+ * Execute HTTP test
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_http();
+
+/**
+ * Execute HTTPS test
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_https();
+
+/**
+ * Execute HTTP POST test
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_http_post();
+
+/**
+ * Execute HTTP PUT test
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_http_put();
+
+/**
+ * Execute HTTP PUT file test
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_http_put_file();
+
 #ifdef __cplusplus
 }
 #endif

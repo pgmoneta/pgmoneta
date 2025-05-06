@@ -1349,6 +1349,15 @@ pgmoneta_backtrace(void);
 int
 pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int* kernel_patch);
 
+/**
+ * Is the string a number ?
+ * @param str The string
+ * @param base The base (10 or 16)
+ * @return True if number, otherwise false
+ */
+bool
+pgmoneta_is_number(char* str, int base);
+
 #ifdef __cplusplus
 }
 #endif

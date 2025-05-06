@@ -53,8 +53,6 @@ RUN apk add --no-cache \
     yaml-dev \
     libarchive \
     libarchive-dev \
-    libcurl \
-    curl-dev \
     libssh \
     libssh-dev 
 
@@ -88,8 +86,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     zstd \
     lz4-libs \
     libarchive \
-    libssh \
-    libcurl 
+    libssh
 
 RUN adduser -D -s /bin/sh pgmoneta
 

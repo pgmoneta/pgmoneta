@@ -29,8 +29,10 @@ if (check)
 
   set(SOURCES
     tsclient.c
+    tsclient_http.c
     testcases/pgmoneta_test_1.c
     testcases/pgmoneta_test_2.c
+    testcases/pgmoneta_test_3.c
     runner.c
   )
 

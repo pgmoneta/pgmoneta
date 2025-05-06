@@ -84,6 +84,7 @@ static int get_permissions(char* from, int* permissions);
 
 static void do_copy_file(struct worker_common* wc);
 static void do_delete_file(struct worker_common* wc);
+bool pgmoneta_is_number(char* str, int base);
 
 int32_t
 pgmoneta_get_request(struct message* msg)
@@ -4112,6 +4113,49 @@ pgmoneta_is_incremental_path(char* path)
    }
    name = path + (len - seglen);
    return pgmoneta_starts_with(name, INCREMENTAL_PREFIX);
+}
+
+bool
+pgmoneta_is_number(char* str, int base)
+{
+   if (str == NULL || strlen(str) == 0)
+   {
+      return false;
+   }
+
+   if (base != 10 && base != 16)
+   {
+      return false;
+   }
+
+   for (int i = 0; str[i] != '\0'; i++)
+   {
+      if (str[i] >= 48 && str[i] <= 57)
+      {
+         /* Standard numbers */
+      }
+      else if (str[i] == '\r' || str[i] == '\n')
+      {
+         /* Feeds */
+      }
+      else if (base == 16)
+      {
+         if ((str[i] >= 65 && str[i] <= 70) || (str[i] >= 97 && str[i] <= 102))
+         {
+            /* Hex */
+         }
+         else
+         {
+            return false;
+         }
+      }
+      else
+      {
+         return false;
+      }
+   }
+
+   return true;
 }
 
 int

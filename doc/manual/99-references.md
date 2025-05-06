@@ -20,7 +20,6 @@
   [systemd]: https://www.freedesktop.org/wiki/Software/systemd/
   [rst2man]: https://docutils.sourceforge.io/
   [libssh]: https://www.libssh.org/
-  [libcurl]: https://curl.se/libcurl/
   [libarchive]: http://www.libarchive.org/
   [pandoc]: https://pandoc.org/
   [pandoc_latex_template]: https://github.com/Wandmalfarbe/pandoc-latex-template
