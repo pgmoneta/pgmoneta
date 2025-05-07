@@ -66,7 +66,7 @@ pgmoneta_create_sha512(void)
 static char*
 sha512_name(void)
 {
-   return "SHA-512";
+   return "SHA512";
 }
 
 static int

@@ -68,7 +68,6 @@ struct build_backup_file_input
    struct deque* prior_labels;
    struct art* backups;
    struct json* files;
-   int algorithm;
    bool incremental;
    bool exclude;
 };
@@ -83,7 +82,7 @@ static int carry_out_workflow(struct workflow* workflow, struct art* nodes);
 
 static void clear_manifest_incremental_entries(struct json* manifest);
 
-static int get_file_manifest(char* path, char* manifest_path, int algorithm, struct json** file);
+static int get_file_manifest(char* path, char* manifest_path, struct json** file);
 /**
  * Combine the provided backups or each of the user defined table-spaces
  * The function will be called for two rounds, the first round would construct the data directory
@@ -96,7 +95,6 @@ static int get_file_manifest(char* path, char* manifest_path, int algorithm, str
  * @param output_dir The base directory of the output incremental backup
  * @param relative_dir The internal directory relative to input_dir (either data directory or tsoid dir under pg_tblspc)
  * (the last level of directory should not be followed by back slash)
- * @param algorithm The manifest hash algorithm used for the backup
  * @param prior_labels The labels of prior incremental/full backups, from newest to oldest
  * @param files The file array inside manifest of the backup
  * @param incremental Whether to combine the backups into incremental backup
@@ -110,7 +108,6 @@ static int combine_backups_recursive(uint32_t tsoid,
                                      char* input_dir,
                                      char* output_dir,
                                      char* relative_dir,
-                                     int algorithm,
                                      struct deque* prior_labels,
                                      struct art* backups,
                                      struct json* files,
@@ -141,7 +138,6 @@ reconstruct_backup_file(int server,
                         struct deque* prior_labels,
                         struct art* backups,
                         bool incremental,
-                        int algorithm,
                         struct json* files);
 
 static void
@@ -156,7 +152,6 @@ create_reconstruct_backup_file_input(int server,
                                      struct deque* prior_labels,
                                      struct art* backups,
                                      bool incremental,
-                                     int algorithm,
                                      struct json* files,
                                      struct workers* workers,
                                      struct build_backup_file_input** wi);
@@ -677,7 +672,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
    create_workspace_directories(server, prior_labels, NULL);
 
    // round 1 for base data directory
-   if (combine_backups_recursive(0, server, label, input_dir, output_dir, NULL, bck->hash_algorithm, prior_labels, backups, files, incremental, !combine_as_is, workers))
+   if (combine_backups_recursive(0, server, label, input_dir, output_dir, NULL, prior_labels, backups, files, incremental, !combine_as_is, workers))
    {
       goto error;
    }
@@ -732,7 +727,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
          goto error;
       }
 
-      if (combine_backups_recursive(tsoid, server, label, itblspc_dir, full_tablespace_path, NULL, bck->hash_algorithm, prior_labels, backups, files, incremental, !combine_as_is, workers))
+      if (combine_backups_recursive(tsoid, server, label, itblspc_dir, full_tablespace_path, NULL, prior_labels, backups, files, incremental, !combine_as_is, workers))
       {
          goto error;
       }
@@ -1177,7 +1172,6 @@ combine_backups_recursive(uint32_t tsoid,
                           char* input_dir,
                           char* output_dir,
                           char* relative_dir,
-                          int algorithm,
                           struct deque* prior_labels,
                           struct art* backups,
                           struct json* files,
@@ -1290,7 +1284,7 @@ combine_backups_recursive(uint32_t tsoid,
          create_workspace_directory(server, label, new_relative_prefix);
          create_workspace_directories(server, prior_labels, new_relative_prefix);
 
-         if (combine_backups_recursive(tsoid, server, label, input_dir, output_dir, new_relative_dir, algorithm, prior_labels, backups, files, incremental, exclude, workers))
+         if (combine_backups_recursive(tsoid, server, label, input_dir, output_dir, new_relative_dir, prior_labels, backups, files, incremental, exclude, workers))
          {
             goto error;
          }
@@ -1335,7 +1329,6 @@ combine_backups_recursive(uint32_t tsoid,
                                                     prior_labels,
                                                     backups,
                                                     incremental,
-                                                    algorithm,
                                                     files,
                                                     workers,
                                                     &wi);
@@ -1357,7 +1350,6 @@ combine_backups_recursive(uint32_t tsoid,
                                         prior_labels,
                                         backups,
                                         incremental,
-                                        algorithm,
                                         files))
             {
                pgmoneta_log_error("unable to reconstruct file %s%s", relative_prefix, entry->d_name + INCREMENTAL_PREFIX_LENGTH);
@@ -1415,7 +1407,6 @@ reconstruct_backup_file(int server,
                         struct deque* prior_labels,
                         struct art* backups,
                         bool incremental,
-                        int algorithm,
                         struct json* files)
 {
    struct deque* sources = NULL; // bookkeeping of each incr/full backup rfile, so that we can free them conveniently
@@ -1622,7 +1613,7 @@ reconstruct_backup_file(int server,
    }
 
    // Update file entry in manifest
-   if (get_file_manifest(ofullpath, manifest_path, algorithm, &file))
+   if (get_file_manifest(ofullpath, manifest_path, &file))
    {
       pgmoneta_log_error("Unable to get manifest for file %s", ofullpath);
       goto error;
@@ -2134,7 +2125,7 @@ clear_manifest_incremental_entries(struct json* manifest)
 }
 
 static int
-get_file_manifest(char* path, char* manifest_path, int algorithm, struct json** file)
+get_file_manifest(char* path, char* manifest_path, struct json** file)
 {
    struct json* f = NULL;
    size_t size = 0;
@@ -2153,32 +2144,12 @@ get_file_manifest(char* path, char* manifest_path, int algorithm, struct json** 
    memset(now, 0, sizeof(now));
    strftime(now, sizeof(now), "%Y-%m-%d %H:%M:%S GMT", tinfo);
 
-   if (pgmoneta_create_file_hash(algorithm, path, &checksum))
+   if (pgmoneta_create_sha512_file(path, &checksum))
    {
       goto error;
    }
 
-   switch (algorithm)
-   {
-      case HASH_ALGORITHM_SHA224:
-         pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"SHA224", ValueString);
-         break;
-      case HASH_ALGORITHM_SHA256:
-         pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"SHA256", ValueString);
-         break;
-      case HASH_ALGORITHM_SHA384:
-         pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"SHA384", ValueString);
-         break;
-      case HASH_ALGORITHM_SHA512:
-         pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"SHA512", ValueString);
-         break;
-      case HASH_ALGORITHM_CRC32C:
-         pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"CRC32C", ValueString);
-         break;
-      default:
-         pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"NONE", ValueString);
-         break;
-   }
+   pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"SHA512", ValueString);
    pgmoneta_json_put(f, "Path", (uintptr_t)manifest_path, ValueString);
    pgmoneta_json_put(f, "Size", size, ValueUInt64);
    pgmoneta_json_put(f, "Last-Modified", (uintptr_t)now, ValueString);
@@ -2651,7 +2622,6 @@ do_reconstruct_backup_file(struct worker_common* wc)
                                input->prior_labels,
                                input->backups,
                                input->incremental,
-                               input->algorithm,
                                input->files))
    {
       goto error;
@@ -2699,7 +2669,6 @@ create_reconstruct_backup_file_input(int server,
                                      struct deque* prior_labels,
                                      struct art* backups,
                                      bool incremental,
-                                     int algorithm,
                                      struct json* files,
                                      struct workers* workers,
                                      struct build_backup_file_input** wi)
@@ -2716,7 +2685,6 @@ create_reconstruct_backup_file_input(int server,
    input->prior_labels = prior_labels;
    input->backups = backups;
    input->incremental = incremental;
-   input->algorithm = algorithm;
    input->files = files;
    *wi = input;
 }

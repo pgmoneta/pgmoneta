@@ -112,7 +112,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    char old_label_path[MAX_PATH];
    int backup_max_rate;
    int network_max_rate;
-   int hash;
    uint64_t biggest_file_size;
    struct main_configuration* config;
    struct message* basebackup_msg = NULL;
@@ -285,13 +284,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
 
-   hash = config->common.servers[server].manifest;
-   if (hash == HASH_ALGORITHM_DEFAULT)
-   {
-      hash = config->manifest;
-   }
-
-   pgmoneta_create_base_backup_message(config->common.servers[server].version, incremental != NULL, tag, true, hash,
+   pgmoneta_create_base_backup_message(config->common.servers[server].version, incremental != NULL, tag, true,
                                        config->compression_type, config->compression_level,
                                        &basebackup_msg);
 
@@ -431,7 +424,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_update_info_string(backup_base, INFO_END_WALPOS, endpos);
    pgmoneta_update_info_unsigned_long(backup_base, INFO_START_TIMELINE, start_timeline);
    pgmoneta_update_info_unsigned_long(backup_base, INFO_END_TIMELINE, end_timeline);
-   pgmoneta_update_info_unsigned_long(backup_base, INFO_HASH_ALGORITHM, hash);
+   pgmoneta_update_info_string(backup_base, INFO_HASH_ALGORITHM, "SHA512");
    pgmoneta_update_info_double(backup_base, INFO_BASEBACKUP_ELAPSED, basebackup_elapsed_time);
 
    if (incremental != NULL)

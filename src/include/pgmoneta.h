@@ -254,7 +254,6 @@ struct server
    int workers;                             /**< The number of workers */
    int backup_max_rate;                     /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;                    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
-   int manifest;                            /**< The manifest hash algorithm */
    int number_of_extra;                     /**< The number of source directory*/
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];   /**< Source directory*/
    bool ext_valid;                          /**< Is the extension valid */
@@ -413,8 +412,6 @@ struct main_configuration
 
    int backup_max_rate;                         /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;                        /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
-
-   int manifest;                                /**< The manifest hash algorithm */
 
 #ifdef DEBUG
    bool link;                                   /**< Do linking */

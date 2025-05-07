@@ -36,6 +36,7 @@
 #include <security.h>
 #include <shmem.h>
 #include <utils.h>
+#include <value.h>
 
 /* system */
 #include <ctype.h>
@@ -144,8 +145,6 @@ pgmoneta_init_main_configuration(void* shm)
    config->backup_max_rate = 0;
    config->network_max_rate = 0;
 
-   config->manifest = HASH_ALGORITHM_SHA256;
-
 #ifdef DEBUG
    config->link = true;
 #endif
@@ -244,7 +243,6 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.workers = -1;
                   srv.backup_max_rate = -1;
                   srv.network_max_rate = -1;
-                  srv.manifest = HASH_ALGORITHM_DEFAULT;
 
                   idx_server++;
                }
@@ -1386,21 +1384,6 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "manifest"))
-               {
-                  if (!strcmp(section, "pgmoneta"))
-                  {
-                     config->manifest = pgmoneta_get_hash_algorithm(value);
-                  }
-                  else if (strlen(section) > 0)
-                  {
-                     srv.manifest = pgmoneta_get_hash_algorithm(value);
-                  }
-                  else
-                  {
-                     unknown = true;
-                  }
-               }
 #ifdef DEBUG
                else if (!strcmp(key, "link"))
                {
@@ -2507,7 +2490,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LIBEV, (uintptr_t)config->libev, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->backup_max_rate, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->network_max_rate, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)config->manifest, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_KEEP_ALIVE, (uintptr_t)config->common.keep_alive, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NODELAY, (uintptr_t)config->common.nodelay, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING, (uintptr_t)config->common.non_blocking, ValueBool);
@@ -2555,7 +2538,7 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->common.servers[i].backup_max_rate, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->common.servers[i].network_max_rate, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)config->common.servers[i].manifest, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->common.servers[i].tls_cert_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->common.servers[i].tls_ca_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->common.servers[i].tls_key_file, ValueString);
@@ -3519,20 +3502,6 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
                unknown = true;
             }
             pgmoneta_json_put(response, key, (uintptr_t)config->network_max_rate, ValueInt32);
-         }
-      }
-      else if (!strcmp(key, "manifest"))
-      {
-         if (strlen(section) > 0)
-         {
-            config->common.servers[server_index].manifest = pgmoneta_get_hash_algorithm(config_value);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].manifest, ValueInt32);
-            pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
-         }
-         else
-         {
-            config->manifest = pgmoneta_get_hash_algorithm(config_value);
-            pgmoneta_json_put(response, key, (uintptr_t)config->manifest, ValueInt32);
          }
       }
       else
@@ -4881,7 +4850,6 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    config->workers = reload->workers;
    config->backup_max_rate = reload->backup_max_rate;
    config->network_max_rate = reload->network_max_rate;
-   config->manifest = reload->manifest;
 
    /* prometheus */
    atomic_init(&config->common.prometheus.logging_info, 0);
@@ -4951,7 +4919,6 @@ copy_server(struct server* dst, struct server* src)
    dst->workers = src->workers;
    dst->backup_max_rate = src->backup_max_rate;
    dst->network_max_rate = src->network_max_rate;
-   dst->manifest = src->manifest;
 
    if (restart_string("tls_cert_file", dst->tls_cert_file, src->tls_cert_file))
    {

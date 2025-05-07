@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "value.h"
 #include <pgmoneta.h>
 #include <csv.h>
 #include <logging.h>
@@ -172,7 +173,7 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_DIRECTORY, (uintptr_t)pgmoneta_art_search(nodes, NODE_TARGET_BASE), ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_FILENAME, (uintptr_t)columns[0], ValueString);
       pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_ORIGINAL, (uintptr_t)columns[1], ValueString);
-      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)backup->hash_algorithm, ValueInt32);
+      pgmoneta_json_put(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM, (uintptr_t)"SHA512", ValueString);
 
       payload->data = j;
       payload->failed = failed_deque;
@@ -248,7 +249,6 @@ do_verify(struct worker_common* wc)
    char* f = NULL;
    char* hash_cal = NULL;
    bool failed = false;
-   int ha = 0;
    struct json* j = NULL;
 
    j = wi->data;
@@ -265,73 +265,9 @@ do_verify(struct worker_common* wc)
       goto error;
    }
 
-   ha = (int)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_HASH_ALGORITHM);
-   if (ha == HASH_ALGORITHM_SHA256)
+   if (!pgmoneta_create_sha512_file(f, &hash_cal))
    {
-      if (!pgmoneta_create_sha256_file(f, &hash_cal))
-      {
-         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
-         {
-            failed = true;
-         }
-      }
-      else
-      {
-         failed = true;
-      }
-   }
-   else if (ha == HASH_ALGORITHM_SHA384)
-   {
-      if (!pgmoneta_create_sha384_file(f, &hash_cal))
-      {
-         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
-         {
-            failed = true;
-         }
-      }
-      else
-      {
-         failed = true;
-      }
-   }
-   else if (ha == HASH_ALGORITHM_SHA512)
-   {
-      if (!pgmoneta_create_sha512_file(f, &hash_cal))
-      {
-         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
-         {
-            failed = true;
-         }
-      }
-      else
-      {
-         failed = true;
-      }
-   }
-   else if (ha == HASH_ALGORITHM_SHA224)
-   {
-      if (!pgmoneta_create_sha224_file(f, &hash_cal))
-      {
-         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
-         {
-            failed = true;
-         }
-      }
-      else
-      {
-         failed = true;
-      }
-   }
-   else if (ha == HASH_ALGORITHM_CRC32C)
-   {
-      if (!pgmoneta_create_crc32c_file(f, &hash_cal))
-      {
-         if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
-         {
-            failed = true;
-         }
-      }
-      else
+      if (strcmp(hash_cal, (char*)pgmoneta_json_get(j, MANAGEMENT_ARGUMENT_ORIGINAL)))
       {
          failed = true;
       }

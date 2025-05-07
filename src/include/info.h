@@ -150,7 +150,6 @@ struct backup
    uint32_t checkpoint_lsn_lo32;                                  /**< The low 32 bits of WAL checkpoint position of the backup */
    uint32_t start_timeline;                                       /**< The starting timeline of the backup */
    uint32_t end_timeline;                                         /**< The ending timeline of the backup */
-   int hash_algorithm;                                            /**< The hash algorithm for the manifest */
    int compression;                                               /**< The compression type */
    int encryption;                                                /**< The encryption type */
    char comments[MAX_COMMENT];                                    /**< The comments */

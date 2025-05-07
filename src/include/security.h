@@ -39,13 +39,6 @@ extern "C" {
 #include <stdlib.h>
 #include <openssl/ssl.h>
 
-#define HASH_ALGORITHM_DEFAULT 0
-#define HASH_ALGORITHM_CRC32C  1
-#define HASH_ALGORITHM_SHA224  2
-#define HASH_ALGORITHM_SHA256  3
-#define HASH_ALGORITHM_SHA384  4
-#define HASH_ALGORITHM_SHA512  5
-
 /**
  * Authenticate a user
  * @param server The server
@@ -97,15 +90,6 @@ int
 pgmoneta_tls_valid(void);
 
 /**
- * Generate SHA224 for a file
- * @param filename The file path
- * @param sha224 The hash value
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_create_sha224_file(char* filename, char** sha224);
-
-/**
  * Generate SHA256 for a file
  * @param filename The file path
  * @param sha256 The hash value
@@ -113,15 +97,6 @@ pgmoneta_create_sha224_file(char* filename, char** sha224);
  */
 int
 pgmoneta_create_sha256_file(char* filename, char** sha256);
-
-/**
- * Generate SHA384 for a file
- * @param filename The file path
- * @param sha384 The hash value
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_create_sha384_file(char* filename, char** sha384);
 
 /**
  * Generate SHA512 for a file
@@ -184,29 +159,11 @@ int
 pgmoneta_create_crc32c_file(char* path, char** crc);
 
 /**
- * Create file hash with given algorithm
- * @param algorithm The algorithm represented by index
- * @param file_path The file path
- * @param hash [out] The hash value
- * @return 0 upon success, otherwise 1.
- */
-int
-pgmoneta_create_file_hash(int algorithm, char* file_path, char** hash);
-
-/**
  * Close a SSL structure
  * @param ssl The SSL structure
  */
 void
 pgmoneta_close_ssl(SSL* ssl);
-
-/**
- * Convert an algorithm string into algorithm enum index
- * @param algorithm The algorithm, case insensitive
- * @return The algorithm index
- */
-int
-pgmoneta_get_hash_algorithm(char* algorithm);
 
 /**
  * Create a SSL context

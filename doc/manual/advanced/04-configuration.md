@@ -152,7 +152,6 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 | :------- | :------ | :--- | :------- | :---------- |
 | backup_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the backup rate|
 | network_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate|
-| manifest | sha256 | String | No | The hash algoritm  for the manifest. Valid options: `crc32c`, `sha224`, `sha256`, `sha384` and `sha512`|
 | blocking_timeout | 30 | String | No | The number of seconds the process will be blocking for a connection. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables it. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
 | nodelay | on | Bool | No | Have `TCP_NODELAY` on sockets |
@@ -228,7 +227,6 @@ have access to the `postgres` database in order to get the necessary configurati
 | :------- | :------ | :--- | :------- | :---------- |
 | backup_max_rate | -1 | Int | No | The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable, -1 means use the global settting|
 | network_max_rate | -1 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting|
-| manifest | sha256 | String | No | The hash algoritm  for the manifest. Valid options: `crc32c`, `sha224`, `sha256`, `sha384` and `sha512`|
 
 #### Extra
 

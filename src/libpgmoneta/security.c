@@ -2872,21 +2872,9 @@ create_hash_file(char* filename, char* algorithm, char** hash)
 }
 
 int
-pgmoneta_create_sha224_file(char* filename, char** sha224)
-{
-   return create_hash_file(filename, "SHA224", sha224);
-}
-
-int
 pgmoneta_create_sha256_file(char* filename, char** sha256)
 {
    return create_hash_file(filename, "SHA256", sha256);
-}
-
-int
-pgmoneta_create_sha384_file(char* filename, char** sha384)
-{
-   return create_hash_file(filename, "SHA384", sha384);
 }
 
 int
@@ -3263,36 +3251,6 @@ error:
    return 1;
 }
 
-int
-pgmoneta_create_file_hash(int algorithm, char* file_path, char** hash)
-{
-   int stat = 0;
-   switch (algorithm)
-   {
-      case HASH_ALGORITHM_CRC32C:
-         pgmoneta_create_crc32c_file(file_path, hash);
-         break;
-      case HASH_ALGORITHM_SHA224:
-         stat = pgmoneta_create_sha224_file(file_path, hash);
-         break;
-      case HASH_ALGORITHM_DEFAULT:
-      case HASH_ALGORITHM_SHA256:
-         stat = pgmoneta_create_sha256_file(file_path, hash);
-         break;
-      case HASH_ALGORITHM_SHA384:
-         stat = pgmoneta_create_sha384_file(file_path, hash);
-         break;
-      case HASH_ALGORITHM_SHA512:
-         stat = pgmoneta_create_sha512_file(file_path, hash);
-         break;
-      default:
-         pgmoneta_log_error("Unrecognized hash algorithm: %s", algorithm);
-         stat = 1;
-         break;
-   }
-   return stat;
-}
-
 void
 pgmoneta_close_ssl(SSL* ssl)
 {
@@ -3310,33 +3268,6 @@ pgmoneta_close_ssl(SSL* ssl)
       SSL_free(ssl);
       SSL_CTX_free(ctx);
    }
-}
-
-int
-pgmoneta_get_hash_algorithm(char* algorithm)
-{
-   if (!strcasecmp(algorithm, "crc32c"))
-   {
-      return HASH_ALGORITHM_CRC32C;
-   }
-   else if (!strcasecmp(algorithm, "sha224"))
-   {
-      return HASH_ALGORITHM_SHA224;
-   }
-   else if (!strcasecmp(algorithm, "sha256"))
-   {
-      return HASH_ALGORITHM_SHA256;
-   }
-   else if (!strcasecmp(algorithm, "sha384"))
-   {
-      return HASH_ALGORITHM_SHA384;
-   }
-   else if (!strcasecmp(algorithm, "sha512"))
-   {
-      return HASH_ALGORITHM_SHA512;
-   }
-
-   return HASH_ALGORITHM_SHA256;
 }
 
 int

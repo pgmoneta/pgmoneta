@@ -1139,10 +1139,6 @@ pgmoneta_get_backup_file(char* fn, struct backup** backup)
          {
             bck->end_timeline = atoi(&value[0]);
          }
-         else if (pgmoneta_starts_with(&key[0], INFO_HASH_ALGORITHM))
-         {
-            bck->hash_algorithm = atoi(&value[0]);
-         }
          else if (pgmoneta_starts_with(&key[0], INFO_COMMENTS))
          {
             memcpy(&bck->comments[0], &value[0], strlen(&value[0]));

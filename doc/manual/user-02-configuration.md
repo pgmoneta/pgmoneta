@@ -69,7 +69,6 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | libev | `auto` | String | No | Select the [libev][libev] backend to use. Valid options: `auto`, `select`, `poll`, `epoll`, `iouring`, `devpoll` and `port` |
 | backup_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the backup rate|
 | network_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate|
-| manifest | sha256 | String | No | The hash algoritm  for the manifest. Valid options: `crc32c`, `sha224`, `sha256`, `sha384` and `sha512`|
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
 | nodelay | on | Bool | No | Have `TCP_NODELAY` on sockets |
 | non_blocking | on | Bool | No | Have `O_NONBLOCK` on sockets |
@@ -97,7 +96,6 @@ See a [sample][sample] configuration for running [**pgmoneta**][pgmoneta] on `lo
 | workers | -1 | Int | No | The number of workers that each process can use for its work. Use 0 to disable, -1 means use the global settting. Maximum is CPU count |
 | backup_max_rate | -1 | Int | No | The number of bytes of tokens added every one second to limit the backup rate. Use 0 to disable, -1 means use the global settting|
 | network_max_rate | -1 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting|
-| manifest | sha256 | String | No | The hash algoritm  for the manifest. Valid options: `crc32c`, `sha224`, `sha256`, `sha384` and `sha512`|
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. |
 | tls_key_file | | String | No | Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. |
 | tls_ca_file | | String | No | Certificate Authority (CA) file for TLS. This file must be owned by either the user running pgmoneta or root.  |

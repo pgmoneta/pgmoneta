@@ -237,7 +237,7 @@ for taking a backup every day at 6 am.
 
 ## Verify backup integrity
 
-pgmoneta creates a SHA-512 checksum file(`backup.sha512`) for each backup at the backup root directory, which can be used to verify the integrity of the files.
+pgmoneta creates a SHA512 checksum file(`backup.sha512`) for each backup at the backup root directory, which can be used to verify the integrity of the files.
 
 Using `sha512sum`:
 ```

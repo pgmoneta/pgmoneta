@@ -787,7 +787,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 }
 
 int
-pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal, int checksum_algorithm,
+pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal,
                                     int compression, int compression_level,
                                     struct message** msg)
 {
@@ -846,32 +846,7 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
 
       options = pgmoneta_append(options, "MANIFEST 'yes', ");
 
-      options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
-      switch (checksum_algorithm)
-      {
-         case HASH_ALGORITHM_DEFAULT:
-            options = pgmoneta_append(options, "SHA256");
-            break;
-         case HASH_ALGORITHM_CRC32C:
-            options = pgmoneta_append(options, "CRC32C");
-            break;
-         case HASH_ALGORITHM_SHA224:
-            options = pgmoneta_append(options, "SHA224");
-            break;
-         case HASH_ALGORITHM_SHA256:
-            options = pgmoneta_append(options, "SHA256");
-            break;
-         case HASH_ALGORITHM_SHA384:
-            options = pgmoneta_append(options, "SHA384");
-            break;
-         case HASH_ALGORITHM_SHA512:
-            options = pgmoneta_append(options, "SHA512");
-            break;
-         default:
-            options = pgmoneta_append(options, "SHA256");
-            break;
-      }
-      options = pgmoneta_append(options, "'");
+      options = pgmoneta_append(options, "MANIFEST_CHECKSUMS 'SHA512'");
 
       snprintf(cmd, sizeof(cmd), "BASE_BACKUP (%s)", options);
    }
@@ -892,32 +867,7 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
 
       options = pgmoneta_append(options, "MANIFEST 'yes' ");
 
-      options = pgmoneta_append(options, "MANIFEST_CHECKSUMS '");
-      switch (checksum_algorithm)
-      {
-         case HASH_ALGORITHM_DEFAULT:
-            options = pgmoneta_append(options, "SHA256");
-            break;
-         case HASH_ALGORITHM_CRC32C:
-            options = pgmoneta_append(options, "CRC32C");
-            break;
-         case HASH_ALGORITHM_SHA224:
-            options = pgmoneta_append(options, "SHA224");
-            break;
-         case HASH_ALGORITHM_SHA256:
-            options = pgmoneta_append(options, "SHA256");
-            break;
-         case HASH_ALGORITHM_SHA384:
-            options = pgmoneta_append(options, "SHA384");
-            break;
-         case HASH_ALGORITHM_SHA512:
-            options = pgmoneta_append(options, "SHA512");
-            break;
-         default:
-            options = pgmoneta_append(options, "SHA256");
-            break;
-      }
-      options = pgmoneta_append(options, "' ");
+      options = pgmoneta_append(options, "MANIFEST_CHECKSUMS 'SHA512'");
 
       snprintf(cmd, sizeof(cmd), "BASE_BACKUP %s;", options);
    }

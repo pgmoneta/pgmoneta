@@ -302,9 +302,6 @@ backup_max_rate
 network_max_rate
   The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
 
-manifest
-  The hash algoritm  for the manifest. Valid options: crc32c, sha224, sha256, sha384 and sha512. Default is sha256
-
 tls_cert_file
   Certificate file for TLS. This file must be owned by either the user running pgmoneta or root.
 

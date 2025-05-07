@@ -84,7 +84,6 @@ pgmoneta_manifest_checksum_verify(char* root)
       size_t file_size = 0;
       size_t file_size_manifest = 0;
       char* hash = NULL;
-      char* algorithm = NULL;
       char* checksum = NULL;
 
       memset(file_path, 0, MAX_PATH);
@@ -104,10 +103,9 @@ pgmoneta_manifest_checksum_verify(char* root)
          pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file_size_manifest);
       }
 
-      algorithm = (char*)pgmoneta_json_get(file, "Checksum-Algorithm");
-      if (pgmoneta_create_file_hash(pgmoneta_get_hash_algorithm(algorithm), file_path, &hash))
+      if (pgmoneta_create_sha512_file(file_path, &hash))
       {
-         pgmoneta_log_error("Unable to generate hash for file %s with algorithm %s", file_path, algorithm);
+         pgmoneta_log_error("Unable to generate hash for file %s with algorithm SHA512", file_path);
          goto error;
       }
 

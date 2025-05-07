@@ -358,14 +358,13 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
  * @param incremental If the backup is incremental
  * @param label The label of the backup
  * @param include_wal The indication of whether to also include WAL
- * @param checksum_algorithm The checksum algorithm to be applied to backup manifest
  * @param compression The compression type
  * @param compression_level The compression level
  * @param msg The resulting message
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal, int checksum_algorithm,
+pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal,
                                     int compression, int compression_level,
                                     struct message** msg);
 
