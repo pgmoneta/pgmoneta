@@ -943,9 +943,6 @@ wf_delete_backup(void)
    head = pgmoneta_create_delete_backup();
    current = head;
 
-   current->next = pgmoneta_create_sha512();
-   current = current->next;
-
 #ifdef DEBUG
    current = head;
    while (current != NULL)
