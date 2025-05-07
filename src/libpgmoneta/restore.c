@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <management.h>
+#include <manifest.h>
 #include <network.h>
 #include <restore.h>
 #include <security.h>
@@ -760,7 +761,7 @@ pgmoneta_combine_backups(int server, char* label, char* base, char* input_dir, c
       }
    }
 
-   if (pgmoneta_json_write_file(manifest_path, manifest))
+   if (pgmoneta_write_postgresql_manifest(manifest, manifest_path))
    {
       pgmoneta_log_error("Fail to write manifest to %s", manifest_path);
       goto error;

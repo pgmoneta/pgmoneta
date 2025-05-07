@@ -35,6 +35,7 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <art.h>
+#include <json.h>
 
 #define MANIFEST_CHUNK_SIZE 8192
 
@@ -80,6 +81,15 @@ pgmoneta_manifest_checksum_verify(char* root);
  */
 int
 pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** deleted_files, struct art** changed_files, struct art** added_files);
+
+/**
+ * Generate the manifest on disk according to postgres manifest format
+ * @param manifest The manifest
+ * @param path The path
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_write_postgresql_manifest(struct json* manifest, char* path);
 
 #ifdef __cplusplus
 }

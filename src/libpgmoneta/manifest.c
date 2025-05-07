@@ -36,8 +36,15 @@
 #include <utils.h>
 
 /* system */
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+
+#define MANIFEST_KEY_VERSION "PostgreSQL-Backup-Manifest-Version"
+#define MANIFEST_KEY_SYS_IDENTIFIER "System-Identifier"
+#define MANIFEST_KEY_FILES "Files"
+#define MANIFEST_KEY_WAL_RANGES "WAL-Ranges"
+#define MANIFEST_KEY_CHECKSUM "Manifest-Checksum"
 
 static void
 build_deque(struct deque* deque, struct csv_reader* reader, char** f);
@@ -302,6 +309,116 @@ error:
    pgmoneta_csv_reader_destroy(r2);
    pgmoneta_art_destroy(tree);
    pgmoneta_deque_destroy(que);
+   return 1;
+}
+
+int
+pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
+{
+   FILE* file = NULL;
+   char* checksum = NULL;
+   struct json* files = NULL;
+   struct json* f = NULL;
+   struct json_iterator* fiter = NULL;
+   struct json* wal_ranges = NULL;
+   struct json* r = NULL;
+   struct json_iterator* riter = NULL;
+
+   if (path == NULL || manifest == NULL)
+   {
+      goto error;
+   }
+
+   if (!pgmoneta_json_contains_key(manifest, MANIFEST_KEY_VERSION) ||
+       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_SYS_IDENTIFIER) ||
+       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_FILES) ||
+       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_WAL_RANGES) ||
+       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_CHECKSUM))
+   {
+      pgmoneta_log_error("Manifest doesn't contain necessary entries");
+      goto error;
+   }
+
+   files = (struct json*) pgmoneta_json_get(manifest, MANIFEST_KEY_FILES);
+   wal_ranges = (struct json*) pgmoneta_json_get(manifest, MANIFEST_KEY_WAL_RANGES);
+
+   pgmoneta_json_iterator_create(files, &fiter);
+   pgmoneta_json_iterator_create(wal_ranges, &riter);
+
+   file = fopen(path, "wb");
+   if (file == NULL)
+   {
+      pgmoneta_log_error("Failed to create json file %s", path);
+      goto error;
+   }
+
+   fprintf(file, "{ \"%s\": %d,\n", MANIFEST_KEY_VERSION, (int)pgmoneta_json_get(manifest, MANIFEST_KEY_VERSION));
+   fprintf(file, "\"%s\": %" PRIu64 ",\n", MANIFEST_KEY_SYS_IDENTIFIER,
+           (uint64_t)pgmoneta_json_get(manifest, MANIFEST_KEY_SYS_IDENTIFIER));
+
+   fprintf(file, "\"%s\": [\n", MANIFEST_KEY_FILES);
+   while (pgmoneta_json_iterator_next(fiter))
+   {
+      f = (struct json*) pgmoneta_value_data(fiter->value);
+      fprintf(file, "{ \"Path\": \"%s\", \"Size\": %" PRIu64 ", \"Last-Modified\": \"%s\", \"Checksum-Algorithm\": \"%s\", \"Checksum\": \"%s\" }",
+              (char*)pgmoneta_json_get(f, "Path"),
+              (uint64_t)pgmoneta_json_get(f, "Size"),
+              (char*)pgmoneta_json_get(f, "Last-Modified"),
+              (char*)pgmoneta_json_get(f, "Checksum-Algorithm"),
+              (char*)pgmoneta_json_get(f, "Checksum"));
+      if (pgmoneta_json_iterator_has_next(fiter))
+      {
+         fprintf(file, ",\n");
+      }
+      else
+      {
+         fprintf(file, "\n");
+      }
+   }
+   fprintf(file, "],\n");
+
+   fprintf(file, "\"%s\": [\n", MANIFEST_KEY_WAL_RANGES);
+   while (pgmoneta_json_iterator_next(riter))
+   {
+      r = (struct json*) pgmoneta_value_data(riter->value);
+      fprintf(file, "{ \"Timeline\": %d, \"Start-LSN\": \"%s\", \"End-LSN\": \"%s\" }",
+              (int)pgmoneta_json_get(r, "Timeline"),
+              (char*)pgmoneta_json_get(r, "Start-LSN"),
+              (char*)pgmoneta_json_get(r, "End-LSN"));
+      if (pgmoneta_json_iterator_has_next(riter))
+      {
+         fprintf(file, ",\n");
+      }
+      else
+      {
+         fprintf(file, "\n");
+      }
+   }
+   fprintf(file, "],\n");
+
+   fflush(file);
+
+   if (pgmoneta_create_sha256_file(path, &checksum))
+   {
+      pgmoneta_log_error("unable to get manifest checksum at %s", path);
+      goto error;
+   }
+   fprintf(file, "\"%s\": \"%s\"}\n", MANIFEST_KEY_CHECKSUM, checksum);
+
+   free(checksum);
+   fclose(file);
+   pgmoneta_json_iterator_destroy(fiter);
+   pgmoneta_json_iterator_destroy(riter);
+   return 0;
+
+error:
+   free(checksum);
+   pgmoneta_json_iterator_destroy(fiter);
+   pgmoneta_json_iterator_destroy(riter);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
    return 1;
 }
 
