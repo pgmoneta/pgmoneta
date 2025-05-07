@@ -1123,8 +1123,6 @@ pgmoneta_copy_postgresql_restore(char* from, char* to, char* base, char* server,
       free(restore_last_files_names);
    }
 
-   pgmoneta_workers_destroy(workers);
-
    return 0;
 
 error:
@@ -1139,8 +1137,6 @@ error:
       }
       free(restore_last_files_names);
    }
-
-   pgmoneta_workers_destroy(workers);
 
    return 1;
 }
@@ -1204,6 +1200,8 @@ pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings,
    {
       goto error;
    }
+
+   pgmoneta_workers_wait(workers);
 
    return 0;
 
