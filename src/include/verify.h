@@ -50,6 +50,13 @@ extern "C" {
 void
 pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
 
+/**
+ * Run sha512 verification job
+ * @param argv The argv
+ */
+void
+pgmoneta_sha512_verification(char** argv);
+
 #ifdef __cplusplus
 }
 #endif

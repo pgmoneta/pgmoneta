@@ -31,10 +31,12 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <security.h>
 #include <utils.h>
 #include <workflow.h>
 
 /* system */
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -265,4 +267,228 @@ error:
    free(elapsed);
 
    exit(1);
+}
+
+void
+pgmoneta_sha512_verification(char** argv)
+{
+   int server = 0;
+   struct main_configuration* config;
+   char* backup_dir = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   char* sha512_path = NULL;
+   FILE* sha512_file = NULL;
+   char buffer[4096];
+   char* root = NULL;
+   char* filename = NULL;
+   char* hash = NULL;
+   char* calculated_hash = NULL;
+   char* absolute_file_path = NULL;
+   bool active = false;
+   atomic_bool locked = false;
+   int line = 0;
+   int err = 0;
+   char* elapsed = NULL;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
+
+   pgmoneta_start_logging();
+
+   config = (struct main_configuration*)shmem;
+
+   pgmoneta_set_proc_title(1, argv, "sha512 verification", NULL);
+
+   for (server = 0; server < config->common.number_of_servers; server++)
+   {
+      pgmoneta_log_debug("Verification: Starting for server %s", config->common.servers[server].name);
+
+      active = false;
+      if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
+      {
+         pgmoneta_log_warn("Verification: Server %s is already active, skipping verification", config->common.servers[server].name);
+         continue;
+      }
+
+      atomic_store(&locked, true);
+
+      backup_dir = pgmoneta_get_server_backup(server);
+
+      if (pgmoneta_get_backups(backup_dir, &number_of_backups, &backups))
+      {
+         pgmoneta_log_error("Verification: %s: Unable to get backups", config->common.servers[server].name);
+         err = 1;
+         goto server_cleanup;
+      }
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+
+#ifdef HAVE_FREEBSD
+         clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+         clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
+         if (backups[i] == NULL || backups[i]->valid != VALID_TRUE)
+         {
+            continue;
+         }
+         root = pgmoneta_get_server_backup_identifier(server, backups[i]->label);
+
+         sha512_path = pgmoneta_append(sha512_path, root);
+         sha512_path = pgmoneta_append(sha512_path, "/backup.sha512");
+
+         sha512_file = fopen(sha512_path, "r");
+         if (sha512_file == NULL)
+         {
+            pgmoneta_log_error("Verification: Could not open file %s: %s", sha512_path, strerror(errno));
+            err = 1;
+            goto backup_cleanup;
+         }
+
+         line = 0;
+         while (fgets(&buffer[0], sizeof(buffer), sha512_file) != NULL)
+         {
+            line++;
+            char* entry = strtok(&buffer[0], " ");
+            if (entry == NULL)
+            {
+               pgmoneta_log_warn("Verification: %s: formatting error at line %d", sha512_path, line);
+               err = 1;
+               goto line_cleanup;
+            }
+
+            hash = strdup(entry);
+            if (hash == NULL)
+            {
+               pgmoneta_log_error("Verification: Memory allocation error for hash");
+               err = 1;
+               goto line_cleanup;
+            }
+
+            entry = strtok(NULL, "\n");
+            if (entry == NULL || strlen(entry) < 3)
+            {
+               pgmoneta_log_warn("Verification: %s: formatting error at line %d", sha512_path, line);
+               err = 1;
+               goto line_cleanup;
+            }
+
+            // skip the " *." or " */"
+            filename = entry + 3;
+
+            absolute_file_path = pgmoneta_append(absolute_file_path, root);
+            if (!pgmoneta_ends_with(absolute_file_path, "/"))
+            {
+               absolute_file_path = pgmoneta_append(absolute_file_path, "/");
+            }
+
+            absolute_file_path = pgmoneta_append(absolute_file_path, filename);
+
+            if (pgmoneta_create_sha512_file(absolute_file_path, &calculated_hash))
+            {
+               pgmoneta_log_error("Verification: Could not create hash for %s", absolute_file_path);
+               err = 1;
+               goto line_cleanup;
+            }
+
+            if (strcmp(hash, calculated_hash) != 0)
+            {
+               pgmoneta_log_error("Verification: Hash mismatch for %s | Expected: %s | Got: %s", absolute_file_path, hash, calculated_hash);
+               err = 1;
+            }
+
+            if (hash)
+            {
+               free(hash);
+               hash = NULL;
+            }
+            if (absolute_file_path)
+            {
+               free(absolute_file_path);
+               absolute_file_path = NULL;
+            }
+            if (calculated_hash)
+            {
+               free(calculated_hash);
+               calculated_hash = NULL;
+            }
+            continue;
+
+line_cleanup:
+            if (hash)
+            {
+               free(hash);
+               hash = NULL;
+            }
+            if (absolute_file_path)
+            {
+               free(absolute_file_path);
+               absolute_file_path = NULL;
+            }
+            if (calculated_hash)
+            {
+               free(calculated_hash);
+               calculated_hash = NULL;
+            }
+         }
+
+#ifdef HAVE_FREEBSD
+         clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+         clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+         elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+         pgmoneta_log_info("Verification: %s/%s (Elapsed: %s)", config->common.servers[server].name, backups[i]->label, elapsed);
+
+backup_cleanup:
+         if (sha512_file)
+         {
+            fclose(sha512_file);
+            sha512_file = NULL;
+         }
+         if (sha512_path)
+         {
+            free(sha512_path);
+            sha512_path = NULL;
+         }
+         if (root)
+         {
+            free(root);
+            root = NULL;
+         }
+      }
+
+server_cleanup:
+      if (backups)
+      {
+         for (int i = 0; i < number_of_backups; i++)
+         {
+            if (backups[i])
+            {
+               free(backups[i]);
+            }
+         }
+         free(backups);
+         backups = NULL;
+      }
+
+      if (backup_dir)
+      {
+         free(backup_dir);
+         backup_dir = NULL;
+      }
+
+      if (locked)
+      {
+         atomic_store(&config->common.servers[server].repository, false);
+         atomic_store(&locked, false);
+      }
+   }
+
+   pgmoneta_stop_logging();
+   exit(err);
 }

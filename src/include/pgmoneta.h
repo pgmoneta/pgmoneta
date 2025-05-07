@@ -416,6 +416,8 @@ struct main_configuration
 
    int manifest;                                /**< The manifest hash algorithm */
 
+   int verification;                            /**< The sha512 verification interval */
+
 #ifdef DEBUG
    bool link;                                   /**< Do linking */
 #endif
