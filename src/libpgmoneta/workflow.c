@@ -938,12 +938,11 @@ static struct workflow*
 wf_delete_backup(void)
 {
    struct workflow* head = NULL;
-   struct workflow* current = NULL;
 
    head = pgmoneta_create_delete_backup();
-   current = head;
 
 #ifdef DEBUG
+   struct workflow* current = NULL;
    current = head;
    while (current != NULL)
    {
