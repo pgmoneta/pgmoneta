@@ -56,6 +56,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 
+
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
 #endif
@@ -76,7 +77,7 @@ static int max_process_title_size = 0;
 
 static int string_compare(const void* a, const void* b);
 
-static bool is_wal_file(char* file);
+bool pgmoneta_is_wal_file(char* file);
 
 static char* get_server_basepath(int server);
 
@@ -3002,7 +3003,7 @@ pgmoneta_read_wal(char* directory, char** wal)
 
    for (int i = 0; !found && i < number_of_wal_files; i++)
    {
-      if (is_wal_file(wal_files[i]))
+      if (pgmoneta_is_wal_file(wal_files[i]))
       {
          result = malloc(strlen(wal_files[i]) + 1);
          memset(result, 0, strlen(wal_files[i]) + 1);
@@ -3098,8 +3099,8 @@ string_compare(const void* a, const void* b)
    return strcmp(*(char**)a, *(char**)b);
 }
 
-static bool
-is_wal_file(char* file)
+bool
+pgmoneta_is_wal_file(char* file)
 {
    if (pgmoneta_ends_with(file, ".history"))
    {

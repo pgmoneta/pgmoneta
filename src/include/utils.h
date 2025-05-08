@@ -1349,6 +1349,15 @@ pgmoneta_backtrace(void);
 int
 pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int* kernel_patch);
 
+/**
+ * Check if the given filename represents a WAL file.
+ *
+ * @param file The filename to check
+ * @return true if the file is a WAL file, false otherwise
+ */
+bool
+pgmoneta_is_wal_file(char* file);
+
 #ifdef __cplusplus
 }
 #endif
