@@ -31,7 +31,7 @@ jobs:
           git gcc clang clang-tools cmake make \
           libev4 libev-dev libssl-dev libsystemd-dev \
           zlib1g zlib1g-dev libzstd-dev liblz4-dev \
-          libssh-dev libcurl4-openssl-dev libatomic1 \
+          libssh-dev libatomic1 \
           python3-docutils libbz2-dev libarchive-dev \
           bzip2 net-tools check graphviz doxygen \
           pandoc texlive texlive-latex-extra \
@@ -254,7 +254,6 @@ jobs:
               libarchive \
               check \
               py311-docutils \
-              curl \
               doxygen \
               hs-pandoc \
               texlive-base \

@@ -67,7 +67,7 @@ pgmoneta_read_block_message(SSL* ssl, int socket, struct message** msg)
 {
    if (ssl == NULL)
    {
-      return read_message(socket, true, 0, msg);
+      return read_message(socket, true, 5, msg);
    }
 
    return ssl_read_message(ssl, 0, msg);

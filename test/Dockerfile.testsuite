@@ -42,11 +42,11 @@ RUN dnf -y update && \
       git gcc clang cmake make \
       libev libev-devel openssl-devel systemd-devel \
       zlib zlib-devel libzstd-devel lz4-devel \
-      libssh-devel libcurl-devel libatomic \
+      libssh-devel libatomic \
       python3-docutils bzip2-devel libarchive-devel \
       net-tools check check-devel graphviz \
       doxygen pandoc texlive texlive-latex \
-      python3-pip curl ca-certificates wget \
+      python3-pip ca-certificates wget \
       libasan libubsan libstdc++-devel libgcc glibc-devel \
       gawk coreutils findutils iproute && \
     dnf clean all

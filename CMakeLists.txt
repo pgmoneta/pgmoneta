@@ -218,13 +218,6 @@ else ()
   message(FATAL_ERROR "libssh needed")
 endif()
 
-find_package(Libcurl)
-if (LIBCURL_FOUND)
-  message(STATUS "libcurl found")
-else ()
-  message(FATAL_ERROR "libcurl needed")
-endif()
-
 find_package(THREAD)
 if (THREAD_FOUND)
   message(STATUS "pthread found")
