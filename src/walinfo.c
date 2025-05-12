@@ -63,7 +63,7 @@ usage(void)
    printf("\n");
 
    printf("Usage:\n");
-   printf("  pgmoneta-walinfo <file>\n");
+   printf("  pgmoneta-walinfo <file|directory>\n");
    printf("\n");
    printf("Options:\n");
    printf("  -c,   --config      Set the path to the pgmoneta_walinfo.conf file\n");
@@ -584,12 +584,36 @@ main(int argc, char** argv)
 
    if (filepath != NULL)
    {
-      if (pgmoneta_describe_walfile(filepath, type, output, quiet, color,
-                                    rms, start_lsn, end_lsn, xids, limit, included_objects))
+      partial_record = malloc(sizeof(struct partial_xlog_record));
+      partial_record->data_buffer_bytes_read = 0;
+      partial_record->xlog_record_bytes_read = 0;
+      partial_record->xlog_record = NULL;
+      partial_record->data_buffer = NULL;
+      if (pgmoneta_is_directory(filepath))
+      {
+         if (pgmoneta_describe_walfiles_in_directory(filepath, type, output, quiet, color,
+                                                     rms, start_lsn, end_lsn, xids, limit, included_objects))
+         {
+            fprintf(stderr, "Error while reading/describing WAL directory\n");
+            goto error;
+         }
+      }
+
+      else if (pgmoneta_describe_walfile(filepath, type, output, quiet, color,
+                                         rms, start_lsn, end_lsn, xids, limit, included_objects))
       {
          fprintf(stderr, "Error while reading/describing WAL file\n");
          goto error;
       }
+      if (partial_record->xlog_record != NULL)
+      {
+         free(partial_record->xlog_record);
+      }
+      if (partial_record->data_buffer != NULL)
+      {
+         free(partial_record->data_buffer);
+      }
+      free(partial_record);
    }
    else
    {

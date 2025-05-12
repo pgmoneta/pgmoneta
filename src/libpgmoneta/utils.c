@@ -76,8 +76,6 @@ static int max_process_title_size = 0;
 
 static int string_compare(const void* a, const void* b);
 
-static bool is_wal_file(char* file);
-
 static char* get_server_basepath(int server);
 
 static int get_permissions(char* from, int* permissions);
@@ -2977,6 +2975,23 @@ error:
    return 1;
 }
 
+bool
+pgmoneta_is_wal_file(char* file)
+{
+   if (pgmoneta_ends_with(file, ".history"))
+   {
+      return false;
+   }
+
+   if (strlen(file) != 24)
+   {
+      return false;
+   }
+
+   return true;
+}
+
+
 int
 pgmoneta_read_wal(char* directory, char** wal)
 {
@@ -3003,7 +3018,7 @@ pgmoneta_read_wal(char* directory, char** wal)
 
    for (int i = 0; !found && i < number_of_wal_files; i++)
    {
-      if (is_wal_file(wal_files[i]))
+      if (pgmoneta_is_wal_file(wal_files[i]))
       {
          result = malloc(strlen(wal_files[i]) + 1);
          memset(result, 0, strlen(wal_files[i]) + 1);
@@ -3099,21 +3114,6 @@ string_compare(const void* a, const void* b)
    return strcmp(*(char**)a, *(char**)b);
 }
 
-static bool
-is_wal_file(char* file)
-{
-   if (pgmoneta_ends_with(file, ".history"))
-   {
-      return false;
-   }
-
-   if (strlen(file) != 24)
-   {
-      return false;
-   }
-
-   return true;
-}
 
 char*
 pgmoneta_get_server(int server)

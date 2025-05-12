@@ -32,7 +32,11 @@
 #include <utils.h>
 #include <walfile.h>
 
+#include <dirent.h>
 #include <libgen.h>
+
+
+struct partial_xlog_record* partial_record = NULL;
 
 /**
  * Validate if a WAL file exists and is accessible before processing.
@@ -75,7 +79,6 @@ pgmoneta_read_walfile(int server, char* path, struct walfile** wf)
 {
    int error_code = PGMONETA_WAL_SUCCESS;
    struct walfile* new_wf = NULL;
-
    int validation_status = validate_wal_file(path);
    if (validation_status != PGMONETA_WAL_SUCCESS)
    {
@@ -457,5 +460,47 @@ error:
    free(wal_path);
    pgmoneta_destroy_walfile(wf);
    pgmoneta_deque_iterator_destroy(record_iterator);
+   return 1;
+}
+
+int
+pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output, bool quiet, bool color,
+                                        struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                                        uint32_t limit, char** included_objects)
+{
+   int file_count = 0;
+   int free_counter = 0;
+   char** files = NULL;
+   char* file_path = malloc(MAX_PATH);
+
+   if (pgmoneta_get_wal_files(dir_path, &file_count, &files))
+   {
+      free(file_path);
+      return 1;
+   }
+
+   for (int i = 0; i < file_count; i++)
+   {
+      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+      if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
+                                    rms, start_lsn, end_lsn, xids, limit, included_objects))
+      {
+         free_counter = i;
+         goto error;
+      }
+      free(files[i]);
+   }
+
+   free(file_path);
+   free(files);
+   return 0;
+
+error:
+   for (int i = free_counter; i < file_count; i++)
+   {
+      free(files[i]);
+   }
+   free(file_path);
+   free(files);
    return 1;
 }
