@@ -302,6 +302,12 @@ backup_max_rate
 network_max_rate
   The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
 
+verification
+  The time between verification of a backup. If this value is specified without units,
+  it is taken as seconds. Setting this parameter to 0 disables verification. It supports the
+  following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D'
+  for days, and 'W' for weeks. Default is 0 (disabled).
+
 tls_cert_file
   Certificate file for TLS. This file must be owned by either the user running pgmoneta or root.
 

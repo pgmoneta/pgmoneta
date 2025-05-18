@@ -118,6 +118,14 @@
 |------------|----------|--------|--------|----------|
 | retention | 7, - , - , - | Array | [नहीं]{lang=hi} | [संग्रहण समय दिन, सप्ताह, महीने, साल में]{lang=hi} |
 
+#### Verification
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| verification | 0 | String | No | The time between verification of a backup. If this value is specified without units,
+  it is taken as seconds. Setting this parameter to 0 disables verification. It supports the
+  following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D'
+  for days, and 'W' for weeks. Default is 0 (disabled) |
 
 #### [लॉगिंग]{lang=hi}
 

@@ -413,6 +413,8 @@ struct main_configuration
    int backup_max_rate;                         /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;                        /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
+   int verification;                            /**< The sha512 verification interval */
+
 #ifdef DEBUG
    bool link;                                   /**< Do linking */
 #endif
