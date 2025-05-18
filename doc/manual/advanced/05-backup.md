@@ -245,3 +245,14 @@ cd <path-to-specific-backup-directory>
 
 sha512sum --check backup.sha512
 ```
+
+The `verification` parameter can be use to control how frequently pgmoneta verifies the integrity of backup files. You can configure this in `pgmoneta.conf`:
+
+```
+[pgmoneta]
+.
+.
+.
+verification = 3600
+```
+For example, setting `verification = 3600` or `verification = 1H` will perform integrity checks every hour.

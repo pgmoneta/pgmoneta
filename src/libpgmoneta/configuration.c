@@ -145,6 +145,8 @@ pgmoneta_init_main_configuration(void* shm)
    config->backup_max_rate = 0;
    config->network_max_rate = 0;
 
+   config->verification = 0;
+
 #ifdef DEBUG
    config->link = true;
 #endif
@@ -1384,6 +1386,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "verification"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_seconds(value, &config->verification, 0))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
 #ifdef DEBUG
                else if (!strcmp(key, "link"))
                {
@@ -1729,6 +1745,11 @@ pgmoneta_validate_main_configuration(void* shm)
       }
    }
 
+   if (config->verification < 0)
+   {
+      pgmoneta_log_fatal("verification cannot be less than 0");
+      return 1;
+   }
    return 0;
 }
 
@@ -2501,6 +2522,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->common.configuration_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->common.users_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->common.admins_path, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_VERIFICATION, (uintptr_t)config->verification, ValueInt64);
 
    free(ret);
 }
@@ -3503,6 +3525,14 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
             }
             pgmoneta_json_put(response, key, (uintptr_t)config->network_max_rate, ValueInt32);
          }
+      }
+      else if (!strcmp(key, "verification"))
+      {
+         if (as_seconds(config_value, &config->verification, 0))
+         {
+            unknown = true;
+         }
+         pgmoneta_json_put(response, key, (uintptr_t)config->verification, ValueInt32);
       }
       else
       {
@@ -4749,6 +4779,11 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       changed = true;
    }
    config->common.log_level = reload->common.log_level;
+
+   if (restart_int("verification", config->verification, reload->verification))
+   {
+      changed = true;
+   }
 
    if (strncmp(config->common.log_path, reload->common.log_path, MISC_LENGTH) ||
        config->common.log_rotation_size != reload->common.log_rotation_size ||

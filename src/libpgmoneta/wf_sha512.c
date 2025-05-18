@@ -32,6 +32,7 @@
 #include <security.h>
 #include <string.h>
 #include <utils.h>
+#include <verify.h>
 #include <workflow.h>
 
 /* system */
