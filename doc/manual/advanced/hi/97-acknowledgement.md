@@ -7,7 +7,7 @@
 [**pgmoneta**][pgmoneta] [को निम्नलिखित लेखकों द्वारा बनाया गया है:]{lang=hi}
 
 ```
-Jesper Pedersen <jesper.pedersen@comcast.net>
+Jesper Pedersen <jesperpedersen.db@gmail.com>
 David Fetter <david@fetter.org>
 Will Leinweber <will@bitfission.com>
 Luca Ferrari <fluca1978@gmail.com>
@@ -31,6 +31,16 @@ Mario Rodas
 Annupamaa <annu242005@gmail.com>
 Ashutosh Sharma <ash2003sharma@gmail.com>
 Mohab Yaser <mohabyaserofficial2003@gmail.com>
+Georg Pfuetzenreuter <mail@georg-pfuetzenreuter.net>
+Ahmed Ashour <a8087027@gmail.com>
+Sangkeun J.C. Kim <jchrys@me.com>
+Tejas Tyagi <tejastyagi.tt@gmail.com>
+Aryan Arora <aryanarora.w1@gmail.com>
+Arshdeep Singh <balarsh535@gmail.com>
+Din Xin Chen <s990346@gmail.com>
+Mingzhuo Yin <yinmingzhuo@gmail.com>
+Vanes Angelo <k124k3n@gmail.com>
+Bassam Adnan <mailbassam@gmail.com>
 ```
 
 ## [कमिटर्स]{lang=hi}
