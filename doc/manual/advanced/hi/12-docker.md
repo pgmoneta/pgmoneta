@@ -1,3 +1,5 @@
+\newpage
+
 # Running pgmoneta with Docker
 
 You can run [**pgmoneta**][pgmoneta] using Docker instead of compiling it manually.
