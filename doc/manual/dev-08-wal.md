@@ -16,7 +16,7 @@ In addition to standard WAL files, `pgmoneta-walinfo` also supports encrypted (*
 #### Usage
 
 ```bash
-pgmoneta-walinfo 0.17.0
+pgmoneta-walinfo 0.17.1
   Command line utility to read and display Write-Ahead Log (WAL) files
 
 Usage:
