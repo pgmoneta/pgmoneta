@@ -218,3 +218,25 @@ crontab -e
 ```
 
 [यह हर दिन सुबह 6 बजे बैकअप लेने के लिए है।]{lang=hi}
+
+## [बैकअप अखंडता सत्यापित करें]{lang=hi}
+
+pgmoneta [बैकअप रूट निर्देशिका में प्रत्येक बैकअप के लिए एक]{lang=hi} SHA512 [चेकसम फ़ाइल]{lang=hi} (`backup.sha512`) [बनाता है, जिसका उपयोग फ़ाइलों की अखंडता को सत्यापित करने के लिए किया जा सकता है।]{lang=hi}
+
+`sha512sum` [का उपयोग करना:]{lang=hi}
+```
+cd <path-to-specific-backup-directory>
+
+sha512sum --check backup.sha512
+```
+
+`verification` [पैरामीटर का उपयोग यह नियंत्रित करने के लिए किया जा सकता है कि]{lang=hi} pgmoneta [कितनी बार बैकअप फ़ाइलों की अखंडता को सत्यापित करता है। आप इसे]{lang=hi} `pgmoneta.conf` [में कॉन्फ़िगर कर सकते हैं:]{lang=hi}
+
+```
+[pgmoneta]
+.
+.
+.
+verification = 3600
+```
+[उदाहरण के लिए]{lang=hi}, `verification = 3600` [या]{lang=hi} `verification = 1H` [सेट करने पर हर घंटे अखंडता जांच की जाएगी।]{lang=hi}
