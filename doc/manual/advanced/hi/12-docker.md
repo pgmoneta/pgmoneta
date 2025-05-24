@@ -1,15 +1,15 @@
 \newpage
 
-# Running pgmoneta with Docker
+# Docker [के साथ]{lang=hi} pgmoneta [निष्पादित करना]{lang=hi}
 
-You can run [**pgmoneta**][pgmoneta] using Docker instead of compiling it manually.
+[आप इसे मैन्युअल रूप से संकलित करने के बजाय डॉकर का उपयोग करके]{lang=hi} [**pgmoneta**][pgmoneta] [निष्पादित कर सकते हैं।]{lang=hi}
 
-## Prerequisites
+## [पूर्वापेक्षाएँ]{lang=hi}
 
-* [**Docker**][docker] or [**Podman**][podman] must be installed on the server where PostgreSQL is running.
-* Ensure PostgreSQL is configured to allow external connections.
+* [**Docker**][docker] [या]{lang=hi} [**Podman**][podman] [को उस सर्वर पर स्थापित किया जाना चाहिए जहाँ यह]{lang=hi} PostgreSQL [चला रहा है।]{lang=hi}
+* [सुनिश्चित करें कि]{lang=hi} PostgreSQL [बाहरी कनेक्शन की अनुमति देने के लिए कॉन्फ़िगर किया गया है।]{lang=hi}
 
-## Update the configuration file if needed:
+## [यदि आवश्यक हो तो कॉन्फ़िगरेशन फ़ाइल को अपडेट करें:]{lang=hi}
 
 ```ini
 [pgmoneta]
@@ -35,123 +35,124 @@ user = repl
 wal_slot = repl
 ```
 
-## Step 1: Enable External PostgreSQL Access
+## [चरण]{lang=hi} 1: PostgreSQL [के लिए बाहरी पहुँच सक्षम करें]{lang=hi}
 
-Modify the local PostgreSQL server's `postgresql.conf` file to allow connections from outside:
+[बाहर से कनेक्शन की अनुमति देने के लिए]{lang=hi} PostgreSQL [स्थानीय सर्वर के]{lang=hi} `postgresql.conf` [को संशोधित करेंः]{lang=hi}
 ```ini
 listen_addresses = '*'
 ```
 
-Update `pg_hba.conf` to allow remote connections:
+`pg_hba.conf` [को दूरस्थ कनेक्शन की अनुमति देने के लिए अद्यतन करेंः]{lang=hi}
 ```ini
 host    all    all    0.0.0.0/0    scram-sha-256
 ```
 
-Then, restart PostgreSQL for the changes to take effect:
+[फिर, परिवर्तनों को प्रभावी बनाने के लिए]{lang=hi} PostgreSQL [को पुनरारंभ करेंः]{lang=hi}
 ```sh
 sudo systemctl restart postgresql
 ```
 
-## Step 2: Clone the Repository
+## [चरण]{lang=hi} 2: [रिपॉजिटरी को क्लोन करें]{lang=hi}
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
 ```
 
-## Step 3: Build the Docker Image
+## [चरण]{lang=hi} 3: [डॉकर इमेज बनाएं]{lang=hi}
 
-There are two Dockerfiles available:
-1. **Alpine-based image**
+[दो डॉकरफाइल उपलब्ध हैंः]{lang=hi}
 
-**Using Docker**
+1. **Alpine [इमेज]{lang=hi}**
+
+**Docker [का उपयोग करके]{lang=hi}**
 ```sh
 docker build -t pgmoneta:latest -f ./contrib/docker/Dockerfile.alpine .
 ```
 
-**Using Podman**
+**Podman [का उपयोग करके]{lang=hi}**
 
 ```sh
 podman build -t pgmoneta:latest -f ./contrib/docker/Dockerfile.alpine .
 ```
 
-2. **Rocky Linux 9-based image**
+2. **Rocky Linux 9 [इमेज]{lang=hi}**
 
-**Using Docker**
+**Docker [का उपयोग करके]{lang=hi}**
 ```sh
 docker build -t pgmoneta:latest -f ./contrib/docker/Dockerfile.rocky9 .
 ```
 
-**Using Podman**
+**Podman [का उपयोग करके]{lang=hi}**
 
 ```sh
 podman build -t pgmoneta:latest -f ./contrib/docker/Dockerfile.rocky9 .
 ```
 
-## Step 4: Run pgmoneta as a Docker Container
+## [चरण]{lang=hi} 4: pgmoneta [को डॉकर कंटेनर के रूप में चलाएँ]{lang=hi}
 
-Once the image is built, run the container using:
+[एक बार इमेज बन जाने पर, कंटेनर को निम्न का उपयोग करके चलाएँ:]{lang=hi}
 
-- **Using Docker**
+- **Docker [का उपयोग करके]{lang=hi}**
 
 ```sh
 docker run -d --name pgmoneta --network host pgmoneta:latest
 ```
 
-- **Using Podman**
+- **Podman [का उपयोग करके]{lang=hi}**
 
 ```sh
 podman run -d --name pgmoneta --network host pgmoneta:latest
 ```
 
-## Step 5: Verify the Container
+## [चरण]{lang=hi} 5: [कंटेनर को सत्यापित करें]{lang=hi}
 
-Check if the container is running:
+[जाँचें कि कंटेनर चल रहा है या नहीं:]{lang=hi}
 
-- **Using Docker**
+- **Docker [का उपयोग करके]{lang=hi}**
 
 ```sh
 docker ps | grep pgmoneta -->
 ```
 
-- **Using Podman**
+- **Podman [का उपयोग करके]{lang=hi}**
 ```sh
 podman ps | grep pgmoneta
 ```
 
-Check logs for any errors:
+[किसी भी त्रुटि के लिए लॉग की जाँच करें:]{lang=hi}
 
-- **Using Docker**
+- **Docker [का उपयोग करके]{lang=hi}**
 
 ```sh
 docker logs pgmoneta
 ```
 
-- **Using Podman**
+- **Podman [का उपयोग करके]{lang=hi}**
 
 ```sh
 podman logs pgmoneta
 ```
 
-You can also inspect the exposed metrics at:
+[आप उजागर मीट्रिक्स का निरीक्षण यहां भी कर सकते हैं:]{lang=hi}
 ```
 http://localhost:5001/metrics
 ```
 
-You can stop the container using
+[आप निम्न का उपयोग करके कंटेनर को बंद कर सकते हैं]{lang=hi}
 
-- **Using Docker**
+- **Docker [का उपयोग करके]{lang=hi}**
 
 ```sh
 docker stop pgmoneta
 ```
 
-- **Using Podman**
+- **Podman [का उपयोग करके]{lang=hi}**
 
 ```sh
 podman stop pgmoneta
 ```
 
-You can exec into the container and run the cli commands as
+[आप कंटेनर में]{lang=hi} exec [कर सकते हैं और]{lang=hi} cli [कमांड को चला सकते हैं]{lang=hi}
 
 ```sh
 docker exec -it pgmoneta /bin/bash
@@ -162,6 +163,6 @@ cd /etc/pgmoneta
 /usr/local/bin/pgmoneta-cli -c pgmoneta.conf shutdown
 ```
 
-See [this](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/user-10-cli.md) for more cli commands.
+[अधिक]{lang=hi} cli [कमांड के लिए]{lang=hi} [[यह]{lang=hi}](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/user-10-cli.md) [देखें।]{lang=hi}
 
-You can access the three binaries at `/usr/local/bin`
+[आप]{lang=hi} `/usr/local/bin` [पर तीनों बाइनरी तक पहुँच सकते हैं।]{lang=hi}

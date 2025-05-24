@@ -118,14 +118,11 @@
 |------------|----------|--------|--------|----------|
 | retention | 7, - , - , - | Array | [नहीं]{lang=hi} | [संग्रहण समय दिन, सप्ताह, महीने, साल में]{lang=hi} |
 
-#### Verification
+#### [सत्यापन]{lang=hi}
 
-| Property | Default | Unit | Required | Description |
+| [गुण]{lang=hi} | [डिफ़ॉल्ट]{lang=hi} | [इकाई]{lang=hi} | [आवश्यक]{lang=hi} | [विवरण]{lang=hi} |
 | :------- | :------ | :--- | :------- | :---------- |
-| verification | 0 | String | No | The time between verification of a backup. If this value is specified without units,
-  it is taken as seconds. Setting this parameter to 0 disables verification. It supports the
-  following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D'
-  for days, and 'W' for weeks. Default is 0 (disabled) |
+| verification | 0 | String | [नहीं]{lang=hi} |[बैकअप के सत्यापन के बीच का समय। यदि यह मान इकाइयों के बिना निर्दिष्ट किया जाता है, तो इसे सेकंड के रूप में लिया जाता है। इस पैरामीटर को]{lang=hi} 0 [पर सेट करने से सत्यापन अक्षम हो जाता है। यह प्रत्यय के रूप में निम्नलिखित इकाइयों का समर्थन करता है: सेकंड के लिए]{lang=hi} 'S' [(डिफ़ॉल्ट), मिनटों के लिए]{lang=hi} 'M', [घंटों के लिए]{lang=hi} 'H', [दिनों के लिए]{lang=hi} 'D' [और हफ्तों के लिए]{lang=hi} 'W'। [डिफ़ॉल्ट]{lang=hi} 0 [(अक्षम) है]{lang=hi} |
 
 #### [लॉगिंग]{lang=hi}
 
