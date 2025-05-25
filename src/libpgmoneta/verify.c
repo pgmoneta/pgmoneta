@@ -406,7 +406,7 @@ pgmoneta_sha512_verification(char** argv)
                goto cleanup;
             }
 
-            if (!strcmp(hash, calculated_hash))
+            if (strcmp(hash, calculated_hash) != 0)
             {
                pgmoneta_log_error("Verification: Server %s / Hash mismatch for %s | Expected: %s | Got: %s",
                                   config->common.servers[server].name,
