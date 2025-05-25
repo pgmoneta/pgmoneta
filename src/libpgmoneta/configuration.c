@@ -483,12 +483,33 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(&srv.name, section, max);
-                     max = strlen(value);
-                     if (max > MAX_PATH - 1)
+
+                     // comma separated paths
+                     char* paths = strdup(value);
+                     char* token = strtok(paths, ",");
+                     int count = 0;
+
+                     while (token != NULL && count < NUMBER_OF_HOT_STANDBY)
                      {
-                        max = MAX_PATH - 1;
+                        char* path = pgmoneta_remove_whitespace(token);
+
+                        max = strlen(path);
+                        if (max > MAX_PATH - 1)
+                        {
+                           max = MAX_PATH - 1;
+                        }
+                        memcpy(&srv.hot_standby[count], path, max);
+                        ++count;
+                        free(path);
+
+                        token = strtok(NULL, ",");
                      }
-                     memcpy(&srv.hot_standby, value, max);
+                     if (token != NULL)
+                     {
+                        pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                     }
+                     free(paths);
+                     srv.hot_standby_count = count;
                   }
                }
                else if (!strcmp(key, "hot_standby_overrides"))
@@ -2555,6 +2576,19 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING, (uintptr_t)config->common.servers[i].wal_shipping, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)config->common.servers[i].hot_standby, ValueString);
+      // Hot_standby
+      char* hot_standby = NULL;
+      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      {
+         if (j > 0)
+         {
+            hot_standby = pgmoneta_append(hot_standby, ",");
+         }
+         hot_standby = pgmoneta_append(hot_standby, config->common.servers[i].hot_standby[j]);
+      }
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)hot_standby, ValueString);
+      free(hot_standby);
+
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES, (uintptr_t)config->common.servers[i].hot_standby_overrides, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->common.servers[i].hot_standby_tablespaces, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
@@ -2938,13 +2972,34 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
       {
          if (strlen(section) > 0)
          {
-            max = strlen(config_value);
-            if (max > MAX_PATH - 1)
+            // Clear it first to prevent undefined behavior
+            config->common.servers[server_index].hot_standby_count = 0;
+
+            char* paths = strdup(config_value);
+            char* token = strtok(paths, ",");
+            int count = 0;
+
+            while (token != NULL && count < NUMBER_OF_HOT_STANDBY)
             {
-               max = MAX_PATH - 1;
+               char* path = pgmoneta_remove_whitespace(token);
+               max = strlen(token);
+               if (max > MAX_PATH - 1)
+               {
+                  max = MAX_PATH - 1;
+               }
+               memcpy(&config->common.servers[server_index].hot_standby[count], path, max);
+               free(path);
+               ++count;
+               token = strtok(NULL, ",");
             }
-            memcpy(&config->common.servers[server_index].hot_standby, config_value, max);
-            pgmoneta_json_put(server_j, key, (uintptr_t)config->common.servers[server_index].hot_standby, ValueString);
+            if (token != NULL)
+            {
+               pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+            }
+            free(paths);
+            config->common.servers[server_index].hot_standby_count = count;
+
+            pgmoneta_json_put(server_j, key, (uintptr_t)config_value, ValueString);
             pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
          }
          else
@@ -4937,7 +4992,11 @@ copy_server(struct server* dst, struct server* src)
    {
       changed = true;
    }
-   memcpy(&dst->hot_standby[0], &src->hot_standby[0], MAX_PATH);
+   for (int i = 0; i < src->hot_standby_count; i++)
+   {
+      memcpy(&dst->hot_standby[i][0], &src->hot_standby[i][0], MAX_PATH);
+   }
+   dst->hot_standby_count = src->hot_standby_count;
    memcpy(&dst->hot_standby_overrides[0], &src->hot_standby_overrides[0], MAX_PATH);
    memcpy(&dst->hot_standby_tablespaces[0], &src->hot_standby_tablespaces[0], MAX_PATH);
    /* dst->cur_timeline = src->cur_timeline; */

@@ -74,6 +74,7 @@ extern "C" {
 #define NUMBER_OF_SERVERS 64
 #define NUMBER_OF_USERS   64
 #define NUMBER_OF_ADMINS   8
+#define NUMBER_OF_HOT_STANDBY 8
 
 #define MAX_NUMBER_OF_COLUMNS      8
 #define MAX_NUMBER_OF_TABLESPACES 64
@@ -245,7 +246,8 @@ struct server
    atomic_llong last_operation_time;        /**< Last operation time of the server */
    atomic_llong last_failed_operation_time; /**< Last failed operation time of the server */
    char wal_shipping[MAX_PATH];             /**< The WAL shipping directory */
-   char hot_standby[MAX_PATH];              /**< The hot standby directory */
+   char hot_standby[NUMBER_OF_HOT_STANDBY][MAX_PATH];    /**< The hot standby directories */
+   int hot_standby_count;                   /**< The number of hot standby directories */
    char hot_standby_overrides[MAX_PATH];    /**< The hot standby overrides directory */
    char hot_standby_tablespaces[MAX_PATH];  /**< The hot standby tablespaces mappings */
    char tls_cert_file[MAX_PATH];            /**< TLS certificate path */

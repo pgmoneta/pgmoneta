@@ -1,6 +1,6 @@
 ## Hot standby
 
-This tutorial will show you how to configure a hot standby instance.
+This tutorial will show you how to configure hot standby instances.
 
 ### Preface
 
@@ -19,13 +19,19 @@ hot_standby = /your/local/hot/standby/directory
 to the corresponding server section of `pgmoneta.conf`. [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will create the directory if it doesn't exist,
 and keep the latest backup in the defined directory.
 
+You can also configure muptiple hot standby directories (up to 8) by providing comma-separated paths:
+```
+/path/to/hot/standby1,/path/to/hot/standby2,/path/to/hot/standby3
+```
+[**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will maintain identical copies of the hot standby in all specified directories.
+
 You can use
 
 ```
 hot_standby_overrides = /your/local/hot/standby/overrides/
 ```
 
-to override files in the `hot_standby` directory.
+to override files in the `hot_standby` directories. The overrides will be applied to all hot_standby directories.
 
 ### Tablespaces
 

@@ -183,12 +183,9 @@ done:
    free(backups);
    free(backup);
 
-   if (strlen(config->common.servers[server].hot_standby) > 0)
+   if (config->common.servers[server].hot_standby_count > 0)
    {
-      char* srv = NULL;
-      char* hs = NULL;
-
-      srv = pgmoneta_get_server_backup(server);
+      d = pgmoneta_get_server_backup(server);
 
       if (pgmoneta_get_backups(d, &number_of_backups, &backups))
       {
@@ -197,17 +194,24 @@ done:
 
       if (number_of_backups == 0)
       {
-         hs = pgmoneta_append(hs, config->common.servers[server].hot_standby);
-         if (!pgmoneta_ends_with(hs, "/"))
+         for (int j = 0; j < config->common.servers[server].hot_standby_count; j++)
          {
-            hs = pgmoneta_append_char(hs, '/');
-         }
+            char* hs = NULL;
+            hs = pgmoneta_append(hs, config->common.servers[server].hot_standby[j]);
+            if (!pgmoneta_ends_with(hs, "/"))
+            {
+               hs = pgmoneta_append_char(hs, '/');
+            }
+            if (pgmoneta_exists(hs))
+            {
+               pgmoneta_delete_directory(hs);
 
-         if (pgmoneta_exists(hs))
-         {
-            pgmoneta_delete_directory(hs);
-
-            pgmoneta_log_info("Hot standby deleted: %s", config->common.servers[server].name);
+               pgmoneta_log_info("Hot standby deleted: %s (directory %d: %s)",
+                                 config->common.servers[server].name,
+                                 j + 1,
+                                 config->common.servers[server].hot_standby[j]);
+            }
+            free(hs);
          }
       }
 
@@ -216,9 +220,6 @@ done:
          free(backups[i]);
       }
       free(backups);
-
-      free(srv);
-      free(hs);
    }
 
    free(d);

@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <logging.h>
 #include <manifest.h>
 #include <restore.h>
@@ -74,13 +75,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
-   char* root = NULL;
    char* base = NULL;
    char* source_root = NULL;
    char* source = NULL;
-   char* destination = NULL;
-   char* old_manifest = NULL;
-   char* new_manifest = NULL;
    bool incremental = false;
    struct timespec start_t;
    struct timespec end_t;
@@ -90,16 +87,8 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
    double seconds;
    char elapsed[128];
    int number_of_workers = 0;
-   char* f = NULL;
-   char* from = NULL;
-   char* to = NULL;
-   struct art* deleted_files = NULL;
-   struct art_iterator* deleted_iter = NULL;
-   struct art* changed_files = NULL;
-   struct art_iterator* changed_iter = NULL;
-   struct art* added_files = NULL;
-   struct art_iterator* added_iter = NULL;
    int number_of_backups = 0;
+   int failed_count = 0;
    struct backup** backups = NULL;
    struct workers* workers = NULL;
    struct main_configuration* config;
@@ -125,7 +114,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Hot standby (execute): %s/%s", config->common.servers[server].name, label);
 
-   if (strlen(config->common.servers[server].hot_standby) > 0)
+   if (config->common.servers[server].hot_standby_count > 0)
    {
       number_of_workers = pgmoneta_get_number_of_workers(server);
 #ifdef HAVE_FREEBSD
@@ -138,195 +127,242 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
       pgmoneta_get_backups(base, &number_of_backups, &backups);
 
-      root = pgmoneta_append(root, config->common.servers[server].hot_standby);
-      if (!pgmoneta_ends_with(root, "/"))
+      for (int i = 0; i < config->common.servers[server].hot_standby_count; i++)
       {
-         root = pgmoneta_append_char(root, '/');
-      }
+         char* root = NULL;
+         char* destination = NULL;
+         char* old_manifest = NULL;
+         char* new_manifest = NULL;
+         char* f = NULL;
+         char* from = NULL;
+         char* to = NULL;
+         struct art* deleted_files = NULL;
+         struct art_iterator* deleted_iter = NULL;
+         struct art* changed_files = NULL;
+         struct art_iterator* changed_iter = NULL;
+         struct art* added_files = NULL;
+         struct art_iterator* added_iter = NULL;
+         bool error = false;
 
-      destination = pgmoneta_append(destination, root);
-      destination = pgmoneta_append(destination, config->common.servers[server].name);
-
-      if (!incremental && pgmoneta_exists(destination) && number_of_backups >= 2)
-      {
-         if (number_of_workers > 0)
+         root = pgmoneta_append(root, config->common.servers[server].hot_standby[i]);
+         if (!pgmoneta_ends_with(root, "/"))
          {
-            pgmoneta_workers_initialize(number_of_workers, &workers);
+            root = pgmoneta_append_char(root, '/');
          }
 
-         source = pgmoneta_append(source, base);
-         if (!pgmoneta_ends_with(source, "/"))
+         pgmoneta_log_debug("Processing hot standby directory %d/%d: %s",
+                           i + 1,
+                           config->common.servers[server].hot_standby_count,
+                           config->common.servers[server].hot_standby[i]);
+
+         destination = pgmoneta_append(destination, root);
+         destination = pgmoneta_append(destination, config->common.servers[server].name);
+         if (!incremental && pgmoneta_exists(destination) && number_of_backups >= 2)
          {
-            source = pgmoneta_append_char(source, '/');
-         }
-         source = pgmoneta_append(source, backups[number_of_backups - 1]->label);
-         if (!pgmoneta_ends_with(source, "/"))
-         {
-            source = pgmoneta_append_char(source, '/');
-         }
-
-         old_manifest = pgmoneta_append(old_manifest, base);
-         if (!pgmoneta_ends_with(old_manifest, "/"))
-         {
-            old_manifest = pgmoneta_append_char(old_manifest, '/');
-         }
-         old_manifest = pgmoneta_append(old_manifest, backups[number_of_backups - 2]->label);
-         if (!pgmoneta_ends_with(old_manifest, "/"))
-         {
-            old_manifest = pgmoneta_append_char(old_manifest, '/');
-         }
-         old_manifest = pgmoneta_append(old_manifest, "backup.manifest");
-
-         new_manifest = pgmoneta_append(new_manifest, source);
-         new_manifest = pgmoneta_append(new_manifest, "backup.manifest");
-
-         pgmoneta_log_trace("old_manifest: %s", old_manifest);
-         pgmoneta_log_trace("new_manifest: %s", new_manifest);
-
-         pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files);
-
-         pgmoneta_art_iterator_create(deleted_files, &deleted_iter);
-         pgmoneta_art_iterator_create(changed_files, &changed_iter);
-         pgmoneta_art_iterator_create(added_files, &added_iter);
-
-         while (pgmoneta_art_iterator_next(deleted_iter))
-         {
-            f = pgmoneta_append(f, destination);
-            if (!pgmoneta_ends_with(f, "/"))
+            if (number_of_workers > 0 && workers == NULL)
             {
-               f = pgmoneta_append_char(f, '/');
-            }
-            f = pgmoneta_append(f, deleted_iter->key);
-
-            if (pgmoneta_exists(f))
-            {
-               pgmoneta_delete_file(f, workers);
-            }
-            else
-            {
-               pgmoneta_log_debug("%s doesn't exists", f);
+               pgmoneta_workers_initialize(number_of_workers, &workers);
             }
 
-            free(f);
-            f = NULL;
-         }
-
-         while (pgmoneta_art_iterator_next(changed_iter))
-         {
-            from = pgmoneta_append(from, source);
-            if (!pgmoneta_ends_with(from, "/"))
+            if (source == NULL)
             {
-               from = pgmoneta_append_char(from, '/');
+               source = pgmoneta_append(source, base);
+               if (!pgmoneta_ends_with(source, "/"))
+               {
+                  source = pgmoneta_append_char(source, '/');
+               }
+               source = pgmoneta_append(source, backups[number_of_backups - 1]->label);
+               if (!pgmoneta_ends_with(source, "/"))
+               {
+                  source = pgmoneta_append_char(source, '/');
+               }
             }
-            from = pgmoneta_append(from, "data/");
-            from = pgmoneta_append(from, changed_iter->key);
 
-            to = pgmoneta_append(to, destination);
-            if (!pgmoneta_ends_with(to, "/"))
+            old_manifest = pgmoneta_append(old_manifest, base);
+            if (!pgmoneta_ends_with(old_manifest, "/"))
             {
-               to = pgmoneta_append_char(to, '/');
+               old_manifest = pgmoneta_append_char(old_manifest, '/');
             }
-            to = pgmoneta_append(to, changed_iter->key);
-
-            pgmoneta_log_trace("hot_standby changed: %s -> %s", from, to);
-
-            pgmoneta_copy_file(from, to, workers);
-
-            free(from);
-            from = NULL;
-
-            free(to);
-            to = NULL;
-         }
-
-         while (pgmoneta_art_iterator_next(added_iter))
-         {
-            from = pgmoneta_append(from, source);
-            if (!pgmoneta_ends_with(from, "/"))
+            old_manifest = pgmoneta_append(old_manifest, backups[number_of_backups - 2]->label);
+            if (!pgmoneta_ends_with(old_manifest, "/"))
             {
-               from = pgmoneta_append_char(from, '/');
+               old_manifest = pgmoneta_append_char(old_manifest, '/');
             }
-            from = pgmoneta_append(from, "data/");
-            from = pgmoneta_append(from, added_iter->key);
+            old_manifest = pgmoneta_append(old_manifest, "backup.manifest");
 
-            to = pgmoneta_append(to, destination);
-            if (!pgmoneta_ends_with(to, "/"))
+            new_manifest = pgmoneta_append(new_manifest, source);
+            new_manifest = pgmoneta_append(new_manifest, "backup.manifest");
+
+            pgmoneta_log_trace("old_manifest: %s", old_manifest);
+            pgmoneta_log_trace("new_manifest: %s", new_manifest);
+
+            pgmoneta_compare_manifests(old_manifest, new_manifest, &deleted_files, &changed_files, &added_files);
+
+            pgmoneta_art_iterator_create(deleted_files, &deleted_iter);
+            pgmoneta_art_iterator_create(changed_files, &changed_iter);
+            pgmoneta_art_iterator_create(added_files, &added_iter);
+
+            while (pgmoneta_art_iterator_next(deleted_iter))
             {
-               to = pgmoneta_append_char(to, '/');
+               f = pgmoneta_append(f, destination);
+               if (!pgmoneta_ends_with(f, "/"))
+               {
+                  f = pgmoneta_append_char(f, '/');
+               }
+               f = pgmoneta_append(f, deleted_iter->key);
+
+               if (pgmoneta_exists(f))
+               {
+                  pgmoneta_delete_file(f, workers);
+               }
+               else
+               {
+                  pgmoneta_log_debug("%s doesn't exists", f);
+               }
+
+               free(f);
+               f = NULL;
             }
-            to = pgmoneta_append(to, added_iter->key);
 
-            pgmoneta_log_trace("hot_standby new: %s -> %s", from, to);
-
-            pgmoneta_copy_file(from, to, workers);
-
-            free(from);
-            from = NULL;
-
-            free(to);
-            to = NULL;
-         }
-      }
-      else
-      {
-         if (incremental)
-         {
-            if (pgmoneta_extract_incremental_backup(server, label, &source_root, &source))
+            while (pgmoneta_art_iterator_next(changed_iter))
             {
-               pgmoneta_log_error("Hotstandby: Unable to extract backup %s", label);
-               goto error;
+               from = pgmoneta_append(from, source);
+               if (!pgmoneta_ends_with(from, "/"))
+               {
+                  from = pgmoneta_append_char(from, '/');
+               }
+               from = pgmoneta_append(from, "data/");
+               from = pgmoneta_append(from, changed_iter->key);
+
+               to = pgmoneta_append(to, destination);
+               if (!pgmoneta_ends_with(to, "/"))
+               {
+                  to = pgmoneta_append_char(to, '/');
+               }
+               to = pgmoneta_append(to, changed_iter->key);
+
+               pgmoneta_log_trace("hot_standby changed: %s -> %s", from, to);
+
+               pgmoneta_copy_file(from, to, workers);
+
+               free(from);
+               from = NULL;
+
+               free(to);
+               to = NULL;
+            }
+
+            while (pgmoneta_art_iterator_next(added_iter))
+            {
+               from = pgmoneta_append(from, source);
+               if (!pgmoneta_ends_with(from, "/"))
+               {
+                  from = pgmoneta_append_char(from, '/');
+               }
+               from = pgmoneta_append(from, "data/");
+               from = pgmoneta_append(from, added_iter->key);
+
+               to = pgmoneta_append(to, destination);
+               if (!pgmoneta_ends_with(to, "/"))
+               {
+                  to = pgmoneta_append_char(to, '/');
+               }
+               to = pgmoneta_append(to, added_iter->key);
+
+               pgmoneta_log_trace("hot_standby new: %s -> %s", from, to);
+
+               pgmoneta_copy_file(from, to, workers);
+
+               free(from);
+               from = NULL;
+
+               free(to);
+               to = NULL;
             }
          }
          else
          {
-            source = pgmoneta_append(source, base);
-            source = pgmoneta_append(source, label);
-            source = pgmoneta_append_char(source, '/');
-            source = pgmoneta_append(source, "data");
+            /* incremental or  number of backups < 2 */
+            if (incremental && source == NULL)
+            {
+               if (pgmoneta_extract_incremental_backup(server, label, &source_root, &source))
+               {
+                  pgmoneta_log_error("Hotstandby: Unable to extract backup %s", label);
+                  error = true;
+                  goto cleanup;
+               }
+            }
+            else if (source == NULL)
+            {
+               source = pgmoneta_append(source, base);
+               source = pgmoneta_append(source, label);
+               source = pgmoneta_append_char(source, '/');
+               source = pgmoneta_append(source, "data");
+            }
+            if (number_of_workers > 0 && workers == NULL)
+            {
+               pgmoneta_workers_initialize(number_of_workers, &workers);
+            }
+
+            if (pgmoneta_exists(destination))
+            {
+               pgmoneta_delete_directory(destination);
+            }
+
+            pgmoneta_mkdir(root);
+            pgmoneta_mkdir(destination);
+
+            pgmoneta_copy_postgresql_hotstandby(source, destination, config->common.servers[server].hot_standby_tablespaces, backups[number_of_backups - 1], workers);
          }
-         if (number_of_workers > 0)
+         pgmoneta_log_debug("hot_standby source:      %s", source);
+         pgmoneta_log_debug("hot_standby destination: %s", destination);
+         pgmoneta_workers_wait(workers);
+         if (workers != NULL && !workers->outcome)
          {
-            pgmoneta_workers_initialize(number_of_workers, &workers);
+            error = true;
+            goto cleanup;
          }
 
-         if (pgmoneta_exists(destination))
+         if (strlen(config->common.servers[server].hot_standby_overrides) > 0 &&
+             pgmoneta_exists(config->common.servers[server].hot_standby_overrides) &&
+             pgmoneta_is_directory(config->common.servers[server].hot_standby_overrides))
          {
-            pgmoneta_delete_directory(destination);
+            pgmoneta_log_debug("hot_standby_overrides source:      %s", config->common.servers[server].hot_standby_overrides);
+            pgmoneta_log_debug("hot_standby_overrides destination: %s", destination);
+
+            pgmoneta_copy_directory(config->common.servers[server].hot_standby_overrides,
+                                    destination,
+                                    NULL,
+                                    workers);
+         }
+         pgmoneta_workers_wait(workers);
+         if (workers != NULL && !workers->outcome)
+         {
+            error = true;
+            goto cleanup;
          }
 
-         pgmoneta_mkdir(root);
-         pgmoneta_mkdir(destination);
+cleanup:
+         if (error)
+         {
+            ++failed_count;
+            pgmoneta_log_error("Failed to process hot standby directory: %s",
+                               config->common.servers[server].hot_standby[i]);
+         }
+         free(old_manifest);
+         free(new_manifest);
+         free(root);
+         free(destination);
 
-         pgmoneta_copy_postgresql_hotstandby(source, destination, config->common.servers[server].hot_standby_tablespaces, backups[number_of_backups - 1], workers);
+         pgmoneta_art_iterator_destroy(deleted_iter);
+         pgmoneta_art_iterator_destroy(changed_iter);
+         pgmoneta_art_iterator_destroy(added_iter);
+
+         pgmoneta_art_destroy(deleted_files);
+         pgmoneta_art_destroy(changed_files);
+         pgmoneta_art_destroy(added_files);
       }
 
-      pgmoneta_log_debug("hot_standby source:      %s", source);
-      pgmoneta_log_debug("hot_standby destination: %s", destination);
-
-      pgmoneta_workers_wait(workers);
-      if (workers != NULL && !workers->outcome)
-      {
-         goto error;
-      }
-
-      if (strlen(config->common.servers[server].hot_standby_overrides) > 0 &&
-          pgmoneta_exists(config->common.servers[server].hot_standby_overrides) &&
-          pgmoneta_is_directory(config->common.servers[server].hot_standby_overrides))
-      {
-         pgmoneta_log_debug("hot_standby_overrides source:      %s", config->common.servers[server].hot_standby_overrides);
-         pgmoneta_log_debug("hot_standby_overrides destination: %s", destination);
-
-         pgmoneta_copy_directory(config->common.servers[server].hot_standby_overrides,
-                                 destination,
-                                 NULL,
-                                 workers);
-      }
-
-      pgmoneta_workers_wait(workers);
-      if (workers != NULL && !workers->outcome)
-      {
-         goto error;
-      }
       pgmoneta_workers_destroy(workers);
 
 #ifdef HAVE_FREEBSD
@@ -343,11 +379,12 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
       memset(&elapsed[0], 0, sizeof(elapsed));
       sprintf(&elapsed[0], "%02i:%02i:%.4f", hours, minutes, seconds);
 
-      pgmoneta_log_debug("Hot standby: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
+      pgmoneta_log_debug("Hot standby: %s/%s - Processed %d/%d directories successfully (Elapsed: %s)",
+                         config->common.servers[server].name, label,
+                         config->common.servers[server].hot_standby_count - failed_count,
+                         config->common.servers[server].hot_standby_count
+                         & elapsed[0]);
    }
-
-   free(old_manifest);
-   free(new_manifest);
 
    if (source_root != NULL)
    {
@@ -355,58 +392,13 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
       free(source_root);
    }
 
+   free(base);
+   free(source);
    for (int i = 0; i < number_of_backups; i++)
    {
       free(backups[i]);
    }
    free(backups);
 
-   pgmoneta_art_iterator_destroy(deleted_iter);
-   pgmoneta_art_iterator_destroy(changed_iter);
-   pgmoneta_art_iterator_destroy(added_iter);
-
-   pgmoneta_art_destroy(deleted_files);
-   pgmoneta_art_destroy(changed_files);
-   pgmoneta_art_destroy(added_files);
-
-   free(root);
-   free(base);
-   free(source);
-   free(destination);
-
-   return 0;
-
-error:
-
-   free(old_manifest);
-   free(new_manifest);
-
-   pgmoneta_workers_destroy(workers);
-
-   if (source_root != NULL)
-   {
-      pgmoneta_delete_directory(source_root);
-      free(source_root);
-   }
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
-   pgmoneta_art_iterator_destroy(deleted_iter);
-   pgmoneta_art_iterator_destroy(changed_iter);
-   pgmoneta_art_iterator_destroy(added_iter);
-
-   pgmoneta_art_destroy(deleted_files);
-   pgmoneta_art_destroy(changed_files);
-   pgmoneta_art_destroy(added_files);
-
-   free(root);
-   free(base);
-   free(source);
-   free(destination);
-
-   return 1;
+   return failed_count;
 }

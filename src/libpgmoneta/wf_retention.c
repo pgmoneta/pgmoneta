@@ -195,10 +195,9 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
       }
       free(backups);
 
-      if (strlen(config->common.servers[i].hot_standby) > 0)
+      if (config->common.servers[i].hot_standby_count > 0)
       {
          char* srv = NULL;
-         char* hs = NULL;
 
          srv = pgmoneta_get_server_backup(i);
 
@@ -206,17 +205,22 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
          {
             if (number_of_backups == 0)
             {
-               hs = pgmoneta_append(hs, config->common.servers[i].hot_standby);
-               if (!pgmoneta_ends_with(hs, "/"))
-               {
-                  hs = pgmoneta_append_char(hs, '/');
-               }
 
-               if (pgmoneta_exists(hs))
+               for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
                {
-                  pgmoneta_delete_directory(hs);
-
-                  pgmoneta_log_info("Hot standby deleted: %s", config->common.servers[i].name);
+                  char* hs = NULL;
+                  hs = pgmoneta_append(hs, config->common.servers[i].hot_standby[j]);
+                  if (!pgmoneta_ends_with(hs, "/"))
+                  {
+                     pgmoneta_append_char(hs, '/');
+                  }
+                  if (pgmoneta_exists(hs))
+                  {
+                     pgmoneta_delete_directory(hs);
+                     pgmoneta_log_info("Hot standby deleted: %s (directory %d: %s)",
+                                       config->common.servers[i].name, j + 1, config->common.servers[i].hot_standby[j]);
+                  }
+                  free(hs);
                }
             }
          }
@@ -228,7 +232,6 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
          free(backups);
 
          free(srv);
-         free(hs);
       }
 
       free(retention_keep);

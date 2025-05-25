@@ -2991,7 +2991,6 @@ pgmoneta_is_wal_file(char* file)
    return true;
 }
 
-
 int
 pgmoneta_read_wal(char* directory, char** wal)
 {
@@ -3113,7 +3112,6 @@ string_compare(const void* a, const void* b)
 {
    return strcmp(*(char**)a, *(char**)b);
 }
-
 
 char*
 pgmoneta_get_server(int server)
@@ -3252,31 +3250,6 @@ error:
    free(ws);
 
    return 1;
-}
-
-char*
-pgmoneta_get_server_hot_standby(int server)
-{
-   struct main_configuration* config;
-   char* hs = NULL;
-
-   config = (struct main_configuration*)shmem;
-
-   if (strlen(config->common.servers[server].hot_standby) > 0)
-   {
-      hs = pgmoneta_append(hs, config->common.servers[server].hot_standby);
-
-      if (!pgmoneta_ends_with(hs, "/"))
-      {
-         hs = pgmoneta_append(hs, "/");
-      }
-
-      hs = pgmoneta_append(hs, config->common.servers[server].name);
-
-      return hs;
-   }
-
-   return NULL;
 }
 
 char*

@@ -1867,22 +1867,25 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      d = pgmoneta_get_server_hot_standby(i);
-
-      if (d != NULL)
+      size = 0;
+      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
       {
-         size = pgmoneta_directory_size(d);
-         data = pgmoneta_append_ulong(data, size);
-      }
-      else
-      {
-         data = pgmoneta_append_ulong(data, 0);
-      }
+         d = pgmoneta_append(d, config->common.servers[i].hot_standby[j]);
+         if (!pgmoneta_ends_with(d, "/"))
+         {
+            d = pgmoneta_append_char(d, '/');
+         }
+         d = pgmoneta_append(d, config->common.servers[i].name);
 
+         if (pgmoneta_exists(d))
+         {
+            size += pgmoneta_directory_size(d);
+         }
+         free(d);
+         d = NULL;
+      }
+      data = pgmoneta_append_ulong(data, size);
       data = pgmoneta_append(data, "\n");
-
-      free(d);
-      d = NULL;
    }
    data = pgmoneta_append(data, "\n");
 
@@ -1896,22 +1899,25 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      d = pgmoneta_get_server_hot_standby(i);
-
-      if (d != NULL)
+      size = 0;
+      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
       {
-         size = pgmoneta_free_space(d);
-         data = pgmoneta_append_ulong(data, size);
-      }
-      else
-      {
-         data = pgmoneta_append_ulong(data, 0);
-      }
+         d = pgmoneta_append(d, config->common.servers[i].hot_standby[j]);
+         if (!pgmoneta_ends_with(d, "/"))
+         {
+            d = pgmoneta_append_char(d, '/');
+         }
+         d = pgmoneta_append(d, config->common.servers[i].name);
 
+         if (pgmoneta_exists(d))
+         {
+            size += pgmoneta_free_space(d);
+         }
+         free(d);
+         d = NULL;
+      }
+      data = pgmoneta_append_ulong(data, size);
       data = pgmoneta_append(data, "\n");
-
-      free(d);
-      d = NULL;
    }
    data = pgmoneta_append(data, "\n");
 
@@ -1925,22 +1931,25 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      d = pgmoneta_get_server_hot_standby(i);
-
-      if (d != NULL)
+      size = 0;
+      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
       {
-         size = pgmoneta_total_space(d);
-         data = pgmoneta_append_ulong(data, size);
-      }
-      else
-      {
-         data = pgmoneta_append_ulong(data, 0);
-      }
+         d = pgmoneta_append(d, config->common.servers[i].hot_standby[j]);
+         if (!pgmoneta_ends_with(d, "/"))
+         {
+            d = pgmoneta_append_char(d, '/');
+         }
+         d = pgmoneta_append(d, config->common.servers[i].name);
 
+         if (pgmoneta_exists(d))
+         {
+            size += pgmoneta_total_space(d);
+         }
+         free(d);
+         d = NULL;
+      }
+      data = pgmoneta_append_ulong(data, size);
       data = pgmoneta_append(data, "\n");
-
-      free(d);
-      d = NULL;
    }
    data = pgmoneta_append(data, "\n");
 

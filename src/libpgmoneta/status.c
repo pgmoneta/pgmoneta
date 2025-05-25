@@ -34,6 +34,9 @@
 #include <network.h>
 #include <utils.h>
 
+/* system */
+#include <stdint.h>
+
 #define NAME "status"
 
 void
@@ -161,13 +164,10 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
          workspace_size = 0;
       }
 
-      if (strlen(config->common.servers[i].hot_standby) > 0)
+      hot_standby_size = 0;
+      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
       {
-         hot_standby_size = pgmoneta_directory_size(config->common.servers[i].hot_standby);
-      }
-      else
-      {
-         hot_standby_size = 0;
+         hot_standby_size += pgmoneta_directory_size(config->common.servers[i].hot_standby[j]);
       }
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)workspace_size, ValueUInt64);
@@ -373,13 +373,10 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
          workspace_size = 0;
       }
 
-      if (strlen(config->common.servers[i].hot_standby) > 0)
+      hot_standby_size = 0;
+      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
       {
-         hot_standby_size = pgmoneta_directory_size(config->common.servers[i].hot_standby);
-      }
-      else
-      {
-         hot_standby_size = 0;
+         hot_standby_size += pgmoneta_directory_size(config->common.servers[i].hot_standby[j]);
       }
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)workspace_size, ValueUInt64);
