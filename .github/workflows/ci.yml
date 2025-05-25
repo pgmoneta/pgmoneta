@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - 0.16.x
+      - 0.17.x
   pull_request:
     branches:
       - main
-      - 0.16.x
+      - 0.17.x
   workflow_dispatch:
 
 jobs:
