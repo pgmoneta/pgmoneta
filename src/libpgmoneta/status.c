@@ -220,6 +220,8 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
 
    pgmoneta_log_info("Status (Elapsed: %s)", elapsed);
 
+   free(elapsed);
+
    pgmoneta_json_destroy(payload);
 
    pgmoneta_disconnect(client_fd);
@@ -486,6 +488,8 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Status details (Elapsed: %s)", elapsed);
+
+   free(elapsed);
 
    pgmoneta_json_destroy(payload);
 
