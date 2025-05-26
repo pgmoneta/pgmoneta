@@ -33,6 +33,7 @@ if (check)
     testcases/pgmoneta_test_1.c
     testcases/pgmoneta_test_2.c
     testcases/pgmoneta_test_3.c
+    testcases/pgmoneta_test_4.c
     runner.c
   )
 

@@ -62,6 +62,7 @@ typedef int64_t timestamp_tz;
 #define MAXIMUM_ALIGNOF            8  // TODO: double check this value
 #define ALIGNOF_SHORT              2  // TODO: double check this value
 #define InvalidXLogRecPtr          0
+#define InvalidBlockNumber         ((uint32_t) 0xFFFFFFFF)
 #define InvalidBuffer              0
 #define XLOG_PAGE_MAGIC            0xD10D  // WAL version indicator
 #define InvalidOid                 ((oid) 0)

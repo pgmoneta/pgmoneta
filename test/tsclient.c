@@ -29,6 +29,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <brt.h>
 #include <configuration.h>
 #include <json.h>
 #include <management.h>
@@ -56,6 +57,7 @@ static int check_output_outcome(int socket);
 static int get_connection();
 static char* get_configuration_path();
 static char* get_restore_path();
+static char* get_backup_summary_path();
 
 int
 pgmoneta_tsclient_init(char* base_dir)
@@ -218,6 +220,96 @@ error:
    return 1;
 }
 
+int
+pgmoneta_tsclient_brt_init(block_ref_table** brt)
+{
+   block_ref_table* b = NULL;
+
+   if ((b = (block_ref_table*)malloc(sizeof(block_ref_table))) == NULL)
+   {
+      goto error;
+   }
+
+   *brt = b;
+   return 0;
+error:
+   pgmoneta_brt_destroy(b);
+   return 1;
+}
+
+void
+pgmoneta_tsclient_brt_destroy(block_ref_table* brt)
+{
+   pgmoneta_brt_destroy(brt);
+}
+
+void
+pgmoneta_tsclient_relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number forknum, struct rel_file_locator* r, enum fork_number* frk)
+{
+   struct rel_file_locator rlocator;
+   rlocator.spcOid = spcoid; rlocator.dbOid = dboid; rlocator.relNumber = relnum;
+
+   *r = rlocator;
+   *frk = forknum;
+}
+
+int
+pgmoneta_tsclient_execute_consecutive_mark_block_modified(block_ref_table* brt, struct rel_file_locator* rlocator, enum fork_number frk, block_number blkno, int n)
+{
+   for (int i = 0; i < n; i++)
+   {
+      if (pgmoneta_brt_mark_block_modified(brt, rlocator, frk, blkno + i))
+      {
+         return 1;
+      }
+   }
+   return 0;
+}
+
+int
+pgmoneta_tsclient_write(block_ref_table* brt)
+{
+   char* r = NULL;
+   r = get_backup_summary_path();
+
+   r = pgmoneta_append(r, "summary");
+   if (pgmoneta_brt_write(brt, r))
+   {
+      goto error;
+   }
+
+   free(r);
+   return 0;
+error:
+   if (r != NULL)
+   {
+      free(r);
+   }
+   return 1;
+}
+
+int
+pgmoneta_tsclient_read(block_ref_table** brt)
+{
+   char* r = NULL;
+
+   r = get_backup_summary_path();
+   r = pgmoneta_append(r, "summary");
+
+   if (pgmoneta_brt_read(r, brt))
+   {
+      goto error;
+   }
+   free(r);
+   return 0;
+error:
+   if (r != NULL)
+   {
+      free(r);
+   }
+   return 1;
+}
+
 static int
 check_output_outcome(int socket)
 {
@@ -277,6 +369,21 @@ get_restore_path()
    memcpy(restore_path + project_directory_length, PGMONETA_RESTORE_TRAIL, restore_trail_length);
 
    return restore_path;
+}
+
+static char*
+get_backup_summary_path()
+{
+   char* backup_summary_path = NULL;
+   int project_directory_length = strlen(project_directory);
+   int backup_summary_trail_length = strlen(PGMONETA_BACKUP_SUMMARY_TRAIL);
+
+   backup_summary_path = (char*)calloc(project_directory_length + backup_summary_trail_length + 1, sizeof(char));
+
+   memcpy(backup_summary_path, project_directory, project_directory_length);
+   memcpy(backup_summary_path + project_directory_length, PGMONETA_BACKUP_SUMMARY_TRAIL, backup_summary_trail_length);
+
+   return backup_summary_path;
 }
 
 static char*

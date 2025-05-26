@@ -26,52 +26,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <tsclient.h>
 
-#include "testcases/pgmoneta_test_1.h"
-#include "testcases/pgmoneta_test_2.h"
-#include "testcases/pgmoneta_test_3.h"
-#include "testcases/pgmoneta_test_4.h"
+#ifndef PGMONETA_TEST4_H
+#define PGMONETA_TEST4_H
 
-int
-main(int argc, char* argv[])
-{
+#include <check.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-   if (argc != 2)
-   {
-      printf("Usage: %s <project_directory>\n", argv[0]);
-      return 1;
-   }
+/**
+ * Set up a suite of test cases for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test4_suite();
 
-   int number_failed;
-   Suite* s1;
-   Suite* s2;
-   Suite* s3;
-   Suite* s4;
-   SRunner* sr;
-
-   if (pgmoneta_tsclient_init(argv[1]))
-   {
-      goto done;
-   }
-
-   s1 = pgmoneta_test1_suite();
-   s2 = pgmoneta_test2_suite();
-   s3 = pgmoneta_test3_suite();
-   s4 = pgmoneta_test4_suite();
-
-   sr = srunner_create(s1);
-   srunner_add_suite(sr, s2);
-   srunner_add_suite(sr, s3);
-   srunner_add_suite(sr, s4);
-
-   // Run the tests in verbose mode
-   srunner_run_all(sr, CK_VERBOSE);
-   number_failed = srunner_ntests_failed(sr);
-   srunner_free(sr);
-
-done:
-   pgmoneta_tsclient_destroy();
-
-   return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+#endif // PGMONETA_TEST4_H

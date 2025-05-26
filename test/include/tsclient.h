@@ -34,7 +34,11 @@
 extern "C" {
 #endif
 
+#include <art.h>
+#include <brt.h>
 #include <json.h>
+#include <wal.h>
+#include <walfile/wal_reader.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,10 +46,11 @@ extern "C" {
 
 #define BUFFER_SIZE 8192
 
-#define PGMONETA_LOG_FILE_TRAIL      "/log/pgmoneta.log"
-#define PGMONETA_EXECUTABLE_TRAIL    "/src/pgmoneta-cli"
-#define PGMONETA_CONFIGURATION_TRAIL "/pgmoneta-testsuite/conf/pgmoneta.conf"
-#define PGMONETA_RESTORE_TRAIL       "/pgmoneta-testsuite/restore/"
+#define PGMONETA_LOG_FILE_TRAIL       "/log/pgmoneta.log"
+#define PGMONETA_EXECUTABLE_TRAIL     "/src/pgmoneta-cli"
+#define PGMONETA_CONFIGURATION_TRAIL  "/pgmoneta-testsuite/conf/pgmoneta.conf"
+#define PGMONETA_RESTORE_TRAIL        "/pgmoneta-testsuite/restore/"
+#define PGMONETA_BACKUP_SUMMARY_TRAIL "/pgmoneta-testsuite/backup/primary/"
 
 extern char project_directory[BUFFER_SIZE];
 
@@ -129,6 +134,44 @@ pgmoneta_tsclient_execute_http_put();
  */
 int
 pgmoneta_tsclient_execute_http_put_file();
+
+/**
+ * Mark n consecutive blocknumber starting at blkno as modified in the block reference table
+ * @param brt The block reference table
+ * @param rlocator Pointer to the relation fork
+ * @param frk fork number of the relation fork
+ * @param blkno The starting block number
+ * @param n The number of consecutive block to be marked as modified
+ * @return 0 if success, otherwise failure
+ */
+int
+pgmoneta_tsclient_execute_consecutive_mark_block_modified(block_ref_table* brt, struct rel_file_locator* rlocator, enum fork_number frk, block_number blkno, int n);
+
+/**
+ * Initialize the relation fork
+ * @param spcoid The tablespace OID
+ * @param dboid The database OID
+ * @param relnum The relation number
+ * @param frk The fork number
+ * @param rlocator Pointer to the relation file locator to be initialized
+ * @param forknum Pointer to the fork number to be set
+ */
+void
+pgmoneta_tsclient_relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number frk, struct rel_file_locator* rlocator, enum fork_number* forknum);
+
+/**
+ * Write the block reference table to a file
+ * @param brt The block reference table to be written
+ */
+int
+pgmoneta_tsclient_write(block_ref_table* brt);
+
+/**
+ * Read the block reference table from a file
+ * @param brt Pointer to the block reference table to be read
+ */
+int
+pgmoneta_tsclient_read(block_ref_table** brt);
 
 #ifdef __cplusplus
 }
