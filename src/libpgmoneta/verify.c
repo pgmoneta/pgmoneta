@@ -433,6 +433,7 @@ cleanup:
 
          elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
          pgmoneta_log_info("Verification: %s/%s (Elapsed: %s)", config->common.servers[server].name, backups[i]->label, elapsed);
+         free(elapsed);
 
 backup_cleanup:
          if (sha512_file != NULL)
