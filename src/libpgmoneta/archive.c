@@ -210,6 +210,8 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
       pgmoneta_log_info("Archive: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, elapsed);
+
+      free(elapsed);
    }
 
    pgmoneta_art_destroy(nodes);

@@ -2619,6 +2619,8 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
    pgmoneta_log_info("Conf Get (Elapsed: %s)", elapsed);
 
+   free(elapsed);
+
    pgmoneta_json_destroy(payload);
 
    pgmoneta_disconnect(client_fd);
@@ -3563,6 +3565,8 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
    pgmoneta_log_info("Conf Set (Elapsed: %s)", elapsed);
+
+   free(elapsed);
 
    pgmoneta_json_destroy(payload);
 
