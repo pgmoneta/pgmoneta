@@ -151,9 +151,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
          }
 
          pgmoneta_log_debug("Processing hot standby directory %d/%d: %s",
-                           i + 1,
-                           config->common.servers[server].hot_standby_count,
-                           config->common.servers[server].hot_standby[i]);
+                            i + 1,
+                            config->common.servers[server].hot_standby_count,
+                            config->common.servers[server].hot_standby[i]);
 
          destination = pgmoneta_append(destination, root);
          destination = pgmoneta_append(destination, config->common.servers[server].name);

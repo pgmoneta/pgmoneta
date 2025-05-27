@@ -369,7 +369,7 @@ pgmoneta_http_post(struct http* http, char* hostname, char* path, char* data, si
    char* response = NULL;
    char* user_agent = NULL;
    char content_length[32];
-   
+
    pgmoneta_log_trace("Starting pgmoneta_http_post");
    if (http_build_header(PGMONETA_HTTP_POST, path, &request))
    {
@@ -807,6 +807,8 @@ pgmoneta_http_read(SSL* ssl, int socket, char** response_text)
 int
 pgmoneta_http_disconnect(struct http* http)
 {
+   int status = 0;
+
    if (http != NULL)
    {
       if (http->ssl != NULL)
@@ -819,7 +821,8 @@ pgmoneta_http_disconnect(struct http* http)
       {
          if (pgmoneta_disconnect(http->socket))
          {
-            return 1;
+            pgmoneta_log_error("Failed to disconnect socket in pgmoneta_http_disconnect");
+            status = 1;
          }
          http->socket = -1;
       }
@@ -842,5 +845,14 @@ pgmoneta_http_disconnect(struct http* http)
          http->request_headers = NULL;
       }
    }
+
+   if (status != 0)
+   {
+      goto error;
+   }
+
    return 0;
+
+error:
+   return 1;
 }
