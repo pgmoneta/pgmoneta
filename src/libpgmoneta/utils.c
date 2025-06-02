@@ -55,6 +55,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <arpa/inet.h>
 
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
@@ -392,105 +393,81 @@ pgmoneta_read_uint8(void* data)
 int16_t
 pgmoneta_read_int16(void* data)
 {
-   unsigned char bytes[] = {*((unsigned char*)data),
-                            *((unsigned char*)(data + 1))};
-
-   int16_t res = (int16_t)((bytes[0] << 8)) |
-                 ((bytes[1]));
-
-   return res;
+   int16_t val;
+   memcpy(&val, data, sizeof(val));
+   return ntohs(val);
 }
 
 uint16_t
 pgmoneta_read_uint16(void* data)
 {
-   unsigned char bytes[] = {*((unsigned char*)data),
-                            *((unsigned char*)(data + 1))};
-
-   uint16_t res = (uint16_t)((bytes[0] << 8)) |
-                  ((bytes[1]));
-
-   return res;
+   uint16_t val;
+   memcpy(&val, data, sizeof(val));
+   return ntohs(val);
 }
 
 int32_t
 pgmoneta_read_int32(void* data)
 {
-   unsigned char bytes[] = {*((unsigned char*)data),
-                            *((unsigned char*)(data + 1)),
-                            *((unsigned char*)(data + 2)),
-                            *((unsigned char*)(data + 3))};
-
-   int32_t res = (int32_t)(((uint32_t)bytes[0] << 24)) |
-                 (((uint32_t)bytes[1] << 16)) |
-                 (((uint32_t)bytes[2] << 8)) |
-                 (((uint32_t)bytes[3]));
-
-   return res;
+   int32_t val;
+   memcpy(&val, data, sizeof(val));
+   return ntohl(val);
 }
 
 uint32_t
 pgmoneta_read_uint32(void* data)
 {
-   unsigned char bytes[] = {*((unsigned char*)data),
-                            *((unsigned char*)(data + 1)),
-                            *((unsigned char*)(data + 2)),
-                            *((unsigned char*)(data + 3))};
-
-   uint32_t res = (uint32_t)(((uint32_t)bytes[0] << 24)) |
-                  (((uint32_t)bytes[1] << 16)) |
-                  (((uint32_t)bytes[2] << 8)) |
-                  (((uint32_t)bytes[3]));
-
-   return res;
+   uint32_t val;
+   memcpy(&val, data, sizeof(val));
+   return ntohl(val);
 }
 
 int64_t
 pgmoneta_read_int64(void* data)
 {
-   unsigned char bytes[] = {*((unsigned char*)data),
-                            *((unsigned char*)(data + 1)),
-                            *((unsigned char*)(data + 2)),
-                            *((unsigned char*)(data + 3)),
-                            *((unsigned char*)(data + 4)),
-                            *((unsigned char*)(data + 5)),
-                            *((unsigned char*)(data + 6)),
-                            *((unsigned char*)(data + 7))};
-
-   int64_t res = (int64_t)(((uint64_t)bytes[0] << 56)) |
-                 (((uint64_t)bytes[1] << 48)) |
-                 (((uint64_t)bytes[2] << 40)) |
-                 (((uint64_t)bytes[3] << 32)) |
-                 (((uint64_t)bytes[4] << 24)) |
-                 (((uint64_t)bytes[5] << 16)) |
-                 (((uint64_t)bytes[6] << 8)) |
-                 (((uint64_t)bytes[7]));
-
-   return res;
+   if (pgmoneta_bigendian())
+   {
+      int64_t val;
+      memcpy(&val, data, sizeof(val));
+      return val;
+   }
+   else
+   {
+      unsigned char* bytes = (unsigned char*)data;
+      int64_t res = ((int64_t)bytes[0] << 56) |
+                    ((int64_t)bytes[1] << 48) |
+                    ((int64_t)bytes[2] << 40) |
+                    ((int64_t)bytes[3] << 32) |
+                    ((int64_t)bytes[4] << 24) |
+                    ((int64_t)bytes[5] << 16) |
+                    ((int64_t)bytes[6] << 8) |
+                    ((int64_t)bytes[7]);
+      return res;
+   }
 }
 
 uint64_t
 pgmoneta_read_uint64(void* data)
 {
-   unsigned char bytes[] = {*((unsigned char*)data),
-                            *((unsigned char*)(data + 1)),
-                            *((unsigned char*)(data + 2)),
-                            *((unsigned char*)(data + 3)),
-                            *((unsigned char*)(data + 4)),
-                            *((unsigned char*)(data + 5)),
-                            *((unsigned char*)(data + 6)),
-                            *((unsigned char*)(data + 7))};
-
-   uint64_t res = (uint64_t)(((uint64_t)bytes[0] << 56)) |
-                  (((uint64_t)bytes[1] << 48)) |
-                  (((uint64_t)bytes[2] << 40)) |
-                  (((uint64_t)bytes[3] << 32)) |
-                  (((uint64_t)bytes[4] << 24)) |
-                  (((uint64_t)bytes[5] << 16)) |
-                  (((uint64_t)bytes[6] << 8)) |
-                  (((uint64_t)bytes[7]));
-
-   return res;
+   if (pgmoneta_bigendian())
+   {
+      uint64_t val;
+      memcpy(&val, data, sizeof(val));
+      return val;
+   }
+   else
+   {
+      unsigned char* bytes = (unsigned char*)data;
+      uint64_t res = ((uint64_t)bytes[0] << 56) |
+                     ((uint64_t)bytes[1] << 48) |
+                     ((uint64_t)bytes[2] << 40) |
+                     ((uint64_t)bytes[3] << 32) |
+                     ((uint64_t)bytes[4] << 24) |
+                     ((uint64_t)bytes[5] << 16) |
+                     ((uint64_t)bytes[6] << 8) |
+                     ((uint64_t)bytes[7]);
+      return res;
+   }
 }
 
 bool
@@ -514,93 +491,73 @@ pgmoneta_write_uint8(void* data, uint8_t b)
 void
 pgmoneta_write_int16(void* data, int16_t i)
 {
-   char* ptr = (char*)&i;
-
-   *((char*)(data + 1)) = *ptr;
-   ptr++;
-   *((char*)(data)) = *ptr;
+   int16_t n = htons(i);
+   memcpy(data, &n, sizeof(n));
 }
 
 void
 pgmoneta_write_uint16(void* data, uint16_t i)
 {
-   char* ptr = (char*)&i;
-
-   *((char*)(data + 1)) = *ptr;
-   ptr++;
-   *((char*)(data)) = *ptr;
+   uint16_t n = htons(i);
+   memcpy(data, &n, sizeof(n));
 }
 
 void
 pgmoneta_write_int32(void* data, int32_t i)
 {
-   char* ptr = (char*)&i;
-
-   *((char*)(data + 3)) = *ptr;
-   ptr++;
-   *((char*)(data + 2)) = *ptr;
-   ptr++;
-   *((char*)(data + 1)) = *ptr;
-   ptr++;
-   *((char*)(data)) = *ptr;
+   int32_t n = htonl(i);
+   memcpy(data, &n, sizeof(n));
 }
 
 void
 pgmoneta_write_uint32(void* data, uint32_t i)
 {
-   uint8_t* ptr = (uint8_t*)&i;
-
-   *((uint8_t*)(data + 3)) = *ptr;
-   ptr++;
-   *((uint8_t*)(data + 2)) = *ptr;
-   ptr++;
-   *((uint8_t*)(data + 1)) = *ptr;
-   ptr++;
-   *((uint8_t*)(data)) = *ptr;
+   uint32_t n = htonl(i);
+   memcpy(data, &n, sizeof(n));
 }
 
 void
 pgmoneta_write_int64(void* data, int64_t i)
 {
-   char* ptr = (char*)&i;
-
-   *((char*)(data + 7)) = *ptr;
-   ptr++;
-   *((char*)(data + 6)) = *ptr;
-   ptr++;
-   *((char*)(data + 5)) = *ptr;
-   ptr++;
-   *((char*)(data + 4)) = *ptr;
-   ptr++;
-   *((char*)(data + 3)) = *ptr;
-   ptr++;
-   *((char*)(data + 2)) = *ptr;
-   ptr++;
-   *((char*)(data + 1)) = *ptr;
-   ptr++;
-   *((char*)(data)) = *ptr;
+   if (pgmoneta_bigendian())
+   {
+      memcpy(data, &i, sizeof(i));
+   }
+   else
+   {
+      unsigned char* ptr = (unsigned char*)&i;
+      unsigned char* out = (unsigned char*)data;
+      out[7] = ptr[0];
+      out[6] = ptr[1];
+      out[5] = ptr[2];
+      out[4] = ptr[3];
+      out[3] = ptr[4];
+      out[2] = ptr[5];
+      out[1] = ptr[6];
+      out[0] = ptr[7];
+   }
 }
 
 void
 pgmoneta_write_uint64(void* data, uint64_t i)
 {
-   char* ptr = (char*)&i;
-
-   *((char*)(data + 7)) = *ptr;
-   ptr++;
-   *((char*)(data + 6)) = *ptr;
-   ptr++;
-   *((char*)(data + 5)) = *ptr;
-   ptr++;
-   *((char*)(data + 4)) = *ptr;
-   ptr++;
-   *((char*)(data + 3)) = *ptr;
-   ptr++;
-   *((char*)(data + 2)) = *ptr;
-   ptr++;
-   *((char*)(data + 1)) = *ptr;
-   ptr++;
-   *((char*)(data)) = *ptr;
+   if (pgmoneta_bigendian())
+   {
+      memcpy(data, &i, sizeof(i));
+   }
+   else
+   {
+      unsigned char* ptr = (unsigned char*)&i;
+      unsigned char* out = (unsigned char*)data;
+      out[7] = ptr[0];
+      out[6] = ptr[1];
+      out[5] = ptr[2];
+      out[4] = ptr[3];
+      out[3] = ptr[4];
+      out[2] = ptr[5];
+      out[1] = ptr[6];
+      out[0] = ptr[7];
+   }
 }
 
 void
