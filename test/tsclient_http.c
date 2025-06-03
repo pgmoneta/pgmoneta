@@ -50,7 +50,7 @@ pgmoneta_tsclient_execute_http()
    }
 
    status = pgmoneta_http_get(h, (char*)hostname, "/get");
-   
+
    pgmoneta_http_disconnect(h);
    free(h);
 
@@ -75,7 +75,7 @@ pgmoneta_tsclient_execute_https()
    }
 
    status = pgmoneta_http_get(h, (char*)hostname, "/get");
-   
+
    pgmoneta_http_disconnect(h);
    free(h);
 
@@ -101,7 +101,7 @@ pgmoneta_tsclient_execute_http_post()
    }
 
    status = pgmoneta_http_post(h, (char*)hostname, "/post", (char*)test_data, strlen(test_data));
-   
+
    pgmoneta_http_disconnect(h);
    free(h);
 
@@ -127,7 +127,7 @@ pgmoneta_tsclient_execute_http_put()
    }
 
    status = pgmoneta_http_put(h, (char*)hostname, "/put", (void*)test_data, strlen(test_data));
-   
+
    pgmoneta_http_disconnect(h);
    free(h);
 
@@ -170,7 +170,7 @@ pgmoneta_tsclient_execute_http_put_file()
    }
 
    status = pgmoneta_http_put_file(h, (char*)hostname, "/put", temp_file, data_len, "text/plain");
-   
+
    pgmoneta_http_disconnect(h);
    free(h);
    fclose(temp_file);
