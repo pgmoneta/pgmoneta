@@ -80,7 +80,7 @@ pgmoneta_tsclient_execute_backup(char* server, char* incremental);
  * @param server the server to perform restore on
  * @param backup_id the backup_id to perform restore on
  * @param position the position parameters
- * @return 0 upon success, otherwise 
+ * @return 0 upon success, otherwise
  */
 int
 pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position);
@@ -90,7 +90,7 @@ pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position)
  * @param socket the value of socket corresponding to the main server
  * @param server the server to perform delete on
  * @param backup_id the backup_id to delete
- * @return 0 upon success, otherwise 
+ * @return 0 upon success, otherwise
  */
 int
 pgmoneta_tsclient_execute_delete(char* server, char* backup_id);

@@ -60,207 +60,208 @@ static char* get_restore_path();
 int
 pgmoneta_tsclient_init(char* base_dir)
 {
-    struct main_configuration* config = NULL;
-    int ret;
-    size_t size;
-    char* configuration_path = NULL;
-    size_t configuration_path_length = 0;
+   struct main_configuration* config = NULL;
+   int ret;
+   size_t size;
+   char* configuration_path = NULL;
+   size_t configuration_path_length = 0;
 
-    memset(project_directory, 0, sizeof(project_directory));
-    memcpy(project_directory, base_dir, strlen(base_dir));
+   memset(project_directory, 0, sizeof(project_directory));
+   memcpy(project_directory, base_dir, strlen(base_dir));
 
-    configuration_path = get_configuration_path();
+   configuration_path = get_configuration_path();
 
-    // Create the shared memory for the configuration
-    size = sizeof(struct main_configuration);
-    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
-    {
-        goto error;
-    }
-    pgmoneta_init_main_configuration(shmem);
-    // Try reading configuration from the configuration path
-    if (configuration_path != NULL)
-    {
-        ret = pgmoneta_read_main_configuration(shmem, configuration_path);
-        if (ret)
-        {
-            goto error;
-        }
+   // Create the shared memory for the configuration
+   size = sizeof(struct main_configuration);
+   if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
+   {
+      goto error;
+   }
+   pgmoneta_init_main_configuration(shmem);
+   // Try reading configuration from the configuration path
+   if (configuration_path != NULL)
+   {
+      ret = pgmoneta_read_main_configuration(shmem, configuration_path);
+      if (ret)
+      {
+         goto error;
+      }
 
-        config = (struct main_configuration*)shmem;
-    }
-    else
-    {
-        goto error;
-    } 
+      config = (struct main_configuration*)shmem;
+   }
+   else
+   {
+      goto error;
+   }
 
-    free(configuration_path);
-    return 0;
+   free(configuration_path);
+   return 0;
 error:
-    free(configuration_path);
-    return 1;
+   free(configuration_path);
+   return 1;
 }
 
 int
 pgmoneta_tsclient_destroy()
 {
-    size_t size;
+   size_t size;
 
-    size = sizeof(struct main_configuration);
-    return pgmoneta_destroy_shared_memory(shmem, size);
+   size = sizeof(struct main_configuration);
+   return pgmoneta_destroy_shared_memory(shmem, size);
 }
 
 int
 pgmoneta_tsclient_execute_backup(char* server, char* incremental)
 {
-    int socket = -1;
-    
-    socket = get_connection();
-    // Security Checks
-    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
-    {
-        goto error;
-    }
-    // Create a backup request to the main server
-    if (pgmoneta_management_request_backup(NULL, socket, server, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, incremental, MANAGEMENT_OUTPUT_FORMAT_JSON))
-    {
-        goto error;
-    }
+   int socket = -1;
 
-    // Check the outcome field of the output, if true success, else failure
-    if (check_output_outcome(socket))
-    {
-        goto error;
-    }
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+   // Create a backup request to the main server
+   if (pgmoneta_management_request_backup(NULL, socket, server, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, incremental, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
 
-    pgmoneta_disconnect(socket);
-    return 0;
+   // Check the outcome field of the output, if true success, else failure
+   if (check_output_outcome(socket))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
 error:
-    pgmoneta_disconnect(socket);
-    return 1;
+   pgmoneta_disconnect(socket);
+   return 1;
 }
 
 int
 pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position)
 {
-    char* restore_path = NULL;
-    int socket = -1;
-    
-    socket = get_connection();
-    // Security Checks
-    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
-    {
-        goto error;
-    }
+   char* restore_path = NULL;
+   int socket = -1;
 
-    // Fallbacks
-    if (backup_id == NULL)
-    {
-        backup_id = "newest";
-    }
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
 
-    restore_path = get_restore_path();
-    // Create a restore request to the main server
-    if (pgmoneta_management_request_restore(NULL, socket, server, backup_id, position, restore_path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
-    {
-        goto error;
-    }
+   // Fallbacks
+   if (backup_id == NULL)
+   {
+      backup_id = "newest";
+   }
 
-    // Check the outcome field of the output, if true success, else failure
-    if (check_output_outcome(socket))
-    {
-        goto error;
-    }
+   restore_path = get_restore_path();
+   // Create a restore request to the main server
+   if (pgmoneta_management_request_restore(NULL, socket, server, backup_id, position, restore_path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
 
-    free(restore_path);
-    pgmoneta_disconnect(socket);
-    return 0;
+   // Check the outcome field of the output, if true success, else failure
+   if (check_output_outcome(socket))
+   {
+      goto error;
+   }
+
+   free(restore_path);
+   pgmoneta_disconnect(socket);
+   return 0;
 error:
-    free(restore_path);
-    pgmoneta_disconnect(socket);
-    return 1;
+   free(restore_path);
+   pgmoneta_disconnect(socket);
+   return 1;
 }
 
 int
 pgmoneta_tsclient_execute_delete(char* server, char* backup_id)
 {
-    int socket = -1;
+   int socket = -1;
 
-    socket = get_connection();
-    // Security Checks
-    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
-    {
-        return 1;
-    }
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      return 1;
+   }
 
-    // Fallbacks
-    if (!backup_id) {
-        backup_id = "oldest";
-    }
+   // Fallbacks
+   if (!backup_id)
+   {
+      backup_id = "oldest";
+   }
 
-    // Create a delete request to the main server
-    if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
-    {
-        goto error;
-    }
+   // Create a delete request to the main server
+   if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
 
-    // Check the outcome field of the output, if true success, else failure
-    if (check_output_outcome(socket))
-    {
-        goto error;
-    }
+   // Check the outcome field of the output, if true success, else failure
+   if (check_output_outcome(socket))
+   {
+      goto error;
+   }
 
-    pgmoneta_disconnect(socket);
-    return 0;
+   pgmoneta_disconnect(socket);
+   return 0;
 error:
-    pgmoneta_disconnect(socket);
-    return 1;
+   pgmoneta_disconnect(socket);
+   return 1;
 }
 
-static int 
+static int
 check_output_outcome(int socket)
 {
-    struct json* read = NULL;
-    struct json* outcome = NULL;
+   struct json* read = NULL;
+   struct json* outcome = NULL;
 
-    if (pgmoneta_management_read_json(NULL, socket, NULL, NULL, &read))
-    {
-        goto error;
-    }
-    
-    if (!pgmoneta_json_contains_key(read, MANAGEMENT_CATEGORY_OUTCOME))
-    {
-        goto error;
-    }
+   if (pgmoneta_management_read_json(NULL, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
 
-    outcome = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_OUTCOME);
-    if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_STATUS) && !(bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS))
-    {
-        goto error;
-    }
+   if (!pgmoneta_json_contains_key(read, MANAGEMENT_CATEGORY_OUTCOME))
+   {
+      goto error;
+   }
 
-    pgmoneta_json_destroy(read);
-    return 0;
+   outcome = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_OUTCOME);
+   if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_STATUS) && !(bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(read);
+   return 0;
 error:
-    pgmoneta_json_destroy(read);
-    return 1;
+   pgmoneta_json_destroy(read);
+   return 1;
 }
 
 static int
 get_connection()
 {
-    int socket = -1;
-    struct main_configuration* config;
+   int socket = -1;
+   struct main_configuration* config;
 
-    config = (struct main_configuration*)shmem;
-    if (!strlen(config->common.configuration_path))
-    {
-        if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
-        {
-            return -1;
-        }
-    }
-    return socket;
+   config = (struct main_configuration*)shmem;
+   if (!strlen(config->common.configuration_path))
+   {
+      if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
+      {
+         return -1;
+      }
+   }
+   return socket;
 }
 
 static char*
