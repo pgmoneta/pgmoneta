@@ -369,7 +369,7 @@ pgmoneta_http_post(struct http* http, char* hostname, char* path, char* data, si
    char* response = NULL;
    char* user_agent = NULL;
    char content_length[32];
-   
+
    pgmoneta_log_trace("Starting pgmoneta_http_post");
    if (http_build_header(PGMONETA_HTTP_POST, path, &request))
    {

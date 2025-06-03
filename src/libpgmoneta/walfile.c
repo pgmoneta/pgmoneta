@@ -35,7 +35,6 @@
 #include <dirent.h>
 #include <libgen.h>
 
-
 struct partial_xlog_record* partial_record = NULL;
 
 /**

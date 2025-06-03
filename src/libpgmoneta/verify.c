@@ -356,35 +356,35 @@ pgmoneta_sha512_verification(char** argv)
          line = 0;
          while (fgets(&buffer[0], sizeof(buffer), sha512_file) != NULL)
          {
-            char *entry = NULL;
+            char* entry = NULL;
 
             line++;
             entry = strtok(&buffer[0], " ");
             if (entry == NULL)
             {
-              pgmoneta_log_error("Verification: Server %s / %s: formatting error at line %d",
-                                 config->common.servers[server].name, sha512_path, sha512_path,
-                                 line);
-              err = 1;
-              goto cleanup;
+               pgmoneta_log_error("Verification: Server %s / %s: formatting error at line %d",
+                                  config->common.servers[server].name, sha512_path, sha512_path,
+                                  line);
+               err = 1;
+               goto cleanup;
             }
 
             hash = strdup(entry);
             if (hash == NULL)
             {
-              pgmoneta_log_error("Verification: Server %s / Memory allocation error for hash",
-                                 config->common.servers[server].name);
-              err = 1;
-              goto cleanup;
+               pgmoneta_log_error("Verification: Server %s / Memory allocation error for hash",
+                                  config->common.servers[server].name);
+               err = 1;
+               goto cleanup;
             }
 
             entry = strtok(NULL, "\n");
             if (entry == NULL || strlen(entry) < 3)
             {
-              pgmoneta_log_error("Verification: Server %s / %s: formatting error at line %d",
-                                config->common.servers[server].name, sha512_path, line);
-              err = 1;
-              goto cleanup;
+               pgmoneta_log_error("Verification: Server %s / %s: formatting error at line %d",
+                                  config->common.servers[server].name, sha512_path, line);
+               err = 1;
+               goto cleanup;
             }
 
             // skip the " *." or " */"

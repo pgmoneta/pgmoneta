@@ -2948,7 +2948,6 @@ pgmoneta_is_wal_file(char* file)
    return true;
 }
 
-
 int
 pgmoneta_read_wal(char* directory, char** wal)
 {
@@ -3070,7 +3069,6 @@ string_compare(const void* a, const void* b)
 {
    return strcmp(*(char**)a, *(char**)b);
 }
-
 
 char*
 pgmoneta_get_server(int server)
