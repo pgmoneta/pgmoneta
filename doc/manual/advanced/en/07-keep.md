@@ -14,7 +14,7 @@ you will get output like
 
 ```
 Header:
-  ClientVersion: 0.17.1
+  ClientVersion: 0.17.2
   Command: list-backup
   Output: text
   Timestamp: 20241018092853
@@ -38,7 +38,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.17.1
+  ServerVersion: 0.17.2
 ```
 
 As you can see backup `20241012091219` has a `Keep` flag of `false`.
@@ -56,7 +56,7 @@ and get output like,
 
 ```
 Header:
-  ClientVersion: 0.17.1
+  ClientVersion: 0.17.2
   Command: retain
   Output: text
   Timestamp: 20241018094129
@@ -75,7 +75,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.17.1
+  ServerVersion: 0.17.2
   Valid: yes
 ```
 
@@ -87,7 +87,7 @@ Now, you may want to add a description to your backup, and as you can see
 
 ```
 Header:
-  ClientVersion: 0.17.1
+  ClientVersion: 0.17.2
   Command: retain
   Output: text
   Timestamp: 20241018094129
@@ -106,7 +106,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.17.1
+  ServerVersion: 0.17.2
   Valid: yes
 ```
 
@@ -122,7 +122,7 @@ which will give
 
 ```
 Header:
-  ClientVersion: 0.17.1
+  ClientVersion: 0.17.2
   Command: annotate
   Output: text
   Timestamp: 20241018095906
@@ -153,7 +153,7 @@ Response:
   NumberOfTablespaces: 0
   RestoreSize: 39.13MB
   Server: primary
-  ServerVersion: 0.17.1
+  ServerVersion: 0.17.2
   StartHiLSN: 0
   StartLoLSN: 33554472
   StartTimeline: 1
@@ -179,7 +179,7 @@ will give,
 
 ```
 Header:
-  ClientVersion: 0.17.1
+  ClientVersion: 0.17.2
   Command: expunge
   Output: text
   Timestamp: 20241018101839
@@ -198,7 +198,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.17.1
+  ServerVersion: 0.17.2
   Valid: yes
 ```
 
