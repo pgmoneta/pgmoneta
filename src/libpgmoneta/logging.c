@@ -392,6 +392,14 @@ retry:
          else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
          {
             buf[strftime(buf, sizeof(buf), config->common.log_line_prefix, tm)] = '\0';
+            if (log_file == NULL)
+            {
+               log_file_open();
+               if (log_file == NULL)
+               {
+                  printf("Failed to open log file %s due to %s\n", strlen(config->common.log_path) > 0 ? config->common.log_path : "pgmoneta.log", strerror(errno));
+               }
+            }
             fprintf(log_file, "%s %-5s %s:%d ",
                     buf, levels[level - 1], filename, line);
             vfprintf(log_file, fmt, vl);
