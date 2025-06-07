@@ -87,6 +87,8 @@ extern "C" {
 #define INCREMENTAL_PREFIX_LENGTH (sizeof(INCREMENTAL_PREFIX) - 1)
 #define MANIFEST_FILES "Files"
 
+#define INFO_BUFFER_SIZE 8192
+
 /**
  * @struct rfile
  * An rfile stores the metadata we need to use a file on disk for reconstruction.
@@ -166,42 +168,6 @@ struct backup
  */
 void
 pgmoneta_create_info(char* directory, char* label, int status);
-
-/**
- * Update backup information: unsigned long
- * @param directory The backup directory
- * @param key The key
- * @param value The value
- */
-void
-pgmoneta_update_info_unsigned_long(char* directory, char* key, unsigned long value);
-
-/**
- * Update backup information: float
- * @param directory The backup directory
- * @param key The key
- * @param value The value
- */
-void
-pgmoneta_update_info_double(char* directory, char* key, double value);
-
-/**
- * Update backup information: string
- * @param directory The backup directory
- * @param key The key
- * @param value The value
- */
-void
-pgmoneta_update_info_string(char* directory, char* key, char* value);
-
-/**
- * Update backup information: bool
- * @param directory The backup directory
- * @param key The key
- * @param value The value
- */
-void
-pgmoneta_update_info_bool(char* directory, char* key, bool value);
 
 /**
  * Update backup information: annotate
@@ -325,6 +291,15 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server, uint8_t compression, 
  */
 void
 pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
+ * Save backup information
+ * @param directory The backup directory
+ * @param label The label
+ * @param backup The backup
+ */
+int
+pgmoneta_save_info(char* directory, char* label, struct backup* backup);
 
 /**
  * Create an rfile structure of a backup file

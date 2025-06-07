@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <utils.h>
+#include <info.h>
 
 /* system */
 #include <dirent.h>
@@ -4604,4 +4605,23 @@ error:
    pgmoneta_log_debug("Kernel version not available.");
    return 1;
 #endif
+}
+
+void
+pgmoneta_write_info(FILE* sfile, const char* fmt, ...)
+{
+   char buffer[INFO_BUFFER_SIZE];
+   va_list args;
+
+   memset(buffer, 0, sizeof(buffer));
+
+   va_start(args, fmt);
+   vsnprintf(buffer, sizeof(buffer), fmt, args);
+   va_end(args);
+
+   if (sfile != NULL)
+   {
+      fputs(buffer, sfile);
+   }
+   pgmoneta_log_trace("%s", buffer);
 }

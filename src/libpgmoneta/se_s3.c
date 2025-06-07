@@ -115,7 +115,7 @@ s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
    char* local_root = NULL;
    char* s3_root = NULL;
    struct main_configuration* config;
-
+   struct backup* temp_backup = NULL;
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
 #else
@@ -158,15 +158,21 @@ s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 
    remote_s3_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
-   pgmoneta_update_info_double(local_root, INFO_REMOTE_S3_ELAPSED, remote_s3_elapsed_time);
+   if (pgmoneta_get_backup(local_root, NULL, &temp_backup))
+   {
+      goto error;
+   }
+   temp_backup->remote_s3_elapsed_time = remote_s3_elapsed_time;
+   pgmoneta_save_info(local_root, NULL, temp_backup);
 
+   free(temp_backup);
    free(local_root);
    free(s3_root);
 
    return 0;
 
 error:
-
+   free(temp_backup);
    free(local_root);
    free(s3_root);
 

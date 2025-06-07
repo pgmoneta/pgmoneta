@@ -330,7 +330,13 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+         if (pgmoneta_get_backup(d, NULL, &backups[next_index]))
+         {
+            pgmoneta_log_error("Unable to get backup for directory %s", d);
+            goto error;
+         }
+         backups[next_index]->backup_size = size;
+         pgmoneta_save_info(d, NULL, backups[next_index]);
 
          free(from);
          free(to);
@@ -366,7 +372,13 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+         if (pgmoneta_get_backup(d, NULL, &backups[next_index]))
+         {
+            pgmoneta_log_error("Unable to get backup for directory %s", d);
+            goto error;
+         }
+         backups[next_index]->backup_size = size;
+         pgmoneta_save_info(d, NULL, backups[next_index]);
 
          free(from);
          free(to);
