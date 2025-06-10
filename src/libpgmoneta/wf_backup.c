@@ -201,7 +201,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (!pgmoneta_server_valid(server))
    {
-      pgmoneta_server_info(server);
+      pgmoneta_server_info(server, ssl, socket);
 
       if (!pgmoneta_server_valid(server))
       {

@@ -61,28 +61,29 @@
 
 #define HELP 99
 
-#define COMMAND_BACKUP "backup"
-#define COMMAND_LIST_BACKUP "list-backup"
-#define COMMAND_RESTORE "restore"
-#define COMMAND_VERIFY "verify"
-#define COMMAND_ARCHIVE "archive"
-#define COMMAND_DELETE "delete"
-#define COMMAND_RETAIN "retain"
-#define COMMAND_RESET "reset"
-#define COMMAND_RELOAD "reload"
-#define COMMAND_EXPUNGE "expunge"
-#define COMMAND_ENCRYPT "encrypt"
-#define COMMAND_DECRYPT "decrypt"
-#define COMMAND_COMPRESS "compress"
-#define COMMAND_DECOMPRESS "decompress"
-#define COMMAND_PING "ping"
-#define COMMAND_SHUTDOWN "shutdown"
-#define COMMAND_STATUS "status"
+#define COMMAND_ANNOTATE       "annotate"
+#define COMMAND_ARCHIVE        "archive"
+#define COMMAND_BACKUP         "backup"
+#define COMMAND_CLEAR          "clear"
+#define COMMAND_COMPRESS       "compress"
+#define COMMAND_CONF           "conf"
+#define COMMAND_DECOMPRESS     "decompress"
+#define COMMAND_DECRYPT        "decrypt"
+#define COMMAND_DELETE         "delete"
+#define COMMAND_ENCRYPT        "encrypt"
+#define COMMAND_EXPUNGE        "expunge"
+#define COMMAND_INFO           "info"
+#define COMMAND_LIST_BACKUP    "list-backup"
+#define COMMAND_MODE           "mode"
+#define COMMAND_PING           "ping"
+#define COMMAND_RELOAD         "reload"
+#define COMMAND_RESET          "reset"
+#define COMMAND_RESTORE        "restore"
+#define COMMAND_RETAIN         "retain"
+#define COMMAND_SHUTDOWN       "shutdown"
+#define COMMAND_STATUS         "status"
 #define COMMAND_STATUS_DETAILS "status-details"
-#define COMMAND_CONF "conf"
-#define COMMAND_CLEAR "clear"
-#define COMMAND_INFO "info"
-#define COMMAND_ANNOTATE "annotate"
+#define COMMAND_VERIFY         "verify"
 
 #define OUTPUT_FORMAT_JSON "json"
 #define OUTPUT_FORMAT_TEXT "text"
@@ -109,6 +110,7 @@ static void help_conf(void);
 static void help_clear(void);
 static void help_info(void);
 static void help_annotate(void);
+static void help_mode(void);
 static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
@@ -135,6 +137,7 @@ static int decompress_data_server(SSL* ssl, int socket, char* path, uint8_t comp
 static int compress_data_server(SSL* ssl, int socket, char* path, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_get(SSL* ssl, int socket, char* config_key, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -219,6 +222,7 @@ usage(void)
    printf("  expunge                  Expunge a backup from a server\n");
    printf("  info                     Information about a backup\n");
    printf("  list-backup              List the backups for a server\n");
+   printf("  mode                     Switch the mode for a server\n");
    printf("  ping                     Check if pgmoneta is alive\n");
    printf("  restore                  Restore a backup from a server\n");
    printf("  retain                   Retain a backup from a server\n");
@@ -414,6 +418,14 @@ struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_ANNOTATE,
       .deprecated = false,
       .log_message = "<annotate> [%s]"
+   },
+   {
+      .command = "mode",
+      .subcommand = "",
+      .accepted_argument_count = {2},
+      .action = MANAGEMENT_MODE,
+      .deprecated = false,
+      .log_message = "<mode> [%s]"
    }
 };
 
@@ -959,6 +971,10 @@ execute:
    {
       exit_code = annotate(s_ssl, socket, parsed.args[0], parsed.args[1], parsed.args[2], parsed.args[3], parsed.args[4], compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_MODE)
+   {
+      exit_code = mode(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+   }
    else if (parsed.cmd->action == MANAGEMENT_CONF_LS)
    {
       exit_code = conf_ls(s_ssl, socket, compression, encryption, output_format);
@@ -1155,6 +1171,13 @@ help_annotate(void)
 }
 
 static void
+help_mode(void)
+{
+   printf("Switch mode of a server\n");
+   printf("  pgmoneta-cli mode <server> <online|offline>\n");
+}
+
+static void
 display_helper(char* command)
 {
    if (!strcmp(command, COMMAND_BACKUP))
@@ -1232,6 +1255,10 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_ANNOTATE))
    {
       help_annotate();
+   }
+   else if (!strcmp(command, COMMAND_MODE))
+   {
+      help_mode();
    }
    else
    {
@@ -1825,6 +1852,26 @@ error:
 }
 
 static int
+mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_mode(ssl, socket, server, action, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
 conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_conf_ls(ssl, socket, compression, encryption, output_format))
@@ -2377,6 +2424,9 @@ translate_command(int32_t cmd_code)
          break;
       case MANAGEMENT_ANNOTATE:
          command_output = pgmoneta_append(command_output, COMMAND_ANNOTATE);
+         break;
+      case MANAGEMENT_MODE:
+         command_output = pgmoneta_append(command_output, COMMAND_MODE);
          break;
       case MANAGEMENT_CONF_LS:
          command_output = pgmoneta_append(command_output, COMMAND_CONF);
@@ -3016,6 +3066,8 @@ translate_json_object(struct json* j)
                break;
             case MANAGEMENT_CONF_GET:
                translate_configuration(response);
+               break;
+            case MANAGEMENT_MODE:
                break;
             default:
                break;

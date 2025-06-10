@@ -132,6 +132,12 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
 
       pgmoneta_log_debug("Retention (execute): %s", config->common.servers[i].name);
 
+      if (!config->common.servers[i].online)
+      {
+         pgmoneta_log_debug("Server %s is offline", config->common.servers[i].name);
+         continue;
+      }
+
       retention_days = config->common.servers[i].retention_days;
       if (retention_days <= 0)
       {

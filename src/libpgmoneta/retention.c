@@ -55,6 +55,12 @@ pgmoneta_retention(char** argv)
    {
       bool active = false;
 
+      if (!config->common.servers[server].online)
+      {
+         pgmoneta_log_debug("Retention: Server %s is offline", config->common.servers[server].name);
+         continue;
+      }
+
       if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
       {
          pgmoneta_log_info("Retention: Server %s is active", config->common.servers[server].name);

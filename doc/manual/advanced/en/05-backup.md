@@ -223,6 +223,14 @@ Response:
 
 Lets create a `crontab` such that a backup is made every day,
 
+First, take a full backup if you are using PostgreSQL 17+,
+
+```
+pgmoneta-cli backup primary
+```
+
+then you can use incremental backup for your daily jobs,
+
 ```
 crontab -e
 ```
@@ -230,10 +238,12 @@ crontab -e
 and insert
 
 ```
-0 6 * * * pgmoneta-cli backup primary
+0 6 * * * pgmoneta-cli backup primary latest
 ```
 
-for taking a backup every day at 6 am.
+for taking an incremental backup every day at 6 am.
+
+Otherwise use the full backup in the cron job.
 
 ## Verify backup integrity
 

@@ -228,6 +228,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   memset(&srv, 0, sizeof(struct server));
                   memcpy(&srv.name, &section, strlen(section));
 
+                  srv.online = false;
                   atomic_init(&srv.repository, false);
                   srv.active_backup = false;
                   srv.active_restore = false;
@@ -2569,6 +2570,7 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->common.servers[i].host, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PORT, (uintptr_t)config->common.servers[i].port, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_USER, (uintptr_t)config->common.servers[i].username, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SLOT, (uintptr_t)config->common.servers[i].wal_slot, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->common.servers[i].create_slot, ValueInt32);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_FOLLOW, (uintptr_t)config->common.servers[i].follow, ValueString);

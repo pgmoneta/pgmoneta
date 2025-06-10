@@ -184,6 +184,14 @@ The numbeer of workers for a server
 | :-------- | :---------- |
 | name | The server identifier |
 
+## pgmoneta_server_online
+
+Is the server in an online state
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+
 ## pgmoneta_server_valid
 
 Is the server in a valid state

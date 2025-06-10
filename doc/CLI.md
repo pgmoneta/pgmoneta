@@ -48,6 +48,7 @@ Commands:
   expunge                  Expunge a backup from a server
   info                     Information about a backup
   list-backup              List the backups for a server
+  mode                     Switch the mode for a server
   ping                     Check if pgmoneta is alive
   restore                  Restore a backup from a server
   retain                   Retain a backup from a server
@@ -288,6 +289,32 @@ Example
 ``` sh
 pgmoneta-cli ping
 ```
+
+## mode
+
+[**pgmoneta**](pgmoneta) detects when a server is down. You can bring a server online or offline
+using the mode command.
+
+Command
+
+```
+pgmoneta-cli mode <server> <online|offline>
+```
+
+Example
+
+```
+pgmoneta-cli mode primary offline
+```
+
+or
+
+```
+pgmoneta-cli mode primary online
+```
+
+[**pgmoneta**](pgmoneta) will keep basic services running for an offline server such that
+you can verify a backup or do a restore.
 
 ## shutdown
 

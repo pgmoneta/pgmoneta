@@ -15,7 +15,6 @@ Options:
   -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file
   -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file
   -d, --daemon             Run as a daemon
-      --offline            Run in offline mode
   -V, --version            Display version information
   -?, --help               Display help
 ```
@@ -168,6 +167,7 @@ Commands:
   expunge                  Expunge a backup from a server
   info                     Information about a backup
   list-backup              List the backups for a server
+  mode                     Switch the mode for a server
   ping                     Check if pgmoneta is alive
   restore                  Restore a backup from a server
   retain                   Retain a backup from a server

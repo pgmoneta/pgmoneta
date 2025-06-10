@@ -83,6 +83,7 @@ extern "C" {
 #define MANAGEMENT_CONF_LS        21
 #define MANAGEMENT_CONF_GET       22
 #define MANAGEMENT_CONF_SET       23
+#define MANAGEMENT_MODE           24
 
 #define MANAGEMENT_MASTER_KEY     24
 #define MANAGEMENT_ADD_USER       25
@@ -144,7 +145,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_BACKUPS     "NumberOfBackups"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS     "NumberOfServers"
 #define MANAGEMENT_ARGUMENT_NUMBER_OF_TABLESPACES "NumberOfTablespaces"
-#define MANAGEMENT_ARGUMENT_OFFLINE               "Offline"
+#define MANAGEMENT_ARGUMENT_ONLINE                "Online"
 #define MANAGEMENT_ARGUMENT_ORIGINAL              "Original"
 #define MANAGEMENT_ARGUMENT_OUTPUT                "Output"
 #define MANAGEMENT_ARGUMENT_POSITION              "Position"
@@ -352,6 +353,13 @@ extern "C" {
 #define MANAGEMENT_ERROR_CONF_SET_UNKNOWN_SERVER            2705
 #define MANAGEMENT_ERROR_CONF_SET_NETWORK                   2706
 #define MANAGEMENT_ERROR_CONF_SET_ERROR                     2707
+
+#define MANAGEMENT_ERROR_MODE_NOSERVER       2800
+#define MANAGEMENT_ERROR_MODE_NOFORK         2801
+#define MANAGEMENT_ERROR_MODE_FAILED         2802
+#define MANAGEMENT_ERROR_MODE_NETWORK        2803
+#define MANAGEMENT_ERROR_MODE_ERROR          2804
+#define MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION 2805
 
 /**
  * Output formats
@@ -713,6 +721,19 @@ pgmoneta_management_request_info(SSL* ssl, int socket, char* server, char* backu
  */
 int
 pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* backup_id, char* action, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a mode request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param action The action
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int pgmoneta_management_request_mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an ok response

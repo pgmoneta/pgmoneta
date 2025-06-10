@@ -331,7 +331,11 @@ pgmoneta_sha512_verification(char** argv)
 
    for (server = 0; server < config->common.number_of_servers; server++)
    {
-      pgmoneta_log_debug("Verification: Starting for server %s", config->common.servers[server].name);
+      if (!config->common.servers[server].online)
+      {
+         pgmoneta_log_debug("Verification: Server %s is offline", config->common.servers[server].name);
+         continue;
+      }
 
       active = false;
       if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
@@ -339,6 +343,8 @@ pgmoneta_sha512_verification(char** argv)
          pgmoneta_log_warn("Verification: Server %s is already active, skipping verification", config->common.servers[server].name);
          continue;
       }
+
+      pgmoneta_log_debug("Verification: Starting for server %s", config->common.servers[server].name);
 
       locked = true;
 

@@ -125,6 +125,11 @@ pgmoneta_wal(int srv, char** argv)
 
    memset(msg, 0, sizeof(struct message));
 
+   if (!config->common.servers[srv].online)
+   {
+      goto error;
+   }
+
    if (config->common.servers[srv].wal_streaming)
    {
       goto error;
@@ -144,7 +149,7 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_log_trace("Invalid user for %s", config->common.servers[srv].name);
       goto error;
    }
-   pgmoneta_server_info(srv);
+   /* pgmoneta_server_info(srv); */
 
    if (config->common.servers[srv].checksums)
    {
@@ -271,7 +276,7 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_free_query_response(identify_system_response);
    identify_system_response = NULL;
 
-   while (config->running)
+   while (config->running && config->common.servers[srv].online)
    {
       if (wal_fetch_history(d, timeline, ssl, socket))
       {
@@ -299,7 +304,7 @@ pgmoneta_wal(int srv, char** argv)
 
       // wait for the CopyBothResponse message
 
-      while (config->running && (msg == NULL || type != 'W'))
+      while (config->running && config->common.servers[srv].online && (msg == NULL || type != 'W'))
       {
          ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
          if (ret != 1)
@@ -320,7 +325,7 @@ pgmoneta_wal(int srv, char** argv)
       type = 0;
 
       // start streaming current timeline's WAL segments
-      while (config->running)
+      while (config->running && config->common.servers[srv].online)
       {
          ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
          if (ret == 0)
@@ -562,7 +567,7 @@ pgmoneta_wal(int srv, char** argv)
       xlogpos = NULL;
       // receive the last command complete message
       msg->kind = '\0';
-      while (config->running && msg->kind != 'C')
+      while (config->running && config->common.servers[srv].online && msg->kind != 'C')
       {
          pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
          pgmoneta_consume_copy_stream_end(buffer, msg);
@@ -600,6 +605,8 @@ pgmoneta_wal(int srv, char** argv)
       current = current->next;
    }
 
+   config->common.servers[srv].online = false;
+
    pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
@@ -623,6 +630,7 @@ pgmoneta_wal(int srv, char** argv)
    exit(0);
 
 error:
+   config->common.servers[srv].online = false;
    config->common.servers[srv].wal_streaming = false;
    pgmoneta_close_ssl(ssl);
    if (socket != -1)

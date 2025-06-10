@@ -82,7 +82,6 @@
 
 #define NAME "main"
 #define MAX_FDS 64
-#define OFFLINE 1000
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
@@ -98,7 +97,9 @@ static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
 static bool reload_configuration(void);
 static void init_receivewals(void);
+static int init_receivewal(int server);
 static int init_replication_slots(void);
+static int init_replication_slot(int server);
 static int verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
@@ -123,7 +124,6 @@ static int metrics_fds_length = -1;
 static struct accept_io io_management[MAX_FDS];
 static int* management_fds = NULL;
 static int management_fds_length = -1;
-static bool offline = false;
 
 static void
 start_mgt(void)
@@ -223,7 +223,6 @@ usage(void)
    printf("  -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file\n");
    printf("  -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file\n");
    printf("  -d, --daemon             Run as a daemon\n");
-   printf("      --offline            Run in offline mode\n");
    printf("  -V, --version            Display version information\n");
    printf("  -?, --help               Display help\n");
    printf("\n");
@@ -266,7 +265,6 @@ main(int argc, char** argv)
       {"u", "users", true},
       {"A", "admins", true},
       {"d", "daemon", false},
-      {"", "offline", false},
       {"V", "version", false},
       {"?", "help", false},
    };
@@ -307,10 +305,6 @@ main(int argc, char** argv)
       else if (!strcmp(optname, "d") || !strcmp(optname, "daemon"))
       {
          daemon = true;
-      }
-      else if (!strcmp(optname, "offline"))
-      {
-         offline = true;
       }
       else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
       {
@@ -489,7 +483,7 @@ main(int argc, char** argv)
 
    config = (struct main_configuration*)shmem;
 
-   if (!offline && daemon)
+   if (daemon)
    {
       if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
@@ -643,58 +637,39 @@ main(int argc, char** argv)
    }
 
    /* Create and/or validate replication slots */
-   if (!offline && init_replication_slots())
+   if (init_replication_slots())
    {
       goto error;
    }
 
-   if (!offline)
+   /* Start to retrieve WAL */
+   init_receivewals();
+
+   /* Start to validate server configuration */
+   ev_periodic_init (&valid, valid_cb, 0., 600, 0);
+   ev_periodic_start (main_loop, &valid);
+
+   /* Start to verify WAL streaming */
+   ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
+   ev_periodic_start (main_loop, &wal_streaming);
+
+   /* Start WAL compression */
+   if (config->compression_type != COMPRESSION_NONE ||
+       config->encryption != ENCRYPTION_NONE)
    {
-      /* Start to retrieve WAL */
-      init_receivewals();
-
-      /* Start to validate server configuration */
-      ev_periodic_init (&valid, valid_cb, 0., 600, 0);
-      ev_periodic_start (main_loop, &valid);
-
-      /* Start to verify WAL streaming */
-      ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
-      ev_periodic_start (main_loop, &wal_streaming);
+      ev_periodic_init(&wal, wal_cb, 0., 60, 0);
+      ev_periodic_start(main_loop, &wal);
    }
 
-   if (!offline)
-   {
-      /* Start WAL compression */
-      if (config->compression_type != COMPRESSION_NONE ||
-          config->encryption != ENCRYPTION_NONE)
-      {
-         ev_periodic_init(&wal, wal_cb, 0., 60, 0);
-         ev_periodic_start(main_loop, &wal);
-      }
-   }
+   /* Start backup retention policy */
+   ev_periodic_init(&retention, retention_cb, 0., config->retention_interval, 0);
+   ev_periodic_start(main_loop, &retention);
 
-   if (!offline)
-   {
-      /* Start backup retention policy */
-      ev_periodic_init(&retention, retention_cb, 0., config->retention_interval, 0);
-      ev_periodic_start(main_loop, &retention);
-   }
+   /* Start SHA512 verification job */
+   ev_periodic_init(&verification, verification_cb, 0., config->verification, 0);
+   ev_periodic_start(main_loop, &verification);
 
-   if (!offline)
-   {
-      /* Start SHA512 verification job */
-      ev_periodic_init(&verification, verification_cb, 0., config->verification, 0);
-      ev_periodic_start(main_loop, &verification);
-   }
-
-   if (!offline)
-   {
-      pgmoneta_log_info("Started on %s", config->host);
-   }
-   else
-   {
-      pgmoneta_log_info("Started on %s (offline)", config->host);
-   }
+   pgmoneta_log_info("Started on %s", config->host);
    pgmoneta_log_debug("Management: %d", unix_management_socket);
    for (int i = 0; i < metrics_fds_length; i++)
    {
@@ -879,23 +854,24 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    {
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
 
-      if (!offline)
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
       {
-         srv = -1;
-         for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+         if (!strcmp(config->common.servers[i].name, server))
          {
-            if (!strcmp(config->common.servers[i].name, server))
-            {
-               srv = i;
-            }
+            srv = i;
          }
+      }
 
-         if (srv != -1)
+      if (srv != -1)
+      {
+         if (config->common.servers[srv].online)
          {
             pid = fork();
             if (pid == -1)
             {
-               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, NAME, compression, encryption, payload);
+               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOFORK, NAME,
+                                                  compression, encryption, payload);
                pgmoneta_log_error("Backup: No fork (%d)", MANAGEMENT_ERROR_BACKUP_NOFORK);
                goto error;
             }
@@ -913,17 +889,17 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else
          {
-            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, NAME, compression, encryption, payload);
-            pgmoneta_log_error("Backup: No server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_NOSERVER);
-            goto error;
+            pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER),
+                                               MANAGEMENT_ERROR_BACKUP_OFFLINE, NAME, compression, encryption, payload);
+            pgmoneta_log_info("Backup: Server %s is offline", server);
          }
       }
       else
       {
-         pgmoneta_log_warn("Can not create backups in offline mode");
-
-         pgmoneta_management_response_error(NULL, client_fd, (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER), MANAGEMENT_ERROR_BACKUP_OFFLINE, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Offline: Server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_OFFLINE);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_BACKUP_NOSERVER, NAME,
+                                            compression, encryption, payload);
+         pgmoneta_log_error("Backup: No server %s (%d)", server, MANAGEMENT_ERROR_BACKUP_NOSERVER);
+         goto error;
       }
    }
    else if (id == MANAGEMENT_LIST_BACKUP)
@@ -1300,7 +1276,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_json_clone(payload, &pyl);
 
          pgmoneta_set_proc_title(1, ai->argv, "status", NULL);
-         pgmoneta_status(NULL, client_fd, offline, compression, encryption, pyl);
+         pgmoneta_status(NULL, client_fd, compression, encryption, pyl);
       }
    }
    else if (id == MANAGEMENT_STATUS_DETAILS)
@@ -1321,7 +1297,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_json_clone(payload, &pyl);
 
          pgmoneta_set_proc_title(1, ai->argv, "details", NULL);
-         pgmoneta_status_details(NULL, client_fd, offline, compression, encryption, pyl);
+         pgmoneta_status_details(NULL, client_fd, compression, encryption, pyl);
       }
    }
    else if (id == MANAGEMENT_RETAIN)
@@ -1596,7 +1572,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          if (pid == -1)
          {
             pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOFORK, NAME, compression, encryption, payload);
-            pgmoneta_log_error("Annotate: No fork %s (%d)", server, MANAGEMENT_ERROR_INFO_NOFORK);
+            pgmoneta_log_error("Annotate: No fork %s (%d)", server, MANAGEMENT_ERROR_ANNOTATE_NOFORK);
             goto error;
          }
          else if (pid == 0)
@@ -1611,10 +1587,84 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_annotate_request(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
+   }
+   else if (id == MANAGEMENT_MODE)
+   {
+      char* action = NULL;
+      struct timespec start_t;
+      struct timespec end_t;
+
+#ifdef HAVE_FREEBSD
+      clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+      clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+      action = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_ACTION);
+
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      {
+         if (!strcmp(config->common.servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
+
+      if (srv != -1)
+      {
+         if (!strcmp(action, "offline"))
+         {
+            config->common.servers[srv].online = false;
+
+#ifdef HAVE_FREEBSD
+            clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+            clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+            if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+            {
+               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_MODE_NETWORK, NAME, compression,
+                                                  encryption, payload);
+               pgmoneta_log_error("Mode: Error sending response for %s", server);
+               goto error;
+            }
+         }
+         else if (!strcmp(action, "online"))
+         {
+            config->common.servers[srv].online = true;
+            /* TODO */
+            init_replication_slot(srv);
+            init_receivewal(srv);
+
+#ifdef HAVE_FREEBSD
+            clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+            clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+            if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+            {
+               pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_MODE_NETWORK, NAME, compression,
+                                                  encryption, payload);
+               pgmoneta_log_error("Mode: Error sending response for %s", server);
+               goto error;
+            }
+         }
+         else
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION, NAME,
+                                               compression, encryption, payload);
+            pgmoneta_log_error("Mode: Unknown action %s for server %s (%d)", action, server,
+                               MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION);
+            goto error;
+         }
+      }
       else
       {
-         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, NAME, compression, encryption, payload);
-         pgmoneta_log_error("Annotate: No server %s (%d)", server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER);
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_MODE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Mode: No server %s (%d)", server, MANAGEMENT_ERROR_MODE_NOSERVER);
          goto error;
       }
    }
@@ -1847,48 +1897,55 @@ wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute_
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      /* Compression is always in a fork() */
-      if (!fork())
+      if (config->common.servers[i].online)
       {
-         bool active = false;
-         char* d = NULL;
-
-         pgmoneta_set_proc_title(1, argv_ptr, "wal", config->common.servers[i].name);
-
-         shutdown_ports();
-
-         if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
+         /* Compression is always in a fork() */
+         if (!fork())
          {
-            d = pgmoneta_get_server_wal(i);
+            bool active = false;
+            char* d = NULL;
 
-            if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+            pgmoneta_set_proc_title(1, argv_ptr, "wal", config->common.servers[i].name);
+
+            shutdown_ports();
+
+            if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
             {
-               pgmoneta_gzip_wal(d);
-            }
-            else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-            {
-               pgmoneta_zstandardc_wal(d);
-            }
-            else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-            {
-               pgmoneta_lz4c_wal(d);
-            }
-            else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-            {
-               pgmoneta_bzip2_wal(d);
+               d = pgmoneta_get_server_wal(i);
+
+               if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+               {
+                  pgmoneta_gzip_wal(d);
+               }
+               else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+               {
+                  pgmoneta_zstandardc_wal(d);
+               }
+               else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+               {
+                  pgmoneta_lz4c_wal(d);
+               }
+               else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+               {
+                  pgmoneta_bzip2_wal(d);
+               }
+
+               if (config->encryption != ENCRYPTION_NONE)
+               {
+                  pgmoneta_encrypt_wal(d);
+               }
+
+               free(d);
+
+               atomic_store(&config->common.servers[i].repository, false);
             }
 
-            if (config->encryption != ENCRYPTION_NONE)
-            {
-               pgmoneta_encrypt_wal(d);
-            }
-
-            free(d);
-
-            atomic_store(&config->common.servers[i].repository, false);
+            exit(0);
          }
-
-         exit(0);
+      }
+      else
+      {
+         pgmoneta_log_debug("WAL compression: Server %s is offline", config->common.servers[i].name);
       }
    }
 }
@@ -1948,11 +2005,45 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
 
       for (int i = 0; i < config->common.number_of_servers; i++)
       {
-         pgmoneta_log_trace("Valid - Server %d Valid %d WAL %d", i, config->common.servers[i].valid, config->common.servers[i].wal_streaming);
+         pgmoneta_log_trace("Valid - Server %s Online %d Valid %d WAL %d",
+                            config->common.servers[i].name,
+                            config->common.servers[i].online,
+                            config->common.servers[i].valid,
+                            config->common.servers[i].wal_streaming);
 
-         if (keep_running && !config->common.servers[i].valid)
+         if (keep_running && config->common.servers[i].online && !config->common.servers[i].valid)
          {
-            pgmoneta_server_info(i);
+            int usr = -1;
+            SSL* ssl = NULL;
+            int socket = -1;
+            int auth = AUTH_ERROR;
+
+            for (int j = 0; usr == -1 && j < config->common.number_of_users; j++)
+            {
+               if (!strcmp(config->common.servers[i].username, config->common.users[j].username))
+               {
+                  usr = i;
+               }
+            }
+
+            auth = pgmoneta_server_authenticate(i, "postgres",
+                                                config->common.users[usr].username,
+                                                config->common.users[usr].password,
+                                                true, &ssl, &socket);
+
+            if (auth != AUTH_SUCCESS)
+            {
+               pgmoneta_log_error("Authentication failed for user %s on %s",
+                                  config->common.users[usr].username,
+                                  config->common.servers[i].name);
+            }
+            else
+            {
+               pgmoneta_server_info(i, ssl, socket);
+            }
+
+            pgmoneta_close_ssl(ssl);
+            pgmoneta_disconnect(socket);
          }
       }
 
@@ -1980,44 +2071,56 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      pgmoneta_log_trace("WAL streaming - Server %d Valid %d WAL %d CHECKSUMS %d SUMMARIZE_WAL %d",
-                         i, config->common.servers[i].valid, config->common.servers[i].wal_streaming,
-                         config->common.servers[i].checksums, config->common.servers[i].summarize_wal);
 
       if (keep_running && !config->common.servers[i].wal_streaming)
       {
          start = false;
 
-         if (strlen(config->common.servers[i].follow) == 0)
+         if (config->common.servers[i].online)
          {
-            follow = -1;
+            pgmoneta_log_trace("WAL streaming: Server %s Online %d Valid %d WAL %d CHECKSUMS %d SUMMARIZE_WAL %d",
+                               config->common.servers[i].name, config->common.servers[i].online,
+                               config->common.servers[i].valid, config->common.servers[i].wal_streaming,
+                               config->common.servers[i].checksums, config->common.servers[i].summarize_wal);
 
-            for (int j = 0; follow == -1 && j < config->common.number_of_servers; j++)
+            if (strlen(config->common.servers[i].follow) == 0)
             {
-               if (!strcmp(config->common.servers[j].follow, config->common.servers[i].name))
+               follow = -1;
+
+               for (int j = 0;
+                    follow == -1 && j < config->common.number_of_servers; j++)
                {
-                  follow = j;
+                  if (!strcmp(config->common.servers[j].follow, config->common.servers[i].name))
+                  {
+                     follow = j;
+                  }
                }
-            }
 
-            if (follow == -1)
-            {
-               start = true;
-            }
-            else if (!config->common.servers[follow].wal_streaming)
-            {
-               start = true;
-            }
-         }
-         else
-         {
-            for (int j = 0; !start && j < config->common.number_of_servers; j++)
-            {
-               if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name) && !config->common.servers[j].wal_streaming)
+               if (follow == -1)
+               {
+                  start = true;
+               }
+               else if (!config->common.servers[follow].wal_streaming)
                {
                   start = true;
                }
             }
+            else
+            {
+               for (int j = 0; !start && j < config->common.number_of_servers;
+                    j++)
+               {
+                  if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name) &&
+                      !config->common.servers[j].wal_streaming)
+                  {
+                     start = true;
+                  }
+               }
+            }
+         }
+         else
+         {
+            pgmoneta_log_debug("WAL streaming: Server %s is offline", config->common.servers[i].name);
          }
 
          if (start)
@@ -2148,14 +2251,31 @@ reload_configuration(void)
 static void
 init_receivewals(void)
 {
-   int active = 0;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      if (strlen(config->common.servers[i].follow) == 0)
+      if (init_receivewal(i))
+      {
+         config->common.servers[i].online = false;
+         pgmoneta_log_debug("Server %s is offline", config->common.servers[i].name);
+      }
+   }
+}
+
+static int
+init_receivewal(int server)
+{
+   int ret = 0;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (strlen(config->common.servers[server].follow) == 0)
+   {
+      if (config->common.servers[server].online)
       {
          pid_t pid;
 
@@ -2164,27 +2284,44 @@ init_receivewals(void)
          {
             /* No process */
             pgmoneta_log_error("WAL - Cannot create process");
+            ret = 1;
          }
          else if (pid == 0)
          {
             shutdown_ports();
-            pgmoneta_wal(i, argv_ptr);
+            pgmoneta_wal(server, argv_ptr);
          }
-         else
-         {
-            active++;
-         }
+      }
+      else
+      {
+         ret = 1;
       }
    }
 
-   if (active == 0)
-   {
-      pgmoneta_log_error("No active WAL streaming");
-   }
+   return ret;
 }
 
 static int
 init_replication_slots(void)
+{
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   for (int srv = 0; srv < config->common.number_of_servers; srv++)
+   {
+      if (init_replication_slot(srv))
+      {
+         config->common.servers[srv].online = false;
+         pgmoneta_log_debug("Server %s is offline", config->common.servers[srv].name);
+      }
+   }
+
+   return 0;
+}
+
+static int
+init_replication_slot(int server)
 {
    int usr;
    int auth = AUTH_ERROR;
@@ -2201,113 +2338,109 @@ init_replication_slots(void)
 
    pgmoneta_memory_init();
 
-   for (int srv = 0; srv < config->common.number_of_servers; srv++)
+   usr = -1;
+   for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
    {
-      usr = -1;
-
-      for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
+      if (!strcmp(config->common.servers[server].username, config->common.users[i].username))
       {
-         if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
-         {
-            usr = i;
-         }
+         usr = i;
       }
+   }
 
-      if (usr != -1)
+   if (usr != -1)
+   {
+      create_slot = config->common.servers[server].create_slot == CREATE_SLOT_YES ||
+                    (config->create_slot == CREATE_SLOT_YES && config->common.servers[server].create_slot != CREATE_SLOT_NO);
+      socket = 0;
+      auth = pgmoneta_server_authenticate(server, "postgres",
+                                          config->common.users[usr].username, config->common.users[usr].password,
+                                          false, &ssl, &socket);
+
+      if (auth == AUTH_SUCCESS)
       {
-         create_slot = config->common.servers[srv].create_slot == CREATE_SLOT_YES ||
-                       (config->create_slot == CREATE_SLOT_YES && config->common.servers[srv].create_slot != CREATE_SLOT_NO);
-         socket = 0;
-         auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket);
+         pgmoneta_server_info(server, ssl, socket);
 
-         if (auth == AUTH_SUCCESS)
+         if (!pgmoneta_server_valid(server))
          {
-            pgmoneta_server_info(srv);
+            pgmoneta_log_fatal("Could not get version for server %s", config->common.servers[server].name);
+            ret = 1;
+            goto server_done;
+         }
 
-            if (!pgmoneta_server_valid(srv))
-            {
-               pgmoneta_log_fatal("Could not get version for server %s", config->common.servers[srv].name);
-               ret = 1;
-               goto server_done;
-            }
+         if (config->common.servers[server].version < POSTGRESQL_MIN_VERSION)
+         {
+            pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION,
+                               config->common.servers[server].name);
+            ret = 1;
+            goto server_done;
+         }
 
-            if (config->common.servers[srv].version < POSTGRESQL_MIN_VERSION)
-            {
-               pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION, config->common.servers[srv].name);
-               ret = 1;
-               goto server_done;
-            }
-
-            if (config->common.servers[srv].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
+         if (config->common.servers[server].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
                                                              config->compression_type == COMPRESSION_SERVER_ZSTD ||
                                                              config->compression_type == COMPRESSION_SERVER_LZ4))
+         {
+            pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression",
+                               config->common.servers[server].name);
+            ret = 1;
+            goto server_done;
+         }
+
+         if (config->common.servers[server].version >= 17 && !config->common.servers[server].summarize_wal)
+         {
+            pgmoneta_log_fatal("PostgreSQL %d or higher requires summarize_wal for server %s",
+                               config->common.servers[server].version, config->common.servers[server].name);
+            ret = 1;
+            goto server_done;
+         }
+
+         /* Verify replication slot */
+         slot_status = verify_replication_slot(config->common.servers[server].wal_slot, server, ssl, socket);
+         if (slot_status == VALID_SLOT)
+         {
+            /* Ok */
+         }
+         else if (!create_slot)
+         {
+            if (slot_status == SLOT_NOT_FOUND)
             {
-               pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression", config->common.servers[srv].name);
+               pgmoneta_log_fatal("Replication slot '%s' is not found for server %s",
+                                  config->common.servers[server].wal_slot, config->common.servers[server].name);
                ret = 1;
                goto server_done;
             }
-
-            if (config->common.servers[srv].version >= 17 && !config->common.servers[srv].summarize_wal)
+            else if (slot_status == INCORRECT_SLOT_TYPE)
             {
-               pgmoneta_log_fatal("PostgreSQL %d or higher requires summarize_wal for server %s",
-                                  config->common.servers[srv].version, config->common.servers[srv].name);
+               pgmoneta_log_fatal("Replication slot '%s' should be physical", config->common.servers[server].wal_slot);
                ret = 1;
                goto server_done;
-            }
-
-            /* Verify replication slot */
-            slot_status = verify_replication_slot(config->common.servers[srv].wal_slot, srv, ssl, socket);
-            if (slot_status == VALID_SLOT)
-            {
-               /* Ok */
-            }
-            else if (!create_slot)
-            {
-               if (slot_status == SLOT_NOT_FOUND)
-               {
-                  pgmoneta_log_fatal("Replication slot '%s' is not found for server %s", config->common.servers[srv].wal_slot, config->common.servers[srv].name);
-                  ret = 1;
-               }
-               else if (slot_status == INCORRECT_SLOT_TYPE)
-               {
-                  pgmoneta_log_fatal("Replication slot '%s' should be physical", config->common.servers[srv].wal_slot);
-                  ret = 1;
-               }
             }
          }
          else
          {
-            pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[srv].name);
-            ret = 1;
-         }
-
-         pgmoneta_close_ssl(ssl);
-         pgmoneta_disconnect(socket);
-         socket = 0;
-
-         if (create_slot && slot_status == SLOT_NOT_FOUND)
-         {
-            auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, true, &ssl, &socket);
-
-            if (auth == AUTH_SUCCESS)
+            if (create_slot && slot_status == SLOT_NOT_FOUND)
             {
-               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->common.servers[srv].name, config->common.servers[srv].wal_slot);
-
-               pgmoneta_create_replication_slot_message(config->common.servers[srv].wal_slot, &slot_request_msg, config->common.servers[srv].version);
+               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->common.servers[server].name, config->common.servers[server].wal_slot);
+               pgmoneta_create_replication_slot_message(config->common.servers[server].wal_slot, &slot_request_msg,
+                                                        config->common.servers[server].version);
                if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
                {
                   if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                   {
-                     pgmoneta_log_info("Created replication slot %s on %s", config->common.servers[srv].wal_slot, config->common.servers[srv].name);
+                     pgmoneta_log_info("Created replication slot %s on %s",
+                                       config->common.servers[server].wal_slot, config->common.servers[server].name);
                   }
                   else
                   {
-                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->common.servers[srv].name);
+                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->common.servers[server].name);
+                     ret = 1;
+                     goto server_done;
                   }
                }
                else
                {
-                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->common.servers[srv].name);
+                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->common.servers[server].name);
+                  ret = 1;
+                  goto server_done;
                }
 
                pgmoneta_free_message(slot_request_msg);
@@ -2316,20 +2449,29 @@ init_replication_slots(void)
                pgmoneta_clear_message();
                slot_response_msg = NULL;
             }
-            else
-            {
-               pgmoneta_log_error("Authentication failed for user on %s", config->common.servers[srv].name);
-            }
-
-server_done:
-            pgmoneta_close_ssl(ssl);
-            pgmoneta_disconnect(socket);
          }
+      }
+      else if (auth == AUTH_BAD_PASSWORD)
+      {
+         pgmoneta_log_error("Authentication failed for user %s on %s",
+                            config->common.users[usr].username, config->common.servers[server].name);
       }
       else
       {
-         pgmoneta_log_error("Invalid user for %s", config->common.servers[srv].name);
+         pgmoneta_log_debug("Server %s is offline", config->common.servers[server].name);
       }
+
+server_done:
+
+      pgmoneta_close_ssl(ssl);
+      pgmoneta_disconnect(socket);
+
+      ssl = NULL;
+      socket = 0;
+   }
+   else
+   {
+      pgmoneta_log_error("Invalid user for %s", config->common.servers[server].name);
    }
 
    pgmoneta_memory_destroy();

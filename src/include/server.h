@@ -40,9 +40,11 @@ extern "C" {
 /**
  * Get the information for a server
  * @param srv The server index
+ * @param ssl The SSL connection
+ * @param socket The socket
  */
 void
-pgmoneta_server_info(int srv);
+pgmoneta_server_info(int srv, SSL* ssl, int socket);
 
 /**
  * Is the base settings for the server set

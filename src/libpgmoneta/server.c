@@ -28,16 +28,20 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <deque.h>
 #include <extension.h>
 #include <logging.h>
+#include <message.h>
 #include <network.h>
 #include <security.h>
 #include <utils.h>
 
 /* system */
 #include <ev.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <openssl/ssl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -53,12 +57,8 @@ static int process_server_parameters(int server, struct deque* server_parameters
 static bool is_valid_response(struct query_response* response);
 
 void
-pgmoneta_server_info(int srv)
+pgmoneta_server_info(int srv, SSL* ssl, int socket)
 {
-   int usr;
-   int auth;
-   SSL* ssl = NULL;
-   int socket = -1;
    bool replica;
    bool checksums;
    int ws;
@@ -71,30 +71,15 @@ pgmoneta_server_info(int srv)
 
    config = (struct main_configuration*)shmem;
 
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto done;
+   }
+
+   config->common.servers[srv].online = true;
    config->common.servers[srv].valid = false;
    config->common.servers[srv].checksums = false;
-
-   usr = -1;
-   for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
-   {
-      if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
-      {
-         usr = i;
-      }
-   }
-
-   if (usr == -1)
-   {
-      goto done;
-   }
-
-   auth = pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket);
-
-   if (auth != AUTH_SUCCESS)
-   {
-      pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[srv].name);
-      goto done;
-   }
 
    if (pgmoneta_extract_server_parameters(&server_parameters))
    {
@@ -209,16 +194,9 @@ pgmoneta_server_info(int srv)
    }
    pgmoneta_log_debug("%s/summarize_wal %d", config->common.servers[srv].name, config->common.servers[srv].summarize_wal);
 
-   pgmoneta_write_terminate(ssl, socket);
-
 done:
 
    pgmoneta_deque_destroy(server_parameters);
-   pgmoneta_close_ssl(ssl);
-   if (socket != -1)
-   {
-      pgmoneta_disconnect(socket);
-   }
 
    if (!config->common.servers[srv].valid)
    {

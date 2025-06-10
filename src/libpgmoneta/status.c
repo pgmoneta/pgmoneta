@@ -40,7 +40,7 @@
 #define NAME "status"
 
 void
-pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_status(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -97,7 +97,6 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FREE_SPACE, (uintptr_t)free_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE, (uintptr_t)total_size, ValueUInt64);
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_OFFLINE, (uintptr_t)offline, ValueBool);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->common.number_of_servers, ValueInt32);
 
@@ -137,6 +136,8 @@ pgmoneta_status(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_WEEKS, (uintptr_t)retention_weeks, ValueInt32);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_MONTHS, (uintptr_t)retention_months, ValueInt32);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_YEARS, (uintptr_t)retention_years, ValueInt32);
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
 
       d = pgmoneta_get_server_backup(i);
 
@@ -250,7 +251,7 @@ error:
 }
 
 void
-pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* d = NULL;
    int32_t retention_days;
@@ -310,7 +311,6 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FREE_SPACE, (uintptr_t)free_size, ValueUInt64);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE, (uintptr_t)total_size, ValueUInt64);
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_OFFLINE, (uintptr_t)offline, ValueBool);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt32);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_NUMBER_OF_SERVERS, (uintptr_t)config->common.number_of_servers, ValueInt32);
 
@@ -353,6 +353,8 @@ pgmoneta_status_details(SSL* ssl, int client_fd, bool offline, uint8_t compressi
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_WEEKS, (uintptr_t)retention_weeks, ValueInt32);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_MONTHS, (uintptr_t)retention_months, ValueInt32);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_YEARS, (uintptr_t)retention_years, ValueInt32);
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
 
       d = pgmoneta_get_server(i);
 

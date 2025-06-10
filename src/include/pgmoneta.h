@@ -215,6 +215,7 @@ struct server
    int port;                                /**< The port of the server */
    char username[MAX_USERNAME_LENGTH];      /**< The user name */
    char wal_slot[MISC_LENGTH];              /**< The WAL slot name */
+   bool online;                             /**< Is the server online ? */
    char current_wal_filename[MISC_LENGTH];  /**< The current WAL filename*/
    char current_wal_lsn[MISC_LENGTH];       /**< The current WAL log sequence number*/
    char follow[MISC_LENGTH];                /**< Follow a server */

@@ -16,7 +16,7 @@
 * Hot standby
 * Prometheus support
 * Remote management
-* Offline mode
+* Offline detection
 * Transport Layer Security (TLS) v1.2+ support
 * Daemon mode
 * User vault

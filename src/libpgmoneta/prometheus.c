@@ -465,6 +465,9 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_total_space</h2>\n");
    data = pgmoneta_append(data, "  The total disk space for pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_online</h2>\n");
+   data = pgmoneta_append(data, "  Is the server in an online state\n");
+   data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_server_valid</h2>\n");
    data = pgmoneta_append(data, "  Is the server in a valid state\n");
    data = pgmoneta_append(data, "  <p>\n");
@@ -2084,6 +2087,22 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       data = pgmoneta_append_int(data, workers);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_online Is the server in an online state\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_online gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_online{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_bool(data, config->common.servers[i].online);
 
       data = pgmoneta_append(data, "\n");
    }
