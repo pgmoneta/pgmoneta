@@ -99,7 +99,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
    struct art* deleted_files = NULL;
    struct art* changed_files = NULL;
    struct art* added_files = NULL;
-
+   struct backup* temp_backup = NULL;
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
@@ -201,7 +201,15 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_log_debug("Link: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
          backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
-         pgmoneta_update_info_double(backup_base, INFO_LINKING_ELAPSED, linking_elapsed_time);
+
+         if (pgmoneta_get_backup(backup_base, NULL, &temp_backup))
+         {
+            goto error;
+         }
+         temp_backup->linking_elapsed_time = linking_elapsed_time;
+         pgmoneta_save_info(backup_base, NULL, temp_backup);
+         free(temp_backup);
+         temp_backup = NULL;
       }
    }
 
@@ -210,7 +218,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
       free(backups[i]);
    }
    free(backups);
-
+   free(temp_backup);
    free(server_path);
    free(from);
    free(to);
@@ -233,6 +241,7 @@ error:
       free(backups[i]);
    }
    free(backups);
+   free(temp_backup);
 
    free(server_path);
    free(from);
