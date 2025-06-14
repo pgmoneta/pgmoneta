@@ -382,8 +382,8 @@ cleanup:
       pgmoneta_log_debug("Hot standby: %s/%s - Processed %d/%d directories successfully (Elapsed: %s)",
                          config->common.servers[server].name, label,
                          config->common.servers[server].hot_standby_count - failed_count,
-                         config->common.servers[server].hot_standby_count
-                         & elapsed[0]);
+                         config->common.servers[server].hot_standby_count,
+                         &elapsed[0]);
    }
 
    if (source_root != NULL)
