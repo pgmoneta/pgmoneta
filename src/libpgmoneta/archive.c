@@ -117,6 +117,11 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
+   if (pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)directory, ValueString))
+   {
+      goto error;
+   }
+
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
    {
       ec = MANAGEMENT_ERROR_ARCHIVE_NOBACKUP;
