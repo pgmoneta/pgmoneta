@@ -1487,7 +1487,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    {
       struct json* tbl = NULL;
 
-      if (pgmoneta_json_create(&tablespaces))
+      if (pgmoneta_json_create(&tbl))
       {
          ec = MANAGEMENT_ERROR_ALLOCATION;
          pgmoneta_log_error("Info: Allocation error");
@@ -1687,7 +1687,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    {
       struct json* tbl = NULL;
 
-      if (pgmoneta_json_create(&tablespaces))
+      if (pgmoneta_json_create(&tbl))
       {
          ec = MANAGEMENT_ERROR_ALLOCATION;
          pgmoneta_log_error("Annotate: Allocation error");
