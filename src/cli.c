@@ -2665,7 +2665,7 @@ translate_backup_argument(struct json* response)
    char* translated_wal = NULL;
    char* translated_delta = NULL;
 
-   translated_backup_size = pgmoneta_translate_file_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE));
+   translated_backup_size = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE));
    if (translated_backup_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP_SIZE, (uintptr_t)translated_backup_size, ValueString);
@@ -2688,23 +2688,23 @@ translate_backup_argument(struct json* response)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ENCRYPTION, (uintptr_t)translated_encryption, ValueString);
    }
-   translated_restore_size = pgmoneta_translate_file_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE));
+   translated_restore_size = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE));
    if (translated_restore_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_RESTORE_SIZE, (uintptr_t)translated_restore_size, ValueString);
    }
    translated_biggest_file_size =
-      pgmoneta_translate_file_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE));
+      pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE));
    if (translated_restore_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE, (uintptr_t)translated_biggest_file_size, ValueString);
    }
-   translated_wal = pgmoneta_translate_file_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_WAL));
+   translated_wal = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_WAL));
    if (translated_wal)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WAL, (uintptr_t)translated_wal, ValueString);
    }
-   translated_delta = pgmoneta_translate_file_size((int32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_DELTA));
+   translated_delta = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_DELTA));
    if (translated_delta)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_DELTA, (uintptr_t)translated_delta, ValueString);
@@ -2776,17 +2776,17 @@ translate_response_argument(struct json* response)
    char* translated_free_space = NULL;
    char* translated_used_space = NULL;
 
-   translated_total_space = pgmoneta_translate_file_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE));
+   translated_total_space = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE));
    if (translated_total_space)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_TOTAL_SPACE, (uintptr_t)translated_total_space, ValueString);
    }
-   translated_free_space = pgmoneta_translate_file_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_FREE_SPACE));
+   translated_free_space = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_FREE_SPACE));
    if (translated_free_space)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_FREE_SPACE, (uintptr_t)translated_free_space, ValueString);
    }
-   translated_used_space = pgmoneta_translate_file_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_USED_SPACE));
+   translated_used_space = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_USED_SPACE));
    if (translated_used_space)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_USED_SPACE, (uintptr_t)translated_used_space, ValueString);
@@ -2813,20 +2813,20 @@ translate_servers_argument(struct json* response)
    char* translated_hotstandby_size = NULL;
    char* translated_server_size = NULL;
 
-   translated_workspace_size = pgmoneta_translate_file_size((int64_t)pgmoneta_json_get(response,
+   translated_workspace_size = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response,
                                                                                        MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE));
    if (translated_workspace_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)translated_workspace_size, ValueString);
    }
 
-   translated_hotstandby_size = pgmoneta_translate_file_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE));
+   translated_hotstandby_size = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE));
    if (translated_hotstandby_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE, (uintptr_t)translated_hotstandby_size, ValueString);
    }
 
-   translated_server_size = pgmoneta_translate_file_size((int64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVER_SIZE));
+   translated_server_size = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVER_SIZE));
    if (translated_server_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER_SIZE, (uintptr_t)translated_server_size, ValueString);
