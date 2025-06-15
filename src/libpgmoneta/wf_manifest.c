@@ -87,6 +87,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -181,13 +182,21 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 
    manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
-   pgmoneta_update_info_double(backup_base, INFO_MANIFEST_ELAPSED, manifest_elapsed_time);
+   if (pgmoneta_get_backup(backup_base, NULL, &temp_backup))
+   {
+      goto error;
+   }
+   temp_backup->manifest_elapsed_time = manifest_elapsed_time;
+   pgmoneta_save_info(backup_base, NULL, temp_backup);
+
+   free(temp_backup);
    return 0;
 
 error:
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
+   free(temp_backup);
    free(backup);
    free(manifest);
    free(manifest_orig);

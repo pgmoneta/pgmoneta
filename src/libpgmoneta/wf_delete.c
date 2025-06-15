@@ -263,6 +263,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
    int number_of_workers = 0;
    struct workers* workers = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -330,10 +331,18 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+         if (pgmoneta_get_backup(d, NULL, &temp_backup))
+         {
+            pgmoneta_log_error("Unable to get backup for directory %s", d);
+            goto error;
+         }
+         temp_backup->backup_size = size;
+         pgmoneta_save_info(d, NULL, temp_backup);
 
+         free(temp_backup);
          free(from);
          free(to);
+         temp_backup = NULL;
          from = NULL;
          to = NULL;
       }
@@ -366,10 +375,18 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
-         pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
+         if (pgmoneta_get_backup(d, NULL, &temp_backup))
+         {
+            pgmoneta_log_error("Unable to get backup for directory %s", d);
+            goto error;
+         }
+         temp_backup->backup_size = size;
+         pgmoneta_save_info(d, NULL, temp_backup);
 
+         free(temp_backup);
          free(from);
          free(to);
+         temp_backup = NULL;
          from = NULL;
          to = NULL;
       }
@@ -385,6 +402,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
       pgmoneta_delete_directory(d);
    }
 
+   free(temp_backup);
    free(d);
    free(from);
    free(to);
@@ -397,6 +415,7 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
+   free(temp_backup);
    free(d);
    free(from);
    free(to);
