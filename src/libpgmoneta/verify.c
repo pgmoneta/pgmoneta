@@ -47,6 +47,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 {
    char* identifier = NULL;
    char* directory = NULL;
+   char* real_directory = NULL;
    char* files = NULL;
    char* elapsed = NULL;
    struct timespec start_t;
@@ -103,7 +104,33 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       goto error;
    }
 
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)directory, ValueString))
+   {
+      goto error;
+   }
+
    if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   {
+      goto error;
+   }
+
+   real_directory = pgmoneta_append(real_directory, directory);
+   if (!pgmoneta_ends_with(real_directory, "/"))
+   {
+      real_directory = pgmoneta_append_char(real_directory, '/');
+   }
+   real_directory = pgmoneta_append(real_directory, config->common.servers[server].name);
+   real_directory = pgmoneta_append_char(real_directory, '-');
+   real_directory = pgmoneta_append(real_directory, backup->label);
+
+   if (pgmoneta_exists(real_directory))
+   {
+      pgmoneta_delete_directory(real_directory);
+   }
+
+   pgmoneta_mkdir(real_directory);
+
+   if (pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)real_directory, ValueString))
    {
       goto error;
    }
@@ -243,6 +270,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
 
    pgmoneta_stop_logging();
 
+   free(real_directory);
    free(elapsed);
 
    exit(0);
@@ -264,6 +292,7 @@ error:
 
    pgmoneta_stop_logging();
 
+   free(real_directory);
    free(elapsed);
 
    exit(1);
