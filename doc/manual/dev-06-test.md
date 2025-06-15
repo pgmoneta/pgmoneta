@@ -76,7 +76,7 @@ It will be the responsibility of the script to clean up the setup environment.
 In case you see those setup directories like `pgmoneta-postgres` and `pgmoneta-testsiute` in build after successfully executing the script, you should probably run
 
 ```
-./testsuite clean
+./testsuite.sh clean
 ```
 
 before running the script again to avoid any inconsistency or errors. The clean subcommand will however clean the logs as well.

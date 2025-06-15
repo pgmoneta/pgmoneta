@@ -26,56 +26,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+/* pgmoneta */
+#include <pgmoneta.h>
+#include <configuration.h>
+#include <deque.h>
+#include <json.h>
+#include <logging.h>
+#include <management.h>
+#include <network.h>
+#include <walfile/pg_control.h>
+#include <security.h>
+#include <shmem.h>
+#include <utils.h>
+#include <value.h>
 #include <tsclient.h>
+#include <walfile.h>
 
-#include "testcases/pgmoneta_test_1.h"
-#include "testcases/pgmoneta_test_2.h"
-#include "testcases/pgmoneta_test_3.h"
-#include "testcases/pgmoneta_test_4.h"
-#include "testcases/pgmoneta_test_5.h"
+/* system */
+#include <err.h>
+#include <getopt.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
-int
-main(int argc, char* argv[])
-{
+#define WAL_CHECKPOINT_SHUTDOWN 0
+#define WAL_CHECKPOINT_ONLINE 1
+#define WAL_COMMIT_TS_TRUNCATE 2
+#define WAL_HEAP2_PRUNE 3
+#define WAL_END_OF_RECOVERY 4
 
-   if (argc != 2)
-   {
-      printf("Usage: %s <project_directory>\n", argv[0]);
-      return 1;
-   }
+int pgmoneta_test_walfile(struct walfile* (*generate)(void));
+// int pgmoneta_wal_test(int version);
 
-   int number_failed;
-   Suite* s1;
-   Suite* s2;
-   Suite* s3;
-   Suite* s4;
-   Suite* s5;
-   SRunner* sr;
+struct walfile* generate_check_point_shutdown_v17();
+struct walfile* generate_check_point_online_v17();
+struct walfile* generate_commit_ts_truncate_v17();
+struct walfile* generate_heap_prune_v17();
+struct walfile* generate_end_of_recovery_v17();
 
-   if (pgmoneta_tsclient_init(argv[1]))
-   {
-      goto done;
-   }
-
-   s1 = pgmoneta_test1_suite();
-   s2 = pgmoneta_test2_suite();
-   s3 = pgmoneta_test3_suite();
-   s4 = pgmoneta_test4_suite();
-   s5 = pgmoneta_test5_suite();
-
-   sr = srunner_create(s1);
-   srunner_add_suite(sr, s2);
-   srunner_add_suite(sr, s3);
-   srunner_add_suite(sr, s4);
-   srunner_add_suite(sr, s5);
-
-   // Run the tests in verbose mode
-   srunner_run_all(sr, CK_VERBOSE);
-   number_failed = srunner_ntests_failed(sr);
-   srunner_free(sr);
-
-done:
-   pgmoneta_tsclient_destroy();
-
-   return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+// struct wal_record
+// {
+//    int version;
+//    int type;
+//    struct walfile* (*generate)(void);
+// };

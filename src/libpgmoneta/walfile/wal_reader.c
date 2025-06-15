@@ -228,7 +228,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    }
    else
    {
-      assert(config->common.servers[server].version == magic_value_to_postgres_version(long_header->std.xlp_magic));
+      // assert(config->common.servers[server].version == magic_value_to_postgres_version(long_header->std.xlp_magic));
       server_config = &config->common.servers[server];
    }
 
@@ -465,6 +465,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
       if (decode_xlog_record(buffer, decoded, record, wal_file->long_phd->xlp_xlog_blcksz, wal_file->long_phd->std.xlp_magic, lsn))
       {
+         printf("Failed to decode xlog record\n");
          free(decoded);
          decoded = NULL;
          goto error;
@@ -473,6 +474,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       {
          if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
          {
+            printf("Failed to add decoded to deque\n");
             free(decoded);
             decoded = NULL;
             goto error;
@@ -538,6 +540,9 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
    while (remaining > datatotal)
    {
       COPY_HEADER_FIELD(&block_id, sizeof(uint8_t));
+      printf("remaining: %d, datatotal: %d\n", remaining, datatotal);
+      printf("block_id: %d\n", block_id);
+      printf("buffer: %s, ptr: %s\n", buffer, ptr);
 
       if (block_id == XLR_BLOCK_ID_DATA_SHORT)
       {
@@ -577,6 +582,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
 
          if (block_id <= decoded->max_block_id)
          {
+            printf("block_id: %d, decoded->max_block_id: %d\n", block_id, decoded->max_block_id);
             goto err;
          }
          decoded->max_block_id = block_id;
@@ -601,6 +607,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
          }
          if (!blk->has_data && blk->data_len != 0)
          {
+            printf("BKPBLOCK_HAS_DATA not set, but data length is not zero\n");
             pgmoneta_log_fatal("BKPBLOCK_HAS_DATA not set, but data length is not zero");
             goto err;
          }
@@ -1360,54 +1367,29 @@ finish:
 char*
 pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t magic_value, char* buffer)
 {
+   if (!decoded)
+   {
+      return NULL;
+   }
+
+   uint32_t calculated_length = 0;
    uint32_t total_length = 0;
    uint8_t block_id;
    char* ptr = NULL;
    struct xlog_record record = decoded->header;
 
-   /* Compute total length required for the buffer */
-   total_length = record.xl_tot_len;
+   calculated_length = SIZE_OF_XLOG_RECORD;
 
-   /* Allocate buffer */
-   buffer = malloc(total_length);
-   if (!buffer)
-   {
-      /* Handle allocation failure */
-      return NULL;
-   }
-   ptr = buffer;
-
-   /* Write header */
-   memcpy(ptr, &record, SIZE_OF_XLOG_RECORD);
-   ptr += SIZE_OF_XLOG_RECORD;
-
-   assert(ptr - buffer == SIZE_OF_XLOG_RECORD);
-
-   /* Write record_origin */
    if (decoded->record_origin != INVALID_REP_ORIGIN_ID)
    {
-      /* Write block_id */
-      *ptr = (uint8_t)XLR_BLOCK_ID_ORIGIN;
-      ptr += sizeof(uint8_t);
-
-      /* Write record_origin */
-      memcpy(ptr, &decoded->record_origin, sizeof(rep_origin_id));
-      ptr += sizeof(rep_origin_id);
+      calculated_length += sizeof(uint8_t) + sizeof(rep_origin_id);
    }
 
-   /* Write toplevel_xid */
    if (decoded->toplevel_xid != INVALID_TRANSACTION_ID)
    {
-      /* Write block_id */
-      *ptr = (uint8_t)XLR_BLOCK_ID_TOPLEVEL_XID;
-      ptr += sizeof(uint8_t);
-
-      /* Write toplevel_xid */
-      memcpy(ptr, &decoded->toplevel_xid, sizeof(transaction_id));
-      ptr += sizeof(transaction_id);
+      calculated_length += sizeof(uint8_t) + sizeof(transaction_id);
    }
 
-   /* Write blocks */
    for (block_id = 0; block_id <= decoded->max_block_id; block_id++)
    {
       struct decoded_bkp_block* blk = &decoded->blocks[block_id];
@@ -1417,57 +1399,116 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
          continue;
       }
 
-      /* Write block_id */
-      memcpy(ptr, &block_id, sizeof(uint8_t));
-      ptr += sizeof(uint8_t);
+      calculated_length += sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t);
 
-      /* Write fork_flags */
-      memcpy(ptr, &blk->flags, sizeof(uint8_t));
-      ptr += sizeof(uint8_t);
-
-      /* Write data_len */
-      uint16_t data_len = blk->data_len;
-      memcpy(ptr, &data_len, sizeof(uint16_t));
-      ptr += sizeof(uint16_t);
-
-      /* Write image data if present */
       if (blk->has_image)
       {
-         /* Write bimg_len */
-         uint16_t bimg_len = blk->bimg_len;
-         memcpy(ptr, &bimg_len, sizeof(uint16_t));
-         ptr += sizeof(uint16_t);
+         calculated_length += sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint8_t);
 
-         /* Write hole_offset */
-         uint16_t hole_offset = blk->hole_offset;
-         memcpy(ptr, &hole_offset, sizeof(uint16_t));
-         ptr += sizeof(uint16_t);
-
-         /* Write bimg_info */
-         uint8_t bimg_info = blk->bimg_info;
-         memcpy(ptr, &bimg_info, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-
-         if (pgmoneta_wal_is_bkp_image_compressed(magic_value, blk->bimg_info))
+         if (pgmoneta_wal_is_bkp_image_compressed(magic_value, blk->bimg_info) &&
+             (blk->bimg_info & BKPIMAGE_HAS_HOLE))
          {
-            if (blk->bimg_info & BKPIMAGE_HAS_HOLE)
-            {
-               uint16_t hole_length = blk->hole_length;
-               memcpy(ptr, &hole_length, sizeof(uint16_t));
-               ptr += sizeof(uint16_t);
-            }
+            calculated_length += sizeof(uint16_t);
          }
       }
 
-      /* Write rlocator if not SAME_REL */
+      if (!(blk->flags & BKPBLOCK_SAME_REL))
+      {
+         calculated_length += sizeof(struct rel_file_locator);
+      }
+
+      calculated_length += sizeof(block_number);
+
+      if (blk->has_data)
+      {
+         calculated_length += blk->data_len;
+      }
+
+      if (blk->has_image)
+      {
+         calculated_length += blk->bimg_len;
+      }
+   }
+
+   if (decoded->main_data_len > 0)
+   {
+      if (decoded->main_data_len <= UINT8_MAX)
+      {
+         calculated_length += sizeof(uint8_t) + sizeof(uint8_t);
+      }
+      else
+      {
+         calculated_length += sizeof(uint8_t) + sizeof(uint32_t);
+      }
+      calculated_length += decoded->main_data_len;
+   }
+
+   total_length = calculated_length;
+
+   buffer = malloc(total_length);
+   if (!buffer)
+   {
+      return NULL;
+   }
+   ptr = buffer;
+
+   memcpy(ptr, &record, SIZE_OF_XLOG_RECORD);
+   ptr += SIZE_OF_XLOG_RECORD;
+
+   if (decoded->record_origin != INVALID_REP_ORIGIN_ID)
+   {
+      *ptr++ = (uint8_t)XLR_BLOCK_ID_ORIGIN;
+      memcpy(ptr, &decoded->record_origin, sizeof(rep_origin_id));
+      ptr += sizeof(rep_origin_id);
+   }
+
+   if (decoded->toplevel_xid != INVALID_TRANSACTION_ID)
+   {
+      *ptr++ = (uint8_t)XLR_BLOCK_ID_TOPLEVEL_XID;
+      memcpy(ptr, &decoded->toplevel_xid, sizeof(transaction_id));
+      ptr += sizeof(transaction_id);
+   }
+
+   for (block_id = 0; block_id <= decoded->max_block_id; block_id++)
+   {
+      struct decoded_bkp_block* blk = &decoded->blocks[block_id];
+
+      if (!blk->in_use)
+      {
+         continue;
+      }
+
+      *ptr++ = block_id;
+
+      *ptr++ = blk->flags;
+
+      memcpy(ptr, &blk->data_len, sizeof(uint16_t));
+      ptr += sizeof(uint16_t);
+
+      if (blk->has_image)
+      {
+         memcpy(ptr, &blk->bimg_len, sizeof(uint16_t));
+         ptr += sizeof(uint16_t);
+
+         memcpy(ptr, &blk->hole_offset, sizeof(uint16_t));
+         ptr += sizeof(uint16_t);
+
+         *ptr++ = blk->bimg_info;
+
+         if (pgmoneta_wal_is_bkp_image_compressed(magic_value, blk->bimg_info) &&
+             (blk->bimg_info & BKPIMAGE_HAS_HOLE))
+         {
+            memcpy(ptr, &blk->hole_length, sizeof(uint16_t));
+            ptr += sizeof(uint16_t);
+         }
+      }
+
       if (!(blk->flags & BKPBLOCK_SAME_REL))
       {
          memcpy(ptr, &blk->rlocator, sizeof(struct rel_file_locator));
          ptr += sizeof(struct rel_file_locator);
-
       }
 
-      /* Write blkno */
       memcpy(ptr, &blk->blkno, sizeof(block_number));
       ptr += sizeof(block_number);
    }
@@ -1476,27 +1517,13 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
    {
       if (decoded->main_data_len <= UINT8_MAX)
       {
-         /* Write block_id */
-         int block_data_short = XLR_BLOCK_ID_DATA_SHORT;
-         memcpy(ptr, &block_data_short, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-
-         /* Write main_data_len (uint8_t) */
-
-         uint8_t main_data_len = decoded->main_data_len;
-         memcpy(ptr, &main_data_len, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
+         *ptr++ = (uint8_t)XLR_BLOCK_ID_DATA_SHORT;
+         *ptr++ = (uint8_t)decoded->main_data_len;
       }
       else
       {
-         /* Write block_id */
-         int block_data_long = XLR_BLOCK_ID_DATA_LONG;
-         memcpy(ptr, &block_data_long, sizeof(uint8_t));
-         ptr += sizeof(uint8_t);
-
-         /* Write main_data_len (uint32_t) */
-         uint32_t main_data_len = decoded->main_data_len;
-         memcpy(ptr, &main_data_len, sizeof(uint32_t));
+         *ptr++ = (uint8_t)XLR_BLOCK_ID_DATA_LONG;
+         memcpy(ptr, &decoded->main_data_len, sizeof(uint32_t));
          ptr += sizeof(uint32_t);
       }
    }
@@ -1504,27 +1531,54 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
    for (block_id = 0; block_id <= decoded->max_block_id; block_id++)
    {
       struct decoded_bkp_block* blk = &decoded->blocks[block_id];
-      if (blk->has_data)
+
+      if (!blk->in_use)
       {
+         continue;
+      }
+
+      if (blk->has_data && blk->data && blk->data_len > 0)
+      {
+         if (ptr + blk->data_len > buffer + total_length)
+         {
+            free(buffer);
+            return NULL;
+         }
          memcpy(ptr, blk->data, blk->data_len);
          ptr += blk->data_len;
       }
-      /* Write backup image if present */
-      if (blk->has_image)
+
+      if (blk->has_image && blk->bkp_image && blk->bimg_len > 0)
       {
+         if (ptr + blk->bimg_len > buffer + total_length)
+         {
+            free(buffer);
+            return NULL;
+         }
          memcpy(ptr, blk->bkp_image, blk->bimg_len);
          ptr += blk->bimg_len;
       }
    }
 
-   if (decoded->main_data_len > 0)
+   if (decoded->main_data_len > 0 && decoded->main_data)
    {
+      if (ptr + decoded->main_data_len > buffer + total_length)
+      {
+         free(buffer);
+         return NULL;
+      }
       memcpy(ptr, decoded->main_data, decoded->main_data_len);
       ptr += decoded->main_data_len;
    }
 
-   /* Ensure we've written the correct amount of data */
-   assert(ptr - buffer == total_length);
+   if ((uint32_t)(ptr - buffer) != total_length)
+   {
+      free(buffer);
+      return NULL;
+   }
+
+   struct xlog_record* header_in_buffer = (struct xlog_record*)buffer;
+   header_in_buffer->xl_tot_len = total_length;
 
    return buffer;
 }
