@@ -4761,6 +4761,7 @@ get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year)
    if (rt_days > 0)
    {
       retention = pgmoneta_append_int(retention, rt_days);
+      retention = pgmoneta_append_char(retention, ',');
    }
    else
    {
@@ -4769,6 +4770,7 @@ get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year)
    if (rt_weeks > 0)
    {
       retention = pgmoneta_append_int(retention, rt_weeks);
+      retention = pgmoneta_append_char(retention, ',');
    }
    else
    {
@@ -4777,6 +4779,7 @@ get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year)
    if (rt_months > 0)
    {
       retention = pgmoneta_append_int(retention, rt_months);
+      retention = pgmoneta_append_char(retention, ',');
    }
    else
    {
