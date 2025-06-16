@@ -24,80 +24,27 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
-#ifndef PGMONETA_TSCOMMON_H
-#define PGMONETA_TSCOMMON_H
+#ifndef PGMONETA_WAL_SUMMARY_H
+#define PGMONETA_WAL_SUMMARY_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "pgmoneta.h"
-#include <message.h>
-
-#define PRIMARY_SERVER 0
-#define ENV_VAR_BASE_DIR "PGMONETA_TEST_BASE_DIR"
-
-extern char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
-extern char TEST_RESTORE_DIR[MAX_PATH];
-extern char TEST_BASE_DIR[MAX_PATH];
+#include <pgmoneta.h>
 
 /**
- * Create the testing environment
- */
-void
-pgmoneta_test_environment_create(void);
-
-/**
- * Destroy the testing environment
- */
-void
-pgmoneta_test_environment_destroy(void);
-
-/**
- * Add a backup for testing purpose
- */
-void
-pgmoneta_test_add_backup(void);
-
-/**
- * Add a chain of 3 backups for testing purpose
- */
-void
-pgmoneta_test_add_backup_chain(void);
-
-/**
- * Clean up the backup directory
- */
-void
-pgmoneta_test_basedir_cleanup(void);
-
-/**
- * Basic setup before each forked unit test
- */
-void
-pgmoneta_test_setup(void);
-
-/**
- * Basic teardown after each forked unit test
- */
-void
-pgmoneta_test_teardown(void);
-
-/**
- * Execute an SQL query on postgres database
- * @param srv The server index
- * @param query The query to be executed
- * @param is_dummy Use dummy user and password
- * @param qr [out] The query response
- * @return 0 upon success, otherwise 1
+ * Summarize the WAL records in the range [start_lsn, end_lsn) for a timeline, assuming that
+ * both start and end LSNs belongs to the same timeline.
+ * @param srv The server
+ * @param wal_dir The directory to the wal segments (Optional and is used for testing)
+ * @param start_lsn The start lsn is the point at which we should start summarizing. If this
+ * value comes from the end LSN of the previous record as returned by the xlogreader machinery,
+ * 'exact' should be true; otherwise, 'exact' should be false, and this function will search
+ * forward for the start of a valid WAL record.
+ * @param end_lsn identifies the point beyond which we can't count on being able to read any
+ * more WAL.
+ * @return 0 is success, otherwise failure
  */
 int
-pgmoneta_test_execute_query(int srv, char* query, bool is_dummy, struct query_response** qr);
-
-#ifdef __cplusplus
-}
-#endif
+pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn);
 
 #endif

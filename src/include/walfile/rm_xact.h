@@ -545,6 +545,26 @@ void
 pgmoneta_wal_parse_xact_commit_v15(struct xl_xact_parsed_commit* wrapper, void* rec);
 
 /**
+ * Parses a commit record for versions less than 15
+ *
+ * @param info The additional information inside the record
+ * @param xlrec The main data of the record
+ * @param parsed [out] The parsed contents
+ */
+void
+pgmoneta_wal_parse_commit_record_l15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xact_parsed_commit_v14* parsed);
+
+/**
+ * Parses a commit record for versions greater than or equal to 15
+ *
+ * @param info The additional information inside the record
+ * @param xlrec The main data of the record
+ * @param parsed [out] The parsed contents
+ */
+void
+pgmoneta_wal_parse_commit_record_ge15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xact_parsed_commit_v15* parsed);
+
+/**
  * Formats a commit record for version 14 into a human-readable string.
  *
  * @param wrapper The commit wrapper structure to format.
@@ -601,6 +621,26 @@ pgmoneta_wal_parse_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper
  */
 void
 pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper, void* rec);
+
+/**
+ * Parses a abort record for versions less than 15
+ *
+ * @param info The additional information inside the record
+ * @param xlrec The main data of the record
+ * @param parsed [out] The parsed contents
+ */
+void
+pgmoneta_wal_parse_abort_record_l15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v14* parsed);
+
+/**
+ * Parses a abort record for versions greater than equal to 15
+ *
+ * @param info The additional information inside the record
+ * @param xlrec The main data of the record
+ * @param parsed [out] The parsed contents
+ */
+void
+pgmoneta_wal_parse_abort_record_ge15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v15* parsed);
 
 /**
  * Format a transaction abort record (v14) as a string.

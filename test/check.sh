@@ -293,6 +293,9 @@ export_pgmoneta_test_variables() {
   echo "export PGMONETA_TEST_CONF_SAMPLE=$CONFIGURATION_DIRECTORY/pgmoneta.conf.sample"
   export PGMONETA_TEST_CONF_SAMPLE=$CONFIGURATION_DIRECTORY/pgmoneta.conf.sample
 
+  echo "export PGMONETA_TEST_USER_CONF=$CONFIGURATION_DIRECTORY/pgmoneta_users.conf"
+  export PGMONETA_TEST_USER_CONF=$CONFIGURATION_DIRECTORY/pgmoneta_users.conf
+
   echo "export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY"
   export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY
 }
@@ -300,6 +303,7 @@ export_pgmoneta_test_variables() {
 unset_pgmoneta_test_variables() {
   unset PGMONETA_TEST_BASE_DIR
   unset PGMONETA_TEST_CONF
+  unset PGMONETA_TEST_USER_CONF
   unset PGMONETA_TEST_CONF_SAMPLE
   unset PGMONETA_TEST_RESTORE_DIR
   unset LLVM_PROFILE_FILE

@@ -42,6 +42,7 @@ main(int argc, char* argv[])
    Suite* delete_suite;
    Suite* http_suite;
    Suite* wal_utils_suite;
+   Suite* brt_io_suite;
    Suite* wal_summary_suite;
    SRunner* sr;
 
@@ -52,6 +53,7 @@ main(int argc, char* argv[])
    delete_suite = pgmoneta_test_delete_suite();
    http_suite = pgmoneta_test_http_suite();
    wal_utils_suite = pgmoneta_test_wal_utils_suite();
+   brt_io_suite = pgmoneta_test_brt_io_suite();
    wal_summary_suite = pgmoneta_test_wal_summary_suite();
 
    sr = srunner_create(backup_suite);
@@ -59,6 +61,7 @@ main(int argc, char* argv[])
    srunner_add_suite(sr, delete_suite);
    srunner_add_suite(sr, http_suite);
    srunner_add_suite(sr, wal_utils_suite);
+   srunner_add_suite(sr, brt_io_suite);
    srunner_add_suite(sr, wal_summary_suite);
    srunner_set_log (sr, "-");
    srunner_set_fork_status(sr, CK_NOFORK);

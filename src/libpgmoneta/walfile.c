@@ -26,8 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <aes.h>
-#include <compression.h>
+#include <brt.h>
 #include <logging.h>
 #include <utils.h>
 #include <walfile.h>
@@ -364,88 +363,38 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
                           uint32_t limit, bool summary, char** included_objects)
 {
-   char* tmp_wal = NULL;
    struct walfile* wf = NULL;
    struct deque_iterator* record_iterator = NULL;
    struct decoded_xlog_record* record = NULL;
-   char* decompressed_file_name = NULL;
-   char* decrypted_file_name = NULL;
-   char* wal_path = NULL;
-   bool copy = true;
+   char* from = NULL;
+   char* to = NULL;
 
    if (!pgmoneta_is_file(path))
    {
-      pgmoneta_log_fatal("WAL file at %s does not exist", path);
+      pgmoneta_log_error("WAL file at %s does not exist", path);
       goto error;
    }
 
-   wal_path = pgmoneta_append(wal_path, path);
+   from = pgmoneta_append(from, path);
+   /* Extract the wal file in /tmp/ */
+   to = pgmoneta_append(to, "/tmp/");
+   to = pgmoneta_append(to, basename(path));
 
-   // Based on the file extension, if it's an encrypted file, decrypt it in /tmp
-   if (pgmoneta_is_encrypted(wal_path))
+   if (pgmoneta_copy_and_extract_file(from, &to))
    {
-      tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
-
-      // Temporarily copying the encrypted WAL file, because the decrypt
-      // functions delete the source file
-      pgmoneta_copy_file(wal_path, tmp_wal, NULL);
-      copy = false;
-
-      pgmoneta_strip_extension(basename(wal_path), &decrypted_file_name);
-
-      free(wal_path);
-      wal_path = NULL;
-
-      wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decrypted_file_name);
-      free(decrypted_file_name);
-
-      if (pgmoneta_decrypt_file(tmp_wal, wal_path))
-      {
-         pgmoneta_log_fatal("Failed to decrypt WAL file at %s", path);
-         goto error;
-      }
+      pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);
+      goto error;
    }
 
-   // Based on the file extension, if it's a compressed file, decompress it
-   // in /tmp
-   if (pgmoneta_is_compressed(wal_path))
+   if (pgmoneta_read_walfile(-1, to, &wf))
    {
-      free(tmp_wal);
-      tmp_wal = NULL;
-
-      tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
-
-      if (copy)
-      {
-         // Temporarily copying the compressed WAL file, because the decompress
-         // functions delete the source file
-         pgmoneta_copy_file(wal_path, tmp_wal, NULL);
-      }
-
-      pgmoneta_strip_extension(basename(wal_path), &decompressed_file_name);
-
-      free(wal_path);
-      wal_path = NULL;
-
-      wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decompressed_file_name);
-      free(decompressed_file_name);
-
-      if (pgmoneta_decompress(tmp_wal, wal_path))
-      {
-         pgmoneta_log_fatal("Failed to decompress WAL file at %s", path);
-         goto error;
-      }
-   }
-
-   if (pgmoneta_read_walfile(-1, wal_path, &wf))
-   {
-      pgmoneta_log_fatal("Failed to read WAL file at %s", path);
+      pgmoneta_log_error("Failed to read WAL file at %s", path);
       goto error;
    }
 
    if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
    {
-      pgmoneta_log_fatal("Failed to create deque iterator");
+      pgmoneta_log_error("Failed to create deque iterator");
       goto error;
    }
 
@@ -492,16 +441,16 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
       }
    }
 
-   free(tmp_wal);
-   free(wal_path);
+   free(from);
+   free(to);
    pgmoneta_deque_iterator_destroy(record_iterator);
    pgmoneta_destroy_walfile(wf);
    return 0;
 
 error:
 
-   free(tmp_wal);
-   free(wal_path);
+   free(from);
+   free(to);
    pgmoneta_destroy_walfile(wf);
    pgmoneta_deque_iterator_destroy(record_iterator);
    return 1;
@@ -528,6 +477,109 @@ pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FI
       snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
       if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
                                     rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
+      {
+         free_counter = i;
+         goto error;
+      }
+      free(files[i]);
+   }
+
+   free(file_path);
+   free(files);
+   return 0;
+
+error:
+   for (int i = free_counter; i < file_count; i++)
+   {
+      free(files[i]);
+   }
+   free(file_path);
+   free(files);
+   return 1;
+}
+
+int
+pgmoneta_summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt)
+{
+   struct walfile* wf = NULL;
+   struct deque_iterator* record_iterator = NULL;
+   struct decoded_xlog_record* record = NULL;
+   char* from = NULL;
+   char* to = NULL;
+
+   if (!pgmoneta_is_file(path))
+   {
+      pgmoneta_log_error("WAL file at %s does not exist", path);
+      goto error;
+   }
+
+   from = pgmoneta_append(from, path);
+   /* Extract the wal file in /tmp/ */
+   to = pgmoneta_append(to, "/tmp/");
+   to = pgmoneta_append(to, basename(path));
+
+   if (pgmoneta_copy_and_extract_file(from, &to))
+   {
+      pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);
+      goto error;
+   }
+
+   /* Read and Parse the WAL records of this WAL file */
+   if (pgmoneta_read_walfile(-1, to, &wf))
+   {
+      pgmoneta_log_error("Failed to read WAL file at %s", path);
+      goto error;
+   }
+
+   if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
+   {
+      pgmoneta_log_error("Failed to create deque iterator");
+      goto error;
+   }
+
+   /* Iterate each record */
+   while (pgmoneta_deque_iterator_next(record_iterator))
+   {
+      record = (struct decoded_xlog_record*)record_iterator->value->data;
+      if (pgmoneta_wal_record_summary(record, start_lsn, end_lsn, brt))
+      {
+         pgmoneta_log_error("Failed to summarize the WAL record at %s", pgmoneta_lsn_to_string(record->lsn));
+         goto error;
+      }
+   }
+
+   free(from);
+   free(to);
+   pgmoneta_deque_iterator_destroy(record_iterator);
+   pgmoneta_destroy_walfile(wf);
+   return 0;
+
+error:
+   free(from);
+   free(to);
+   pgmoneta_deque_iterator_destroy(record_iterator);
+   pgmoneta_destroy_walfile(wf);
+   return 1;
+}
+
+int
+pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt)
+{
+   int file_count = 0;
+   int free_counter = 0;
+   char** files = NULL;
+   char* file_path = malloc(MAX_PATH);
+
+   if (pgmoneta_get_wal_files(dir_path, &file_count, &files))
+   {
+      goto error;
+   }
+
+   for (int i = 0; i < file_count; i++)
+   {
+      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+
+      if (pgmoneta_summarize_walfile(file_path, start_lsn, end_lsn, brt))
       {
          free_counter = i;
          goto error;

@@ -27,63 +27,86 @@
  *
  */
 
-#include <art.h>
-#include <brt.h>
-#include <info.h>
+/* pgmoneta */
+#include <pgmoneta.h>
+#include <configuration.h>
+#include <deque.h>
+#include <logging.h>
+#include <tsclient.h>
 #include <tscommon.h>
 #include <tssuite.h>
+#include <tswalutils.h>
 #include <utils.h>
+#include <value.h>
+#include <wal.h>
+#include <walfile.h>
 #include <walfile/wal_reader.h>
+#include <walfile/wal_summary.h>
 
-static void relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number forknum, struct rel_file_locator* r, enum fork_number* frk);
-static void consecutive_mark_block_modified(block_ref_table* brt, struct rel_file_locator* rlocator, enum fork_number frk, block_number blkno, int n);
-static void brt_write(block_ref_table* brt);
-static void brt_read(block_ref_table** brt);
-static char* get_backup_summary_path();
+static int do_checkpoint_and_get_lsn(int server, xlog_rec_ptr* checkpoint_lsn);
 
-START_TEST(test_pgmoneta_write_multiple_chunks_multiple_representations)
+START_TEST(test_pgmoneta_wal_summary)
 {
-   block_ref_table* brt;
-   // This test will create a block reference table with multiple chunks
-   // and switch from bitmap representation to array representation
-   pgmoneta_brt_create_empty(&brt);
-   ck_assert_ptr_nonnull(brt);
-   // Create a relation fork locator
-   struct rel_file_locator rlocator;
-   enum fork_number frk;
-   relation_fork_init(1663, 234, 345, MAIN_FORKNUM, &rlocator, &frk);
+    char* summary_dir = NULL;
+    struct main_configuration* config = NULL;
+    xlog_rec_ptr s_lsn;
+    xlog_rec_ptr e_lsn;
+    int ret;
+    char* wal_dir = NULL;
+    struct query_response* qr = NULL;
 
-   consecutive_mark_block_modified(brt, &rlocator, frk, 0x123, MAX_ENTRIES_PER_CHUNK + 10);
-   consecutive_mark_block_modified(brt, &rlocator, frk, 3 * BLOCKS_PER_CHUNK + 0x123, 1000);
-   /* Write to file to switch representation */
-   brt_write(brt);
-   pgmoneta_brt_destroy(brt);
-}
-END_TEST
-START_TEST(test_pgmoneta_read_summary_get_blocks)
-{
-   int size = 4096;
-   int nblocks;
-   block_number start_blk = 0;
-   block_number stop_blk = size;
-   block_ref_table* brt = NULL;
+    config = (struct main_configuration*)shmem;
 
-   block_number blocks[size];
+    /* get the starting lsn for summary */
+    ret = !do_checkpoint_and_get_lsn(PRIMARY_SERVER, &s_lsn);
+    ck_assert_msg(ret, "failed to create a checkpoint");
 
-   brt_read(&brt);
+    /* Create a table  */
+    ret = !pgmoneta_test_execute_query(PRIMARY_SERVER, "CREATE TABLE t1 (id int);", 1, &qr);
+    ck_assert_msg(ret, "failed to execute a query: 'CREATE TABLE t1 (id int);'");
 
-   // Create a relation fork locator
-   struct rel_file_locator rlocator;
-   enum fork_number frk;
-   relation_fork_init(1663, 234, 345, MAIN_FORKNUM, &rlocator, &frk);
-   // Check if the blocks are correctly read
-   block_ref_table_entry* entry = pgmoneta_brt_get_entry(brt, &rlocator, frk, NULL);
-   ck_assert_msg(entry != NULL, "Entry not found in block reference table");
+    pgmoneta_free_query_response(qr);
+    qr = NULL;
 
-   ck_assert(!pgmoneta_brt_entry_get_blocks(entry, start_blk, stop_blk, blocks, size, &nblocks));
-   ck_assert_msg(nblocks > 0, "No blocks found in the specified range");
+    /* Insert some tuples */
+    ret =  !pgmoneta_test_execute_query(PRIMARY_SERVER, "INSERT INTO t1 SELECT  GENERATE_SERIES(1, 800);", 1, &qr);
+    ck_assert_msg(ret, "failed to execute a query: 'INSERT INTO t1 SELECT  GENERATE_SERIES(1, 800);'");
 
-   pgmoneta_brt_destroy(brt);
+    pgmoneta_free_query_response(qr);
+    qr = NULL;
+
+    /* get the ending lsn for summary */
+    ret = !do_checkpoint_and_get_lsn(PRIMARY_SERVER, &e_lsn);
+    ck_assert_msg(ret, "failed to create a checkpoint");
+
+    /* Switch the wal segment so that records won't appear in partial segments */
+    ret = !pgmoneta_test_execute_query(PRIMARY_SERVER, "SELECT pg_switch_wal();", 0, &qr);
+    ck_assert_msg(ret, "failed to execute a query 'SELECT pg_switch_wal()'");
+
+    pgmoneta_free_query_response(qr);
+    qr = NULL;
+
+    /* Append some more tuples just to ensure that a new wal segment is streamed */
+    ret = !do_checkpoint_and_get_lsn(PRIMARY_SERVER, NULL);
+    ck_assert_msg(ret, "failed to create a checkpoint");
+
+    pgmoneta_free_query_response(qr);
+    qr = NULL;
+
+    sleep(10);
+
+    /* Create summary directory in the base_dir of a server if not already present */
+    summary_dir = pgmoneta_get_server_summary(PRIMARY_SERVER);
+    ck_assert_msg(!pgmoneta_mkdir(summary_dir), "failed to create %s directory", summary_dir);
+
+    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);
+
+    ck_assert_int_ge(e_lsn, s_lsn);
+    ret = !pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn);
+    ck_assert_msg(ret, "failed to summarize the wal");
+
+    free(summary_dir);
+    free(wal_dir);
 }
 END_TEST
 
@@ -98,58 +121,46 @@ pgmoneta_test_wal_summary_suite()
 
    tcase_set_timeout(tc_wal_summary, 60);
    tcase_add_checked_fixture(tc_wal_summary, pgmoneta_test_setup, pgmoneta_test_teardown);
-   tcase_add_test(tc_wal_summary, test_pgmoneta_write_multiple_chunks_multiple_representations);
-   tcase_add_test(tc_wal_summary, test_pgmoneta_read_summary_get_blocks);
+   tcase_add_test(tc_wal_summary, test_pgmoneta_wal_summary);
    suite_add_tcase(s, tc_wal_summary);
 
    return s;
 }
 
-static void
-relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number forknum, struct rel_file_locator* r, enum fork_number* frk)
+static int
+do_checkpoint_and_get_lsn(int srv, xlog_rec_ptr* checkpoint_lsn)
 {
-   struct rel_file_locator rlocator;
-   rlocator.spcOid = spcoid; rlocator.dbOid = dboid; rlocator.relNumber = relnum;
+    char* chkpt_lsn = NULL;
+    uint32_t chkpt_hi = 0;
+    uint32_t chkpt_lo = 0;
+    int ret;
+    struct query_response* qr = NULL;
 
-   *r = rlocator;
-   *frk = forknum;
-}
+    /* Assuming the user associated with this server has 'pg_checkpoint' role */
+    ret = !pgmoneta_test_execute_query(srv, "CHECKPOINT;", 0, &qr);
+    ck_assert_msg(ret, "failed to execute 'CHECKPOINT;' query");
 
-static void
-consecutive_mark_block_modified(block_ref_table* brt, struct rel_file_locator* rlocator, enum fork_number frk, block_number blkno, int n)
-{
-   for (int i = 0; i < n; i++)
-   {
-      ck_assert(pgmoneta_brt_mark_block_modified(brt, rlocator, frk, blkno + i));
-   }
-}
+    // Ignore this result
+    pgmoneta_free_query_response(qr);
+    qr = NULL;
 
-static void
-brt_write(block_ref_table* brt)
-{
-   char* r = NULL;
-   r = get_backup_summary_path();
+    ret = !pgmoneta_test_execute_query(srv, "SELECT checkpoint_lsn FROM pg_control_checkpoint();", 0, &qr);
+    ck_assert_msg(ret, "failed to execute 'SELECT checkpoint_lsn FROM pg_control_checkpoint();' query");
 
-   r = pgmoneta_append(r, "summary");
-   ck_assert(!pgmoneta_brt_write(brt, r));
+    /* Extract the checkpoint lsn */
+    ck_assert_ptr_nonnull(qr);
+    ck_assert_int_ge(qr->number_of_columns, 1);
+    
+    chkpt_lsn = pgmoneta_query_response_get_data(qr, 0);
+    ck_assert_ptr_nonnull(chkpt_lsn);
 
-   free(r);
-}
+    sscanf(chkpt_lsn, "%X/%X", &chkpt_hi, &chkpt_lo);
 
-static void
-brt_read(block_ref_table** brt)
-{
-   char* r = NULL;
+    if (checkpoint_lsn)
+    {
+        *checkpoint_lsn = ((uint64_t)chkpt_hi << 32) + (uint64_t)chkpt_lo;
+    }
 
-   r = get_backup_summary_path();
-   r = pgmoneta_append(r, "summary");
-
-   ck_assert(!pgmoneta_brt_read(r, brt));
-   free(r);
-}
-
-static char*
-get_backup_summary_path()
-{
-   return pgmoneta_get_server(PRIMARY_SERVER);
+   pgmoneta_free_query_response(qr);
+   return 0;
 }

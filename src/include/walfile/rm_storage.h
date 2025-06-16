@@ -38,6 +38,13 @@ extern "C" {
 #define XLOG_SMGR_CREATE   0x10   /**< XLOG opcode for creating a storage manager file. */
 #define XLOG_SMGR_TRUNCATE 0x20   /**< XLOG opcode for truncating a storage manager file. */
 
+/* flags for xl_smgr_truncate */
+#define SMGR_TRUNCATE_HEAP    0x0001
+#define SMGR_TRUNCATE_VM      0x0002
+#define SMGR_TRUNCATE_FSM     0x0004
+#define SMGR_TRUNCATE_ALL     \
+        (SMGR_TRUNCATE_HEAP | SMGR_TRUNCATE_VM | SMGR_TRUNCATE_FSM)
+
 /**
  * @struct xl_smgr_create
  * @brief Represents a storage manager create operation in XLOG.

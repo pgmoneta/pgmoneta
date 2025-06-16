@@ -29,9 +29,7 @@
 /* pgmoneta */
 #include <assert.h>
 #include <pgmoneta.h>
-#include <aes.h>
 #include <backup.h>
-#include <compression.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
@@ -1651,51 +1649,13 @@ pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, 
 
    if (!pgmoneta_ends_with(to, "/"))
    {
-      from = pgmoneta_append_char(to, '/');
+      to = pgmoneta_append_char(to, '/');
    }
    to = pgmoneta_append(to, relative_file_path);
 
-   if (pgmoneta_copy_file(from, to, NULL))
+   if (pgmoneta_copy_and_extract_file(from, &to))
    {
       goto error;
-   }
-
-   if (pgmoneta_is_encrypted(to))
-   {
-      char* new_to = NULL;
-
-      if (pgmoneta_strip_extension(to, &new_to))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_decrypt_file(to, new_to))
-      {
-         free(new_to);
-         goto error;
-      }
-
-      free(to);
-      to = new_to;
-   }
-
-   if (pgmoneta_is_compressed(to))
-   {
-      char* new_to = NULL;
-
-      if (pgmoneta_strip_extension(to, &new_to))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_decompress(to, new_to))
-      {
-         free(new_to);
-         goto error;
-      }
-
-      free(to);
-      to = new_to;
    }
 
    pgmoneta_log_trace("Extract: %s -> %s", from, to);

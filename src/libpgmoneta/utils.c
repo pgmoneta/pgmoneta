@@ -28,6 +28,8 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
+#include <compression.h>
 #include <logging.h>
 #include <utils.h>
 #include <info.h>
@@ -3115,6 +3117,17 @@ pgmoneta_get_server_wal(int server)
 }
 
 char*
+pgmoneta_get_server_summary(int server)
+{
+   char* d = NULL;
+
+   d = get_server_basepath(server);
+   d = pgmoneta_append(d, "summary/");
+
+   return d;
+}
+
+char*
 pgmoneta_get_server_wal_shipping(int server)
 {
    struct main_configuration* config;
@@ -3628,6 +3641,61 @@ pgmoneta_get_file_size(char* file_path)
    }
 
    return file_stat.st_size;
+}
+
+int
+pgmoneta_copy_and_extract_file(char* from, char** to)
+{
+   char* new_to = NULL;
+   char* old_to = NULL;
+
+   old_to = *to;
+
+   if (pgmoneta_copy_file(from, old_to, NULL))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_is_encrypted(old_to))
+   {
+      if (pgmoneta_strip_extension(old_to, &new_to))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_decrypt_file(old_to, new_to))
+      {
+         free(new_to);
+         goto error;
+      }
+
+      free(old_to);
+      old_to = new_to;
+      new_to = NULL;
+   }
+
+   if (pgmoneta_is_compressed(old_to))
+   {
+      if (pgmoneta_strip_extension(old_to, &new_to))
+      {
+         goto error;
+      }
+
+      if (pgmoneta_decompress(old_to, new_to))
+      {
+         free(new_to);
+         goto error;
+      }
+
+      free(old_to);
+      old_to = new_to;
+   }
+
+   *to = old_to;
+
+   return 0;
+error:
+   return 1;
 }
 
 bool

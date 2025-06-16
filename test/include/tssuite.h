@@ -61,11 +61,11 @@ Suite*
 pgmoneta_test_http_suite();
 
 /**
- * Set up a wal summary test suite for pgmoneta
+ * Set up a brt input/output suite for pgmoneta
  * @return The result
  */
 Suite*
-pgmoneta_test_wal_summary_suite();
+pgmoneta_test_brt_io_suite();
 
 /**
  * Set up a wal utils test suite for pgmoneta
@@ -73,5 +73,12 @@ pgmoneta_test_wal_summary_suite();
  */
 Suite*
 pgmoneta_test_wal_utils_suite();
+
+/**
+ * Set up a wal summary test suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_wal_summary_suite();
 
 #endif
