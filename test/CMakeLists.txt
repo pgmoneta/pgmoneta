@@ -37,6 +37,7 @@ if (check)
     testcases/pgmoneta_test_3.c
     testcases/pgmoneta_test_4.c
     testcases/pgmoneta_test_10.c
+    testcases/pgmoneta_test_5.c
     runner.c
   )
 

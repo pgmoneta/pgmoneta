@@ -51,6 +51,7 @@ typedef int64_t pg_time_t;
 #define XLOG_FPI_FOR_HINT             0xA0   /**< XLOG record type for a full-page image for hint bits */
 #define XLOG_FPI                      0xB0   /**< XLOG record type for a full-page image */
 #define XLOG_OVERWRITE_CONTRECORD     0xD0   /**< XLOG record type for overwriting a continuation record */
+#define XLOG_CHECKPOINT_REDO          0x0E   /**< XLOG record type for a redo point */
 
 #define MOCK_AUTH_NONCE_LEN      32
 #define PG_CONTROL_MAX_SAFE_SIZE 512

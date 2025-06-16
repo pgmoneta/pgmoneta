@@ -45,6 +45,7 @@ TEST_DIRECTORY=$(pwd)/test
 LOG_DIRECTORY=$(pwd)/log
 PGCTL_LOG_FILE=$LOG_DIRECTORY/logfile
 PGMONETA_LOG_FILE=$LOG_DIRECTORY/pgmoneta.log
+PGBENCH_LOG_FILE=$LOG_DIRECTORY/pgbench.log
 
 POSTGRES_OPERATION_DIR=$(pwd)/pgmoneta-postgresql
 DATA_DIRECTORY=$POSTGRES_OPERATION_DIR/data
@@ -88,7 +89,7 @@ next_available_port() {
 wait_for_server_ready() {
    local start_time=$SECONDS
    while true; do
-      pg_isready -h localhost -p $PORT
+      pg_isready -h localhost -p $PORT -d postgres
       if [ $? -eq 0 ]; then
          echo "pgmoneta is ready for accepting responses"
          return 0
@@ -132,6 +133,16 @@ check_pg_ctl() {
       echo "check pg_ctl in path ... not ok"
       return 1
    fi
+}
+
+check_pgbench() {
+    if which pgbench > /dev/null 2>&1; then
+        echo "check pgbench in path ... ok"
+        return 0
+    else
+        echo "check pgbench in path ... not present"
+        return 1
+    fi
 }
 
 stop_pgctl(){
@@ -184,6 +195,10 @@ check_system_requirements() {
    if [ $? -ne 0 ]; then
       exit 1
    fi
+   check_pgbench
+   if [ $? -ne 0 ]; then
+      exit 1
+   fi
    check_psql
    if [ $? -ne 0 ]; then
       exit 1
@@ -203,6 +218,8 @@ initialize_log_files() {
    echo "create log file ... $PGMONETA_LOG_FILE"
    touch $PGCTL_LOG_FILE
    echo "create log file ... $PGCTL_LOG_FILE"
+   touch $PGBENCH_LOG_FILE
+    echo "create log file ... $PGBENCH_LOG_FILE"
    echo ""
 }
 ##############################################################
@@ -222,6 +239,7 @@ create_cluster() {
         pw useradd -n postgres -u 770 -g postgres -d /var/db/postgres -s /bin/sh
     fi
     chown postgres:postgres $PGCTL_LOG_FILE
+    chown postgres:postgres $PGBENCH_LOG_FILE
     chown -R postgres:postgres "$DATA_DIRECTORY"
     chown -R postgres:postgres $BACKUP_DIRECTORY
     chown -R postgres:postgres $CONFIGURATION_DIRECTORY
@@ -363,14 +381,14 @@ create_cluster() {
 initialize_hba_configuration() {
    echo -e "\e[34mCreate HBA Configuration \e[0m"
    echo "
-    local   all              all                                     trust
-    local   replication      all                                     trust
-    host    mydb             myuser          127.0.0.1/32            scram-sha-256
-    host    mydb             myuser          ::1/128                 scram-sha-256
-    host    postgres         repl            127.0.0.1/32            scram-sha-256
-    host    postgres         repl            ::1/128                 scram-sha-256
-    host    replication      repl            127.0.0.1/32            scram-sha-256
-    host    replication      repl            ::1/128                 scram-sha-256
+    local   all             all                                     trust
+    local   replication     all                                     trust
+    host    all             all             127.0.0.1/32            trust
+    host    all             all             ::1/128                 trust
+    host    replication     all             127.0.0.1/32            trust
+    host    replication     all             ::1/128                 trust
+    host    mydb            myuser          127.0.0.1/32            scram-sha-256
+    host    mydb            myuser          ::1/128                 scram-sha-256
     " >$DATA_DIRECTORY/pg_hba.conf
    echo "initialize hba configuration at $DATA_DIRECTORY/pg_hba.conf ... ok"
    echo ""
@@ -391,7 +409,7 @@ initialize_cluster() {
       clean
       exit 1
    fi
-   pg_isready -h localhost -p $PORT
+   pg_isready -h localhost -p $PORT -d postgres
    if [ $? -eq 0 ]; then
       echo "postgres server is accepting requests ... ok"
    else
@@ -399,7 +417,7 @@ initialize_cluster() {
       clean
       exit 1
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD '$PGPASSWORD';" 2>&1)
+   err_out=$(psql -h localhost -p $PORT -U $PSQL_USER -d postgres -c "CREATE ROLE repl WITH LOGIN REPLICATION PASSWORD '$PGPASSWORD';" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create role repl ... $err_out"
       stop_pgctl
@@ -408,7 +426,7 @@ initialize_cluster() {
    else
       echo "create role repl ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "SELECT pg_create_physical_replication_slot('repl', true, false);" 2>&1)
+   err_out=$(psql -h localhost -p $PORT -U $PSQL_USER -d postgres -c "SELECT pg_create_physical_replication_slot('repl', true, false);" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create replication slot for repl ... $err_out"
       stop_pgctl
@@ -417,7 +435,25 @@ initialize_cluster() {
    else
       echo "create replication slot for repl ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE USER myuser WITH PASSWORD '$PGPASSWORD';" 2>&1)
+   err_out=$(psql -h localhost -p $PORT -U $PSQL_USER -d postgres -c "GRANT pg_checkpoint TO repl;" 2>&1)
+   if [ $? -ne 0 ]; then
+      echo "grant pg_checkpoint role to repl ... $err_out"
+      stop_pgctl
+      clean
+      exit 1
+   else
+      echo "grant pg_checkpoint role to repl ... ok"
+   fi
+   err_out=$(psql -h localhost -p $PORT -U $PSQL_USER -d postgres -c "GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO repl;" 2>&1)
+   if [ $? -ne 0 ]; then
+      echo "grant EXECUTE role on pg_switch_wal() to repl ... $err_out"
+      stop_pgctl
+      clean
+      exit 1
+   else
+      echo "grant EXECUTE role on pg_switch_wal() to repl ... ok"
+   fi
+   err_out=$(psql -h localhost -p $PORT -U $PSQL_USER -d postgres -c "CREATE USER myuser WITH PASSWORD '$PGPASSWORD';" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create user myuser ... $err_out"
       stop_pgctl
@@ -426,7 +462,7 @@ initialize_cluster() {
    else
       echo "create user myuser ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE DATABASE mydb WITH OWNER myuser ENCODING 'UTF8' TEMPLATE template0;" 2>&1)
+   err_out=$(psql -h localhost -p $PORT -U $PSQL_USER -d postgres -c "CREATE DATABASE mydb WITH OWNER myuser ENCODING 'UTF8' TEMPLATE template0;" 2>&1)
    if [ $? -ne 0 ]; then
       echo "create database mydb with owner myuser ... $err_out"
       stop_pgctl
@@ -434,6 +470,15 @@ initialize_cluster() {
       exit 1
    else
       echo "create database mydb with owner myuser ... ok"
+   fi
+   err_out=$(pgbench -i -s 1 -n -h localhost -p $PORT -U $PSQL_USER -d postgres 2>&1)
+   if [ $? -ne 0 ]; then
+      echo "initialize pgbench ... $err_out"
+      stop_pgctl
+      clean
+      exit 1
+   else
+      echo "initialize pgbench on user: $PSQL_USER and database: postgres ... ok"
    fi
    set -e
    stop_pgctl
@@ -515,7 +560,7 @@ execute_testcases() {
    echo -e "\e[34mExecute Testcases \e[0m"
    set +e
    run_as_postgres "pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start"
-   pg_isready -h localhost -p $PORT
+   pg_isready -h localhost -p $PORT -d postgres
    if [ $? -eq 0 ]; then
       echo "postgres server accepting requests ... ok"
    else
@@ -565,7 +610,7 @@ execute_pgmoneta_ext_suite() {
    set +e
    pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE start
 
-   pg_isready -h localhost -p $PORT
+   pg_isready -h localhost -p $PORT -d postgres
    if [ $? -eq 0 ]; then
       echo "postgres server is accepting requests ... ok"
    else
@@ -575,13 +620,13 @@ execute_pgmoneta_ext_suite() {
    fi
 
    ## create extension
-   err_out=$(psql -h /tmp -p $PORT -U $USER -d postgres -t -c "DROP EXTENSION IF EXISTS pgmoneta_ext;" 2>&1)
+   err_out=$(psql -h localhost -p $PORT -U $USER -d postgres -t -c "DROP EXTENSION IF EXISTS pgmoneta_ext;" 2>&1)
    if [ $? -ne 0 ]; then
       echo "drop extension pgmoneta_ext ... $err_out"
    else
       echo "drop extension pgmoneta_ext ... ok"
    fi
-   err_out=$(psql -h /tmp -p $PORT -U $USER -d postgres -t -c "CREATE EXTENSION pgmoneta_ext;" 2>&1)
+   err_out=$(psql -h localhost -p $PORT -U $USER -d postgres -t -c "CREATE EXTENSION pgmoneta_ext;" 2>&1)
    if [ $? -ne 0 ]; then
       echo "drop extension pgmoneta_ext ... $err_out"
    else
@@ -589,11 +634,11 @@ execute_pgmoneta_ext_suite() {
    fi
 
    ## test extension
-   out=$(psql -h /tmp -p $PORT -U $USER -d postgres -t -c "SELECT pgmoneta_ext_version();")
+   out=$(psql -h localhost -p $PORT -U $USER -d postgres -t -c "SELECT pgmoneta_ext_version();")
    echo "pgmoneta_ext version ... $out"
-   out=$(psql -h /tmp -p $PORT -U $USER -d postgres -t -c "SELECT pgmoneta_ext_switch_wal();")
+   out=$(psql -h localhost -p $PORT -U $USER -d postgres -t -c "SELECT pgmoneta_ext_switch_wal();")
    echo "pgmoneta_ext switch wal ... $out"
-   out=$(psql -h /tmp -p $PORT -U $USER -d postgres -t -c "SELECT pgmoneta_ext_checkpoint();")
+   out=$(psql -h localhost -p $PORT -U $USER -d postgres -t -c "SELECT pgmoneta_ext_checkpoint();")
    echo "pgmoneta_ext checkout ... $out"
    pg_ctl -D $DATA_DIRECTORY -l $PGCTL_LOG_FILE stop
    set -e

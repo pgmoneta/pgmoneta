@@ -132,7 +132,8 @@ typedef int64_t timestamp_tz;
 
 #define XLOG_SEG_NO_OFFEST_TO_REC_PTR(segno, offset, wal_segsz_bytes, dest) \
         (dest) = (segno) * (wal_segsz_bytes) + (offset)
-
+#define XLOG_REC_HAS_BLOCK_REF(record, block_id) \
+        ((record->max_block_id >= (block_id)) && (record->blocks[block_id].in_use))
 /* Enums */
 
 /**
@@ -173,7 +174,7 @@ enum wal_level
 
 struct walfile;                         /* Forward declaration of walfile, defined in walfile.h. */
 struct xlog_long_page_header_data;      /* Forward declaration of xlog_long_page_header_data, defined in walfile.h */
-
+struct block_ref_table;                 /* Forward declaration of block reference table structure, defined in brt.h */
 /**
  * @struct xlog_page_header_data
  * @brief Represents the header of an XLOG page.
@@ -440,6 +441,28 @@ pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
 void
 pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
                             struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, char** included_objects);
+
+/**
+ * Display the ocuurance of resource manager in WAL records
+ * @param record The decoded WAL record to display.
+ * @param start_lsn The start LSN
+ * @param end_lsn The end LSN
+ * @param limit The limit
+ */
+void
+pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn);
+
+/**
+ * Summarizes the contents of a decoded WAL record
+ *
+ * @param record The decoded WAL record to summarize.
+ * @param start_lsn The start LSN
+ * @param end_lsn The end LSN
+ * @param brt The block reference table
+ * @return 0 is success, otherwise failure
+ */
+int
+pgmoneta_wal_record_summary(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn, struct block_ref_table* brt);
 
 /**
  * Encodes a WAL record into a buffer.
