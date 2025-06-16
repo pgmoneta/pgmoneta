@@ -28,12 +28,18 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <brt.h>
 #include <json.h>
 #include <logging.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
+#include <walfile/pg_control.h>
 #include <walfile/rmgr.h>
+#include <walfile/rm.h>
+#include <walfile/rm_database.h>
+#include <walfile/rm_storage.h>
+#include <walfile/rm_xact.h>
 #include <walfile/wal_reader.h>
 
 /* system */
@@ -54,6 +60,16 @@ static bool is_included(char* rm, struct deque* rms,
                         uint64_t s_lsn, uint64_t start_lsn,
                         uint64_t e_lsn, uint64_t end_lsn,
                         uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc);
+
+static bool xlog_record_get_block_tag(struct decoded_xlog_record* record, int block_id,
+                                      struct rel_file_locator* rlocator, enum fork_number* frk,
+                                      block_number* blkno);
+
+static bool summarize_xlog_record(uint8_t info);
+static void summarize_xact_record_l15(struct decoded_xlog_record* record, block_ref_table* brt);
+static void summarize_xact_record_ge15(struct decoded_xlog_record* record, block_ref_table* brt);
+static void summarize_smgr_record(struct decoded_xlog_record* record, block_ref_table* brt);
+static void summarize_dbase_record(struct decoded_xlog_record* record, block_ref_table* brt);
 
 bool
 is_bimg_apply(uint8_t bimg_info)
@@ -1243,6 +1259,93 @@ pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, ui
    rmgr_summary_table[record->header.xl_rmid].number_of_records++;
 }
 
+int
+pgmoneta_wal_record_summary(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn, struct block_ref_table* brt)
+{
+   struct rel_file_locator rlocator;
+   enum fork_number forknum;
+   block_number blocknum;
+   uint8_t info;
+
+   /* Simply return if record is partial or not in range */
+   if (record->partial || !(record->lsn >= start_lsn && record->lsn < end_lsn))
+   {
+      return 0;
+   }
+
+   /**  Summarize depending on different resource managers **/
+
+   /**
+    * Special handeling for the resource manager whose id is RM_XLOG_ID.
+    *
+    * In cases where info is REDO, CHECKPOINT SHUTDOWN, PARAMETER_CHANGE skip those records as you will
+    * not get any block modification related information from there.
+    */
+   if (record->header.xl_rmid == 0)
+   {
+      info = record->header.xl_info & ~XLR_INFO_MASK;
+      if (summarize_xlog_record(info))
+      {
+         pgmoneta_log_debug("XLOG record of RM_XLOG_ID encountered");
+         return 0;
+      }
+   }
+
+   /**
+    * Some records like TRUNCATE changes the limit block of the relation file, To take in account
+    * such cases, we again do special handeling
+    */
+   switch (record->header.xl_rmid)
+   {
+      /* Special handling for WAL records with RM_XACT_ID. */
+      case 1:
+         if (server_config->version >= 15)
+         {
+            summarize_xact_record_ge15(record, brt);
+         }
+         else
+         {
+            summarize_xact_record_l15(record, brt);
+         }
+         break;
+      /* Special handling for WAL records with RM_SMGR_ID. */
+      case 2:
+         summarize_smgr_record(record, brt);
+         break;
+      /* Special handling for WAL records with RM_DBASE_ID. */
+      case 4:
+         summarize_dbase_record(record, brt);
+         break;
+   }
+
+   /**
+    * Now its time to get the modified blocks from the records
+    */
+   for (int block_id = 0; block_id <= record->max_block_id; block_id++)
+   {
+      if (!xlog_record_get_block_tag(record, block_id, &rlocator, &forknum, &blocknum))
+      {
+         continue;
+      }
+
+      /*
+       * We ignore the FSM fork, because it's not completely WAL-logged.
+       */
+      if (forknum != FSM_FORKNUM)
+      {
+         if (pgmoneta_brt_mark_block_modified(brt, &rlocator, forknum, blocknum))
+         {
+            pgmoneta_log_fatal("Cannot set block_number:%d in block reference table", blocknum);
+            goto error;
+         }
+      }
+   }
+
+   return 0;
+error:
+   return 1;
+}
+
 static bool
 is_included(char* rm, struct deque* rms,
             uint64_t s_lsn, uint64_t start_lsn,
@@ -1439,6 +1542,270 @@ finish:
    pgmoneta_value_create(ValueJSON, (uintptr_t) record_json, value);
    free(rm_desc);
    free(backup_str);
+}
+
+static bool
+summarize_xlog_record(uint8_t info)
+{
+   switch (info)
+   {
+      case XLOG_CHECKPOINT_REDO:
+      case XLOG_CHECKPOINT_SHUTDOWN:
+      case XLOG_END_OF_RECOVERY:
+      case XLOG_PARAMETER_CHANGE:
+         return true;
+      default:
+         break;
+   }
+
+   return false;
+}
+
+/* summarize an xact record for postgres versions less than 15 */
+static void
+summarize_xact_record_l15(struct decoded_xlog_record* record, block_ref_table* brt)
+{
+   uint8_t info;
+   char* rec = NULL;
+   uint8_t xact_info;
+   struct rel_file_locator rlocator;
+
+   info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
+   rec = XLOG_REC_GET_DATA(record);
+   xact_info = info & XLOG_XACT_OPMASK;
+
+   if (xact_info == XLOG_XACT_COMMIT || xact_info == XLOG_XACT_COMMIT_PREPARED)
+   {
+      struct xl_xact_commit* xlrec = (struct xl_xact_commit*)rec;
+
+      struct xl_xact_parsed_commit_v14 parsed;
+      pgmoneta_wal_parse_commit_record_l15(info, xlrec, &parsed);
+      for (int i = 0; i < parsed.nrels; ++i)
+      {
+         enum fork_number forknum;
+         rlocator.spcOid = parsed.xnodes[i].spcNode;
+         rlocator.dbOid = parsed.xnodes[i].dbNode;
+         rlocator.relNumber = parsed.xnodes[i].relNode;
+
+         for (forknum = 0; forknum <= INIT_FORKNUM; ++forknum)
+         {
+            if (forknum != FSM_FORKNUM)
+            {
+               pgmoneta_brt_set_limit_block(brt, &rlocator, forknum, 0);
+            }
+         }
+      }
+   }
+   else if (xact_info == XLOG_XACT_ABORT || xact_info == XLOG_XACT_ABORT_PREPARED)
+   {
+      struct xl_xact_abort* xlrec = (struct xl_xact_abort*)rec;
+
+      struct xl_xact_parsed_abort_v14 parsed;
+      pgmoneta_wal_parse_abort_record_l15(info, xlrec, &parsed);
+      for (int i = 0; i < parsed.nrels; ++i)
+      {
+         enum fork_number forknum;
+         rlocator.spcOid = parsed.xnodes[i].spcNode;
+         rlocator.dbOid = parsed.xnodes[i].dbNode;
+         rlocator.relNumber = parsed.xnodes[i].relNode;
+
+         for (forknum = 0; forknum <= INIT_FORKNUM; ++forknum)
+         {
+            if (forknum != FSM_FORKNUM)
+            {
+               pgmoneta_brt_set_limit_block(brt, &rlocator, forknum, 0);
+            }
+         }
+      }
+   }
+}
+
+/* summarize an xact record for postgres versions greater than or equal to 15 */
+static void
+summarize_xact_record_ge15(struct decoded_xlog_record* record, block_ref_table* brt)
+{
+   uint8_t info;
+   char* rec = NULL;
+   uint8_t xact_info;
+   struct rel_file_locator rlocator;
+
+   info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
+   rec = XLOG_REC_GET_DATA(record);
+   xact_info = info & XLOG_XACT_OPMASK;
+
+   if (xact_info == XLOG_XACT_COMMIT || xact_info == XLOG_XACT_COMMIT_PREPARED)
+   {
+      struct xl_xact_commit* xlrec = (struct xl_xact_commit*)rec;
+
+      struct xl_xact_parsed_commit_v15 parsed;
+      pgmoneta_wal_parse_commit_record_ge15(info, xlrec, &parsed);
+      for (int i = 0; i < parsed.nrels; ++i)
+      {
+         enum fork_number forknum;
+         rlocator.spcOid = parsed.xnodes[i].spcNode;
+         rlocator.dbOid = parsed.xnodes[i].dbNode;
+         rlocator.relNumber = parsed.xnodes[i].relNode;
+
+         for (forknum = 0; forknum <= INIT_FORKNUM; ++forknum)
+         {
+            if (forknum != FSM_FORKNUM)
+            {
+               pgmoneta_brt_set_limit_block(brt, &rlocator, forknum, 0);
+            }
+         }
+      }
+   }
+   else if (xact_info == XLOG_XACT_ABORT || xact_info == XLOG_XACT_ABORT_PREPARED)
+   {
+      struct xl_xact_abort* xlrec = (struct xl_xact_abort*)rec;
+      struct xl_xact_parsed_abort_v15 parsed;
+
+      pgmoneta_wal_parse_abort_record_ge15(info, xlrec, &parsed);
+      for (int i = 0; i < parsed.nrels; ++i)
+      {
+         enum fork_number forknum;
+         rlocator.spcOid = parsed.xnodes[i].spcNode;
+         rlocator.dbOid = parsed.xnodes[i].dbNode;
+         rlocator.relNumber = parsed.xnodes[i].relNode;
+
+         for (forknum = 0; forknum <= INIT_FORKNUM; ++forknum)
+         {
+            if (forknum != FSM_FORKNUM)
+            {
+               pgmoneta_brt_set_limit_block(brt, &rlocator, forknum, 0);
+            }
+         }
+      }
+   }
+}
+
+static void
+summarize_dbase_record(struct decoded_xlog_record* record, block_ref_table* brt)
+{
+   uint8_t info;
+
+   info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
+
+   if (info == XLOG_DBASE_CREATE_FILE_COPY)
+   {
+      struct xl_dbase_create_file_copy_rec* xlrec;
+      struct rel_file_locator rlocator;
+
+      xlrec = (struct xl_dbase_create_file_copy_rec*) XLOG_REC_GET_DATA(record);
+      rlocator.spcOid = xlrec->tablespace_id;
+      rlocator.dbOid = xlrec->db_id;
+      rlocator.relNumber = 0;
+      pgmoneta_brt_set_limit_block(brt, &rlocator, MAIN_FORKNUM, 0);
+   }
+   else if (info == XLOG_DBASE_CREATE_WAL_LOG)
+   {
+      struct xl_dbase_create_wal_log_rec* xlrec;
+      struct rel_file_locator rlocator;
+
+      xlrec = (struct xl_dbase_create_wal_log_rec*) XLOG_REC_GET_DATA(record);
+      rlocator.spcOid = xlrec->tablespace_id;
+      rlocator.dbOid = xlrec->db_id;
+      rlocator.relNumber = 0;
+      pgmoneta_brt_set_limit_block(brt, &rlocator, MAIN_FORKNUM, 0);
+   }
+   else if (info == XLOG_DBASE_DROP)
+   {
+      struct xl_dbase_drop_rec* xlrec;
+      struct rel_file_locator rlocator;
+
+      xlrec = (struct xl_dbase_drop_rec*) XLOG_REC_GET_DATA(record);
+      rlocator.dbOid = xlrec->db_id;
+      rlocator.relNumber = 0;
+      for (int i = 0; i < xlrec->ntablespaces; ++i)
+      {
+         rlocator.spcOid = xlrec->tablespace_ids[i];
+         pgmoneta_brt_set_limit_block(brt, &rlocator, MAIN_FORKNUM, 0);
+      }
+   }
+}
+
+static void
+summarize_smgr_record(struct decoded_xlog_record* record, block_ref_table* brt)
+{
+   uint8_t info;
+   struct rel_file_locator rlocator;
+
+   info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
+
+   if (info == XLOG_SMGR_CREATE)
+   {
+      struct xl_smgr_create* xlrec;
+
+      /**
+       * When a new relation fork is created on disk, there's no need to track which blocks were
+       * changed — the entire fork is considered new. So, we set its limit block to 0. The FSM
+       * (Free Space Map) fork is skipped here since it's not fully logged in WAL.
+       */
+      xlrec = (struct xl_smgr_create*) XLOG_REC_GET_DATA(record);
+
+      rlocator.spcOid = xlrec->rnode.spcNode;
+      rlocator.dbOid = xlrec->rnode.dbNode;
+      rlocator.relNumber = xlrec->rnode.relNode;
+
+      if (xlrec->forkNum != FSM_FORKNUM)
+      {
+         pgmoneta_brt_set_limit_block(brt, &rlocator,
+                                      xlrec->forkNum, 0);
+      }
+   }
+   else if (info == XLOG_SMGR_TRUNCATE)
+   {
+      struct xl_smgr_truncate* xlrec;
+
+      xlrec = (struct xl_smgr_truncate*) XLOG_REC_GET_DATA(record);
+
+      rlocator.spcOid = xlrec->rnode.spcNode;
+      rlocator.dbOid = xlrec->rnode.dbNode;
+      rlocator.relNumber = xlrec->rnode.relNode;
+      /**
+       * When a new relation fork is initialized on disk, tracking modified blocks is unnecessary
+       * since the entire fork starts out empty. Therefore, we set its block limit to 0. The FSM fork
+       * is excluded from this process because it isn't completely logged in WAL.
+       */
+      if ((xlrec->flags & SMGR_TRUNCATE_HEAP) != 0)
+      {
+         pgmoneta_brt_set_limit_block(brt, &rlocator,
+                                      MAIN_FORKNUM, xlrec->blkno);
+      }
+      if ((xlrec->flags & SMGR_TRUNCATE_VM) != 0)
+      {
+         pgmoneta_brt_set_limit_block(brt, &rlocator,
+                                      VISIBILITYMAP_FORKNUM, xlrec->blkno);
+      }
+   }
+}
+
+static bool
+xlog_record_get_block_tag(struct decoded_xlog_record* record, int block_id,
+                          struct rel_file_locator* rlocator, enum fork_number* frk, block_number* blkno)
+{
+   struct decoded_bkp_block* bkpb;
+   /* Check if this record has a specific block reference, basically check the status of a block, modified or not */
+   if (!XLOG_REC_HAS_BLOCK_REF(record, block_id))
+   {
+      return false;
+   }
+
+   bkpb = &record->blocks[block_id];
+
+   if (rlocator)
+   {
+      *rlocator = bkpb->rlocator;
+   }
+   if (frk)
+   {
+      *frk = bkpb->forknum;
+   }
+   if (blkno)
+   {
+      *blkno = bkpb->blkno;
+   }
+   return true;
 }
 
 char*

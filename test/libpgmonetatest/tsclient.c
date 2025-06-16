@@ -33,6 +33,8 @@
 #include <configuration.h>
 #include <json.h>
 #include <management.h>
+#include <memory.h>
+#include <message.h>
 #include <network.h>
 #include <tsclient.h>
 #include <tscommon.h>
@@ -190,6 +192,98 @@ pgmoneta_tsclient_reload()
    return 0;
    error:
       pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_summarize_wal(char* server)
+{
+   char* wal_dir = NULL;
+   char* summary_dir = NULL;
+   struct main_configuration* config = NULL;
+   int srv = -1;
+   xlog_rec_ptr s_lsn;
+   xlog_rec_ptr e_lsn;
+   struct query_response* qr = NULL;
+
+   config = (struct main_configuration*)shmem;
+   /* get the server index */
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!strcmp(config->common.servers[i].name, server))
+      {
+         srv = i;
+         break;
+      }
+   }
+
+   /* get the starting lsn for summary */
+   if (do_checkpoint_and_get_lsn(srv, &s_lsn))
+   {
+      goto error;
+   }
+
+   /* Create a table  */
+   if (pgmoneta_tsclient_execute_query(srv, "CREATE TABLE t1 (id int);", 1, &qr))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   /* Insert some tuples */
+   if (pgmoneta_tsclient_execute_query(srv, "INSERT INTO t1 SELECT  GENERATE_SERIES(1, 800);", 1, &qr))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   /* get the ending lsn for summary */
+   if (do_checkpoint_and_get_lsn(srv, &e_lsn))
+   {
+      goto error;
+   }
+
+   /* Switch the wal segment so that records won't appear in partial segments */
+   if (pgmoneta_tsclient_execute_query(srv, "SELECT pg_switch_wal();", 0, &qr))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   /* Append some more tuples just to ensure that a new wal segment is streamed */
+   if (do_checkpoint_and_get_lsn(srv, NULL))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   sleep(5);
+
+   wal_dir = get_pg_wal_dir_path(PGMONETA_PG_WAL_DIR_TRAIL, server);
+   /* Create summary directory in the base_dir of a server if not already present */
+   summary_dir = pgmoneta_get_server_summary(srv);
+   if (pgmoneta_mkdir(summary_dir))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_summarize_wal(srv, wal_dir, s_lsn, e_lsn))
+   {
+      goto error;
+   }
+
+   free(summary_dir);
+   free(wal_dir);
+   return 0;
+
+error:
+   pgmoneta_free_query_response(qr);
+   free(summary_dir);
+   free(wal_dir);
    return 1;
 }
 

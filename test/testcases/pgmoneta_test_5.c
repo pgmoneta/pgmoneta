@@ -27,64 +27,32 @@
  *
  */
 
-#ifndef PGMONETA_TSCLIENT_H
-#define PGMONETA_TSCLIENT_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <pgmoneta.h>
-#include <brt.h>
+#include <tsclient.h>
+#include <wal.h>
 #include <walfile/wal_reader.h>
 
-/**
- * Execute backup command on the server
- * @param server the server to perform backup on
- * @param incremental execute backup in incremental mode
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_backup(char* server, char* incremental);
+#include "pgmoneta_test_5.h"
 
-/**
- * Execute restore command on the server
- * @param server the server to perform restore on
- * @param backup_id the backup_id to perform restore on
- * @param position the position parameters
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_restore(char* server, char* backup_id, char* position);
-
-/**
- * Execute delete command on the server
- * @param server the server to perform delete on
- * @param backup_id the backup_id to delete
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_delete(char* server, char* backup_id);
-
-/**
- * Execute reload command on the server
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_reload();
-
-/**
- * Summarize WAL in a wal_dir
- * @param server The name of the server
- * @param s_lsn The start lsn
- * @param e_lsn The end lsn
- * @return 0 if success, otherwise 1
- */
-int
-pgmoneta_tsclient_summarize_wal(char* server);
-
-#ifdef __cplusplus
+START_TEST(test_pgmoneta_summarize_wal)
+{
+   int found = 0;
+   found = !pgmoneta_tsclient_summarize_wal("primary");
+   ck_assert_msg(found, "success status not found");
 }
-#endif
+END_TEST
 
-#endif
+Suite*
+pgmoneta_test5_suite()
+{
+   Suite* s;
+   TCase* tc_core;
+   s = suite_create("pgmoneta_test5");
+
+   tc_core = tcase_create("Core");
+
+   tcase_set_timeout(tc_core, 60);
+   tcase_add_test(tc_core, test_pgmoneta_summarize_wal);
+   suite_add_tcase(s, tc_core);
+
+   return s;
+}

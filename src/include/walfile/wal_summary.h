@@ -24,67 +24,27 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
-#ifndef PGMONETA_TSCLIENT_H
-#define PGMONETA_TSCLIENT_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef PGMONETA_WAL_SUMMARY_H
+#define PGMONETA_WAL_SUMMARY_H
 
 #include <pgmoneta.h>
-#include <brt.h>
-#include <walfile/wal_reader.h>
 
 /**
- * Execute backup command on the server
- * @param server the server to perform backup on
- * @param incremental execute backup in incremental mode
- * @return 0 upon success, otherwise 1
+ * Summarize the WAL records in the range [start_lsn, end_lsn) for a timeline, assuming that
+ * both start and end LSNs belongs to the same timeline.
+ * @param srv The server
+ * @param wal_dir The directory to the wal segments (Optional and is used for testing)
+ * @param start_lsn The start lsn is the point at which we should start summarizing. If this
+ * value comes from the end LSN of the previous record as returned by the xlogreader machinery,
+ * 'exact' should be true; otherwise, 'exact' should be false, and this function will search
+ * forward for the start of a valid WAL record.
+ * @param end_lsn identifies the point beyond which we can't count on being able to read any
+ * more WAL.
+ * @return 0 is success, otherwise failure
  */
 int
-pgmoneta_tsclient_backup(char* server, char* incremental);
-
-/**
- * Execute restore command on the server
- * @param server the server to perform restore on
- * @param backup_id the backup_id to perform restore on
- * @param position the position parameters
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_restore(char* server, char* backup_id, char* position);
-
-/**
- * Execute delete command on the server
- * @param server the server to perform delete on
- * @param backup_id the backup_id to delete
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_delete(char* server, char* backup_id);
-
-/**
- * Execute reload command on the server
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_reload();
-
-/**
- * Summarize WAL in a wal_dir
- * @param server The name of the server
- * @param s_lsn The start lsn
- * @param e_lsn The end lsn
- * @return 0 if success, otherwise 1
- */
-int
-pgmoneta_tsclient_summarize_wal(char* server);
-
-#ifdef __cplusplus
-}
-#endif
+pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn);
 
 #endif
