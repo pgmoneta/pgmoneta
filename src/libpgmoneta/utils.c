@@ -3099,6 +3099,17 @@ pgmoneta_get_server_wal(int server)
 }
 
 char*
+pgmoneta_get_server_summary(int server)
+{
+   char* d = NULL;
+
+   d = get_server_basepath(server);
+   d = pgmoneta_append(d, "summary/");
+
+   return d;
+}
+
+char*
 pgmoneta_get_server_wal_shipping(int server)
 {
    struct main_configuration* config;
