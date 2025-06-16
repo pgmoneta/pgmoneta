@@ -164,6 +164,7 @@ main(int argc, char** argv)
       {"v", "verbose", false},
       {"S", "summary", false},
       {"V", "version", false},
+      {"S", "summary", false},
       {"?", "help", false},
    };
 
