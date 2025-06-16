@@ -171,14 +171,16 @@ pgmoneta_http_get(struct http* http, char* hostname, char* path)
    char* full_request = NULL;
    char* response = NULL;
    char* user_agent = NULL;
-   char* endpoint = path ? path : "/get";
 
    pgmoneta_log_trace("Starting pgmoneta_http_get");
-   if (http_build_header(PGMONETA_HTTP_GET, endpoint, &request))
+   if (path == NULL || strlen(path) == 0)
    {
-      pgmoneta_log_error("Failed to build HTTP header");
+      pgmoneta_log_error("GET: Path can not be NULL");
       goto error;
    }
+   request = pgmoneta_append(request, "GET ");
+   request = pgmoneta_append(request, path);
+   request = pgmoneta_append(request, " HTTP/1.1\r\n");
 
    pgmoneta_http_add_header(http, "Host", hostname);
    user_agent = pgmoneta_append(user_agent, "pgmoneta/");
@@ -199,7 +201,6 @@ pgmoneta_http_get(struct http* http, char* hostname, char* path)
    }
 
    memset(msg_request, 0, sizeof(struct message));
-
    msg_request->data = full_request;
    msg_request->length = strlen(full_request) + 1;
 
@@ -225,7 +226,7 @@ req:
 
    if (response == NULL)
    {
-      pgmoneta_log_error("No response data collected");
+      pgmoneta_log_error("GET: No response data collected");
       goto error;
    }
 
@@ -826,7 +827,24 @@ pgmoneta_http_disconnect(struct http* http)
          }
          http->socket = -1;
       }
+   }
 
+   if (status != 0)
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+int
+pgmoneta_http_destroy(struct http* http)
+{
+   if (http != NULL)
+   {
       if (http->headers != NULL)
       {
          free(http->headers);
@@ -844,15 +862,8 @@ pgmoneta_http_disconnect(struct http* http)
          free(http->request_headers);
          http->request_headers = NULL;
       }
-   }
-
-   if (status != 0)
-   {
-      goto error;
+      free(http);
    }
 
    return 0;
-
-error:
-   return 1;
 }

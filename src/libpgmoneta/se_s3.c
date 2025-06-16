@@ -464,7 +464,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    free(auth_value);
 
    pgmoneta_http_disconnect(http);
-   free(http);
+   pgmoneta_http_destroy(http);
 
    fclose(file);
    return 0;
@@ -554,7 +554,7 @@ error:
    if (http != NULL)
    {
       pgmoneta_http_disconnect(http);
-      free(http);
+      pgmoneta_http_destroy(http);
    }
 
    if (file != NULL)

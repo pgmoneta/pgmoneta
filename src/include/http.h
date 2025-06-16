@@ -145,6 +145,14 @@ pgmoneta_http_put(struct http* http, char* hostname, char* path, const void* dat
 int
 pgmoneta_http_put_file(struct http* http, char* hostname, char* path, FILE* file, size_t file_size, char* content_type);
 
+/**
+ * Destroy the HTTP structure, free allocated memory
+ * @param http The HTTP structure
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_http_destroy(struct http* http);
+
 #ifdef __cplusplus
 }
 #endif
