@@ -14,7 +14,7 @@ pgmoneta-cli backup primary
 
 ```
 Header: 
-  ClientVersion: 0.16.0
+  ClientVersion: 0.18.0
   Command: 1
   Output: 0
   Timestamp: 20240928065644
@@ -32,7 +32,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.16.0
+  ServerVersion: 0.18.0
 ```
 
 ## [बैकअप देखना]{lang=hi}
@@ -47,7 +47,7 @@ pgmoneta-cli list-backup primary
 
 ```
 Header: 
-  ClientVersion: 0.16.0
+  ClientVersion: 0.18.0
   Command: 2
   Output: 0
   Timestamp: 20240928065812
@@ -72,7 +72,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.16.0
+  ServerVersion: 0.18.0
 ```
 
 ## [वृद्धिशील बैकअप बनाएं]{lang=hi}
@@ -87,7 +87,7 @@ pgmoneta-cli backup primary 20240928065644
 
 ```
 Header: 
-  ClientVersion: 0.16.0
+  ClientVersion: 0.18.0
   Command: 1
   Output: 0
   Timestamp: 20240928065730
@@ -106,7 +106,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.16.0
+  ServerVersion: 0.18.0
 ```
 
 [वृद्धिशील बैकअप केवल]{lang=hi} [PostgreSQL 17+](https://www.postgresql.org) [में समर्थित हैं।]{lang=hi} 
@@ -125,7 +125,7 @@ pgmoneta-cli list-backup primary
 
 ```
 Header: 
-  ClientVersion: 0.16.0
+  ClientVersion: 0.18.0
   Command: 2
   Output: 0
   Timestamp: 20240928065812
@@ -150,7 +150,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.16.0
+  ServerVersion: 0.18.0
 ```
 
 ## [बैकअप जानकारी]{lang=hi}
@@ -165,7 +165,7 @@ pgmoneta-cli -c pgmoneta.conf info primary newest
 
 ```
 Header:
-  ClientVersion: 0.16.0
+  ClientVersion: 0.18.0
   Command: info
   Output: text
   Timestamp: 20241025163541
@@ -194,7 +194,7 @@ Response:
   NumberOfTablespaces: 0
   RestoreSize: 45.82MB
   Server: primary
-  ServerVersion: 0.16.0
+  ServerVersion: 0.18.0
   StartHiLSN: 0
   StartLoLSN: 4F000060
   StartTimeline: 1
