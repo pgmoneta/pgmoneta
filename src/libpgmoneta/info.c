@@ -1648,6 +1648,15 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
       goto error;
    }
 
+   if (!pgmoneta_compare_string("add", action) ||
+       !pgmoneta_compare_string("update", action) ||
+       !pgmoneta_compare_string("remove", action))
+   {
+      ec = MANAGEMENT_ERROR_ANNOTATE_UNKNOWN_ACTION;
+      pgmoneta_log_error("Annotate: unknown action (%s)", action);
+      goto error;
+   }
+
    if (pgmoneta_update_info_annotate(server, bck, action, key, comment))
    {
       ec = MANAGEMENT_ERROR_ANNOTATE_FAILED;

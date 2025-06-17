@@ -1807,16 +1807,6 @@ error:
 static int
 annotate(SSL* ssl, int socket, char* server, char* backup, char* action, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (!strcmp(action, "add") || !strcmp(action, "remove") || !strcmp(action, "update"))
-   {
-      /* Ok */
-   }
-   else
-   {
-      printf("Unknown action: %s\n", action);
-      goto error;
-   }
-
    if (pgmoneta_management_request_annotate(ssl, socket, server, backup, action, key, comment, compression, encryption, output_format))
    {
       goto error;
@@ -2814,7 +2804,7 @@ translate_servers_argument(struct json* response)
    char* translated_server_size = NULL;
 
    translated_workspace_size = pgmoneta_translate_file_size((uint64_t)pgmoneta_json_get(response,
-                                                                                       MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE));
+                                                                                        MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE));
    if (translated_workspace_size)
    {
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE, (uintptr_t)translated_workspace_size, ValueString);
