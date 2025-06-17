@@ -5,7 +5,7 @@
 Make sure that [**pgmoneta**][pgmoneta] is installed and in your path by using `pgmoneta -?`. You should see
 
 ``` console
-pgmoneta 0.17.2
+pgmoneta 0.17.3
   Backup / restore solution for PostgreSQL
 
 Usage:
