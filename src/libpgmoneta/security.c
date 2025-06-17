@@ -2780,21 +2780,21 @@ error:
 static int
 create_hash_file(char* filename, char* algorithm, char** hash)
 {
-   EVP_MD_CTX* md_ctx;
-   const EVP_MD* md;
-   unsigned char md_value[EVP_MAX_MD_SIZE];
-   unsigned int md_len;
+   EVP_MD_CTX* md_ctx = NULL;
+   const EVP_MD* md = NULL;
+   unsigned char md_value[EVP_MAX_MD_SIZE] = {0};
+   unsigned int md_len = 0;
    FILE* file = NULL;
-   char read_buf[16384];
+   char read_buf[16384] = {0};
    unsigned long read_bytes = 0;
-   char* hash_buf;
-   unsigned int hash_len;
+   char* hash_buf = NULL;
+   unsigned int hash_len = 0;
 
    md = EVP_get_digestbyname(algorithm);
    if (md == NULL)
    {
       pgmoneta_log_error("Invalid message digest: %s", algorithm);
-      return 1;
+      goto error;
    }
 
    if (strcmp("SHA224", algorithm) == 0)
@@ -2815,10 +2815,18 @@ create_hash_file(char* filename, char* algorithm, char** hash)
    }
 
    hash_buf = malloc(hash_len);
+   if (hash_buf == NULL)
+   {
+      goto error;
+   }
 
    memset(hash_buf, 0, hash_len);
 
    md_ctx = EVP_MD_CTX_new();
+   if (md_ctx == NULL)
+   {
+      goto error;
+   }
 
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
    if (!EVP_DigestInit_ex2(md_ctx, md, NULL))
@@ -2827,14 +2835,13 @@ create_hash_file(char* filename, char* algorithm, char** hash)
 #endif
    {
       pgmoneta_log_error("Message digest initialization failed");
-      EVP_MD_CTX_free(md_ctx);
-      return 1;
+      goto error;
    }
 
    file = fopen(filename, "rb");
    if (file == NULL)
    {
-      return 1;
+      goto error;
    }
 
    memset(read_buf, 0, sizeof(read_buf));
@@ -2844,16 +2851,14 @@ create_hash_file(char* filename, char* algorithm, char** hash)
       if (!EVP_DigestUpdate(md_ctx, read_buf, read_bytes))
       {
          pgmoneta_log_error("Message digest update failed");
-         EVP_MD_CTX_free(md_ctx);
-         return 1;
+         goto error;
       }
    }
 
    if (!EVP_DigestFinal_ex(md_ctx, md_value, &md_len))
    {
       pgmoneta_log_error("Message digest finalization failed");
-      EVP_MD_CTX_free(md_ctx);
-      return 1;
+      goto error;
    }
 
    EVP_MD_CTX_free(md_ctx);
@@ -2869,6 +2874,22 @@ create_hash_file(char* filename, char* algorithm, char** hash)
    fclose(file);
 
    return 0;
+
+error:
+
+   free(hash_buf);
+
+   if (md_ctx != NULL)
+   {
+      EVP_MD_CTX_free(md_ctx);
+   }
+
+   if (file != NULL)
+   {
+      fclose(file);
+   }
+
+   return 1;
 }
 
 int
