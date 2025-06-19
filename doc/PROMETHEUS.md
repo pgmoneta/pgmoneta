@@ -192,6 +192,14 @@ Is the server in an online state
 | :-------- | :---------- |
 | name | The server identifier |
 
+## pgmoneta_server_primary
+
+Is the server a primary ?
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+
 ## pgmoneta_server_valid
 
 Is the server in a valid state

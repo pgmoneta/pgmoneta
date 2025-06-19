@@ -149,6 +149,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_ORIGINAL              "Original"
 #define MANAGEMENT_ARGUMENT_OUTPUT                "Output"
 #define MANAGEMENT_ARGUMENT_POSITION              "Position"
+#define MANAGEMENT_ARGUMENT_PRIMARY               "Primary"
 #define MANAGEMENT_ARGUMENT_RESTART               "Restart"
 #define MANAGEMENT_ARGUMENT_RESTORE_SIZE          "RestoreSize"
 #define MANAGEMENT_ARGUMENT_RETENTION_DAYS        "RetentionDays"

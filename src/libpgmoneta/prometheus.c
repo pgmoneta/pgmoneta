@@ -2108,6 +2108,22 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_primary Is the server a primary\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_primary gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      data = pgmoneta_append(data, "pgmoneta_server_primary{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      data = pgmoneta_append_bool(data, config->common.servers[i].primary);
+
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
    data = pgmoneta_append(data, "#HELP pgmoneta_server_valid Is the server in a valid state\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_valid gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)

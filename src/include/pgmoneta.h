@@ -213,6 +213,7 @@ struct server
    char name[MISC_LENGTH];                  /**< The name of the server */
    char host[MISC_LENGTH];                  /**< The host name of the server */
    int port;                                /**< The port of the server */
+   bool primary;                            /**< Is the server a primary ? */
    char username[MAX_USERNAME_LENGTH];      /**< The user name */
    char wal_slot[MISC_LENGTH];              /**< The WAL slot name */
    bool online;                             /**< Is the server online ? */

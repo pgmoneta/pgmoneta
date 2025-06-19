@@ -45,6 +45,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+static int get_primary(SSL* ssl, int socket, bool* primary);
 static int get_wal_level(SSL* ssl, int socket, bool* replica);
 static int get_wal_size(SSL* ssl, int socket, int* ws);
 static int get_checksums(SSL* ssl, int socket, bool* checksums);
@@ -59,9 +60,10 @@ static bool is_valid_response(struct query_response* response);
 void
 pgmoneta_server_info(int srv, SSL* ssl, int socket)
 {
-   bool replica;
-   bool checksums;
-   int ws;
+   bool primary = false;
+   bool replica = false;
+   bool checksums = false;
+   int ws = 0;
    size_t blocksz = 0;
    size_t segsz = 0;
    bool sw = false;
@@ -95,6 +97,17 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
 
    pgmoneta_log_debug("%s/version %d.%d", config->common.servers[srv].name,
                       config->common.servers[srv].version, config->common.servers[srv].minor_version);
+
+   if (get_primary(ssl, socket, &primary))
+   {
+      pgmoneta_log_error("Unable to get primary information for %s", config->common.servers[srv].name);
+      config->common.servers[srv].primary = false;
+      goto done;
+   }
+   else
+   {
+      config->common.servers[srv].primary = primary;
+   }
 
    if (get_wal_level(ssl, socket, &replica))
    {
@@ -311,6 +324,66 @@ error:
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+static int
+get_primary(SSL* ssl, int socket, bool* primary)
+{
+   bool p = false;
+   int status;
+   size_t size = 40;
+   signed char state;
+   char is_recovery[size];
+   struct message qmsg;
+   struct message* tmsg = NULL;
+
+   *primary = false;
+
+   memset(&qmsg, 0, sizeof(struct message));
+   memset(&is_recovery, 0, size);
+
+   pgmoneta_write_byte(&is_recovery, 'Q');
+   pgmoneta_write_int32(&(is_recovery[1]), size - 1);
+   pgmoneta_write_string(&(is_recovery[5]), "SELECT * FROM pg_is_in_recovery();");
+
+   qmsg.kind = 'Q';
+   qmsg.length = size;
+   qmsg.data = &is_recovery;
+
+   status = pgmoneta_write_message(ssl, socket, &qmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   status = pgmoneta_read_block_message(ssl, socket, &tmsg);
+   if (status != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+   /* Read directly from the D message fragment */
+   state = pgmoneta_read_byte(tmsg->data + 54);
+
+   pgmoneta_clear_message();
+
+   if (state == 'f')
+   {
+      p = true;
+   }
+   else
+   {
+      p = false;
+   }
+
+   *primary = p;
+
+   return 0;
+
+error:
+   pgmoneta_clear_message();
+
    return 1;
 }
 

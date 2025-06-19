@@ -138,6 +138,7 @@ pgmoneta_status(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_YEARS, (uintptr_t)retention_years, ValueInt32);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_PRIMARY, (uintptr_t)config->common.servers[i].primary, ValueBool);
 
       d = pgmoneta_get_server_backup(i);
 
@@ -355,6 +356,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_YEARS, (uintptr_t)retention_years, ValueInt32);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_PRIMARY, (uintptr_t)config->common.servers[i].primary, ValueBool);
 
       d = pgmoneta_get_server(i);
 

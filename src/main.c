@@ -2005,9 +2005,10 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
 
       for (int i = 0; i < config->common.number_of_servers; i++)
       {
-         pgmoneta_log_trace("Valid - Server %s Online %d Valid %d WAL %d",
+         pgmoneta_log_trace("Valid - Server %s Online %d Primary %d Valid %d WAL %d",
                             config->common.servers[i].name,
                             config->common.servers[i].online,
+                            config->common.servers[i].primary,
                             config->common.servers[i].valid,
                             config->common.servers[i].wal_streaming);
 

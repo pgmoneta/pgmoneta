@@ -188,6 +188,22 @@ The numbeer of workers for a server
 | :-------- | :---------- |
 | name | The server identifier |
 
+## pgmoneta_server_online
+
+Is the server online ?
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+
+## pgmoneta_server_primary
+
+Is the server a primary ?
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+
 ## pgmoneta_server_valid
 
 Is the server in a valid state

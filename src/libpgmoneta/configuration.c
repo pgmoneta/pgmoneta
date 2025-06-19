@@ -229,6 +229,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   memcpy(&srv.name, &section, strlen(section));
 
                   srv.online = false;
+                  srv.primary = false;
                   atomic_init(&srv.repository, false);
                   srv.active_backup = false;
                   srv.active_restore = false;
