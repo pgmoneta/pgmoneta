@@ -218,7 +218,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
                   hs = pgmoneta_append(hs, config->common.servers[i].hot_standby[j]);
                   if (!pgmoneta_ends_with(hs, "/"))
                   {
-                     pgmoneta_append_char(hs, '/');
+                     hs = pgmoneta_append_char(hs, '/');
                   }
                   if (pgmoneta_exists(hs))
                   {
