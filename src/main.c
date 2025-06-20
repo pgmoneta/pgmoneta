@@ -1593,6 +1593,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       char* action = NULL;
       struct timespec start_t;
       struct timespec end_t;
+      struct json* response = NULL;
 
 #ifdef HAVE_FREEBSD
       clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -1623,6 +1624,15 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 #else
             clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
+            pgmoneta_log_info("Mode: Server %s is offline", config->common.servers[srv].name);
+
+            if (pgmoneta_management_create_response(payload, srv, &response))
+            {
+               pgmoneta_log_error("Mode: Error sending response for %s", server);
+               goto error;
+            }
+
+            pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[srv].online, ValueBool);
 
             if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
             {
@@ -1635,16 +1645,42 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          else if (!strcmp(action, "online"))
          {
             config->common.servers[srv].online = true;
-            /* TODO */
-            init_replication_slot(srv);
-            init_receivewal(srv);
+
+            if (pgmoneta_server_verify_connection(srv))
+            {
+               if (init_replication_slot(srv))
+               {
+                  config->common.servers[srv].online = false;
+               }
+               if (init_receivewal(srv))
+               {
+                  config->common.servers[srv].online = false;
+               }
+            }
+            else
+            {
+               config->common.servers[srv].online = false;
+            }
 
 #ifdef HAVE_FREEBSD
             clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
 #else
             clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
-            if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
+            pgmoneta_log_info("Mode: Server %s is %s", config->common.servers[srv].name,
+                              config->common.servers[srv].online ? "online" : "offline");
+
+            if (pgmoneta_management_create_response(payload, srv, &response))
+            {
+               pgmoneta_log_error("Mode: Error sending response for %s", server);
+               goto error;
+            }
+
+            pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[srv].online, ValueBool);
+
+            if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t,
+                                                compression, encryption,
+                                                payload))
             {
                pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_MODE_NETWORK, NAME, compression,
                                                   encryption, payload);

@@ -49,9 +49,18 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket);
 /**
  * Is the base settings for the server set
  * @param srv The server index
+ * @return True if valid, otherwise false
  */
 bool
 pgmoneta_server_valid(int srv);
+
+/**
+ * Verify that a connection can be established to a server
+ * @param srv The server index
+ * @return True if yes, otherwise false
+ */
+bool
+pgmoneta_server_verify_connection(int srv);
 
 #ifdef __cplusplus
 }

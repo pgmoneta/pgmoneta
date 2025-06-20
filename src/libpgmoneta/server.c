@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "server.h"
 #include <pgmoneta.h>
 #include <deque.h>
 #include <extension.h>
@@ -245,6 +246,31 @@ pgmoneta_server_valid(int srv)
    }
 
    return true;
+}
+
+bool
+pgmoneta_server_verify_connection(int srv)
+{
+   int fd = -1;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (pgmoneta_connect(config->common.servers[srv].host,
+                        config->common.servers[srv].port,
+                        &fd))
+   {
+      pgmoneta_log_debug("No connection to %s:%d",
+                         config->common.servers[srv].host,
+                         config->common.servers[srv].port);
+   }
+   else
+   {
+      pgmoneta_disconnect(fd);
+      return true;
+   }
+
+   return false;
 }
 
 static int
