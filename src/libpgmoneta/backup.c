@@ -61,6 +61,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    char* server_backup = NULL;
    char* root = NULL;
    char* d = NULL;
+   char* backup_dir = NULL;
    unsigned long size;
    bool backup_incremental = false;
    int number_of_backups = 0;
@@ -72,6 +73,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct json* req = NULL;
    struct json* response = NULL;
    struct main_configuration* config;
+   struct backup* temp_backup = NULL;
 
    pgmoneta_start_logging();
 
@@ -227,23 +229,32 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    pgmoneta_mkdir(root);
 
-   d = pgmoneta_get_server_backup_identifier_data(server, date);
+   backup_dir = pgmoneta_get_server_backup_identifier(server, date);
 
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
    }
-
-   size = pgmoneta_directory_size(d);
-   pgmoneta_update_info_unsigned_long(root, INFO_BACKUP, size);
-
+   size = pgmoneta_directory_size(backup_dir);
+   if (pgmoneta_load_backup(server_backup, date, &temp_backup))
+   {
+      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+      goto error;
+   }
+   temp_backup->backup_size = size;
+   if (pgmoneta_save_info(server_backup, temp_backup))
+   {
+      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+      goto error;
+   }
+   temp_backup = NULL;
    if (pgmoneta_management_create_response(payload, server, &response))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;
       goto error;
    }
 
-   if (pgmoneta_get_backup(server_backup, date, &backup))
+   if (pgmoneta_load_backup(server_backup, date, &backup))
    {
       ec = MANAGEMENT_ERROR_BACKUP_ERROR;
       goto error;
@@ -268,8 +279,19 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_update_info_double(root, INFO_ELAPSED, total_seconds);
-   pgmoneta_update_sha512(root, "backup.info");
+   if (pgmoneta_load_backup(server_backup, date, &temp_backup))
+   {
+      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+      goto error;
+   }
+   temp_backup->total_elapsed_time = total_seconds;
+   if (pgmoneta_save_info(server_backup, temp_backup))
+   {
+      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
+      goto error;
+   }
+   server_backup = pgmoneta_append(server_backup, date);
+   pgmoneta_update_sha512(server_backup, "backup.info");
 
    if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
    {
@@ -294,6 +316,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    {
       free(backups[i]);
    }
+   free(temp_backup);
    free(backups);
    free(backup);
    free(child);
@@ -688,12 +711,12 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    {
       goto error;
    }
-
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
-
+   pgmoneta_log_debug("identifier: %s", identifier);
    if (pgmoneta_workflow_nodes(srv, identifier, nodes, &backup))
    {
+      pgmoneta_log_error("Delete: Unable to get backup nodes for %s", identifier);
       goto error;
    }
 
@@ -701,9 +724,10 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
+      pgmoneta_log_error("Delete: Unable to execute workflow for %s", identifier);
       goto error;
    }
-
+   pgmoneta_log_debug("backup: %s", backup->label);
    if (pgmoneta_management_create_response(payload, srv, &response))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;

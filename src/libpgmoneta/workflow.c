@@ -188,11 +188,15 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 
    if (identifier != NULL)
    {
+      pgmoneta_log_debug("pgmoneta_workflow_nodes: identifier: %s", identifier);
+      pgmoneta_log_debug("pgmoneta_workflow_nodes: server: %d", server);
       if (pgmoneta_get_backup_server(server, identifier, &bck))
       {
+         pgmoneta_log_error("pgmoneta_workflow_nodes: Unable to get backup for %s", identifier);
          goto error;
       }
-
+      pgmoneta_log_debug("pgmoneta_workflow_nodes: bck->label: %s", bck->label);
+      pgmoneta_log_debug("pgmoneta_workflow_nodes: bck->valid: %d", bck->valid);
       if (!pgmoneta_art_contains_key(nodes, NODE_LABEL))
       {
          if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)bck->label, ValueString))
@@ -205,6 +209,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
       {
          if (pgmoneta_art_insert(nodes, NODE_BACKUP, (uintptr_t)bck, ValueRef))
          {
+            pgmoneta_log_error("pgmoneta_workflow_nodes: Unable to insert backup for %s", identifier);
             goto error;
          }
       }
@@ -217,6 +222,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
       {
          if (pgmoneta_art_insert(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
          {
+            pgmoneta_log_error("pgmoneta_workflow_nodes: Unable to insert backup base for %s", identifier);
             goto error;
          }
       }
@@ -228,6 +234,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
       {
          if (pgmoneta_art_insert(nodes, NODE_BACKUP_DATA, (uintptr_t)backup_data, ValueString))
          {
+            pgmoneta_log_error("pgmoneta_workflow_nodes: Unable to insert backup data for %s", identifier);
             goto error;
          }
       }

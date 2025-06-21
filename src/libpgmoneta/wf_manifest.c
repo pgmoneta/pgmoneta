@@ -76,6 +76,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    struct timespec end_t;
    double manifest_elapsed_time;
    char* backup_base = NULL;
+   char* backup_dir = NULL;
    char* backup_data = NULL;
    char* manifest_orig = NULL;
    char* manifest = NULL;
@@ -120,6 +121,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+   backup_dir = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
    manifest = pgmoneta_append(manifest, backup_base);
@@ -181,7 +183,14 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 
    manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
 
-   pgmoneta_update_info_double(backup_base, INFO_MANIFEST_ELAPSED, manifest_elapsed_time);
+   backup->manifest_elapsed_time = manifest_elapsed_time;
+   snprintf(backup->label, sizeof(backup->label), "%s", label);
+   if (pgmoneta_save_info(backup_dir, backup))
+   {
+      goto error;
+   }
+
+   free(backup);
    return 0;
 
 error:
