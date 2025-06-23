@@ -7,7 +7,7 @@
 [postgresql]: https://www.postgresql.org
 [pgmoneta]: https://pgmoneta.github.io/
 [prometheus]: https://prometheus.io/
-[grafana]: https://grafana.com/  
+[grafana]: https://grafana.com/
 
 [yum]: https://yum.postgresql.org/
 [ask]: https://github.com/pgmoneta/pgmoneta/discussions

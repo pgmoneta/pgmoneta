@@ -1,6 +1,6 @@
 # pgmoneta-cli user guide
 
-The **pgmoneta-cli** command line interface controls your interaction with **pgmoneta**.
+The **pgmoneta-cli** command line interface controls your interaction with [**pgmoneta**](https://pgmoneta.github.io/).
 
 **It is important that you only use the pgmoneta-cli command line interface to operate on your backup directory**
 
@@ -62,19 +62,19 @@ Backup a server
 
 The command for a full backup is
 
-``` sh
+```sh
 pgmoneta-cli backup <server>
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli backup primary
 ```
 
 The command for an incremental backup is
 
-``` sh
+```sh
 pgmoneta-cli backup <server> <identifier>
 ```
 
@@ -82,7 +82,7 @@ where the `identifier` is the identifier for a backup.
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli backup primary 20250101120000
 ```
 
@@ -92,13 +92,13 @@ List the backups for a server
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli list-backup <server>
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli list-backup primary
 ```
 
@@ -108,7 +108,7 @@ Restore a backup from a server
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli restore <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>
 ```
 
@@ -129,7 +129,7 @@ where
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli restore primary newest name=MyLabel,primary /tmp
 ```
 
@@ -139,13 +139,13 @@ Verify a backup from a server
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli verify <server> [<timestamp>|oldest|newest] <directory> [failed|all]
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli verify primary oldest /tmp
 ```
 
@@ -155,13 +155,13 @@ Archive a backup from a server
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli archive <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli archive primary newest current /tmp
 ```
 
@@ -171,13 +171,13 @@ Delete a backup from a server
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli delete <server> [<timestamp>|oldest|newest]
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli delete primary oldest
 ```
 
@@ -187,13 +187,13 @@ Retain a backup from a server. The backup will not be deleted by the retention p
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli retain <server> [<timestamp>|oldest|newest]
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli retain primary oldest
 ```
 
@@ -203,13 +203,13 @@ Expunge a backup from a server. The backup will be deleted by the retention poli
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli expunge <server> [<timestamp>|oldest|newest]
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli expunge primary oldest
 ```
 
@@ -219,7 +219,7 @@ Encrypt the file in place, remove unencrypted file after successful encryption.
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli encrypt <file>
 ```
 
@@ -229,7 +229,7 @@ Decrypt the file in place, remove encrypted file after successful decryption.
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli decrypt <file>
 ```
 
@@ -239,7 +239,7 @@ Compress the file in place, remove uncompressed file after successful compressio
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli compress <file>
 ```
 
@@ -249,7 +249,7 @@ Decompress the file in place, remove compressed file after successful decompress
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli decompress <file>
 ```
 
@@ -259,7 +259,7 @@ Information about a backup.
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli info <server> <timestamp|oldest|newest>
 ```
 
@@ -275,49 +275,49 @@ pgmoneta-cli annotate <server> <backup> remove <key>
 
 ## ping
 
-Verify if [**pgmoneta**][pgmoneta] is alive
+Verify if [**pgmoneta**](https://pgmoneta.github.io/) is alive
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli ping
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli ping
 ```
 
 ## shutdown
 
-Shutdown [**pgmoneta**][pgmoneta]
+Shutdown [**pgmoneta**](https://pgmoneta.github.io/)
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli shutdown
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli shutdown
 ```
 
 ## status
 
-Status of [**pgmoneta**][pgmoneta], with a `details` option
+Status of [**pgmoneta**](https://pgmoneta.github.io/), with a `details` option
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli status [details]
 ```
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli status details
 ```
 
@@ -327,7 +327,7 @@ Manage the configuration
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli conf [reload | ls | get | set]
 ```
 
@@ -340,7 +340,7 @@ Subcommand
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli conf reload
 pgmoneta-cli conf ls
 pgmoneta-cli conf get primary.host
@@ -353,7 +353,7 @@ Clear data/statistics
 
 Command
 
-``` sh
+```sh
 pgmoneta-cli clear [prometheus]
 ```
 
@@ -363,7 +363,7 @@ Subcommand
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli clear prometheus
 ```
 

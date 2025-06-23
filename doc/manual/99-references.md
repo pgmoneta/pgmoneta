@@ -1,6 +1,6 @@
 <!-- Reference links -->
 
-  [pgmoneta]: https://github.com/pgmoneta/pgmoneta
+  [pgmoneta]: https://pgmoneta.github.io/
   [postgresql]: https://www.postgresql.org
   [fedora]: https://getfedora.org/
   [rhel]: https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux

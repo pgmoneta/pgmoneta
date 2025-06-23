@@ -63,4 +63,4 @@ Haoran Zhang <andrewzhr9911@gmail.com>
 
 [कृपया हमारी]{lang=hi} [Code of Conduct][conduct] [नीतियों का पालन करें जब आप हमारे समुदाय के साथ संवाद करें।]{lang=hi}
 
-[यदि आपको यह प्रोजेक्ट उपयोगी लगे, तो]{lang=hi} [GitHub][pgmoneta] [पर इसे एक स्टार दें। और, प्रोजेक्ट को]{lang=hi} [Twitter][twitter] [पर फॉलो करने के लिए स्वतंत्र महसूस करें।]{lang=hi}
+[यदि आपको यह प्रोजेक्ट उपयोगी लगे, तो]{lang=hi} [GitHub][pgmoneta] [पर इसे एक स्टार दें। और, प्रोजेक्ट को]{lang=hi} [X][twitter] [पर फॉलो करने के लिए स्वतंत्र महसूस करें।]{lang=hi}
