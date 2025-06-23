@@ -306,4 +306,4 @@ community.
 
 Consider giving the project a [star](https://github.com/pgmoneta/pgmoneta/stargazers) on
 [GitHub](https://github.com/pgmoneta/pgmoneta/) if you find it useful. And, feel free to follow
-the project on [Twitter](https://twitter.com/pgmoneta/) as well.
+the project on [X](https://x.com/pgmoneta/) as well.
