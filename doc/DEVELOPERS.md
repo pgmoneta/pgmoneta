@@ -403,27 +403,27 @@ Usage:
   pgmoneta-walinfo <file>
 
 Options:
-  -c,   --config      Set the path to the pgmoneta_walinfo.conf file
-  -u,   --users       Set the path to the pgmoneta_users.conf file
-  -RT, --tablespaces  Filter on tablspaces
-  -RD, --databases    Filter on databases
-  -RT, --relations    Filter on relations
-  -R,   --filter      Combination of -RT, -RD, -RR
-  -o,   --output      Output file
-  -F,   --format      Output format (raw, json)
-  -L,   --logfile     Set the log file
-  -q,   --quiet       No output only result
-        --color       Use colors (on, off)
-  -r,   --rmgr        Filter on a resource manager
-  -s,   --start       Filter on a start LSN
-  -e,   --end         Filter on an end LSN
-  -x,   --xid         Filter on an XID
-  -l,   --limit       Limit number of outputs
-  -v,   --verbose     Output result
-  -V,   --version     Display version information
-  -m,   --mapping     Provide mappings file for OID translation
-  -t,   --translate   Translate OIDs to object names in XLOG records
-  -?,   --help        Display help
+  -c,  --config      Set the path to the pgmoneta_walinfo.conf file
+  -u,  --users       Set the path to the pgmoneta_users.conf file
+  -RT, --tablespaces Filter on tablspaces
+  -RD, --databases   Filter on databases
+  -RT, --relations   Filter on relations
+  -R,  --filter      Combination of -RT, -RD, -RR
+  -o,  --output      Output file
+  -F,  --format      Output format (raw, json)
+  -L,  --logfile     Set the log file
+  -q,  --quiet       No output only result
+       --color       Use colors (on, off)
+  -r,  --rmgr        Filter on a resource manager
+  -s,  --start       Filter on a start LSN
+  -e,  --end         Filter on an end LSN
+  -x,  --xid         Filter on an XID
+  -l,  --limit       Limit number of outputs
+  -v,  --verbose     Output result
+  -V,  --version     Display version information
+  -m,  --mapping     Provide mappings file for OID translation
+  -t,  --translate   Translate OIDs to object names in XLOG records
+  -?,  --help        Display help
 ```
 
 For more details, please refer to the [wal documentation](./manual/dev-08-wal.md).

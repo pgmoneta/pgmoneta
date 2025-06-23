@@ -54,16 +54,16 @@ OPTIONS
 -m, --mapping
   The JSON file that contains the mapping of the OIDs to the corresponding object names
 
--RT, --tablespaces  
+-RT, --tablespaces
   Filter on tablspaces
 
--RD, --databases    
+-RD, --databases
   Filter on databases
 
--RT, --relations    
+-RT, --relations
   Filter on relations
 
--R,   --filter      
+-R,   --filter
   Combination of -RT, -RD, -RR
 
 -?, --help
@@ -85,7 +85,7 @@ To display information about a WAL file in raw format:
 To display information in JSON format:
 
     pgmoneta-walinfo -F json /path/to/walfile
-  
+
 To display information and translate the OIDs to the corresponding object names:
 
     pgmoneta-walinfo -c pgmoneta_walinfo.conf -t -m /path/to/mapping.json /path/to/walfile
