@@ -283,6 +283,8 @@ jobs:
               texlive-base \
               texlive-texmf \
               graphviz
+            # Initialize Graphviz plugins after installation
+            dot -c
 
       - name: Build Project
         shell: freebsd {0}
