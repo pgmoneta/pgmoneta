@@ -64,20 +64,20 @@ This process is optional. If you choose not to generate the PDF and HTML files, 
 
     Download the `Eisvogel` template for `pandoc`, please visit the [pandoc-latex-template](https://github.com/Wandmalfarbe/pandoc-latex-template) repository. For a standard installation, you can follow the steps outlined below.
 
-    ```sh
+```sh
     wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.2.0/Eisvogel-3.2.0.tar.gz
     tar -xzf Eisvogel-3.2.0.tar.gz
     mkdir -p $HOME/.local/share/pandoc/templates
     mv Eisvogel-3.2.0/eisvogel.latex $HOME/.local/share/pandoc/templates/
-    ```
+```
 
 3. Add package for LaTeX
 
     Download the additional packages required for generating PDF and HTML files.
 
-    ```sh
+```sh
     dnf install 'tex(footnote.sty)' 'tex(footnotebackref.sty)' 'tex(pagecolor.sty)' 'tex(hardwrap.sty)' 'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' 'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' 'tex(titling.sty)' 'tex(csquotes.sty)' 'tex(zref-abspage.sty)' 'tex(needspace.sty)' 'tex(selnolig.sty)'
-    ```
+```
 
 #### Generate API guide
 
@@ -85,13 +85,13 @@ This process is optional. If you choose not to generate the API HTML files, you 
 
 Download dependencies
 
-    ``` sh
+```sh
     dnf install graphviz doxygen
-    ```
+```
 
 #### Generating Code Coverage
 
-Code coverage is automatically enabled **only for GCC builds** if both `gcov` and `gcovr` are installed on your system.  
+Code coverage is automatically enabled **only for GCC builds** if both `gcov` and `gcovr` are installed on your system.
 To install the required tools, run:
 
 ```sh
@@ -103,7 +103,7 @@ dnf install gcovr gcc
 > pip3 install gcovr
 > ```
 
-When these tools are present and the compiler is set to GCC, the build system will detect them and enable code coverage generation automatically during the build process.  
+When these tools are present and the compiler is set to GCC, the build system will detect them and enable code coverage generation automatically during the build process.
 If you use Clang as the compiler, code coverage will not be enabled by default.
 
 ### Build
