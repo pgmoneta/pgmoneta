@@ -212,9 +212,9 @@ have access to the `postgres` database in order to get the necessary configurati
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| hot_standby | | String | No | Hot standby directory |
-| hot_standby_overrides | | String | No | Files to override in the hot standby directory |
-| hot_standby_tablespaces | | String | No | Tablespace mappings for the hot standby. Syntax is [from -> to,?]+ |
+| hot_standby | | String | No | Hot standby directory. Single directory or comma separated directories up to 8 (e.g., /path/to/hot/standby1,/path/to/hot/standby2) |
+| hot_standby_overrides | | String | No | Files to override in the hot standby directory. If multiple hot standbys are specified then this setting is separated by a \| |
+| hot_standby_tablespaces | | String | No | Tablespace mappings for the hot standby. Syntax is [from -> to,?]+. If multiple hot standbys are specified then this setting is separated by a \| |
 
 #### Workers
 

@@ -262,7 +262,8 @@ static int copy_tablespaces_restore(char* from, char* to, char* base,
                                     char* server, char* id,
                                     struct backup* backup,
                                     struct workers* workers);
-static int copy_tablespaces_hotstandby(char* from, char* to,
+static int copy_tablespaces_hotstandby(int server,
+                                       char* from, char* to,
                                        char* tblspc_mappings,
                                        struct backup* backup,
                                        struct workers* workers);
@@ -1095,7 +1096,7 @@ error:
 }
 
 int
-pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
+pgmoneta_copy_postgresql_hotstandby(int server, char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
 {
    DIR* d = opendir(from);
    char* from_buffer = NULL;
@@ -1128,7 +1129,7 @@ pgmoneta_copy_postgresql_hotstandby(char* from, char* to, char* tblspc_mappings,
             {
                if (!strcmp(entry->d_name, "pg_tblspc"))
                {
-                  copy_tablespaces_hotstandby(from, to, tblspc_mappings, backup, workers);
+                  copy_tablespaces_hotstandby(server, from, to, tblspc_mappings, backup, workers);
                }
                else
                {
@@ -2902,10 +2903,13 @@ error:
 }
 
 static int
-copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
+copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappings, struct backup* backup, struct workers* workers)
 {
    char* from_tblspc = NULL;
    char* to_tblspc = NULL;
+   struct main_configuration *config;
+
+   config = (struct main_configuration *)shmem;
 
    from_tblspc = pgmoneta_append(from_tblspc, from);
    if (!pgmoneta_ends_with(from_tblspc, "/"))
@@ -2986,6 +2990,17 @@ copy_tablespaces_hotstandby(char* from, char* to, char* tblspc_mappings, struct 
 
          if (!found)
          {
+            if (config->common.servers[server].number_of_hot_standbys == 1)
+            {
+               pgmoneta_log_info("Using default tablespace mapping for %s/%s",
+                                 config->common.servers[server].name, src);
+            }
+            else
+            {
+               pgmoneta_log_warn("Using default tablespace mapping for %s/%s",
+                                 config->common.servers[server].name, src);
+            }
+
             dst = pgmoneta_append(dst, backup->tablespaces_paths[i]);
             dst = pgmoneta_append(dst, "hs");
          }

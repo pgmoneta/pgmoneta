@@ -283,13 +283,15 @@ workspace
   Default is /tmp/pgmoneta-workspace/
 
 hot_standby
-  Hot standby directory
+  Hot standby directory. Single directory or comma separated directories up to 8 (e.g., /path/to/hot/standby1,/path/to/hot/standby2)
 
 hot_standby_overrides
-  Files to override in the hot standby directory
+  Files to override in the hot standby directory. If multiple hot standbys are specified then
+  this setting is separated by a |
 
 hot_standby_tablespaces
-  Tablespace mappings for the hot standby. Syntax is [from -> to,?]+
+  Tablespace mappings for the hot standby. Syntax is [from -> to,?]+. If multiple hot standbys are specified
+  then this setting is separated by a |
 
 workers
   The number of workers that each process can use for its work.

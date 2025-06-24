@@ -1871,7 +1871,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       size = 0;
-      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          d = pgmoneta_append(d, config->common.servers[i].hot_standby[j]);
          if (!pgmoneta_ends_with(d, "/"))
@@ -1903,7 +1903,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       size = 0;
-      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          d = pgmoneta_append(d, config->common.servers[i].hot_standby[j]);
          if (!pgmoneta_ends_with(d, "/"))
@@ -1935,7 +1935,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, "\"} ");
 
       size = 0;
-      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          d = pgmoneta_append(d, config->common.servers[i].hot_standby[j]);
          if (!pgmoneta_ends_with(d, "/"))

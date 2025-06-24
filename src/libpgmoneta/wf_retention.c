@@ -201,7 +201,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
       }
       free(backups);
 
-      if (config->common.servers[i].hot_standby_count > 0)
+      if (config->common.servers[i].number_of_hot_standbys > 0)
       {
          char* srv = NULL;
 
@@ -212,7 +212,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
             if (number_of_backups == 0)
             {
 
-               for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+               for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
                {
                   char* hs = NULL;
                   hs = pgmoneta_append(hs, config->common.servers[i].hot_standby[j]);

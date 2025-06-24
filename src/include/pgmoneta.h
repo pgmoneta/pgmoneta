@@ -248,10 +248,10 @@ struct server
    atomic_llong last_operation_time;        /**< Last operation time of the server */
    atomic_llong last_failed_operation_time; /**< Last failed operation time of the server */
    char wal_shipping[MAX_PATH];             /**< The WAL shipping directory */
-   char hot_standby[NUMBER_OF_HOT_STANDBY][MAX_PATH];    /**< The hot standby directories */
-   int hot_standby_count;                   /**< The number of hot standby directories */
-   char hot_standby_overrides[MAX_PATH];    /**< The hot standby overrides directory */
-   char hot_standby_tablespaces[MAX_PATH];  /**< The hot standby tablespaces mappings */
+   int number_of_hot_standbys;              /**< The number of hot standby directories */
+   char hot_standby[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby directories */
+   char hot_standby_overrides[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby overrides directory */
+   char hot_standby_tablespaces[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby tablespaces mappings */
    char tls_cert_file[MAX_PATH];            /**< TLS certificate path */
    char tls_key_file[MAX_PATH];             /**< TLS key path */
    char tls_ca_file[MAX_PATH];              /**< TLS CA certificate path */

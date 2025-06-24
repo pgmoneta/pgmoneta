@@ -183,7 +183,7 @@ done:
    free(backups);
    free(backup);
 
-   if (config->common.servers[server].hot_standby_count > 0)
+   if (config->common.servers[server].number_of_hot_standbys > 0)
    {
       d = pgmoneta_get_server_backup(server);
 
@@ -194,7 +194,7 @@ done:
 
       if (number_of_backups == 0)
       {
-         for (int j = 0; j < config->common.servers[server].hot_standby_count; j++)
+         for (int j = 0; j < config->common.servers[server].number_of_hot_standbys; j++)
          {
             char* hs = NULL;
             hs = pgmoneta_append(hs, config->common.servers[server].hot_standby[j]);

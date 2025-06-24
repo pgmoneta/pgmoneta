@@ -167,7 +167,7 @@ pgmoneta_status(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption
       }
 
       hot_standby_size = 0;
-      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          hot_standby_size += pgmoneta_directory_size(config->common.servers[i].hot_standby[j]);
       }
@@ -380,7 +380,7 @@ pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
       }
 
       hot_standby_size = 0;
-      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          hot_standby_size += pgmoneta_directory_size(config->common.servers[i].hot_standby[j]);
       }

@@ -114,7 +114,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Hot standby (execute): %s/%s", config->common.servers[server].name, label);
 
-   if (config->common.servers[server].hot_standby_count > 0)
+   if (config->common.servers[server].number_of_hot_standbys > 0)
    {
       number_of_workers = pgmoneta_get_number_of_workers(server);
 #ifdef HAVE_FREEBSD
@@ -127,7 +127,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
       pgmoneta_get_backups(base, &number_of_backups, &backups);
 
-      for (int i = 0; i < config->common.servers[server].hot_standby_count; i++)
+      for (int i = 0; i < config->common.servers[server].number_of_hot_standbys; i++)
       {
          char* root = NULL;
          char* destination = NULL;
@@ -152,7 +152,7 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
 
          pgmoneta_log_debug("Processing hot standby directory %d/%d: %s",
                             i + 1,
-                            config->common.servers[server].hot_standby_count,
+                            config->common.servers[server].number_of_hot_standbys,
                             config->common.servers[server].hot_standby[i]);
 
          destination = pgmoneta_append(destination, root);
@@ -312,7 +312,9 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             pgmoneta_mkdir(root);
             pgmoneta_mkdir(destination);
 
-            pgmoneta_copy_postgresql_hotstandby(source, destination, config->common.servers[server].hot_standby_tablespaces, backups[number_of_backups - 1], workers);
+            pgmoneta_copy_postgresql_hotstandby(server, source, destination,
+                                                config->common.servers[server].hot_standby_tablespaces[i],
+                                                backups[number_of_backups - 1], workers);
          }
          pgmoneta_log_debug("hot_standby source:      %s", source);
          pgmoneta_log_debug("hot_standby destination: %s", destination);
@@ -323,17 +325,21 @@ hot_standby_execute(char* name __attribute__((unused)), struct art* nodes)
             goto cleanup;
          }
 
-         if (strlen(config->common.servers[server].hot_standby_overrides) > 0 &&
-             pgmoneta_exists(config->common.servers[server].hot_standby_overrides) &&
-             pgmoneta_is_directory(config->common.servers[server].hot_standby_overrides))
+         if (strlen(config->common.servers[server].hot_standby_overrides[i]) > 0 &&
+             pgmoneta_exists(config->common.servers[server].hot_standby_overrides[i]) &&
+             pgmoneta_is_directory(config->common.servers[server].hot_standby_overrides[i]))
          {
-            pgmoneta_log_debug("hot_standby_overrides source:      %s", config->common.servers[server].hot_standby_overrides);
+            pgmoneta_log_debug("hot_standby_overrides source:      %s", config->common.servers[server].hot_standby_overrides[i]);
             pgmoneta_log_debug("hot_standby_overrides destination: %s", destination);
 
-            pgmoneta_copy_directory(config->common.servers[server].hot_standby_overrides,
+            pgmoneta_copy_directory(config->common.servers[server].hot_standby_overrides[i],
                                     destination,
                                     NULL,
                                     workers);
+         }
+         else
+         {
+            pgmoneta_log_debug("No hot_standby_overrides %s", config->common.servers[server].hot_standby[i]);
          }
          pgmoneta_workers_wait(workers);
          if (workers != NULL && !workers->outcome)
@@ -381,8 +387,8 @@ cleanup:
 
       pgmoneta_log_debug("Hot standby: %s/%s - Processed %d/%d directories successfully (Elapsed: %s)",
                          config->common.servers[server].name, label,
-                         config->common.servers[server].hot_standby_count - failed_count,
-                         config->common.servers[server].hot_standby_count,
+                         config->common.servers[server].number_of_hot_standbys - failed_count,
+                         config->common.servers[server].number_of_hot_standbys,
                          &elapsed[0]);
    }
 

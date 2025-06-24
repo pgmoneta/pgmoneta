@@ -35,6 +35,7 @@
 #include <network.h>
 #include <security.h>
 #include <shmem.h>
+#include <tablespace.h>
 #include <utils.h>
 #include <value.h>
 
@@ -511,7 +512,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
-                     srv.hot_standby_count = count;
+                     srv.number_of_hot_standbys = count;
                   }
                }
                else if (!strcmp(key, "hot_standby_overrides"))
@@ -524,12 +525,32 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(&srv.name, section, max);
-                     max = strlen(value);
-                     if (max > MAX_PATH - 1)
+
+                     // comma separated paths
+                     char* paths = strdup(value);
+                     char* token = strtok(paths, "|");
+                     int count = 0;
+
+                     while (token != NULL && count < NUMBER_OF_HOT_STANDBY)
                      {
-                        max = MAX_PATH - 1;
+                        char* override = pgmoneta_remove_whitespace(token);
+
+                        max = strlen(override);
+                        if (max > MAX_PATH - 1)
+                        {
+                           max = MAX_PATH - 1;
+                        }
+                        memcpy(&srv.hot_standby_overrides[count], override, max);
+                        ++count;
+                        free(override);
+
+                        token = strtok(NULL, "|");
                      }
-                     memcpy(&srv.hot_standby_overrides, value, max);
+                     if (token != NULL)
+                     {
+                        pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                     }
+                     free(paths);
                   }
                }
                else if (!strcmp(key, "hot_standby_tablespaces"))
@@ -542,12 +563,32 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         max = MISC_LENGTH - 1;
                      }
                      memcpy(&srv.name, section, max);
-                     max = strlen(value);
-                     if (max > MAX_PATH - 1)
+
+                     // comma separated paths
+                     char* paths = strdup(value);
+                     char* token = strtok(paths, "|");
+                     int count = 0;
+
+                     while (token != NULL && count < NUMBER_OF_HOT_STANDBY)
                      {
-                        max = MAX_PATH - 1;
+                        char* mapping = pgmoneta_remove_whitespace(token);
+
+                        max = strlen(mapping);
+                        if (max > MAX_PATH - 1)
+                        {
+                           max = MAX_PATH - 1;
+                        }
+                        memcpy(&srv.hot_standby_tablespaces[count], mapping, max);
+                        ++count;
+                        free(mapping);
+
+                        token = strtok(NULL, "|");
                      }
-                     memcpy(&srv.hot_standby_tablespaces, value, max);
+                     if (token != NULL)
+                     {
+                        pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                     }
+                     free(paths);
                   }
                }
                else if (!strcmp(key, "metrics"))
@@ -2581,7 +2622,7 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)config->common.servers[i].hot_standby, ValueString);
       // Hot_standby
       char* hot_standby = NULL;
-      for (int j = 0; j < config->common.servers[i].hot_standby_count; j++)
+      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          if (j > 0)
          {
@@ -2978,7 +3019,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
          if (strlen(section) > 0)
          {
             // Clear it first to prevent undefined behavior
-            config->common.servers[server_index].hot_standby_count = 0;
+            config->common.servers[server_index].number_of_hot_standbys = 0;
 
             char* paths = strdup(config_value);
             char* token = strtok(paths, ",");
@@ -3002,7 +3043,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
                pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
             }
             free(paths);
-            config->common.servers[server_index].hot_standby_count = count;
+            config->common.servers[server_index].number_of_hot_standbys = count;
 
             pgmoneta_json_put(server_j, key, (uintptr_t)config_value, ValueString);
             pgmoneta_json_put(response, config->common.servers[server_index].name, (uintptr_t)server_j, ValueJSON);
@@ -5002,13 +5043,20 @@ copy_server(struct server* dst, struct server* src)
    {
       changed = true;
    }
-   for (int i = 0; i < src->hot_standby_count; i++)
+
+   dst->number_of_hot_standbys = src->number_of_hot_standbys;
+   for (int i = 0; i < src->number_of_hot_standbys; i++)
    {
       memcpy(&dst->hot_standby[i][0], &src->hot_standby[i][0], MAX_PATH);
    }
-   dst->hot_standby_count = src->hot_standby_count;
-   memcpy(&dst->hot_standby_overrides[0], &src->hot_standby_overrides[0], MAX_PATH);
-   memcpy(&dst->hot_standby_tablespaces[0], &src->hot_standby_tablespaces[0], MAX_PATH);
+   for (int i = 0; i < src->number_of_hot_standbys; i++)
+   {
+      memcpy(&dst->hot_standby_overrides[i][0], &src->hot_standby_overrides[i][0], MAX_PATH);
+   }
+   for (int i = 0; i < src->number_of_hot_standbys; i++)
+   {
+      memcpy(&dst->hot_standby_tablespaces[i][0], &src->hot_standby_tablespaces[i][0], MAX_PATH);
+   }
    /* dst->cur_timeline = src->cur_timeline; */
    dst->retention_days = src->retention_days;
    dst->retention_weeks = src->retention_weeks;
