@@ -27,11 +27,12 @@
  */
 
 /* pgmoneta */
-#include "art.h"
 #include <pgmoneta.h>
 #include <aes.h>
+#include <art.h>
 #include <backup.h>
 #include <compression.h>
+#include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
@@ -777,4 +778,122 @@ pgmoneta_get_backup_max_rate(int server)
    }
 
    return config->backup_max_rate;
+}
+
+bool
+pgmoneta_is_backup_valid(int server, char* identifier)
+{
+   bool result = false;
+   char* d = NULL;
+   char* base = NULL;
+   char* sha = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct backup* bck = NULL;
+
+   d = pgmoneta_get_server_backup(server);
+
+   if (pgmoneta_get_backups(d, &number_of_backups, &backups))
+   {
+      goto error;
+   }
+
+   if (!strcmp(identifier, "oldest"))
+   {
+      if (number_of_backups > 0)
+      {
+         bck = backups[0];
+      }
+   }
+   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+   {
+      if (number_of_backups > 0)
+      {
+         bck = backups[number_of_backups - 1];
+      }
+   }
+   else
+   {
+      /* Explicit search */
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         if (backups[i] != NULL && !strcmp(backups[i]->label, identifier))
+         {
+            bck = backups[i];
+         }
+      }
+   }
+
+   result = pgmoneta_is_backup_struct_valid(server, bck);
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(base);
+   free(sha);
+   free(d);
+
+   return result;
+
+error:
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(sha);
+   free(base);
+   free(d);
+
+   return false;
+}
+
+bool
+pgmoneta_is_backup_struct_valid(int server, struct backup* backup)
+{
+   bool result = false;
+   char* base = NULL;
+   char* sha = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (backup != NULL)
+   {
+      base = pgmoneta_get_server_backup_identifier(server, backup->label);
+
+      if (backup->valid == VALID_TRUE)
+      {
+         sha = pgmoneta_append(sha, base);
+         if (!pgmoneta_ends_with(sha, "/"))
+         {
+            sha = pgmoneta_append_char(sha, '/');
+         }
+         sha = pgmoneta_append(sha, "backup.sha512");
+
+         result = pgmoneta_exists(sha);
+      }
+   }
+
+   if (!result)
+   {
+      if (backup != NULL)
+      {
+         backup->valid = VALID_FALSE;
+      }
+
+      pgmoneta_log_error("Backup isn't valid: %s/%s",
+                         config->common.servers[server].name,
+                         backup != NULL ? backup->label : "NULL");
+   }
+
+   free(base);
+   free(sha);
+
+   return result;
 }

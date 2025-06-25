@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <backup.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -115,7 +116,7 @@ pgmoneta_delete_wal(int srv)
 
    for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
    {
-      if (!backups[i]->keep && backups[i]->valid == VALID_TRUE)
+      if (!backups[i]->keep && pgmoneta_is_backup_struct_valid(srv, backups[i]))
       {
          backup_index = i;
       }

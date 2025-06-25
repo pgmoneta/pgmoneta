@@ -2907,9 +2907,9 @@ copy_tablespaces_hotstandby(int server, char* from, char* to, char* tblspc_mappi
 {
    char* from_tblspc = NULL;
    char* to_tblspc = NULL;
-   struct main_configuration *config;
+   struct main_configuration* config;
 
-   config = (struct main_configuration *)shmem;
+   config = (struct main_configuration*)shmem;
 
    from_tblspc = pgmoneta_append(from_tblspc, from);
    if (!pgmoneta_ends_with(from_tblspc, "/"))

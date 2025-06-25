@@ -2235,12 +2235,12 @@
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "pgmoneta_backup_count",
+          "expr": "pgmoneta_backup_valid",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
-          "refId": "pgmoneta_backup_count"
+          "refId": "pgmoneta_backup_valid"
         }
       ],
       "title": "Backup Count",
@@ -2346,11 +2346,11 @@
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "pgmoneta_backup_count",
+          "expr": "pgmoneta_backup_valid",
           "instant": false,
           "legendFormat": "{{name}}",
           "range": true,
-          "refId": "pgmoneta_backup_count"
+          "refId": "pgmoneta_backup_valid"
         }
       ],
       "title": "Backup Count",

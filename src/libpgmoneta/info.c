@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <aes.h>
+#include <backup.h>
 #include <compression.h>
 #include <info.h>
 #include <logging.h>
@@ -858,7 +859,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    {
       for (int i = 0; id == NULL && i < number_of_backups; i++)
       {
-         if (backups[i]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(server, backups[i]))
          {
             id = backups[i]->label;
          }
@@ -868,7 +869,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
    {
       for (int i = number_of_backups - 1; id == NULL && i >= 0; i--)
       {
-         if (backups[i]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(server, backups[i]))
          {
             id = backups[i]->label;
          }
@@ -879,7 +880,7 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
       /* Explicit search */
       for (int i = 0; id == NULL && i < number_of_backups; i++)
       {
-         if (!strcmp(backups[i]->label, identifier) && backups[i]->valid == VALID_TRUE)
+         if (!strcmp(backups[i]->label, identifier) && pgmoneta_is_backup_struct_valid(server, backups[i]))
          {
             id = backups[i]->label;
          }
@@ -890,7 +891,8 @@ pgmoneta_get_backup_server(int server, char* identifier, struct backup** backup)
          /* Prefix search */
          for (int i = 0; id == NULL && i < number_of_backups; i++)
          {
-            if (pgmoneta_starts_with(backups[i]->label, identifier) && backups[i]->valid == VALID_TRUE)
+            if (pgmoneta_starts_with(backups[i]->label, identifier) &&
+                pgmoneta_is_backup_struct_valid(server, backups[i]))
             {
                id = backups[i]->label;
             }

@@ -289,9 +289,17 @@ The newest backup for a server
 | :-------- | :---------- |
 | name | The server identifier |
 
-## pgmoneta_backup_count
+## pgmoneta_backup_valid
 
 The number of valid backups for a server
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+
+## pgmoneta_backup_invalid
+
+The number of invalid backups for a server
 
 | Attribute | Description |
 | :-------- | :---------- |

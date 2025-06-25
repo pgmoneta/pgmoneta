@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "backup.h"
 #include <pgmoneta.h>
 #include <logging.h>
 #include <management.h>
@@ -365,11 +366,8 @@ pgmoneta_sha512_verification(char** argv)
          clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-         if (backups[i] == NULL || backups[i]->valid != VALID_TRUE)
+         if (!pgmoneta_is_backup_struct_valid(server, backups[i]))
          {
-            pgmoneta_log_error("Verification: Server %s / Backup %s isn't valid",
-                               config->common.servers[server].name,
-                               backups[i] != NULL ? backups[i]->label : "Unknown");
             err = 1;
             continue;
          }

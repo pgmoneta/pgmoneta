@@ -35,8 +35,8 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <json.h>
+#include <info.h>
 
-#include <ev.h>
 #include <stdlib.h>
 
 /**
@@ -79,6 +79,24 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
  */
 int
 pgmoneta_get_backup_max_rate(int server);
+
+/**
+ * Is the backup valid ?
+ * @param server The server
+ * @param identifier The identifier
+ * @return True if valid, otherwise false
+ */
+bool
+pgmoneta_is_backup_valid(int server, char* identifier);
+
+/**
+ * Is the backup valid ?
+ * @param server The server
+ * @param backup The backup
+ * @return True if valid, otherwise false
+ */
+bool
+pgmoneta_is_backup_struct_valid(int server, struct backup* backup);
 
 #ifdef __cplusplus
 }

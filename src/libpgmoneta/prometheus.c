@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <backup.h>
 #include <info.h>
 #include <logging.h>
 #include <network.h>
@@ -616,8 +617,19 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "    </tbody>\n");
    data = pgmoneta_append(data, "  </table>\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_count</h2>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_valid</h2>\n");
    data = pgmoneta_append(data, "  The number of valid backups for a server\n");
+   data = pgmoneta_append(data, "  <table border=\"1\">\n");
+   data = pgmoneta_append(data, "    <tbody>\n");
+   data = pgmoneta_append(data, "      <tr>\n");
+   data = pgmoneta_append(data, "        <td>name</td>\n");
+   data = pgmoneta_append(data, "        <td>The identifier for the server</td>\n");
+   data = pgmoneta_append(data, "      </tr>\n");
+   data = pgmoneta_append(data, "    </tbody>\n");
+   data = pgmoneta_append(data, "  </table>\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_backup_invalid</h2>\n");
+   data = pgmoneta_append(data, "  The number of invalid backups for a server\n");
    data = pgmoneta_append(data, "  <table border=\"1\">\n");
    data = pgmoneta_append(data, "    <tbody>\n");
    data = pgmoneta_append(data, "      <tr>\n");
@@ -2333,8 +2345,9 @@ backup_information(SSL* client_ssl, int client_fd)
    int number_of_backups;
    struct backup** backups;
    bool valid;
-   int valid_count;
-   char* data = NULL;
+   int valid_count = 0;
+   int invalid_count = 0;
+   char *data = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -2359,7 +2372,7 @@ backup_information(SSL* client_ssl, int client_fd)
       valid = false;
       for (int j = 0; !valid && j < number_of_backups; j++)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(i, backups[j]))
          {
             data = pgmoneta_append(data, backups[j]->label);
             valid = true;
@@ -2411,7 +2424,7 @@ backup_information(SSL* client_ssl, int client_fd)
       valid = false;
       for (int j = number_of_backups - 1; !valid && j >= 0; j--)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(i, backups[j]))
          {
             data = pgmoneta_append(data, backups[j]->label);
             valid = true;
@@ -2435,8 +2448,8 @@ backup_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_backup_count The number of valid backups for a server\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_count gauge\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_valid The number of valid backups for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_valid gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
       d = pgmoneta_get_server_backup(i);
@@ -2446,7 +2459,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
       pgmoneta_get_backups(d, &number_of_backups, &backups);
 
-      data = pgmoneta_append(data, "pgmoneta_backup_count{");
+      data = pgmoneta_append(data, "pgmoneta_backup_valid{");
 
       data = pgmoneta_append(data, "name=\"");
       data = pgmoneta_append(data, config->common.servers[i].name);
@@ -2455,13 +2468,61 @@ backup_information(SSL* client_ssl, int client_fd)
       valid_count = 0;
       for (int j = 0; j < number_of_backups; j++)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(i, backups[j]))
          {
             valid_count++;
          }
       }
 
       data = pgmoneta_append_int(data, valid_count);
+
+      data = pgmoneta_append(data, "\n");
+
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         free(backups[j]);
+      }
+      free(backups);
+
+      free(d);
+   }
+   data = pgmoneta_append(data, "\n");
+
+   if (data != NULL)
+   {
+      send_chunk(client_ssl, client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+      data = NULL;
+   }
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_invalid The number of invalid backups for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_invalid gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      d = pgmoneta_get_server_backup(i);
+
+      number_of_backups = 0;
+      backups = NULL;
+
+      pgmoneta_get_backups(d, &number_of_backups, &backups);
+
+      data = pgmoneta_append(data, "pgmoneta_backup_invalid{");
+
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\"} ");
+
+      invalid_count = 0;
+      for (int j = 0; j < number_of_backups; j++)
+      {
+         if (!pgmoneta_is_backup_struct_valid(i, backups[j]))
+         {
+            invalid_count++;
+         }
+      }
+
+      data = pgmoneta_append_int(data, invalid_count);
 
       data = pgmoneta_append(data, "\n");
 
@@ -2498,20 +2559,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j] != NULL)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup{");
+            data = pgmoneta_append(data, "pgmoneta_backup{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, backups[j]->valid);
+            data = pgmoneta_append_int(data, pgmoneta_is_backup_struct_valid(i, backups[j]));
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2558,22 +2616,19 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_version{");
+            data = pgmoneta_append(data, "pgmoneta_backup_version{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\", major=\"");
-               data = pgmoneta_append_int(data, backups[j]->major_version);
-               data = pgmoneta_append(data, "\", minor=\"");
-               data = pgmoneta_append_int(data, backups[j]->minor_version);
-               data = pgmoneta_append(data, "\"} 1");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\", major=\"");
+            data = pgmoneta_append_int(data, backups[j] != NULL ? backups[j]->major_version : 0);
+            data = pgmoneta_append(data, "\", minor=\"");
+            data = pgmoneta_append_int(data, backups[j] != NULL ? backups[j]->minor_version : 0);
+            data = pgmoneta_append(data, "\"} 1");
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2582,7 +2637,13 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"");
+         data = pgmoneta_append(data, "0");
+         data = pgmoneta_append(data, "\", major=\"");
+         data = pgmoneta_append_int(data, 0);
+         data = pgmoneta_append(data, "\", minor=\"");
+         data = pgmoneta_append_int(data, 0);
+         data = pgmoneta_append(data, "\"} 0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2620,20 +2681,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_total_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_total_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->total_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->total_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2642,7 +2700,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2672,20 +2730,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_basebackup_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_basebackup_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->basebackup_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->basebackup_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2694,7 +2749,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2724,20 +2779,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_manifest_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_manifest_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->manifest_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->manifest_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2746,7 +2798,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2776,20 +2828,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_compression_zstd_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->compression_zstd_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->compression_zstd_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2798,7 +2847,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2828,20 +2877,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_compression_gzip_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->compression_gzip_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->compression_gzip_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2850,7 +2896,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2880,20 +2926,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_compression_bzip2_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->compression_bzip2_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->compression_bzip2_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2902,7 +2945,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2932,20 +2975,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_compression_lz4_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->compression_lz4_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->compression_lz4_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -2954,7 +2994,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -2984,20 +3024,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_encryption_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_encryption_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->encryption_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->encryption_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3006,7 +3043,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3036,20 +3073,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_linking_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_linking_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->linking_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->linking_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3058,7 +3092,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3088,20 +3122,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_remote_ssh_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->remote_ssh_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->remote_ssh_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3110,7 +3141,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3141,20 +3172,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_remote_s3_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->remote_s3_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->remote_s3_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3163,7 +3191,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3194,20 +3222,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_elapsed_time{");
+            data = pgmoneta_append(data, "pgmoneta_backup_remote_azure_elapsed_time{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_double_precision(data, backups[j]->remote_azure_elapsed_time, 4);
+            data = pgmoneta_append_double_precision(data, backups[j] != NULL ? backups[j]->remote_azure_elapsed_time : 0.0, 4);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3216,7 +3241,7 @@ backup_information(SSL* client_ssl, int client_fd)
 
          data = pgmoneta_append(data, "name=\"");
          data = pgmoneta_append(data, config->common.servers[i].name);
-         data = pgmoneta_append(data, "\", label=\"0\"} 0");
+         data = pgmoneta_append(data, "\", label=\"0\"} 0.0");
 
          data = pgmoneta_append(data, "\n");
       }
@@ -3247,20 +3272,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_start_timeline{");
+            data = pgmoneta_append(data, "pgmoneta_backup_start_timeline{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, backups[j]->start_timeline);
+            data = pgmoneta_append_int(data, backups[j] != NULL ? backups[j]->start_timeline : 0);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3299,20 +3321,17 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_end_timeline{");
+            data = pgmoneta_append(data, "pgmoneta_backup_end_timeline{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, backups[j]->end_timeline);
+            data = pgmoneta_append_int(data, backups[j] != NULL ? backups[j]->end_timeline : 0);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3351,27 +3370,26 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               char walpos[MISC_LENGTH];
-               memset(walpos, 0, MISC_LENGTH);
-               data = pgmoneta_append(data, "pgmoneta_backup_start_walpos{");
+            char walpos[MISC_LENGTH];
+            memset(walpos, 0, MISC_LENGTH);
+            data = pgmoneta_append(data, "pgmoneta_backup_start_walpos{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\", ");
 
-               snprintf(walpos, MISC_LENGTH, "%X/%X", backups[j]->start_lsn_hi32, backups[j]->start_lsn_lo32);
-               data = pgmoneta_append(data, "walpos=\"");
-               data = pgmoneta_append(data, walpos);
-               data = pgmoneta_append(data, "\"} ");
+            snprintf(walpos, MISC_LENGTH, "%X/%X",
+                     backups[j] != NULL ? backups[j]->start_lsn_hi32 : 0,
+                     backups[j] != NULL ? backups[j]->start_lsn_lo32 : 0);
+            data = pgmoneta_append(data, "walpos=\"");
+            data = pgmoneta_append(data, walpos);
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, 1);
+            data = pgmoneta_append_int(data, 1);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3410,27 +3428,24 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               char walpos[MISC_LENGTH];
-               memset(walpos, 0, MISC_LENGTH);
-               data = pgmoneta_append(data, "pgmoneta_backup_checkpoint_walpos{");
+            char walpos[MISC_LENGTH];
+            memset(walpos, 0, MISC_LENGTH);
+            data = pgmoneta_append(data, "pgmoneta_backup_checkpoint_walpos{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j]->label);
+            data = pgmoneta_append(data, "\", ");
 
-               snprintf(walpos, MISC_LENGTH, "%X/%X", backups[j]->checkpoint_lsn_hi32, backups[j]->checkpoint_lsn_lo32);
-               data = pgmoneta_append(data, "walpos=\"");
-               data = pgmoneta_append(data, walpos);
-               data = pgmoneta_append(data, "\"} ");
+            snprintf(walpos, MISC_LENGTH, "%X/%X", backups[j]->checkpoint_lsn_hi32, backups[j]->checkpoint_lsn_lo32);
+            data = pgmoneta_append(data, "walpos=\"");
+            data = pgmoneta_append(data, walpos);
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, 1);
+            data = pgmoneta_append_int(data, 1);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3470,27 +3485,26 @@ backup_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               char walpos[MISC_LENGTH];
-               memset(walpos, 0, MISC_LENGTH);
-               data = pgmoneta_append(data, "pgmoneta_backup_end_walpos{");
+            char walpos[MISC_LENGTH];
+            memset(walpos, 0, MISC_LENGTH);
+            data = pgmoneta_append(data, "pgmoneta_backup_end_walpos{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\", ");
 
-               snprintf(walpos, MISC_LENGTH, "%X/%X", backups[j]->end_lsn_hi32, backups[j]->end_lsn_lo32);
-               data = pgmoneta_append(data, "walpos=\"");
-               data = pgmoneta_append(data, walpos);
-               data = pgmoneta_append(data, "\"} ");
+            snprintf(walpos, MISC_LENGTH, "%X/%X",
+                     backups[j] != NULL ? backups[j]->end_lsn_hi32 : 0,
+                     backups[j] != NULL ? backups[j]->end_lsn_lo32 : 0);
+            data = pgmoneta_append(data, "walpos=\"");
+            data = pgmoneta_append(data, walpos);
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_int(data, 1);
+            data = pgmoneta_append_int(data, 1);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else
@@ -3557,7 +3571,7 @@ size_information(SSL* client_ssl, int client_fd)
       valid = false;
       for (int j = number_of_backups - 1; !valid && j >= 0; j--)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(i, backups[j]))
          {
             data = pgmoneta_append_ulong(data, backups[j]->restore_size);
             valid = true;
@@ -3609,7 +3623,7 @@ size_information(SSL* client_ssl, int client_fd)
       valid = false;
       for (int j = number_of_backups - 1; !valid && j >= 0; j--)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(i, backups[j]))
          {
             data = pgmoneta_append_ulong(data, backups[j]->backup_size);
             valid = true;
@@ -3656,17 +3670,17 @@ size_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
+            if (pgmoneta_is_backup_struct_valid(i, backups[j]))
             {
                data = pgmoneta_append(data, "pgmoneta_restore_size{");
 
                data = pgmoneta_append(data, "name=\"");
                data = pgmoneta_append(data, config->common.servers[i].name);
                data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
+               data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
                data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_ulong(data, backups[j]->restore_size);
+               data = pgmoneta_append_ulong(data, backups[j] != NULL ? backups[j]->restore_size : 0);
 
                data = pgmoneta_append(data, "\n");
             }
@@ -3783,20 +3797,17 @@ size_information(SSL* client_ssl, int client_fd)
       {
          for (int j = 0; j < number_of_backups; j++)
          {
-            if (backups[j]->valid == VALID_TRUE)
-            {
-               data = pgmoneta_append(data, "pgmoneta_backup_size{");
+            data = pgmoneta_append(data, "pgmoneta_backup_size{");
 
-               data = pgmoneta_append(data, "name=\"");
-               data = pgmoneta_append(data, config->common.servers[i].name);
-               data = pgmoneta_append(data, "\", label=\"");
-               data = pgmoneta_append(data, backups[j]->label);
-               data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", label=\"");
+            data = pgmoneta_append(data, backups[j] != NULL ? backups[j]->label : "0");
+            data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_ulong(data, backups[j]->backup_size);
+            data = pgmoneta_append_ulong(data, backups[j] != NULL ? backups[j]->backup_size : 0);
 
-               data = pgmoneta_append(data, "\n");
-            }
+            data = pgmoneta_append(data, "\n");
          }
       }
       else

@@ -30,6 +30,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <backup.h>
 #include <logging.h>
 #include <security.h>
 #include <utils.h>
@@ -361,7 +362,7 @@ ssh_storage_backup_execute(char* name __attribute__((unused)), struct art* nodes
    {
       for (int j = number_of_backups - 2; j >= 0 && next_newest == -1; j--)
       {
-         if (backups[j]->valid == VALID_TRUE)
+         if (pgmoneta_is_backup_struct_valid(server, backups[j]))
          {
             if (next_newest == -1)
             {

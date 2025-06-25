@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "backup.h"
 #include <pgmoneta.h>
 #include <info.h>
 #include <logging.h>
@@ -148,7 +149,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
-   if (backups[backup_index]->valid == VALID_TRUE && backups[backup_index]->type == TYPE_FULL)
+   if (pgmoneta_is_backup_struct_valid(srv, backups[backup_index]) && backups[backup_index]->type == TYPE_FULL)
    {
       d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
 

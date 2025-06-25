@@ -27,14 +27,16 @@
  */
 
 /* pgmoneta */
-#include "art.h"
-#include "management.h"
-#include "value.h"
+
 #include <pgmoneta.h>
+#include <art.h>
+#include <backup.h>
 #include <link.h>
 #include <logging.h>
+#include <management.h>
 #include <restore.h>
 #include <utils.h>
+#include <value.h>
 #include <workflow.h>
 
 /* system */
@@ -269,7 +271,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
    /* Find previous valid backup */
    for (int i = index - 1; prev_index == -1 && i >= 0; i--)
    {
-      if (backups[i]->valid == VALID_TRUE)
+      if (pgmoneta_is_backup_struct_valid(server, backups[i]))
       {
          prev_index = i;
       }
@@ -278,7 +280,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
    /* Find next valid backup */
    for (int i = index + 1; next_index == -1 && i < number_of_backups; i++)
    {
-      if (backups[i]->valid == VALID_TRUE)
+      if (pgmoneta_is_backup_struct_valid(server, backups[i]))
       {
          next_index = i;
       }
@@ -304,7 +306,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
       pgmoneta_workers_initialize(number_of_workers, &workers);
    }
 
-   if (backups[index]->valid == VALID_TRUE)
+   if (pgmoneta_is_backup_struct_valid(server, backups[index]))
    {
       if (prev_index != -1 && next_index != -1)
       {
@@ -327,7 +329,8 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = NULL;
 
          /* Recalculate to */
-         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+         d = pgmoneta_get_server_backup_identifier(
+            server, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
          pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
@@ -345,8 +348,10 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
       else if (next_index != -1)
       {
          /* Oldest valid backup */
-         from = pgmoneta_get_server_backup_identifier_data(server, backups[index]->label);
-         to = pgmoneta_get_server_backup_identifier_data(server, backups[next_index]->label);
+         from = pgmoneta_get_server_backup_identifier_data(
+            server, backups[index]->label);
+         to = pgmoneta_get_server_backup_identifier_data(
+            server, backups[next_index]->label);
 
          pgmoneta_relink(from, to, workers);
 
@@ -363,7 +368,8 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = NULL;
 
          /* Recalculate to */
-         d = pgmoneta_get_server_backup_identifier(server, backups[next_index]->label);
+         d = pgmoneta_get_server_backup_identifier(
+            server, backups[next_index]->label);
 
          size = pgmoneta_directory_size(d);
          pgmoneta_update_info_unsigned_long(d, INFO_BACKUP, size);
