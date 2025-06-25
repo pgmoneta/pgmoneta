@@ -561,7 +561,7 @@ error:
 }
 
 int
-pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -578,6 +578,7 @@ pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* bac
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_CASCADE, (uintptr_t)cascade, ValueBool);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {
@@ -596,7 +597,7 @@ error:
 }
 
 int
-pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -613,6 +614,7 @@ pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* ba
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_CASCADE, (uintptr_t)cascade, ValueBool);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {

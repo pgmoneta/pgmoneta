@@ -2347,7 +2347,7 @@ backup_information(SSL* client_ssl, int client_fd)
    bool valid;
    int valid_count = 0;
    int invalid_count = 0;
-   char *data = NULL;
+   char* data = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;

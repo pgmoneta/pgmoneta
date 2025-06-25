@@ -38,10 +38,12 @@
 /* system */
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define NAME "keep"
 
 static void keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression, uint8_t encryption, struct json* payload);
+static void keep_backup(int srv, char* label, bool k);
 
 void
 pgmoneta_retain_backup(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
@@ -69,7 +71,10 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
    int backup_index = -1;
    int number_of_backups = 0;
    bool kr = false;
+   bool cascade = false;
    struct backup** backups = NULL;
+   struct backup* bck = NULL;
+   struct json* bcks = NULL;
    struct json* req = NULL;
    struct json* response = NULL;
    struct main_configuration* config;
@@ -99,6 +104,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    backup_id = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   cascade = (bool)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_CASCADE);
 
    if (!strcmp(backup_id, "oldest"))
    {
@@ -149,23 +155,51 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
-   if (pgmoneta_is_backup_struct_valid(srv, backups[backup_index]) && backups[backup_index]->type == TYPE_FULL)
+   if (backups[backup_index]->valid == VALID_TRUE)
    {
-      d = pgmoneta_get_server_backup_identifier(srv, backups[backup_index]->label);
-
-      pgmoneta_update_info_bool(d, INFO_KEEP, k);
-      pgmoneta_update_sha512(d, "backup.info");
-
+      keep_backup(srv, backups[backup_index]->label, k);
       kr = k;
-
-      free(d);
-      d = NULL;
    }
 
-   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backups[backup_index]->label, ValueString);
+   if (cascade)
+   {
+      struct backup* temp_bck = NULL;
+      pgmoneta_json_create(&bcks);
+      pgmoneta_json_append(bcks, (uintptr_t)backups[backup_index]->label, ValueString);
+
+      if (backups[backup_index]->type != TYPE_FULL)
+      {
+         bck = (struct backup*) malloc(sizeof(struct backup));
+         memcpy(bck, backups[backup_index], sizeof(struct backup));
+
+         while (!pgmoneta_get_backup_parent(srv, bck, &temp_bck))
+         {
+            free(bck);
+            bck = temp_bck;
+            temp_bck = NULL;
+
+            keep_backup(srv, bck->label, k);
+            pgmoneta_json_append(bcks, (uintptr_t)bck->label, ValueString);
+         }
+
+         free(bck);
+         bck = NULL;
+      }
+   }
+
+   if (!cascade)
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backups[backup_index]->label, ValueString);
+   }
+   else
+   {
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUPS, (uintptr_t)bcks, ValueJSON);
+   }
+
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backups[backup_index]->valid, ValueInt8);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[backup_index]->comments, ValueString);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_KEEP, (uintptr_t)kr, ValueBool);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CASCADE, (uintptr_t)cascade, ValueBool);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
@@ -198,6 +232,8 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       free(backups[i]);
    }
    free(backups);
+   free(bck);
+   pgmoneta_json_destroy(bcks);
 
    free(d);
    free(elapsed);
@@ -224,9 +260,23 @@ error:
       free(backups[i]);
    }
    free(backups);
+   free(bck);
+   pgmoneta_json_destroy(bcks);
 
    free(d);
    free(elapsed);
 
    exit(1);
+}
+
+static void
+keep_backup(int srv, char* label, bool k)
+{
+   char* d = NULL;
+   d = pgmoneta_get_server_backup_identifier(srv, label);
+
+   pgmoneta_update_info_bool(d, INFO_KEEP, k);
+   pgmoneta_update_sha512(d, "backup.info");
+
+   free(d);
 }
