@@ -25,6 +25,8 @@ Options:
   -F, --format text|json|raw                      Set the output format
   -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
   -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
+  -s, --sort asc|desc                             Sort result (for list-backup)
+      --cascade                                   Cascade a retain/expunge backup
   -?, --help                                      Display help
 
 Commands:
@@ -189,7 +191,7 @@ Retain a backup from a server. The backup will not be deleted by the retention p
 Command
 
 ```sh
-pgmoneta-cli retain <server> [<timestamp>|oldest|newest]
+pgmoneta-cli retain [--cascade] <server> [<timestamp>|oldest|newest]
 ```
 
 Example
@@ -205,7 +207,7 @@ Expunge a backup from a server. The backup will be deleted by the retention poli
 Command
 
 ```sh
-pgmoneta-cli expunge <server> [<timestamp>|oldest|newest]
+pgmoneta-cli expunge [--cascade] <server> [<timestamp>|oldest|newest]
 ```
 
 Example

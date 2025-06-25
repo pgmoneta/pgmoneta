@@ -144,6 +144,8 @@ Options:
   -F, --format text|json|raw                      Set the output format
   -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
   -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
+  -s, --sort asc|desc                             Sort result (for list-backup)
+      --cascade                                   Cascade a retain/expunge backup
   -?, --help                                      Display help
 
 Commands:

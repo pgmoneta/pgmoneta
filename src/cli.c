@@ -125,8 +125,8 @@ static int details(SSL* ssl, int socket, uint8_t compression, uint8_t encryption
 static int ping(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int reset(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int reload(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format);
-static int expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format);
+static int retain(SSL* ssl, int socket, char* server, char* backup_id, bool cascade, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int expunge(SSL* ssl, int socket, char* server, char* backup_id, bool cascade, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int decrypt_data_client(char* from);
 static int encrypt_data_client(char* from);
 static int decompress_data_client(char* from);
@@ -199,7 +199,7 @@ usage(void)
    printf("  -C, --compress none|gz|zstd|lz4|bz2            Compress the wire protocol\n");
    printf("  -E, --encrypt none|aes|aes256|aes192|aes128    Encrypt the wire protocol\n");
    printf("  -s, --sort asc|desc                            Sort result (for list-backup)\n");
-   printf("      --cascade                                  Cascadingly retain/expunge backups until the root base backup\n");
+   printf("      --cascade                                  Cascade a retain/expunge backup\n");
    printf("  -?, --help                                     Display help\n");
    printf("\n");
    printf("Commands:\n");
@@ -919,11 +919,11 @@ execute:
    }
    else if (parsed.cmd->action == MANAGEMENT_RETAIN)
    {
-      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, cascade, output_format);
+      exit_code = retain(s_ssl, socket, parsed.args[0], parsed.args[1], cascade, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_EXPUNGE)
    {
-      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, cascade, output_format);
+      exit_code = expunge(s_ssl, socket, parsed.args[0], parsed.args[1], cascade, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_DECRYPT)
    {
@@ -1087,14 +1087,14 @@ static void
 help_retain(void)
 {
    printf("Retain a backup for a server\n");
-   printf("  pgmoneta-cli [--cascade] retain <server> <timestamp|oldest|newest>\n");
+   printf("  pgmoneta-cli retain [--cascade] <server> <timestamp|oldest|newest>\n");
 }
 
 static void
 help_expunge(void)
 {
    printf("Expunge a backup for a server\n");
-   printf("  pgmoneta-cli [--cascade] expunge <server> <timestamp|oldest|newest>\n");
+   printf("  pgmoneta-cli expunge [--cascade] <server> <timestamp|oldest|newest>\n");
 }
 
 static void
@@ -1514,9 +1514,9 @@ error:
 }
 
 static int
-retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format)
+retain(SSL* ssl, int socket, char* server, char* backup_id, bool cascade, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_retain(ssl, socket, server, backup_id, compression, encryption, cascade, output_format))
+   if (pgmoneta_management_request_retain(ssl, socket, server, backup_id, cascade, compression, encryption, output_format))
    {
       goto error;
    }
@@ -1534,9 +1534,9 @@ error:
 }
 
 static int
-expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format)
+expunge(SSL* ssl, int socket, char* server, char* backup_id, bool cascade, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_expunge(ssl, socket, server, backup_id, compression, encryption, cascade, output_format))
+   if (pgmoneta_management_request_expunge(ssl, socket, server, backup_id, cascade, compression, encryption, output_format))
    {
       goto error;
    }

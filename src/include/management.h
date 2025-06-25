@@ -109,6 +109,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_BACKUP_SIZE           "BackupSize"
 #define MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE     "BiggestFileSize"
 #define MANAGEMENT_ARGUMENT_CALCULATED            "Calculated"
+#define MANAGEMENT_ARGUMENT_CASCADE               "Cascade"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN      "CheckpointHiLSN"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN      "CheckpointLoLSN"
 #define MANAGEMENT_ARGUMENT_CHECKSUMS             "Checksums"
@@ -178,7 +179,6 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 #define MANAGEMENT_ARGUMENT_WORKFLOW              "Workflow"
 #define MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE  "WorkspaceFreeSpace"
-#define MANAGEMENT_ARGUMENT_CASCADE               "Cascade"
 
 /**
  * Management error
@@ -619,14 +619,14 @@ pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, cha
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
+ * @param cascade Whether to do cascade retain
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
- * @param cascade Whether to retain cascadingly
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
-int
-pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format);
+int pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, bool cascade,
+                                       uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an expunge request
@@ -634,14 +634,14 @@ pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* bac
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
+ * @param cascade Whether to do cascade expunge
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
- * @param cascade Whether to expunge cascadingly
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
-int
-pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format);
+int pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, bool cascade,
+                                        uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a decrypt request

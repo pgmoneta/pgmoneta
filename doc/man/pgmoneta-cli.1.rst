@@ -54,77 +54,77 @@ OPTIONS
 -E, --encrypt none|aes|aes256|aes192|aes128
   Encrypt the wire protocol
 
+-s, --sort asc|desc
+  Sort result (for list-backup)
+
+--cascade
+  Cascade a retain/expunge backup
+
 -?, --help
   Display help
 
 COMMANDS
 ========
 
-backup
-  Backup a server
-
-list-backup
-  List the backups for a server
-
-restore
-  Restore a backup from a server
-
-verify
-  Verify a backup from a server
+annotate
+  Annotate a backup with comments
 
 archive
   Archive a backup from a server
 
+backup
+  Backup a server
+
+clear [prometheus]
+  Clear Prometheus data
+
+compress
+  Compress a file using configured method
+
+conf [get|ls|reload|set]
+  Manage the configuration
+
+decompress
+  Decompress a file using configured method
+
+decrypt
+  Decrypt a file using master-key
+
 delete
   Delete a backup from a server
 
-retain
-  Retain a backup from a server - exclude deletion by retention policy
+encrypt
+  Encrypt a file using master-key
 
 expunge
-  Expunge a backup from a server - include in deletion by retention policy
-
-encrypt
-  Encrypt the file in place, remove unencrypted file after successful encryption.
-
-decrypt
-  Decrypt the file in place, remove encrypted file after successful decryption.
-
-compress
-  Compress the file in place, remove uncompressed file after successful compression.
-
-decompress
-  Decompress the file in place, remove compressed file after successful decompression.
+  Expunge a backup from a server
 
 info
   Information about a backup
 
-annotate
-  Annotate a backup with comments
+list-backup
+  List the backups for a server
+
+mode
+  Switch the mode for a server
 
 ping
   Check if pgmoneta is alive
+
+restore
+  Restore a backup from a server
+
+retain
+  Retain a backup from a server
 
 shutdown
   Shutdown pgmoneta
 
 status [details]
-  Status of pgmoneta
+  Status of pgmoneta, with optional details
 
-conf [reload]
-  Reload the configuration
-
-conf [ls]
-  To print the configurations used
-
-conf [get]
-  To obtain information about a runtime configuration value
-
-conf [set]
-  To modify the runtime configuration value
-
-clear [prometheus]
-  Reset the Prometheus statistics
+verify
+  Verify a backup from a server
 
 REPORTING BUGS
 ==============

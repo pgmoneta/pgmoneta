@@ -155,7 +155,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
-   if (backups[backup_index]->valid == VALID_TRUE)
+   if (pgmoneta_is_backup_struct_valid(srv, backups[backup_index]))
    {
       keep_backup(srv, backups[backup_index]->label, k);
       kr = k;

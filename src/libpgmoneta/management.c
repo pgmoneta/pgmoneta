@@ -561,7 +561,8 @@ error:
 }
 
 int
-pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format)
+pgmoneta_management_request_retain(SSL* ssl, int socket, char* server, char* backup_id, bool cascade,
+                                   uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -597,7 +598,8 @@ error:
 }
 
 int
-pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, bool cascade, int32_t output_format)
+pgmoneta_management_request_expunge(SSL* ssl, int socket, char* server, char* backup_id, bool cascade,
+                                    uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
