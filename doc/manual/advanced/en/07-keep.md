@@ -67,7 +67,9 @@ Request:
   Backup: 20241012091219
   Server: primary
 Response:
-  Backup: 20241012091219
+  Backups:
+    - 20241012091219
+  Cascade: false
   Comments: ''
   Compression: none
   Encryption: none
@@ -98,7 +100,9 @@ Request:
   Backup: 20241012091219
   Server: primary
 Response:
-  Backup: 20241012091219
+  Backups:
+    - 20241012091219
+  Cascade: false  
   Comments: ''
   Compression: none
   Encryption: none
@@ -203,3 +207,48 @@ Response:
 ```
 
 and now, the `Keep` flag is back to `false`.
+
+## Cascade mode
+You can retain/expunge the entire incremental backup chain using the `--cascade` option. 
+This will retain/expunge all backups along the line until the root full backup.
+
+Say you have an incremental backup chain: `20250625055547 (incremental)` -> `20250625055528 (incremental)` -> `20250625055517(full)`.
+Running `pgmoneta-cli retain --cascade primary 20250625055547` will also retain backup `20250625055528` and backup `20250625055517`.
+
+This will give
+```
+Header:
+  ClientVersion: 0.18.0
+  Command: retain
+  Compression: none
+  Encryption: none
+  Output: text
+  Timestamp: 20250625055654
+Outcome:
+  Status: true
+  Time: 00:00:0.1032
+Request:
+  Backup: newest
+  Cascade: true
+  Server: primary
+Response:
+  BackupSize: 0.00B
+  Backups:
+    - 20250625055547
+    - 20250625055528
+    - 20250625055517
+  BiggestFileSize: 0.00B
+  Cascade: true
+  Comments: ''
+  Compression: none
+  Delta: 0.00B
+  Encryption: none
+  Keep: true
+  MajorVersion: 17
+  MinorVersion: 0
+  RestoreSize: 0.00B
+  Server: primary
+  ServerVersion: 0.18.0
+  Valid: yes
+  WAL: 0.00B
+```

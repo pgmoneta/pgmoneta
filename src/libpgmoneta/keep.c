@@ -155,17 +155,18 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       goto error;
    }
 
+   pgmoneta_json_create(&bcks);
+
    if (pgmoneta_is_backup_struct_valid(srv, backups[backup_index]))
    {
       keep_backup(srv, backups[backup_index]->label, k);
+      pgmoneta_json_append(bcks, (uintptr_t)backups[backup_index]->label, ValueString);
       kr = k;
    }
 
    if (cascade)
    {
       struct backup* temp_bck = NULL;
-      pgmoneta_json_create(&bcks);
-      pgmoneta_json_append(bcks, (uintptr_t)backups[backup_index]->label, ValueString);
 
       if (backups[backup_index]->type != TYPE_FULL)
       {
@@ -178,8 +179,11 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
             bck = temp_bck;
             temp_bck = NULL;
 
-            keep_backup(srv, bck->label, k);
-            pgmoneta_json_append(bcks, (uintptr_t)bck->label, ValueString);
+            if (pgmoneta_is_backup_struct_valid(srv, bck))
+            {
+               keep_backup(srv, bck->label, k);
+               pgmoneta_json_append(bcks, (uintptr_t)bck->label, ValueString);
+            }
          }
 
          free(bck);
@@ -187,14 +191,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
       }
    }
 
-   if (!cascade)
-   {
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backups[backup_index]->label, ValueString);
-   }
-   else
-   {
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUPS, (uintptr_t)bcks, ValueJSON);
-   }
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BACKUPS, (uintptr_t)bcks, ValueJSON);
 
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_VALID, (uintptr_t)backups[backup_index]->valid, ValueInt8);
    pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_COMMENTS, (uintptr_t)backups[backup_index]->comments, ValueString);
