@@ -758,7 +758,7 @@ pgmoneta_get_number_of_valid_backups(int server)
 
    for (int i = 0; i < number_of_backups; i++)
    {
-      if (backups[i] != NULL && backups[i]->valid)
+      if (pgmoneta_is_backup_struct_valid(server, backups[i]))
       {
          result++;
       }

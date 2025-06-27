@@ -122,7 +122,7 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    manifest_file = pgmoneta_append(manifest_file, label);
    manifest_file = pgmoneta_append(manifest_file, "/");
    manifest_file = pgmoneta_append(manifest_file, "backup.manifest");
-   
+
    if (pgmoneta_load_info(base, label, &backup))
    {
       goto error;
