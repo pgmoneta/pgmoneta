@@ -984,6 +984,14 @@ char*
 pgmoneta_get_server_wal(int server);
 
 /**
+ * Get the summary directory for a server
+ * @param server The server
+ * @return The summary directory
+ */
+char*
+pgmoneta_get_server_summary(int server);
+
+/**
  * Get the wal shipping directory for a server
  * @param server The server
  * @return The wal shipping directory
