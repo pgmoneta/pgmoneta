@@ -1055,12 +1055,12 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 
    if (!record->partial)
    {
-      rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
+      rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
       char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
 
-      if (!is_included(RmgrTable[record->header.xl_rmid].name, rms,
+      if (!is_included(rmgr_table[record->header.xl_rmid].name, rms,
                        record->header.xl_prev, start_lsn,
                        record->lsn, end_lsn,
                        record->header.xl_xid, xids, included_objects, record_desc))
@@ -1120,7 +1120,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          if (color)
          {
             header_str = pgmoneta_format_and_append(header_str, "%s%s%s | %s%s%s | %s%s%s | %s%d%s | %s%d%s | %s%d%s",
-                                                    COLOR_RED, RmgrTable[record->header.xl_rmid].name, COLOR_RESET,
+                                                    COLOR_RED, rmgr_table[record->header.xl_rmid].name, COLOR_RESET,
                                                     COLOR_MAGENTA, start_lsn_string, COLOR_RESET,
                                                     COLOR_MAGENTA, end_lsn_string, COLOR_RESET,
                                                     COLOR_BLUE, rec_len, COLOR_RESET,
@@ -1130,7 +1130,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          else
          {
             header_str = pgmoneta_format_and_append(header_str, "%s | %s | %s | %d | %d | %d",
-                                                    RmgrTable[record->header.xl_rmid].name,
+                                                    rmgr_table[record->header.xl_rmid].name,
                                                     start_lsn_string,
                                                     end_lsn_string,
                                                     rec_len,
@@ -1157,6 +1157,20 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          free(end_lsn_string);
       }
    }
+}
+
+void
+pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn)
+{
+   if (record->partial || !is_included(rmgr_table[record->header.xl_rmid].name, NULL,
+                                       record->header.xl_prev, start_lsn,
+                                       record->lsn, end_lsn,
+                                       record->header.xl_xid, NULL, NULL, NULL))
+   {
+      return;
+   }
+   /* Increment the resource manager count */
+   rmgr_summary_table[record->header.xl_rmid].number_of_records++;
 }
 
 static bool
@@ -1330,11 +1344,11 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct valu
 
    get_record_length(record, &rec_len, &fpi_len);
 
-   rm_desc = RmgrTable[record->header.xl_rmid].rm_desc(rm_desc, record);
+   rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
    backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
    // Header serialization
-   pgmoneta_json_put(record_json, "ResourceManager", (uintptr_t) RmgrTable[record->header.xl_rmid].name, ValueString);
+   pgmoneta_json_put(record_json, "ResourceManager", (uintptr_t) rmgr_table[record->header.xl_rmid].name, ValueString);
    pgmoneta_json_put(record_json, "RecordLength", rec_len, ValueUInt32);
    pgmoneta_json_put(record_json, "TotalLength", record->header.xl_tot_len, ValueUInt32);
    pgmoneta_json_put(record_json, "Xid", record->header.xl_xid, ValueUInt32);
