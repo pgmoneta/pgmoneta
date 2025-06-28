@@ -300,11 +300,10 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 }
 
 int
-pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
+pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quiet, bool color,
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                          uint32_t limit, char** included_objects)
+                          uint32_t limit, bool summary, char** included_objects)
 {
-   FILE* out = NULL;
    char* tmp_wal = NULL;
    struct walfile* wf = NULL;
    struct deque_iterator* record_iterator = NULL;
@@ -390,19 +389,14 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       goto error;
    }
 
-   if (output == NULL)
+   if (out != NULL)
    {
-      out = stdout;
-   }
-   else
-   {
-      out = fopen(output, "w");
       color = false;
    }
 
    if (type == ValueJSON)
    {
-      if (!quiet)
+      if (!quiet && !summary)
       {
          fprintf(out, "{ \"WAL\": [\n");
       }
@@ -410,11 +404,18 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
          record = (struct decoded_xlog_record*) record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit, included_objects);
+         if (summary)
+         {
+            pgmoneta_wal_record_modify_rmgr_occurance(record, start_lsn, end_lsn);
+         }
+         else
+         {
+            pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects);
+         }
       }
 
-      if (!quiet)
+      if (!quiet && !summary)
       {
          fprintf(out, "\n]}");
       }
@@ -424,17 +425,15 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
          record = (struct decoded_xlog_record*) record_iterator->value->data;
-         pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                     rms, start_lsn, end_lsn, xids, limit, included_objects);
-      }
-   }
-
-   if (output != NULL)
-   {
-      if (out != NULL)
-      {
-         fflush(out);
-         fclose(out);
+         if (summary)
+         {
+            pgmoneta_wal_record_modify_rmgr_occurance(record, start_lsn, end_lsn);
+         }
+         else
+         {
+            pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects);
+         }
       }
    }
 
@@ -446,15 +445,6 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
 
 error:
 
-   if (output != NULL)
-   {
-      if (out != NULL)
-      {
-         fflush(out);
-         fclose(out);
-      }
-   }
-
    free(tmp_wal);
    free(wal_path);
    pgmoneta_destroy_walfile(wf);
@@ -463,9 +453,9 @@ error:
 }
 
 int
-pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output, bool quiet, bool color,
+pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output, bool quiet, bool color,
                                         struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                                        uint32_t limit, char** included_objects)
+                                        uint32_t limit, bool summary, char** included_objects)
 {
    int file_count = 0;
    int free_counter = 0;
@@ -482,7 +472,7 @@ pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, ch
    {
       snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
       if (pgmoneta_describe_walfile(file_path, type, output, quiet, color,
-                                    rms, start_lsn, end_lsn, xids, limit, included_objects))
+                                    rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
       {
          free_counter = i;
          goto error;

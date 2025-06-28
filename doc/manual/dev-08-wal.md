@@ -40,6 +40,7 @@ Options:
   -x,  --xid         Filter on an XID
   -l,  --limit       Limit number of outputs
   -v,  --verbose     Output result
+  -S,  --summary     Show a summary of WAL record counts grouped by resource manager
   -V,  --version     Display version information
   -m,  --mapping     Provide mappings file for OID translation
   -t,  --translate   Translate OIDs to object names in XLOG records
@@ -234,9 +235,9 @@ pgmoneta_destroy_walfile(wf);
 #### `pgmoneta_describe_walfile`
 
 ```c
-int pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
+int pgmoneta_describe_walfile(char* path, enum value_type type, FILE* output, bool quiet, bool color,
                               struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                              uint32_t limit, char** included_objects);
+                              uint32_t limit, bool summary, char** included_objects);
 ```
 
 ##### Description:
@@ -245,7 +246,7 @@ This function reads a single WAL file at the specified `path`, filters its recor
 ##### Parameters:
 - **path**: Path to the WAL file to be described
 - **type**: Output format type (raw or JSON)
-- **output**: File path for output; if NULL, prints to stdout
+- **output**: File stream for output; if NULL, prints to stdout
 - **quiet**: If true, suppresses detailed output
 - **color**: If true, enables colored output for better readability
 - **rms**: Deque of resource managers to filter on
@@ -253,6 +254,7 @@ This function reads a single WAL file at the specified `path`, filters its recor
 - **end_lsn**: Ending LSN to filter records (0 for no filter)
 - **xids**: Deque of transaction IDs to filter on
 - **limit**: Maximum number of records to output (0 for no limit)
+- **summary**: Show a summary of WAL record counts grouped by resource manager 
 - **included_objects**: Array of object names to filter on (NULL for all objects)
 
 ##### Return:
@@ -263,10 +265,10 @@ This function reads a single WAL file at the specified `path`, filters its recor
 #### `pgmoneta_describe_walfiles_in_directory`
 
 ```c
-int pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output,
+int pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output,
                                             bool quiet, bool color, struct deque* rms,
                                             uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                                            uint32_t limit, char** included_objects);
+                                            uint32_t limit, bool summary, char** included_objects);
 ```
 
 ##### Description:
@@ -275,7 +277,7 @@ This function processes all WAL files in the directory specified by `dir_path`, 
 ##### Parameters:
 - **dir_path**: Path to the directory containing WAL files
 - **type**: Output format type (raw or JSON)
-- **output**: File path for output; if NULL, prints to stdout
+- **output**: File stream for output; if NULL, prints to stdout
 - **quiet**: If true, suppresses detailed output
 - **color**: If true, enables colored output for better readability
 - **rms**: Deque of resource managers to filter on
@@ -283,6 +285,7 @@ This function processes all WAL files in the directory specified by `dir_path`, 
 - **end_lsn**: Ending LSN to filter records (0 for no filter)
 - **xids**: Deque of transaction IDs to filter on
 - **limit**: Maximum number of records to output (0 for no limit)
+- **summary**: Show a summary of WAL record counts grouped by resource manager
 - **included_objects**: Array of object names to filter on (NULL for all objects)
 
 ##### Return:

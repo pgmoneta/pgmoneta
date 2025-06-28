@@ -135,13 +135,14 @@ pgmoneta_destroy_walfile(struct walfile* wf);
  * @param end_lsn The end LSN
  * @param xids The XIDs
  * @param limit The limit
+ * @param summary is summary enabled
  * @param included_objects The objects to include the wal records for, if NULL, all objects are included
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool quiet, bool color,
+pgmoneta_describe_walfile(char* path, enum value_type type, FILE* output, bool quiet, bool color,
                           struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                          uint32_t limit, char** included_objects);
+                          uint32_t limit, bool summary, char** included_objects);
 
 /**
  * Describe WAL files in a directory
@@ -155,13 +156,14 @@ pgmoneta_describe_walfile(char* path, enum value_type type, char* output, bool q
  * @param end_lsn The end LSN
  * @param xids The XIDs
  * @param limit The limit
+ * @param summary is summary enabled
  * @param included_objects The objects to include the wal records for, if NULL, all objects are included
  * @return 0 upon success, otherwise 1
  */
 
 int
-pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, char* output, bool quiet, bool color,
+pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output, bool quiet, bool color,
                                         struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
-                                        uint32_t limit, char** included_objects);
+                                        uint32_t limit, bool summary, char** included_objects);
 
 #endif //PGMONETA_WALFILE_H

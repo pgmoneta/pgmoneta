@@ -45,6 +45,9 @@ OPTIONS
 -v, --verbose
   Output result
 
+-S, --summary
+  Show a summary of WAL record counts grouped by resource manager
+
 -V, --version
   Display version information
 
