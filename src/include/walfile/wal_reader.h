@@ -439,6 +439,16 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 char*
 pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t magic_value, char* buffer);
 
+/**
+ * This function tracks the number of WAL records for each resource manager
+ *
+ * @param decoded The decoded WAL record to encode.
+ * @param start_lsn The start LSN
+ * @param end_lsn The end LSN
+ */
+void
+pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn);
+
 #ifdef __cplusplus
 }
 #endif

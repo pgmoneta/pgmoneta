@@ -58,6 +58,7 @@ extern "C" {
 #include <stdint.h>
 
 #define PG_RMGR(symname, name, desc) {name, desc},
+#define PG_RMGR_SUMMARY(symname, name, number_of_records) {name, number_of_records},
 #define RM_MAX_ID           UINT8_MAX
 
 /**
@@ -75,32 +76,24 @@ struct rmgr_data
 };
 
 /**
+ * @struct rmgr_summary
+ * @brief Represents a Resource Manager (RMGR) data structure.
+ *
+ * Fields:
+ * - name: The name of the resource manager.
+ * - number_of_records: A function pointer to the description function for the resource manager.
+ */
+struct rmgr_summary
+{
+   char* name;             /**< The name of the resource manager */
+   int number_of_records;  /**< The number of records of a specific type */
+};
+
+/**
  * Table of resource managers. Each entry corresponds to a specific RMGR identified by an ID.
  */
-struct rmgr_data RmgrTable[RM_MAX_ID + 1] = {
-   PG_RMGR(RM_XLOG_ID, "XLOG", pgmoneta_wal_xlog_desc)
-   PG_RMGR(RM_XACT_ID, "Transaction", pgmoneta_wal_xact_desc)
-   PG_RMGR(RM_SMGR_ID, "Storage", pgmoneta_wal_storage_desc)
-   PG_RMGR(RM_CLOG_ID, "CLOG", pgmoneta_wal_clog_desc)
-   PG_RMGR(RM_DBASE_ID, "Database", pgmoneta_wal_database_desc)
-   PG_RMGR(RM_TBLSPC_ID, "Tablespace", pgmoneta_wal_tablespace_desc)
-   PG_RMGR(RM_MULTIXACT_ID, "MultiXact", pgmoneta_wal_multixact_desc)
-   PG_RMGR(RM_RELMAP_ID, "RelMap", pgmoneta_wal_relmap_desc)
-   PG_RMGR(RM_STANDBY_ID, "Standby", pgmoneta_wal_standby_desc)
-   PG_RMGR(RM_HEAP2_ID, "Heap2", pgmoneta_wal_heap2_desc)
-   PG_RMGR(RM_HEAP_ID, "Heap", pgmoneta_wal_heap_desc)
-   PG_RMGR(RM_BTREE_ID, "Btree", pgmoneta_wal_btree_desc)
-   PG_RMGR(RM_HASH_ID, "Hash", pgmoneta_wal_hash_desc)
-   PG_RMGR(RM_GIN_ID, "Gin", pgmoneta_wal_gin_desc)
-   PG_RMGR(RM_GIST_ID, "Gist", pgmoneta_wal_gist_desc)
-   PG_RMGR(RM_SEQ_ID, "Sequence", pgmoneta_wal_seq_desc)
-   PG_RMGR(RM_SPGIST_ID, "SPGist", pgmoneta_wal_spg_desc)
-   PG_RMGR(RM_BRIN_ID, "BRIN", pgmoneta_wal_brin_desc)
-   PG_RMGR(RM_COMMIT_TS_ID, "CommitTs", pgmoneta_wal_commit_ts_desc)
-   PG_RMGR(RM_REPLORIGIN_ID, "ReplicationOrigin", pgmoneta_wal_replorigin_desc)
-   PG_RMGR(RM_GENERIC_ID, "Generic", pgmoneta_wal_generic_desc)
-   PG_RMGR(RM_LOGICALMSG_ID, "LogicalMessage", pgmoneta_wal_logicalmsg_desc)
-};
+extern struct rmgr_data rmgr_table[RM_MAX_ID + 1];
+extern struct rmgr_summary rmgr_summary_table[RM_MAX_ID + 1];
 
 #ifdef __cplusplus
 }

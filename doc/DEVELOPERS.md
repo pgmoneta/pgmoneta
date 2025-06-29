@@ -420,6 +420,7 @@ Options:
   -x,  --xid         Filter on an XID
   -l,  --limit       Limit number of outputs
   -v,  --verbose     Output result
+  -S,  --summary     Show a summary of WAL record counts grouped by resource manager
   -V,  --version     Display version information
   -m,  --mapping     Provide mappings file for OID translation
   -t,  --translate   Translate OIDs to object names in XLOG records

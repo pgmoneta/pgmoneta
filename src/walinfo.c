@@ -38,6 +38,7 @@
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
+#include <walfile/rmgr.h>
 
 /* system */
 #include <err.h>
@@ -83,6 +84,7 @@ usage(void)
    printf("  -x,  --xid         Filter on an XID\n");
    printf("  -l,  --limit       Limit number of outputs\n");
    printf("  -v,  --verbose     Output result\n");
+   printf("  -S,  --summary     Show a summary of WAL record counts grouped by resource manager\n");
    printf("  -V,  --version     Display version information\n");
    printf("  -m,  --mapping     Provide mappings file for OID translation\n");
    printf("  -t,  --translate   Translate OIDs to object names in XLOG records\n");
@@ -113,6 +115,7 @@ main(int argc, char** argv)
    struct deque* xids = NULL;
    uint32_t limit = 0;
    bool verbose = false;
+   bool summary = false;
    enum value_type type = ValueString;
    size_t size;
    struct walinfo_configuration* config = NULL;
@@ -137,6 +140,7 @@ main(int argc, char** argv)
    char* filepath;
    int num_results = 0;
    int num_options = 0;
+   FILE* out = NULL;
 
    cli_option options[] = {
       {"c", "config", true},
@@ -158,6 +162,7 @@ main(int argc, char** argv)
       {"x", "xid", true},
       {"l", "limit", true},
       {"v", "verbose", false},
+      {"S", "summary", false},
       {"V", "version", false},
       {"?", "help", false},
    };
@@ -332,6 +337,10 @@ main(int argc, char** argv)
       else if (!strcmp(optname, "v") || !strcmp(optname, "verbose"))
       {
          verbose = true;
+      }
+      else if (!strcmp(optname, "S") || !strcmp(optname, "summmary"))
+      {
+         summary = true;
       }
       else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
       {
@@ -582,6 +591,16 @@ main(int argc, char** argv)
       }
    }
 
+   if (output == NULL)
+   {
+      out = stdout;
+   }
+   else
+   {
+      out = fopen(output, "w");
+      color = false;
+   }
+
    if (filepath != NULL)
    {
       partial_record = malloc(sizeof(struct partial_xlog_record));
@@ -591,16 +610,16 @@ main(int argc, char** argv)
       partial_record->data_buffer = NULL;
       if (pgmoneta_is_directory(filepath))
       {
-         if (pgmoneta_describe_walfiles_in_directory(filepath, type, output, quiet, color,
-                                                     rms, start_lsn, end_lsn, xids, limit, included_objects))
+         if (pgmoneta_describe_walfiles_in_directory(filepath, type, out, quiet, color,
+                                                     rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
          {
             fprintf(stderr, "Error while reading/describing WAL directory\n");
             goto error;
          }
       }
 
-      else if (pgmoneta_describe_walfile(filepath, type, output, quiet, color,
-                                         rms, start_lsn, end_lsn, xids, limit, included_objects))
+      else if (pgmoneta_describe_walfile(filepath, type, out, quiet, color,
+                                         rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
       {
          fprintf(stderr, "Error while reading/describing WAL file\n");
          goto error;
@@ -620,6 +639,109 @@ main(int argc, char** argv)
       fprintf(stderr, "Missing <file> argument\n");
       usage();
       goto error;
+   }
+
+   if (summary)
+   {
+      int max_rmgr_name_length = 6; // Corresponds to the length of string `Record`
+      int max_digit_length = 6; // Corresponds to the length of string `Number`
+      int total_records = 0;
+      char* number_string = NULL;
+      char* rmgr_name = NULL;
+
+      for (int i = 0; i < RM_MAX_ID + 1; i++)
+      {
+         if (!rmgr_summary_table[i].number_of_records)
+         {
+            continue;
+         }
+         max_rmgr_name_length = MAX(max_rmgr_name_length, (int)strlen(rmgr_summary_table[i].name));
+         total_records += rmgr_summary_table[i].number_of_records;
+      }
+      number_string = pgmoneta_append_int(number_string, total_records);
+      max_digit_length = MAX(max_digit_length, (int)strlen(number_string));
+      free(number_string);
+      number_string = NULL;
+
+      if (type == ValueJSON)
+      {
+         fprintf(out, "{\"Summary\": {\n");
+         for (int i = 0; i < RM_MAX_ID + 1; i++)
+         {
+            if (!rmgr_summary_table[i].number_of_records)
+            {
+               continue;
+            }
+            if (i == 0)
+            {
+               fprintf(out, "\"%s\": %d", rmgr_summary_table[i].name, rmgr_summary_table[i].number_of_records);
+            }
+            else
+            {
+               fprintf(out, ",\"%s\": %d", rmgr_summary_table[i].name, rmgr_summary_table[i].number_of_records);
+            }
+
+            /* Revert the state of rmgr_summary_table */
+            rmgr_summary_table[i].number_of_records = 0;
+         }
+         fprintf(out, "},\n\"Total\": %d}\n", total_records);
+      }
+      else
+      {
+         /* Print the first row */
+         if (max_digit_length == 6)
+         {
+            fprintf(out, "Number | Record%*s\n", max_rmgr_name_length - 6, " ");
+         }
+         else
+         {
+            fprintf(out, "%*sNumber | Record%*s\n", max_digit_length - 6, " ", max_rmgr_name_length - 6, " ");
+         }
+         /* Print horizontal line '---------' */
+         for (int i = 0; i < max_digit_length + max_rmgr_name_length + 3; i++)
+         {
+            fprintf(out, "-");
+         }
+         fprintf(out, "\n");
+
+         for (int i = 0; i < RM_MAX_ID + 1; i++)
+         {
+            if (!rmgr_summary_table[i].number_of_records)
+            {
+               continue;
+            }
+            number_string = pgmoneta_append_int(number_string, rmgr_summary_table[i].number_of_records);
+            rmgr_name = rmgr_summary_table[i].name;
+            fprintf(out, "%*s%s | %s%*s\n", max_digit_length - (int)strlen(number_string), " ",
+                    number_string, rmgr_name, max_rmgr_name_length - (int)strlen(rmgr_name), " ");
+            free(number_string);
+            number_string = NULL;
+
+            /* Revert the state of rmgr_summary_table */
+            rmgr_summary_table[i].number_of_records = 0;
+         }
+
+         /* Print horizontal line '---------' */
+         for (int i = 0; i < max_digit_length + max_rmgr_name_length + 3; i++)
+         {
+            fprintf(out, "-");
+         }
+         fprintf(out, "\n");
+         /* Print total records */
+         number_string = pgmoneta_append_int(number_string, total_records);
+         if (max_digit_length == 6)
+         {
+            fprintf(out, "%*s%s | Total%*s\n", max_digit_length - (int)strlen(number_string), " ",
+                    number_string, max_rmgr_name_length - 5, " ");
+         }
+         else
+         {
+            fprintf(out, "%s | Total%*s\n",
+                    number_string, max_rmgr_name_length - 5, " ");
+         }
+         free(number_string);
+         number_string = NULL;
+      }
    }
 
    if (included_objects)
@@ -645,6 +767,12 @@ main(int argc, char** argv)
 
    pgmoneta_deque_destroy(rms);
    pgmoneta_deque_destroy(xids);
+
+   if (out != NULL)
+   {
+      fflush(out);
+      fclose(out);
+   }
 
    return 0;
 
@@ -710,6 +838,12 @@ error:
          free(temp_list[i]);
       }
       free(temp_list);
+   }
+
+   if (out)
+   {
+      fflush(out);
+      fclose(out);
    }
 
    return 1;
