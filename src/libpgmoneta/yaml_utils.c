@@ -26,7 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- /* pgmoneta */
+/* pgmoneta */
 #include "yaml_utils.h"
 
 /* system */
