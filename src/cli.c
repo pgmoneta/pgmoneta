@@ -2225,16 +2225,20 @@ error:
 static int
 get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t output_format)
 {
-   char server[MISC_LENGTH];
+   char section[MISC_LENGTH];
+   char context[MISC_LENGTH];
    char key[MISC_LENGTH];
 
    struct json* configuration_js = NULL;
    struct json* filtered_response = NULL;
    struct json* response = NULL;
    struct json* outcome = NULL;
-   struct json_iterator* iter;
+   struct json_iterator* iter = NULL;
    char* config_value = NULL;
-   int begin = -1, end = -1;
+   int part_count = 0;
+   char* parts[4] = {NULL, NULL, NULL, NULL}; // Allow max 4 to detect invalid input
+   char* token;
+   char* config_key_copy = NULL;
 
    if (!config_key)
    {
@@ -2247,37 +2251,77 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       goto error;
    }
 
-   memset(server, 0, MISC_LENGTH);
+   memset(section, 0, MISC_LENGTH);
+   memset(context, 0, MISC_LENGTH);
    memset(key, 0, MISC_LENGTH);
 
-   for (unsigned long i = 0; i < strlen(config_key); i++)
+   size_t config_key_len = strlen(config_key);
+   config_key_copy = malloc(config_key_len + 1);
+   if (!config_key_copy)
    {
-      if (config_key[i] == '.')
-      {
-         if (!strlen(server))
-         {
-            memcpy(server, &config_key[begin], end - begin + 1);
-            server[end - begin + 1] = '\0';
-            begin = end = -1;
-            continue;
-         }
-      }
+      goto error;
+   }
+   memcpy(config_key_copy, config_key, config_key_len);
+   config_key_copy[config_key_len] = '\0';  // Null terminate
 
-      if (begin < 0)
-      {
-         begin = i;
-      }
-
-      end = i;
-
+   if (!config_key_copy)
+   {
+      goto error;
    }
 
-   // if the key has not been found, since there is no ending dot,
-   // try to extract it from the string
-   if (!strlen(key))
+   // Parse the config_key by dots and count them
+   token = strtok(config_key_copy, ".");
+   while (token != NULL && part_count < 4) // Allow parsing up to 4 parts to detect invalid input
    {
-      memcpy(key, &config_key[begin], end - begin + 1);
-      key[end - begin + 1] = '\0';
+      size_t token_len = strlen(token);
+      parts[part_count] = malloc(token_len + 1);
+      if (!parts[part_count])
+      {
+         goto error;
+      }
+      memcpy(parts[part_count], token, token_len);
+      parts[part_count][token_len] = '\0';
+      part_count++;
+      token = strtok(NULL, ".");
+   }
+
+   // Validate the number of parts - only 1, 2, or 3 parts are valid
+   if (part_count < 1 || part_count > 3)
+   {
+      pgmoneta_log_warn("Invalid configuration key format: %s (only 1-3 dot-separated parts are allowed)", config_key);
+      goto error;
+   }
+
+   // Assign parts based on count
+   if (part_count == 1)
+   {
+      // Single key: config_key
+      strncpy(key, parts[0], MISC_LENGTH - 1);
+      key[MISC_LENGTH - 1] = '\0';
+   }
+   else if (part_count == 2)
+   {
+      // Two parts: section.key
+      strncpy(section, parts[0], MISC_LENGTH - 1);
+      section[MISC_LENGTH - 1] = '\0';
+      strncpy(key, parts[1], MISC_LENGTH - 1);
+      key[MISC_LENGTH - 1] = '\0';
+
+      // Treat "pgmoneta" as the main section (empty)
+      if (!strcasecmp(section, PGMONETA_MAIN_INI_SECTION))
+      {
+         memset(section, 0, MISC_LENGTH);
+      }
+   }
+   else if (part_count == 3)
+   {
+      // Three parts: section.context.key
+      strncpy(section, parts[0], MISC_LENGTH - 1);
+      section[MISC_LENGTH - 1] = '\0';
+      strncpy(context, parts[1], MISC_LENGTH - 1);
+      context[MISC_LENGTH - 1] = '\0';
+      strncpy(key, parts[2], MISC_LENGTH - 1);
+      key[MISC_LENGTH - 1] = '\0';
    }
 
    response = (struct json*)pgmoneta_json_get(j, MANAGEMENT_CATEGORY_RESPONSE);
@@ -2293,16 +2337,10 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       goto error;
    }
 
-   // translate the complete configuration in response
-   if (MANAGEMENT_OUTPUT_FORMAT_RAW != output_format)
+   if (strlen(section) > 0)
    {
-      translate_configuration(response);
-   }
-
-   if (strlen(server) > 0)
-   {
-      configuration_js = (struct json*)pgmoneta_json_get(response, server);
-      if (!configuration_js)
+      configuration_js = (struct json*)pgmoneta_json_get(response, section);
+      if ((uintptr_t)configuration_js < 0x1000)
       {
          goto error;
       }
@@ -2315,8 +2353,34 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
    pgmoneta_json_iterator_create(configuration_js, &iter);
    while (pgmoneta_json_iterator_next(iter))
    {
-      if (!strcmp(key, iter->key))
+      // Handle three-part keys: section.context.key
+      if (strlen(context) > 0)
       {
+         // Looking for a specific context (like "mydb" in "limit.mydb.username")
+         if (!strcmp(context, iter->key) && iter->value->type == ValueJSON)
+         {
+            struct json* nested_obj = (struct json*)iter->value->data;
+            struct json_iterator* nested_iter;
+            pgmoneta_json_iterator_create(nested_obj, &nested_iter);
+            while (pgmoneta_json_iterator_next(nested_iter))
+            {
+               if (!strcmp(key, nested_iter->key))
+               {
+                  config_value = pgmoneta_value_to_string(nested_iter->value, FORMAT_TEXT, NULL, 0);
+                  if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
+                  {
+                     pgmoneta_json_put(filtered_response, key, (uintptr_t)nested_iter->value->data, nested_iter->value->type);
+                  }
+                  break;
+               }
+            }
+            pgmoneta_json_iterator_destroy(nested_iter);
+            break;
+         }
+      }
+      else if (!strcmp(key, iter->key))
+      {
+         // Handle single or two-part keys
          config_value = pgmoneta_value_to_string(iter->value, FORMAT_TEXT, NULL, 0);
          if (iter->value->type == ValueJSON)
          {
@@ -2328,8 +2392,10 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
          {
             pgmoneta_json_put(filtered_response, key, (uintptr_t)iter->value->data, iter->value->type);
          }
+         break;
       }
    }
+
    pgmoneta_json_iterator_destroy(iter);
 
    if (!config_value)  // if key doesn't match with any field in configuration
@@ -2340,34 +2406,69 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON || !config_key)
    {
       *r = (uintptr_t)filtered_response;
+
       free(config_value);
+      config_value = NULL;
+
    }
    else
    {
       *r = (uintptr_t)config_value;
       pgmoneta_json_destroy(filtered_response);
    }
+
+   // Clean up parts
+   for (int i = 0; i < part_count; i++)
+   {
+      free(parts[i]);
+      parts[i] = NULL;
+   }
+
+   free(config_key_copy);
+   config_key_copy = NULL;
 
    return 0;
 
 error:
-
    if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
    {
       pgmoneta_json_put(filtered_response, "Outcome", (uintptr_t)false, ValueBool);
       *r = (uintptr_t)filtered_response;
+
       free(config_value);
+      config_value = NULL;
+
    }
    else
    {
+
+      free(config_value);
+      config_value = NULL;
+
       config_value = (char*)malloc(6);
-      memcpy(config_value, "Error\0", 6);
+      if (config_value)
+      {
+         snprintf(config_value, 6, "Error");
+      }
       *r = (uintptr_t)config_value;
       pgmoneta_json_destroy(filtered_response);
    }
 
+   // Clean up parts on error
+   for (int i = 0; i < part_count; i++)
+   {
+
+      free(parts[i]);
+      parts[i] = NULL;
+
+   }
+
+   free(config_key_copy);
+   config_key_copy = NULL;
+
    return 1;
 }
+
 
 static char*
 translate_command(int32_t cmd_code)

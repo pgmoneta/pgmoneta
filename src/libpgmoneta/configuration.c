@@ -2595,19 +2595,37 @@ static void
 add_servers_configuration_response(struct json* res)
 {
    struct main_configuration* config = NULL;
+   struct json* servers_section = NULL;
+   struct json* server_conf = NULL;
+   char* ret = NULL;
+   char* hot_standby = NULL;
+   int i = 0;
+   int j = 0;
 
    config = (struct main_configuration*)shmem;
 
-   // JSON of server configuration
-   for (int i = 0; i < config->common.number_of_servers; i++)
+   if (pgmoneta_json_create(&servers_section))
    {
-      struct json* server_conf = NULL;
-      char* ret = get_retention_string(config->common.servers[i].retention_days, config->common.servers[i].retention_weeks, config->common.servers[i].retention_months, config->common.servers[i].retention_years);
+      pgmoneta_log_error("Failed to create servers section JSON");
+      goto error;
+   }
+
+   for (i = 0; i < config->common.number_of_servers; i++)
+   {
+      ret = NULL;
+      hot_standby = NULL;
 
       if (pgmoneta_json_create(&server_conf))
       {
-         return;
+         pgmoneta_log_error("Failed to create server configuration JSON for %s",
+                            config->common.servers[i].name);
+         goto error;
       }
+
+      ret = get_retention_string(config->common.servers[i].retention_days,
+                                 config->common.servers[i].retention_weeks,
+                                 config->common.servers[i].retention_months,
+                                 config->common.servers[i].retention_years);
 
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->common.servers[i].host, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PORT, (uintptr_t)config->common.servers[i].port, ValueInt64);
@@ -2619,10 +2637,9 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->common.servers[i].workspace, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING, (uintptr_t)config->common.servers[i].wal_shipping, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)config->common.servers[i].hot_standby, ValueString);
-      // Hot_standby
-      char* hot_standby = NULL;
-      for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
+
+      // Compose hot_standby as comma-separated string
+      for (j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
       {
          if (j > 0)
          {
@@ -2644,10 +2661,39 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->common.servers[i].tls_key_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_EXTRA, (uintptr_t)config->common.servers[i].extra, ValueString);
 
-      pgmoneta_json_put(res, config->common.servers[i].name, (uintptr_t)server_conf, ValueJSON);
+      // Add this server to the servers section using server name as key
+      pgmoneta_json_put(servers_section, config->common.servers[i].name, (uintptr_t)server_conf, ValueJSON);
 
       free(ret);
+      server_conf = NULL;
    }
+
+   // Add the servers section to the main response
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SERVER, (uintptr_t)servers_section, ValueJSON);
+   return;
+
+error:
+   if (server_conf != NULL)
+   {
+      pgmoneta_json_destroy(server_conf);
+      server_conf = NULL;
+   }
+   if (servers_section != NULL)
+   {
+      pgmoneta_json_destroy(servers_section);
+      servers_section = NULL;
+   }
+   if (ret != NULL)
+   {
+      free(ret);
+      ret = NULL;
+   }
+   if (hot_standby != NULL)
+   {
+      free(hot_standby);
+      hot_standby = NULL;
+      }
+   return;
 }
 
 void
@@ -3900,8 +3946,9 @@ extract_syskey_value(char* str, char** key, char** value)
    // empty value
    if (c == length)
    {
-      free(k);
-      k = NULL;
+      v = calloc(1, 1); // empty string
+      *key = k;
+      *value = v;
       return 0;
    }
 

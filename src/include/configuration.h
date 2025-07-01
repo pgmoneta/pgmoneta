@@ -38,6 +38,7 @@ extern "C" {
 
 #include <stdlib.h>
 
+#define PGMONETA_MAIN_INI_SECTION                  "pgmoneta"
 #define PGMONETA_DEFAULT_CONFIG_FILE_PATH          "/etc/pgmoneta/pgmoneta.conf"
 #define PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH  "/etc/pgmoneta/pgmoneta_walinfo.conf"
 #define PGMONETA_DEFAULT_USERS_FILE_PATH           "/etc/pgmoneta/pgmoneta_users.conf"
@@ -111,6 +112,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_WAL_SLOT                "wal_slot"
 #define CONFIGURATION_ARGUMENT_WORKERS                "workers"
 #define CONFIGURATION_ARGUMENT_WORKSPACE               "workspace"
+#define CONFIGURATION_ARGUMENT_SERVER                  "server"
 
 #define CONFIGURATION_TYPE_MAIN 0
 #define CONFIGURATION_TYPE_WALINFO 1

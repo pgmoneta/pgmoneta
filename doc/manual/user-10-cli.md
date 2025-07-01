@@ -358,19 +358,44 @@ Manage the configuration
 
 Command
 
-``` sh
-pgmoneta-cli conf [reload]
+```sh
+pgmoneta-cli conf [reload | ls | get | set]
 ```
 
 Subcommand
 
 - `reload`: Reload configuration
+- `ls` : To print the configurations used
+- `get <config_key>` : To obtain information about a runtime configuration value
+- `set <config_key> <config_value>` : To modify the runtime configuration value
 
 Example
 
-``` sh
+```sh
 pgmoneta-cli conf reload
+pgmoneta-cli conf ls
+pgmoneta-cli conf get server.primary.host
+pgmoneta-cli conf set encryption aes-256-cbc
 ```
+### conf get
+
+Get the value of a runtime configuration key, or the entire configuration.
+
+- If you provide a `<config_key>`, you get the value for that key.
+  - For main section keys, you can use either just the key (e.g., `host`) or with the section (e.g., `pgmoneta.host`).
+  - For server section keys, use the server name as the section (e.g., `server.primary.host`, `server.myserver.port`).
+- If you run `pgmoneta-cli conf get` without any key, the complete configuration will be output.
+
+Examples
+
+```sh
+pgmoneta-cli conf get
+pgmoneta-cli conf get host
+pgmoneta-cli conf get pgmoneta.host
+pgmoneta-cli conf get server.primary.host
+pgmoneta-cli conf get server.myserver.port
+```
+`
 
 ## clear
 
