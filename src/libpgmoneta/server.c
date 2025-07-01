@@ -50,7 +50,6 @@ static int get_primary(SSL* ssl, int socket, bool* primary);
 static int get_wal_level(SSL* ssl, int socket, bool* replica);
 static int get_wal_size(SSL* ssl, int socket, int* ws);
 static int get_checksums(SSL* ssl, int socket, bool* checksums);
-static int get_ext_version(SSL* ssl, int socket, char** version);
 static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, size_t* blocksz);
 static int get_summarize_wal(SSL* ssl, int socket, bool* sw);
@@ -69,7 +68,6 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    size_t segsz = 0;
    bool sw = false;
    struct main_configuration* config;
-   char* ext_version = NULL;
    struct deque* server_parameters = NULL;
 
    config = (struct main_configuration*)shmem;
@@ -148,25 +146,15 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
    }
    pgmoneta_log_debug("%s/wal_segment_size %d", config->common.servers[srv].name, config->common.servers[srv].wal_size);
 
-   if (get_ext_version(ssl, socket, &ext_version))
+   if (pgmoneta_detect_server_extensions(srv))
    {
-      pgmoneta_log_warn("Unable to get extionsion version for %s", config->common.servers[srv].name);
-      config->common.servers[srv].ext_valid = false;
-   }
-   else
-   {
-      config->common.servers[srv].ext_valid = true;
-      strcpy(config->common.servers[srv].ext_version, ext_version);
-   }
-   if (ext_version != NULL)
-   {
-      free(ext_version);
+      pgmoneta_log_warn("Unable to detect extensions in server %s", config->common.servers[srv].name);
    }
 
-   pgmoneta_log_debug("%s ext_valid: %s, ext_version: %s",
+   pgmoneta_log_debug("%s has_extension: %s, ext_version: %s",
                       config->common.servers[srv].name,
-                      config->common.servers[srv].ext_valid ? "true" : "false",
-                      config->common.servers[srv].ext_valid ? config->common.servers[srv].ext_version : "N/A");
+                      config->common.servers[srv].has_extension ? "true" : "false",
+                      config->common.servers[srv].has_extension ? config->common.servers[srv].ext_version : "N/A");
    if (get_segment_size(ssl, socket, &segsz))
    {
       pgmoneta_log_error("Unable to get segment_size for %s", config->common.servers[srv].name);
@@ -536,49 +524,6 @@ error:
    pgmoneta_query_response_debug(response);
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
-   return 1;
-}
-
-static int
-get_ext_version(SSL* ssl, int socket, char** version)
-{
-   struct query_response* qr = NULL;
-
-   if (version == NULL)
-   {
-      goto error;
-   }
-   *version = NULL;
-
-   pgmoneta_ext_version(ssl, socket, &qr);
-
-   if (qr != NULL && qr->tuples != NULL && qr->tuples->data[0] != NULL)
-   {
-      size_t len = strlen(qr->tuples->data[0]) + 1;
-      *version = (char*)malloc(len);
-
-      if (*version == NULL)
-      {
-         pgmoneta_log_warn("get_ext_version: Memory allocation failed");
-         goto error;
-      }
-
-      strcpy(*version, qr->tuples->data[0]);
-
-      pgmoneta_free_query_response(qr);
-      return 0;
-   }
-   else
-   {
-      pgmoneta_log_warn("get_ext_version: Query failed or invalid response");
-      goto error;
-   }
-
-error:
-   if (qr != NULL)
-   {
-      pgmoneta_free_query_response(qr);
-   }
    return 1;
 }
 

@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <backup.h>
+#include <extension.h>
 #include <info.h>
 #include <logging.h>
 #include <network.h>
@@ -408,8 +409,14 @@ home_page(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "  <h2>pgmoneta_version</h2>\n");
    data = pgmoneta_append(data, "  The version of pgmoneta\n");
    data = pgmoneta_append(data, "  <p>\n");
-   data = pgmoneta_append(data, "  <h2>pgmoneta_extension</h2>\n");
-   data = pgmoneta_append(data, "  The version of pgmoneta extension\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_extensions_detected</h2>\n");
+   data = pgmoneta_append(data, "  The number of extensions detected on server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_server_extension</h2>\n");
+   data = pgmoneta_append(data, "  Information about installed extensions on server\n");
+   data = pgmoneta_append(data, "  <p>\n");
+   data = pgmoneta_append(data, "  <h2>pgmoneta_extension_pgmoneta_ext</h2>\n");
+   data = pgmoneta_append(data, "  Status of the pgmoneta extension\n");
    data = pgmoneta_append(data, "  <p>\n");
    data = pgmoneta_append(data, "  <h2>pgmoneta_logging_info</h2>\n");
    data = pgmoneta_append(data, "  The number of INFO logging statements\n");
@@ -2302,33 +2309,141 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
-   data = pgmoneta_append(data, "#HELP pgmoneta_extension The version of pgmoneta extension\n");
-   data = pgmoneta_append(data, "#TYPE pgmoneta_extension gauge\n");
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_extensions_detected The number of extensions detected on server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_extensions_detected gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-      data = pgmoneta_append(data, "pgmoneta_extension{");
-
+      data = pgmoneta_append(data, "pgmoneta_server_extensions_detected{");
       data = pgmoneta_append(data, "name=\"");
       data = pgmoneta_append(data, config->common.servers[i].name);
-      data = pgmoneta_append(data, "\"");
-      data = pgmoneta_append(data, ", ");
-      data = pgmoneta_append(data, "version=\"");
-      data = pgmoneta_append(data, config->common.servers[i].ext_version);
-      data = pgmoneta_append(data, "\"");
-      data = pgmoneta_append(data, "} ");
-      if (config->common.servers[i].ext_valid)
-      {
-         data = pgmoneta_append_int(data, 1);
-      }
-      else
-      {
-         data = pgmoneta_append_int(data, 0);
-      }
-
+      data = pgmoneta_append(data, "\"} ");
+      data = pgmoneta_append_int(data, config->common.servers[i].number_of_extensions);
       data = pgmoneta_append(data, "\n");
    }
    data = pgmoneta_append(data, "\n");
 
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_extension Information about installed extensions on server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_extension gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (config->common.servers[i].number_of_extensions > 0)
+      {
+         for (int j = 0; j < config->common.servers[i].number_of_extensions; j++)
+         {
+            struct extension_info* ext = &config->common.servers[i].extensions[j];
+
+            data = pgmoneta_append(data, "pgmoneta_server_extension{");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "extension=\"");
+            data = pgmoneta_append(data, ext->name);
+            data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "version=\"");
+
+            if (ext->enabled && ext->installed_version.major != -1)
+            {
+               char version_buf[64];
+               if (pgmoneta_version_to_string(&ext->installed_version, version_buf, sizeof(version_buf)) == 0)
+               {
+                  data = pgmoneta_append(data, version_buf);
+               }
+               else
+               {
+                  data = pgmoneta_append_int(data, ext->installed_version.major);
+                  if (ext->installed_version.minor != -1)
+                  {
+                     data = pgmoneta_append(data, ".");
+                     data = pgmoneta_append_int(data, ext->installed_version.minor);
+                     if (ext->installed_version.patch != -1)
+                     {
+                        data = pgmoneta_append(data, ".");
+                        data = pgmoneta_append_int(data, ext->installed_version.patch);
+                     }
+                  }
+               }
+            }
+            else
+            {
+               data = pgmoneta_append(data, "unknown");
+            }
+
+            data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "comment=\"");
+            data = pgmoneta_append(data, ext->comment);
+            data = pgmoneta_append(data, "\"} ");
+
+            data = pgmoneta_append_int(data, ext->enabled ? 1 : 0);
+            data = pgmoneta_append(data, "\n");
+         }
+      }
+      else
+      {
+         data = pgmoneta_append(data, "pgmoneta_server_extension{");
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->common.servers[i].name);
+         data = pgmoneta_append(data, "\", ");
+         data = pgmoneta_append(data, "extension=\"none\", ");
+         data = pgmoneta_append(data, "version=\"\", ");
+         data = pgmoneta_append(data, "comment=\"\"} 0");
+         data = pgmoneta_append(data, "\n");
+      }
+   }
+   data = pgmoneta_append(data, "\n");
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_extension_pgmoneta_ext Status of the pgmoneta extension\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_extension_pgmoneta_ext gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      bool found_pgmoneta_ext = false;
+
+      for (int j = 0; j < config->common.servers[i].number_of_extensions; j++)
+      {
+         struct extension_info* ext = &config->common.servers[i].extensions[j];
+         if (strcmp(ext->name, "pgmoneta_ext") == 0)
+         {
+            found_pgmoneta_ext = true;
+            data = pgmoneta_append(data, "pgmoneta_extension_pgmoneta_ext{");
+            data = pgmoneta_append(data, "name=\"");
+            data = pgmoneta_append(data, config->common.servers[i].name);
+            data = pgmoneta_append(data, "\", ");
+            data = pgmoneta_append(data, "version=\"");
+
+            if (ext->enabled && ext->installed_version.major != -1)
+            {
+               char version_buf[64];
+               if (pgmoneta_version_to_string(&ext->installed_version, version_buf, sizeof(version_buf)) == 0)
+               {
+                  data = pgmoneta_append(data, version_buf);
+               }
+               else
+               {
+                  data = pgmoneta_append(data, "unknown");
+               }
+            }
+            else
+            {
+               data = pgmoneta_append(data, "disabled");
+            }
+
+            data = pgmoneta_append(data, "\"} ");
+            data = pgmoneta_append_int(data, ext->enabled ? 1 : 0);
+            data = pgmoneta_append(data, "\n");
+            break;
+         }
+      }
+
+      if (!found_pgmoneta_ext)
+      {
+         data = pgmoneta_append(data, "pgmoneta_extension_pgmoneta_ext{");
+         data = pgmoneta_append(data, "name=\"");
+         data = pgmoneta_append(data, config->common.servers[i].name);
+         data = pgmoneta_append(data, "\", ");
+         data = pgmoneta_append(data, "version=\"not_installed\"} 0");
+         data = pgmoneta_append(data, "\n");
+      }
+   }
+   data = pgmoneta_append(data, "\n");
    if (data != NULL)
    {
       send_chunk(client_ssl, client_fd, data);

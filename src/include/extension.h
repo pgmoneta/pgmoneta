@@ -53,16 +53,6 @@ int
 pgmoneta_ext_is_installed(SSL* ssl, int socket, struct query_response** qr);
 
 /**
- * Return the extension version number
- * @param ssl The SSL structure
- * @param socket The socket
- * @param qr The query result
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_ext_version(SSL* ssl, int socket, struct query_response** qr);
-
-/**
  * Trigger WAL switch operation
  * @param ssl The SSL structure
  * @param socket The socket
@@ -135,6 +125,33 @@ pgmoneta_ext_send_file_chunk(SSL* ssl, int socket, char* dest_path, char* base64
  */
 int
 pgmoneta_ext_promote(SSL* ssl, int socket, struct query_response** qr);
+
+/**
+ * Parse a semantic version string (e.g., "1.8.2" or "2.1") into version struct
+ * @param version_str The version string to parse
+ * @param version Output version struct
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_extension_parse_version(char* version_str, struct version* version);
+
+/**
+ * Convert a version struct to a string representation
+ * @param version The version struct to convert
+ * @param buffer Output buffer to write the version string
+ * @param buffer_size Size of the output buffer
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_version_to_string(struct version* version, char* buffer, size_t buffer_size);
+
+/**
+ * Detect and populate all installed PostgreSQL extensions for a server
+ * @param server The server index
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_detect_server_extensions(int server);
 
 #ifdef __cplusplus
 }

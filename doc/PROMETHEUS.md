@@ -264,14 +264,33 @@ Is summarize_wal enabled
 | :-------- | :---------- |
 | name | The server identifier |
 
-## pgmoneta_extension
+## pgmoneta_server_extensions_detected
 
-The version of pgmoneta extension
+The number of extensions detected on server
 
 | Attribute | Description |
 | :-------- | :---------- |
 | name | The server identifier |
+
+## pgmoneta_server_extension
+
+Information about installed extensions on server
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| extension | The name of the extension |
 | version | The version of the extension |
+| comment | Description of the extension's functionality |
+
+## pgmoneta_extension_pgmoneta_ext
+
+Status of the pgmoneta extension
+
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The server identifier |
+| version | The version of the pgmoneta extension (or "not_installed" if not present) |
 
 ## pgmoneta_backup_oldest
 

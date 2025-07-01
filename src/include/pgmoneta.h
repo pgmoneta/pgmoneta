@@ -75,6 +75,7 @@ extern "C" {
 #define NUMBER_OF_USERS   64
 #define NUMBER_OF_ADMINS   8
 #define NUMBER_OF_HOT_STANDBY 8
+#define NUMBER_OF_EXTENSIONS 64
 
 #define MAX_NUMBER_OF_COLUMNS      8
 #define MAX_NUMBER_OF_TABLESPACES 64
@@ -205,6 +206,29 @@ extern void* shmem;
  */
 extern void* prometheus_cache_shmem;
 
+/**
+ * @struct version
+ * Semantic version structure for extensions (major.minor.patch format)
+ */
+struct version
+{
+   int major;     /**< Major version number */
+   int minor;     /**< Minor version number (-1 if not specified) */
+   int patch;     /**< Patch version number (-1 if not specified) */
+} __attribute__ ((aligned (64)));
+
+/** @struct extension_info
+ * Defines information about a PostgreSQL extension
+ */
+struct extension_info
+{
+   char name[MISC_LENGTH];              /**< The extension name */
+   char comment[MISC_LENGTH];           /**< The extension description/comment */
+   int server;                          /**< The server index */
+   bool enabled;                        /**< Is extension enabled */
+   struct version installed_version;    /**< The installed version */
+} __attribute__ ((aligned (64)));
+
 /** @struct server
  * Defines a server
  */
@@ -249,6 +273,7 @@ struct server
    atomic_llong last_failed_operation_time; /**< Last failed operation time of the server */
    char wal_shipping[MAX_PATH];             /**< The WAL shipping directory */
    int number_of_hot_standbys;              /**< The number of hot standby directories */
+   int number_of_extensions;                /**< The number of extensions */
    char hot_standby[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby directories */
    char hot_standby_overrides[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby overrides directory */
    char hot_standby_tablespaces[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby tablespaces mappings */
@@ -260,8 +285,9 @@ struct server
    int network_max_rate;                    /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
    int number_of_extra;                     /**< The number of source directory*/
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];   /**< Source directory*/
-   bool ext_valid;                          /**< Is the extension valid */
+   bool has_extension;                      /**< Does this have pgmoneta_ext */
    char ext_version[MISC_LENGTH];           /**< The major version of the extension*/
+   struct extension_info extensions[NUMBER_OF_EXTENSIONS];      /**< The extensions */
 } __attribute__ ((aligned (64)));
 
 /** @struct user
