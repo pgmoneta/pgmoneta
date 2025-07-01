@@ -27,18 +27,22 @@
  */
 
 /* pgmoneta */
+#include <aes.h>
+#include <compression.h>
 #include <configuration.h>
-
 #include <info.h>
 #include <logging.h>
 #include <pgmoneta.h>
 #include <shmem.h>
 #include <utils.h>
+#include <walfile.h>
 #include <yaml_utils.h>
 
 /* system */
 #include <err.h>
 #include <stdio.h>
+#include <dirent.h>
+#include <libgen.h>
 
 static void
 usage(void)
@@ -77,6 +81,20 @@ main(int argc, char* argv[])
    char* backup_label = NULL;
    char* parent_dir = NULL;
    char* last_slash = NULL;
+   char* tmp_wal = NULL;
+   struct walfile* wf = NULL;
+   struct deque_iterator* record_iterator = NULL;
+   struct decoded_xlog_record* record = NULL;
+   char* decompressed_file_name = NULL;
+   char* decrypted_file_name = NULL;
+   char* wal_path = NULL;
+   bool copy = true;
+
+   if (file_path == NULL)
+   {
+      warnx("Failed to allocate memory for file_path");
+      return 1;
+   }
 
    size = sizeof(struct walinfo_configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
@@ -150,20 +168,23 @@ main(int argc, char* argv[])
    last_slash = NULL;
 
    parent_dir = strdup(yaml_config.source_dir);
-   if (parent_dir != NULL)
+   if (parent_dir == NULL)
    {
-      last_slash = strrchr(parent_dir, '/');
-      if (last_slash != NULL && last_slash != parent_dir)
-      {
-         *last_slash = '\0';
-      }
-      else if (last_slash == parent_dir)
-      {
-         // The path is like "/foo", so keep "/"
-         parent_dir[1] = '\0';
-      }
-      // else: no slash found, parent_dir stays as is (probably ".")
+      pgmoneta_log_error("Failed to allocate memory for parent_dir");
+      goto error;
    }
+
+   last_slash = strrchr(parent_dir, '/');
+   if (last_slash != NULL && last_slash != parent_dir)
+   {
+      *last_slash = '\0';
+   }
+   else if (last_slash == parent_dir)
+   {
+      // The path is like "/foo", so keep "/"
+      parent_dir[1] = '\0';
+   }
+   // else: no slash found, parent_dir stays as is (probably ".")
 
    parent_dir = pgmoneta_append(parent_dir, "/");
 
@@ -173,52 +194,210 @@ main(int argc, char* argv[])
       goto error;
    }
 
-   printf("end_lsn_hi32 = %u, end_lsn_lo32 = %u\n", backup->end_lsn_hi32, backup->end_lsn_lo32);
-
    wal_files_path = pgmoneta_append(NULL, yaml_config.source_dir);
    wal_files_path = pgmoneta_append(wal_files_path, "/data/pg_wal");
 
-   if (pgmoneta_get_wal_files(wal_files_path, &file_count, &files))
+   if (pgmoneta_get_files(wal_files_path, &file_count, &files))
    {
       pgmoneta_log_error("Failed to get WAL files from %s\n", wal_files_path);
       goto error;
    }
 
+   partial_record = malloc(sizeof(struct partial_xlog_record));
+   if (partial_record == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate memory for partial_record");
+      goto error;
+   }
+
+   partial_record->data_buffer_bytes_read = 0;
+   partial_record->xlog_record_bytes_read = 0;
+   partial_record->xlog_record = NULL;
+   partial_record->data_buffer = NULL;
+
    for (int i = 0; i < file_count; i++)
    {
       snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, files[i]);
       printf("Processing WAL file: %s\n", file_path);
+
+      if (!pgmoneta_is_file(file_path))
+      {
+         pgmoneta_log_fatal("WAL file at %s does not exist", file_path);
+         goto error;
+      }
+
+      free(wal_path);
+      wal_path = NULL;
+      wal_path = pgmoneta_append(wal_path, file_path);
+
+      // Based on the file extension, if it's an encrypted file, decrypt it in /tmp
+      if (pgmoneta_is_encrypted(wal_path))
+      {
+         free(tmp_wal);
+         tmp_wal = NULL;
+         tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
+
+         // Temporarily copying the encrypted WAL file, because the decrypt
+         // functions delete the source file
+         pgmoneta_copy_file(wal_path, tmp_wal, NULL);
+         copy = false;
+
+         pgmoneta_strip_extension(basename(wal_path), &decrypted_file_name);
+
+         free(wal_path);
+         wal_path = NULL;
+
+         wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decrypted_file_name);
+         free(decrypted_file_name);
+         decrypted_file_name = NULL;
+
+         if (pgmoneta_decrypt_file(tmp_wal, wal_path))
+         {
+            pgmoneta_log_fatal("Failed to decrypt WAL file at %s", file_path);
+            goto error;
+         }
+      }
+
+      // Based on the file extension, if it's a compressed file, decompress it
+      // in /tmp
+      if (pgmoneta_is_compressed(wal_path))
+      {
+         free(tmp_wal);
+         tmp_wal = NULL;
+
+         tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
+
+         if (copy)
+         {
+            // Temporarily copying the compressed WAL file, because the decompress
+            // functions delete the source file
+            pgmoneta_copy_file(wal_path, tmp_wal, NULL);
+         }
+
+         pgmoneta_strip_extension(basename(wal_path), &decompressed_file_name);
+
+         free(wal_path);
+         wal_path = NULL;
+
+         wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decompressed_file_name);
+         free(decompressed_file_name);
+         decompressed_file_name = NULL;
+
+         if (pgmoneta_decompress(tmp_wal, wal_path))
+         {
+            pgmoneta_log_fatal("Failed to decompress WAL file at %s", file_path);
+            goto error;
+         }
+      }
+
+      if (pgmoneta_read_walfile(-1, wal_path, &wf))
+      {
+         pgmoneta_log_fatal("Failed to read WAL file at %s", file_path);
+         goto error;
+      }
+
+      if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
+      {
+         pgmoneta_log_fatal("Failed to create deque iterator");
+         goto error;
+      }
+
+      while (pgmoneta_deque_iterator_next(record_iterator))
+      {
+         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         printf("record->lsn 0x%lX\n", (unsigned long)record->lsn);
+      }
+
+      pgmoneta_deque_iterator_destroy(record_iterator);
+      record_iterator = NULL;
+      pgmoneta_destroy_walfile(wf);
+      wf = NULL;
+   }
+
+   // ======================== Cleanup ========================
+
+   free(tmp_wal);
+   tmp_wal = NULL;
+   free(wal_path);
+   wal_path = NULL;
+   if (partial_record != NULL)
+   {
+      free(partial_record);
+      partial_record = NULL;
    }
 
    if (parent_dir != NULL)
    {
       free(parent_dir);
+      parent_dir = NULL;
    }
    if (file_path != NULL)
    {
       free(file_path);
+      file_path = NULL;
    }
    if (wal_files_path != NULL)
    {
       free(wal_files_path);
+      wal_files_path = NULL;
    }
    if (backup != NULL)
    {
       free(backup);
+      backup = NULL;
    }
    if (files)
    {
       for (int i = 0; i < file_count; i++)
       {
-         free(files[i]);
+         if (files[i] != NULL)
+         {
+            free(files[i]);
+         }
       }
       free(files);
+      files = NULL;
    }
 
    cleanup_config(&yaml_config);
+
+   if (shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, size);
+   }
+
    return 0;
 
 error:
+
+   if (partial_record != NULL)
+   {
+      free(partial_record);
+   }
+   if (tmp_wal != NULL)
+   {
+      free(tmp_wal);
+   }
+   if (wal_path != NULL)
+   {
+      free(wal_path);
+   }
+   if (decrypted_file_name != NULL)
+   {
+      free(decrypted_file_name);
+   }
+   if (decompressed_file_name != NULL)
+   {
+      free(decompressed_file_name);
+   }
+   if (record_iterator != NULL)
+   {
+      pgmoneta_deque_iterator_destroy(record_iterator);
+   }
+   if (wf != NULL)
+   {
+      pgmoneta_destroy_walfile(wf);
+   }
    if (parent_dir != NULL)
    {
       free(parent_dir);
@@ -239,10 +418,18 @@ error:
    {
       for (int i = 0; i < file_count; i++)
       {
-         free(files[i]);
+         if (files[i] != NULL)
+         {
+            free(files[i]);
+         }
       }
       free(files);
    }
+   if (shmem != NULL)
+   {
+      pgmoneta_destroy_shared_memory(shmem, size);
+   }
 
-   cleanup_config(&yaml_config);   return 1;
+   cleanup_config(&yaml_config);
+   return 1;
 }

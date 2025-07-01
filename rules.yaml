@@ -1,0 +1,6 @@
+source_dir: /home/mohab/Downloads/backup/primary/backup/20250625001524
+target_dir: /dir/with/new/wal/stream
+
+rules:
+  - exclude:
+    - operations: [ DELETE ]
