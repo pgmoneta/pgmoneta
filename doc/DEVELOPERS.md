@@ -454,6 +454,10 @@ that can help you
 In order to debug problems in your code you can use [gdb](https://www.sourceware.org/gdb/), or add extra logging using
 the `pgmoneta_log_XYZ()` API
 
+### Core APIs
+You may find [core APIs](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/dev-09-core_api.md) quite useful. Try
+not to reinvent the wheels, unless for a good reason.
+
 ## Basic git guide
 
 Here are some links that will help you
