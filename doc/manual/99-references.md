@@ -92,7 +92,7 @@
   [zstandard_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/zstandard_compression.h
   [bzip2_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/bzip2_compression.h
   [value_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/value.h
-  [deque._h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/deque.h
+  [deque_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/deque.h
   [art_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/art.h
   [json_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/json.h
 <!-- src/libpgmoneta -->

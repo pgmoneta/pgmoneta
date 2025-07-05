@@ -6,7 +6,7 @@
 enable you to develop more advanced functionalities. Currently, we offer adaptive radix tree (ART),
 deque and JSON, which are all based on a universal value type system that help you manage the memory easily.
 
-The document will mostly focus on design decisions, functionalities and things to be cautions about. It may
+The document will mostly focus on design decisions, functionalities and things to be cautious about. It may
 offer some examples as to how to use the APIs.
 
 ## Value
@@ -175,7 +175,7 @@ struct rfile* latest_source;
 struct value_config rfile_config = {.destroy_data = rfile_destroy_cb, .to_string = NULL};
 ...
 
-gmoneta_deque_add_with_config(sources, NULL, (uintptr_t)latest_source, &rfile_config);
+pgmoneta_deque_add_with_config(sources, NULL, (uintptr_t)latest_source, &rfile_config);
 }
 ```
 
