@@ -4606,3 +4606,37 @@ error:
    return 1;
 #endif
 }
+
+char*
+pgmoneta_get_parent_dir(const char* path)
+{
+   if (path == NULL)
+   {
+      return NULL;
+   }
+
+   char* parent_dir = strdup(path);
+   if (parent_dir == NULL)
+   {
+      return NULL;
+   }
+
+   char* last_slash = strrchr(parent_dir, '/');
+   if (last_slash != NULL && last_slash != parent_dir)
+   {
+      *last_slash = '\0';
+   }
+   else if (last_slash == parent_dir)
+   {
+      // The path is like "/foo", so keep "/"
+      parent_dir[1] = '\0';
+   }
+   else if (last_slash == NULL)
+   {
+      // No slash found, return "."
+      free(parent_dir);
+      parent_dir = strdup(".");
+   }
+
+   return parent_dir;
+}
