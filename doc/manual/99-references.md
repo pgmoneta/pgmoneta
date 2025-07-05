@@ -91,6 +91,10 @@
   [lz4_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/lz4_compression.h
   [zstandard_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/zstandard_compression.h
   [bzip2_compression.h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/bzip2_compression.h
+  [value_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/value.h
+  [deque._h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/deque.h
+  [art_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/art.h
+  [json_h]: https://github.com/pgmoneta/pgmoneta/blob/main/src/include/json.h
 <!-- src/libpgmoneta -->
   [aes.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/aes.c
   [backup_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/backup.c
@@ -111,7 +115,10 @@
   [lz4_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/lz4_compression.c
   [zstandard_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/zstandard_compression.c
   [bzip2_compression.c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/bzip2_compression.c
-
+  [value_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/value.c
+  [deque_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/deque.c
+  [art_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/art.c
+  [json_c]: https://github.com/pgmoneta/pgmoneta/blob/main/src/libpgmoneta/json.c
 <!-- Contributing -->
   [ask]: https://github.com/pgmoneta/pgmoneta/discussions
   [issue]: https://github.com/pgmoneta/pgmoneta/issues
