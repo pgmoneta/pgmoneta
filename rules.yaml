@@ -1,4 +1,4 @@
-source_dir: /home/mohab/Downloads/backup/primary/backup/20250625001524
+source_dir: /home/mohab/Downloads/backup/primary/backup/20250702182152
 target_dir: /dir/with/new/wal/stream
 
 rules:

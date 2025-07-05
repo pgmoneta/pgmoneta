@@ -37,12 +37,19 @@
 #include <utils.h>
 #include <walfile.h>
 #include <yaml_utils.h>
+#include <walfile/rm_heap.h>
 
 /* system */
 #include <err.h>
 #include <stdio.h>
 #include <dirent.h>
 #include <libgen.h>
+
+#define OPERATION_DELETE "DELETE"
+
+#ifndef RM_HEAP_ID
+#define RM_HEAP_ID 13
+#endif
 
 static void
 usage(void)
@@ -58,6 +65,149 @@ usage(void)
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
 }
 
+struct walfile**
+pgmoneta_filter_operation_delete(int file_count, struct walfile** walfiles, int* new_count)
+{
+   // 1. Collect all XIDs from HEAP DELETE records
+   transaction_id* delete_xids = NULL;
+   int delete_xid_count = 0;
+   int delete_xid_capacity = 16;
+   delete_xids = malloc(delete_xid_capacity * sizeof(transaction_id));
+   if (!delete_xids)
+   {
+      return NULL;
+   }
+
+   for (int i = 0; i < file_count; i++)
+   {
+      struct walfile* wf = walfiles[i];
+      struct deque_iterator* iter = NULL;
+
+      pgmoneta_deque_iterator_create(wf->records, &iter);
+      while (pgmoneta_deque_iterator_next(iter))
+      {
+         struct decoded_xlog_record* rec = (struct decoded_xlog_record*)iter->value->data;
+         if (rec->header.xl_rmid == RM_HEAP_ID)
+         {
+            uint8_t info = rec->header.xl_info & ~XLR_INFO_MASK;
+            info &= XLOG_HEAP_OPMASK;
+            if (info == XLOG_HEAP_DELETE)
+            {
+               struct xl_heap_delete* del = (struct xl_heap_delete*)rec->main_data;
+               // Store the XID (xmax)
+               if (delete_xid_count == delete_xid_capacity)
+               {
+                  delete_xid_capacity *= 2;
+                  delete_xids = realloc(delete_xids, delete_xid_capacity * sizeof(transaction_id));
+               }
+               delete_xids[delete_xid_count++] = del->xmax;
+            }
+         }
+      }
+      pgmoneta_deque_iterator_destroy(iter);
+   }
+
+   // 2. Helper: check if xid is in delete_xids
+   #define XID_IS_DELETED(xid) \
+           ({ int found = 0; \
+              for (int k = 0; k < delete_xid_count; k++) { \
+                 if (delete_xids[k] == (xid)) { found = 1; break; } \
+              } found; })
+
+   // 3. Build new walfile array
+   struct walfile** new_walfiles = malloc(file_count * sizeof(struct walfile*));
+   int nfiles = 0;
+   for (int i = 0; i < file_count; i++)
+   {
+      struct walfile* wf = walfiles[i];
+      struct walfile* new_wf = malloc(sizeof(struct walfile));
+
+      if (!new_wf)
+      {
+         continue;
+      }
+
+      memset(new_wf, 0, sizeof(struct walfile));
+      new_wf->magic_number = wf->magic_number;
+
+      // Deep copy long_phd
+      new_wf->long_phd = malloc(sizeof(struct xlog_long_page_header_data));
+      memcpy(new_wf->long_phd, wf->long_phd, sizeof(struct xlog_long_page_header_data));
+
+      // Copy page_headers deque (shallow, as headers are not filtered)
+      pgmoneta_deque_create(false, &new_wf->page_headers);
+      struct deque_iterator* ph_iter = NULL;
+      pgmoneta_deque_iterator_create(wf->page_headers, &ph_iter);
+
+      while (pgmoneta_deque_iterator_next(ph_iter))
+      {
+         pgmoneta_deque_add(new_wf->page_headers, NULL, (uintptr_t)ph_iter->value->data, ValueRef);
+      }
+      pgmoneta_deque_iterator_destroy(ph_iter);
+
+      // Copy records, filtering out unwanted ones
+      pgmoneta_deque_create(false, &new_wf->records);
+      struct deque_iterator* rec_iter = NULL;
+      pgmoneta_deque_iterator_create(wf->records, &rec_iter);
+
+      while (pgmoneta_deque_iterator_next(rec_iter))
+      {
+         struct decoded_xlog_record* rec = (struct decoded_xlog_record*)rec_iter->value->data;
+         int skip = 0;
+         // 1. Skip if this is a HEAP DELETE record
+         if (rec->header.xl_rmid == RM_HEAP_ID)
+         {
+            uint8_t info = rec->header.xl_info & ~XLR_INFO_MASK;
+            info &= XLOG_HEAP_OPMASK;
+            if (info == XLOG_HEAP_DELETE)
+            {
+               skip = 1;
+            }
+         }
+         // 2. Skip if this record references a deleted XID
+         if (!skip)
+         {
+            if (XID_IS_DELETED(rec->header.xl_xid) || XID_IS_DELETED(rec->toplevel_xid))
+            {
+               skip = 1;
+            }
+         }
+         if (!skip)
+         {
+            // Deep copy the record
+            struct decoded_xlog_record* rec_copy = malloc(sizeof(struct decoded_xlog_record));
+            memcpy(rec_copy, rec, sizeof(struct decoded_xlog_record));
+
+            // Deep copy main_data if present
+            if (rec->main_data && rec->main_data_len > 0)
+            {
+               rec_copy->main_data = malloc(rec->main_data_len);
+               memcpy(rec_copy->main_data, rec->main_data, rec->main_data_len);
+            }
+            pgmoneta_deque_add(new_wf->records, NULL, (uintptr_t)rec_copy, ValueRef);
+         }
+      }
+      pgmoneta_deque_iterator_destroy(rec_iter);
+      new_walfiles[nfiles++] = new_wf;
+   }
+
+   // Print deleted XIDs for debugging
+   printf("Filtered WAL files: %d\n", nfiles);
+   printf("Total XIDs deleted: %d\n", delete_xid_count);
+   if (delete_xid_count > 0)
+   {
+      printf("Deleted XIDs:\n");
+      for (int i = 0; i < delete_xid_count; i++)
+      {
+         printf("  %u\n", delete_xids[i]);
+      }
+   }
+
+   free(delete_xids);
+   *new_count = nfiles;
+   return new_walfiles;
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -68,7 +218,7 @@ main(int argc, char* argv[])
    }
 
    config_t yaml_config;
-   struct walinfo_configuration* config = NULL;
+   struct walfilter_configuration* config = NULL;
    char* logfile = NULL;
    int file_count = 0;
    char** files = NULL;
@@ -83,12 +233,12 @@ main(int argc, char* argv[])
    char* last_slash = NULL;
    char* tmp_wal = NULL;
    struct walfile* wf = NULL;
-   struct deque_iterator* record_iterator = NULL;
-   struct decoded_xlog_record* record = NULL;
    char* decompressed_file_name = NULL;
    char* decrypted_file_name = NULL;
    char* wal_path = NULL;
    bool copy = true;
+   struct walfile** walfiles = NULL;
+   int walfile_count = 0;
 
    if (file_path == NULL)
    {
@@ -96,21 +246,21 @@ main(int argc, char* argv[])
       return 1;
    }
 
-   size = sizeof(struct walinfo_configuration);
+   size = sizeof(struct walfilter_configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
       warnx("Error creating shared memory");
       goto error;
    }
 
-   pgmoneta_init_walinfo_configuration(shmem);
-   config = (struct walinfo_configuration*)shmem;
+   pgmoneta_init_walfilter_configuration(shmem);
+   config = (struct walfilter_configuration*)shmem;
 
    if (configuration_path != NULL)
    {
       if (pgmoneta_exists(configuration_path))
       {
-         loaded = pgmoneta_read_walinfo_configuration(shmem, configuration_path);
+         loaded = pgmoneta_read_walfilter_configuration(shmem, configuration_path);
       }
 
       if (loaded)
@@ -119,9 +269,9 @@ main(int argc, char* argv[])
       }
    }
 
-   if (loaded && pgmoneta_exists(PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH))
+   if (loaded && pgmoneta_exists(PGMONETA_WALFILTER_DEFAULT_CONFIG_FILE_PATH))
    {
-      loaded = pgmoneta_read_walinfo_configuration(shmem, PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH);
+      loaded = pgmoneta_read_walfilter_configuration(shmem, PGMONETA_WALFILTER_DEFAULT_CONFIG_FILE_PATH);
    }
 
    if (loaded)
@@ -138,7 +288,7 @@ main(int argc, char* argv[])
       }
    }
 
-   if (pgmoneta_validate_walinfo_configuration())
+   if (pgmoneta_validate_walfilter_configuration())
    {
       goto error;
    }
@@ -165,26 +315,15 @@ main(int argc, char* argv[])
    }
 
    // Create a new path that points to the parent directory of yaml_config.source_dir
-   last_slash = NULL;
-
-   parent_dir = strdup(yaml_config.source_dir);
+   parent_dir = pgmoneta_get_parent_dir(yaml_config.source_dir);
    if (parent_dir == NULL)
    {
       pgmoneta_log_error("Failed to allocate memory for parent_dir");
       goto error;
    }
 
-   last_slash = strrchr(parent_dir, '/');
-   if (last_slash != NULL && last_slash != parent_dir)
-   {
-      *last_slash = '\0';
-   }
-   else if (last_slash == parent_dir)
-   {
-      // The path is like "/foo", so keep "/"
-      parent_dir[1] = '\0';
-   }
-   // else: no slash found, parent_dir stays as is (probably ".")
+   wal_files_path = pgmoneta_get_parent_dir(parent_dir);
+   wal_files_path = pgmoneta_append(wal_files_path, "/wal");
 
    parent_dir = pgmoneta_append(parent_dir, "/");
 
@@ -194,8 +333,11 @@ main(int argc, char* argv[])
       goto error;
    }
 
-   wal_files_path = pgmoneta_append(NULL, yaml_config.source_dir);
-   wal_files_path = pgmoneta_append(wal_files_path, "/data/pg_wal");
+   printf("Parent directory: %s\n", parent_dir);
+   printf("Backup label: %s\n", backup_label);
+   printf("WAL files path: %s\n", wal_files_path);
+   printf("Backup END_WALPOS: %X/%X\n",
+          backup->end_lsn_hi32, backup->end_lsn_lo32);
 
    if (pgmoneta_get_files(wal_files_path, &file_count, &files))
    {
@@ -214,6 +356,18 @@ main(int argc, char* argv[])
    partial_record->xlog_record_bytes_read = 0;
    partial_record->xlog_record = NULL;
    partial_record->data_buffer = NULL;
+
+   walfiles = malloc(file_count * sizeof(struct walfile*));
+   if (walfiles == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate memory for walfiles array");
+      goto error;
+   }
+
+   for (int i = 0; i < file_count; i++)
+   {
+      walfiles[i] = NULL;
+   }
 
    for (int i = 0; i < file_count; i++)
    {
@@ -296,25 +450,68 @@ main(int argc, char* argv[])
          goto error;
       }
 
-      if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
-      {
-         pgmoneta_log_fatal("Failed to create deque iterator");
-         goto error;
-      }
-
-      while (pgmoneta_deque_iterator_next(record_iterator))
-      {
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
-         printf("record->lsn 0x%lX\n", (unsigned long)record->lsn);
-      }
-
-      pgmoneta_deque_iterator_destroy(record_iterator);
-      record_iterator = NULL;
-      pgmoneta_destroy_walfile(wf);
+      walfiles[walfile_count] = wf;
+      walfile_count++;
       wf = NULL;
    }
 
-   // ======================== Cleanup ========================
+   // ======================== Filtering on operations ========================
+   for (int i = 0; i < yaml_config.rules->exclude.operation_count; i++)
+   {
+      if (strcmp(yaml_config.rules->exclude.operations[i], OPERATION_DELETE) == 0)
+      {
+         struct walfile** filtered_walfiles = NULL;
+         int filtered_count = 0;
+         filtered_walfiles = pgmoneta_filter_operation_delete(walfile_count, walfiles, &filtered_count);
+         if (filtered_walfiles != NULL)
+         {
+            // Free the original walfiles before replacing
+            for (int j = 0; j < walfile_count; j++)
+            {
+               if (walfiles[j] != NULL)
+               {
+                  pgmoneta_destroy_walfile(walfiles[j]);
+                  walfiles[j] = NULL;
+               }
+            }
+            free(walfiles);
+            // Use the filtered walfiles for the rest of the program
+            walfiles = filtered_walfiles;
+            walfile_count = filtered_count;
+         }
+      }
+   }
+   // ======================== End of filtering on operations ========================
+
+   // Print all walfiles, their records, and each record's LSN
+   printf("\n=== Filtered WAL Files (Described) ===\n");
+   for (int i = 0; i < walfile_count; i++)
+   {
+      if (files && i < file_count && files[i]) {
+         printf("WAL file #%d: %s\n", i, files[i]);
+         char file_full_path[MAX_PATH];
+         snprintf(file_full_path, MAX_PATH, "%s/%s", wal_files_path, files[i]);
+         pgmoneta_describe_walfile(file_full_path, ValueString, NULL, false, true, NULL, 0, 0, NULL, 0, NULL);
+      } else {
+         printf("WAL file #%d: [unknown file name]\n", i);
+      }
+   }
+   printf("=== End of WAL Files ===\n\n");
+
+   // Free all walfiles and related memory after printing
+   if (walfiles != NULL)
+   {
+      for (int i = 0; i < walfile_count; i++)
+      {
+         if (walfiles[i] != NULL)
+         {
+            pgmoneta_destroy_walfile(walfiles[i]);
+            walfiles[i] = NULL;
+         }
+      }
+      free(walfiles);
+      walfiles = NULL;
+   }
 
    free(tmp_wal);
    tmp_wal = NULL;
@@ -390,10 +587,6 @@ error:
    {
       free(decompressed_file_name);
    }
-   if (record_iterator != NULL)
-   {
-      pgmoneta_deque_iterator_destroy(record_iterator);
-   }
    if (wf != NULL)
    {
       pgmoneta_destroy_walfile(wf);
@@ -428,6 +621,19 @@ error:
    if (shmem != NULL)
    {
       pgmoneta_destroy_shared_memory(shmem, size);
+   }
+
+   // Clean up walfiles array in error case
+   if (walfiles != NULL)
+   {
+      for (int i = 0; i < file_count; i++)  // Use file_count here since walfile_count might not be set
+      {
+         if (walfiles[i] != NULL)
+         {
+            pgmoneta_destroy_walfile(walfiles[i]);
+         }
+      }
+      free(walfiles);
    }
 
    cleanup_config(&yaml_config);
