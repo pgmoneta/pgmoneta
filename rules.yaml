@@ -1,6 +1,6 @@
-source_dir: /home/mohab/Downloads/backup/primary/backup/20250702182152
-target_dir: /dir/with/new/wal/stream
+source_dir: /home/mohab/Downloads/backup/primary/backup/20250712175729
+target_dir: /home/mohab/Downloads/pgmoneta-walfilter-test-target-dir
 
 rules:
   - exclude:
-    - operations: [ DELETE ]
+      - operations: [DELETE]
