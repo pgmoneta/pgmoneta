@@ -117,6 +117,49 @@ extern "C" {
 #define CONFIGURATION_TYPE_MAIN 0
 #define CONFIGURATION_TYPE_WALINFO 1
 
+// Set configuration argument constants
+#define CONFIGURATION_RESPONSE_STATUS                           "status"
+#define CONFIGURATION_RESPONSE_MESSAGE                          "message"
+#define CONFIGURATION_RESPONSE_CONFIG_KEY                       "config_key"
+#define CONFIGURATION_RESPONSE_REQUESTED_VALUE                  "requested_value"
+#define CONFIGURATION_RESPONSE_CURRENT_VALUE                    "current_value"
+#define CONFIGURATION_RESPONSE_OLD_VALUE                        "old_value"
+#define CONFIGURATION_RESPONSE_NEW_VALUE                        "new_value"
+#define CONFIGURATION_RESPONSE_RESTART_REQUIRED                 "restart_required"
+#define CONFIGURATION_STATUS_SUCCESS                            "success"
+#define CONFIGURATION_STATUS_RESTART_REQUIRED                   "success_restart_required"
+#define CONFIGURATION_MESSAGE_SUCCESS                           "Configuration change applied successfully"
+#define CONFIGURATION_MESSAGE_RESTART_REQUIRED                  "Configuration change requires restart. Current values preserved."
+
+/**
+ * @struct config_key_info
+ * @brief Parsed representation of a configuration key for runtime configuration changes.
+ *
+ * This structure is used internally to represent a configuration key as parsed from
+ * user input (e.g., from the CLI or management API). It supports both main/global
+ * configuration parameters and server-specific parameters.
+ *
+ * Example key formats:
+ *   - "log_level"                  (main/global parameter)
+ *   - "pgmoneta.log_level"         (main/global parameter, explicit section)
+ *   - "server.primary.port"        (server-specific parameter)
+ *
+ * Fields:
+ *   section      The top-level section ("pgmoneta" for main config, "server" for server config)
+ *   context      The context identifier (e.g., server name for server configs, empty for main)
+ *   key          The actual configuration parameter name (e.g., "port", "log_level")
+ *   is_main_section True if this refers to the main/global configuration section
+ *   section_type  Section type: 0=main, 1=server
+ */
+struct config_key_info
+{
+   char section[MISC_LENGTH];   /**< Section name: "pgmoneta" for main config, "server" for server config */
+   char context[MISC_LENGTH];   /**< Context identifier: server name for server configs, empty for main config */
+   char key[MISC_LENGTH];       /**< Configuration parameter name (e.g., "port", "log_level") */
+   bool is_main_section;        /**< True if this is a main/global configuration parameter */
+   int section_type;            /**< Section type: 0=main, 1=server */
+};
+
 /**
  * Initialize the configuration structure
  * @param shmem The shared memory segment
@@ -227,8 +270,8 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
  * @param encryption The encrypt method for wire protocol
  * @param payload The payload
  */
-void
-pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+int
+pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required);
 
 #ifdef __cplusplus
 }

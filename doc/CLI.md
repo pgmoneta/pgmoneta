@@ -394,6 +394,53 @@ pgmoneta-cli conf get server.primary.host
 pgmoneta-cli conf get server.myserver.port
 ```
 
+### conf set
+
+Set runtime configuration values with immediate application or restart notification.
+
+**Syntax:**
+```sh
+pgmoneta-cli conf set <config_key> <config_value>
+```
+
+**Key Formats:**
+- Main configuration: `parameter` or `pgmoneta.parameter`
+- Server configuration: `server.server_name.parameter` (only format supported)
+
+**Examples:**
+```sh
+# Immediate application
+pgmoneta-cli conf set log_level debug5
+pgmoneta-cli conf set metrics 5001
+pgmoneta-cli conf set compression zstd
+pgmoneta-cli conf set server.primary.workers 4
+
+# Restart required (shows restart message)
+pgmoneta-cli conf set host 192.168.1.100
+pgmoneta-cli conf set server.primary.port 5433
+
+# Service control
+pgmoneta-cli conf set metrics 0      # Disable metrics
+pgmoneta-cli conf set management 0   # Disable management
+```
+
+**Output Examples:**
+```
+# Immediate success
+Configuration change applied successfully
+   Parameter: log_level
+   Old value: info
+   New value: debug5
+   Status: Active (applied to running instance)
+
+# Restart required
+Configuration change requires manual restart
+   Parameter: host
+   Current value: localhost (unchanged in running instance)
+   Requested value: 192.168.1.100 (cannot be applied to live instance)
+   Status: Requires full service restart
+```
+
 ## clear
 
 Clear data/statistics

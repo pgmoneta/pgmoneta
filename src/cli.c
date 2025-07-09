@@ -2073,68 +2073,97 @@ static int
 process_set_result(SSL* ssl, int socket, char* config_key, int32_t output_format)
 {
    struct json* read = NULL;
-   bool is_char = false;
-   char* char_res = NULL;
-   int status = 0;
-   struct json* json_res = NULL;
-   uintptr_t res;
+   struct json* outcome = NULL;
+   struct json* response = NULL;
+   char* conf_status = NULL;
+   char* old_value = NULL;
+   char* new_value = NULL;
+   char* current_value = NULL;
+   char* requested_value = NULL;
 
    if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
    {
+      pgmoneta_log_fatal("Failed to read response from server\n");
       goto error;
    }
 
-   status = get_config_key_result(config_key, read, &res, output_format);
-   if (MANAGEMENT_OUTPUT_FORMAT_JSON == output_format)
+   if (!read)
    {
-      json_res = (struct json*)res;
-      pgmoneta_json_print(json_res, FORMAT_JSON_COMPACT);
+      pgmoneta_log_fatal("No response received\n");
+      goto error;
+   }
+
+   // For JSON output, just print the raw response
+   if (output_format == MANAGEMENT_OUTPUT_FORMAT_JSON)
+   {
+      pgmoneta_json_print(read, FORMAT_JSON);
+      pgmoneta_json_destroy(read);
+      return 0;
+   }
+
+   // Check for standard pgmoneta management response structure
+   outcome = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_OUTCOME);
+   response = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_RESPONSE);
+
+   // Check for errors first
+   if (outcome)
+   {
+      bool status = (bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS);
+      int32_t error_code = (int32_t)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
+
+      if (!status || error_code != 0)
+      {
+         printf("Configuration change failed\n");
+         printf("   Invalid key format: '%s'\n", config_key ? config_key : "unknown");
+         printf("   Valid formats: 'key', 'section.key', or 'section.context.key'\n");
+         goto error;
+      }
+   }
+
+   // Parse response for success cases
+   if (response)
+   {
+      conf_status = (char*)pgmoneta_json_get(response, CONFIGURATION_RESPONSE_STATUS);
+      old_value = (char*)pgmoneta_json_get(response, CONFIGURATION_RESPONSE_OLD_VALUE);
+      new_value = (char*)pgmoneta_json_get(response, CONFIGURATION_RESPONSE_NEW_VALUE);
+      current_value = (char*)pgmoneta_json_get(response, CONFIGURATION_RESPONSE_CURRENT_VALUE);
+      requested_value = (char*)pgmoneta_json_get(response, CONFIGURATION_RESPONSE_REQUESTED_VALUE);
+   }
+
+   // Handle success cases with accurate messaging
+   if (conf_status && !strcmp(conf_status, CONFIGURATION_STATUS_SUCCESS))
+   {
+      printf("Configuration change applied successfully\n");
+      printf("   Parameter: %s\n", config_key ? config_key : "unknown");
+      printf("   Old value: %s\n", old_value ? old_value : "unknown");
+      printf("   New value: %s\n", new_value ? new_value : "unknown");
+      printf("   Status: Active (applied to running instance)\n");
+   }
+   else if (conf_status && !strcmp(conf_status, CONFIGURATION_STATUS_RESTART_REQUIRED))
+   {
+      printf("Configuration change requires manual restart\n");
+      printf("   Parameter: %s\n", config_key ? config_key : "unknown");
+      printf("   Current value: %s (unchanged in running instance)\n", current_value ? current_value : "unknown");
+      printf("   Requested value: %s (cannot be applied to live instance)\n", requested_value ? requested_value : "unknown");
+      printf("   Status: Requires full service restart\n");
    }
    else
    {
-      is_char = true;
-      char_res = (char*)res;
-      printf("%s\n", char_res);
-   }
-
-   if (status == 1)
-   {
-      goto error;
+      printf("Configuration operation completed\n");
+      printf("   Parameter: %s\n", config_key ? config_key : "unknown");
+      printf("   Check server logs for details\n");
    }
 
    pgmoneta_json_destroy(read);
-   if (config_key)
-   {
-      if (is_char)
-      {
-         free(char_res);
-      }
-      else
-      {
-         pgmoneta_json_destroy(json_res);
-      }
-   }
-
    return 0;
 
 error:
-
-   pgmoneta_json_destroy(read);
-   if (config_key)
+   if (read)
    {
-      if (is_char)
-      {
-         free(char_res);
-      }
-      else
-      {
-         pgmoneta_json_destroy(json_res);
-      }
+      pgmoneta_json_destroy(read);
    }
-
    return 1;
 }
-
 static int
 process_ls_result(SSL* ssl, int socket, int32_t output_format)
 {
@@ -2468,7 +2497,6 @@ error:
 
    return 1;
 }
-
 
 static char*
 translate_command(int32_t cmd_code)

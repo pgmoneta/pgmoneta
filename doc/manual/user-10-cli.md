@@ -396,6 +396,83 @@ pgmoneta-cli conf get server.primary.host
 pgmoneta-cli conf get server.myserver.port
 ```
 `
+### conf set
+
+Set the value of a runtime configuration parameter.
+
+**Syntax:**
+```sh
+pgmoneta-cli conf set <config_key> <config_value>
+```
+
+Examples 
+
+```sh
+# Logging and monitoring
+pgmoneta-cli conf set log_level debug5
+pgmoneta-cli conf set metrics 5001
+pgmoneta-cli conf set management 5002
+
+# Performance tuning  
+pgmoneta-cli conf set workers 4
+pgmoneta-cli conf set backup_max_rate 1000000
+pgmoneta-cli conf set compression zstd
+
+# Retention policies
+pgmoneta-cli conf set retention "14,2,6,1"
+```
+
+**Key Formats:**
+- **Main section parameters**: `key` or `pgmoneta.key`
+  - Examples: `log_level`, `pgmoneta.metrics`
+- **Server section parameters**: `server.server_name.key` only
+  - Examples: `server.primary.port`, `server.primary.host`
+
+**Important Notes:**
+- Setting `metrics=0` or `management=0` disables those services
+- Invalid port numbers may show success but cause service failures (check server logs)
+- Server configuration uses format `server.name.parameter` (not `name.parameter`)
+
+**Response Types:**
+- **Success (Applied)**: Configuration change applied to running instance immediately
+- **Success (Restart Required)**: Configuration change validated but requires manual update of configuration files AND restart
+- **Error**: Invalid key format, validation failure, or other errors
+
+**Important: Restart Required Changes**
+When a configuration change requires restart, the change is only validated and stored temporarily in memory. To make the change permanent:
+
+1. **Manually edit the configuration file** (e.g., `/etc/pgmoneta/pgmoneta.conf`)
+3. **Restart pgmoneta** using `systemctl restart pgmoneta` or equivalent
+
+**Warning:** Simply restarting pgmoneta without updating the configuration files will **revert** the change back to the file-based configuration.
+
+**Example of Restart Required Process:**
+```sh
+# 1. Attempt to change host (requires restart)
+pgmoneta-cli conf set host 192.168.1.100
+# Output: Configuration change requires manual restart
+#         Current value: localhost (unchanged in running instance)
+#         Requested value: 192.168.1.100 (cannot be applied to live instance)
+
+# 2. Manually edit /etc/pgmoneta/pgmoneta.conf
+sudo nano /etc/pgmoneta/pgmoneta.conf
+# Change: host = localhost
+# To:     host = 192.168.1.100
+
+# 3. Restart pgmoneta
+sudo systemctl restart pgmoneta
+
+# 4. Verify the change
+pgmoneta-cli conf get host
+# Output: 192.168.1.100
+```
+
+**Why Manual File Editing is Required:**
+- `pgmoneta-cli conf set` only validates and temporarily stores restart-required changes
+- Configuration files are **not automatically updated** by the command
+- On restart, pgmoneta always reads from the configuration files on disk
+- Without file updates, restart will revert to the original file-based values
+
 
 ## clear
 

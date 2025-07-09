@@ -82,6 +82,7 @@
 
 #define NAME "main"
 #define MAX_FDS 64
+#define SIGNALS_NUMBER 6
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
@@ -96,6 +97,9 @@ static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
 static bool reload_configuration(void);
+static void service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
+static void reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+static bool reload_services_only(void);
 static void init_receivewals(void);
 static int init_receivewal(int server);
 static int init_replication_slots(void);
@@ -242,7 +246,7 @@ main(int argc, char** argv)
    bool mgt_started = false;
    bool metrics_started = false;
    pid_t pid, sid;
-   struct signal_info signal_watcher[5];
+   struct signal_info signal_watcher[SIGNALS_NUMBER];
    struct ev_periodic wal;
    struct ev_periodic retention;
    struct ev_periodic valid;
@@ -567,8 +571,9 @@ main(int argc, char** argv)
    ev_signal_init((struct ev_signal*)&signal_watcher[2], shutdown_cb, SIGINT);
    ev_signal_init((struct ev_signal*)&signal_watcher[3], coredump_cb, SIGABRT);
    ev_signal_init((struct ev_signal*)&signal_watcher[4], shutdown_cb, SIGALRM);
+   ev_signal_init((struct ev_signal*)&signal_watcher[5], service_reload_cb, SIGUSR1);
 
-   for (int i = 0; i < 5; i++)
+   for (int i = 0; i < 6; i++)
    {
       signal_watcher[i].slot = -1;
       ev_signal_start(main_loop, (struct ev_signal*)&signal_watcher[i]);
@@ -1255,7 +1260,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_json_clone(payload, &pyl);
 
          pgmoneta_set_proc_title(1, ai->argv, "conf set", NULL);
-         pgmoneta_conf_set(NULL, client_fd, compression, encryption, pyl);
+         reload_set_configuration(NULL, client_fd, compression, encryption, pyl);
       }
    }
    else if (id == MANAGEMENT_STATUS)
@@ -1901,6 +1906,116 @@ shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents)
    ev_break(loop, EVBREAK_ALL);
    keep_running = 0;
    config->running = false;
+}
+
+static void
+reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+{
+   bool restart_required = false;
+
+   // Apply configuration changes to shared memory
+   if (pgmoneta_conf_set(ssl, client_fd, compression, encryption, payload, &restart_required))
+   {
+      goto error;
+      pgmoneta_log_debug("pgmoneta: configuration changes applied successfully");
+   }
+
+   // Only restart services if config change succeeded AND no restart required
+   if (restart_required)
+   {
+      pgmoneta_log_info("Configuration requires restart - continuing with old configuration");
+   }
+   else
+   {
+      pgmoneta_log_info("Configuration applied successfully, reloading services");
+      kill(getppid(), SIGUSR1);
+
+   }
+
+   exit(0);
+
+error:
+   pgmoneta_log_error("Error applying configuration changes");
+   exit(1);
+}
+
+static bool
+reload_services_only(void)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   shutdown_metrics();
+
+   free(metrics_fds);
+   metrics_fds = NULL;
+   metrics_fds_length = 0;
+
+   if (config->metrics > 0)
+   {
+      /* Bind metrics socket */
+      if (pgmoneta_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
+      {
+         pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
+         goto error;
+      }
+
+      if (metrics_fds_length > MAX_FDS)
+      {
+         pgmoneta_log_fatal("Too many descriptors %d", metrics_fds_length);
+         goto error;
+      }
+
+      start_metrics();
+
+      for (int i = 0; i < metrics_fds_length; i++)
+      {
+         pgmoneta_log_debug("Metrics: %d", *(metrics_fds + i));
+      }
+   }
+
+   shutdown_management();
+
+   free(management_fds);
+   management_fds = NULL;
+   management_fds_length = 0;
+
+   if (config->management > 0)
+   {
+      /* Bind management socket */
+      if (pgmoneta_bind(config->host, config->management, &management_fds, &management_fds_length))
+      {
+         pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->management);
+         goto error;
+      }
+
+      if (management_fds_length > MAX_FDS)
+      {
+         pgmoneta_log_fatal("Too many descriptors %d", management_fds_length);
+         goto error;
+      }
+
+      start_management();
+
+      for (int i = 0; i < management_fds_length; i++)
+      {
+         pgmoneta_log_debug("Remote management: %d", *(management_fds + i));
+      }
+   }
+
+   pgmoneta_log_info("conf set: Services restarted successfully");
+   return true;
+
+error:
+   return false;
+}
+
+static void
+service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents)
+{
+   pgmoneta_log_debug("pgmoneta: service restart requested (%p, %p, %d)", loop, w, revents);
+   reload_services_only();
 }
 
 static void

@@ -138,6 +138,14 @@ However, some configuration settings requires a full restart of [**pgmoneta**][p
 
 The configuration can also be reloaded using `pgmoneta-cli -c pgmoneta.conf conf reload`. The command is only supported over the local interface, and hence doesn't work remotely.
 
+The `SIGHUP` signal will trigger a full reload of the configuration. When `SIGHUP` is received, [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) will re-read the configuration from the configuration files on disk and apply any changes that can be handled at runtime. This is the standard way to apply changes made to the configuration files.
+
+In contrast, the `SIGUSR1` signal will trigger a service reload, but **does not** re-read the configuration files. Instead, `SIGUSR1` restarts specific services (metrics and management) using the current in-memory configuration. This signal is automatically triggered by `pgmoneta-cli conf set` when applying runtime configuration changes that don't require a full restart. Any changes made to the configuration files will **not** be picked up when using `SIGUSR1`; only the configuration already loaded in memory will be used.
+
+**Services affected by SIGUSR1:**
+- **Metrics service**: Restarted when `metrics` port is changed or enabled/disabled
+- **Management service**: Restarted when `management` port is changed or enabled/disabled
+
 ## Prometheus
 
 pgmoneta has support for [Prometheus][prometheus] when the `metrics` port is specified.
