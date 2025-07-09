@@ -328,7 +328,8 @@ pgmoneta_wal(int srv, char** argv)
       while (config->running && config->common.servers[srv].online)
       {
          ret = pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
-         if (ret == 0)
+         // the streaming may have stopped because user terminated it
+         if (ret == 0 || !config->running)
          {
             break;
          }
@@ -577,6 +578,14 @@ pgmoneta_wal(int srv, char** argv)
       end_of_timeline_response = NULL;
       pgmoneta_free_message(start_replication_msg);
       start_replication_msg = NULL;
+   }
+
+   if (config->common.servers[srv].online)
+   {
+      // Send CopyDone message to server to gracefully stop the streaming.
+      // Normally we would receive a CopyDone from server as an acknowledgement,
+      // but we opt not to wait for it as the system should no longer be running
+      pgmoneta_send_copy_done_message(ssl, socket);
    }
 
    config->common.servers[srv].wal_streaming = false;
