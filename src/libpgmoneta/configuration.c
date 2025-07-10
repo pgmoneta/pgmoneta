@@ -2773,7 +2773,7 @@ error:
 }
 
 int
-pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required)
+pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required)
 {
    char* en = NULL;
    int ec = -1;
@@ -3082,8 +3082,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
 
 static int
 apply_configuration(char* config_key, char* config_value,
-                             struct config_key_info* key_info,
-                             bool* restart_required)
+                    struct config_key_info* key_info,
+                    bool* restart_required)
 {
    struct main_configuration* current_config;
    struct main_configuration* temp_config;

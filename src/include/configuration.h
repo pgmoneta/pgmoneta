@@ -271,7 +271,8 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
  * @param payload The payload
  */
 int
-pgmoneta_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required);
+pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption,
+                  struct json* payload, bool* restart_required);
 
 #ifdef __cplusplus
 }
