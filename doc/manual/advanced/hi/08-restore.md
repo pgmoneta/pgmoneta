@@ -29,7 +29,7 @@ pgmoneta-cli restore primary newest current /tmp
 
 ```
 Header: 
-  ClientVersion: 0.18.0
+  ClientVersion: 0.19.0
   Command: 3
   Output: 0
   Timestamp: 20240928130406
@@ -51,7 +51,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.18.0
+  ServerVersion: 0.19.0
 ```
 
 [यह कमांड नवीनतम बैकअप और सभी]{lang=hi} Write-Ahead Log (WAL) [सेगमेंट्स को लेकर]{lang=hi} `/tmp/primary-20240928065644` [डायरेक्टरी में एक अद्यतन प्रति पुनर्स्थापित करेगा।]{lang=hi}
