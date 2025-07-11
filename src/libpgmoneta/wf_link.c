@@ -210,8 +210,6 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
          {
             goto error;
          }
-         free(backup);
-         backup = NULL;
       }
    }
 

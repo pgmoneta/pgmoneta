@@ -230,13 +230,16 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    pgmoneta_mkdir(root);
 
-   backup_dir = pgmoneta_get_server_backup_identifier(server, date);
-
+   
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;
    }
-   size = pgmoneta_directory_size(pgmoneta_append(backup_dir, "/data"));
+
+   backup_dir = pgmoneta_get_server_backup_identifier(server, date);
+   backup_dir = pgmoneta_append(backup_dir, "/data");
+   size = pgmoneta_directory_size(backup_dir);
+
    if (pgmoneta_load_info(server_backup, date, &temp_backup))
    {
       ec = MANAGEMENT_ERROR_BACKUP_ERROR;
@@ -319,6 +322,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    free(backups);
    free(backup);
    free(child);
+   free(backup_dir);
    free(elapsed);
    free(server_backup);
    free(root);
@@ -356,6 +360,7 @@ error:
    free(date);
    free(backup);
    free(child);
+   free(backup_dir);
    free(elapsed);
    free(server_backup);
    free(root);

@@ -1333,17 +1333,18 @@ int
 pgmoneta_save_info(char* directory, struct backup* backup)
 {
    char buffer[INFO_BUFFER_SIZE];
-   char* s = NULL;
+   char* bck_root_dir = NULL;
+   char* bck_info_file = NULL;
    FILE* sfile = NULL;
 
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, backup->label);
-   s = pgmoneta_append(s, "/backup.info");
+   bck_info_file = pgmoneta_append(bck_info_file, directory);
+   bck_info_file = pgmoneta_append(bck_info_file, backup->label);
+   bck_info_file = pgmoneta_append(bck_info_file, "/backup.info");
 
-   sfile = fopen(s, "w");
+   sfile = fopen(bck_info_file, "w");
    if (sfile == NULL)
    {
-      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      pgmoneta_log_error("Could not open file %s due to %s", bck_info_file, strerror(errno));
       errno = 0;
       goto error;
    }
@@ -1388,18 +1389,18 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    fputs(&buffer[0], sfile);
    pgmoneta_log_trace("%s=%s", INFO_EXTRA, backup->extra);
 
-   pgmoneta_permission(s, 6, 0, 0);
+   pgmoneta_permission(bck_info_file, 6, 0, 0);
 
    fsync(fileno(sfile));
    fclose(sfile);
 
-   s = NULL;
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, backup->label);
-   pgmoneta_log_trace("Updating SHA512 for %s", s);
-   pgmoneta_update_sha512(s, "backup.info");
+   bck_root_dir = pgmoneta_append(bck_root_dir, directory);
+   bck_root_dir = pgmoneta_append(bck_root_dir, backup->label);
+   pgmoneta_log_trace("Updating SHA512 for %s", bck_root_dir);
+   pgmoneta_update_sha512(bck_root_dir, "backup.info");
 
-   free(s);
+   free(bck_root_dir);
+   free(bck_info_file);
    return 0;
 
 error:
@@ -1409,7 +1410,8 @@ error:
       fclose(sfile);
    }
 
-   free(s);
+   free(bck_root_dir);
+   free(bck_info_file);
    return 1;
 }
 
