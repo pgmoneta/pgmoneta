@@ -118,6 +118,7 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 {
    char* server_base = NULL;
    char* server_backup = NULL;
+   char* backup_dir = NULL;
    char* backup_base = NULL;
    char* backup_data = NULL;
    struct backup* bck = NULL;
@@ -188,12 +189,13 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 
    if (identifier != NULL)
    {
-      backup_base = pgmoneta_get_server_backup(server);
-      if (pgmoneta_load_info(backup_base, identifier, &bck))
+      backup_dir = pgmoneta_get_server_backup(server);
+      if (pgmoneta_load_info(backup_dir, identifier, &bck))
       {
          pgmoneta_log_error("pgmoneta_workflow_nodes: Unable to get backup for %s", identifier);
          goto error;
       }
+
       if (!pgmoneta_art_contains_key(nodes, NODE_LABEL))
       {
          if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)bck->label, ValueString))
@@ -236,9 +238,11 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
          }
       }
 
+      free(backup_dir);
       free(backup_base);
       free(backup_data);
 
+      backup_dir = NULL;
       backup_base = NULL;
       backup_data = NULL;
    }
@@ -252,6 +256,10 @@ pgmoneta_workflow_nodes(int server, char* identifier, struct art* nodes, struct 
 
 error:
 
+   free(backup_dir);
+   free(backup_base);
+   free(backup_data);
+   free(bck);
    return 1;
 }
 

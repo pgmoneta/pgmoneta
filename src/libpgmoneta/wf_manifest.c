@@ -82,6 +82,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    char* manifest = NULL;
    char* key_path[1] = {"Files"};
    struct backup* backup = NULL;
+   struct backup* backup_loaded = NULL;
    struct json_reader* reader = NULL;
    struct json* entry = NULL;
    struct csv_writer* writer = NULL;
@@ -181,17 +182,18 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
-   if (pgmoneta_load_info(backup_dir, backup->label, &backup))
+   if (pgmoneta_load_info(backup_dir, backup->label, &backup_loaded))
    {
       goto error;
    }
-   backup->manifest_elapsed_time = manifest_elapsed_time;
-   if (pgmoneta_save_info(backup_dir, backup))
+   backup_loaded->manifest_elapsed_time = manifest_elapsed_time;
+   if (pgmoneta_save_info(backup_dir, backup_loaded))
    {
       goto error;
    }
 
    free(backup);
+   free(backup_loaded);
    return 0;
 
 error:
@@ -199,6 +201,7 @@ error:
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
    free(backup);
+   free(backup_loaded);
    free(manifest);
    free(manifest_orig);
 

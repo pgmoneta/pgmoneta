@@ -502,6 +502,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_token_bucket_destroy(network_bucket);
    free(backup);
    free(backup_base);
+   free(backup_dir);
    free(backup_data);
    free(manifest_path);
    free(chkptpos);
@@ -537,6 +538,7 @@ error:
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
    free(backup_base);
+   free(backup_dir);
    free(backup_data);
    free(manifest_path);
    free(chkptpos);
