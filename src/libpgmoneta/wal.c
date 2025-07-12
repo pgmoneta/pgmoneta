@@ -517,6 +517,7 @@ pgmoneta_wal(int srv, char** argv)
                case 'k':
                {
                   // keep alive request
+                  update_wal_lsn(srv, xlogptr);
                   wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
                   break;
                }
