@@ -389,11 +389,6 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
       goto error;
    }
 
-   if (out != NULL)
-   {
-      color = false;
-   }
-
    if (type == ValueJSON)
    {
       if (!quiet && !summary)
