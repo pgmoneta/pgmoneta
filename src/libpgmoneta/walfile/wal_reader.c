@@ -1066,7 +1066,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                        record->header.xl_xid, xids, included_objects, record_desc))
       {
          free(record_desc);
-         return;
+         goto cleanup;
       }
       free(record_desc);
    }
@@ -1074,7 +1074,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    current_limit++;
    if (limit > 0 && current_limit > limit)
    {
-      return;
+      goto cleanup;
    }
 
    if (type == ValueJSON)
@@ -1093,8 +1093,11 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          value_str = pgmoneta_value_to_string(record_serialized, FORMAT_JSON_COMPACT, NULL, 0);
          fprintf(out, "%s}", value_str);
          pgmoneta_value_destroy(record_serialized);
+         record_serialized = NULL;
          free(value_str);
+         value_str = NULL;
       }
+      goto cleanup;
    }
    else if (type == ValueString)
    {
@@ -1111,8 +1114,9 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
             {
                fprintf(out, "Incomplete | | | | | Skipped\n");
             }
-            return;
+            goto cleanup;
          }
+         
          get_record_length(record, &rec_len, &fpi_len);
          start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
          end_lsn_string = pgmoneta_lsn_to_string(record->lsn);
@@ -1149,13 +1153,20 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          {
             fprintf(out, "%s | %s %s\n", header_str, rm_desc, backup_str);
          }
-
-         free(header_str);
-         free(rm_desc);
-         free(backup_str);
-         free(start_lsn_string);
-         free(end_lsn_string);
       }
+      goto cleanup;
+   }
+
+cleanup:
+   free(header_str);
+   free(rm_desc);
+   free(backup_str);
+   free(start_lsn_string);
+   free(end_lsn_string);
+   free(value_str);
+   if (record_serialized != NULL)
+   {
+      pgmoneta_value_destroy(record_serialized);
    }
 }
 
