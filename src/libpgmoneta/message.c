@@ -55,6 +55,7 @@ static int ssl_read_message(SSL* ssl, int timeout, struct message** msg);
 static int ssl_write_message(SSL* ssl, struct message* msg);
 
 static int create_D_tuple(int number_of_columns, struct message* msg, struct tuple** tuple);
+static int create_C_tuple(struct message* msg, struct tuple** tuple);
 static int get_number_of_columns(struct message* msg);
 static int get_column_name(struct message* msg, int index, char** name);
 
@@ -1037,11 +1038,12 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
    bool cont;
    int cols;
    char* name = NULL;
-   struct message* tmsg = NULL;
+   struct message* rmsg = NULL;
    char* content = NULL;
    struct message* reply = NULL;
    struct query_response* r = NULL;
    struct tuple* current = NULL;
+   struct tuple* ctuple = NULL;
    size_t data_size;
    void* data = pgmoneta_memory_dynamic_create(&data_size);
    size_t offset = 0;
@@ -1102,65 +1104,86 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       }
    }
 
-   if (pgmoneta_has_message('E', data, data_size))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_extract_message_from_data('T', data, data_size, &tmsg))
-   {
-      goto error;
-   }
-
-   cols = get_number_of_columns(tmsg);
-
    r = (struct query_response*)malloc(sizeof(struct query_response));
    memset(r, 0, sizeof(struct query_response));
 
-   r->number_of_columns = cols;
-
-   for (int i = 0; i < cols; i++)
+   if (pgmoneta_has_message('E', data, data_size)) /* if the response is ErrorResponse */
    {
-      if (get_column_name(tmsg, i, &name))
+      goto error;
+   }
+   if (pgmoneta_has_message('T', data, data_size)) /* if the response is RowDescription */
+   {
+      if (pgmoneta_extract_message_from_data('T', data, data_size, &rmsg))
       {
          goto error;
       }
 
-      memcpy(&r->names[i][0], name, strlen(name));
+      cols = get_number_of_columns(rmsg);
 
-      free(name);
-      name = NULL;
-   }
+      r->number_of_columns = cols;
 
-   while (offset < data_size)
-   {
-      offset = pgmoneta_extract_message_offset(offset, data, &msg);
-
-      if (msg != NULL && msg->kind == 'D')
+      for (int i = 0; i < cols; i++)
       {
-         struct tuple* dtuple = NULL;
-
-         create_D_tuple(cols, msg, &dtuple);
-
-         if (r->tuples == NULL)
+         if (get_column_name(rmsg, i, &name))
          {
-            r->tuples = dtuple;
-         }
-         else
-         {
-            current->next = dtuple;
+            goto error;
          }
 
-         current = dtuple;
+         memcpy(&r->names[i][0], name, strlen(name));
+
+         free(name);
+         name = NULL;
       }
 
-      pgmoneta_free_message(msg);
-      msg = NULL;
+      while (offset < data_size)
+      {
+         offset = pgmoneta_extract_message_offset(offset, data, &msg);
+
+         if (msg != NULL && msg->kind == 'D')
+         {
+            struct tuple* dtuple = NULL;
+
+            create_D_tuple(cols, msg, &dtuple);
+
+            if (r->tuples == NULL)
+            {
+               r->tuples = dtuple;
+            }
+            else
+            {
+               current->next = dtuple;
+            }
+
+            current = dtuple;
+         }
+
+         pgmoneta_free_message(msg);
+         msg = NULL;
+      }
+
+      r->is_command_complete = false;
+   }
+   else if (pgmoneta_has_message('C', data, data_size)) /* if the response is CommandComplete */
+   {
+      if (pgmoneta_extract_message_from_data('C', data, data_size, &rmsg))
+      {
+         goto error;
+      }
+      r->number_of_columns = 1;
+
+      create_C_tuple(rmsg, &ctuple);
+
+      r->tuples = ctuple;
+      r->is_command_complete = true;
+   }
+   else /* if the response is an anything else */
+   {
+      goto error;
    }
 
    *response = r;
 
-   pgmoneta_free_message(tmsg);
+   pgmoneta_free_message(rmsg);
    pgmoneta_memory_dynamic_destroy(data);
 
    free(content);
@@ -1172,7 +1195,7 @@ error:
    pgmoneta_disconnect(fd);
 
    pgmoneta_clear_message();
-   pgmoneta_free_message(tmsg);
+   pgmoneta_free_message(rmsg);
    pgmoneta_memory_dynamic_destroy(data);
 
    free(content);
@@ -1350,6 +1373,36 @@ create_D_tuple(int number_of_columns, struct message* msg, struct tuple** tuple)
 
    *tuple = result;
 
+   return 0;
+}
+
+static int
+create_C_tuple(struct message* msg, struct tuple** tuple)
+{
+   int length;
+   struct tuple* result = NULL;
+
+   result = (struct tuple*)malloc(sizeof(struct tuple));
+   memset(result, 0, sizeof(struct tuple));
+
+   result->data = (char**)malloc(1 * sizeof(char*));
+   result->next = NULL;
+
+   length = pgmoneta_read_int32(msg->data + 1);
+   length -= 5; // Exclude the message identifier byte and the length of message bytes (4)
+
+   if (length > 0)
+   {
+      result->data[0] = (char*)malloc(length + 1);
+      memset(result->data[0], 0, length + 1);
+      memcpy(result->data[0], msg->data + 5, length);
+   }
+   else
+   {
+      result->data[0] = NULL;
+   }
+
+   *tuple = result;
    return 0;
 }
 

@@ -72,7 +72,7 @@ struct query_response
 {
    char names[MAX_NUMBER_OF_COLUMNS][MISC_LENGTH]; /**< The column names */
    int number_of_columns;                          /**< The number of columns */
-
+   bool is_command_complete;                       /**< The response is command complete or not */
    struct tuple* tuples;                           /**< The resulting tuples */
 } __attribute__ ((aligned (64)));
 
