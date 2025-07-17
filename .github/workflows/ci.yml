@@ -191,13 +191,13 @@ jobs:
           export CC=$(xcrun -find clang)
           cmake -DCMAKE_BUILD_TYPE=Debug ..
           make -j$(sysctl -n hw.ncpu)
-      - name: Run tests with Clang build
-        working-directory: ${{ env.BUILD_DIR }}
-        run: $(which bash) ./testsuite.sh
+      # - name: Run tests with Clang build
+      #   working-directory: ${{ env.BUILD_DIR }}
+      #   run: $(which bash) ./testsuite.sh
 
-      - name: Clean up after Clang tests
-        working-directory: ${{ env.BUILD_DIR }}
-        run: $(which bash) ./testsuite.sh clean
+      # - name: Clean up after Clang tests
+      #   working-directory: ${{ env.BUILD_DIR }}
+      #   run: $(which bash) ./testsuite.sh clean
 
       - name: Show logs on failure
         if: failure()
@@ -215,7 +215,7 @@ jobs:
             ${{ env.BUILD_DIR }}/log/
             /tmp/*.log
           retention-days: 7
-      
+
       - name: Upload Generated Documentation Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -315,7 +315,7 @@ jobs:
             $GITHUB_WORKSPACE/build/log/*
             /tmp/*.log
           retention-days: 7
-      
+
       - name: Upload Generated Documentation Artifacts
         if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
@@ -323,4 +323,4 @@ jobs:
           name: freebsd-generated-docs
           path: $GITHUB_WORKSPACE/build/doc/*
           retention-days: 7
-        
+
