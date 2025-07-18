@@ -372,6 +372,30 @@ pgmoneta_wal_parse_xl_xact_parsed_abort_v15(struct xl_xact_parsed_abort* wrapper
    memcpy(&wrapper->data.v15.origin_timestamp, ptr, sizeof(timestamp_tz));
 }
 
+void
+pgmoneta_wal_parse_commit_record_l15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xact_parsed_commit_v14* parsed)
+{
+   parse_commit_record_v14(info, xlrec, parsed);
+}
+
+void
+pgmoneta_wal_parse_commit_record_ge15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xact_parsed_commit_v15* parsed)
+{
+   parse_commit_record_v15(info, xlrec, parsed);
+}
+
+void
+pgmoneta_wal_parse_abort_record_l15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v14* parsed)
+{
+   parse_abort_record_v14(info, xlrec, parsed);
+}
+
+void
+pgmoneta_wal_parse_abort_record_ge15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v15* parsed)
+{
+   parse_abort_record_v15(info, xlrec, parsed);
+}
+
 char*
 pgmoneta_wal_format_xl_xact_parsed_abort_v14(struct xl_xact_parsed_abort* wrapper __attribute__((unused)), char* rec __attribute__((unused)), char* buf)
 {

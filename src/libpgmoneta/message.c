@@ -1079,10 +1079,12 @@ pgmoneta_query_execute(SSL* ssl, int socket, struct message* msg, struct query_r
       }
       else if (status == MESSAGE_STATUS_ZERO)
       {
+         printf("status not success -> 1");
          SLEEP(1000000L);
       }
       else
       {
+         printf("status not success -> 2");
          goto error;
       }
 
