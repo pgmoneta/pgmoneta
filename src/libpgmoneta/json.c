@@ -501,6 +501,17 @@ pgmoneta_json_get(struct json* item, char* tag)
    return pgmoneta_art_search(item->elements, tag);
 }
 
+uintptr_t
+pgmoneta_json_get_typed(struct json* item, char* tag, enum value_type* type)
+{
+   if (item == NULL || item->type != JSONItem || tag == NULL || strlen(tag) == 0)
+   {
+      *type = ValueNone;
+      return 0;
+   }
+   return pgmoneta_art_search_typed(item->elements, tag, type);
+}
+
 bool
 pgmoneta_json_contains_key(struct json* item, char* key)
 {

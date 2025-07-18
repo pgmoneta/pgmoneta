@@ -220,6 +220,16 @@ pgmoneta_value_data(struct value* value)
    return value->data;
 }
 
+enum value_type
+pgmoneta_value_type(struct value* value)
+{
+   if (value == NULL)
+   {
+      return ValueNone;
+   }
+   return value->type;
+}
+
 char*
 pgmoneta_value_to_string(struct value* value, int32_t format, char* tag, int indent)
 {
