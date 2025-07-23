@@ -73,6 +73,9 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
    val->type = type;
    switch (type)
    {
+      case ValueNone:
+         val->to_string = noop_to_string_cb;
+         break;
       case ValueInt8:
          val->to_string = int8_to_string_cb;
          break;
@@ -310,12 +313,13 @@ pgmoneta_value_to_ref(enum value_type type)
    }
 }
 
-#ifdef DEBUG
 char*
 pgmoneta_value_type_to_string(enum value_type type)
 {
    switch (type)
    {
+      case ValueNone:
+         return "none";
       case ValueInt8:
          return "int8";
       case ValueUInt8:
@@ -368,7 +372,6 @@ pgmoneta_value_type_to_string(enum value_type type)
          return "unknown type";
    }
 }
-#endif
 
 static void
 noop_destroy_cb(uintptr_t data)

@@ -230,7 +230,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    pgmoneta_mkdir(root);
 
-   
    if (pgmoneta_workflow_execute(workflow, nodes, &en, &ec))
    {
       goto error;

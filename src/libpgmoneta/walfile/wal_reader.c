@@ -1116,7 +1116,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
             }
             goto cleanup;
          }
-         
+
          get_record_length(record, &rec_len, &fpi_len);
          start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
          end_lsn_string = pgmoneta_lsn_to_string(record->lsn);
