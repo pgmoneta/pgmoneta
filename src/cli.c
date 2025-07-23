@@ -2264,6 +2264,8 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
    struct json* outcome = NULL;
    struct json_iterator* iter = NULL;
    char* config_value = NULL;
+   enum value_type section_type;
+   uintptr_t section_data;
    int part_count = 0;
    char* parts[4] = {NULL, NULL, NULL, NULL}; // Allow max 4 to detect invalid input
    char* token;
@@ -2368,8 +2370,17 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
 
    if (strlen(section) > 0)
    {
-      configuration_js = (struct json*)pgmoneta_json_get(response, section);
-      if ((uintptr_t)configuration_js < 0x1000)
+      section_data = pgmoneta_json_get_typed(response, section, &section_type);
+      pgmoneta_log_debug("Section '%s' has type: %s", section, pgmoneta_value_type_to_string(section_type));
+
+      if (section_type != ValueJSON)
+      {
+         goto error;
+      }
+
+      configuration_js = (struct json*)section_data;
+
+      if (!configuration_js)
       {
          goto error;
       }
@@ -2379,7 +2390,11 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       configuration_js = response;
    }
 
-   pgmoneta_json_iterator_create(configuration_js, &iter);
+   if (pgmoneta_json_iterator_create(configuration_js, &iter))
+   {
+      goto error;
+   }
+
    while (pgmoneta_json_iterator_next(iter))
    {
       // Handle three-part keys: section.context.key
