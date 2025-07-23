@@ -64,6 +64,10 @@ int
 pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value)
 {
    struct value* val = NULL;
+   if (type == ValueNone)
+   {
+      goto error;
+   }
    val = (struct value*) malloc(sizeof(struct value));
    if (val == NULL)
    {
@@ -73,9 +77,6 @@ pgmoneta_value_create(enum value_type type, uintptr_t data, struct value** value
    val->type = type;
    switch (type)
    {
-      case ValueNone:
-         val->to_string = noop_to_string_cb;
-         break;
       case ValueInt8:
          val->to_string = int8_to_string_cb;
          break;

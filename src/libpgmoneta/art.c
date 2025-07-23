@@ -440,7 +440,7 @@ pgmoneta_art_insert(struct art* t, char* key, uintptr_t value, enum value_type t
    pgmoneta_value_destroy(v);
 #endif
 
-   if (t == NULL || key == NULL)
+   if (t == NULL || key == NULL || type == ValueNone)
    {
       // c'mon, at least create a tree first...
       goto error;
