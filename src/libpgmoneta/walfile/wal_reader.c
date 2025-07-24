@@ -232,11 +232,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       server_config = &config->common.servers[server];
    }
 
-   uint32_t next_record = MAXALIGN(
-      ftell(file) +
-      ((long_header->std.xlp_rem_len / long_header->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
-      long_header->std.xlp_rem_len % long_header->xlp_xlog_blcksz
-      );
+   uint32_t next_record;
    int page_number = 0;
    wal_file->long_phd = long_header;
    read_all_page_headers(file, wal_file->long_phd, wal_file);
@@ -250,6 +246,12 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    if (long_header->std.xlp_rem_len > 0)
    {
+      next_record = MAXALIGN(
+         ftell(file) +
+         ((long_header->std.xlp_rem_len / long_header->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
+         long_header->std.xlp_rem_len % long_header->xlp_xlog_blcksz
+         );
+
       if (partial_record->xlog_record_bytes_read == 0)
       {
          decoded = malloc(sizeof(struct decoded_xlog_record));
@@ -272,6 +274,10 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          temp_next_record = next_record;
          next_record = SIZE_OF_XLOG_LONG_PHD;
       }
+   }
+   else
+   {
+      next_record = long_header->xlp_xlog_blcksz;
    }
    long_header = NULL;
    fseek(file, next_record, SEEK_SET);
