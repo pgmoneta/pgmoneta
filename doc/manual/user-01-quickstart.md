@@ -118,25 +118,27 @@ If this doesn't give an error, then we are ready to do backups.
 You can see the commands it supports by using `pgmoneta-cli -?` which will give
 
 ``` console
-pgmoneta 0.19.0
-  Backup / restore solution for PostgreSQL
+pgmoneta-cli 0.19.0
+  Command line utility for pgmoneta
 
 Usage:
-  pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -d ]
+  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 
 Options:
-  -c, --config CONFIG_FILE                        Set the path to the pgmoneta.conf file
-  -h, --host HOST                                 Set the host name
-  -p, --port PORT                                 Set the port number
-  -U, --user USERNAME                             Set the user name
-  -P, --password PASSWORD                         Set the password
-  -L, --logfile FILE                              Set the log file
-  -v, --verbose                                   Output text string of result
-  -V, --version                                   Display version information
-  -F, --format text|json|raw                      Set the output format
-  -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
-  -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
-  -?, --help                                      Display help
+  -c, --config CONFIG_FILE                       Set the path to the pgmoneta.conf file
+  -h, --host HOST                                Set the host name
+  -p, --port PORT                                Set the port number
+  -U, --user USERNAME                            Set the user name
+  -P, --password PASSWORD                        Set the password
+  -L, --logfile FILE                             Set the log file
+  -v, --verbose                                  Output text string of result
+  -V, --version                                  Display version information
+  -F, --format text|json|raw                     Set the output format
+  -C, --compress none|gz|zstd|lz4|bz2            Compress the wire protocol
+  -E, --encrypt none|aes|aes256|aes192|aes128    Encrypt the wire protocol
+  -s, --sort asc|desc                            Sort result (for list-backup)
+      --cascade                                  Cascade a retain/expunge backup
+  -?, --help                                     Display help
 
 Commands:
   annotate                 Annotate a backup with comments

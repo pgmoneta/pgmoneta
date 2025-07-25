@@ -182,7 +182,7 @@ usage(void)
    printf("\n");
 
    printf("Usage:\n");
-   printf("  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ] \n");
+   printf("  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]\n");
    printf("\n");
    printf("Options:\n");
    printf("  -c, --config CONFIG_FILE                       Set the path to the pgmoneta.conf file\n");
