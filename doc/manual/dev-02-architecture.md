@@ -168,6 +168,16 @@ Simple logging implementation based on a `atomic_schar` lock.
 
 The implementation is done in [logging.h][logging_h] and [logging.c][logging_c].
 
+| Level | Description |
+| :------- | :------ |
+| TRACE | Information for developers including values of variables |
+| DEBUG | Higher level information for developers - typically about flow control and the value of key variables |
+| INFO | A user command was successful or general health information about the system |
+| WARN | A user command didn't complete correctly so attention is needed |
+| ERROR | Something unexpected happened - try to give information to help identify the problem |
+| FATAL | We can't recover - display as much information as we can about the problem and `exit(1)` |
+
+
 ## Protocol
 
 The protocol interactions can be debugged using [Wireshark][wireshark] or [pgprtdbg][pgprtdbg].

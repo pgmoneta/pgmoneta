@@ -429,6 +429,17 @@ Options:
 
 For more details, please refer to the [wal documentation](./manual/dev-08-wal.md).
 
+## Logging levels
+
+| Level | Description |
+| :------- | :------ |
+| TRACE | Information for developers including values of variables |
+| DEBUG | Higher level information for developers - typically about flow control and the value of key variables |
+| INFO | A user command was successful or general health information about the system |
+| WARN | A user command didn't complete correctly so attention is needed |
+| ERROR | Something unexpected happened - try to give information to help identify the problem |
+| FATAL | We can't recover - display as much information as we can about the problem and `exit(1)` |
+
 ## End
 
 Now that we've attempted our first backup, take a moment to relax. There are a few things we need to pay attention to:
