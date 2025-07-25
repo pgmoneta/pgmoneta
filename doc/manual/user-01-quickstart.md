@@ -12,14 +12,14 @@ Usage:
   pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -A ADMINS_FILE ] [ -D DIRECTORY ] [ -d ]
 
 Options:
-  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
-  -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file
-  -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file
+  -c, --config CONFIG_FILE  Set the path to the pgmoneta.conf file
+  -u, --users USERS_FILE    Set the path to the pgmoneta_users.conf file
+  -A, --admins ADMINS_FILE  Set the path to the pgmoneta_admins.conf file
   -D, --directory DIRECTORY Set the directory containing all configuration files
-                           (can also be set via PGMONETA_CONFIGURATION_PATH environment variable)
-  -d, --daemon             Run as a daemon
-  -V, --version            Display version information
-  -?, --help               Display help
+                            Can also be set via PGMONETA_CONFIGURATION_PATH environment variable
+  -d, --daemon              Run as a daemon
+  -V, --version             Display version information
+  -?, --help                Display help
 
 pgmoneta: https://pgmoneta.github.io/
 Report bugs: https://github.com/pgmoneta/pgmoneta/issues
