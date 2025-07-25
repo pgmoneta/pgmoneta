@@ -136,6 +136,44 @@ The configuration is loaded from either the path specified by the `-A` flag or `
 
 If pgmoneta has both Transport Layer Security (TLS) and `management` enabled then `pgmoneta-cli` can connect with TLS using the files `~/.pgmoneta/pgmoneta.key` (must be 0600 permission), `~/.pgmoneta/pgmoneta.crt` and `~/.pgmoneta/root.crt`.
 
+## Configuration Directory
+
+You can specify a directory for all configuration files using the `-D` flag (or `--directory`).
+Alternatively, you can set the `PGMONETA_CONFIG_DIR` environment variable to define the configuration directory.
+
+**Behavior:**
+- When the directory flag (`-D`) is set, pgmoneta will look for all configuration files in the specified directory.
+- If a required file is not found in the specified directory, pgmoneta will look for it in its default location (e.g., `/etc/pgmoneta/pgmoneta.conf`).
+- If the file is not found in either location:
+  - If the file is mandatory, pgmoneta will log an error and fail to start.
+  - If the file is optional, pgmoneta will log a warning and continue without it.
+- All file lookup attempts and missing files are logged for troubleshooting.
+
+**Precedence Rules:**
+- Individual file flags (such as `-c`, `-u`, `-A`, etc.) always take precedence over the directory flag and environment variable for their respective files.
+- The directory flag (`-D`) takes precedence over the environment variable (`PGMONETA_CONFIG_DIR`).
+- If neither the directory flag nor individual file flags are set, pgmoneta uses the default locations for all configuration files.
+
+**Using the Environment Variable:**
+1. Set the environment variable before starting pgmoneta:
+```
+export PGMONETA_CONFIG_DIR=/path/to/config_dir
+pgmoneta -d
+```
+2. If both the environment variable and the `-D` flag are set, the flag takes precedence.
+
+**Example:**
+```
+pgmoneta -D /custom/config/dir -d
+```
+or
+```
+export PGMONETA_CONFIG_DIR=/custom/config/dir
+pgmoneta -d
+```
+
+Refer to logs for details about which configuration files were loaded and from which locations.
+
 # pgmoneta_walinfo configuration
 The `pgmoneta_walinfo` configuration defines the info needed for `walinfo` to work.
 

@@ -30,6 +30,9 @@ OPTIONS
 -A, --admins ADMINS_FILE
   Set the path to the pgmoneta_admins.conf file
 
+-D, --directory DIRECTORY_PATH
+  Set the path to load configuration files
+
 -d, --daemon
   Run as a daemon
 

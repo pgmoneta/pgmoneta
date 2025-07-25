@@ -226,6 +226,8 @@ usage(void)
    printf("  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file\n");
    printf("  -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file\n");
    printf("  -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file\n");
+   printf("  -D, --directory DIRECTORY Set the directory containing all configuration files\n");
+   printf("                  Can also be set via PGMONETA_CONFIG_DIR environment variable\n");
    printf("  -d, --daemon             Run as a daemon\n");
    printf("  -V, --version            Display version information\n");
    printf("  -?, --help               Display help\n");
@@ -240,6 +242,7 @@ main(int argc, char** argv)
    char* configuration_path = NULL;
    char* users_path = NULL;
    char* admins_path = NULL;
+   char* directory_path = NULL;
    bool daemon = false;
    bool pid_file_created = false;
    bool management_started = false;
@@ -263,12 +266,18 @@ main(int argc, char** argv)
    int optind = 0;
    int num_options = 0;
    int num_results = 0;
+   char config_path_buffer[MAX_PATH];
+   char users_path_buffer[MAX_PATH];
+   char admins_path_buffer[MAX_PATH];
+   struct stat path_stat = {0};
+   char* adjusted_dir_path = NULL;
 
    cli_option options[] = {
       {"c", "config", true},
       {"u", "users", true},
       {"A", "admins", true},
       {"d", "daemon", false},
+      {"D", "directory", true},
       {"V", "version", false},
       {"?", "help", false},
    };
@@ -310,6 +319,10 @@ main(int argc, char** argv)
       {
          daemon = true;
       }
+      else if (!strcmp(optname, "D") || !strcmp(optname, "directory"))
+      {
+         directory_path = optarg;
+      }
       else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
       {
          version();
@@ -342,6 +355,86 @@ main(int argc, char** argv)
 
    pgmoneta_init_main_configuration(shmem);
    config = (struct main_configuration*)shmem;
+
+   if (directory_path == NULL)
+   {
+      // Check for environment variable if no -D flag provided
+      directory_path = getenv("PGMONETA_CONFIG_DIR");
+      if (directory_path != NULL)
+      {
+         pgmoneta_log_info("Configuration directory set via PGMONETA_CONFIG_DIR environment variable: %s", directory_path);
+      }
+   }
+
+   if (directory_path != NULL)
+   {
+      if (!strcmp(directory_path, "/etc/pgmoneta"))
+      {
+         pgmoneta_log_warn("Using the default configuration directory %s, -D can be omitted.", directory_path);
+      }
+
+      if (access(directory_path, F_OK) != 0)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration directory not found %s", directory_path);
+#endif
+         pgmoneta_log_error("Configuration directory not found: %s", directory_path);
+         exit(1);
+      }
+
+      if (stat(directory_path, &path_stat) == 0)
+      {
+         if (!S_ISDIR(path_stat.st_mode))
+         {
+#ifdef HAVE_SYSTEMD
+            sd_notifyf(0, "STATUS=Path is not a directory %s", directory_path);
+#endif
+            pgmoneta_log_error("Path is not a directory: %s", directory_path);
+            exit(1);
+         }
+      }
+
+      if (access(directory_path, R_OK | X_OK) != 0)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Insufficient permissions for directory %s", directory_path);
+#endif
+         pgmoneta_log_error("Insufficient permissions for directory: %s", directory_path);
+         exit(1);
+      }
+
+      if (directory_path[strlen(directory_path) - 1] != '/')
+      {
+         adjusted_dir_path = pgmoneta_append(strdup(directory_path), "/");
+      }
+      else
+      {
+         adjusted_dir_path = strdup(directory_path);
+      }
+
+      if (adjusted_dir_path == NULL)
+      {
+         pgmoneta_log_error("Memory allocation failed while copying directory path.");
+         exit(1);
+      }
+
+      if (!configuration_path && pgmoneta_normalize_path(adjusted_dir_path, "pgmoneta.conf", PGMONETA_DEFAULT_CONFIG_FILE_PATH, config_path_buffer, sizeof(config_path_buffer)) == 0 && strlen(config_path_buffer) > 0)
+      {
+         configuration_path = config_path_buffer;
+      }
+
+      if (!users_path && pgmoneta_normalize_path(adjusted_dir_path, "pgmoneta_users.conf", PGMONETA_DEFAULT_USERS_FILE_PATH, users_path_buffer, sizeof(users_path_buffer)) == 0 && strlen(users_path_buffer) > 0)
+      {
+         users_path = users_path_buffer;
+      }
+
+      if (!admins_path && pgmoneta_normalize_path(adjusted_dir_path, "pgmoneta_admins.conf", CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, admins_path_buffer, sizeof(admins_path_buffer)) == 0 && strlen(admins_path_buffer) > 0)
+      {
+         admins_path = admins_path_buffer;
+      }
+
+      free(adjusted_dir_path);
+   }
 
    if (configuration_path != NULL)
    {

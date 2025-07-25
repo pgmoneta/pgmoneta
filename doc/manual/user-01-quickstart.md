@@ -9,50 +9,17 @@ pgmoneta 0.19.0
   Backup / restore solution for PostgreSQL
 
 Usage:
-  pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -d ]
+  pgmoneta [ -c CONFIG_FILE ] [ -u USERS_FILE ] [ -A ADMINS_FILE ] [ -D DIRECTORY ] [ -d ]
 
 Options:
-  -c, --config CONFIG_FILE                        Set the path to the pgmoneta.conf file
-  -h, --host HOST                                 Set the host name
-  -p, --port PORT                                 Set the port number
-  -U, --user USERNAME                             Set the user name
-  -P, --password PASSWORD                         Set the password
-  -L, --logfile FILE                              Set the log file
-  -v, --verbose                                   Output text string of result
-  -V, --version                                   Display version information
-  -F, --format text|json|raw                      Set the output format
-  -C, --compress none|gz|zstd|lz4|bz2             Compress the wire protocol
-  -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
-  -?, --help                                      Display help
-
-Commands:
-  annotate                 Annotate a backup with comments
-  archive                  Archive a backup from a server
-  backup                   Backup a server
-  clear <what>             Clear data, with:
-                           - 'prometheus' to reset the Prometheus statistics
-  compress                 Compress a file using configured method
-  conf <action>            Manage the configuration, with one of subcommands:
-                           - 'get' to obtain information about a runtime configuration value
-                             conf get <parameter_name>
-                           - 'ls' to print the configurations used
-                           - 'reload' to reload the configuration
-                           - 'set' to modify a configuration value;
-                             conf set <parameter_name> <parameter_value>;
-  decompress               Decompress a file using configured method
-  decrypt                  Decrypt a file using master-key
-  delete                   Delete a backup from a server
-  encrypt                  Encrypt a file using master-key
-  expunge                  Expunge a backup from a server
-  info                     Information about a backup
-  list-backup              List the backups for a server
-  mode                     Switch the mode for a server
-  ping                     Check if pgmoneta is alive
-  restore                  Restore a backup from a server
-  retain                   Retain a backup from a server
-  shutdown                 Shutdown pgmoneta
-  status [details]         Status of pgmoneta, with optional details
-  verify                   Verify a backup from a server
+  -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
+  -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file
+  -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file
+  -D, --directory DIRECTORY Set the directory containing all configuration files
+                           (can also be set via PGMONETA_CONFIGURATION_PATH environment variable)
+  -d, --daemon             Run as a daemon
+  -V, --version            Display version information
+  -?, --help               Display help
 
 pgmoneta: https://pgmoneta.github.io/
 Report bugs: https://github.com/pgmoneta/pgmoneta/issues

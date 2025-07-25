@@ -1322,6 +1322,18 @@ int
 pgmoneta_resolve_path(char* orig_path, char** new_path);
 
 /**
+ * Check and set directory path using caller-provided buffer
+ * @param directory_path Directory to search for path
+ * @param filename Filename to append
+ * @param default_path Default path to use if directory_path fails
+ * @param path_buffer Buffer to store the resulting path
+ * @param buffer_size Size of the path_buffer
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path, char* path_buffer, size_t buffer_size);
+
+/**
  * Generate a backtrace in the log
  * @return 0 if success, otherwise 1
  */

@@ -14,6 +14,7 @@ Options:
   -c, --config CONFIG_FILE Set the path to the pgmoneta.conf file
   -u, --users USERS_FILE   Set the path to the pgmoneta_users.conf file
   -A, --admins ADMINS_FILE Set the path to the pgmoneta_admins.conf file
+  -D, --directory DIRECTORY Set the directory containing all configuration files
   -d, --daemon             Run as a daemon
   -V, --version            Display version information
   -?, --help               Display help
