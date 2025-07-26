@@ -33,6 +33,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/select.h>
+#include <sys/time.h>
 
 #include "pgmoneta_test_3.h"
 
@@ -57,36 +59,63 @@ echo_server_thread(void* arg)
 
    while (server->running)
    {
-      struct sockaddr_in client_addr;
-      socklen_t client_len = sizeof(client_addr);
+      fd_set read_fds;
+      struct timeval timeout;
 
-      int client_fd = accept(server->socket_fd, (struct sockaddr*)&client_addr, &client_len);
-      if (client_fd < 0)
+      FD_ZERO(&read_fds);
+      FD_SET(server->socket_fd, &read_fds);
+
+      timeout.tv_sec = 1;
+      timeout.tv_usec = 0;
+
+      int result = select(server->socket_fd + 1, &read_fds, NULL, NULL, &timeout);
+
+      if (result < 0)
       {
-         if (server->running)
+         if (!server->running)
          {
+            break;
+         }
+         continue;
+      }
+      else if (result == 0)
+      {
+         continue;
+      }
+
+      if (FD_ISSET(server->socket_fd, &read_fds))
+      {
+         struct sockaddr_in client_addr;
+         socklen_t client_len = sizeof(client_addr);
+
+         int client_fd = accept(server->socket_fd, (struct sockaddr*)&client_addr, &client_len);
+         if (client_fd < 0)
+         {
+            if (!server->running)
+            {
+               break;
+            }
             continue;
          }
-         break;
+
+         char buffer[4096];
+         ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
+         if (bytes_read > 0)
+         {
+            buffer[bytes_read] = '\0';
+
+            char response[] = "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: application/json\r\n"
+                              "Connection: close\r\n"
+                              "\r\n"
+                              "{\"status\":\"ok\"}\n";
+
+            send(client_fd, response, strlen(response), 0);
+         }
+
+         close(client_fd);
       }
-
-      char buffer[4096];
-      ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-
-      if (bytes_read > 0)
-      {
-         buffer[bytes_read] = '\0';
-
-         char response[] = "HTTP/1.1 200 OK\r\n"
-                           "Content-Type: application/json\r\n"
-                           "Connection: close\r\n"
-                           "\r\n"
-                           "{\"status\":\"ok\"}\n";
-
-         send(client_fd, response, strlen(response), 0);
-      }
-
-      close(client_fd);
    }
 
    return NULL;
@@ -167,6 +196,8 @@ stop_echo_server(void)
    }
 
    test_server->running = false;
+
+   usleep(1100000);
 
    if (test_server->socket_fd >= 0)
    {
