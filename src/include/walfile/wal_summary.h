@@ -24,58 +24,27 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
-#include <tsclient.h>
 
-#include "testcases/pgmoneta_test_1.h"
-#include "testcases/pgmoneta_test_2.h"
-// #include "testcases/pgmoneta_test_3.h"
-#include "testcases/pgmoneta_test_4.h"
-#include "testcases/pgmoneta_test_5.h"
+#ifndef PGMONETA_WAL_SUMMARY_H
+#define PGMONETA_WAL_SUMMARY_H
 
+#include <pgmoneta.h>
+
+/**
+ * Summarize the WAL records in the range [start_lsn, end_lsn) for a timeline, assuming that
+ * both start and end LSNs belongs to the same timeline.
+ * @param srv The server
+ * @param wal_dir The directory to the wal segments (Optional and is used for testing)
+ * @param start_lsn The start lsn is the point at which we should start summarizing. If this
+ * value comes from the end LSN of the previous record as returned by the xlogreader machinery,
+ * 'exact' should be true; otherwise, 'exact' should be false, and this function will search
+ * forward for the start of a valid WAL record.
+ * @param end_lsn identifies the point beyond which we can't count on being able to read any
+ * more WAL.
+ * @return 0 is success, otherwise failure
+ */
 int
-main(int argc, char* argv[])
-{
+pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn);
 
-   if (argc != 2)
-   {
-      printf("Usage: %s <project_directory>\n", argv[0]);
-      return 1;
-   }
-
-   int number_failed;
-   Suite* s1;
-   Suite* s2;
-   // Suite* s3;
-   Suite* s4;
-   Suite* s5;
-   SRunner* sr;
-
-   if (pgmoneta_tsclient_init(argv[1]))
-   {
-      goto done;
-   }
-
-   s1 = pgmoneta_test1_suite();
-   s2 = pgmoneta_test2_suite();
-   // s3 = pgmoneta_test3_suite();
-   s4 = pgmoneta_test4_suite();
-   s5 = pgmoneta_test5_suite();
-
-   sr = srunner_create(s1);
-   srunner_add_suite(sr, s2);
-   // srunner_add_suite(sr, s3);
-   srunner_add_suite(sr, s4);
-   srunner_add_suite(sr, s5);
-
-   // Run the tests in verbose mode
-   srunner_run_all(sr, CK_VERBOSE);
-   number_failed = srunner_ntests_failed(sr);
-   srunner_free(sr);
-
-done:
-   pgmoneta_tsclient_destroy();
-
-   return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+#endif

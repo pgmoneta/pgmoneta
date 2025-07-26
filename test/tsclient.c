@@ -32,12 +32,16 @@
 #include <brt.h>
 #include <configuration.h>
 #include <json.h>
+#include <logging.h>
 #include <management.h>
+#include <memory.h>
+#include <message.h>
 #include <network.h>
 #include <security.h>
 #include <shmem.h>
 #include <utils.h>
 #include <value.h>
+#include <walfile/wal_summary.h>
 #include <tsclient.h>
 
 /* system */
@@ -55,9 +59,14 @@ char project_directory[BUFFER_SIZE];
 
 static int check_output_outcome(int socket);
 static int get_connection();
-static char* get_configuration_path();
-static char* get_restore_path();
-static char* get_backup_summary_path();
+static char* get_configuration_path(char* format_string, ...);
+static char* get_users_path(char* format_string, ...);
+static char* get_restore_path(char* format_string, ...);
+static char* get_pgbench_log_path(char* format_string, ...);
+static char* get_backup_summary_path(char* format_string, ...);
+static char* get_pg_wal_dir_path(char* format_string, ...);
+
+static int do_checkpoint_and_get_lsn(int server, xlog_rec_ptr* checkpoint_lsn);
 
 int
 pgmoneta_tsclient_init(char* base_dir)
@@ -66,12 +75,13 @@ pgmoneta_tsclient_init(char* base_dir)
    int ret;
    size_t size;
    char* configuration_path = NULL;
-   size_t configuration_path_length = 0;
+   char* users_path = NULL;
 
    memset(project_directory, 0, sizeof(project_directory));
    memcpy(project_directory, base_dir, strlen(base_dir));
 
-   configuration_path = get_configuration_path();
+   configuration_path = get_configuration_path(PGMONETA_CONFIGURATION_TRAIL);
+   users_path = get_users_path(PGMONETA_USERS_TRAIL);
 
    // Create the shared memory for the configuration
    size = sizeof(struct main_configuration);
@@ -80,7 +90,8 @@ pgmoneta_tsclient_init(char* base_dir)
       goto error;
    }
    pgmoneta_init_main_configuration(shmem);
-   // Try reading configuration from the configuration path
+   /* Try reading configuration from the configuration path */
+
    if (configuration_path != NULL)
    {
       ret = pgmoneta_read_main_configuration(shmem, configuration_path);
@@ -96,10 +107,38 @@ pgmoneta_tsclient_init(char* base_dir)
       goto error;
    }
 
+   /* Initiate logging */
+   if (pgmoneta_init_logging())
+   {
+      goto error;
+   }
+
+   if (pgmoneta_start_logging())
+   {
+      goto error;
+   }
+
+   /* Try reading user configuration from the user path */
+   if (users_path != NULL)
+   {
+      ret = pgmoneta_read_users_configuration(shmem, users_path);
+      if (ret)
+      {
+         goto error;
+      }
+   }
+   else
+   {
+      goto error;
+   }
+
    free(configuration_path);
+   free(users_path);
    return 0;
 error:
+   pgmoneta_stop_logging();
    free(configuration_path);
+   free(users_path);
    return 1;
 }
 
@@ -109,6 +148,7 @@ pgmoneta_tsclient_destroy()
    size_t size;
 
    size = sizeof(struct main_configuration);
+   pgmoneta_stop_logging();
    return pgmoneta_destroy_shared_memory(shmem, size);
 }
 
@@ -161,7 +201,7 @@ pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position)
       backup_id = "newest";
    }
 
-   restore_path = get_restore_path();
+   restore_path = get_restore_path(PGMONETA_RESTORE_TRAIL);
    // Create a restore request to the main server
    if (pgmoneta_management_request_restore(NULL, socket, server, backup_id, position, restore_path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
@@ -221,6 +261,71 @@ error:
 }
 
 int
+pgmoneta_tsclient_execute_query(int srv, char* query, bool is_dummy, struct query_response** qr)
+{
+   int socket = -1;
+   struct main_configuration* config = NULL;
+   struct message* msg = NULL;
+   struct query_response* response = NULL;
+   int usr = -1;
+   SSL* ssl = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   pgmoneta_memory_init();
+
+   /* find the corresponding user's index of the given server */
+   for (int i = 0; i < config->common.number_of_users; i++)
+   {
+      if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
+      {
+         usr = i;
+      }
+   }
+   if (usr == -1)
+   {
+      goto error;
+   }
+
+   if (is_dummy)
+   {
+      /* establish a connection, with dummy user pass and replication flag not set */
+      if (pgmoneta_server_authenticate(srv, "mydb", "myuser", "password", false, &ssl, &socket) != AUTH_SUCCESS)
+      {
+         goto error;
+      }
+   }
+   else
+   {
+      /* establish a connection, with replication flag not set */
+      if (pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
+      {
+         goto error;
+      }
+   }
+
+   /* create and execute the query */
+   pgmoneta_create_query_message(query, &msg);
+   if (pgmoneta_query_execute(NULL, socket, msg, &response) || response == NULL)
+   {
+      goto error;
+   }
+
+   *qr = response;
+
+   pgmoneta_memory_destroy();
+   pgmoneta_free_message(msg);
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_memory_destroy();
+   pgmoneta_free_message(msg);
+   pgmoneta_free_query_response(response);
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
 pgmoneta_tsclient_brt_init(block_ref_table** brt)
 {
    block_ref_table* b = NULL;
@@ -270,9 +375,9 @@ int
 pgmoneta_tsclient_write(block_ref_table* brt)
 {
    char* r = NULL;
-   r = get_backup_summary_path();
+   r = get_backup_summary_path(PGMONETA_BACKUP_SUMMARY_TRAIL);
 
-   r = pgmoneta_append(r, "summary");
+   r = pgmoneta_append(r, "tmp.summary");
    if (pgmoneta_brt_write(brt, r))
    {
       goto error;
@@ -293,8 +398,8 @@ pgmoneta_tsclient_read(block_ref_table** brt)
 {
    char* r = NULL;
 
-   r = get_backup_summary_path();
-   r = pgmoneta_append(r, "summary");
+   r = get_backup_summary_path(PGMONETA_BACKUP_SUMMARY_TRAIL);
+   r = pgmoneta_append(r, "tmp.summary");
 
    if (pgmoneta_brt_read(r, brt))
    {
@@ -307,6 +412,98 @@ error:
    {
       free(r);
    }
+   return 1;
+}
+
+int
+pgmoneta_tsclient_summarize_wal(char* server)
+{
+   char* wal_dir = NULL;
+   char* summary_dir = NULL;
+   struct main_configuration* config = NULL;
+   int srv = -1;
+   xlog_rec_ptr s_lsn;
+   xlog_rec_ptr e_lsn;
+   struct query_response* qr = NULL;
+
+   config = (struct main_configuration*)shmem;
+   /* get the server index */
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (!strcmp(config->common.servers[i].name, server))
+      {
+         srv = i;
+         break;
+      }
+   }
+
+   /* get the starting lsn for summary */
+   if (do_checkpoint_and_get_lsn(srv, &s_lsn))
+   {
+      goto error;
+   }
+
+   /* Create a table  */
+   if (pgmoneta_tsclient_execute_query(srv, "CREATE TABLE t1 (id int);", 1, &qr))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   /* Insert some tuples */
+   if (pgmoneta_tsclient_execute_query(srv, "INSERT INTO t1 SELECT  GENERATE_SERIES(1, 800);", 1, &qr))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   /* get the ending lsn for summary */
+   if (do_checkpoint_and_get_lsn(srv, &e_lsn))
+   {
+      goto error;
+   }
+
+   /* Switch the wal segment so that records won't appear in partial segments */
+   if (pgmoneta_tsclient_execute_query(srv, "SELECT pg_switch_wal();", 0, &qr))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   /* Append some more tuples just to ensure that a new wal segment is streamed */
+   if (do_checkpoint_and_get_lsn(srv, NULL))
+   {
+      goto error;
+   }
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   sleep(5);
+
+   wal_dir = get_pg_wal_dir_path(PGMONETA_PG_WAL_DIR_TRAIL, server);
+   /* Create summary directory in the base_dir of a server if not already present */
+   summary_dir = pgmoneta_get_server_summary(srv);
+   if (pgmoneta_mkdir(summary_dir))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_summarize_wal(srv, wal_dir, s_lsn, e_lsn))
+   {
+      goto error;
+   }
+
+   free(summary_dir);
+   free(wal_dir);
+   return 0;
+
+error:
+   pgmoneta_free_query_response(qr);
+   free(summary_dir);
+   free(wal_dir);
    return 1;
 }
 
@@ -357,46 +554,157 @@ get_connection()
 }
 
 static char*
-get_restore_path()
+get_restore_path(char* format_string, ...)
 {
+   va_list args;
    char* restore_path = NULL;
-   int project_directory_length = strlen(project_directory);
-   int restore_trail_length = strlen(PGMONETA_RESTORE_TRAIL);
+   char buffer[BUFFER_SIZE];
 
-   restore_path = (char*)calloc(project_directory_length + restore_trail_length + 1, sizeof(char));
+   va_start(args, format_string);
+   memset(buffer, 0, sizeof(buffer));
+   snprintf(buffer, sizeof(buffer), format_string, args);
+   va_end(args);
 
-   memcpy(restore_path, project_directory, project_directory_length);
-   memcpy(restore_path + project_directory_length, PGMONETA_RESTORE_TRAIL, restore_trail_length);
+   restore_path = pgmoneta_append(restore_path, project_directory);
+   restore_path = pgmoneta_append(restore_path, buffer);
 
    return restore_path;
 }
 
 static char*
-get_backup_summary_path()
+get_backup_summary_path(char* format_string, ...)
 {
+   va_list args;
    char* backup_summary_path = NULL;
-   int project_directory_length = strlen(project_directory);
-   int backup_summary_trail_length = strlen(PGMONETA_BACKUP_SUMMARY_TRAIL);
+   char buffer[BUFFER_SIZE];
 
-   backup_summary_path = (char*)calloc(project_directory_length + backup_summary_trail_length + 1, sizeof(char));
+   va_start(args, format_string);
+   memset(buffer, 0, sizeof(buffer));
+   snprintf(buffer, sizeof(buffer), format_string, args);
+   va_end(args);
 
-   memcpy(backup_summary_path, project_directory, project_directory_length);
-   memcpy(backup_summary_path + project_directory_length, PGMONETA_BACKUP_SUMMARY_TRAIL, backup_summary_trail_length);
+   backup_summary_path = pgmoneta_append(backup_summary_path, project_directory);
+   backup_summary_path = pgmoneta_append(backup_summary_path, buffer);
 
    return backup_summary_path;
 }
 
 static char*
-get_configuration_path()
+get_configuration_path(char* format_string, ...)
 {
+   va_list args;
    char* configuration_path = NULL;
-   int project_directory_length = strlen(project_directory);
-   int configuration_trail_length = strlen(PGMONETA_CONFIGURATION_TRAIL);
+   char buffer[BUFFER_SIZE];
 
-   configuration_path = (char*)calloc(project_directory_length + configuration_trail_length + 1, sizeof(char));
+   va_start(args, format_string);
+   memset(buffer, 0, sizeof(buffer));
+   snprintf(buffer, sizeof(buffer), format_string, args);
+   va_end(args);
 
-   memcpy(configuration_path, project_directory, project_directory_length);
-   memcpy(configuration_path + project_directory_length, PGMONETA_CONFIGURATION_TRAIL, configuration_trail_length);
+   configuration_path = pgmoneta_append(configuration_path, project_directory);
+   configuration_path = pgmoneta_append(configuration_path, buffer);
 
    return configuration_path;
+}
+
+static char*
+get_users_path(char* format_string, ...)
+{
+   va_list args;
+   char* users_path = NULL;
+   char buffer[BUFFER_SIZE];
+
+   va_start(args, format_string);
+   memset(buffer, 0, sizeof(buffer));
+   snprintf(buffer, sizeof(buffer), format_string, args);
+   va_end(args);
+
+   users_path = pgmoneta_append(users_path, project_directory);
+   users_path = pgmoneta_append(users_path, buffer);
+
+   return users_path;
+}
+
+static char*
+get_pgbench_log_path(char* format_string, ...)
+{
+   va_list args;
+   char* pgbench_log_path = NULL;
+   char buffer[BUFFER_SIZE];
+
+   va_start(args, format_string);
+   memset(buffer, 0, sizeof(buffer));
+   snprintf(buffer, sizeof(buffer), format_string, args);
+   va_end(args);
+
+   pgbench_log_path = pgmoneta_append(pgbench_log_path, project_directory);
+   pgbench_log_path = pgmoneta_append(pgbench_log_path, buffer);
+
+   return pgbench_log_path;
+}
+
+static char*
+get_pg_wal_dir_path(char* format_string, ...)
+{
+   va_list args;
+   char* pg_waldir_path = NULL;
+   char buffer[BUFFER_SIZE];
+
+   va_start(args, format_string);
+   memset(buffer, 0, sizeof(buffer));
+   vsnprintf(buffer, sizeof(buffer), format_string, args);
+   va_end(args);
+
+   pg_waldir_path = pgmoneta_append(pg_waldir_path, project_directory);
+   pg_waldir_path = pgmoneta_append(pg_waldir_path, buffer);
+
+   return pg_waldir_path;
+}
+
+static int
+do_checkpoint_and_get_lsn(int srv, xlog_rec_ptr* checkpoint_lsn)
+{
+   // xlog_rec_ptr c_lsn = 0;
+   char* chkpt_lsn = NULL;
+   uint32_t chkpt_hi = 0;
+   uint32_t chkpt_lo = 0;
+   struct query_response* qr = NULL;
+
+   /* Assuming the user associated with this server has 'pg_checkpoint' role */
+   if (pgmoneta_tsclient_execute_query(srv, "CHECKPOINT;", 0, &qr))
+   {
+      goto error;
+   }
+   // Ignore this result
+   pgmoneta_free_query_response(qr);
+   qr = NULL;
+
+   if (pgmoneta_tsclient_execute_query(srv, "SELECT checkpoint_lsn FROM pg_control_checkpoint();", 0, &qr))
+   {
+      goto error;
+   }
+
+   /* Extract the checkpoint lsn */
+   if (qr == NULL || qr->number_of_columns < 1)
+   {
+      goto error;
+   }
+
+   chkpt_lsn = pgmoneta_query_response_get_data(qr, 0);
+
+   if (chkpt_lsn != NULL)
+   {
+      sscanf(chkpt_lsn, "%X/%X", &chkpt_hi, &chkpt_lo);
+   }
+
+   if (checkpoint_lsn)
+   {
+      *checkpoint_lsn = ((uint64_t)chkpt_hi << 32) + (uint64_t)chkpt_lo;
+   }
+
+   pgmoneta_free_query_response(qr);
+   return 0;
+error:
+   pgmoneta_free_query_response(qr);
+   return 1;
 }
