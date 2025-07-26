@@ -195,10 +195,23 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    char* temp_buffer = NULL;
    u_int32_t temp_next_record = 0;
    bool initialized = false;
+   int idx = 0;
+   struct deque_iterator* iter = NULL;
+   xlog_rec_ptr* lsn_array = NULL;
+   size_t lsn_array_size = 0;
+   size_t lsn_array_capacity = 100;
+   FILE* file = NULL;
+
+   lsn_array = malloc(lsn_array_capacity * sizeof(xlog_rec_ptr));
+   if (lsn_array == NULL)
+   {
+      pgmoneta_log_error("Error: Could not allocate memory for LSN array");
+      goto error;
+   }
 
    config = (struct walinfo_configuration*) shmem;
 
-   FILE* file = fopen(path, "rb");
+   file = fopen(path, "rb");
    if (file == NULL)
    {
       pgmoneta_log_fatal("Error: Could not open file %s", path);
@@ -471,12 +484,25 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
       if (decode_xlog_record(buffer, decoded, record, wal_file->long_phd->xlp_xlog_blcksz, wal_file->long_phd->std.xlp_magic, lsn))
       {
-         free(decoded);
-         decoded = NULL;
          goto error;
       }
       else
       {
+         if (lsn_array_size >= lsn_array_capacity)
+         {
+            lsn_array_capacity *= 2;
+            xlog_rec_ptr* temp_array = realloc(lsn_array, lsn_array_capacity * sizeof(xlog_rec_ptr));
+            if (temp_array == NULL)
+            {
+               pgmoneta_log_error("Error: Could not reallocate LSN array");
+               goto error;
+            }
+            lsn_array = temp_array;
+         }
+
+         lsn_array[lsn_array_size] = lsn;
+         lsn_array_size++;
+
          if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
          {
             free(decoded);
@@ -490,7 +516,27 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       free(record);
       record = NULL;
    }
+
 finish:
+   if (pgmoneta_deque_iterator_create(wal_file->records, &iter))
+   {
+      pgmoneta_log_error("Failed to create deque iterator");
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      decoded = (struct decoded_xlog_record*) iter->value->data;
+      decoded->next_lsn = lsn_array[idx++];
+   }
+
+   decoded->next_lsn = 0; // Handle last record
+
+   pgmoneta_deque_iterator_destroy(iter);
+
+   free(lsn_array);
+   lsn_array = NULL;
+
    fclose(file);
    return 0;
 
@@ -502,6 +548,11 @@ error:
    free(buffer);
    free(record);
    free(decoded);
+   decoded = NULL;
+
+   free(lsn_array);
+   lsn_array = NULL;
+
    if (file != NULL)
    {
       fclose(file);
