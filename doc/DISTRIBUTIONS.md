@@ -108,5 +108,6 @@ make
 Remember to set the `log_level` configuration option to `debug5`.
 
 ## Install
+
 The installation process of `pgmoneta` is the same on all platforms. Please follow the
-instructions in the [tutorial](https://github.com/pgmoneta/pgmoneta/blob/main/doc/tutorial/01_install.md).
+instructions in the manual.

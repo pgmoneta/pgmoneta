@@ -513,9 +513,8 @@ Remember to add your name to the following files,
 
 ```
 AUTHORS
-doc/manual/97-acknowledgement.md
-doc/manual/advanced/en/97-acknowledgement.md
-doc/manual/advanced/hi/97-acknowledgement.md
+doc/manual/en/97-acknowledgement.md
+doc/manual/hi/97-acknowledgement.md
 ```
 
 in your first pull request

@@ -1,13 +1,15 @@
-# pgmoneta-cli user guide
+\newpage
 
-The **pgmoneta-cli** command line interface controls your interaction with [**pgmoneta**](https://pgmoneta.github.io/).
+# Command line interface
+
+The **pgmoneta-cli** command line interface controls your interaction with **pgmoneta**.
 
 **It is important that you only use the pgmoneta-cli command line interface to operate on your backup directory**
 
 Using other commands on the backup directory could cause problems.
 
-```
-pgmoneta-cli
+``` sh
+pgmoneta-cli 0.19.0
   Command line utility for pgmoneta
 
 Usage:
@@ -57,6 +59,9 @@ Commands:
   shutdown                 Shutdown pgmoneta
   status [details]         Status of pgmoneta, with optional details
   verify                   Verify a backup from a server
+
+pgmoneta: https://pgmoneta.github.io/
+Report bugs: https://github.com/pgmoneta/pgmoneta/issues
 ```
 
 ## backup
@@ -65,19 +70,19 @@ Backup a server
 
 The command for a full backup is
 
-```sh
+``` sh
 pgmoneta-cli backup <server>
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli backup primary
 ```
 
 The command for an incremental backup is
 
-```sh
+``` sh
 pgmoneta-cli backup <server> <identifier>
 ```
 
@@ -85,7 +90,7 @@ where the `identifier` is the identifier for a backup.
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli backup primary 20250101120000
 ```
 
@@ -95,14 +100,24 @@ List the backups for a server
 
 Command
 
-```sh
-pgmoneta-cli list-backup <server>
+``` sh
+pgmoneta-cli list-backup <server> [--sort asc|desc]
 ```
+
+The `--sort` option allows sorting backups by timestamp:
+- `asc` for ascending order (oldest first)
+- `desc` for descending order (newest first)
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli list-backup primary
+```
+
+Example with sorting
+
+``` sh
+pgmoneta-cli list-backup primary --sort desc
 ```
 
 ## restore
@@ -111,7 +126,7 @@ Restore a backup from a server
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli restore <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>
 ```
 
@@ -125,14 +140,12 @@ where
 * `inclusive=X` means that the restore is inclusive of the specified information
 * `timeline=X` means that the restore is done to the specified information timeline
 * `action=X` means which action should be executed after the restore (pause, shutdown)
-* `primary` means that the cluster is setup as a primary
-* `replica` means that the cluster is setup as a replica
 
 [More information](https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET)
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli restore primary newest name=MyLabel,primary /tmp
 ```
 
@@ -142,13 +155,13 @@ Verify a backup from a server
 
 Command
 
-```sh
-pgmoneta-cli verify <server> [<timestamp>|oldest|newest] <directory> [failed|all]
+``` sh
+pgmoneta-cli verify <server> <directory> [failed|all]
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli verify primary oldest /tmp
 ```
 
@@ -158,13 +171,13 @@ Archive a backup from a server
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli archive <server> [<timestamp>|oldest|newest] [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*] <directory>
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli archive primary newest current /tmp
 ```
 
@@ -174,13 +187,13 @@ Delete a backup from a server
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli delete <server> [<timestamp>|oldest|newest]
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli delete primary oldest
 ```
 
@@ -190,13 +203,13 @@ Retain a backup from a server. The backup will not be deleted by the retention p
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli retain [--cascade] <server> [<timestamp>|oldest|newest]
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli retain primary oldest
 ```
 
@@ -206,13 +219,13 @@ Expunge a backup from a server. The backup will be deleted by the retention poli
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli expunge [--cascade] <server> [<timestamp>|oldest|newest]
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli expunge primary oldest
 ```
 
@@ -222,7 +235,7 @@ Encrypt the file in place, remove unencrypted file after successful encryption.
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli encrypt <file>
 ```
 
@@ -232,7 +245,7 @@ Decrypt the file in place, remove encrypted file after successful decryption.
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli decrypt <file>
 ```
 
@@ -242,7 +255,7 @@ Compress the file in place, remove uncompressed file after successful compressio
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli compress <file>
 ```
 
@@ -252,7 +265,7 @@ Decompress the file in place, remove compressed file after successful decompress
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli decompress <file>
 ```
 
@@ -262,39 +275,28 @@ Information about a backup.
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli info <server> <timestamp|oldest|newest>
-```
-
-## annotate
-
-Annotate a backup with comments
-
-```sh
-pgmoneta-cli annotate <server> <backup> add <key> <comment>
-pgmoneta-cli annotate <server> <backup> update <key> <comment>
-pgmoneta-cli annotate <server> <backup> remove <key>
 ```
 
 ## ping
 
-Verify if [**pgmoneta**](https://pgmoneta.github.io/) is alive
+Verify if [**pgmoneta**][pgmoneta] is alive
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli ping
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli ping
 ```
-
 ## mode
 
-[**pgmoneta**](https://pgmoneta.github.io/) detects when a server is down. You can bring a server online or offline
+[**pgmoneta**][pgmoneta] detects when a server is down. You can bring a server online or offline
 using the mode command.
 
 Command
@@ -315,38 +317,38 @@ or
 pgmoneta-cli mode primary online
 ```
 
-[**pgmoneta**](https://pgmoneta.github.io/) will keep basic services running for an offline server such that
+[**pgmoneta**][pgmoneta] will keep basic services running for an offline server such that
 you can verify a backup or do a restore.
 
 ## shutdown
 
-Shutdown [**pgmoneta**](https://pgmoneta.github.io/)
+Shutdown [**pgmoneta**][pgmoneta]
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli shutdown
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli shutdown
 ```
 
 ## status
 
-Status of [**pgmoneta**](https://pgmoneta.github.io/), with a `details` option
+Status of [**pgmoneta**][pgmoneta], with a `details` option
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli status [details]
 ```
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli status details
 ```
 
@@ -375,7 +377,7 @@ pgmoneta-cli conf ls
 pgmoneta-cli conf get server.primary.host
 pgmoneta-cli conf set encryption aes-256-cbc
 ```
-### conf get
+**conf get**
 
 Get the value of a runtime configuration key, or the entire configuration.
 
@@ -393,53 +395,84 @@ pgmoneta-cli conf get pgmoneta.host
 pgmoneta-cli conf get server.primary.host
 pgmoneta-cli conf get server.myserver.port
 ```
+`
+**conf set**
 
-### conf set
-
-Set runtime configuration values with immediate application or restart notification.
+Set the value of a runtime configuration parameter.
 
 **Syntax:**
 ```sh
 pgmoneta-cli conf set <config_key> <config_value>
 ```
 
-**Key Formats:**
-- Main configuration: `parameter` or `pgmoneta.parameter`
-- Server configuration: `server.server_name.parameter` (only format supported)
+Examples
 
-**Examples:**
 ```sh
-# Immediate application
+# Logging and monitoring
 pgmoneta-cli conf set log_level debug5
 pgmoneta-cli conf set metrics 5001
+pgmoneta-cli conf set management 5002
+
+# Performance tuning
+pgmoneta-cli conf set workers 4
+pgmoneta-cli conf set backup_max_rate 1000000
 pgmoneta-cli conf set compression zstd
-pgmoneta-cli conf set server.primary.workers 4
 
-# Restart required (shows restart message)
+# Retention policies
+pgmoneta-cli conf set retention "14,2,6,1"
+```
+
+**Key Formats:**
+- **Main section parameters**: `key` or `pgmoneta.key`
+  - Examples: `log_level`, `pgmoneta.metrics`
+- **Server section parameters**: `server.server_name.key` only
+  - Examples: `server.primary.port`, `server.primary.host`
+
+**Important Notes:**
+- Setting `metrics=0` or `management=0` disables those services
+- Invalid port numbers may show success but cause service failures (check server logs)
+- Server configuration uses format `server.name.parameter` (not `name.parameter`)
+
+**Response Types:**
+- **Success (Applied)**: Configuration change applied to running instance immediately
+- **Success (Restart Required)**: Configuration change validated but requires manual update of configuration files AND restart
+- **Error**: Invalid key format, validation failure, or other errors
+
+**Important: Restart Required Changes**
+When a configuration change requires restart, the change is only validated and stored temporarily in memory. To make the change permanent:
+
+1. **Manually edit the configuration file** (e.g., `/etc/pgmoneta/pgmoneta.conf`)
+3. **Restart pgmoneta** using `systemctl restart pgmoneta` or equivalent
+
+**Warning:** Simply restarting pgmoneta without updating the configuration files will **revert** the change back to the file-based configuration.
+
+**Example of Restart Required Process:**
+```sh
+# 1. Attempt to change host (requires restart)
 pgmoneta-cli conf set host 192.168.1.100
-pgmoneta-cli conf set server.primary.port 5433
+# Output: Configuration change requires manual restart
+#         Current value: localhost (unchanged in running instance)
+#         Requested value: 192.168.1.100 (cannot be applied to live instance)
 
-# Service control
-pgmoneta-cli conf set metrics 0      # Disable metrics
-pgmoneta-cli conf set management 0   # Disable management
+# 2. Manually edit /etc/pgmoneta/pgmoneta.conf
+sudo nano /etc/pgmoneta/pgmoneta.conf
+# Change: host = localhost
+# To:     host = 192.168.1.100
+
+# 3. Restart pgmoneta
+sudo systemctl restart pgmoneta
+
+# 4. Verify the change
+pgmoneta-cli conf get host
+# Output: 192.168.1.100
 ```
 
-**Output Examples:**
-```
-# Immediate success
-Configuration change applied successfully
-   Parameter: log_level
-   Old value: info
-   New value: debug5
-   Status: Active (applied to running instance)
+**Why Manual File Editing is Required:**
+- `pgmoneta-cli conf set` only validates and temporarily stores restart-required changes
+- Configuration files are **not automatically updated** by the command
+- On restart, pgmoneta always reads from the configuration files on disk
+- Without file updates, restart will revert to the original file-based values
 
-# Restart required
-Configuration change requires manual restart
-   Parameter: host
-   Current value: localhost (unchanged in running instance)
-   Requested value: 192.168.1.100 (cannot be applied to live instance)
-   Status: Requires full service restart
-```
 
 ## clear
 
@@ -447,7 +480,7 @@ Clear data/statistics
 
 Command
 
-```sh
+``` sh
 pgmoneta-cli clear [prometheus]
 ```
 
@@ -457,7 +490,7 @@ Subcommand
 
 Example
 
-```sh
+``` sh
 pgmoneta-cli clear prometheus
 ```
 

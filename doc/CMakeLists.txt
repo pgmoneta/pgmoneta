@@ -67,14 +67,8 @@ install(FILES ${PGMONETA_CONF_DST_FILE} DESTINATION share/man/man5)
 #
 if(generation)
   # Files
-  FILE(GLOB PREDS "manual/0?-*.md")
-  FILE(GLOB POSTDS "manual/9?-*.md")
-  FILE(GLOB TDS "tutorial/??_*.md")
-  FILE(GLOB UMDS_PRE "manual/user-0?-*.md")
-  FILE(GLOB UMDS_POST "manual/user-1?-*.md")
-  FILE(GLOB DMDS "manual/dev-??-*.md")
-  FILE(GLOB AG_EN "manual/advanced/en/??-*.md")
-  FILE(GLOB AG_HI "manual/advanced/hi/??-*.md")
+  FILE(GLOB EN "manual/en/??-*.md")
+  FILE(GLOB HI "manual/hi/??-*.md")
 
   # Manuals definitions
   set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
@@ -88,73 +82,42 @@ if(generation)
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf --from markdown --template eisvogel --listings -N --toc ${PREDS} ${UMDS_PRE} ${TDS} ${UMDS_POST} ${POSTDS}
-    DEPENDS ${UMDS}
-    COMMENT "Generating User Guide PDF documentation"
-  )
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf --from markdown --template eisvogel --listings -N --toc ${PREDS} ${DMDS} ${POSTDS}
-    DEPENDS ${DMDS}
-    COMMENT "Generating Developer Guide PDF documentation"
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf --from markdown --template eisvogel --listings -N --toc ${EN}
+    DEPENDS ${EN}
+    COMMENT "Generating English PDF documentation"
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${UMDS_PRE} ${TDS} ${UMDS_POST} ${POSTDS}
-    DEPENDS ${UMDS}
-    COMMENT "Generating User Guide HTML documentation"
-  )
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html -s -f markdown-smart -N --toc -t html5 ${PREDS} ${DMDS} ${POSTDS}
-    DEPENDS ${DMDS}
-    COMMENT "Generating Developer Guide HTML documentation"
-  )
-
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf --from markdown --template eisvogel --listings -N --toc ${AG_EN}
-    DEPENDS ${AG_EN}
-    COMMENT "Generating Advanced English PDF documentation"
-  )
-
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf
-    COMMAND ${PANDOC_EXECUTABLE} --quiet -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf --pdf-engine=lualatex --template eisvogel --listings -N --toc ${AG_HI}
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf
+    COMMAND ${PANDOC_EXECUTABLE} --quiet -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf --pdf-engine=lualatex --template eisvogel --listings -N --toc ${HI}
     DEPENDS ${AG_HI}
-    COMMENT "Generating Advanced Hindi PDF documentation"
+    COMMENT "Generating Hindi PDF documentation"
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html -s -f markdown-smart -N --toc -t html5 ${AG_EN}
-    DEPENDS ${AG_EN}
-    COMMENT "Generating Advanced English HTML documentation"
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html -s -f markdown-smart -N --toc -t html5 ${EN}
+    DEPENDS ${EN}
+    COMMENT "Generating English HTML documentation"
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html -s -f markdown-smart -N --toc -t html5 ${AG_HI}
-    DEPENDS ${AG_HI}
-    COMMENT "Generating Advanced Hindi HTML documentation"
+    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
+    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html -s -f markdown-smart -N --toc -t html5 ${HI}
+    DEPENDS ${HI}
+    COMMENT "Generating Hindi HTML documentation"
   )
 
   add_custom_target(
     all_docs ALL
-    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html
-    ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf  ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html
+    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf  ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
   )
 
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-user-guide.html DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-dev-guide.html DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-en.html DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-advanced-hi.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf DESTINATION share/doc/pgmoneta/manual)
+  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html DESTINATION share/doc/pgmoneta/manual)
 
 endif()
 
@@ -176,7 +139,9 @@ if (DOXYGEN_FOUND)
       ${DOXYGEN_VERSION} STREQUAL "1.12.0" OR
       ${DOXYGEN_VERSION} STREQUAL "1.13.0" OR
       ${DOXYGEN_VERSION} STREQUAL "1.13.1" OR
-      ${DOXYGEN_VERSION} STREQUAL "1.13.2")
+      ${DOXYGEN_VERSION} STREQUAL "1.13.2" OR
+      ${DOXYGEN_VERSION} STREQUAL "1.14.0")
+
     add_custom_command(
       TARGET api
       COMMAND ${DOXYGEN_EXECUTABLE} -q ${DOXYFILE_OUT}
