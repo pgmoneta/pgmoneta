@@ -30,10 +30,13 @@ if (check)
   set(SOURCES
     tsclient.c
     tsclient_http.c
+    wal/wal_utils.c
+    wal/wal_17.c
     testcases/pgmoneta_test_1.c
     testcases/pgmoneta_test_2.c
     testcases/pgmoneta_test_3.c
     testcases/pgmoneta_test_4.c
+    testcases/pgmoneta_test_10.c
     runner.c
   )
 

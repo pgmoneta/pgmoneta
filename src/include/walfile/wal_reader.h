@@ -97,6 +97,21 @@ typedef int64_t timestamp_tz;
 #define MAXALIGNTYPE(LEN)          TYPEALIGN(MAXIMUM_ALIGNOF, (LEN))
 #define SHORTALIGN(LEN)            TYPEALIGN(ALIGNOF_SHORT, (LEN))
 
+/* When record crosses page boundary, set this flag in new page's header */
+#define XLP_FIRST_IS_CONTRECORD              MAXALIGN(0x0001)
+
+/* This flag indicates a "long" page header */
+#define XLP_LONG_HEADER                      MAXALIGN(0x0002)
+
+/* This flag indicates backup blocks starting in this page are optional */
+#define XLP_BKP_REMOVABLE                    MAXALIGN(0x0004)
+
+/* Replaces a missing contrecord; see CreateOverwriteContrecordRecord */
+#define XLP_FIRST_IS_OVERWRITE_CONTRECORD    MAXALIGN(0x0008)
+
+/* All defined flag bits in xlp_info (used for validity checking of header) */
+#define XLP_ALL_FLAGS                        MAXALIGN(0x000F)
+
 #define XLogRecHasBlockRef(record, block_id) \
         ((record->max_block_id >= (block_id)) && \
          (record->blocks[block_id].in_use))

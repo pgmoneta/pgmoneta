@@ -130,10 +130,19 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
 {
    int error_code = PGMONETA_WAL_SUCCESS;
    FILE* file = NULL;
-
    struct deque_iterator* record_iterator = NULL;
-   struct xlog_page_header_data* page_header = NULL;
-   struct deque_iterator* page_header_iterator = NULL;
+   uint32_t block_size = wf->long_phd->xlp_xlog_blcksz;
+   uint64_t seg_size = wf->long_phd->xlp_seg_size;
+   int current_page = 0;
+   size_t current_pos = SIZE_OF_XLOG_LONG_PHD;  /* Position in current page */
+   size_t file_pos = current_pos;               /* Absolute file position */
+   char* encoded_record = NULL;
+   struct decoded_xlog_record* record = NULL;
+   uint32_t written = 0;
+   uint32_t total_length = 0;
+   size_t space_left = 0;
+   size_t to_write = 0;
+   size_t current_size = 0;
 
    if (!wf || !path)
    {
@@ -149,9 +158,9 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
       goto error;
    }
 
-   if (pgmoneta_deque_iterator_create(wf->page_headers, &page_header_iterator) || pgmoneta_deque_iterator_create(wf->records, &record_iterator))
+   if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
    {
-      pgmoneta_log_error("Failed to create WAL deque iterators for writing");
+      pgmoneta_log_error("Failed to create WAL record iterator");
       error_code = PGMONETA_WAL_ERR_MEMORY;
       goto error;
    }
@@ -159,78 +168,129 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
    if (fwrite(wf->long_phd, SIZE_OF_XLOG_LONG_PHD, 1, file) != 1)
    {
       pgmoneta_log_error("Failed to write WAL header to file: %s", path);
-      pgmoneta_deque_iterator_destroy(page_header_iterator);
-      pgmoneta_deque_iterator_destroy(record_iterator);
       error_code = PGMONETA_WAL_ERR_IO;
       goto error;
    }
 
-   int page_number = 1;
-   while (pgmoneta_deque_iterator_next(page_header_iterator))
-   {
-      page_header = (struct xlog_page_header_data*) page_header_iterator->value->data;
-      fseek(file, page_number * wf->long_phd->xlp_xlog_blcksz, SEEK_SET);
-      fwrite(page_header, sizeof(struct xlog_page_header_data), 1, file);
-      page_number++;
-   }
-
-   pgmoneta_deque_iterator_destroy(page_header_iterator);
-
-   page_number = 0;
-   fseek(file, SIZE_OF_XLOG_LONG_PHD, SEEK_SET);
-
+   /* Iterate through all records */
    while (pgmoneta_deque_iterator_next(record_iterator))
    {
-      char* encoded_record = NULL;
-      struct decoded_xlog_record* record = (struct decoded_xlog_record*) record_iterator->value->data;
+      record = (struct decoded_xlog_record*)record_iterator->value->data;
+
+      /* Encode the record */
       encoded_record = pgmoneta_wal_encode_xlog_record(record, wf->long_phd->std.xlp_magic, encoded_record);
-
-      uint32_t total_length = record->header.xl_tot_len;
-      uint32_t written = 0;
-      do
+      if (!encoded_record)
       {
-         uint32_t remaining_space_in_current_page = (page_number + 1) * wf->long_phd->xlp_xlog_blcksz - ftell(file);
+         pgmoneta_log_error("Failed to encode WAL record");
+         error_code = PGMONETA_WAL_ERR_FORMAT;
+         goto error;
+      }
 
-         if (remaining_space_in_current_page > 0)
+      total_length = record->header.xl_tot_len;
+      written = 0;
+
+      while (written < total_length)
+      {
+         /* Check if we need to start a new page */
+         if (current_pos >= block_size)
          {
-            written += fwrite(encoded_record + written, 1, MIN(remaining_space_in_current_page, total_length - written), file);
+            current_page++;
+            current_pos = 0;
+            file_pos = current_page * block_size;
+            fseek(file, file_pos, SEEK_SET);
          }
-         if (written != total_length)
+
+         /* Write short header if we're at the start of a new page (not page 0) */
+         if (current_page > 0 && current_pos == 0)
          {
-            page_number++;
-            fseek(file, page_number * wf->long_phd->xlp_xlog_blcksz + SIZE_OF_XLOG_SHORT_PHD, SEEK_SET);
-         }
-         else
-         {
-            /* Add padding until MAXALIGN */
-            int padding = MAXALIGN(ftell(file)) - ftell(file);
-            if (padding > 0)
+            struct xlog_page_header_data short_header;
+            short_header.xlp_magic = wf->long_phd->std.xlp_magic;
+            short_header.xlp_info = (written == 0) ? 0 : XLP_FIRST_IS_CONTRECORD;
+            short_header.xlp_tli = wf->long_phd->std.xlp_tli;
+            short_header.xlp_pageaddr = wf->long_phd->std.xlp_pageaddr + (current_page * block_size);
+            short_header.xlp_rem_len = total_length - written;
+
+            if (fwrite(&short_header, SIZE_OF_XLOG_SHORT_PHD, 1, file) != 1)
             {
-               char zero_padding[padding];
-               memset(zero_padding, 0, padding);
-               fwrite(zero_padding, 1, padding, file);
+               pgmoneta_log_error("Failed to write page header");
+               error_code = PGMONETA_WAL_ERR_IO;
+               goto error;
             }
+
+            current_pos = SIZE_OF_XLOG_SHORT_PHD;
+            file_pos += SIZE_OF_XLOG_SHORT_PHD;
+         }
+
+         /* Calculate space left in current page */
+         space_left = block_size - current_pos;
+         if (space_left == 0)
+         {
+            continue;                      /* Page is full, go to next */
+         }
+
+         /* Calculate how much to write in this chunk */
+         to_write = (total_length - written) < space_left ?
+                    (total_length - written) : space_left;
+
+         /* Write record data */
+         if (fwrite(encoded_record + written, 1, to_write, file) != to_write)
+         {
+            pgmoneta_log_error("Failed to write WAL record data");
+            error_code = PGMONETA_WAL_ERR_IO;
+            goto error;
+         }
+
+         written += to_write;
+         current_pos += to_write;
+         file_pos += to_write;
+      }
+
+      /* Add padding for alignment after record */
+      if (current_pos % MAXIMUM_ALIGNOF != 0)
+      {
+         size_t padding = MAXIMUM_ALIGNOF - (current_pos % MAXIMUM_ALIGNOF);
+         if (padding > 0)
+         {
+            char zero_padding[8] = {0};
+            if (fwrite(zero_padding, 1, padding, file) != padding)
+            {
+               pgmoneta_log_error("Failed to write padding after WAL record (page %d, position %zu, padding %zu bytes) to file: %s",
+                                  current_page, current_pos, padding, path);
+               error_code = PGMONETA_WAL_ERR_IO;
+               goto error;
+            }
+            current_pos += padding;
+            file_pos += padding;
          }
       }
-      while (written != total_length);
-      free(encoded_record);
+   }
+
+   /* Fill remaining segment with zeros */
+   current_size = file_pos;
+   if (current_size < seg_size)
+   {
+      size_t zero_bytes = seg_size - current_size;
+      char* zeros = calloc(1, zero_bytes);
+      if (!zeros)
+      {
+         pgmoneta_log_error("Failed to allocate zero buffer");
+         error_code = PGMONETA_WAL_ERR_MEMORY;
+         goto error;
+      }
+
+      if (fwrite(zeros, 1, zero_bytes, file) != zero_bytes)
+      {
+         free(zeros);
+         pgmoneta_log_error("Failed to write zero padding");
+         error_code = PGMONETA_WAL_ERR_IO;
+         goto error;
+      }
+      free(zeros);
    }
 
    pgmoneta_deque_iterator_destroy(record_iterator);
-
-   /* Fill the rest of the file until xlp_seg_size with zeros */
-   long num_zeros = wf->long_phd->xlp_seg_size - ftell(file);
-   if (num_zeros > 0)
-   {
-      char* zeros = (char*)calloc(num_zeros, sizeof(char));
-      if (zeros)
-      {
-         fwrite(zeros, sizeof(char), num_zeros, file);
-         free(zeros);
-      }
-   }
-
    fclose(file);
+   free(encoded_record);
    return PGMONETA_WAL_SUCCESS;
 
 error:
@@ -238,7 +298,7 @@ error:
    {
       fclose(file);
    }
-   pgmoneta_deque_iterator_destroy(page_header_iterator);
+   free(encoded_record);
    pgmoneta_deque_iterator_destroy(record_iterator);
    return error_code;
 }

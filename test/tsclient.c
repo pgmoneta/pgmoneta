@@ -32,6 +32,7 @@
 #include <brt.h>
 #include <configuration.h>
 #include <json.h>
+#include <logging.h>
 #include <management.h>
 #include <network.h>
 #include <security.h>
@@ -95,6 +96,8 @@ pgmoneta_tsclient_init(char* base_dir)
    {
       goto error;
    }
+
+   pgmoneta_start_logging();
 
    free(configuration_path);
    return 0;

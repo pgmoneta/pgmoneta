@@ -26,56 +26,29 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <tsclient.h>
 
-#include "testcases/pgmoneta_test_1.h"
-#include "testcases/pgmoneta_test_2.h"
-#include "testcases/pgmoneta_test_3.h"
-#include "testcases/pgmoneta_test_4.h"
-#include "testcases/pgmoneta_test_10.h"
+#include <wal_utils.h>
+#include "pgmoneta_test_10.h"
 
-int
-main(int argc, char* argv[])
+START_TEST(check_point_shutdown_v17)
 {
+   int rc = pgmoneta_test_walfile(generate_check_point_shutdown_v17);
+   ck_assert_int_eq(rc, 0);
+}
+END_TEST
 
-   if (argc != 2)
-   {
-      printf("Usage: %s <project_directory>\n", argv[0]);
-      return 1;
-   }
+Suite*
+pgmoneta_test10_suite()
+{
+   Suite* s;
+   TCase* tc_core;
+   s = suite_create("pgmoneta_test10");
 
-   int number_failed;
-   Suite* s1;
-   Suite* s2;
-   Suite* s3;
-   Suite* s4;
-   Suite* s10;
-   SRunner* sr;
+   tc_core = tcase_create("Core");
 
-   if (pgmoneta_tsclient_init(argv[1]))
-   {
-      goto done;
-   }
+   tcase_set_timeout(tc_core, 60);
+   tcase_add_test(tc_core, check_point_shutdown_v17);
+   suite_add_tcase(s, tc_core);
 
-   s1 = pgmoneta_test1_suite();
-   s2 = pgmoneta_test2_suite();
-   s3 = pgmoneta_test3_suite();
-   s4 = pgmoneta_test4_suite();
-   s10 = pgmoneta_test10_suite();
-
-   sr = srunner_create(s1);
-   srunner_add_suite(sr, s2);
-   srunner_add_suite(sr, s3);
-   srunner_add_suite(sr, s4);
-   srunner_add_suite(sr, s10);
-
-   // Run the tests in verbose mode
-   srunner_run_all(sr, CK_VERBOSE);
-   number_failed = srunner_ntests_failed(sr);
-   srunner_free(sr);
-
-done:
-   pgmoneta_tsclient_destroy();
-
-   return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+   return s;
 }
