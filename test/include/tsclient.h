@@ -37,6 +37,7 @@ extern "C" {
 #include <art.h>
 #include <brt.h>
 #include <json.h>
+#include <message.h>
 #include <wal.h>
 #include <walfile/wal_reader.h>
 
@@ -46,11 +47,14 @@ extern "C" {
 
 #define BUFFER_SIZE 8192
 
+#define PGBENCH_LOG_FILE_TRAIL        "/log/pgbench.log"
 #define PGMONETA_LOG_FILE_TRAIL       "/log/pgmoneta.log"
 #define PGMONETA_EXECUTABLE_TRAIL     "/src/pgmoneta-cli"
 #define PGMONETA_CONFIGURATION_TRAIL  "/pgmoneta-testsuite/conf/pgmoneta.conf"
+#define PGMONETA_USERS_TRAIL          "/pgmoneta-testsuite/conf/pgmoneta_users.conf"
 #define PGMONETA_RESTORE_TRAIL        "/pgmoneta-testsuite/restore/"
-#define PGMONETA_BACKUP_SUMMARY_TRAIL "/pgmoneta-testsuite/backup/primary/"
+#define PGMONETA_BACKUP_SUMMARY_TRAIL "/pgmoneta-testsuite/"
+#define PGMONETA_PG_WAL_DIR_TRAIL     "/pgmoneta-testsuite/backup/%s/wal/"
 
 extern char project_directory[BUFFER_SIZE];
 
@@ -99,6 +103,17 @@ pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position)
  */
 int
 pgmoneta_tsclient_execute_delete(char* server, char* backup_id);
+
+/**
+ * Execute an SQL query on postgres database
+ * @param srv The server index
+ * @param query The query to be executed
+ * @param is_dummy Use dummy user and password
+ * @param qr [out] The query response
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_execute_query(int srv, char* query, bool is_dummy, struct query_response** qr);
 
 /**
  * Execute HTTP test
@@ -172,6 +187,16 @@ pgmoneta_tsclient_write(block_ref_table* brt);
  */
 int
 pgmoneta_tsclient_read(block_ref_table** brt);
+
+/**
+ * Summarize WAL in a wal_dir
+ * @param server The name of the server
+ * @param s_lsn The start lsn
+ * @param e_lsn The end lsn
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_tsclient_summarize_wal(char* server);
 
 #ifdef __cplusplus
 }
