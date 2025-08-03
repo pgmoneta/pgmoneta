@@ -540,14 +540,6 @@ main(int argc, char** argv)
       }
    }
 
-   if (pgmoneta_init_logging())
-   {
-#ifdef HAVE_SYSTEMD
-      sd_notify(0, "STATUS=Failed to init logging");
-#endif
-      goto error;
-   }
-
    if (pgmoneta_start_logging())
    {
 #ifdef HAVE_SYSTEMD

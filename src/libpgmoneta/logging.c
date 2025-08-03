@@ -50,7 +50,14 @@ time_t next_log_rotation_age;  /* number of seconds at which the next location w
 
 char current_log_path[MAX_PATH]; /* the current log file */
 
-static char* levels[] =
+static bool log_rotation_enabled(void);
+static void log_rotation_disable(void);
+static bool log_rotation_required(void);
+static bool log_rotation_set_next_rotation_age(void);
+static int log_file_open(void);
+static void log_file_rotate(void);
+
+static char *levels[] =
 {
    "TRACE",
    "DEBUG",
@@ -70,121 +77,6 @@ static char* colors[] =
    "\x1b[35m"
 };
 
-bool
-log_rotation_enabled(void)
-{
-   struct main_configuration* config;
-   config = (struct main_configuration*)shmem;
-
-   // disable log rotation in the case
-   // logging is not to a file
-   if (config->common.log_type != PGMONETA_LOGGING_TYPE_FILE)
-   {
-      log_rotation_disable();
-      return false;
-   }
-
-   // log rotation is enabled if either log_rotation_age or
-   // log_rotation_size is enabled
-   return config->common.log_rotation_age != PGMONETA_LOGGING_ROTATION_DISABLED
-          || config->common.log_rotation_size != PGMONETA_LOGGING_ROTATION_DISABLED;
-}
-
-void
-log_rotation_disable(void)
-{
-   struct main_configuration* config;
-   config = (struct main_configuration*)shmem;
-
-   config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
-   config->common.log_rotation_size = PGMONETA_LOGGING_ROTATION_DISABLED;
-   next_log_rotation_age = 0;
-}
-
-bool
-log_rotation_required(void)
-{
-   struct stat log_stat;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   if (!log_rotation_enabled())
-   {
-      return false;
-   }
-
-   if (stat(current_log_path, &log_stat))
-   {
-      return false;
-   }
-
-   if (config->common.log_rotation_size > 0 && log_stat.st_size >= config->common.log_rotation_size)
-   {
-      return true;
-   }
-
-   if (config->common.log_rotation_age > 0 && next_log_rotation_age > 0 && next_log_rotation_age <= log_stat.st_ctime)
-   {
-      return true;
-   }
-
-   return false;
-}
-
-bool
-log_rotation_set_next_rotation_age(void)
-{
-   struct main_configuration* config;
-   time_t now;
-
-   config = (struct main_configuration*)shmem;
-
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE && config->common.log_rotation_age > 0)
-   {
-      now = time(NULL);
-      if (!now)
-      {
-         config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
-         return false;
-      }
-
-      next_log_rotation_age = now + config->common.log_rotation_age;
-      return true;
-   }
-   else
-   {
-      config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
-      return false;
-   }
-}
-
-/**
- *
- */
-int
-pgmoneta_init_logging(void)
-{
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
-   {
-      log_file_open();
-
-      if (!log_file)
-      {
-         printf("Failed to open log file %s due to %s\n", strlen(config->common.log_path) > 0 ? config->common.log_path : "pgmoneta.log", strerror(errno));
-         errno = 0;
-         log_rotation_disable();
-         return 1;
-      }
-   }
-
-   return 0;
-}
-
 /**
  *
  */
@@ -203,6 +95,7 @@ pgmoneta_start_logging(void)
       {
          printf("Failed to open log file %s due to %s\n", strlen(config->common.log_path) > 0 ? config->common.log_path : "pgmoneta.log", strerror(errno));
          errno = 0;
+         log_rotation_disable();
          return 1;
       }
    }
@@ -212,63 +105,6 @@ pgmoneta_start_logging(void)
    }
 
    return 0;
-}
-
-int
-log_file_open(void)
-{
-   struct main_configuration* config;
-   time_t htime;
-   struct tm* tm;
-
-   config = (struct main_configuration*)shmem;
-
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
-   {
-      htime = time(NULL);
-      if (!htime)
-      {
-         log_file = NULL;
-         return 1;
-      }
-
-      tm = localtime(&htime);
-      if (tm == NULL)
-      {
-         log_file = NULL;
-         return 1;
-      }
-
-      if (strftime(current_log_path, sizeof(current_log_path), config->common.log_path, tm) <= 0)
-      {
-         // cannot parse the format string, fallback to default logging
-         memcpy(current_log_path, "pgmoneta.log", strlen("pgmoneta.log"));
-         log_rotation_disable();
-      }
-
-      log_file = fopen(current_log_path, config->common.log_mode == PGMONETA_LOGGING_MODE_APPEND ? "a" : "w");
-
-      if (!log_file)
-      {
-         return 1;
-      }
-
-      log_rotation_set_next_rotation_age();
-      return 0;
-   }
-
-   return 1;
-}
-
-void
-log_file_rotate(void)
-{
-   if (log_rotation_enabled())
-   {
-      fflush(log_file);
-      fclose(log_file);
-      log_file_open();
-   }
 }
 
 /**
@@ -523,5 +359,151 @@ retry:
       }
       else
         SLEEP_AND_GOTO(1000000L,retry)
+   }
+}
+
+static bool
+log_rotation_enabled(void)
+{
+   struct main_configuration* config;
+   config = (struct main_configuration*)shmem;
+
+   // disable log rotation in the case
+   // logging is not to a file
+   if (config->common.log_type != PGMONETA_LOGGING_TYPE_FILE)
+   {
+      log_rotation_disable();
+      return false;
+   }
+
+   // log rotation is enabled if either log_rotation_age or
+   // log_rotation_size is enabled
+   return config->common.log_rotation_age != PGMONETA_LOGGING_ROTATION_DISABLED
+          || config->common.log_rotation_size != PGMONETA_LOGGING_ROTATION_DISABLED;
+}
+
+static void
+log_rotation_disable(void)
+{
+   struct main_configuration* config;
+   config = (struct main_configuration*)shmem;
+
+   config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+   config->common.log_rotation_size = PGMONETA_LOGGING_ROTATION_DISABLED;
+   next_log_rotation_age = 0;
+}
+
+static bool
+log_rotation_required(void)
+{
+   struct stat log_stat;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (!log_rotation_enabled())
+   {
+      return false;
+   }
+
+   if (stat(current_log_path, &log_stat))
+   {
+      return false;
+   }
+
+   if (config->common.log_rotation_size > 0 && log_stat.st_size >= config->common.log_rotation_size)
+   {
+      return true;
+   }
+
+   if (config->common.log_rotation_age > 0 && next_log_rotation_age > 0 && next_log_rotation_age <= log_stat.st_ctime)
+   {
+      return true;
+   }
+
+   return false;
+}
+
+static bool
+log_rotation_set_next_rotation_age(void)
+{
+   struct main_configuration* config;
+   time_t now;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE && config->common.log_rotation_age > 0)
+   {
+      now = time(NULL);
+      if (!now)
+      {
+         config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+         return false;
+      }
+
+      next_log_rotation_age = now + config->common.log_rotation_age;
+      return true;
+   }
+   else
+   {
+      config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+      return false;
+   }
+}
+
+static int
+log_file_open(void)
+{
+   struct main_configuration* config;
+   time_t htime;
+   struct tm* tm;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+   {
+      htime = time(NULL);
+      if (!htime)
+      {
+         log_file = NULL;
+         return 1;
+      }
+
+      tm = localtime(&htime);
+      if (tm == NULL)
+      {
+         log_file = NULL;
+         return 1;
+      }
+
+      if (strftime(current_log_path, sizeof(current_log_path), config->common.log_path, tm) <= 0)
+      {
+         // cannot parse the format string, fallback to default logging
+         memcpy(current_log_path, "pgmoneta.log", strlen("pgmoneta.log"));
+         log_rotation_disable();
+      }
+
+      log_file = fopen(current_log_path, config->common.log_mode == PGMONETA_LOGGING_MODE_APPEND ? "a" : "w");
+
+      if (!log_file)
+      {
+         return 1;
+      }
+
+      log_rotation_set_next_rotation_age();
+      return 0;
+   }
+
+   return 1;
+}
+
+static void
+log_file_rotate(void)
+{
+   if (log_rotation_enabled())
+   {
+      fflush(log_file);
+      fclose(log_file);
+      log_file_open();
    }
 }

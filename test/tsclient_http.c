@@ -38,7 +38,7 @@ pgmoneta_tsclient_execute_http()
    int status;
    struct http* h = NULL;
 
-   pgmoneta_init_logging();
+   pgmoneta_start_logging();
 
    const char* hostname = "localhost";
    int port = 9999;
@@ -53,6 +53,8 @@ pgmoneta_tsclient_execute_http()
 
    pgmoneta_http_disconnect(h);
    pgmoneta_http_destroy(h);
+
+   pgmoneta_stop_logging();
 
    return (status == 0) ? 0 : 1;
 }
@@ -63,7 +65,7 @@ pgmoneta_tsclient_execute_https()
    int status;
    struct http* h = NULL;
 
-   pgmoneta_init_logging();
+   pgmoneta_start_logging();
 
    const char* hostname = "localhost";
    int port = 9999;
@@ -79,6 +81,8 @@ pgmoneta_tsclient_execute_https()
    pgmoneta_http_disconnect(h);
    pgmoneta_http_destroy(h);
 
+   pgmoneta_stop_logging();
+
    return (status == 0) ? 0 : 1;
 }
 
@@ -88,7 +92,7 @@ pgmoneta_tsclient_execute_http_post()
    int status;
    struct http* h = NULL;
 
-   pgmoneta_init_logging();
+   pgmoneta_start_logging();
 
    const char* hostname = "localhost";
    int port = 9999;
@@ -105,6 +109,8 @@ pgmoneta_tsclient_execute_http_post()
    pgmoneta_http_disconnect(h);
    pgmoneta_http_destroy(h);
 
+   pgmoneta_stop_logging();
+
    return (status == 0) ? 0 : 1;
 }
 
@@ -114,7 +120,7 @@ pgmoneta_tsclient_execute_http_put()
    int status;
    struct http* h = NULL;
 
-   pgmoneta_init_logging();
+   pgmoneta_start_logging();
 
    const char* hostname = "localhost";
    int port = 9999;
@@ -131,6 +137,8 @@ pgmoneta_tsclient_execute_http_put()
    pgmoneta_http_disconnect(h);
    pgmoneta_http_destroy(h);
 
+   pgmoneta_stop_logging();
+
    return (status == 0) ? 0 : 1;
 }
 
@@ -141,7 +149,7 @@ pgmoneta_tsclient_execute_http_put_file()
    struct http* h = NULL;
    FILE* temp_file = NULL;
 
-   pgmoneta_init_logging();
+   pgmoneta_start_logging();
 
    const char* hostname = "localhost";
    int port = 9999;
@@ -174,6 +182,8 @@ pgmoneta_tsclient_execute_http_put_file()
    pgmoneta_http_disconnect(h);
    pgmoneta_http_destroy(h);
    fclose(temp_file);
+
+   pgmoneta_stop_logging();
 
    return (status == 0) ? 0 : 1;
 }
