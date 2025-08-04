@@ -62,6 +62,22 @@ pgmoneta_server_valid(int srv);
 bool
 pgmoneta_server_verify_connection(int srv);
 
+/**
+ * Read a relation file from the server cluster
+ * @param srv The server index
+ * @param ssl The SSL connection
+ * @param relative_file_path The relative path of the relation file inside the data cluter
+ * @param offset The offset of the file from where data retrieval should start
+ * @param length The number of bytes that should be retrieved
+ * @param socket The socket
+ * @param [out] out The binary output
+ * @param [out] len The binary output length
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, int offset,
+     int length, int socket, uint8_t** out, int* len);
+
 #ifdef __cplusplus
 }
 #endif

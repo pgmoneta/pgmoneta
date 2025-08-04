@@ -53,6 +53,9 @@ static int get_checksums(SSL* ssl, int socket, bool* checksums);
 static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, size_t* blocksz);
 static int get_summarize_wal(SSL* ssl, int socket, bool* sw);
+static int has_user_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role);
+static int has_execute_privilege(SSL* ssl, int socket, char* usr, char* func_name, bool* has_privilege);
+static int transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len);
 static int process_server_parameters(int server, struct deque* server_parameters);
 
 static bool is_valid_response(struct query_response* response);
@@ -259,6 +262,120 @@ pgmoneta_server_verify_connection(int srv)
    }
 
    return false;
+}
+
+int
+pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, int offset, 
+   int length, int socket, uint8_t** out, int* len)
+{
+   char* user = NULL;
+   int ret;
+   int q = 0;
+   bool has_role = false;
+   bool has_privilege = false;
+   char bytea_data_buffer[DEFAULT_BURST];
+   uint8_t* b_out = NULL;
+   int b_len = 0;
+   char query[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto done;
+   }
+
+   user = config->common.servers[srv].username;
+
+   /* Check if the user has pg_read_server_files role */
+   if (has_user_role(ssl, socket, user, "pg_read_server_files", &has_role))
+   {
+      goto error;
+   }
+
+   if (!has_role)
+   {
+      pgmoneta_log_debug("Connection user: %s does not have 'pg_read_server_files' role", user);
+      goto error;
+   }
+   
+   /* Check if the user has EXECUTE privilege on 'pg_read_binary_file(text, bigint, bigint, boolean)' */
+   if (has_execute_privilege(ssl, socket, user, "pg_read_binary_file(text, bigint, bigint, boolean)", &has_privilege))
+   {
+      goto error;
+   }
+
+   if (!has_privilege)
+   {
+      pgmoneta_log_debug("Connection user: %s does not have EXECUTE privilege on 'pg_read_binary_file(text, bigint, bigint, boolean)' function", user);
+      goto error;
+   }
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT pg_read_binary_file('%s', %d, %d, false);", relative_file_path, offset, length);
+
+   ret = pgmoneta_create_query_message(query, &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+   
+   if (response->number_of_columns != 1)
+   {
+      pgmoneta_log_error("Unexpected number of columns in query response");
+      goto error;
+   }
+
+   memset(bytea_data_buffer, 0, DEFAULT_BURST);
+
+   /* Note: we get data in hex format */
+   snprintf(bytea_data_buffer, DEFAULT_BURST, "%s", response->tuples->data[0]);
+
+   /* Transform it to binary */
+   if (transform_hex_bytea_to_binary(bytea_data_buffer, &b_out, &b_len))
+   {
+      goto error;
+   }
+
+done:
+   *out = b_out;
+   *len = b_len;
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+   free(b_out);
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 1;
 }
 
 static int
@@ -758,6 +875,197 @@ is_valid_response(struct query_response* response)
    }
 
    return true;
+}
+
+static int
+has_user_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role)
+{
+   int q = 0;
+   int ret;
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   char res[MISC_LENGTH];
+   char query[MISC_LENGTH];
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT pg_has_role('%s', '%s', 'member');", usr, role);
+
+   ret = pgmoneta_create_query_message(query, &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&res[0], 0, sizeof(res));
+   snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
+
+   if (response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   if (!strcmp(res, "t"))
+   {
+      *has_role = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 1;
+}
+
+static int
+has_execute_privilege(SSL* ssl, int socket, char* usr, char* func_name, bool* has_privilege)
+{
+   int q = 0;
+   int ret;
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   char res[MISC_LENGTH];
+   char query[MISC_LENGTH];
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT has_function_privilege('%s', '%s', 'EXECUTE');", usr, func_name);
+
+   ret = pgmoneta_create_query_message(query, &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&res[0], 0, sizeof(res));
+   snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
+
+   if (response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   if (!strcmp(res, "t"))
+   {
+      *has_privilege = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 1;
+}
+
+static int
+transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
+{
+   size_t hex_len;
+   size_t binary_len;
+   uint8_t* binary_out = NULL;
+   char* hb = NULL;
+   int hi, lo;
+   char hex_chr_str[2] = {0};
+
+   /* check if valid hex bytea string */
+   if (hex_bytea == NULL || strncmp(hex_bytea, "\\x", 2) != 0)
+   {
+      pgmoneta_log_error("invalid hex bytea (missing \\x prefix)");
+      goto error;
+   }
+
+   /* skip '\x' */
+   hb = hex_bytea + 2;
+   hex_len = strlen(hb);
+
+   if (hex_len % 2 != 0)
+   {
+      pgmoneta_log_error("invalid hex bytea (partial data)");
+      goto error;
+   }
+   
+   binary_len = hex_len / 2;
+   binary_out = (uint8_t*)malloc(sizeof(uint8_t) * binary_len);
+   if (binary_out == NULL)
+   {
+      goto error;
+   }
+   
+   for (size_t i = 0; i < binary_len; i++)
+   {
+      hex_chr_str[0] = hb[2 * i];
+      sscanf(hex_chr_str, "%x", &hi);
+      hex_chr_str[0] = hb[2 * i + 1];
+      sscanf(hex_chr_str, "%x", &lo);
+      if (hi == -1 || lo == -1)
+      {
+         pgmoneta_log_error("invalid hex character encountered");
+         goto error;
+      }
+      binary_out[i] = (uint8_t)(hi << 4) | (uint8_t)lo;
+   }
+
+   *out = binary_out;
+   *len = binary_len;
+   return 0;
+error:
+
+   free(binary_out);
+   return 1;
 }
 
 static int
