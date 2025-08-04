@@ -796,50 +796,16 @@ pgmoneta_is_backup_valid(int server, char* identifier)
    char* d = NULL;
    char* base = NULL;
    char* sha = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
    struct backup* bck = NULL;
 
    d = pgmoneta_get_server_backup(server);
 
-   if (pgmoneta_load_infos(d, &number_of_backups, &backups))
+   if (pgmoneta_load_info(d, identifier, &bck))
    {
       goto error;
    }
 
-   if (!strcmp(identifier, "oldest"))
-   {
-      if (number_of_backups > 0)
-      {
-         bck = backups[0];
-      }
-   }
-   else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
-   {
-      if (number_of_backups > 0)
-      {
-         bck = backups[number_of_backups - 1];
-      }
-   }
-   else
-   {
-      /* Explicit search */
-      for (int i = 0; i < number_of_backups; i++)
-      {
-         if (backups[i] != NULL && !strcmp(backups[i]->label, identifier))
-         {
-            bck = backups[i];
-         }
-      }
-   }
-
    result = pgmoneta_is_backup_struct_valid(server, bck);
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
 
    free(base);
    free(sha);
@@ -848,12 +814,6 @@ pgmoneta_is_backup_valid(int server, char* identifier)
    return result;
 
 error:
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
 
    free(sha);
    free(base);

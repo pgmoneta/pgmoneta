@@ -411,61 +411,56 @@ error:
 }
 
 int
-pgmoneta_load_info(char* directory, char* label, struct backup** backup)
+pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
 {
+   char* label = NULL;
    char* fn = NULL;
    char buffer[INFO_BUFFER_SIZE];
    FILE* file = NULL;
    int tbl_idx = 0;
    struct backup* bck = NULL;
-   int backup_index = -1;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   char* identifier = NULL;
    *backup = NULL;
 
-   identifier = label;
-   if (!strcmp(label, "oldest") || !strcmp(label, "latest") || !strcmp(label, "newest"))
+   if (!strcmp(identifier, "oldest") || !strcmp(identifier, "newest") || !strcmp(identifier, "latest"))
    {
+      int number_of_backups = 0;
+      struct backup **backups = NULL;
+
       if (pgmoneta_load_infos(directory, &number_of_backups, &backups))
       {
          goto error;
       }
 
-      if (!strcmp(label, "oldest"))
+      if (number_of_backups == 0)
       {
-         for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
-         {
-            if (backups[i] != NULL)
-            {
-               backup_index = i;
-            }
-         }
-      }
-      else if (!strcmp(label, "latest") || !strcmp(label, "newest"))
-      {
-         for (int i = number_of_backups - 1; backup_index == -1 && i >= 0; i--)
-         {
-            if (backups[i] != NULL)
-            {
-               backup_index = i;
-            }
-         }
+         goto error;
       }
 
-      if (backup_index != -1)
+      if (!strcmp(identifier, "oldest"))
       {
-         identifier = backups[backup_index]->label;
+         label = pgmoneta_append(label, backups[0]->label);
       }
-      else
+      else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
       {
-         pgmoneta_log_info("still -1");
+         label = pgmoneta_append(label, backups[number_of_backups - 1]->label);
       }
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
+   }
+   else
+   {
+      label = identifier;
    }
 
    fn = NULL;
    fn = pgmoneta_append(fn, directory);
-   fn = pgmoneta_append(fn, identifier);
+   fn = pgmoneta_append(fn, label);
    fn = pgmoneta_append(fn, "/backup.info");
 
    file = fopen(fn, "r");
@@ -697,6 +692,11 @@ pgmoneta_load_info(char* directory, char* label, struct backup** backup)
    }
    free(backups);
 
+   if (identifier != label)
+   {
+      free(label);
+   }
+
    return 0;
 
 error:
@@ -711,11 +711,10 @@ error:
 
    free(fn);
 
-   for (int i = 0; i < number_of_backups; i++)
+   if (identifier != label)
    {
-      free(backups[i]);
+      free(label);
    }
-   free(backups);
 
    return 1;
 }

@@ -99,8 +99,7 @@ pgmoneta_delete_wal(int srv)
 {
    int backup_index = -1;
    char* d = NULL;
-   int number_of_backups = 0;
-   struct backup** backups = NULL;
+   struct backup* backup = NULL;
    char* srv_wal = NULL;
    char* wal_shipping = NULL;
    int number_of_srv_wal_files = 0;
@@ -109,26 +108,17 @@ pgmoneta_delete_wal(int srv)
    /* Find the oldest backup */
    d = pgmoneta_get_server_backup(srv);
 
-   if (pgmoneta_load_infos(d, &number_of_backups, &backups))
+   if (pgmoneta_load_info(d, "oldest", &backup))
    {
       goto error;
-   }
-
-   for (int i = 0; backup_index == -1 && i < number_of_backups; i++)
-   {
-      if (!backups[i]->keep && pgmoneta_is_backup_struct_valid(srv, backups[i]))
-      {
-         backup_index = i;
-      }
    }
 
    free(d);
    d = NULL;
 
-   /* Find the oldest WAL file */
-   if (backup_index == 0)
+   if (backup != NULL)
    {
-      d = pgmoneta_get_server_backup_identifier_data_wal(srv, backups[backup_index]->label);
+      d = pgmoneta_get_server_backup_identifier_data_wal(srv, backup->label);
 
       number_of_srv_wal_files = 0;
       srv_wal_files = NULL;
@@ -145,9 +135,8 @@ pgmoneta_delete_wal(int srv)
    }
 
    /* Delete WAL if there are no backups, or the oldest one is valid */
-   if (number_of_backups == 0 || backup_index == 0)
+   if (backup == NULL)
    {
-
       d = pgmoneta_get_server_wal(srv);
       delete_wal_older_than(srv_wal, d, backup_index);
       free(d);
@@ -170,12 +159,6 @@ pgmoneta_delete_wal(int srv)
    }
    free(srv_wal_files);
 
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
-
    return 0;
 
 error:
@@ -188,12 +171,6 @@ error:
       free(srv_wal_files[i]);
    }
    free(srv_wal_files);
-
-   for (int i = 0; i < number_of_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
 
    return 1;
 }

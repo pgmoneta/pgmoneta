@@ -185,12 +185,12 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
 /**
  * Get a backup
  * @param directory The directory
- * @param label The label
+ * @param identifier The identifier
  * @param backup The backup
  * @return The result
  */
 int
-pgmoneta_load_info(char* directory, char* label, struct backup** backup);
+pgmoneta_load_info(char* directory, char* identifier, struct backup** backup);
 
 /**
  * Get the number of valid backups
