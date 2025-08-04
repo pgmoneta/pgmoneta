@@ -197,8 +197,6 @@ check_system_requirements() {
 
 initialize_log_files() {
    echo -e "\e[34mInitialize Test logfiles \e[0m"
-   mkdir -p $LOG_DIRECTORY
-   echo "create log directory ... $LOG_DIRECTORY"
    touch $PGMONETA_LOG_FILE
    echo "create log file ... $PGMONETA_LOG_FILE"
    touch $PGCTL_LOG_FILE
@@ -508,7 +506,20 @@ EOF
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-admin master-key -P $PGPASSWORD || true"
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-admin -f $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -U repl -P $PGPASSWORD user add"
    echo "add user repl to pgmoneta_users.conf file ... ok"
+   echo "keep a sample pgmoneta configuration"
+   cp $CONFIGURATION_DIRECTORY/pgmoneta.conf $CONFIGURATION_DIRECTORY/pgmoneta.conf.sample
    echo ""
+}
+
+export_pgmoneta_test_variables() {
+  echo "export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf"
+  export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf
+
+  echo "export PGMONETA_TEST_CONF_SAMPLE=$CONFIGURATION_DIRECTORY/pgmoneta.conf.sample"
+  export PGMONETA_TEST_CONF_SAMPLE=$CONFIGURATION_DIRECTORY/pgmoneta.conf.sample
+
+  echo "export PGMONETA_TEST_RESTORE_DIR=$PGMONETA_OPERATION_DIR/restore"
+  export PGMONETA_TEST_RESTORE_DIR=$PGMONETA_OPERATION_DIR/restore
 }
 
 execute_testcases() {
@@ -533,7 +544,7 @@ execute_testcases() {
       clean
       exit 1
    fi
-   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf ping"
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf status details"
    if [ $? -eq 0 ]; then
       echo "pgmoneta server started ... ok"
    else
@@ -543,7 +554,7 @@ execute_testcases() {
       exit 1
    fi
    ### RUN TESTCASES ###
-   $TEST_DIRECTORY/pgmoneta_test $PROJECT_DIRECTORY
+   $TEST_DIRECTORY/pgmoneta_test
    if [ $? -ne 0 ]; then
       run_as_postgres "$EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown"
       stop_pgctl
@@ -617,6 +628,8 @@ run_tests() {
 
       ## pgmoneta operations
       pgmoneta_initialize_configuration
+      ## pgmoneta env variables
+      export_pgmoneta_test_variables
       # execute_pgmoneta_ext_suite Uncomment when pgmoneta_ext is enabled
       execute_testcases
       # clean cluster

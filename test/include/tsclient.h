@@ -34,144 +34,44 @@
 extern "C" {
 #endif
 
-#include <art.h>
+#include <pgmoneta.h>
 #include <brt.h>
-#include <json.h>
-#include <wal.h>
 #include <walfile/wal_reader.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#define BUFFER_SIZE 8192
-
-#define PGMONETA_LOG_FILE_TRAIL       "/log/pgmoneta.log"
-#define PGMONETA_EXECUTABLE_TRAIL     "/src/pgmoneta-cli"
-#define PGMONETA_CONFIGURATION_TRAIL  "/pgmoneta-testsuite/conf/pgmoneta.conf"
-#define PGMONETA_RESTORE_TRAIL        "/pgmoneta-testsuite/restore/"
-#define PGMONETA_BACKUP_SUMMARY_TRAIL "/pgmoneta-testsuite/backup/primary/"
-
-extern char project_directory[BUFFER_SIZE];
-
-/**
- * Initialize the tsclient API
- * @param base_dir path to base
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_init(char* base_dir);
-
-/**
- * Destroy the tsclient (must be used after pgmoneta_tsclient_init)
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_destroy();
 
 /**
  * Execute backup command on the server
- * @param socket the value of socket corresponding to the main server
  * @param server the server to perform backup on
  * @param incremental execute backup in incremental mode
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_execute_backup(char* server, char* incremental);
+pgmoneta_tsclient_backup(char* server, char* incremental);
 
 /**
  * Execute restore command on the server
- * @param socket the value of socket corresponding to the main server
  * @param server the server to perform restore on
  * @param backup_id the backup_id to perform restore on
  * @param position the position parameters
- * @return 0 upon success, otherwise
+ * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_execute_restore(char* server, char* backup_id, char* position);
+pgmoneta_tsclient_restore(char* server, char* backup_id, char* position);
 
 /**
  * Execute delete command on the server
- * @param socket the value of socket corresponding to the main server
  * @param server the server to perform delete on
  * @param backup_id the backup_id to delete
- * @return 0 upon success, otherwise
- */
-int
-pgmoneta_tsclient_execute_delete(char* server, char* backup_id);
-
-/**
- * Execute HTTP test
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_execute_http();
+pgmoneta_tsclient_delete(char* server, char* backup_id);
 
 /**
- * Execute HTTPS test
+ * Execute reload command on the server
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_tsclient_execute_https();
-
-/**
- * Execute HTTP POST test
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_execute_http_post();
-
-/**
- * Execute HTTP PUT test
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_execute_http_put();
-
-/**
- * Execute HTTP PUT file test
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tsclient_execute_http_put_file();
-
-/**
- * Mark n consecutive blocknumber starting at blkno as modified in the block reference table
- * @param brt The block reference table
- * @param rlocator Pointer to the relation fork
- * @param frk fork number of the relation fork
- * @param blkno The starting block number
- * @param n The number of consecutive block to be marked as modified
- * @return 0 if success, otherwise failure
- */
-int
-pgmoneta_tsclient_execute_consecutive_mark_block_modified(block_ref_table* brt, struct rel_file_locator* rlocator, enum fork_number frk, block_number blkno, int n);
-
-/**
- * Initialize the relation fork
- * @param spcoid The tablespace OID
- * @param dboid The database OID
- * @param relnum The relation number
- * @param frk The fork number
- * @param rlocator Pointer to the relation file locator to be initialized
- * @param forknum Pointer to the fork number to be set
- */
-void
-pgmoneta_tsclient_relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number frk, struct rel_file_locator* rlocator, enum fork_number* forknum);
-
-/**
- * Write the block reference table to a file
- * @param brt The block reference table to be written
- */
-int
-pgmoneta_tsclient_write(block_ref_table* brt);
-
-/**
- * Read the block reference table from a file
- * @param brt Pointer to the block reference table to be read
- */
-int
-pgmoneta_tsclient_read(block_ref_table** brt);
+pgmoneta_tsclient_reload();
 
 #ifdef __cplusplus
 }

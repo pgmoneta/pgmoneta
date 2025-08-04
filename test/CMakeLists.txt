@@ -27,22 +27,15 @@
 #
 if (check)
 
-  set(SOURCES
-    tsclient.c
-    tsclient_http.c
-    wal/wal_utils.c
-    wal/wal_17.c
-    testcases/pgmoneta_test_1.c
-    testcases/pgmoneta_test_2.c
-    testcases/pgmoneta_test_3.c
-    testcases/pgmoneta_test_4.c
-    testcases/pgmoneta_test_10.c
-    runner.c
-  )
+  FILE(GLOB_RECURSE SOURCE_FILES "libpgmonetatest/*.c" "testcases/*.c")
+  FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
+
+  set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
+  set(ENABLE_COVERAGE OFF)
 
   add_compile_options(-O0)
   add_compile_options(-DDEBUG)
-  
+
   if (CMAKE_BUILD_TYPE MATCHES Debug)
     if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
       if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")
@@ -60,8 +53,7 @@ if (check)
       endif()
     endif()
   endif()
-
-  add_executable(pgmoneta_test ${SOURCES})
+  add_executable(pgmoneta_test runner.c ${SOURCES})
   target_include_directories(pgmoneta_test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
 
   if(EXISTS "/etc/debian_version")

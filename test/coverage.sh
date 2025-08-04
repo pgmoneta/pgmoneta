@@ -56,10 +56,19 @@ $CONTAINER_ENGINE rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 # Build the image
 $CONTAINER_ENGINE build -f "$DOCKERFILE" -t "$IMAGE_NAME" .
 
+# Prepare the log and coverage directory
+sudo rm -rf "$LOG_DIR" "$COVERAGE_DIR"
+sudo mkdir -p "$LOG_DIR" "$COVERAGE_DIR"
+sudo chmod 777 "$LOG_DIR" "$COVERAGE_DIR"
+
 # Run it, generate & invoke the in-container script
-$CONTAINER_ENGINE run --name "$CONTAINER_NAME" "$IMAGE_NAME" bash -c '
+$CONTAINER_ENGINE run -i --rm \
+-v "$LOG_DIR:/pgmoneta/build/log" \
+-v "$COVERAGE_DIR:/pgmoneta/build/coverage" \
+--name "$CONTAINER_NAME" "$IMAGE_NAME" bash -c '
 set -e
 cd /pgmoneta/build/
+chmod +x ./testsuite.sh
 ./testsuite.sh
 echo "Generating coverage reports…"
 mkdir -p coverage
@@ -69,11 +78,6 @@ gcovr -r /pgmoneta/src --object-directory . > coverage/summary.txt
 gcovr -r /pgmoneta/src --object-directory . --xml -o coverage/coverage.xml
 echo "Coverage in /pgmoneta/build/coverage"
 '
-
-# Copy back logs and coverage
-mkdir -p "$LOG_DIR" "$COVERAGE_DIR"
-$CONTAINER_ENGINE cp "$CONTAINER_NAME:/pgmoneta/build/log/." "$LOG_DIR"
-$CONTAINER_ENGINE cp "$CONTAINER_NAME:/pgmoneta/build/coverage/." "$COVERAGE_DIR"
 
 echo " Fixing file ownership for host user"
 if ! sudo chown -R "$(id -u):$(id -g)" "$LOG_DIR" "$COVERAGE_DIR"; then

@@ -45,7 +45,6 @@ RUN dnf -y update && \
       libssh-devel libatomic \
       python3-docutils bzip2-devel libarchive-devel \
       net-tools check check-devel graphviz \
-      doxygen pandoc texlive texlive-latex \
       python3-pip ca-certificates wget \
       libasan libubsan libstdc++-devel libgcc glibc-devel \
       gawk coreutils findutils iproute && \
@@ -53,14 +52,14 @@ RUN dnf -y update && \
 
 RUN pip3 install --no-cache-dir gcovr
 
-RUN dnf -y install --allowerasing \
+RUN dnf -y install --nogpgcheck --allowerasing \
         https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm && \
-    dnf -qy module disable postgresql && \
-    dnf -y install --allowerasing \
+    dnf -qy --nogpgcheck module disable postgresql && \
+    dnf -y install --nogpgcheck --allowerasing \
       postgresql${PGVERSION} \
       postgresql${PGVERSION}-server \
       postgresql${PGVERSION}-contrib && \
-    dnf clean all
+    dnf --nogpgcheck clean all
 
 # Prepare PGDATA
 RUN mkdir -p /var/lib/pgsql/data && \

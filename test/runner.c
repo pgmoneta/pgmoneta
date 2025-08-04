@@ -26,56 +26,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <tsclient.h>
+#include <shmem.h>
+#include <tscommon.h>
+#include <tssuite.h>
+#include <configuration.h>
 
-#include "testcases/pgmoneta_test_1.h"
-#include "testcases/pgmoneta_test_2.h"
-#include "testcases/pgmoneta_test_3.h"
-#include "testcases/pgmoneta_test_4.h"
-#include "testcases/pgmoneta_test_10.h"
+#include "logging.h"
 
 int
 main(int argc, char* argv[])
 {
-
-   if (argc != 2)
-   {
-      printf("Usage: %s <project_directory>\n", argv[0]);
-      return 1;
-   }
-
-   int number_failed;
-   Suite* s1;
-   Suite* s2;
-   Suite* s3;
-   Suite* s4;
-   Suite* s10;
+   int number_failed = 0;
+   Suite* backup_suite;
+   Suite* restore_suite;
+   Suite* delete_suite;
+   Suite* http_suite;
+   Suite* wal_utils_suite;
+   Suite* wal_summary_suite;
    SRunner* sr;
 
-   if (pgmoneta_tsclient_init(argv[1]))
-   {
-      goto done;
-   }
+   pgmoneta_test_environment_create();
 
-   s1 = pgmoneta_test1_suite();
-   s2 = pgmoneta_test2_suite();
-   s3 = pgmoneta_test3_suite();
-   s4 = pgmoneta_test4_suite();
-   s10 = pgmoneta_test10_suite();
+   backup_suite = pgmoneta_test_backup_suite();
+   restore_suite = pgmoneta_test_restore_suite();
+   delete_suite = pgmoneta_test_delete_suite();
+   http_suite = pgmoneta_test_http_suite();
+   wal_utils_suite = pgmoneta_test_wal_utils_suite();
+   wal_summary_suite = pgmoneta_test_wal_summary_suite();
 
-   sr = srunner_create(s1);
-   srunner_add_suite(sr, s2);
-   srunner_add_suite(sr, s3);
-   srunner_add_suite(sr, s4);
-   srunner_add_suite(sr, s10);
-
+   sr = srunner_create(backup_suite);
+   srunner_add_suite(sr, restore_suite);
+   srunner_add_suite(sr, delete_suite);
+   srunner_add_suite(sr, http_suite);
+   srunner_add_suite(sr, wal_utils_suite);
+   srunner_add_suite(sr, wal_summary_suite);
+   srunner_set_log (sr, "-");
+   srunner_set_fork_status(sr, CK_NOFORK);
    // Run the tests in verbose mode
    srunner_run_all(sr, CK_VERBOSE);
    number_failed = srunner_ntests_failed(sr);
    srunner_free(sr);
 
-done:
-   pgmoneta_tsclient_destroy();
+   pgmoneta_test_environment_destroy();
 
    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

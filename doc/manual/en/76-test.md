@@ -85,18 +85,7 @@ before running the script again to avoid any inconsistency or errors. The clean 
 
 To add an additional testcase go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
 
-Create a `.c` file that contains the test suite and its corresponding `.h` file (see [pgmoneta_test_1.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/pgmoneta_test_1.c) or [pgmoneta_test_2.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/pgmoneta_test_2.c) for reference). Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases/runner.c)
-
-Also remember to link the new test suite in [CMakeLists](https://github.com/pgmoneta/pgmoneta/blob/main/test/CMakeLists.txt) file inside test directory
-
-```
-30:  set(SOURCES
-31:    testcases/common.c
-32:    testcases/pgmoneta_test_1.c
-33:    testcases/pgmoneta_test_2.c
-34:    testcases/runner.c
-35:  )
-```
+Create a `.c` file that contains the test suite and define the suite inside `/test/include/tssuite.sh`. Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/runner.c)
 
 
 **Running Containerized Tests**
