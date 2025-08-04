@@ -1363,6 +1363,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
 
    write_info(sfile, "%s=%u\n", INFO_START_TIMELINE, backup->start_timeline);
    write_info(sfile, "%s=%u\n", INFO_END_TIMELINE, backup->end_timeline);
+   write_info(sfile, "%s=%d\n", INFO_TYPE, backup->type);
    write_info(sfile, "%s=%s\n", INFO_PARENT, backup->parent_label);
    write_info(sfile, "%s=%s\n", INFO_COMMENTS, backup->comments);
 

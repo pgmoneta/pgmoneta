@@ -76,6 +76,7 @@ START_TEST(test_pgmoneta_backup_incremental_basic)
    {
       free(backups[i]);
    }
+   free(backups);
 }
 END_TEST
 
