@@ -218,6 +218,7 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
       free(backups[i]);
    }
    free(backups);
+   free((struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP));
    free(server_path);
    free(from);
    free(to);

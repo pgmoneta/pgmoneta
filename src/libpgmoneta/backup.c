@@ -399,7 +399,6 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
    struct json* request = NULL;
    char* sort_order = NULL;
    bool sort_desc = false;
-   int comp_result;
 
    config = (struct main_configuration*)shmem;
 
@@ -449,21 +448,7 @@ pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t enc
          }
 
          // Sort the backups array based on timestamps (label)
-         for (int i = 0; i < number_of_backups - 1; i++)
-         {
-            for (int j = i + 1; j < number_of_backups; j++)
-            {
-               comp_result = strcmp(backups[i]->label, backups[j]->label);
-
-               // Swap if needed based on sort order
-               if ((sort_desc && comp_result < 0) || (!sort_desc && comp_result > 0))
-               {
-                  struct backup* temp = backups[i];
-                  backups[i] = backups[j];
-                  backups[j] = temp;
-               }
-            }
-         }
+         pgmoneta_sort_backups(backups, number_of_backups, sort_desc);
       }
    }
 

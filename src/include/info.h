@@ -324,6 +324,16 @@ pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, 
 int
 pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* biggest_file_size);
 
+/**
+ * Sort the backup array by its label
+ * @param backups The backups
+ * @param number_of_backups The number of backups
+ * @param desc Sort in descending order
+ * @return 0 on success, 1 if otherwise
+ */
+int
+pgmoneta_sort_backups(struct backup** backups, int number_of_backups, bool desc);
+
 #ifdef __cplusplus
 }
 #endif

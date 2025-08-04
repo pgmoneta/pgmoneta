@@ -169,12 +169,6 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_permission(manifest, 6, 0, 0);
 
-   pgmoneta_json_reader_close(reader);
-   pgmoneta_csv_writer_destroy(writer);
-   pgmoneta_json_destroy(entry);
-   free(manifest);
-   free(manifest_orig);
-
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
 #else
@@ -182,7 +176,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 #endif
 
    manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
-   if (pgmoneta_load_info(backup_dir, backup->label, &backup_loaded))
+   if (pgmoneta_load_info(backup_dir, label, &backup_loaded))
    {
       goto error;
    }
@@ -192,15 +186,18 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   free(backup);
    free(backup_loaded);
+   pgmoneta_json_reader_close(reader);
+   pgmoneta_csv_writer_destroy(writer);
+   pgmoneta_json_destroy(entry);
+   free(manifest);
+   free(manifest_orig);
    return 0;
 
 error:
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
-   free(backup);
    free(backup_loaded);
    free(manifest);
    free(manifest_orig);

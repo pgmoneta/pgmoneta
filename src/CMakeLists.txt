@@ -367,7 +367,7 @@ install(TARGETS pgmoneta DESTINATION ${CMAKE_INSTALL_LIBDIR}/)
 #
 # Build pgmoneta
 #
-add_executable(pgmoneta-bin main.c ${RESOURCE_OBJECT})
+add_executable(pgmoneta-bin main.c)
 if (CMAKE_C_LINK_PIE_SUPPORTED)
   set_target_properties(pgmoneta-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta POSITION_INDEPENDENT_CODE TRUE)
 else()
@@ -380,7 +380,7 @@ install(TARGETS pgmoneta-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 #
 # Build pgmoneta-cli
 #
-add_executable(pgmoneta-cli-bin cli.c ${RESOURCE_OBJECT})
+add_executable(pgmoneta-cli-bin cli.c)
 if (CMAKE_C_LINK_PIE_SUPPORTED)
   set_target_properties(pgmoneta-cli-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-cli POSITION_INDEPENDENT_CODE TRUE)
 else()
@@ -393,7 +393,7 @@ install(TARGETS pgmoneta-cli-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 #
 # Build pgmoneta-admin
 #
-add_executable(pgmoneta-admin-bin admin.c ${RESOURCE_OBJECT})
+add_executable(pgmoneta-admin-bin admin.c)
 if (CMAKE_C_LINK_PIE_SUPPORTED)
   set_target_properties(pgmoneta-admin-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-admin POSITION_INDEPENDENT_CODE TRUE)
 else()
@@ -406,7 +406,7 @@ install(TARGETS pgmoneta-admin-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 #
 # Build pgmoneta-walinfo
 #
-add_executable(pgmoneta-walinfo-bin walinfo.c ${RESOURCE_OBJECT})
+add_executable(pgmoneta-walinfo-bin walinfo.c)
 if (CMAKE_C_LINK_PIE_SUPPORTED)
   set_target_properties(pgmoneta-walinfo-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walinfo POSITION_INDEPENDENT_CODE TRUE)
 else()
