@@ -197,6 +197,7 @@ check_system_requirements() {
 
 initialize_log_files() {
    echo -e "\e[34mInitialize Test logfiles \e[0m"
+   mkdir -p $LOG_DIRECTORY
    touch $PGMONETA_LOG_FILE
    echo "create log file ... $PGMONETA_LOG_FILE"
    touch $PGCTL_LOG_FILE
