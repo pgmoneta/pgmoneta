@@ -27,6 +27,7 @@
  */
 #include <pgmoneta.h>
 #include <csv.h>
+#include <info.h>
 #include <logging.h>
 #include <manifest.h>
 #include <utils.h>
@@ -74,15 +75,13 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    char* label = NULL;
    struct timespec start_t;
    struct timespec end_t;
-   double manifest_elapsed_time;
+   char* server_backup = NULL;
    char* backup_base = NULL;
-   char* backup_dir = NULL;
    char* backup_data = NULL;
    char* manifest_orig = NULL;
    char* manifest = NULL;
    char* key_path[1] = {"Files"};
    struct backup* backup = NULL;
-   struct backup* backup_loaded = NULL;
    struct json_reader* reader = NULL;
    struct json* entry = NULL;
    struct csv_writer* writer = NULL;
@@ -107,7 +106,11 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
       free(a);
    }
    assert(nodes != NULL);
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA));
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
 #endif
 
@@ -116,14 +119,10 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Manifest (execute): %s/%s", config->common.servers[server].name, label);
 
-   if (pgmoneta_workflow_nodes(server, label, nodes, &backup))
-   {
-      goto error;
-   }
-
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
    backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
-   backup_dir = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
+   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
    manifest = pgmoneta_append(manifest, backup_base);
    if (!pgmoneta_ends_with(manifest, "/"))
@@ -175,30 +174,25 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
-   if (pgmoneta_load_info(backup_dir, label, &backup_loaded))
-   {
-      goto error;
-   }
-   backup_loaded->manifest_elapsed_time = manifest_elapsed_time;
-   if (pgmoneta_save_info(backup_dir, backup_loaded))
+   backup->manifest_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   if (pgmoneta_save_info(server_backup, backup))
    {
       goto error;
    }
 
-   free(backup_loaded);
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
    free(manifest);
    free(manifest_orig);
+
    return 0;
 
 error:
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);
-   free(backup_loaded);
    free(manifest);
    free(manifest_orig);
 

@@ -153,6 +153,8 @@ pgmoneta_delete_wal(int srv)
       wal_shipping = NULL;
    }
 
+   free(backup);
+
    for (int i = 0; i < number_of_srv_wal_files; i++)
    {
       free(srv_wal_files[i]);
@@ -165,6 +167,8 @@ error:
 
    free(d);
    free(wal_shipping);
+
+   free(backup);
 
    for (int i = 0; i < number_of_srv_wal_files; i++)
    {

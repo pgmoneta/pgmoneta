@@ -87,7 +87,6 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    char* d = NULL;
    int number_of_backups = 0;
    struct backup** backups = NULL;
-   struct backup* backup = NULL;
    struct backup* child = NULL;
    struct main_configuration* config;
 
@@ -184,7 +183,6 @@ done:
       free(backups[i]);
    }
    free(backups);
-   free(backup);
 
    if (config->common.servers[server].number_of_hot_standbys > 0)
    {
@@ -241,7 +239,6 @@ error:
       free(backups[i]);
    }
    free(backups);
-   free(backup);
 
    free(d);
 
@@ -332,8 +329,7 @@ delete_backup(int server, int index, struct backup* backup __attribute__((unused
          d = NULL;
 
          /* Recalculate to */
-         d = pgmoneta_get_server_backup(
-            server);
+         d = pgmoneta_get_server_backup(server);
          backup_dir = pgmoneta_append(backup_dir, d);
          backup_dir = pgmoneta_append(backup_dir, backups[next_index]->label);
          size = pgmoneta_directory_size(backup_dir);

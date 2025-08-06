@@ -1341,6 +1341,14 @@ int
 pgmoneta_backtrace(void);
 
 /**
+ * Get the backtrace
+ * @param s The backtrace
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_backtrace_string(char** s);
+
+/**
  * Get the OS name and kernel version.
  *
  * @param os            Pointer to store the OS name (e.g., "Linux", "FreeBSD", "OpenBSD").

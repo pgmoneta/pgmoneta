@@ -113,6 +113,7 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
 #endif
 
 #ifdef HAVE_FREEBSD
@@ -123,6 +124,7 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    pgmoneta_log_debug("GZip (compress): %s/%s", config->common.servers[server].name, label);
 
@@ -195,7 +197,6 @@ gzip_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   free(backup);
    free(d);
 
    return 0;
@@ -207,7 +208,6 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
-   free(backup);
    free(d);
 
    return 1;

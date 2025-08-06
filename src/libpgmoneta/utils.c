@@ -1320,8 +1320,15 @@ pgmoneta_directory_size(char* directory)
    struct stat st;
    unsigned long l;
 
+   if (directory == NULL || strlen(directory) == 0)
+   {
+      pgmoneta_log_error("Empty directory");
+      return 0;
+   }
+
    if (!(dir = opendir(directory)))
    {
+      pgmoneta_log_error("Directory '%s' doesn't exists", directory);
       return total_size;
    }
 
@@ -4418,10 +4425,30 @@ error:
 int
 pgmoneta_backtrace(void)
 {
+   char* s = NULL;
+   int ret = 0;
+
+   ret = pgmoneta_backtrace_string(&s);
+
+   if (s != NULL)
+   {
+      pgmoneta_log_debug(s);
+   }
+
+   free(s);
+
+   return ret;
+}
+
+int
+pgmoneta_backtrace_string(char** s)
+{
 #ifdef  HAVE_EXECINFO_H
    void* bt[1024];
    char* log_str = NULL;
    size_t bt_size;
+
+   *s = NULL;
 
    bt_size = backtrace(bt, 1024);
    if (bt_size == 0)
@@ -4492,8 +4519,8 @@ pgmoneta_backtrace(void)
       }
    }
 
-   pgmoneta_log_debug("%s", log_str);
-   free(log_str);
+   *s = log_str;
+
    return 0;
 
 error:

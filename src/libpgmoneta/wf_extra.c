@@ -104,6 +104,7 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
 #endif
 
 #ifdef HAVE_FREEBSD
@@ -114,6 +115,7 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    if (config->common.servers[server].number_of_extra == 0)
    {
@@ -185,10 +187,7 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_log_debug("Extra: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
    info_root = pgmoneta_get_server_backup(server);
-   if (pgmoneta_load_info(info_root, label, &backup))
-   {
-      goto error;
-   }
+
    if (info_extra == NULL)
    {
       memset(backup->extra, 0, sizeof(backup->extra));
@@ -202,7 +201,6 @@ extra_execute(char* name __attribute__((unused)), struct art* nodes)
    {
       goto error;
    }
-   free(backup);
    free(root);
    free(info_root);
    if (info_extra != NULL)

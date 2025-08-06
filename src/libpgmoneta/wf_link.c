@@ -114,6 +114,8 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
@@ -218,7 +220,6 @@ link_execute(char* name __attribute__((unused)), struct art* nodes)
       free(backups[i]);
    }
    free(backups);
-   free((struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP));
    free(server_path);
    free(from);
    free(to);
@@ -241,7 +242,6 @@ error:
       free(backups[i]);
    }
    free(backups);
-   free(backup);
 
    free(server_path);
    free(from);

@@ -86,8 +86,8 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    struct timespec end_t;
    int status;
    char* backup_base = NULL;
-   char* backup_dir = NULL;
    char* backup_data = NULL;
+   char* server_backup = NULL;
    unsigned long size = 0;
    int usr;
    SSL* ssl = NULL;
@@ -138,10 +138,18 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+   backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
+   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
    pgmoneta_log_debug("Basebackup (execute): %s", config->common.servers[server].name, label);
 
@@ -306,19 +314,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_free_query_response(response);
    response = NULL;
 
-   // create the root dir
-   backup_base = pgmoneta_get_server_backup_identifier(server, label);
-   backup_dir = pgmoneta_get_server_backup(server);
-
    pgmoneta_mkdir(backup_base);
-
-   backup = (struct backup*)malloc(sizeof(struct backup));
-   if (backup == NULL)
-   {
-      pgmoneta_log_error("Backup: Could not create backup %s", label);
-      goto error;
-   }
-   memset(backup, 0, sizeof(struct backup));
 
    if (config->common.servers[server].version < 15)
    {
@@ -328,7 +324,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
          backup->valid = VALID_FALSE;
          snprintf(backup->label, sizeof(backup->label), "%s", label);
-         if (pgmoneta_save_info(backup_dir, backup))
+         if (pgmoneta_save_info(server_backup, backup))
          {
             pgmoneta_log_error("Backup: Could not save backup %s", label);
             goto error;
@@ -345,7 +341,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
          backup->valid = VALID_FALSE;
          snprintf(backup->label, sizeof(backup->label), "%s", label);
-         if (pgmoneta_save_info(backup_dir, backup))
+         if (pgmoneta_save_info(server_backup, backup))
          {
             pgmoneta_log_error("Backup: Could not save backup %s", label);
             goto error;
@@ -408,8 +404,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   backup_data = pgmoneta_get_server_backup_identifier_data(server, label);
-
    if (!incremental)
    {
       size = pgmoneta_directory_size(backup_data);
@@ -425,16 +419,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    pgmoneta_read_wal(backup_data, &wal);
    pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
-
-   if (pgmoneta_art_insert(nodes, NODE_BACKUP_BASE, (uintptr_t)backup_base, ValueString))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_art_insert(nodes, NODE_BACKUP_DATA, (uintptr_t)backup_data, ValueString))
-   {
-      goto error;
-   }
 
    backup->valid = VALID_TRUE;
    snprintf(backup->label, sizeof(backup->label), "%s", label);
@@ -482,7 +466,8 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
       backup->number_of_tablespaces++;
       current_tablespace = current_tablespace->next;
    }
-   if (pgmoneta_save_info(backup_dir, backup))
+
+   if (pgmoneta_save_info(server_backup, backup))
    {
       pgmoneta_log_error("Backup: Could not save backup %s", label);
       goto error;
@@ -500,10 +485,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
-   free(backup);
-   free(backup_base);
-   free(backup_dir);
-   free(backup_data);
    free(manifest_path);
    free(chkptpos);
    free(tag);
@@ -536,9 +517,6 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_token_bucket_destroy(bucket);
    pgmoneta_token_bucket_destroy(network_bucket);
-   free(backup_base);
-   free(backup_dir);
-   free(backup_data);
    free(manifest_path);
    free(chkptpos);
    free(tag);

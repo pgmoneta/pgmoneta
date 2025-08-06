@@ -84,7 +84,6 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    int number_of_columns = 0;
    char** columns = NULL;
    int number_of_workers = 0;
-   struct backup* backup = NULL;
    struct deque* failed_deque = NULL;
    struct deque* all_deque = NULL;
    struct csv_reader* csv = NULL;
@@ -122,11 +121,6 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
    manifest_file = pgmoneta_append(manifest_file, label);
    manifest_file = pgmoneta_append(manifest_file, "/");
    manifest_file = pgmoneta_append(manifest_file, "backup.manifest");
-
-   if (pgmoneta_load_info(base, label, &backup))
-   {
-      goto error;
-   }
 
    if (pgmoneta_deque_create(true, &failed_deque))
    {
@@ -207,8 +201,6 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_csv_reader_destroy(csv);
 
-   free(backup);
-
    free(base);
    free(manifest_file);
 
@@ -228,8 +220,6 @@ error:
    pgmoneta_deque_destroy(all_deque);
 
    pgmoneta_csv_reader_destroy(csv);
-
-   free(backup);
 
    free(base);
    free(manifest_file);

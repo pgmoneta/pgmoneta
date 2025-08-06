@@ -62,8 +62,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    char* server_backup = NULL;
    char* root = NULL;
    char* d = NULL;
-   char* backup_dir = NULL;
-   unsigned long size;
+   char* backup_data = NULL;
    bool backup_incremental = false;
    int number_of_backups = 0;
    struct backup** backups = NULL;
@@ -74,7 +73,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    struct json* req = NULL;
    struct json* response = NULL;
    struct main_configuration* config;
-   struct backup* temp_backup = NULL;
 
    pgmoneta_start_logging();
 
@@ -119,33 +117,19 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    date = pgmoneta_append(date, &date_str[0]);
 
-   server_backup = pgmoneta_get_server_backup(server);
-   root = pgmoneta_get_server_backup_identifier(server, date);
-
    if (pgmoneta_art_create(&nodes))
    {
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, USER_SERVER, (uintptr_t)config->common.servers[server].name, ValueString))
+   if (pgmoneta_workflow_nodes(server, date, nodes, &backup))
    {
       goto error;
    }
 
-   if (pgmoneta_art_insert(nodes, NODE_SERVER_ID, (uintptr_t)server, ValueInt32))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_art_insert(nodes, USER_IDENTIFIER, (uintptr_t)date, ValueString))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)date, ValueString))
-   {
-      goto error;
-   }
+   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
+   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
+   root = pgmoneta_get_server_backup_identifier(server, date);
 
    if (incremental != NULL)
    {
@@ -235,23 +219,14 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   backup_dir = pgmoneta_get_server_backup_identifier(server, date);
-   backup_dir = pgmoneta_append(backup_dir, "/data");
-   size = pgmoneta_directory_size(backup_dir);
+   backup->backup_size = pgmoneta_directory_size(backup_data);
 
-   if (pgmoneta_load_info(server_backup, date, &temp_backup))
+   if (pgmoneta_save_info(server_backup, backup))
    {
       ec = MANAGEMENT_ERROR_BACKUP_ERROR;
       goto error;
    }
-   temp_backup->backup_size = size;
-   if (pgmoneta_save_info(server_backup, temp_backup))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
-      goto error;
-   }
-   free(temp_backup);
-   temp_backup = NULL;
+
    if (pgmoneta_management_create_response(payload, server, &response))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;
@@ -283,13 +258,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   if (pgmoneta_load_info(server_backup, date, &temp_backup))
-   {
-      ec = MANAGEMENT_ERROR_BACKUP_ERROR;
-      goto error;
-   }
-   temp_backup->total_elapsed_time = total_seconds;
-   if (pgmoneta_save_info(server_backup, temp_backup))
+   backup->total_elapsed_time = total_seconds;
+   if (pgmoneta_save_info(server_backup, backup))
    {
       ec = MANAGEMENT_ERROR_BACKUP_ERROR;
       goto error;
@@ -318,13 +288,9 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    {
       free(backups[i]);
    }
-   free(temp_backup);
    free(backups);
-   free(backup);
    free(child);
-   free(backup_dir);
    free(elapsed);
-   free(server_backup);
    free(root);
    free(incremental_base);
    free(d);
@@ -349,7 +315,6 @@ error:
    {
       free(backups[i]);
    }
-   free(temp_backup);
    free(backups);
 
    pgmoneta_json_destroy(payload);
@@ -359,11 +324,8 @@ error:
    pgmoneta_art_destroy(nodes);
 
    free(date);
-   free(backup);
    free(child);
-   free(backup_dir);
    free(elapsed);
-   free(server_backup);
    free(root);
    free(incremental_base);
    free(d);

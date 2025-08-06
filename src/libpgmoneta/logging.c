@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <prometheus.h>
+#include <utils.h>
 
 /* system */
 #include <errno.h>
@@ -154,6 +155,7 @@ pgmoneta_log_is_enabled(int level)
 void
 pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
 {
+   FILE* output = NULL;
    signed char isfree;
    struct main_configuration* config;
 
@@ -184,12 +186,21 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
             break;
       }
 
+      if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+      {
+         output = stdout;
+      }
+      else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+      {
+         output = log_file;
+      }
+
 retry:
       isfree = STATE_FREE;
 
       if (atomic_compare_exchange_strong(&config->common.log_lock, &isfree, STATE_IN_USE))
       {
-         char buf[256];
+         char buf[1024];
          va_list vl;
          struct tm* tm;
          time_t t;
@@ -213,26 +224,43 @@ retry:
             memcpy(config->common.log_line_prefix, PGMONETA_LOGGING_DEFAULT_LOG_LINE_PREFIX, strlen(PGMONETA_LOGGING_DEFAULT_LOG_LINE_PREFIX));
          }
 
+         memset(&buf[0], 0, sizeof(buf));
+
+#ifdef DEBUG
+         if (level > 4)
+         {
+            char *bt = NULL;
+            pgmoneta_backtrace_string(&bt);
+            if (bt != NULL)
+            {
+               fprintf(output, "%s", bt);
+               fflush(output);
+            }
+            free(bt);
+            memset(&buf[0], 0, sizeof(buf));
+         }
+#endif
+
          va_start(vl, fmt);
 
          if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
          {
             buf[strftime(buf, sizeof(buf), config->common.log_line_prefix, tm)] = '\0';
-            fprintf(stdout, "%s %s%-5s\x1b[0m \x1b[90m%s:%d\x1b[0m ",
+            fprintf(output, "%s %s%-5s\x1b[0m \x1b[90m%s:%d\x1b[0m ",
                     buf, colors[level - 1], levels[level - 1],
                     filename, line);
-            vfprintf(stdout, fmt, vl);
-            fprintf(stdout, "\n");
-            fflush(stdout);
+            vfprintf(output, fmt, vl);
+            fprintf(output, "\n");
+            fflush(output);
          }
          else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
          {
             buf[strftime(buf, sizeof(buf), config->common.log_line_prefix, tm)] = '\0';
-            fprintf(log_file, "%s %-5s %s:%d ",
+            fprintf(output, "%s %-5s %s:%d ",
                     buf, levels[level - 1], filename, line);
-            vfprintf(log_file, fmt, vl);
-            fprintf(log_file, "\n");
-            fflush(log_file);
+            vfprintf(output, fmt, vl);
+            fprintf(output, "\n");
+            fflush(output);
 
             if (log_rotation_required())
             {

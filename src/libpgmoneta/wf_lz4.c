@@ -112,10 +112,19 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+   backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
+   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
+   tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
 
    pgmoneta_log_debug("LZ4 (compress): %s/%s", config->common.servers[server].name, label);
 
@@ -125,8 +134,6 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-   tarfile = (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE);
-
    if (tarfile == NULL)
    {
       number_of_workers = pgmoneta_get_number_of_workers(server);
@@ -134,11 +141,6 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       {
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
-
-      backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
-      server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
-      backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
-      backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
       pgmoneta_lz4c_data(backup_data, workers);
       pgmoneta_lz4c_tablespaces(backup_base, workers);
@@ -194,7 +196,6 @@ lz4_execute_compress(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   free(backup);
    free(d);
 
    return 0;
@@ -206,7 +207,6 @@ error:
       pgmoneta_workers_destroy(workers);
    }
 
-   free(backup);
    free(d);
 
    return 1;

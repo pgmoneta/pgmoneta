@@ -112,7 +112,11 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
    }
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_BASE));
+   assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA));
 #endif
 
 #ifdef HAVE_FREEBSD
@@ -123,6 +127,10 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+   backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
+   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
+   backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
 
    pgmoneta_log_debug("ZSTD (compress): %s/%s", config->common.servers[server].name, label);
 
@@ -136,10 +144,6 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          pgmoneta_workers_initialize(number_of_workers, &workers);
       }
 
-      backup_base = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_BASE);
-      server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
-      backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
-
       pgmoneta_zstandardc_data(backup_data, workers);
       pgmoneta_zstandardc_tablespaces(backup_base, workers);
 
@@ -149,6 +153,7 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
       pgmoneta_workers_destroy(workers);
+      workers = NULL;
    }
    else
    {
@@ -184,17 +189,12 @@ zstd_execute_compress(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Compression: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   if (pgmoneta_load_info(server_backup, label, &backup))
-   {
-      goto error;
-   }
    backup->compression_zstd_elapsed_time = compression_zstd_elapsed_time;
    if (pgmoneta_save_info(server_backup, backup))
    {
       goto error;
    }
 
-   free(backup);
    free(d);
 
    return 0;
@@ -205,7 +205,6 @@ error:
    {
       pgmoneta_workers_destroy(workers);
    }
-   free(backup);
    free(d);
 
    return 1;

@@ -421,12 +421,13 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    struct backup* bck = NULL;
    int number_of_backups = 0;
    struct backup** backups = NULL;
+
    *backup = NULL;
 
    if (!strcmp(identifier, "oldest") || !strcmp(identifier, "newest") || !strcmp(identifier, "latest"))
    {
       int number_of_backups = 0;
-      struct backup **backups = NULL;
+      struct backup** backups = NULL;
 
       if (pgmoneta_load_infos(directory, &number_of_backups, &backups))
       {
@@ -463,12 +464,15 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    fn = pgmoneta_append(fn, label);
    fn = pgmoneta_append(fn, "/backup.info");
 
-   file = fopen(fn, "r");
-   if (file == NULL)
+   if (pgmoneta_exists(fn))
    {
-      pgmoneta_log_error("Could not open file %s due to %s", fn, strerror(errno));
-      errno = 0;
-      goto error;
+      file = fopen(fn, "r");
+      if (file == NULL)
+      {
+         pgmoneta_log_error("Could not open file %s due to %s", fn, strerror(errno));
+         errno = 0;
+         goto error;
+      }
    }
 
    bck = (struct backup*)malloc(sizeof(struct backup));
