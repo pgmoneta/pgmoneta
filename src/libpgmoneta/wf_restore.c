@@ -372,10 +372,10 @@ static int
 recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
-   char* identifier = NULL;
+   char* label = NULL;
    char* base = NULL;
    char* position = NULL;
-   bool primary;
+   bool primary = true;
    bool is_recovery_info;
    char tokens[256];
    char buffer[256];
@@ -402,29 +402,25 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(nodes != NULL);
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+   assert(pgmoneta_art_contains_key(nodes, NODE_RECOVERY_INFO));
+   assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
+   assert(pgmoneta_art_contains_key(nodes, USER_POSITION));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   identifier = (char*)pgmoneta_art_search(nodes, USER_IDENTIFIER);
-
-   pgmoneta_log_debug("Recovery (execute): %s/%s", config->common.servers[server].name, identifier);
-
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    is_recovery_info = (bool)pgmoneta_art_search(nodes, NODE_RECOVERY_INFO);
+   base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
+   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
+   // TODO primary = (bool)pgmoneta_art_search(nodes, NODE_PRIMARY);
+
+   pgmoneta_log_debug("Recovery (execute): %s/%s", config->common.servers[server].name, label);
 
    if (!is_recovery_info)
    {
       goto done;
    }
-
-   base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
-
-   if (base == NULL)
-   {
-      goto error;
-   }
-
-   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
-   primary = (bool)pgmoneta_art_search(nodes, NODE_PRIMARY);
 
    if (!primary)
    {
@@ -642,48 +638,42 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
       if (pgmoneta_exists(f))
       {
          ffile = fopen(f, "r");
-      }
-      else
-      {
-         pgmoneta_log_error("%s does not exists", f);
-         goto error;
-      }
+         tfile = fopen(t, "w");
 
-      tfile = fopen(t, "w");
-
-      if (tfile == NULL)
-      {
-         pgmoneta_log_error("Could not create %s", t);
-         goto error;
-      }
-
-      if (ffile != NULL)
-      {
-         while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
+         if (tfile == NULL)
          {
-            if (pgmoneta_starts_with(&buffer[0], "primary_conninfo"))
+            pgmoneta_log_error("Could not create %s", t);
+            goto error;
+         }
+
+         if (ffile != NULL)
+         {
+            while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
             {
-               memset(&line[0], 0, sizeof(line));
-               snprintf(&line[0], sizeof(line), "#%s", &buffer[0]);
-               fputs(&line[0], tfile);
-            }
-            else
-            {
-               fputs(&buffer[0], tfile);
+               if (pgmoneta_starts_with(&buffer[0], "primary_conninfo"))
+               {
+                  memset(&line[0], 0, sizeof(line));
+                  snprintf(&line[0], sizeof(line), "#%s", &buffer[0]);
+                  fputs(&line[0], tfile);
+               }
+               else
+               {
+                  fputs(&buffer[0], tfile);
+               }
             }
          }
-      }
 
-      if (ffile != NULL)
-      {
-         fclose(ffile);
-      }
-      if (tfile != NULL)
-      {
-         fclose(tfile);
-      }
+         if (ffile != NULL)
+         {
+            fclose(ffile);
+         }
+         if (tfile != NULL)
+         {
+            fclose(tfile);
+         }
 
-      pgmoneta_move_file(t, f);
+         pgmoneta_move_file(t, f);
+      }
 
       path = pgmoneta_append(path, base);
       if (!pgmoneta_ends_with(path, "/"))

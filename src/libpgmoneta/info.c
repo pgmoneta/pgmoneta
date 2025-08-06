@@ -1374,7 +1374,6 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%.1024s\n", INFO_EXTRA, backup->extra);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%s", INFO_EXTRA, backup->extra);
 
    pgmoneta_permission(bck_info_file, 6, 0, 0);
 

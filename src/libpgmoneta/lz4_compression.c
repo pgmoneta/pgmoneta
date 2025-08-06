@@ -210,10 +210,6 @@ pgmoneta_lz4c_wal(char* directory)
          {
             pgmoneta_delete_file(from, NULL);
          }
-         else
-         {
-            pgmoneta_log_debug("%s doesn't exists", from);
-         }
          pgmoneta_permission(to, 6, 0, 0);
 
          free(from);
@@ -433,10 +429,6 @@ pgmoneta_lz4d_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    {
       pgmoneta_delete_file(from, NULL);
    }
-   else
-   {
-      pgmoneta_log_debug("%s doesn't exists", from);
-   }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -497,10 +489,6 @@ pgmoneta_lz4d_file(char* from, char* to)
       if (pgmoneta_exists(from))
       {
          pgmoneta_delete_file(from, NULL);
-      }
-      else
-      {
-         pgmoneta_log_debug("%s doesn't exists", from);
       }
    }
    else
@@ -564,10 +552,6 @@ pgmoneta_lz4c_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encr
    if (pgmoneta_exists(from))
    {
       pgmoneta_delete_file(from, NULL);
-   }
-   else
-   {
-      pgmoneta_log_debug("%s doesn't exists", from);
    }
 
    if (pgmoneta_management_create_response(payload, -1, &response))

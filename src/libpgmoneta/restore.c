@@ -2217,13 +2217,6 @@ restore_backup_full(struct art* nodes)
    target_base = pgmoneta_append(target_base, backup->label);
    target_base = pgmoneta_append(target_base, "/");
 
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
-   {
-      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(target_root), target_root);
-      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(target_root), target_root);
-      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
-   }
-
    if (!pgmoneta_exists(target_root))
    {
       if (pgmoneta_mkdir(target_root))
@@ -2231,6 +2224,25 @@ restore_backup_full(struct art* nodes)
          pgmoneta_log_error("Unable to create target root directory %s", target_root);
          goto error;
       }
+   }
+
+   if (!pgmoneta_exists(target_base))
+   {
+      if (pgmoneta_mkdir(target_base))
+      {
+         pgmoneta_log_error("Unable to create target base directory %s", target_base);
+         goto error;
+      }
+   }
+
+   pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString);
+   pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base, ValueString);
+
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG5))
+   {
+      pgmoneta_log_trace("Restore: Used space is %lld for %s", pgmoneta_directory_size(target_root), target_root);
+      pgmoneta_log_trace("Restore: Free space is %lld for %s", pgmoneta_free_space(target_root), target_root);
+      pgmoneta_log_trace("Restore: Total space is %lld for %s", pgmoneta_total_space(target_root), target_root);
    }
 
    free_space = pgmoneta_free_space(target_root);
@@ -2255,9 +2267,6 @@ restore_backup_full(struct art* nodes)
       goto error;
    }
 
-   pgmoneta_art_insert(nodes, NODE_TARGET_ROOT, (uintptr_t)target_root, ValueString);
-   pgmoneta_art_insert(nodes, NODE_TARGET_BASE, (uintptr_t)target_base, ValueString);
-   pgmoneta_log_trace("Full backup restore: %s", backup->label);
    workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RESTORE, backup);
    if ((ret = carry_out_workflow(workflow, nodes) != RESTORE_OK))
    {
@@ -2460,6 +2469,7 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
       if (current->setup(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
+         pgmoneta_log_error("setup/%s", current->name());
          goto error;
       }
       current = current->next;
@@ -2471,6 +2481,7 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
       if (current->execute(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
+         pgmoneta_log_error("execute/%s", current->name());
          goto error;
       }
       current = current->next;
@@ -2482,6 +2493,7 @@ carry_out_workflow(struct workflow* workflow, struct art* nodes)
       if (current->teardown(current->name(), nodes))
       {
          ret = RESTORE_MISSING_LABEL;
+         pgmoneta_log_error("teardown/%s", current->name());
          goto error;
       }
       current = current->next;

@@ -1328,7 +1328,7 @@ pgmoneta_directory_size(char* directory)
 
    if (!(dir = opendir(directory)))
    {
-      pgmoneta_log_error("Directory '%s' doesn't exists", directory);
+      errno = 0;
       return total_size;
    }
 

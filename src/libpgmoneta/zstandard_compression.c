@@ -150,10 +150,6 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
                {
                   pgmoneta_delete_file(from, NULL);
                }
-               else
-               {
-                  pgmoneta_log_debug("%s doesn't exists", from);
-               }
 
                memset(zin, 0, zin_size);
                memset(zout, 0, zout_size);
@@ -312,10 +308,6 @@ pgmoneta_zstandardc_wal(char* directory)
             {
                pgmoneta_delete_file(from, NULL);
             }
-            else
-            {
-               pgmoneta_log_debug("%s doesn't exists", from);
-            }
             pgmoneta_permission(to, 6, 0, 0);
 
             memset(zin, 0, zin_size);
@@ -406,10 +398,6 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
    if (pgmoneta_exists(from))
    {
       pgmoneta_delete_file(from, NULL);
-   }
-   else
-   {
-      pgmoneta_log_debug("%s doesn't exists", from);
    }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
@@ -714,10 +702,6 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
    {
       pgmoneta_delete_file(from, NULL);
    }
-   else
-   {
-      pgmoneta_log_debug("%s doesn't exists", from);
-   }
 
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
@@ -743,7 +727,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 
    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
 
-   pgmoneta_log_info("ZSTD: %s (Elapsed: %s)", from, elapsed);
+   pgmoneta_log_info("ZSTD: %s (Elapsed: %s)", to, elapsed);
 
    free(to);
    free(elapsed);
