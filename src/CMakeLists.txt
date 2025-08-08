@@ -31,6 +31,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LZ4_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
+    ${LIBYAML_INCLUDE_DIRS}
     ${LIBSSH_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
@@ -57,6 +58,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
+    ${LIBYAML_LIBRARIES}
     ${LIBSSH_LIBRARIES}
     ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARY}
@@ -91,6 +93,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${LZ4_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
+    ${LIBYAML_INCLUDE_DIRS}
     ${LIBSSH_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
@@ -107,6 +110,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
+    ${LIBYAML_LIBRARIES}
     ${LIBSSH_LIBRARIES}
     ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARY}
@@ -131,6 +135,7 @@ else()
     ${LZ4_INCLUDE_DIRS}
     ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
+    ${LIBYAML_INCLUDE_DIRS}
     ${LIBSSH_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
@@ -147,6 +152,7 @@ else()
     ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
+    ${LIBYAML_LIBRARIES}
     ${LIBSSH_LIBRARIES}
     ${LibArchive_LIBRARIES}
     ${THREAD_LIBRARIES}
@@ -415,3 +421,13 @@ endif()
 target_link_libraries(pgmoneta-walinfo-bin pgmoneta)
 
 install(TARGETS pgmoneta-walinfo-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Build walfilter
+add_executable(pgmoneta-walfilter-bin walfilter.c ${RESOURCE_OBJECT})
+if (CMAKE_C_LINK_PIE_SUPPORTED)
+  set_target_properties(pgmoneta-walfilter-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walfilter POSITION_INDEPENDENT_CODE TRUE)
+else()
+  set_target_properties(pgmoneta-walfilter-bin PROPERTIES LINKER_LANGUAGE C OUTPUT_NAME pgmoneta-walfilter POSITION_INDEPENDENT_CODE FALSE)
+endif()
+target_link_libraries(pgmoneta-walfilter-bin pgmoneta)
+install(TARGETS pgmoneta-walfilter-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
