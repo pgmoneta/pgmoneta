@@ -2662,7 +2662,6 @@ init_replication_slot(int server)
       }
 
 server_done:
-
       pgmoneta_close_ssl(ssl);
       pgmoneta_disconnect(socket);
 
@@ -2683,8 +2682,16 @@ server_done:
             {
                if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
                {
-                  pgmoneta_log_info("Created replication slot %s on %s",
+                  if (slot_response_msg->kind == 'E')
+                  {
+                      pgmoneta_log_error_response_message(slot_response_msg);
+                      ret = 1;
+                  }
+                  else
+                  {
+                      pgmoneta_log_info("Created replication slot %s on %s",
                                     config->common.servers[server].wal_slot, config->common.servers[server].name);
+                  }
                }
                else
                {

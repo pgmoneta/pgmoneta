@@ -36,14 +36,12 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${THREAD_INCLUDE_DIRS}
   )
 
-  find_program(GCOV_PATH gcov)
-  find_program(GCOVR_PATH gcovr)
-  # Enable coverage only if both gcov and gcovr are found and compiler is GCC
- if(GCOV_PATH AND GCOVR_PATH AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  find_program(LLVM_PATH llvm-cov)
+ if(LLVM_PATH AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
   set(ENABLE_COVERAGE ON)
-  message(STATUS "Coverage tools (gcov and gcovr) found and compiler is GCC: Code coverage ENABLED")
+  message(STATUS "Coverage tools (llvm-cov) found and compiler is Clang: Code coverage ENABLED")
  else()
-  message(STATUS "Coverage tools not found or compiler is not GCC: Code coverage SKIPPED")
+  message(STATUS "Coverage tools not found or compiler is not Clang: Code coverage SKIPPED")
  endif()
  
   #
@@ -181,8 +179,8 @@ add_compile_options(-Wunused)
 add_compile_options(-Wunused-result)
 
 if(ENABLE_COVERAGE)
-  add_compile_options(--coverage -O0 -g)
-  add_link_options(--coverage)
+  add_compile_options(-O0 -g -fprofile-instr-generate -fcoverage-mapping)
+  add_link_options(-fprofile-instr-generate)
   message(STATUS "Building with coverage enabled")
 else()
   message(STATUS "Building without coverage")

@@ -53,19 +53,19 @@ if (check)
       endif()
     endif()
   endif()
-  add_executable(pgmoneta_test runner.c ${SOURCES})
-  target_include_directories(pgmoneta_test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
+  add_executable(pgmoneta-test runner.c ${SOURCES})
+  target_include_directories(pgmoneta-test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
 
   if(EXISTS "/etc/debian_version")
-    target_link_libraries(pgmoneta_test Check::check subunit pthread rt m pgmoneta)
+    target_link_libraries(pgmoneta-test Check::check subunit pthread rt m pgmoneta)
   elseif(APPLE)
-    target_link_libraries(pgmoneta_test Check::check m pgmoneta)
+    target_link_libraries(pgmoneta-test Check::check m pgmoneta)
   else()
-    target_link_libraries(pgmoneta_test Check::check pthread rt m pgmoneta)
+    target_link_libraries(pgmoneta-test Check::check pthread rt m pgmoneta)
   endif()
 
   add_custom_target(custom_clean
-    COMMAND ${CMAKE_COMMAND} -E remove -f *.o pgmoneta_test
+    COMMAND ${CMAKE_COMMAND} -E remove -f *.o pgmoneta-test
     COMMENT "Cleaning up..."
   )
 endif()
@@ -73,7 +73,7 @@ endif()
 if(container)
 
 add_test(NAME container_test
-           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/coverage.sh
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 set_property(TEST container_test
@@ -87,12 +87,7 @@ configure_file(
   COPYONLY
 )
 configure_file(
-  "${CMAKE_SOURCE_DIR}/test/coverage.sh"
-  "${CMAKE_BINARY_DIR}/coverage.sh"
-  COPYONLY
-)
-configure_file(
-  "${CMAKE_SOURCE_DIR}/test/Dockerfile.testsuite"
-  "${CMAKE_BINARY_DIR}/Dockerfile.testsuite"
+  "${CMAKE_SOURCE_DIR}/test/check.sh"
+  "${CMAKE_BINARY_DIR}/check.sh"
   COPYONLY
 )

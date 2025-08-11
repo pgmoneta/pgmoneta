@@ -1,122 +1,51 @@
-# Test
 
-## Local Environment
+## Test
 
-To ensure the test suite works well, please make sure you have installed PostgreSQL 17.x version installed
+**Dependencies**
 
-For RPM based distributions such as Fedora and RHEL you can add the
-[PostgreSQL YUM repository](https://yum.postgresql.org/) and do the install via
+To install all the required dependencies, simply run `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh setup`. You need to install docker or podman
+separately.
 
-```
-dnf -qy module disable postgresql
-dnf install -y postgresql17 postgresql17-server pgmoneta
-```
+**Running Tests**
 
-also make sure that the `initdb`, `pg_ctl` and `psql` are in PATH variable.
+To run the tests, simply run `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh`. The script will build a PostgreSQL 17 image the first time you run it,
+and start a docker/podman container using the image (so make sure you at least have one of them installed and have the corresponding container engine started). 
+The containerized postgres server will have a `repl` user with the replication attribute, a normal user `myuser` and a database `mydb`.
 
-### Add Path variable
+The script then starts pgmoneta and runs tests in your local environment. The tests are run locally so that you may leverage stdout to debug and
+the testing environment won't run into weird container environment issues, and so that we can reuse the installed dependencies and cmake cache to speed up development
+and debugging.
 
-Add the `initdb`, `pg_ctl` and `psql` binaries into the environment path.
+All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta-test/`, and a cleanup will run whether 
+the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally.
+So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated. 
 
-```
-export PATH=$PATH:$(dirname $(which initdb))
-export PATH=$PATH:$(dirname $(which psql))
-```
+It recommended that you **ALWAYS** run tests before raising PR.
 
-**Note:** `initdb` and `pg_ctl` belongs to same binary directory
-
-### Install check library
-
-Before you test, you need to install the `check` library. If there is no package for `check`, the `CMakeLists.txt` will not compile the test suite. Only after you have installed `check` will it compile the test suite.
-
-``` sh
-dnf install -y check check-devel check-static
-```
-
-### Build the project
-
-Make sure to execute the test script inside the project build. Run the following commands if project is not already built.
-
-```
-git clone https://github.com/pgmoneta/pgmoneta.git
-cd pgmoneta
-mkdir build
-cd build
-cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
-make
-```
-
-### Run test suites
-
-To run the testsuites get inside your build and just execute -
-
-```
-./testsuite.sh
-```
-
-The script creates the PostgreSQL and pgmoneta environment inside the build itself for example -
-- the PostgreSQL related files like the data directory and PostgreSQL configuration will be stored in `pgmoneta-postgres`
-- the pgmoneta related files like pgmoneta configuration and users file will be stored in `pgmoneta-testsiute`
-
-
-It will be the responsibility of the script to clean up the setup environment.
-
-**Note:** You can however view the PostgreSQL and pgmoneta server logs in a separate `log` directory inside build.
-
-In case you see those setup directories like `pgmoneta-postgres` and `pgmoneta-testsiute` in build after successfully executing the script, you should probably run
-
-```
-./testsuite.sh clean
-```
-
-before running the script again to avoid any inconsistency or errors. The clean subcommand will however clean the logs as well.
-
-
-### Add testcases
+**Add testcases**
 
 To add an additional testcase go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
 
 Create a `.c` file that contains the test suite and define the suite inside `/test/include/tssuite.sh`. Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/runner.c)
 
-### Running Containerized Tests
-
-The test suite supports containerized testing environments. When you run the C tests in the `build` directory, a Docker (or Podman) container is automatically started, and the test script is executed inside it. This ensures a consistent and isolated environment for testing.
-
-> **Note:** The containerized test option (`ctest`) is only available if Docker or Podman is installed on your system. The CMake configuration will detect this and enable the container test target accordingly.
-
-You have two main options to run the tests:
-
-#### 1. Using CTest (with Docker/Podman)
-
-From the `build` directory, simply run:
-
-```sh
-ctest -V
-```
-
-This will:
-- Spin up the Docker/Podman container
-- Execute all test scripts inside the container
-- Collect logs, coverage, and test outputs
-
-#### 2. Using coverage.sh
-
-Alternatively, you can run the coverage script directly:
-
-```sh
-./coverage.sh
-```
-
-This will:
-- Run all tests in the container
-- Generate code coverage reports
-
-#### Artifacts
+**Artifacts**
 
 After running the tests, you will find:
-- **Test logs:** `build/log/`
-- **Coverage reports:** `build/coverage/`
-- **CTest logs:** `build/testing/`
+
+* **pgmoneta log:** `/tmp/pgmoneta-test/log/`
+* **postgres log:** `/tmp/pgmoneta-test/pg_log/`, the log level is set to debug5 and has the application name (**pgmoneta**) shown in the log.
+* **code coverage reports:** `/tmp/pgmoneta-test/coverage/`
+
+**Cleanup**
+
+`<PATH_TO_PGMONETA>/pgmoneta/test/check.sh clean` will remove the testing directory and the built image. If you are using docker, chances are it eats your 
+disk space secretly, in that case consider cleaning up using `docker system prune --volume`. Use with caution though as it
+nukes all the docker volumes.
+
+**Deprecated**
+
+You may also notice the `testsuite.sh` script inside the test directory. This script will now only be used for CI.
+Please leverage `check.sh` for faster testing and debugging.
 
 ### Adding wal-related testcases
 
@@ -266,4 +195,4 @@ and replace `generate_xlog_checkpoint_shutdown_v17);` with the function you impl
 
 If the record type you are adding has differences between versions of PostgreSQL (13-17), you will need to implement a generate function per version (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
 
-For the sake of simplicity, please create one test suite per postgres version where the implementation resides in `test/wal/wal_<version>.c` and the testcases in `test/testcases/pgmoneta_test_<whatever>` and add testcase per record type within this version. You can take a look at [this testcase](../test/testcases/pgmoneta_test_10.c) for reference.
+For the sake of simplicity, please create one test suite per postgres version where the implementation resides in `test/wal/wal_<version>.c` and the testcases in `test/testcases/pgmoneta_test_<whatever>` and add testcase per record type within this version. You can take a look at [this testcase](../../../test/testcases/pgmoneta_test_10.c) for reference.

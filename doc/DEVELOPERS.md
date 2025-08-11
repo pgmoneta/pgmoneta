@@ -448,6 +448,10 @@ Now that we've attempted our first backup, take a moment to relax. There are a f
 
 2. Always use uncrustify to format your code when you make modifications.
 
+## Testing
+
+See `doc/Test.md` for adding test cases and running test suites. It is recommended that you **ALWAYS** run tests before raising PR.
+
 ## C programming
 
 [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) is developed using the [C programming language](https://en.wikipedia.org/wiki/C_(programming_language)) so it is a good

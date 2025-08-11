@@ -686,6 +686,7 @@ get_auth_type(struct message* msg, int* auth_type)
 
    if (msg->kind != 'R')
    {
+      pgmoneta_log_error_response_message(msg);
       return 1;
    }
 
