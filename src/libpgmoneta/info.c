@@ -483,18 +483,8 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    }
 
    memset(bck, 0, sizeof(struct backup));
+
    bck->valid = VALID_UNKNOWN;
-   bck->basebackup_elapsed_time = 0;
-   bck->manifest_elapsed_time = 0;
-   bck->compression_zstd_elapsed_time = 0;
-   bck->compression_bzip2_elapsed_time = 0;
-   bck->compression_lz4_elapsed_time = 0;
-   bck->compression_gzip_elapsed_time = 0;
-   bck->encryption_elapsed_time = 0;
-   bck->linking_elapsed_time = 0;
-   bck->remote_ssh_elapsed_time = 0;
-   bck->remote_azure_elapsed_time = 0;
-   bck->remote_s3_elapsed_time = 0;
 
    if (file != NULL)
    {
@@ -525,7 +515,11 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
 
          memcpy(&value[0], ptr, strlen(ptr) - 1);
 
-         if (!strcmp(INFO_STATUS, &key[0]))
+         if (!strcmp(INFO_PGMONETA_VERSION, &key[0]))
+         {
+            memcpy(&bck->version[0], &value[0], strlen(&value[0]));
+         }
+         else if (!strcmp(INFO_STATUS, &key[0]))
          {
             if (!strcmp("1", &value[0]))
             {
@@ -1335,6 +1329,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
       goto error;
    }
 
+   write_info(sfile, "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
    write_info(sfile, "%s=%d\n", INFO_STATUS, backup->valid == VALID_TRUE ? 1 : 0);
    write_info(sfile, "%s=%s\n", INFO_LABEL, backup->label);
    write_info(sfile, "%s=%s\n", INFO_WAL, backup->wal);
@@ -1343,10 +1338,14 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%lu\n", INFO_BIGGEST_FILE, backup->biggest_file_size);
    write_info(sfile, "%s=%.4f\n", INFO_ELAPSED, backup->total_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_BASEBACKUP_ELAPSED, backup->basebackup_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_ZSTD_ELAPSED, backup->compression_zstd_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_GZIP_ELAPSED, backup->compression_gzip_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_BZIP2_ELAPSED, backup->compression_bzip2_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_LZ4_ELAPSED, backup->compression_lz4_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_ENCRYPTION_ELAPSED, backup->encryption_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_LINKING_ELAPSED, backup->linking_elapsed_time);
-   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED, backup->remote_ssh_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_MANIFEST_ELAPSED, backup->manifest_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED,backup->remote_ssh_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_S3_ELAPSED, backup->remote_s3_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_AZURE_ELAPSED, backup->remote_azure_elapsed_time);
    write_info(sfile, "%s=%d\n", INFO_MAJOR_VERSION, backup->major_version);

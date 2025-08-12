@@ -42,39 +42,38 @@ extern "C" {
 
 #define INFO_PGMONETA_VERSION          "PGMONETA_VERSION"
 #define INFO_BACKUP                    "BACKUP"
+#define INFO_BASEBACKUP_ELAPSED        "BASEBACKUP_ELAPSED"
 #define INFO_BIGGEST_FILE              "BIGGEST_FILE"
 #define INFO_CHKPT_WALPOS              "CHKPT_WALPOS"
 #define INFO_COMMENTS                  "COMMENTS"
 #define INFO_COMPRESSION               "COMPRESSION"
-#define INFO_ELAPSED                   "ELAPSED"
-#define INFO_BASEBACKUP_ELAPSED        "BASEBACKUP_ELAPSED"
-#define INFO_MANIFEST_ELAPSED          "MANIFEST_ELAPSED"
-#define INFO_COMPRESSION_ZSTD_ELAPSED  "COMPRESSION_ZSTD_ELAPSED"
-#define INFO_COMPRESSION_GZIP_ELAPSED  "COMPRESSION_GZIP_ELAPSED"
 #define INFO_COMPRESSION_BZIP2_ELAPSED "COMPRESSION_BZIP2_ELAPSED"
+#define INFO_COMPRESSION_GZIP_ELAPSED  "COMPRESSION_GZIP_ELAPSED"
 #define INFO_COMPRESSION_LZ4_ELAPSED   "COMPRESSION_LZ4_ELAPSED"
-#define INFO_ENCRYPTION_ELAPSED        "ENCRYPTION_ELAPSED"
-#define INFO_LINKING_ELAPSED           "LINKING_ELAPSED"
-#define INFO_REMOTE_SSH_ELAPSED        "REMOTE_SSH_ELAPSED"
-#define INFO_REMOTE_S3_ELAPSED         "REMOTE_S3_ELAPSED"
-#define INFO_REMOTE_AZURE_ELAPSED      "REMOTE_AZURE_ELAPSED"
+#define INFO_COMPRESSION_ZSTD_ELAPSED  "COMPRESSION_ZSTD_ELAPSED"
+#define INFO_ELAPSED                   "ELAPSED"
 #define INFO_ENCRYPTION                "ENCRYPTION"
+#define INFO_ENCRYPTION_ELAPSED        "ENCRYPTION_ELAPSED"
 #define INFO_END_TIMELINE              "END_TIMELINE"
 #define INFO_END_WALPOS                "END_WALPOS"
 #define INFO_EXTRA                     "EXTRA"
-#define INFO_HASH_ALGORITHM            "HASH_ALGORITHM"
 #define INFO_KEEP                      "KEEP"
 #define INFO_LABEL                     "LABEL"
+#define INFO_LINKING_ELAPSED           "LINKING_ELAPSED"
 #define INFO_MAJOR_VERSION             "MAJOR_VERSION"
+#define INFO_MANIFEST_ELAPSED          "MANIFEST_ELAPSED"
 #define INFO_MINOR_VERSION             "MINOR_VERSION"
+#define INFO_PARENT                    "PARENT"
+#define INFO_REMOTE_AZURE_ELAPSED      "REMOTE_AZURE_ELAPSED"
+#define INFO_REMOTE_S3_ELAPSED         "REMOTE_S3_ELAPSED"
+#define INFO_REMOTE_SSH_ELAPSED        "REMOTE_SSH_ELAPSED"
 #define INFO_RESTORE                   "RESTORE"
 #define INFO_START_TIMELINE            "START_TIMELINE"
 #define INFO_START_WALPOS              "START_WALPOS"
 #define INFO_STATUS                    "STATUS"
 #define INFO_TABLESPACES               "TABLESPACES"
-#define INFO_WAL                       "WAL"
 #define INFO_TYPE                      "TYPE"
-#define INFO_PARENT                    "PARENT"
+#define INFO_WAL                       "WAL"
 
 #define TYPE_FULL        0
 #define TYPE_INCREMENTAL 1
@@ -119,6 +118,7 @@ struct rfile
  */
 struct backup
 {
+   char version[MISC_LENGTH];                                     /**< The version of pgmoneta */
    char label[MISC_LENGTH];                                       /**< The label of the backup */
    char wal[MISC_LENGTH];                                         /**< The name of the WAL file */
    uint64_t backup_size;                                          /**< The backup size */
