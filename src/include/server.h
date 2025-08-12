@@ -55,6 +55,22 @@ bool
 pgmoneta_server_valid(int srv);
 
 /**
+ * Is the  server online
+ * @param srv The server index
+ * @return True if online, otherwise false
+ */
+bool
+pgmoneta_server_is_online(int srv);
+
+/**
+ * Set the server online state
+ * @param srv The server index
+ * @param v The state
+ */
+void
+pgmoneta_server_set_online(int srv, bool v);
+
+/**
  * Verify that a connection can be established to a server
  * @param srv The server index
  * @return True if yes, otherwise false

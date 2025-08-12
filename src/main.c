@@ -976,7 +976,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
       if (srv != -1)
       {
-         if (config->common.servers[srv].online)
+         if (pgmoneta_server_is_online(srv))
          {
             pid = fork();
             if (pid == -1)
@@ -1702,6 +1702,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    else if (id == MANAGEMENT_MODE)
    {
       char* action = NULL;
+      int ret;
       struct timespec start_t;
       struct timespec end_t;
       struct json* response = NULL;
@@ -1728,13 +1729,29 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          if (!strcmp(action, "offline"))
          {
-            config->common.servers[srv].online = false;
+            pgmoneta_server_set_online(srv, false);
 
 #ifdef HAVE_FREEBSD
             clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
 #else
             clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
+
+            SLEEP(5000000L);
+            if (config->common.servers[srv].wal_streaming > 0)
+            {
+               ret = kill(config->common.servers[srv].wal_streaming, SIGTERM);
+
+               if (ret == 0)
+               {
+                  config->common.servers[srv].wal_streaming = -1;
+               }
+               else
+               {
+                  errno = 0;
+               }
+            }
+
             pgmoneta_log_info("Mode: Server %s is offline", config->common.servers[srv].name);
 
             if (pgmoneta_management_create_response(payload, srv, &response))
@@ -1743,7 +1760,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                goto error;
             }
 
-            pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[srv].online, ValueBool);
+            pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)pgmoneta_server_is_online(srv), ValueBool);
 
             if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t, compression, encryption, payload))
             {
@@ -1755,22 +1772,25 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          }
          else if (!strcmp(action, "online"))
          {
-            config->common.servers[srv].online = true;
+            pgmoneta_server_set_online(srv, true);
 
             if (pgmoneta_server_verify_connection(srv))
             {
                if (init_replication_slot(srv))
                {
-                  config->common.servers[srv].online = false;
+                  pgmoneta_server_set_online(srv, false);
+                  pgmoneta_log_warn("Server %s is offline (replication slot)", config->common.servers[srv].name);
                }
                if (init_receivewal(srv))
                {
-                  config->common.servers[srv].online = false;
+                  pgmoneta_server_set_online(srv, false);
+                  pgmoneta_log_warn("Server %s is offline (receive wal)", config->common.servers[srv].name);
                }
             }
             else
             {
-               config->common.servers[srv].online = false;
+               pgmoneta_server_set_online(srv, false);
+               pgmoneta_log_warn("Server %s is offline (verify connection)", config->common.servers[srv].name);
             }
 
 #ifdef HAVE_FREEBSD
@@ -1779,7 +1799,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
             pgmoneta_log_info("Mode: Server %s is %s", config->common.servers[srv].name,
-                              config->common.servers[srv].online ? "online" : "offline");
+                              pgmoneta_server_is_online(srv) ? "online" : "offline");
 
             if (pgmoneta_management_create_response(payload, srv, &response))
             {
@@ -1787,7 +1807,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                goto error;
             }
 
-            pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[srv].online, ValueBool);
+            pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)pgmoneta_server_is_online(srv), ValueBool);
 
             if (pgmoneta_management_response_ok(NULL, client_fd, start_t, end_t,
                                                 compression, encryption,
@@ -2267,7 +2287,7 @@ valid_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribut
                             config->common.servers[i].online,
                             config->common.servers[i].primary,
                             config->common.servers[i].valid,
-                            config->common.servers[i].wal_streaming);
+                            config->common.servers[i].wal_streaming > 0);
 
          if (keep_running && config->common.servers[i].online && !config->common.servers[i].valid)
          {
@@ -2330,7 +2350,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
 
-      if (keep_running && !config->common.servers[i].wal_streaming)
+      if (keep_running && config->common.servers[i].wal_streaming <= 0)
       {
          start = false;
 
@@ -2338,7 +2358,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
          {
             pgmoneta_log_trace("WAL streaming: Server %s Online %d Valid %d WAL %d CHECKSUMS %d SUMMARIZE_WAL %d",
                                config->common.servers[i].name, config->common.servers[i].online,
-                               config->common.servers[i].valid, config->common.servers[i].wal_streaming,
+                               config->common.servers[i].valid, config->common.servers[i].wal_streaming > 0,
                                config->common.servers[i].checksums, config->common.servers[i].summarize_wal);
 
             if (strlen(config->common.servers[i].follow) == 0)
@@ -2358,7 +2378,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
                {
                   start = true;
                }
-               else if (!config->common.servers[follow].wal_streaming)
+               else if (config->common.servers[follow].wal_streaming <= 0)
                {
                   start = true;
                }
@@ -2369,7 +2389,7 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
                     j++)
                {
                   if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name) &&
-                      !config->common.servers[j].wal_streaming)
+                      config->common.servers[j].wal_streaming <= 0)
                   {
                      start = true;
                   }
@@ -2517,7 +2537,7 @@ init_receivewals(void)
    {
       if (init_receivewal(i))
       {
-         config->common.servers[i].online = false;
+         pgmoneta_server_set_online(i, false);
          pgmoneta_log_debug("Server %s is offline", config->common.servers[i].name);
       }
    }
@@ -2570,7 +2590,7 @@ init_replication_slots(void)
    {
       if (init_replication_slot(srv))
       {
-         config->common.servers[srv].online = false;
+         pgmoneta_server_set_online(srv, false);
          pgmoneta_log_debug("Server %s is offline", config->common.servers[srv].name);
       }
    }

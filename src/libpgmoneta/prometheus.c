@@ -2169,7 +2169,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming);
+      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming > 0);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -5103,7 +5103,7 @@ size_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].current_wal_filename);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming);
+      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming > 0);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -5131,7 +5131,7 @@ size_information(SSL* client_ssl, int client_fd)
       }
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming);
+      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming > 0);
 
       data = pgmoneta_append(data, "\n");
    }

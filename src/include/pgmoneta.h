@@ -260,7 +260,7 @@ struct server
    size_t block_size;                       /**< The size of a block in relation files*/
    size_t segment_size;                     /**< The max size of a relation file segment*/
    size_t relseg_size;                      /**< The max number of blocks in a relation file segment */
-   bool wal_streaming;                      /**< Is WAL streaming active */
+   pid_t wal_streaming;                     /**< WAL streaming process id */
    bool checksums;                          /**< Are checksums enabled */
    bool summarize_wal;                      /**< Is summarize_wal enabled */
    bool valid;                              /**< Is the server valid */

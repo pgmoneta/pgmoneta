@@ -85,7 +85,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   if (!config->common.servers[server].wal_streaming)
+   if (config->common.servers[server].wal_streaming <= 0)
    {
       ec = MANAGEMENT_ERROR_BACKUP_WAL;
       pgmoneta_log_error("Backup: Server %s is not WAL streaming", config->common.servers[server].name);

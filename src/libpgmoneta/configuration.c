@@ -241,7 +241,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.active_archive = false;
                   srv.active_delete = false;
                   srv.active_retention = false;
-                  srv.wal_streaming = false;
+                  srv.wal_streaming = -1;
                   srv.valid = false;
                   srv.cur_timeline = 1;
                   atomic_init(&srv.operation_count, 0);

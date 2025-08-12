@@ -81,7 +81,7 @@ pgmoneta_server_info(int srv, SSL* ssl, int socket)
       goto done;
    }
 
-   config->common.servers[srv].online = true;
+   pgmoneta_server_set_online(srv, true);
    config->common.servers[srv].valid = false;
    config->common.servers[srv].checksums = false;
 
@@ -237,6 +237,26 @@ pgmoneta_server_valid(int srv)
    }
 
    return true;
+}
+
+bool
+pgmoneta_server_is_online(int srv)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   return config->common.servers[srv].online;
+}
+
+void
+pgmoneta_server_set_online(int srv, bool v)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   config->common.servers[srv].online = v;
 }
 
 bool
