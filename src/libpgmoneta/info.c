@@ -1353,6 +1353,8 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%d\n", INFO_MINOR_VERSION, backup->minor_version);
    write_info(sfile, "%s=%d\n", INFO_KEEP, backup->keep ? 1 : 0);
    write_info(sfile, "%s=%lu\n", INFO_TABLESPACES, backup->number_of_tablespaces);
+   write_info(sfile, "%s=%d\n", INFO_COMPRESSION, backup->compression);
+   write_info(sfile, "%s=%d\n", INFO_ENCRYPTION, backup->encryption);
 
    for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
    {
