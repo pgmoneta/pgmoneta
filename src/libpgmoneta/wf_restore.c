@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include "art.h"
 #include <pgmoneta.h>
 #include <logging.h>
 #include <restore.h>
@@ -376,7 +377,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    char* base = NULL;
    char* position = NULL;
    bool primary = true;
-   bool is_recovery_info;
+   bool is_recovery_info = false;
    char tokens[256];
    char buffer[256];
    char line[1024];
@@ -403,17 +404,24 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-   assert(pgmoneta_art_contains_key(nodes, NODE_RECOVERY_INFO));
    assert(pgmoneta_art_contains_key(nodes, NODE_TARGET_BASE));
-   assert(pgmoneta_art_contains_key(nodes, USER_POSITION));
 #endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-   is_recovery_info = (bool)pgmoneta_art_search(nodes, NODE_RECOVERY_INFO);
+   if (pgmoneta_art_contains_key(nodes, NODE_RECOVERY_INFO))
+   {
+      is_recovery_info = (bool)pgmoneta_art_search(nodes, NODE_RECOVERY_INFO);
+   }
    base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
-   position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
-   // TODO primary = (bool)pgmoneta_art_search(nodes, NODE_PRIMARY);
+   if (pgmoneta_art_contains_key(nodes, USER_POSITION))
+   {
+      position = (char*)pgmoneta_art_search(nodes, USER_POSITION);
+   }
+   if (pgmoneta_art_contains_key(nodes, NODE_PRIMARY))
+   {
+      primary = (bool)pgmoneta_art_search(nodes, NODE_PRIMARY);
+   }
 
    pgmoneta_log_debug("Recovery (execute): %s/%s", config->common.servers[server].name, label);
 

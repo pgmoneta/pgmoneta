@@ -967,7 +967,6 @@ pgmoneta_extract_incremental_backup(int server, char* label, char** root, char**
    *root = backup_root;
 
    pgmoneta_art_destroy(nodes);
-   free(backup);
    return 0;
 
 error:
@@ -978,7 +977,6 @@ error:
    free(backup_base);
    free(backup_root);
    pgmoneta_art_destroy(nodes);
-   free(backup);
    return 1;
 }
 
