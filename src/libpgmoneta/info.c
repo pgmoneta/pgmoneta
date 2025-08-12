@@ -76,77 +76,7 @@ static void
 write_info(FILE* sfile, const char* fmt, ...);
 
 static void
-create_info(char* directory, char* label, int status)
-{
-   char buffer[INFO_BUFFER_SIZE];
-   char* s = NULL;
-   FILE* sfile = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   s = pgmoneta_append(s, directory);
-   s = pgmoneta_append(s, "/backup.info");
-
-   sfile = fopen(s, "w");
-   if (sfile == NULL)
-   {
-      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
-      errno = 0;
-      goto error;
-   }
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%s", INFO_LABEL, label);
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=", INFO_COMMENTS);
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->compression_type);
-
-   memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
-   fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->encryption);
-
-   pgmoneta_permission(s, 6, 0, 0);
-
-   if (sfile != NULL)
-   {
-      fsync(fileno(sfile));
-      fclose(sfile);
-   }
-
-   free(s);
-
-   return;
-
-error:
-
-   free(s);
-}
+create_info(char* directory, char* label, int status);
 
 int
 pgmoneta_update_info_annotate(int server, struct backup* backup, char* action, char* key, char* comment)
@@ -481,27 +411,68 @@ error:
 }
 
 int
-pgmoneta_load_info(char* directory, char* label, struct backup** backup)
+pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
 {
+   char* label = NULL;
    char* fn = NULL;
    char buffer[INFO_BUFFER_SIZE];
    FILE* file = NULL;
    int tbl_idx = 0;
    struct backup* bck = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
 
    *backup = NULL;
+
+   if (!strcmp(identifier, "oldest") || !strcmp(identifier, "newest") || !strcmp(identifier, "latest"))
+   {
+      int number_of_backups = 0;
+      struct backup** backups = NULL;
+
+      if (pgmoneta_load_infos(directory, &number_of_backups, &backups))
+      {
+         goto error;
+      }
+
+      if (number_of_backups == 0)
+      {
+         goto error;
+      }
+
+      if (!strcmp(identifier, "oldest"))
+      {
+         label = pgmoneta_append(label, backups[0]->label);
+      }
+      else if (!strcmp(identifier, "latest") || !strcmp(identifier, "newest"))
+      {
+         label = pgmoneta_append(label, backups[number_of_backups - 1]->label);
+      }
+
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
+   }
+   else
+   {
+      label = identifier;
+   }
 
    fn = NULL;
    fn = pgmoneta_append(fn, directory);
    fn = pgmoneta_append(fn, label);
    fn = pgmoneta_append(fn, "/backup.info");
 
-   file = fopen(fn, "r");
-   if (file == NULL)
+   if (pgmoneta_exists(fn))
    {
-      pgmoneta_log_error("Could not open file %s due to %s", fn, strerror(errno));
-      errno = 0;
-      goto error;
+      file = fopen(fn, "r");
+      if (file == NULL)
+      {
+         pgmoneta_log_error("Could not open file %s due to %s", fn, strerror(errno));
+         errno = 0;
+         goto error;
+      }
    }
 
    bck = (struct backup*)malloc(sizeof(struct backup));
@@ -512,18 +483,8 @@ pgmoneta_load_info(char* directory, char* label, struct backup** backup)
    }
 
    memset(bck, 0, sizeof(struct backup));
+
    bck->valid = VALID_UNKNOWN;
-   bck->basebackup_elapsed_time = 0;
-   bck->manifest_elapsed_time = 0;
-   bck->compression_zstd_elapsed_time = 0;
-   bck->compression_bzip2_elapsed_time = 0;
-   bck->compression_lz4_elapsed_time = 0;
-   bck->compression_gzip_elapsed_time = 0;
-   bck->encryption_elapsed_time = 0;
-   bck->linking_elapsed_time = 0;
-   bck->remote_ssh_elapsed_time = 0;
-   bck->remote_azure_elapsed_time = 0;
-   bck->remote_s3_elapsed_time = 0;
 
    if (file != NULL)
    {
@@ -554,7 +515,11 @@ pgmoneta_load_info(char* directory, char* label, struct backup** backup)
 
          memcpy(&value[0], ptr, strlen(ptr) - 1);
 
-         if (!strcmp(INFO_STATUS, &key[0]))
+         if (!strcmp(INFO_PGMONETA_VERSION, &key[0]))
+         {
+            memcpy(&bck->version[0], &value[0], strlen(&value[0]));
+         }
+         else if (!strcmp(INFO_STATUS, &key[0]))
          {
             if (!strcmp("1", &value[0]))
             {
@@ -719,6 +684,16 @@ pgmoneta_load_info(char* directory, char* label, struct backup** backup)
    }
 
    free(fn);
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   if (identifier != label)
+   {
+      free(label);
+   }
 
    return 0;
 
@@ -733,6 +708,11 @@ error:
    }
 
    free(fn);
+
+   if (identifier != label)
+   {
+      free(label);
+   }
 
    return 1;
 }
@@ -1349,6 +1329,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
       goto error;
    }
 
+   write_info(sfile, "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
    write_info(sfile, "%s=%d\n", INFO_STATUS, backup->valid == VALID_TRUE ? 1 : 0);
    write_info(sfile, "%s=%s\n", INFO_LABEL, backup->label);
    write_info(sfile, "%s=%s\n", INFO_WAL, backup->wal);
@@ -1357,16 +1338,22 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%lu\n", INFO_BIGGEST_FILE, backup->biggest_file_size);
    write_info(sfile, "%s=%.4f\n", INFO_ELAPSED, backup->total_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_BASEBACKUP_ELAPSED, backup->basebackup_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_ZSTD_ELAPSED, backup->compression_zstd_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_GZIP_ELAPSED, backup->compression_gzip_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_BZIP2_ELAPSED, backup->compression_bzip2_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_LZ4_ELAPSED, backup->compression_lz4_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_ENCRYPTION_ELAPSED, backup->encryption_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_LINKING_ELAPSED, backup->linking_elapsed_time);
-   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED, backup->remote_ssh_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_MANIFEST_ELAPSED, backup->manifest_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED,backup->remote_ssh_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_S3_ELAPSED, backup->remote_s3_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_AZURE_ELAPSED, backup->remote_azure_elapsed_time);
    write_info(sfile, "%s=%d\n", INFO_MAJOR_VERSION, backup->major_version);
    write_info(sfile, "%s=%d\n", INFO_MINOR_VERSION, backup->minor_version);
    write_info(sfile, "%s=%d\n", INFO_KEEP, backup->keep ? 1 : 0);
    write_info(sfile, "%s=%lu\n", INFO_TABLESPACES, backup->number_of_tablespaces);
+   write_info(sfile, "%s=%d\n", INFO_COMPRESSION, backup->compression);
+   write_info(sfile, "%s=%d\n", INFO_ENCRYPTION, backup->encryption);
 
    for (uint64_t i = 0; i < backup->number_of_tablespaces; i++)
    {
@@ -1381,13 +1368,13 @@ pgmoneta_save_info(char* directory, struct backup* backup)
 
    write_info(sfile, "%s=%u\n", INFO_START_TIMELINE, backup->start_timeline);
    write_info(sfile, "%s=%u\n", INFO_END_TIMELINE, backup->end_timeline);
+   write_info(sfile, "%s=%d\n", INFO_TYPE, backup->type);
    write_info(sfile, "%s=%s\n", INFO_PARENT, backup->parent_label);
    write_info(sfile, "%s=%s\n", INFO_COMMENTS, backup->comments);
 
    memset(&buffer[0], 0, sizeof(buffer));
    snprintf(&buffer[0], sizeof(buffer), "%s=%.1024s\n", INFO_EXTRA, backup->extra);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%s", INFO_EXTRA, backup->extra);
 
    pgmoneta_permission(bck_info_file, 6, 0, 0);
 
@@ -1788,6 +1775,37 @@ error:
    return 1;
 }
 
+int
+pgmoneta_sort_backups(struct backup** backups, int number_of_backups, bool desc)
+{
+   int comp_result;
+
+   if (backups == NULL)
+   {
+      goto error;
+   }
+
+   for (int i = 0; i < number_of_backups - 1; i++)
+   {
+      for (int j = i + 1; j < number_of_backups; j++)
+      {
+         comp_result = strcmp(backups[i]->label, backups[j]->label);
+
+         // Swap if needed based on sort order
+         if ((desc && comp_result < 0) || (!desc && comp_result > 0))
+         {
+            struct backup* temp = backups[i];
+            backups[i] = backups[j];
+            backups[j] = temp;
+         }
+      }
+   }
+   return 0;
+
+error:
+   return 1;
+}
+
 static int
 file_final_name(char* file, int encryption, int compression, char** finalname)
 {
@@ -1892,4 +1910,77 @@ write_info(FILE* sfile, const char* fmt, ...)
    {
       fputs(buffer, sfile);
    }
+}
+
+static void
+create_info(char* directory, char* label, int status)
+{
+   char buffer[INFO_BUFFER_SIZE];
+   char* s = NULL;
+   FILE* sfile = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   s = pgmoneta_append(s, directory);
+   s = pgmoneta_append(s, "/backup.info");
+
+   sfile = fopen(s, "w");
+   if (sfile == NULL)
+   {
+      pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
+      errno = 0;
+      goto error;
+   }
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_STATUS, status);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=%d", INFO_STATUS, status);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_LABEL, label);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=%s", INFO_LABEL, label);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=0\n", INFO_TABLESPACES);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=0", INFO_TABLESPACES);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%s\n", INFO_PGMONETA_VERSION, VERSION);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=%s", INFO_PGMONETA_VERSION, VERSION);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=\n", INFO_COMMENTS);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=", INFO_COMMENTS);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->compression_type);
+
+   memset(&buffer[0], 0, sizeof(buffer));
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
+   fputs(&buffer[0], sfile);
+   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->encryption);
+
+   pgmoneta_permission(s, 6, 0, 0);
+
+   if (sfile != NULL)
+   {
+      fsync(fileno(sfile));
+      fclose(sfile);
+   }
+
+   free(s);
+
+   return;
+
+error:
+
+   free(s);
 }
