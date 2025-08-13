@@ -5039,6 +5039,7 @@ remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
    int i = 0;
    int last_non_whitespace_index = -1;
    char* result = NULL; // Temporary variable to hold the trimmed line
+
    while (s[i] != '\0' && isspace(s[i]))
    {
       i++;
@@ -5049,7 +5050,6 @@ remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
    {
       if (s[i] == ';' || s[i] == '#')
       {
-         result = pgmoneta_append_char(result, '\0');
          break; // Break loop if a comment character is encountered
       }
       if (!isspace(s[i]))
