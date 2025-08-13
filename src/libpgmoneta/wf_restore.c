@@ -189,14 +189,8 @@ restore_execute(char* name __attribute__((unused)), struct art* nodes)
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
+
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
    assert(pgmoneta_art_contains_key(nodes, USER_POSITION));
@@ -283,14 +277,8 @@ combine_incremental_execute(char* name __attribute__((unused)), struct art* node
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
+
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
@@ -393,14 +381,8 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
+
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
    assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
@@ -830,14 +812,8 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
    struct main_configuration* config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
+
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
 #endif
@@ -991,14 +967,8 @@ restore_excluded_files_teardown(char* name __attribute__((unused)), struct art* 
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
+
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));
 #endif

@@ -82,14 +82,7 @@ retention_setup(char* name __attribute__((unused)), struct art* nodes)
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
 #endif
 
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -113,14 +106,7 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
 #endif
 
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -255,14 +241,7 @@ retention_teardown(char* name __attribute__((unused)), struct art* nodes)
    config = (struct main_configuration*)shmem;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
 #endif
 
    for (int i = 0; i < config->common.number_of_servers; i++)

@@ -33,6 +33,7 @@
 #include <info.h>
 
 /* system */
+#include <assert.h>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
@@ -4531,6 +4532,28 @@ error:
    return 1;
 #else
    return 1;
+#endif
+}
+
+void
+pgmoneta_dump_art(struct art *a)
+{
+#ifdef DEBUG
+   assert(a != NULL);
+   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
+   {
+      char *s = NULL;
+      s = pgmoneta_art_to_string(a, FORMAT_TEXT, NULL, 0);
+      if (s != NULL && strlen(s) > 0)
+      {
+         pgmoneta_log_debug("(Tree)\n%s", s);
+      }
+      else
+      {
+         pgmoneta_log_debug("(Tree)");
+      }
+      free(s);
+   }
 #endif
 }
 

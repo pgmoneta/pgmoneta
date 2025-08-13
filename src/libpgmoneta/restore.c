@@ -483,14 +483,7 @@ pgmoneta_restore_backup(struct art* nodes)
    char* label = NULL;
 
 #ifdef DEBUG
-   if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
-   {
-      char* a = NULL;
-      a = pgmoneta_art_to_string(nodes, FORMAT_TEXT, NULL, 0);
-      pgmoneta_log_debug("(Tree)\n%s", a);
-      free(a);
-   }
-   assert(nodes != NULL);
+   pgmoneta_dump_art(nodes);
 
    assert(pgmoneta_art_contains_key(nodes, USER_DIRECTORY));
    assert(pgmoneta_art_contains_key(nodes, USER_IDENTIFIER));

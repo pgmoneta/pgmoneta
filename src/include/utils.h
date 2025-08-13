@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <art.h>
 #include <message.h>
 #include <workers.h>
 
@@ -1347,6 +1348,13 @@ pgmoneta_backtrace(void);
  */
 int
 pgmoneta_backtrace_string(char** s);
+
+/**
+ * Dump an ART tree under DEBUG
+ * @param a The ART tree
+ */
+void
+pgmoneta_dump_art(struct art* a);
 
 /**
  * Get the OS name and kernel version.
