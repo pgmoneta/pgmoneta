@@ -349,47 +349,47 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
 {
    char* d = NULL;
    struct backup** bcks = NULL;
-   int number_of_directories;
-   char** dirs;
+   int number_of_bcks = 0;
+   char** dirs = NULL;
 
    *number_of_backups = 0;
    *backups = NULL;
 
-   number_of_directories = 0;
-   dirs = NULL;
+   pgmoneta_get_directories(directory, &number_of_bcks, &dirs);
 
-   pgmoneta_get_directories(directory, &number_of_directories, &dirs);
-
-   bcks = (struct backup**)malloc(number_of_directories * sizeof(struct backup*));
-
-   if (bcks == NULL)
+   if (number_of_bcks > 0)
    {
-      goto error;
-   }
+      bcks = (struct backup**)malloc(number_of_bcks * sizeof(struct backup*));
 
-   memset(bcks, 0, number_of_directories * sizeof(struct backup*));
-
-   for (int i = 0; i < number_of_directories; i++)
-   {
-      d = pgmoneta_append(d, directory);
-
-      if (pgmoneta_load_info(d, dirs[i], &bcks[i]))
+      if (bcks == NULL)
       {
-         pgmoneta_log_error("pgmoneta_load_infos: Unable to load backup for %s", d);
          goto error;
       }
 
-      free(d);
-      d = NULL;
+      memset(bcks, 0, number_of_bcks * sizeof(struct backup*));
+
+      for (int i = 0; i < number_of_bcks; i++)
+      {
+         d = pgmoneta_append(d, directory);
+
+         if (pgmoneta_load_info(d, dirs[i], &bcks[i]))
+         {
+            pgmoneta_log_error("pgmoneta_load_infos: Unable to load backup for %s", d);
+            goto error;
+         }
+
+         free(d);
+         d = NULL;
+      }
+
+      for (int i = 0; i < number_of_bcks; i++)
+      {
+         free(dirs[i]);
+      }
+      free(dirs);
    }
 
-   for (int i = 0; i < number_of_directories; i++)
-   {
-      free(dirs[i]);
-   }
-   free(dirs);
-
-   *number_of_backups = number_of_directories;
+   *number_of_backups = number_of_bcks;
    *backups = bcks;
 
    return 0;
@@ -400,11 +400,20 @@ error:
 
    if (dirs != NULL)
    {
-      for (int i = 0; i < number_of_directories; i++)
+      for (int i = 0; i < number_of_bcks; i++)
       {
          free(dirs[i]);
       }
       free(dirs);
+   }
+
+   if (bcks != NULL)
+   {
+      for (int i = 0; i < number_of_bcks; i++)
+      {
+         free(bcks[i]);
+      }
+      free(bcks);
    }
 
    return 1;
@@ -453,6 +462,7 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
          free(backups[i]);
       }
       free(backups);
+      backups = NULL;
    }
    else
    {
@@ -684,11 +694,15 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    }
 
    free(fn);
-   for (int i = 0; i < number_of_backups; i++)
+
+   if (backups != NULL)
    {
-      free(backups[i]);
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
    }
-   free(backups);
 
    if (identifier != label)
    {
@@ -698,6 +712,15 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    return 0;
 
 error:
+
+   if (backups != NULL)
+   {
+      for (int i = 0; i < number_of_backups; i++)
+      {
+         free(backups[i]);
+      }
+      free(backups);
+   }
 
    free(bck);
 
