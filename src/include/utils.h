@@ -985,6 +985,14 @@ char*
 pgmoneta_get_server_wal(int server);
 
 /**
+ * Get the summary directory for a server
+ * @param server The server
+ * @return The summary directory
+ */
+char*
+pgmoneta_get_server_summary(int server);
+
+/**
  * Get the wal shipping directory for a server
  * @param server The server
  * @return The wal shipping directory
@@ -1167,6 +1175,15 @@ pgmoneta_convert_base32_to_hex(unsigned char* base32, int base32_length, unsigne
  */
 size_t
 pgmoneta_get_file_size(char* file_path);
+
+/**
+ * Copy and extract a file
+ * @param from The source file
+ * @param to The destination file
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_copy_and_extract_file(char* from, char** to);
 
 /**
  * Is the file encrypted
