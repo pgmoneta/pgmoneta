@@ -670,6 +670,7 @@ password:
          do_free = true;
          do_verify = false;
          printf("Password : %s", password);
+         do_free = true;
       }
       else
       {
@@ -679,13 +680,9 @@ password:
          {
             printf("Password : ");
 
-            if (password != NULL)
-            {
-               free(password);
-               password = NULL;
-            }
-
             password = pgmoneta_get_password();
+            do_free = true;
+            do_verify = true;
          }
          else
          {
@@ -701,7 +698,10 @@ password:
       if ((unsigned char)(*(password + i)) & 0x80)
       {
          warnx("Illegal character(s) in password");
-         free(password);
+         if (do_free)
+         {
+            free(password);
+         }
          password = NULL;
          goto password;
       }
@@ -919,6 +919,7 @@ password:
                password = generate_password(pwd_length);
                do_verify = false;
                printf("Password : %s", password);
+               do_free = true;
             }
             else
             {
@@ -928,13 +929,9 @@ password:
                {
                   printf("Password : ");
 
-                  if (password != NULL)
-                  {
-                     free(password);
-                     password = NULL;
-                  }
-
                   password = pgmoneta_get_password();
+                  do_free = true;
+                  do_verify = true;
                }
                else
                {
@@ -950,7 +947,10 @@ password:
             if ((unsigned char)(*(password + i)) & 0x80)
             {
                warnx("Illegal character(s) in password");
-               free(password);
+               if (do_free)
+               {
+                  free(password);
+               }
                password = NULL;
                goto password;
             }
