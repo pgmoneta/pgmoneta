@@ -2591,7 +2591,7 @@ init_replication_slot(int server)
       socket = 0;
       auth = pgmoneta_server_authenticate(server, "postgres",
                                           config->common.users[usr].username, config->common.users[usr].password,
-                                          true, &ssl, &socket);
+                                          false, &ssl, &socket);
 
       if (auth == AUTH_SUCCESS)
       {
@@ -2672,7 +2672,7 @@ server_done:
       if (ret == 0 && create_slot && slot_status == SLOT_NOT_FOUND)
       {
          auth = pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username,
-                                             config->common.users[usr].password, false, &ssl, &socket);
+                                             config->common.users[usr].password, true, &ssl, &socket);
 
          if (auth == AUTH_SUCCESS)
          {
