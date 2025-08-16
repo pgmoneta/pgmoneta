@@ -76,7 +76,7 @@ pgmoneta_server_verify_connection(int srv);
  */
 int
 pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, int offset,
-     int length, int socket, uint8_t** out, int* len);
+                                 int length, int socket, uint8_t** out, int* len);
 
 #ifdef __cplusplus
 }

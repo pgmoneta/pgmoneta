@@ -1368,7 +1368,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%.4f\n", INFO_ENCRYPTION_ELAPSED, backup->encryption_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_LINKING_ELAPSED, backup->linking_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_MANIFEST_ELAPSED, backup->manifest_elapsed_time);
-   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED,backup->remote_ssh_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_REMOTE_SSH_ELAPSED, backup->remote_ssh_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_S3_ELAPSED, backup->remote_s3_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_REMOTE_AZURE_ELAPSED, backup->remote_azure_elapsed_time);
    write_info(sfile, "%s=%d\n", INFO_MAJOR_VERSION, backup->major_version);

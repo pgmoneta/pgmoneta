@@ -2560,11 +2560,11 @@ init_replication_slots(void)
 static int
 init_replication_slot(int server)
 {
-   int usr;
+   int usr = -1;
    int auth = AUTH_ERROR;
    int slot_status = INCORRECT_SLOT_TYPE;
    SSL* ssl = NULL;
-   int socket;
+   int socket = 0;
    int ret = 0;
    struct message* slot_request_msg = NULL;
    struct message* slot_response_msg = NULL;
@@ -2591,7 +2591,7 @@ init_replication_slot(int server)
       socket = 0;
       auth = pgmoneta_server_authenticate(server, "postgres",
                                           config->common.users[usr].username, config->common.users[usr].password,
-                                          false, &ssl, &socket);
+                                          true, &ssl, &socket);
 
       if (auth == AUTH_SUCCESS)
       {
@@ -2599,14 +2599,14 @@ init_replication_slot(int server)
 
          if (!pgmoneta_server_valid(server))
          {
-            pgmoneta_log_fatal("Could not get version for server %s", config->common.servers[server].name);
+            pgmoneta_log_error("Could not get version for server %s", config->common.servers[server].name);
             ret = 1;
             goto server_done;
          }
 
          if (config->common.servers[server].version < POSTGRESQL_MIN_VERSION)
          {
-            pgmoneta_log_fatal("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION,
+            pgmoneta_log_error("PostgreSQL %d or higher is required for server %s", POSTGRESQL_MIN_VERSION,
                                config->common.servers[server].name);
             ret = 1;
             goto server_done;
@@ -2616,7 +2616,7 @@ init_replication_slot(int server)
                                                              config->compression_type == COMPRESSION_SERVER_ZSTD ||
                                                              config->compression_type == COMPRESSION_SERVER_LZ4))
          {
-            pgmoneta_log_fatal("PostgreSQL 15 or higher is required for server %s for server side compression",
+            pgmoneta_log_error("PostgreSQL 15 or higher is required for server %s for server side compression",
                                config->common.servers[server].name);
             ret = 1;
             goto server_done;
@@ -2624,7 +2624,7 @@ init_replication_slot(int server)
 
          if (config->common.servers[server].version >= 17 && !config->common.servers[server].summarize_wal)
          {
-            pgmoneta_log_fatal("PostgreSQL %d or higher requires summarize_wal for server %s",
+            pgmoneta_log_error("PostgreSQL %d or higher requires summarize_wal for server %s",
                                config->common.servers[server].version, config->common.servers[server].name);
             ret = 1;
             goto server_done;
@@ -2640,51 +2640,14 @@ init_replication_slot(int server)
          {
             if (slot_status == SLOT_NOT_FOUND)
             {
-               pgmoneta_log_fatal("Replication slot '%s' is not found for server %s",
+               pgmoneta_log_error("Replication slot '%s' is not found for server %s",
                                   config->common.servers[server].wal_slot, config->common.servers[server].name);
                ret = 1;
-               goto server_done;
             }
             else if (slot_status == INCORRECT_SLOT_TYPE)
             {
-               pgmoneta_log_fatal("Replication slot '%s' should be physical", config->common.servers[server].wal_slot);
+               pgmoneta_log_error("Replication slot '%s' should be physical", config->common.servers[server].wal_slot);
                ret = 1;
-               goto server_done;
-            }
-         }
-         else
-         {
-            if (create_slot && slot_status == SLOT_NOT_FOUND)
-            {
-               pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->common.servers[server].name, config->common.servers[server].wal_slot);
-               pgmoneta_create_replication_slot_message(config->common.servers[server].wal_slot, &slot_request_msg,
-                                                        config->common.servers[server].version);
-               if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
-               {
-                  if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
-                  {
-                     pgmoneta_log_info("Created replication slot %s on %s",
-                                       config->common.servers[server].wal_slot, config->common.servers[server].name);
-                  }
-                  else
-                  {
-                     pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->common.servers[server].name);
-                     ret = 1;
-                     goto server_done;
-                  }
-               }
-               else
-               {
-                  pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->common.servers[server].name);
-                  ret = 1;
-                  goto server_done;
-               }
-
-               pgmoneta_free_message(slot_request_msg);
-               slot_request_msg = NULL;
-
-               pgmoneta_clear_message();
-               slot_response_msg = NULL;
             }
          }
       }
@@ -2705,6 +2668,57 @@ server_done:
 
       ssl = NULL;
       socket = 0;
+
+      if (ret == 0 && create_slot && slot_status == SLOT_NOT_FOUND)
+      {
+         auth = pgmoneta_server_authenticate(server, "postgres", config->common.users[usr].username,
+                                             config->common.users[usr].password, false, &ssl, &socket);
+
+         if (auth == AUTH_SUCCESS)
+         {
+            pgmoneta_log_trace("CREATE_SLOT: %s/%s", config->common.servers[server].name, config->common.servers[server].wal_slot);
+            pgmoneta_create_replication_slot_message(config->common.servers[server].wal_slot, &slot_request_msg,
+                                                     config->common.servers[server].version);
+            if (pgmoneta_write_message(ssl, socket, slot_request_msg) == MESSAGE_STATUS_OK)
+            {
+               if (pgmoneta_read_block_message(ssl, socket, &slot_response_msg) == MESSAGE_STATUS_OK)
+               {
+                  pgmoneta_log_info("Created replication slot %s on %s",
+                                    config->common.servers[server].wal_slot, config->common.servers[server].name);
+               }
+               else
+               {
+                  pgmoneta_log_error("Could not read CREATE_REPLICATION_SLOT response for %s", config->common.servers[server].name);
+                  ret = 1;
+               }
+            }
+            else
+            {
+               pgmoneta_log_error("Could not write CREATE_REPLICATION_SLOT request for %s", config->common.servers[server].name);
+               ret = 1;
+            }
+         }
+         else if (auth == AUTH_BAD_PASSWORD)
+         {
+            pgmoneta_log_error("Authentication failed for user %s on %s", config->common.users[usr].username, config->common.servers[server].name);
+         }
+         else
+         {
+            pgmoneta_log_debug("Server %s is offline", config->common.servers[server].name);
+         }
+
+         pgmoneta_free_message(slot_request_msg);
+         slot_request_msg = NULL;
+
+         pgmoneta_clear_message();
+         slot_response_msg = NULL;
+
+         pgmoneta_close_ssl(ssl);
+         pgmoneta_disconnect(socket);
+
+         ssl = NULL;
+         socket = 0;
+      }
    }
    else
    {

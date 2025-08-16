@@ -4536,13 +4536,13 @@ error:
 }
 
 void
-pgmoneta_dump_art(struct art *a)
+pgmoneta_dump_art(struct art* a)
 {
 #ifdef DEBUG
    assert(a != NULL);
    if (pgmoneta_log_is_enabled(PGMONETA_LOGGING_LEVEL_DEBUG1))
    {
-      char *s = NULL;
+      char* s = NULL;
       s = pgmoneta_art_to_string(a, FORMAT_TEXT, NULL, 0);
       if (s != NULL && strlen(s) > 0)
       {

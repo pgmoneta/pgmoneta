@@ -265,8 +265,8 @@ pgmoneta_server_verify_connection(int srv)
 }
 
 int
-pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, int offset, 
-   int length, int socket, uint8_t** out, int* len)
+pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, int offset,
+                                 int length, int socket, uint8_t** out, int* len)
 {
    char* user = NULL;
    int ret;
@@ -302,7 +302,7 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
       pgmoneta_log_debug("Connection user: %s does not have 'pg_read_server_files' role", user);
       goto error;
    }
-   
+
    /* Check if the user has EXECUTE privilege on 'pg_read_binary_file(text, bigint, bigint, boolean)' */
    if (has_execute_privilege(ssl, socket, user, "pg_read_binary_file(text, bigint, bigint, boolean)", &has_privilege))
    {
@@ -345,7 +345,7 @@ q:
          goto error;
       }
    }
-   
+
    if (response->number_of_columns != 1)
    {
       pgmoneta_log_error("Unexpected number of columns in query response");
@@ -1037,14 +1037,14 @@ transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
       pgmoneta_log_error("invalid hex bytea (partial data)");
       goto error;
    }
-   
+
    binary_len = hex_len / 2;
    binary_out = (uint8_t*)malloc(sizeof(uint8_t) * binary_len);
    if (binary_out == NULL)
    {
       goto error;
    }
-   
+
    for (size_t i = 0; i < binary_len; i++)
    {
       hex_chr_str[0] = hb[2 * i];
