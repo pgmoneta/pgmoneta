@@ -195,6 +195,9 @@ start_postgresql_container() {
     if sudo $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
       echo "PostgreSQL 17 is ready!"
     else
+      echo "Printing container logs..."
+      sudo $CONTAINER_ENGINE logs $CONTAINER_NAME
+      echo ""
       echo "PostgreSQL 17 is not ready, exiting"
       cleanup_postgresql_image
       exit 1
