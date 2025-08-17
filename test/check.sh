@@ -97,45 +97,45 @@ cleanup() {
 
        echo "Generating $COVERAGE_DIR/coverage-report-libpgmoneta.txt"
        llvm-cov report $EXECUTABLE_DIRECTORY/libpgmoneta.so \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-report-libpgmoneta.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-report-libpgmoneta.txt
        echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta.txt"
        llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-report-pgmoneta.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-report-pgmoneta.txt
       echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt"
       llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-cli \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt
       echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt"
       llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-admin \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt
-      echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt"
-      llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt
+      # echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt"
+      # llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
+      #    --instr-profile=$COVERAGE_DIR/coverage.profdata \
+      #    --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt
 
        echo "Generating $COVERAGE_DIR/coverage-libpgmoneta.txt"
        llvm-cov show $EXECUTABLE_DIRECTORY/libpgmoneta.so \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-libpgmoneta.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-libpgmoneta.txt
        echo "Generating $COVERAGE_DIR/coverage-pgmoneta.txt"
        llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-pgmoneta.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-pgmoneta.txt
       echo "Generating $COVERAGE_DIR/coverage-pgmoneta-cli.txt"
       llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-cli \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-pgmoneta-cli.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-pgmoneta-cli.txt
       echo "Generating $COVERAGE_DIR/coverage-pgmoneta-admin.txt"
       llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-admin \
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-pgmoneta-admin.txt
-      echo "Generating $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt"
-      llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
-         -instr-profile=$COVERAGE_DIR/coverage.profdata \
-         -format=text > $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt
+         --instr-profile=$COVERAGE_DIR/coverage.profdata \
+         --format=text > $COVERAGE_DIR/coverage-pgmoneta-admin.txt
+      # echo "Generating $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt"
+      # llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
+      #    --instr-profile=$COVERAGE_DIR/coverage.profdata \
+      #    --format=text > $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt
        echo "Coverage --> $COVERAGE_DIR"
      fi
      echo "Logs --> $LOG_DIR, $PG_LOG_DIR"
