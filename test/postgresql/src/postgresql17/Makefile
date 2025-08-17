@@ -43,6 +43,6 @@ build:
 	$(CONTAINER_ENGINE) build --no-cache -t $(IMAGE_NAME) .
 
 clean:
-	$(CONTAINER_ENGINE) stop $(IMAGE_SHORT_NAME) || true
-	$(CONTAINER_ENGINE) rm -f $(IMAGE_SHORT_NAME) || true
-	$(CONTAINER_ENGINE) rmi -f $(IMAGE_NAME) || true
+	$(CONTAINER_ENGINE) stop $(IMAGE_SHORT_NAME) >/dev/null 2>&1 || true
+	$(CONTAINER_ENGINE) rm -f $(IMAGE_SHORT_NAME) >/dev/null 2>&1 || true
+	$(CONTAINER_ENGINE) rmi -f $(IMAGE_NAME) >/dev/null 2>&1 || true

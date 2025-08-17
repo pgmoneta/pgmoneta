@@ -175,7 +175,7 @@ cleanup_postgresql_image() {
 }
 
 start_postgresql_container() {
-  sudo $CONTAINER_ENGINE run -p 5432:5432 -v "$PG_LOG_DIR:/pglog" \
+  sudo $CONTAINER_ENGINE run -p 5432:5432 -v "$PG_LOG_DIR:/pglog:z" \
   --name $CONTAINER_NAME -d \
   -e PG_DATABASE=$PG_DATABASE \
   -e PG_USER_NAME=$PG_USER_NAME \
@@ -212,8 +212,8 @@ start_postgresql() {
 }
 
 remove_postgresql_container() {
-  sudo $CONTAINER_ENGINE stop $CONTAINER_NAME || true
-  sudo $CONTAINER_ENGINE rm -f $CONTAINER_NAME || true
+  sudo $CONTAINER_ENGINE stop --ignore $CONTAINER_NAME >/dev/null 2>&1 || true
+  sudo $CONTAINER_ENGINE rm -f --ignore $CONTAINER_NAME >/dev/null 2>&1 || true
 }
 
 pgmoneta_initialize_configuration() {
