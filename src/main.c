@@ -2684,13 +2684,13 @@ server_done:
                {
                   if (slot_response_msg->kind == 'E')
                   {
-                      pgmoneta_log_error_response_message(slot_response_msg);
-                      ret = 1;
+                     pgmoneta_log_error_response_message(slot_response_msg);
+                     ret = 1;
                   }
                   else
                   {
-                      pgmoneta_log_info("Created replication slot %s on %s",
-                                    config->common.servers[server].wal_slot, config->common.servers[server].name);
+                     pgmoneta_log_info("Created replication slot %s on %s",
+                                       config->common.servers[server].wal_slot, config->common.servers[server].name);
                   }
                }
                else

@@ -28,16 +28,6 @@
 #
 set -eo pipefail
 
-# Detect container engine: Docker or Podman
-if command -v docker &> /dev/null; then
-  CONTAINER_ENGINE="docker"
-elif command -v podman &> /dev/null; then
-  CONTAINER_ENGINE="podman"
-else
-  echo "Neither Docker nor Podman is installed. Please install one to proceed."
-  exit 1
-fi
-
 # Variables
 IMAGE_NAME="pgmoneta-test-postgresql17-rocky9"
 CONTAINER_NAME="pgmoneta-test-postgresql17"
@@ -102,42 +92,53 @@ cleanup() {
       fi
       sudo rm -Rf "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY"
       if ls "$COVERAGE_DIR"/*.profraw >/dev/null 2>&1; then
-       echo "Generating coverage report"
+       echo "Generating coverage report, expect error when the binary is not covered at all"
        llvm-profdata merge -sparse $COVERAGE_DIR/*.profraw -o $COVERAGE_DIR/coverage.profdata
+
+       echo "Generating $COVERAGE_DIR/coverage-report-libpgmoneta.txt"
        llvm-cov report $EXECUTABLE_DIRECTORY/libpgmoneta.so \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-report-libpgmoneta.txt
+       echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta.txt"
        llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-report-pgmoneta.txt
+      echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt"
       llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-cli \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt
+      echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt"
       llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-admin \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt
+      echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt"
       llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt
 
+       echo "Generating $COVERAGE_DIR/coverage-libpgmoneta.txt"
        llvm-cov show $EXECUTABLE_DIRECTORY/libpgmoneta.so \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-libpgmoneta.txt
+       echo "Generating $COVERAGE_DIR/coverage-pgmoneta.txt"
        llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-pgmoneta.txt
+      echo "Generating $COVERAGE_DIR/coverage-pgmoneta-cli.txt"
       llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-cli \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-pgmoneta-cli.txt
+      echo "Generating $COVERAGE_DIR/coverage-pgmoneta-admin.txt"
       llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-admin \
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-pgmoneta-admin.txt
+      echo "Generating $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt"
       llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
          -instr-profile=$COVERAGE_DIR/coverage.profdata \
          -format=text > $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt
-       echo "Logs --> $LOG_DIR"
        echo "Coverage --> $COVERAGE_DIR"
      fi
+     echo "Logs --> $LOG_DIR, $PG_LOG_DIR"
      sudo chmod -R 700 "$PGMONETA_OPERATION_DIR"
    else
       echo "$PGMONETA_OPERATION_DIR not present ... ok"
@@ -190,8 +191,8 @@ start_postgresql_container() {
   if sudo $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
     echo "PostgreSQL 17 is ready!"
   else
-    echo "Wait for 5 seconds and retry"
-    sleep 5
+    echo "Wait for 10 seconds and retry"
+    sleep 10
     if sudo $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
       echo "PostgreSQL 17 is ready!"
     else
@@ -212,8 +213,8 @@ start_postgresql() {
 }
 
 remove_postgresql_container() {
-  sudo $CONTAINER_ENGINE stop --ignore $CONTAINER_NAME >/dev/null 2>&1 || true
-  sudo $CONTAINER_ENGINE rm -f --ignore $CONTAINER_NAME >/dev/null 2>&1 || true
+  sudo $CONTAINER_ENGINE stop $CONTAINER_NAME 2>/dev/null || true
+  sudo $CONTAINER_ENGINE rm -f $CONTAINER_NAME 2>/dev/null || true
 }
 
 pgmoneta_initialize_configuration() {
@@ -306,7 +307,7 @@ run_tests() {
   fi
 
   echo "Preparing the pgmoneta directory"
-  export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%m.profraw"
+  export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p.profraw"
   sudo rm -Rf "$PGMONETA_OPERATION_DIR"
   mkdir -p "$PGMONETA_OPERATION_DIR"
   mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY"
@@ -316,8 +317,8 @@ run_tests() {
   mkdir -p "$PROJECT_DIRECTORY/build"
   cd "$PROJECT_DIRECTORY/build"
   export CC=$(which clang)
-  sudo cmake -DCMAKE_BUILD_TYPE=Debug ..
-  sudo make -j$(nproc)
+  cmake -DCMAKE_BUILD_TYPE=Debug ..
+  make -j$(nproc)
   cd ..
 
   if [[ $MODE == "ci" ]]; then
@@ -360,6 +361,7 @@ elif [[ $# -eq 1 ]]; then
         check check-devel check-static \
         llvm
    elif [[ "$1" == "clean" ]]; then
+      sudo rm -Rf $COVERAGE_DIR
       cleanup
       cleanup_postgresql_image
       sudo rm -Rf $PGMONETA_OPERATION_DIR
