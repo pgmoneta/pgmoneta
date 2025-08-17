@@ -338,7 +338,7 @@ run_tests() {
   mkdir -p "$PROJECT_DIRECTORY/build"
   cd "$PROJECT_DIRECTORY/build"
   export CC=$(which clang)
-  cmake -DCMAKE_BUILD_TYPE=Debug ..
+  cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
   make -j$(nproc)
   cd ..
 

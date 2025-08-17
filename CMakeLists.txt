@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
 
-option(ENABLE_COVERAGE "Enable code coverage" OFF)
-
 set(VERSION_MAJOR "0")
 set(VERSION_MINOR "19")
 set(VERSION_PATCH "0")

@@ -5,8 +5,6 @@ FILE(GLOB_RECURSE SOURCE_FILES "libpgmoneta/*.c")
 FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
 
 set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
-# Always default to OFF
-set(ENABLE_COVERAGE OFF)
 
 #
 # OS
@@ -36,14 +34,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${THREAD_INCLUDE_DIRS}
   )
 
-  find_program(LLVM_PATH llvm-cov)
- if(LLVM_PATH AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
-  set(ENABLE_COVERAGE ON)
-  message(STATUS "Coverage tools (llvm-cov) found and compiler is Clang: Code coverage ENABLED")
- else()
-  message(STATUS "Coverage tools not found or compiler is not Clang: Code coverage SKIPPED")
- endif()
- 
   #
   # Library directories
   #
@@ -178,15 +168,6 @@ add_compile_options(-Wno-deprecated-declarations)
 add_compile_options(-Wunused)
 add_compile_options(-Wunused-result)
 
-if(ENABLE_COVERAGE)
-  add_compile_options(-O0 -g -fprofile-instr-generate -fcoverage-mapping)
-  add_link_options(-fprofile-instr-generate)
-  message(STATUS "Building with coverage enabled")
-else()
-  message(STATUS "Building without coverage")
-endif()
-
-
 #
 # version number and string management
 #
@@ -205,6 +186,11 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
   add_compile_options(-DDEBUG)
 
   if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    message(STATUS "Coverage tools found")
+    add_compile_options(-fprofile-instr-generate)
+    add_compile_options(-fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate)
+
     if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")
       if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
         if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.2)
@@ -237,6 +223,7 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
       endif()
     endif()
   elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    message(STATUS "Coverage tools not found (Use Clang)")
     if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")
       if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
         if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 4.8)
