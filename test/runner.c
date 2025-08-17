@@ -66,7 +66,6 @@ main(int argc, char* argv[])
    srunner_run_all(sr, CK_VERBOSE);
    number_failed = srunner_ntests_failed(sr);
    srunner_free(sr);
-
    pgmoneta_test_environment_destroy();
 
    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;

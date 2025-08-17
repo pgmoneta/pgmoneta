@@ -144,7 +144,7 @@ cleanup() {
       echo "$PGMONETA_OPERATION_DIR not present ... ok"
    fi
 
-   if [[ MODE != "ci" ]]; then
+   if [[ $MODE != "ci" ]]; then
      echo "Removing postgres 17 container"
      remove_postgresql_container
    fi
@@ -207,8 +207,27 @@ start_postgresql_container() {
 }
 
 start_postgresql() {
-  #TODO refer to what postgresql/run-postgresql is doing and set a local postgres up
+  echo "Setting up PostgreSQL 17 directory"
   set +e
+  sudo rm -Rf /conf /pgconf /pgdata /pgwal
+  sudo cp -R $TEST_PG17_DIRECTORY/root /
+  sudo ls /root
+  sudo mkdir -p /conf /pgconf /pgdata /pgwal /pglog
+  sudo cp -R $TEST_PG17_DIRECTORY/conf/* /conf/
+  sudo ls /conf
+  sudo chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
+  sudo chmod -R 777 /conf /pgconf /pgdata /pgwal /pglog /root
+  sudo chmod +x /root/usr/bin/run-postgresql-local
+  sudo mkdir -p /root/usr/local/bin
+
+  echo "Setting up env variables"
+  export PG_DATABASE=${PG_DATABASE}
+  export PG_USER_NAME=${PG_USER_NAME}
+  export PG_USER_PASSWORD=${PG_USER_PASSWORD}
+  export PG_REPL_USER_NAME=${PG_REPL_USER_NAME}
+  export PG_REPL_PASSWORD=${PG_REPL_PASSWORD}
+
+  sudo -E -u postgres /root/usr/bin/run-postgresql-local
   set -e
 }
 
@@ -303,7 +322,9 @@ run_tests() {
   if sudo $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME exists, skip building"
   else
-    build_postgresql_image
+    if [[ $MODE != "ci" ]]; then
+      build_postgresql_image
+    fi
   fi
 
   echo "Preparing the pgmoneta directory"

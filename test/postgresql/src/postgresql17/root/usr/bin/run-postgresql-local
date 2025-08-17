@@ -33,19 +33,7 @@ export PG_EFFECTIVE_CACHE_SIZE=${PG_EFFECTIVE_CACHE_SIZE:-4GB}
 export PG_MAX_WAL_SIZE=${PG_MAX_WAL_SIZE:-1GB}
 export PG_LOG_LEVEL=${PG_LOG_LEVEL:-debug5}
 
-if [ -z "${PG_DATABASE}" ] ||
-   [ -z "${PG_USER_NAME}" ] || [ -z "${PG_USER_PASSWORD}" ] ||
-   [ -z "${PG_REPL_USER_NAME}" ] || [ -z "${PG_REPL_PASSWORD}" ]; then
-    echo "PG_DATABASE, PG_USER_NAME, PG_USER_PASSWORD, PG_REPL_USER_NAME and PG_REPL_PASSWORD needs to be defined."
-    exit 1
-fi
-
-export PG_DATABASE=${PG_DATABASE}
-export PG_USER_NAME=${PG_USER_NAME}
-export PG_USER_PASSWORD=${PG_USER_PASSWORD}
-export PG_REPL_USER_NAME=${PG_REPL_USER_NAME}
-export PG_REPL_PASSWORD=${PG_REPL_PASSWORD}
-/usr/pgsql-17/bin/initdb -k -X /pgwal/ /pgdata/
+/usr/lib/postgresql/17/bin/initdb -k -X /pgwal/ /pgdata/
 
 sed -i "s/PG_MAX_CONNECTIONS/$PG_MAX_CONNECTIONS/g" /conf/postgresql.conf
 sed -i "s/PG_SHARED_BUFFERS/$PG_SHARED_BUFFERS/g" /conf/postgresql.conf
@@ -68,8 +56,5 @@ sed -i "s/PG_USER_PASSWORD/$PG_USER_PASSWORD/g" /conf/setup.sql
 sed -i "s/PG_REPL_USER_NAME/$PG_REPL_USER_NAME/g" /conf/setup.sql
 sed -i "s/PG_REPL_PASSWORD/$PG_REPL_PASSWORD/g" /conf/setup.sql
 
-/usr/pgsql-17/bin/pg_ctl -D /pgdata/ start
-/usr/pgsql-17/bin/psql -q -h /tmp -f /conf/setup.sql postgres
-/usr/pgsql-17/bin/pg_ctl -D /pgdata/ stop
-
-exec /usr/pgsql-17/bin/postgres -D /pgdata/ "$@"
+/usr/lib/postgresql/17/bin/pg_ctl -D /pgdata/ start
+/usr/lib/postgresql/17/bin/psql -q -h /tmp -f /conf/setup.sql postgres

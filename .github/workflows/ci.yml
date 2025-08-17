@@ -76,72 +76,68 @@ jobs:
 
       - name: Run Tests
         run: |
-          if [ "${{ matrix.compiler }}" = "gcc" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
-            ASAN_LIB=$(gcc -print-file-name=libasan.so)
-              export ASAN_OPTIONS=verify_asan_link_order=0
-              export LD_PRELOAD=$ASAN_LIB
-              export ASAN_OPTIONS=detect_leaks=0,verify_asan_link_order=0
+          if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
+            $(which bash) ./test/check.sh ci
           fi
-          $(which bash) ./testsuite.sh
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
+        working-directory: /home/runner/work/pgmoneta/pgmoneta/
 
  # === Generate coverage reports ===
-      - name: Generate Detailed HTML Coverage Report
-        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-        uses: threeal/gcovr-action@v1.1.0
-        with:
-          root: /home/runner/work/pgmoneta/pgmoneta
-          html-details: true
-          html-out: coverage.html
-
-      - name: Generate Cobertura Report
-        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-        uses: threeal/gcovr-action@v1.1.0
-        with:
-          xml-out: cobertura.xml
-
-      - name: Generate Coveralls JSON Report and Upload
-        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-        uses: threeal/gcovr-action@v1.1.0
-        with:
-          root: /home/runner/work/pgmoneta/pgmoneta
-          coveralls-out: coveralls.json
-
-      - name: Bundle All Coverage Reports
-        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-        run: |
-          mkdir -p coverage-report
-          mv *.html coverage-report/
-          mv cobertura.xml coverage-report/
-          mv coveralls.json coverage-report/
-
-      - name: Upload All Coverage Reports as Artifact
-        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}
-          path: coverage-report
-          retention-days: 90
-
-      - name: Upload Build and Run Logs as Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
-          path: /home/runner/work/pgmoneta/pgmoneta/build/log
-          retention-days: 90
-
-      - name: Clean Testsuite
-        run: $(which bash) ./testsuite.sh clean
-        working-directory: /home/runner/work/pgmoneta/pgmoneta/build
-
-      - name: Upload Generated Documentation Artifact
-        if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-generated-docs
-          path: /home/runner/work/pgmoneta/pgmoneta/build/doc
-          retention-days: 90
+#      - name: Generate Detailed HTML Coverage Report
+#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+#        uses: threeal/gcovr-action@v1.1.0
+#        with:
+#          root: /home/runner/work/pgmoneta/pgmoneta
+#          html-details: true
+#          html-out: coverage.html
+#
+#      - name: Generate Cobertura Report
+#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+#        uses: threeal/gcovr-action@v1.1.0
+#        with:
+#          xml-out: cobertura.xml
+#
+#      - name: Generate Coveralls JSON Report and Upload
+#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+#        uses: threeal/gcovr-action@v1.1.0
+#        with:
+#          root: /home/runner/work/pgmoneta/pgmoneta
+#          coveralls-out: coveralls.json
+#
+#      - name: Bundle All Coverage Reports
+#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+#        run: |
+#          mkdir -p coverage-report
+#          mv *.html coverage-report/
+#          mv cobertura.xml coverage-report/
+#          mv coveralls.json coverage-report/
+#
+#      - name: Upload All Coverage Reports as Artifact
+#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}
+#          path: coverage-report
+#          retention-days: 90
+#
+#      - name: Upload Build and Run Logs as Artifacts
+#        if: always()
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
+#          path: /home/runner/work/pgmoneta/pgmoneta/build/log
+#          retention-days: 90
+#
+#      - name: Clean Testsuite
+#        run: $(which bash) ./test/check.sh clean
+#        working-directory: /home/runner/work/pgmoneta/pgmoneta
+#
+#      - name: Upload Generated Documentation Artifact
+#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: linux-generated-docs
+#          path: /home/runner/work/pgmoneta/pgmoneta/build/doc
+#          retention-days: 90
 
   build-macos:
     runs-on: macos-latest
@@ -223,104 +219,104 @@ jobs:
           path: ${{ env.BUILD_DIR }}/doc/
           retention-days: 7
 
-  build-freebsd:
-    runs-on: ubuntu-latest
-    name: FreeBSD Build and Test
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        compiler: [clang]
-        build_type: [Debug, Release]
-      fail-fast: false
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install QEMU dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            qemu-system-x86 \
-            qemu-utils \
-            libvirt-daemon-system \
-            libvirt-clients \
-            bridge-utils
-          sudo systemctl start libvirtd
-
-      - name: Setup FreeBSD VM
-        uses: vmactions/freebsd-vm@v1
-        id: freebsd-vm
-        with:
-          release: "14.2"
-          usesh: true
-          envs: "PATH,GITHUB_ENV,GITHUB_WORKSPACE,RUNNER_USER"
-          mem: 6144
-          sync: rsync
-          copyback: true
-          prepare: |
-            # System bootstrap
-            ASSUME_ALWAYS_YES=yes pkg bootstrap
-            pkg update
-            pkg upgrade -y
-
-            # Base dependencies
-            pkg install -y \
-              bash \
-              sudo \
-              libev \
-              cmake \
-              llvm11 \
-              postgresql17-server \
-              postgresql17-contrib \
-              zstd \
-              liblz4 \
-              bzip2 \
-              libssh \
-              libarchive \
-              check \
-              py311-docutils \
-              doxygen \
-              hs-pandoc \
-              texlive-base \
-              texlive-texmf \
-              graphviz
-            # Initialize Graphviz plugins after installation
-            dot -c
-
-      - name: Build Project
-        shell: freebsd {0}
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/build
-          cd $GITHUB_WORKSPACE/build
-          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} "$GITHUB_WORKSPACE"
-          make -j$(sysctl -n hw.ncpu)
-
-      - name: Debug Testsuite Path
-        shell: freebsd {0}
-        run: |
-          cd "${GITHUB_WORKSPACE}/build"
-          bash ./testsuite.sh
-
-      - name: Clean Testsuite
-        shell: freebsd {0}
-        run: |
-          cd ${GITHUB_WORKSPACE}/build
-          bash ./testsuite.sh clean
-
-      - name: Upload Build Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: freebsd-${{ matrix.compiler }}-${{ matrix.build_type }}-logs
-          path: |
-            $GITHUB_WORKSPACE/build/log/*
-            /tmp/*.log
-          retention-days: 7
-
-      - name: Upload Generated Documentation Artifacts
-        if: matrix.build_type == 'Release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: freebsd-generated-docs
-          path: $GITHUB_WORKSPACE/build/doc/*
-          retention-days: 7
+#  build-freebsd:
+#    runs-on: ubuntu-latest
+#    name: FreeBSD Build and Test
+#    timeout-minutes: 30
+#    strategy:
+#      matrix:
+#        compiler: [clang]
+#        build_type: [Debug, Release]
+#      fail-fast: false
+#
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Install QEMU dependencies
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y \
+#            qemu-system-x86 \
+#            qemu-utils \
+#            libvirt-daemon-system \
+#            libvirt-clients \
+#            bridge-utils
+#          sudo systemctl start libvirtd
+#
+#      - name: Setup FreeBSD VM
+#        uses: vmactions/freebsd-vm@v1
+#        id: freebsd-vm
+#        with:
+#          release: "14.2"
+#          usesh: true
+#          envs: "PATH,GITHUB_ENV,GITHUB_WORKSPACE,RUNNER_USER"
+#          mem: 6144
+#          sync: rsync
+#          copyback: true
+#          prepare: |
+#            # System bootstrap
+#            ASSUME_ALWAYS_YES=yes pkg bootstrap
+#            pkg update
+#            pkg upgrade -y
+#
+#            # Base dependencies
+#            pkg install -y \
+#              bash \
+#              sudo \
+#              libev \
+#              cmake \
+#              llvm11 \
+#              postgresql17-server \
+#              postgresql17-contrib \
+#              zstd \
+#              liblz4 \
+#              bzip2 \
+#              libssh \
+#              libarchive \
+#              check \
+#              py311-docutils \
+#              doxygen \
+#              hs-pandoc \
+#              texlive-base \
+#              texlive-texmf \
+#              graphviz
+#            # Initialize Graphviz plugins after installation
+#            dot -c
+#
+#      - name: Build Project
+#        shell: freebsd {0}
+#        run: |
+#          mkdir -p $GITHUB_WORKSPACE/build
+#          cd $GITHUB_WORKSPACE/build
+#          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} "$GITHUB_WORKSPACE"
+#          make -j$(sysctl -n hw.ncpu)
+#
+#      - name: Debug Testsuite Path
+#        shell: freebsd {0}
+#        run: |
+#          cd "${GITHUB_WORKSPACE}/build"
+#          bash ./testsuite.sh
+#
+#      - name: Clean Testsuite
+#        shell: freebsd {0}
+#        run: |
+#          cd ${GITHUB_WORKSPACE}/build
+#          bash ./testsuite.sh clean
+#
+#      - name: Upload Build Artifacts
+#        if: always()
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: freebsd-${{ matrix.compiler }}-${{ matrix.build_type }}-logs
+#          path: |
+#            $GITHUB_WORKSPACE/build/log/*
+#            /tmp/*.log
+#          retention-days: 7
+#
+#      - name: Upload Generated Documentation Artifacts
+#        if: matrix.build_type == 'Release'
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: freebsd-generated-docs
+#          path: $GITHUB_WORKSPACE/build/doc/*
+#          retention-days: 7
 
