@@ -140,11 +140,6 @@ set_property(TEST container_test
 endif()
 
 configure_file(
-  "${CMAKE_SOURCE_DIR}/test/testsuite.sh"
-  "${CMAKE_BINARY_DIR}/testsuite.sh"
-  COPYONLY
-)
-configure_file(
   "${CMAKE_SOURCE_DIR}/test/check.sh"
   "${CMAKE_BINARY_DIR}/check.sh"
   COPYONLY
