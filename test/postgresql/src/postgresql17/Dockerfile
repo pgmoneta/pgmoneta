@@ -49,14 +49,12 @@ WORKDIR /
 RUN rm -Rf /conf /pgconf /pgdata /pgwal
 COPY root/ /
 RUN mkdir -p /conf /pgconf /pgdata /pgwal /pglog
-RUN touch /pglog/logfile
 COPY conf/* /conf/
 RUN chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
-RUN chmod 700 /conf /pgconf /pgdata /pgwal /pglog
+RUN chmod 700 /conf /pgconf /pgdata /pgwal
+RUN chmod -R 777 /pglog
 RUN chmod +x /usr/bin/run-postgresql
 RUN mkdir -p /usr/local/bin
-
-VOLUME ["/pgconf", "/pgdata", "/pgwal"]
 
 EXPOSE 5432
 
