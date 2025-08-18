@@ -1111,6 +1111,13 @@ pgmoneta_append(char* orig, char* s)
       return orig;
    }
 
+   s_length = strlen(s);
+
+   if (s_length == 0)
+   {
+      return orig;
+   }
+
    if (orig != NULL)
    {
       orig_length = strlen(orig);
@@ -1119,8 +1126,6 @@ pgmoneta_append(char* orig, char* s)
    {
       orig_length = 0;
    }
-
-   s_length = strlen(s);
 
    n = (char*)realloc(orig, orig_length + s_length + 1);
 
