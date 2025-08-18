@@ -1404,6 +1404,19 @@ pgmoneta_is_wal_file(char* file);
 bool
 pgmoneta_is_number(char* str, int base);
 
+/**
+ * Get the parent directory of a given path
+ *
+ * Given a path like "/a/b/c", returns a newly allocated string "/a/b".
+ * If the path is root ("/"), returns "/". If the path has no slash, returns ".".
+ * The returned string must be freed by the caller.
+ *
+ * @param path The input path
+ * @return Newly allocated parent directory string, or NULL on allocation failure
+ */
+char*
+pgmoneta_get_parent_dir(const char* path);
+
 #ifdef __cplusplus
 }
 #endif

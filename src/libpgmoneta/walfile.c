@@ -176,6 +176,12 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
    {
       record = (struct decoded_xlog_record*)record_iterator->value->data;
 
+      if (encoded_record)
+      {
+         free(encoded_record);
+         encoded_record = NULL;
+      }
+
       /* Encode the record */
       encoded_record = pgmoneta_wal_encode_xlog_record(record, wf->long_phd->std.xlp_magic, encoded_record);
       if (!encoded_record)

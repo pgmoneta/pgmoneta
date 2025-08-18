@@ -108,6 +108,14 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...);
 void
 pgmoneta_log_mem(void* data, size_t size);
 
+/**
+ * Print n bytes after ptr in binary format
+ * @param ptr Pointer to the bytes
+ * @param n Number of bytes
+ */
+void
+pgmoneta_print_bytes_binary(void* ptr, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

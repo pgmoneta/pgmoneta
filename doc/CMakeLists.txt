@@ -11,6 +11,8 @@ if (RST2MAN_FOUND)
   set(PGMONETA_ADMIN_DST_FILE "${CMAKE_CURRENT_BINARY_DIR}/pgmoneta-admin.1")
   set(PGMONETA_CONF_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/man/pgmoneta.conf.5.rst")
   set(PGMONETA_CONF_DST_FILE "${CMAKE_CURRENT_BINARY_DIR}/pgmoneta.conf.5")
+  set(PGMONETA_WALFILTER_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/man/pgmoneta-walfilter.1.rst")
+  set(PGMONETA_WALFILTER_DST_FILE "${CMAKE_CURRENT_BINARY_DIR}/pgmoneta-walfilter.1")
 
 
   # pgmoneta.1
@@ -41,10 +43,17 @@ if (RST2MAN_FOUND)
     DEPENDS ${PGMONETA_CONF_SRC_FILE}
     COMMENT "Generating man page: pgmoneta.conf.5"
   )
+  # pgmoneta-walfilter.1
+  add_custom_command(
+    OUTPUT ${PGMONETA_WALFILTER_DST_FILE}
+    COMMAND ${RST2MAN_EXECUTABLE} ${PGMONETA_WALFILTER_SRC_FILE} ${PGMONETA_WALFILTER_DST_FILE}
+    DEPENDS ${PGMONETA_WALFILTER_SRC_FILE}
+    COMMENT "Generating man page: pgmoneta-walfilter.1"
+  )
 
   # Group man page outputs into a target
   add_custom_target(manpages ALL
-    DEPENDS ${PGMONETA_DST_FILE} ${PGMONETA_CLI_DST_FILE} ${PGMONETA_ADMIN_DST_FILE} ${PGMONETA_CONF_DST_FILE}
+    DEPENDS ${PGMONETA_DST_FILE} ${PGMONETA_CLI_DST_FILE} ${PGMONETA_ADMIN_DST_FILE} ${PGMONETA_CONF_DST_FILE} ${PGMONETA_WALFILTER_DST_FILE}
   )
 
   # Make 'man' depend on 'manpages'
@@ -60,6 +69,7 @@ if (RST2MAN_FOUND)
   install(FILES ${PGMONETA_DST_FILE} DESTINATION share/man/man1)
   install(FILES ${PGMONETA_CLI_DST_FILE} DESTINATION share/man/man1)
   install(FILES ${PGMONETA_ADMIN_DST_FILE} DESTINATION share/man/man1)
+  install(FILES ${PGMONETA_WALFILTER_DST_FILE} DESTINATION share/man/man1)
   install(FILES ${PGMONETA_CONF_DST_FILE} DESTINATION share/man/man5)
 endif()
 

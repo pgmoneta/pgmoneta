@@ -199,3 +199,46 @@ The configuration is loaded from either the path specified by the `-c` flag or `
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
+
+# pgmoneta_walfilter configuration
+The `pgmoneta_walfilter` configuration defines the info needed for `walfilter` to work.
+
+The tool uses two configuration files:
+1. A YAML configuration file (required) that specifies source/target directories and other settings.
+2. A pgmoneta_walfilter.conf file (optional) for other configurations.
+
+## YAML Configuration Format
+
+The YAML configuration file defines the paths and other settings for `walfilter`. Below is an example configuration:
+
+```yaml
+source_dir: /path/to/source/backup/directory
+target_dir: /path/to/target/directory
+encryption: aes                    # Optional: encryption method
+compression: gz                    # Optional: compression method
+configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `source_dir` | String | Yes | Source directory containing the backup and WAL files |
+| `target_dir` | String | Yes | Target directory where generated WAL files will be written |
+| `encryption` | String | No | Encryption method used (e.g., "aes") |
+| `compression` | String | No | Compression method used (e.g., "gz", "zstd", "lz4", "bz2") |
+| `configuration_file` | String | No | Path to pgmoneta_walfilter.conf file |
+
+## [pgmoneta_walfilter]
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| log_type | console | String | No | The logging type (console, file, syslog) |
+| log_level | info | String | No | The logging level, any of the (case insensitive) strings `FATAL`, `ERROR`, `WARN`, `INFO` and `DEBUG` (that can be more specific as `DEBUG1` thru `DEBUG5`). Debug level greater than 5 will be set to `DEBUG5`. Not recognized values will make the log_level be `INFO` |
+| log_path | pgmoneta.log | String | No | The log file location. Can be a strftime(3) compatible string. |
+
+## Server section
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| host | | String | Yes | The address of the PostgreSQL instance |
+| port | | Int | Yes | The port of the PostgreSQL instance |
+| user | | String | Yes | The replication user name |

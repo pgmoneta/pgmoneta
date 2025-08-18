@@ -227,6 +227,16 @@ Set wal_level value in `/tmp/pgsql/postgresql.conf` to be `replica`
 wal_level = replica
 ```
 
+#### Set summarize_wal
+
+Set `summarize_wal` value in `/tmp/pgsql/postgresql.conf` to be `on` in order to have `Online: true` in pgmoneta server status.
+
+i.e This is required only for PostgreSQL version 17 and above.
+
+``` sh
+summarize_wal = on
+```
+
 #### Start PostgreSQL
 
 ``` sh
@@ -389,47 +399,16 @@ pgmoneta-cli -c pgmoneta.conf status details
 pgmoneta-cli -c pgmoneta.conf shutdown
 ```
 
-## pgmoneta-walinfo
+## WAL Tools
 
-Alongside pgmoneta, you can use the `pgmoneta-walinfo` tool to read and display PostgreSQL Write-Ahead Log (WAL) files. This utility supports output in either `raw` or `json` format, making it an essential tool for examining WAL file contents.
+pgmoneta provides two WAL (Write-Ahead Log) tools for working with PostgreSQL WAL files:
 
-In the `raw` format, the output is structured as:
+- **pgmoneta-walinfo**: Read and display information about WAL files
+- **pgmoneta-walfilter**: Read and process WAL files based on user-defined criteria
 
-### Usage
+For detailed user documentation about these tools, please refer to the [WAL Tools chapter](./manual/en/17-wal-tools.md).
 
-```sh
-pgmoneta-walinfo
-  Command line utility to read and display Write-Ahead Log (WAL) files
-
-Usage:
-  pgmoneta-walinfo <file>
-
-Options:
-  -c,  --config      Set the path to the pgmoneta_walinfo.conf file
-  -u,  --users       Set the path to the pgmoneta_users.conf file
-  -RT, --tablespaces Filter on tablspaces
-  -RD, --databases   Filter on databases
-  -RT, --relations   Filter on relations
-  -R,  --filter      Combination of -RT, -RD, -RR
-  -o,  --output      Output file
-  -F,  --format      Output format (raw, json)
-  -L,  --logfile     Set the log file
-  -q,  --quiet       No output only result
-       --color       Use colors (on, off)
-  -r,  --rmgr        Filter on a resource manager
-  -s,  --start       Filter on a start LSN
-  -e,  --end         Filter on an end LSN
-  -x,  --xid         Filter on an XID
-  -l,  --limit       Limit number of outputs
-  -v,  --verbose     Output result
-  -S,  --summary     Show a summary of WAL record counts grouped by resource manager
-  -V,  --version     Display version information
-  -m,  --mapping     Provide mappings file for OID translation
-  -t,  --translate   Translate OIDs to object names in XLOG records
-  -?,  --help        Display help
-```
-
-For more details, please refer to the [wal documentation](./manual/dev-08-wal.md).
+For developer information about the internal APIs and implementation details, see the [WAL developer guide](./manual/en/78-wal.md).
 
 ## Logging levels
 

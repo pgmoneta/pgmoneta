@@ -41,6 +41,7 @@ extern "C" {
 #define PGMONETA_MAIN_INI_SECTION                  "pgmoneta"
 #define PGMONETA_DEFAULT_CONFIG_FILE_PATH          "/etc/pgmoneta/pgmoneta.conf"
 #define PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH  "/etc/pgmoneta/pgmoneta_walinfo.conf"
+#define PGMONETA_WALFILTER_DEFAULT_CONFIG_FILE_PATH  "/etc/pgmoneta/pgmoneta_walfilter.conf"
 #define PGMONETA_DEFAULT_USERS_FILE_PATH           "/etc/pgmoneta/pgmoneta_users.conf"
 
 /* Main configuration fields */
@@ -208,6 +209,30 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename);
  */
 int
 pgmoneta_validate_walinfo_configuration(void);
+
+/**
+ * Initialize the WALFILTER configuration structure
+ * @param shmem The shared memory segment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_init_walfilter_configuration(void* shmem);
+
+/**
+ * Read the WALFILTER configuration from a file
+ * @param shmem The shared memory segment
+ * @param filename The file name
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_read_walfilter_configuration(void* shmem, char* filename);
+
+/**
+ * Validate the WALFILTER configuration
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_validate_walfilter_configuration(void);
 
 /**
  * Read the USERS configuration from a file
