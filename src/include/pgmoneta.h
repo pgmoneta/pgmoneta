@@ -458,6 +458,14 @@ struct walinfo_configuration
    struct common_configuration common;          /**< Common configurations that are shared across multiple tools */
 } __attribute__ ((aligned (64)));
 
+/** @struct walfilter_configuration
+ * Defines the walfilter configuration list
+ */
+struct walfilter_configuration
+{
+   struct common_configuration common;          /**< Common configurations that are shared across multiple tools */
+} __attribute__ ((aligned (64)));
+
 #ifdef __cplusplus
 }
 #endif

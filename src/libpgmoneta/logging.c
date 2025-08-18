@@ -390,6 +390,21 @@ retry:
    }
 }
 
+void
+pgmoneta_print_bytes_binary(void* ptr, size_t n)
+{
+   unsigned char* p = (unsigned char*)ptr;
+   for (size_t i = 0; i < n; i++)
+   {
+      for (int bit = 7; bit >= 0; bit--)
+      {
+         putchar((p[i] & (1 << bit)) ? '1' : '0');
+      }
+      putchar(' ');
+   }
+   putchar('\n');
+}
+
 static bool
 log_rotation_enabled(void)
 {

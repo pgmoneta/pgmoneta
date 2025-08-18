@@ -417,7 +417,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn)
    struct query_response* response = NULL;
 
    config = (struct main_configuration*)shmem;
-   
+
    /* get postgres version */
    version = config->common.servers[srv].version;
    user = config->common.servers[srv].username;

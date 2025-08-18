@@ -35,20 +35,17 @@
 #include <utils.h>
 
 /* system */
-#ifdef HAVE_PCLMUL
 #include <nmmintrin.h>
-#endif
+#include <wmmintrin.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#ifdef HAVE_PCLMUL
-#include <wmmintrin.h>
-#endif
 #include <arpa/inet.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -61,29 +58,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-typedef uint32_t pg_crc32c;
-
-#ifdef HAVE_CRC32C
-#ifdef __aarch64__
-__attribute__((unused))
-static inline uint32_t
-_mm_crc32_u64(uint32_t crc, uint64_t value)
-{
-   __asm__ ("crc32cx %w[c], %w[c], %x[v]"
-            : [c] "+r" (crc)
-            : [v] "r" (value));
-   return crc;
-}
-__attribute__((unused))
-static inline uint32_t
-_mm_crc32_u8(uint32_t crc, uint8_t value)
-{
-   __asm__ ("crc32cb %w[c], %w[c], %w[v]"
-            : [c] "+r" (crc)
-            : [v] "r" (value));
-   return crc;
-}
-#endif
+#if defined(__x86_64__) || defined(__i386__)
+#include <cpuid.h>   /* for __get_cpuid */
 #endif
 
 #define SECURITY_INVALID  -2
@@ -137,6 +113,9 @@ static int  server_signature(char* password, char* salt, int salt_length, int it
 static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
 
 static int create_hash_file(char* filename, char* algorithm, char** hash);
+
+typedef int (*crc_impl_t)(const void*, size_t, uint32_t*);
+static crc_impl_t crc_impl = NULL;
 
 int
 pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
@@ -2994,168 +2973,64 @@ error:
    return 1;
 }
 
-#if HAVE_PCLMUL
-__attribute__((target("pclmul,sse4.2")))
 static int
-pgmoneta_crc32c_pclmul(const void* buffer, size_t size, uint32_t* crc)
+cpu_supports_sse42(void)
 {
-   pg_crc32c initial_crc = ~(*crc);
-   ssize_t len = (ssize_t)size;
-   const unsigned char* p = buffer;
-
-   static const uint64_t k1k2[2] = { 0x740eef02, 0x9e4addf8 };
-   static const uint64_t k3k4[2] = { 0xf20c0dfe, 0x14cd00bd6 };
-   static const uint64_t k5k0[2] = { 0xdd45aab8, 0 };
-   static const uint64_t poly[2] = { 0x105ec76f1, 0xdea713f1 };
-
-   if (len >= 64)
+#if defined(__x86_64__) || defined(__i386__)
+   unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
+   if (!__get_cpuid(1, &eax, &ebx, &ecx, &edx))
    {
-      __m128i x0, x1, x2, x3, x4, x5, x6, x7, x8, y5, y6, y7, y8;
-      x1 = _mm_loadu_si128((__m128i*)(p));
-      x2 = _mm_loadu_si128((__m128i*)(p + 0x10));
-      x3 = _mm_loadu_si128((__m128i*)(p + 0x20));
-      x4 = _mm_loadu_si128((__m128i*)(p + 0x30));
-      x1 = _mm_xor_si128(x1, _mm_cvtsi32_si128(initial_crc));
-      x0 = _mm_load_si128((__m128i*)k1k2);
-      p += 64;
-      len -= 64;
-
-      while (len >= 64)
-      {
-         x5 = _mm_clmulepi64_si128(x1, x0, 0x00);
-         x6 = _mm_clmulepi64_si128(x2, x0, 0x00);
-         x7 = _mm_clmulepi64_si128(x3, x0, 0x00);
-         x8 = _mm_clmulepi64_si128(x4, x0, 0x00);
-         x1 = _mm_clmulepi64_si128(x1, x0, 0x11);
-         x2 = _mm_clmulepi64_si128(x2, x0, 0x11);
-         x3 = _mm_clmulepi64_si128(x3, x0, 0x11);
-         x4 = _mm_clmulepi64_si128(x4, x0, 0x11);
-         y5 = _mm_loadu_si128((__m128i*)(p + 0x00));
-         y6 = _mm_loadu_si128((__m128i*)(p + 0x10));
-         y7 = _mm_loadu_si128((__m128i*)(p + 0x20));
-         y8 = _mm_loadu_si128((__m128i*)(p + 0x30));
-         x1 = _mm_xor_si128(x1, x5); x1 = _mm_xor_si128(x1, y5);
-         x2 = _mm_xor_si128(x2, x6); x2 = _mm_xor_si128(x2, y6);
-         x3 = _mm_xor_si128(x3, x7); x3 = _mm_xor_si128(x3, y7);
-         x4 = _mm_xor_si128(x4, x8); x4 = _mm_xor_si128(x4, y8);
-         p += 64;
-         len -= 64;
-      }
-
-      x0 = _mm_load_si128((__m128i*)k3k4);
-      x5 = _mm_clmulepi64_si128(x1, x0, 0x00);
-      x1 = _mm_clmulepi64_si128(x1, x0, 0x11);
-      x1 = _mm_xor_si128(x1, x2); x1 = _mm_xor_si128(x1, x5);
-      x5 = _mm_clmulepi64_si128(x1, x0, 0x00);
-      x1 = _mm_clmulepi64_si128(x1, x0, 0x11);
-      x1 = _mm_xor_si128(x1, x3); x1 = _mm_xor_si128(x1, x5);
-      x5 = _mm_clmulepi64_si128(x1, x0, 0x00);
-      x1 = _mm_clmulepi64_si128(x1, x0, 0x11);
-      x1 = _mm_xor_si128(x1, x4); x1 = _mm_xor_si128(x1, x5);
-
-      while (len >= 16)
-      {
-         x2 = _mm_loadu_si128((__m128i*)p);
-         x5 = _mm_clmulepi64_si128(x1, x0, 0x00);
-         x1 = _mm_clmulepi64_si128(x1, x0, 0x11);
-         x1 = _mm_xor_si128(x1, x2); x1 = _mm_xor_si128(x1, x5);
-         p += 16;
-         len -= 16;
-      }
-
-      x0 = _mm_load_si128((__m128i*)k3k4);
-      x2 = _mm_clmulepi64_si128(x1, x0, 0x10);
-      x3 = _mm_setr_epi32(~0, 0, ~0, 0);
-      x1 = _mm_srli_si128(x1, 8);
-      x1 = _mm_xor_si128(x1, x2);
-      x0 = _mm_loadl_epi64((__m128i*)k5k0);
-      x2 = _mm_srli_si128(x1, 4);
-      x1 = _mm_and_si128(x1, x3);
-      x1 = _mm_clmulepi64_si128(x1, x0, 0x00);
-      x1 = _mm_xor_si128(x1, x2);
-
-      x0 = _mm_load_si128((__m128i*)poly);
-      x2 = _mm_and_si128(x1, x3);
-      x2 = _mm_clmulepi64_si128(x2, x0, 0x10);
-      x2 = _mm_and_si128(x2, x3);
-      x2 = _mm_clmulepi64_si128(x2, x0, 0x00);
-      x1 = _mm_xor_si128(x1, x2);
-      initial_crc = _mm_extract_epi32(x1, 1);
+      return 0;
    }
-
-   uint64_t crc64 = (uint64_t)initial_crc;
-   unsigned char* buf_end = (unsigned char*)buffer + size;
-   size_t remaining = buf_end - p;
-
-   while (remaining >= 8)
-   {
-      uint64_t chunk;
-      memcpy(&chunk, p, 8);
-      crc64 = _mm_crc32_u64(crc64, chunk);
-      p += 8;
-      remaining -= 8;
-   }
-
-   if (remaining >= 4)
-   {
-      uint32_t chunk;
-      memcpy(&chunk, p, 4);
-      crc64 = _mm_crc32_u32((uint32_t)crc64, chunk);
-      p += 4;
-      remaining -= 4;
-   }
-   if (remaining >= 2)
-   {
-      uint16_t chunk;
-      memcpy(&chunk, p, 2);
-      crc64 = _mm_crc32_u16((uint32_t)crc64, chunk);
-      p += 2;
-      remaining -= 2;
-   }
-   if (remaining >= 1)
-   {
-      crc64 = _mm_crc32_u8((uint32_t)crc64, *p);
-   }
-
-   initial_crc = (pg_crc32c)crc64;
-   *crc = ~initial_crc;
-
+   return (int)((ecx >> 20) & 1u);
+#else
    return 0;
-}
 #endif
+}
 
-#if HAVE_CRC32
+#if HAVE_CRC32_SSE42
+#ifdef __x86_64__
 __attribute__((target("sse4.2")))
 static int
 pgmoneta_crc32c_sse42(const void* buffer, size_t size, uint32_t* crc)
 {
-   uint64_t crc64 = (uint64_t) ~(*crc);
+   uint32_t crc32 = *crc;
    const unsigned char* p = (const unsigned char*)buffer;
-   size_t remaining = size;
+   const unsigned char* pend = p + size;
 
-   while (remaining >= 8)
+   // Process eight bytes at a time (x86_64 only)
+   while (p + 8 <= pend)
    {
-      crc64 = _mm_crc32_u64(crc64, *(const uint64_t*)p);
+      crc32 = _mm_crc32_u64(crc32, *(const uint64_t*)p);
       p += 8;
-      remaining -= 8;
    }
 
-   while (remaining > 0)
+   // Process remaining full four bytes if any
+   if (p + 4 <= pend)
    {
-      crc64 = _mm_crc32_u8(crc64, *p++);
-      remaining--;
+      crc32 = _mm_crc32_u32(crc32, *(const uint32_t*)p);
+      p += 4;
    }
 
-   *crc = ~crc64;
+   // Process any remaining bytes one at a time
+   while (p < pend)
+   {
+      crc32 = _mm_crc32_u8(crc32, *p);
+      p++;
+   }
+
+   *crc = crc32;
 
    return 0;
 }
-#endif
+#endif // __x86_64__
+#endif // HAVE_CRC32_SSE42
 
 static int
 pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
 {
-   uint32_t crc_int = ~(*crc);
+   uint32_t crc_int = *crc;
+
    static uint32_t crc32_tab[256] = {
       0x00000000L, 0xF26B8303L, 0xE13B70F7L, 0x1350F3F4L,
       0xC79A971FL, 0x35F1141CL, 0x26A1E7E8L, 0xD4CA64EBL,
@@ -3227,9 +3102,26 @@ pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
    {
       crc_int = crc32_tab[((unsigned char)crc_int ^ ((unsigned char*)buffer)[i])] ^ (crc_int >> 8);
    }
-   *crc = ~crc_int;
+   *crc = crc_int;
 
    return 0;
+}
+
+void
+pgmoneta_crc_init(void)
+{
+#if defined(__x86_64__) || defined(__i386__)
+#if defined(HAVE_CRC32_SSE42)
+   if (cpu_supports_sse42())
+   {
+      crc_impl = pgmoneta_crc32c_sse42;
+      return;
+   }
+#endif
+
+   crc_impl = pgmoneta_crc32c_software;
+   return;
+#endif
 }
 
 int
@@ -3240,13 +3132,17 @@ pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc)
       return 1;
    }
 
-#ifdef HAVE_PCLMUL
-   return pgmoneta_crc32c_pclmul(buffer, size, crc);
-#elif HAVE_CRC32
-   return pgmoneta_crc32c_sse42(buffer, size, crc);
-#endif
+   /*
+      Get called once to initialize the CRC implementation function pointer
+      based on CPU capabilities (if any). If no special CPU capabilities are
+      available, the software implementation will be used.
+    */
+   if (crc_impl == NULL)
+   {
+      pgmoneta_crc_init();
+   }
 
-   return pgmoneta_crc32c_software(buffer, size, crc);
+   return crc_impl(buffer, size, crc);
 }
 
 int
