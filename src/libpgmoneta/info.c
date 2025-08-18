@@ -27,6 +27,7 @@
  */
 
 /* pgmoneta */
+#include <assert.h>
 #include <pgmoneta.h>
 #include <aes.h>
 #include <backup.h>
@@ -352,6 +353,11 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
    int number_of_bcks = 0;
    char** dirs = NULL;
 
+#ifdef DEBUG
+   assert(directory != NULL);
+   assert(strlen(directory) > 0);
+#endif
+
    *number_of_backups = 0;
    *backups = NULL;
 
@@ -432,6 +438,13 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
    struct backup** backups = NULL;
 
    *backup = NULL;
+
+#ifdef DEBUG
+   assert(directory != NULL);
+   assert(strlen(directory) > 0);
+   assert(identifier != NULL);
+   assert(strlen(identifier) > 0);
+#endif
 
    if (!strcmp(identifier, "oldest") || !strcmp(identifier, "newest") || !strcmp(identifier, "latest"))
    {
@@ -1339,6 +1352,12 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    char* bck_root_dir = NULL;
    char* bck_info_file = NULL;
    FILE* sfile = NULL;
+
+#ifdef DEBUG
+   assert(directory != NULL);
+   assert(strlen(directory) > 0);
+   assert(backup != NULL);
+#endif
 
    bck_info_file = pgmoneta_append(bck_info_file, directory);
    bck_info_file = pgmoneta_append(bck_info_file, backup->label);
