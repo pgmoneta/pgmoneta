@@ -865,6 +865,8 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
       pgmoneta_log_error("Unable to save backup info for directory %s", tmp_backup_root);
       goto error;
    }
+   //  Now that tmp_backup is the new new_backup, replace it inside the nodes
+   pgmoneta_art_insert(nodes, NODE_BACKUP, (uintptr_t)tmp_backup, ValueMem);
    pgmoneta_delete_directory(backup_dir);
    if (rename(tmp_backup_root, backup_dir) != 0)
    {
@@ -872,7 +874,7 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
       goto error;
    }
 
-   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, newest_backup);
+   workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_POST_ROLLUP, tmp_backup);
    if (carry_out_workflow(workflow, nodes) != RESTORE_OK)
    {
       goto error;
@@ -880,7 +882,6 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
 
    pgmoneta_workflow_destroy(workflow);
    pgmoneta_art_destroy(nodes);
-   free(tmp_backup);
    free(oldest_backup);
    free(tmp_backup_dir);
    free(tmp_backup_label);

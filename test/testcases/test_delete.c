@@ -65,11 +65,13 @@ START_TEST(test_pgmoneta_delete_chain_last)
    {
       free(bcks_before[i]);
    }
+   free(bcks_before);
 
    for (int i = 0; i < num_bck_after; i++)
    {
       free(bcks_after[i]);
    }
+   free(bcks_after);
 }
 END_TEST
 // test delete the middle incremental backup in the chain
@@ -84,7 +86,6 @@ START_TEST(test_pgmoneta_delete_chain_middle)
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
    pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
    ck_assert_int_eq(num_bck_before, 3);
-   pgmoneta_sort_backups(bcks_before, num_bck_before, false);
 
    found = !pgmoneta_tsclient_delete("primary", bcks_before[1]->label);
    ck_assert_msg(found, "success status not found");
@@ -100,11 +101,13 @@ START_TEST(test_pgmoneta_delete_chain_middle)
    {
       free(bcks_before[i]);
    }
+   free(bcks_before);
 
    for (int i = 0; i < num_bck_after; i++)
    {
       free(bcks_after[i]);
    }
+   free(bcks_after);
 }
 END_TEST
 // test delete the root full backup in the chain
@@ -134,11 +137,13 @@ START_TEST(test_pgmoneta_delete_chain_root)
    {
       free(bcks_before[i]);
    }
+   free(bcks_before);
 
    for (int i = 0; i < num_bck_after; i++)
    {
       free(bcks_after[i]);
    }
+   free(bcks_after);
 }
 END_TEST
 
