@@ -150,6 +150,8 @@ cleanup() {
    fi
 
    unset LLVM_PROFILE_FILE
+   unset CK_RUN_CASE
+   unset CK_RUN_SUITE
 
    set -e
 }

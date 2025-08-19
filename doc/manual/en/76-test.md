@@ -20,6 +20,10 @@ All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta
 the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally.
 So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated. 
 
+To run one particular test case or suite, run `export CK_RUN_CASE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh` or 
+`export CK_RUN_SUITE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh`
+The environment variables will be automatically unset when the test is finished or aborted.
+
 It is recommended that you **ALWAYS** run tests before raising PR.
 
 **Add testcases**
@@ -41,11 +45,6 @@ After running the tests, you will find:
 `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh clean` will remove the testing directory and the built image. If you are using docker, chances are it eats your 
 disk space secretly, in that case consider cleaning up using `docker system prune --volume`. Use with caution though as it
 nukes all the docker volumes.
-
-**Deprecated**
-
-You may also notice the `testsuite.sh` script inside the test directory. This script will now only be used for CI.
-Please leverage `check.sh` for faster testing and debugging.
 
 ### Adding wal-related testcases
 

@@ -62,8 +62,7 @@ main(int argc, char* argv[])
    srunner_add_suite(sr, wal_summary_suite);
    srunner_set_log (sr, "-");
    srunner_set_fork_status(sr, CK_NOFORK);
-   // Run the tests in verbose mode
-   srunner_run_all(sr, CK_VERBOSE);
+   srunner_run(sr, NULL, NULL, CK_VERBOSE);
    number_failed = srunner_ntests_failed(sr);
    srunner_free(sr);
    pgmoneta_test_environment_destroy();
