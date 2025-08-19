@@ -825,7 +825,8 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    tmp_backup_label = pgmoneta_append(tmp_backup_label, TMP_SUFFIX);
    tmp_backup_label = pgmoneta_append(tmp_backup_label, "_");
    tmp_backup_label = pgmoneta_append(tmp_backup_label, newest_label);
-   tmp_backup_root = pgmoneta_append(tmp_backup_dir, tmp_backup_label);
+   tmp_backup_root = pgmoneta_append(tmp_backup_root, tmp_backup_dir);
+   tmp_backup_root = pgmoneta_append(tmp_backup_root, tmp_backup_label);
    backup_dir = pgmoneta_get_server_backup_identifier(server, newest_label);
 
    pgmoneta_art_insert(nodes, USER_DIRECTORY, (uintptr_t)tmp_backup_root, ValueString);
@@ -880,7 +881,6 @@ pgmoneta_rollup_backups(int server, char* newest_label, char* oldest_label)
    pgmoneta_workflow_destroy(workflow);
    pgmoneta_art_destroy(nodes);
    free(tmp_backup);
-   free(newest_backup);
    free(oldest_backup);
    free(tmp_backup_dir);
    free(tmp_backup_label);
@@ -895,7 +895,6 @@ error:
    }
    pgmoneta_workflow_destroy(workflow);
    pgmoneta_art_destroy(nodes);
-   free(newest_backup);
    free(oldest_backup);
    free(tmp_backup_dir);
    free(tmp_backup_label);
