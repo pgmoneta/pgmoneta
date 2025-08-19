@@ -1440,31 +1440,33 @@ pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
    closedir(dir);
    dir = NULL;
 
-   dir = opendir(base);
-
-   array = (char**)malloc(sizeof(char*) * nod);
-   n = 0;
-
-   while ((entry = readdir(dir)) != NULL)
+   if (nod > 0)
    {
-      if (entry->d_type == DT_DIR)
-      {
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-         {
-            continue;
-         }
+       dir = opendir(base);
+       array = (char**)malloc(sizeof(char*) * nod);
+       n = 0;
 
-         array[n] = (char*)malloc(strlen(entry->d_name) + 1);
-         memset(array[n], 0, strlen(entry->d_name) + 1);
-         memcpy(array[n], entry->d_name, strlen(entry->d_name));
-         n++;
-      }
+       while ((entry = readdir(dir)) != NULL)
+       {
+           if (entry->d_type == DT_DIR)
+           {
+               if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+               {
+                   continue;
+               }
+
+               array[n] = (char*)malloc(strlen(entry->d_name) + 1);
+               memset(array[n], 0, strlen(entry->d_name) + 1);
+               memcpy(array[n], entry->d_name, strlen(entry->d_name));
+               n++;
+           }
+       }
+
+       closedir(dir);
+       dir = NULL;
+
+       pgmoneta_sort(nod, array);
    }
-
-   closedir(dir);
-   dir = NULL;
-
-   pgmoneta_sort(nod, array);
 
    free(d);
    d = NULL;
