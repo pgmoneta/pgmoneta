@@ -365,7 +365,7 @@ if [[ $# -gt 1 ]]; then
 elif [[ $# -eq 1 ]]; then
    if [[ "$1" == "setup" ]]; then
       build_postgresql_image
-      dnf install -y \
+      sudo dnf install -y \
         clang \
         clang-analyzer \
         cmake \
