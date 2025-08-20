@@ -513,7 +513,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      if (token != NULL)
                      {
-                        pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                        warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
                      srv.number_of_hot_standbys = count;
@@ -552,7 +552,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      if (token != NULL)
                      {
-                        pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                        warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
                   }
@@ -590,7 +590,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      if (token != NULL)
                      {
-                        pgmoneta_log_warn("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                        warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
                   }
