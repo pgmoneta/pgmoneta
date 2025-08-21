@@ -36,9 +36,11 @@ extern "C" {
 #include "pgmoneta.h"
 
 #define PRIMARY_SERVER 0
+#define ENV_VAR_BASE_DIR "PGMONETA_TEST_BASE_DIR"
 
 extern char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 extern char TEST_RESTORE_DIR[MAX_PATH];
+extern char TEST_BASE_DIR[MAX_PATH];
 
 /**
  * Create the testing environment

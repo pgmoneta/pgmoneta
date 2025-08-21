@@ -149,9 +149,8 @@ cleanup() {
      remove_postgresql_container
    fi
 
-   unset LLVM_PROFILE_FILE
-   unset CK_RUN_CASE
-   unset CK_RUN_SUITE
+   echo "Unsetting environment variables"
+   unset_pgmoneta_test_variables
 
    set -e
 }
@@ -278,6 +277,9 @@ EOF
 }
 
 export_pgmoneta_test_variables() {
+  echo "export PGMONETA_TEST_BASE_DIR=$PGMONETA_OPERATION_DIR"
+  export PGMONETA_TEST_BASE_DIR=$PGMONETA_OPERATION_DIR
+
   echo "export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf"
   export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf
 
@@ -286,6 +288,17 @@ export_pgmoneta_test_variables() {
 
   echo "export PGMONETA_TEST_RESTORE_DIR=$PGMONETA_OPERATION_DIR/restore"
   export PGMONETA_TEST_RESTORE_DIR=$PGMONETA_OPERATION_DIR/restore
+}
+
+unset_pgmoneta_test_variables() {
+  unset PGMONETA_TEST_BASE_DIR
+  unset PGMONETA_TEST_CONF
+  unset PGMONETA_TEST_CONF_SAMPLE
+  unset PGMONETA_TEST_RESTORE_DIR
+  unset LLVM_PROFILE_FILE
+  unset CK_RUN_CASE
+  unset CK_RUN_SUITE
+  unset CC
 }
 
 execute_testcases() {

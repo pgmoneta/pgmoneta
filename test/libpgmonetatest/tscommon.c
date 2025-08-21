@@ -44,6 +44,7 @@
 
 char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 char TEST_RESTORE_DIR[MAX_PATH];
+char TEST_BASE_DIR[MAX_PATH];
 
 void
 pgmoneta_test_environment_create(void)
@@ -52,11 +53,12 @@ pgmoneta_test_environment_create(void)
     char* conf_path = NULL;
     char* conf_sample_path = NULL;
     char* restore_dir = NULL;
-    int ret = 0;
+    char* base_dir = NULL;
     size_t size = 0;
 
     memset(TEST_CONFIG_SAMPLE_PATH, 0, sizeof(TEST_CONFIG_SAMPLE_PATH));
     memset(TEST_RESTORE_DIR, 0, sizeof(TEST_RESTORE_DIR));
+    memset(TEST_BASE_DIR, 0, sizeof(TEST_BASE_DIR));
 
     conf_path = getenv(ENV_VAR_CONF_PATH);
     assert(conf_path != NULL);
@@ -82,6 +84,10 @@ pgmoneta_test_environment_create(void)
     restore_dir = getenv(ENV_VAR_RESTORE_DIR);
     assert(restore_dir != NULL);
     memcpy(TEST_RESTORE_DIR, restore_dir, strlen(restore_dir));
+
+    base_dir = getenv(ENV_VAR_BASE_DIR);
+    assert(base_dir != NULL);
+    memcpy(TEST_BASE_DIR, base_dir, strlen(base_dir));
 
     pgmoneta_start_logging();
 }
