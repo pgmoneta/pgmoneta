@@ -87,5 +87,8 @@
 #define RANDOM_TOPLEVEL_XID                     INVALID_TRANSACTION_ID
 #define RANDOM_PARTIAL                          false
 
+/* Random values for usage inside tests */
+#define RANDOM_WALFILE_NAME                     "/00000001000000000000001D"
+
 struct walfile*
 pgmoneta_test_generate_check_point_shutdown_v17();

@@ -36,6 +36,7 @@
 #include <tsclient.h>
 #include <tscommon.h>
 #include <utils.h>
+#include <walfile.h>
 
 #include <assert.h>
 #include <stdlib.h>
@@ -138,10 +139,14 @@ pgmoneta_test_add_backup_chain(void)
 void pgmoneta_test_basedir_cleanup(void)
 {
     char* backup_dir = NULL;
+    char* wal_dir = NULL;
     bool restart = false;
     struct main_configuration* config;
 
     config = (struct main_configuration*) shmem;
+
+    wal_dir = pgmoneta_append(wal_dir, TEST_BASE_DIR);
+    wal_dir = pgmoneta_append(wal_dir, "/walfiles");
 
     backup_dir = pgmoneta_get_server_backup(PRIMARY_SERVER);
 
@@ -150,6 +155,9 @@ void pgmoneta_test_basedir_cleanup(void)
 
     pgmoneta_delete_directory(TEST_RESTORE_DIR);
     pgmoneta_mkdir(TEST_RESTORE_DIR);
+
+    pgmoneta_delete_directory(wal_dir);
+    pgmoneta_mkdir(wal_dir);
 
     // restore pgmoneta.conf by overwriting it with pgmoneta.conf.sample
     assert(!pgmoneta_delete_file(config->common.configuration_path, NULL));
@@ -160,6 +168,7 @@ void pgmoneta_test_basedir_cleanup(void)
     assert(!pgmoneta_tsclient_reload());
 
     free(backup_dir);
+    free(wal_dir);
     pgmoneta_test_teardown();
 }
 
@@ -172,6 +181,20 @@ pgmoneta_test_setup(void)
 void
 pgmoneta_test_teardown(void)
 {
+    if (partial_record != NULL)
+    {
+        if (partial_record->xlog_record != NULL)
+        {
+            free(partial_record->xlog_record);
+        }
+        if (partial_record->data_buffer != NULL)
+        {
+            free(partial_record->data_buffer);
+        }
+        free(partial_record);
+        partial_record = NULL;
+    }
+
     pgmoneta_memory_destroy();
 }
 

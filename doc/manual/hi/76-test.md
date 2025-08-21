@@ -262,20 +262,19 @@ While moving towards the goal of building a complete test suite to test pgmoneta
 </details>
 
 For every record type, we need to add a test case that will generate the wal record and then replay it. For all types, the reading and writing procedures will be the same, but the generation of the wal record will be different. To add testcases for a specific record type, you will need to follow the procedures mentioned in the previous section. To write the testcase itself, do the following:
-1. Implement function `generate_<type>_v<version>*` in `test/wal/wal_<version>.c` (add the function prototype in `test/include/wal_utils.h` as well). This function is responsible for generating the wal record of the type you are adding that mimics a real PostgreSQL wal record.
+1. Implement function `pgmoneta_test_generate_<type>_v<version>` in `test/libpgmonetatest/tswalutils/tswalutils_<version>.c` (add the function prototype in `test/include/tswalutils.h` as well). This function is responsible for generating the wal record of the type you are adding that mimics a real PostgreSQL wal record.
 2. Add this in the body of the testcase 
 ```c
-  START_TEST(check_point_shutdown_v17)
+  START_TEST(test_check_point_shutdown_v17)
   {
-    int rc = pgmoneta_test_walfile(generate_check_point_shutdown_v17);
-    ck_assert_int_eq(rc, 0);
+    test_walfile(pgmoneta_test_generate_check_point_shutdown_v17);
   }
   END_TEST
 ```
-and replace `generate_xlog_checkpoint_shutdown_v17);` with the function you implemented in step 1.
+and replace `pgmoneta_test_generate_check_point_shutdown_v17);` with the function you implemented in step 1.
 
-`pgmoneta_test_walfile` is a function that will take care of the reading, writing and comparing of the wal file generated against the one read from the disk.
+`test_walfile` is a function that will take care of the reading, writing and comparing of the wal file generated against the one read from the disk.
 
 If the record type you are adding has differences between versions of PostgreSQL (13-17), you will need to implement a generate function per version (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
 
-For the sake of simplicity, please create one test suite per postgres version where the implementation resides in `test/wal/wal_<version>.c` and the testcases in `test/testcases/pgmoneta_test_<whatever>` and add testcase per record type within this version. You can take a look at [this testcase](../../../test/testcases/pgmoneta_test_10.c) for reference.
+For the sake of simplicity, please create one test suite per postgres version where the implementation resides in `test/libpgmonetatest/tswalutils/tswalutils_<version>.c` and the testcases in `test/testcases/test_wal_utils.c` and add testcase per record type within this version. You can take a look at [this testcase](../../../../../test/testcases/test_wal_utils.c) for reference.

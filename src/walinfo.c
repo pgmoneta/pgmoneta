@@ -633,6 +633,7 @@ main(int argc, char** argv)
          free(partial_record->data_buffer);
       }
       free(partial_record);
+      partial_record = NULL;
    }
    else
    {

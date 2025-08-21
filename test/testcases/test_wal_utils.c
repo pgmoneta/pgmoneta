@@ -73,7 +73,7 @@ pgmoneta_test_wal_utils_suite()
    s = suite_create("pgmoneta_test_wal_utils");
 
    tc_wal_utils = tcase_create("test_wal_utils");
-   tcase_add_checked_fixture(tc_wal_utils, pgmoneta_test_setup, pgmoneta_test_teardown);
+   tcase_add_checked_fixture(tc_wal_utils, pgmoneta_test_setup, pgmoneta_test_basedir_cleanup);
    tcase_set_timeout(tc_wal_utils, 60);
    tcase_add_test(tc_wal_utils, test_check_point_shutdown_v17);
    suite_add_tcase(s, tc_wal_utils);
@@ -91,15 +91,15 @@ test_walfile(struct walfile* (*generate)(void))
 
    config = (struct main_configuration*)shmem;
 
-   path = pgmoneta_append(NULL, config->base_dir);
-   ck_assert_ptr_nonnull(path);
+   path = pgmoneta_append(path, TEST_BASE_DIR);
+   path = pgmoneta_append(path, "/walfiles");
 
-   if (access("./walfiles", F_OK) != 0)
+   if (access(path, F_OK) != 0)
    {
-      ck_assert_msg(mkdir("./walfiles", 0700) == 0, "failed to create ./walfiles directory");
+      ck_assert_msg(mkdir(path, 0700) == 0, "failed to create walfiles directory");
    }
 
-   path = pgmoneta_append(path, "/walfiles/00000001000000000000001D");
+   path = pgmoneta_append(path, RANDOM_WALFILE_NAME);
    ck_assert_ptr_nonnull(path);
 
    // 1. Prepare walfile structure
@@ -123,6 +123,19 @@ test_walfile(struct walfile* (*generate)(void))
 
    destroy_walfile(wf);
    destroy_walfile(read_wf);
+   if (partial_record != NULL)
+   {
+      if (partial_record->xlog_record != NULL)
+      {
+         free(partial_record->xlog_record);
+      }
+      if (partial_record->data_buffer != NULL)
+      {
+         free(partial_record->data_buffer);
+      }
+      free(partial_record);
+      partial_record = NULL;
+   }
    free(path);
 }
 

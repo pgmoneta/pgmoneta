@@ -102,6 +102,7 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn)
       free(partial_record->data_buffer);
    }
    free(partial_record);
+   partial_record = NULL;
 
    // /* Generate the WAL summaries */
    summary_dir = pgmoneta_get_server_summary(srv);
