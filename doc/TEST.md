@@ -24,7 +24,7 @@ To run one particular test case or suite, run `export CK_RUN_CASE=<test_case_nam
 `export CK_RUN_SUITE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh`
 The environment variables will be automatically unset when the test is finished or aborted.
 
-It recommended that you **ALWAYS** run tests before raising PR.
+It is recommended that you **ALWAYS** run tests before raising PR.
 
 **Add testcases**
 
@@ -32,7 +32,7 @@ To add an additional testcase go to [testcases](https://github.com/pgmoneta/pgmo
 
 Create a `.c` file that contains the test suite and define the suite inside `/test/include/tssuite.sh`. Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/runner.c)
 
-**Artifacts**
+**Test directory**
 
 After running the tests, you will find:
 
@@ -40,11 +40,19 @@ After running the tests, you will find:
 * **postgres log:** `/tmp/pgmoneta-test/pg_log/`, the log level is set to debug5 and has the application name (**pgmoneta**) shown in the log.
 * **code coverage reports:** `/tmp/pgmoneta-test/coverage/`
 
+If you need to create a directory runtime, create it under `/tmp/pgmoneta-test/base/`, which also contains `backup/`, `restore/`, `conf` and `workspace/`.
+Base directory will be cleaned up after tests are done. In `tscommon.h` you will find `TEST_BASE_DIR` and other global variables holding corresponding directories, 
+fetched from environment variables.
+
 **Cleanup**
 
 `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh clean` will remove the testing directory and the built image. If you are using docker, chances are it eats your 
 disk space secretly, in that case consider cleaning up using `docker system prune --volume`. Use with caution though as it
 nukes all the docker volumes.
+
+**Port**
+
+By default, the pod exposes port 6432 for pgmoneta to connect to. This can be changed by `export PGMONETA_TEST_PORT=<your-port>` before running `check.sh`.
 
 ### Adding wal-related testcases
 
