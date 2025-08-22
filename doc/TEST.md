@@ -20,19 +20,26 @@ All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta
 the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally.
 So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated. 
 
-To run one particular test case or suite, run `export CK_RUN_CASE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh` or 
-`export CK_RUN_SUITE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh`
+To run one particular test case or suite (unfortunately check doesn't support running one single test at the moment), 
+run `CK_RUN_CASE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh` or 
+`CK_RUN_SUITE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh`. Alternatively, you can first export the environment variables 
+and then run the script:
+```
+export CK_RUN_CASE=<test_case_name>
+<PATH_TO_PGMONETA>/pgmoneta/test/check.sh
+```
+
 The environment variables will be automatically unset when the test is finished or aborted.
 
 It is recommended that you **ALWAYS** run tests before raising PR.
 
-**Add testcases**
+**Add Testcases**
 
-To add an additional testcase go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
+To add an additional testcase, go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
 
 Create a `.c` file that contains the test suite and define the suite inside `/test/include/tssuite.sh`. Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/runner.c)
 
-**Test directory**
+**Test Directory**
 
 After running the tests, you will find:
 
@@ -52,7 +59,17 @@ nukes all the docker volumes.
 
 **Port**
 
-By default, the pod exposes port 6432 for pgmoneta to connect to. This can be changed by `export PGMONETA_TEST_PORT=<your-port>` before running `check.sh`.
+By default, the pod exposes port 6432 for pgmoneta to connect to. This can be changed by `export PGMONETA_TEST_PORT=<your-port>` before running `check.sh`. Or you
+may also run `PGMONETA_TEST_PORT=<your-port> ./check.sh`.
+
+**Configuration**
+
+| Name               | Default | Value           | Description                                         |
+|--------------------|---------|-----------------|-----------------------------------------------------|
+| CK_RUN_CASE        |         | test case name  | Run one single test case                            |
+| CK_RUN_SUITE       |         | test suite name | Run one single test suite                           |
+| PGMONETA_TEST_PORT | 6432    | port number     | The port name pgmoneta use to connect to the db pod |
+
 
 ### Adding wal-related testcases
 
