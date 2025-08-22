@@ -53,6 +53,7 @@ main(int argc, char* argv[])
    http_suite = pgmoneta_test_http_suite();
    wal_utils_suite = pgmoneta_test_wal_utils_suite();
    wal_summary_suite = pgmoneta_test_wal_summary_suite();
+    printf("base %s\n", TEST_BASE_DIR);
 
    sr = srunner_create(backup_suite);
    srunner_add_suite(sr, restore_suite);

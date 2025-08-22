@@ -38,14 +38,17 @@ EXECUTABLE_DIRECTORY=$PROJECT_DIRECTORY/build/src
 TEST_DIRECTORY=$PROJECT_DIRECTORY/build/test
 TEST_PG17_DIRECTORY=$PROJECT_DIRECTORY/test/postgresql/src/postgresql17
 
-PGMONETA_OPERATION_DIR="/tmp/pgmoneta-test"
-PGMONETA_WORKSPACE="/tmp/pgmoneta-workspace"
-LOG_DIR="$PGMONETA_OPERATION_DIR/log"
-PG_LOG_DIR="$PGMONETA_OPERATION_DIR/pg_log"
-COVERAGE_DIR="$PGMONETA_OPERATION_DIR/coverage"
-RESTORE_DIRECTORY=$PGMONETA_OPERATION_DIR/restore
-BACKUP_DIRECTORY=$PGMONETA_OPERATION_DIR/backup
-CONFIGURATION_DIRECTORY=$PGMONETA_OPERATION_DIR/conf
+PGMONETA_ROOT_DIR="/tmp/pgmoneta-test"
+BASE_DIR="$PGMONETA_ROOT_DIR/base"
+COVERAGE_DIR="$PGMONETA_ROOT_DIR/coverage"
+LOG_DIR="$PGMONETA_ROOT_DIR/log"
+PG_LOG_DIR="$PGMONETA_ROOT_DIR/pg_log"
+
+# BASE DIR holds all the run time data
+WORKSPACE_DIRECTORY="$BASE_DIR/pgmoneta-workspace/"
+CONFIGURATION_DIRECTORY=$BASE_DIR/conf
+RESTORE_DIRECTORY=$BASE_DIR/restore
+BACKUP_DIRECTORY=$BASE_DIR/backup
 
 PG_DATABASE=mydb
 PG_USER_NAME=myuser
@@ -80,17 +83,16 @@ cleanup() {
      fi
    fi
 
-   if [[ -d $PGMONETA_WORKSPACE ]]; then
-     echo "Removing workspace $PGMONETA_WORKSPACE"
-     sudo rm -Rf $PGMONETA_WORKSPACE
-   fi
-
    echo "Clean Test Resources"
-   if [[ -d $PGMONETA_OPERATION_DIR ]]; then
-      if ! sudo chown -R "$USER:$USER" "$PGMONETA_OPERATION_DIR"; then
+   if [[ -d $PGMONETA_ROOT_DIR ]]; then
+      if ! sudo chown -R "$USER:$USER" "$PGMONETA_ROOT_DIR"; then
         echo " Could not change ownership. You might need to clean manually."
       fi
-      sudo rm -Rf "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY"
+
+      if [[ -d $BASE_DIR ]]; then
+        sudo rm -Rf "$BASE_DIR"
+      fi
+
       if ls "$COVERAGE_DIR"/*.profraw >/dev/null 2>&1; then
        echo "Generating coverage report, expect error when the binary is not covered at all"
        llvm-profdata merge -sparse $COVERAGE_DIR/*.profraw -o $COVERAGE_DIR/coverage.profdata
@@ -139,9 +141,9 @@ cleanup() {
        echo "Coverage --> $COVERAGE_DIR"
      fi
      echo "Logs --> $LOG_DIR, $PG_LOG_DIR"
-     sudo chmod -R 700 "$PGMONETA_OPERATION_DIR"
+     sudo chmod -R 700 "$PGMONETA_ROOT_DIR"
    else
-      echo "$PGMONETA_OPERATION_DIR not present ... ok"
+     echo "$PGMONETA_ROOT_DIR not present ... ok"
    fi
 
    if [[ $MODE != "ci" ]]; then
@@ -257,7 +259,7 @@ log_path = $LOG_DIR/pgmoneta.log
 
 unix_socket_dir = /tmp/
 create_slot = yes
-workspace = $PGMONETA_WORKSPACE
+workspace = $WORKSPACE_DIRECTORY
 
 [primary]
 host = localhost
@@ -277,8 +279,8 @@ EOF
 }
 
 export_pgmoneta_test_variables() {
-  echo "export PGMONETA_TEST_BASE_DIR=$PGMONETA_OPERATION_DIR"
-  export PGMONETA_TEST_BASE_DIR=$PGMONETA_OPERATION_DIR
+  echo "export PGMONETA_TEST_BASE_DIR=$BASE_DIR"
+  export PGMONETA_TEST_BASE_DIR=$BASE_DIR
 
   echo "export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf"
   export PGMONETA_TEST_CONF=$CONFIGURATION_DIRECTORY/pgmoneta.conf
@@ -286,8 +288,8 @@ export_pgmoneta_test_variables() {
   echo "export PGMONETA_TEST_CONF_SAMPLE=$CONFIGURATION_DIRECTORY/pgmoneta.conf.sample"
   export PGMONETA_TEST_CONF_SAMPLE=$CONFIGURATION_DIRECTORY/pgmoneta.conf.sample
 
-  echo "export PGMONETA_TEST_RESTORE_DIR=$PGMONETA_OPERATION_DIR/restore"
-  export PGMONETA_TEST_RESTORE_DIR=$PGMONETA_OPERATION_DIR/restore
+  echo "export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY"
+  export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY
 }
 
 unset_pgmoneta_test_variables() {
@@ -344,10 +346,11 @@ run_tests() {
 
   echo "Preparing the pgmoneta directory"
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p.profraw"
-  sudo rm -Rf "$PGMONETA_OPERATION_DIR"
-  mkdir -p "$PGMONETA_OPERATION_DIR"
-  mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY"
-  sudo chmod -R 777 "$PGMONETA_OPERATION_DIR"
+  sudo rm -Rf "$PGMONETA_ROOT_DIR"
+  mkdir -p "$PGMONETA_ROOT_DIR"
+  mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR"
+  mkdir -p "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY" "$WORKSPACE_DIRECTORY"
+  sudo chmod -R 777 "$PGMONETA_ROOT_DIR"
 
   echo "Building pgmoneta"
   mkdir -p "$PROJECT_DIRECTORY/build"
@@ -400,7 +403,7 @@ elif [[ $# -eq 1 ]]; then
       sudo rm -Rf $COVERAGE_DIR
       cleanup
       cleanup_postgresql_image
-      sudo rm -Rf $PGMONETA_OPERATION_DIR
+      sudo rm -Rf $PGMONETA_ROOT_DIR
    elif [[ "$1" == "ci" ]]; then
       MODE="ci"
       run_tests
