@@ -57,6 +57,7 @@ PG_REPL_USER_NAME=repl
 PG_REPL_PASSWORD=replpass
 USER=$(whoami)
 MODE="dev"
+PORT=6432
 
 # Detect container engine: Docker or Podman
 if command -v docker &> /dev/null; then
@@ -68,6 +69,10 @@ else
   exit 1
 fi
 
+if [ -n "$PGMONETA_TEST_PORT" ]; then
+    PORT=$PGMONETA_TEST_PORT
+fi
+echo "Container port is set to: $PORT"
 
 cleanup() {
    echo "Clean up"
@@ -179,7 +184,7 @@ cleanup_postgresql_image() {
 }
 
 start_postgresql_container() {
-  sudo $CONTAINER_ENGINE run -p 5432:5432 -v "$PG_LOG_DIR:/pglog:z" \
+  sudo $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" \
   --name $CONTAINER_NAME -d \
   -e PG_DATABASE=$PG_DATABASE \
   -e PG_USER_NAME=$PG_USER_NAME \
@@ -263,7 +268,7 @@ workspace = $WORKSPACE_DIRECTORY
 
 [primary]
 host = localhost
-port = 5432
+port = $PORT
 user = $PG_REPL_USER_NAME
 wal_slot = repl
 EOF
