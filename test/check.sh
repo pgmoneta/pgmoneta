@@ -412,6 +412,7 @@ elif [[ $# -eq 1 ]]; then
    elif [[ "$1" == "ci" ]]; then
       MODE="ci"
       PORT=5432
+      trap cleanup EXIT
       run_tests
    else
       echo "Invalid parameter: $1"

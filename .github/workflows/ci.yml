@@ -38,7 +38,7 @@ jobs:
           texlive-fonts-extra texlive-xetex texlive-luatex \
           texlive-science texlive-extra-utils \
           texlive-lang-all \
-          gcovr
+          llvm
 
       - name: Install Eisvogel template for Pandoc
         run: |
@@ -103,29 +103,22 @@ jobs:
 #          root: /home/runner/work/pgmoneta/pgmoneta
 #          coveralls-out: coveralls.json
 #
-#      - name: Bundle All Coverage Reports
-#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-#        run: |
-#          mkdir -p coverage-report
-#          mv *.html coverage-report/
-#          mv cobertura.xml coverage-report/
-#          mv coveralls.json coverage-report/
-#
-#      - name: Upload All Coverage Reports as Artifact
-#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}
-#          path: coverage-report
-#          retention-days: 90
-#
-#      - name: Upload Build and Run Logs as Artifacts
-#        if: always()
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
-#          path: /home/runner/work/pgmoneta/pgmoneta/build/log
-#          retention-days: 90
+
+      - name: Upload All Coverage Reports as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: /tmp/pgmoneta-test/coverage
+          retention-days: 90
+
+      - name: Upload Run Log as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: /tmp/pgmoneta-test/log
+          retention-days: 90
 #
 #      - name: Clean Testsuite
 #        run: $(which bash) ./test/check.sh clean
