@@ -411,6 +411,7 @@ elif [[ $# -eq 1 ]]; then
       sudo rm -Rf $PGMONETA_ROOT_DIR
    elif [[ "$1" == "ci" ]]; then
       MODE="ci"
+      PORT=5432
       run_tests
    else
       echo "Invalid parameter: $1"
