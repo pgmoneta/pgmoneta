@@ -2480,7 +2480,7 @@ pgmoneta_reload_configuration(bool* restart)
       goto error;
    }
 
-   if (strcmp("", config->common.admins_path))
+   if (strlen(config->common.admins_path) > 0)
    {
       if (pgmoneta_read_admins_configuration((void*)reload, config->common.admins_path))
       {
@@ -2498,9 +2498,12 @@ pgmoneta_reload_configuration(bool* restart)
       goto error;
    }
 
-   if (pgmoneta_validate_admins_configuration(reload))
+   if (strlen(config->common.admins_path) > 0)
    {
-      goto error;
+      if (pgmoneta_validate_admins_configuration(reload))
+      {
+         goto error;
+      }
    }
 
    *restart = transfer_configuration(config, reload);

@@ -449,7 +449,8 @@ main(int argc, char** argv)
    }
    else
    {
-      if (pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf"))
+      configuration_path = "/etc/pgmoneta/pgmoneta.conf";
+      if (pgmoneta_read_main_configuration(shmem, configuration_path))
       {
          warnx("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf");
 #ifdef HAVE_SYSTEMD
@@ -457,7 +458,6 @@ main(int argc, char** argv)
 #endif
          goto error;
       }
-      configuration_path = "/etc/pgmoneta/pgmoneta.conf";
    }
 
    memcpy(&config->common.configuration_path[0], configuration_path, MIN(strlen(configuration_path), MAX_PATH - 1));
@@ -489,17 +489,38 @@ main(int argc, char** argv)
 #endif
          goto error;
       }
-      memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
    }
    else
    {
       users_path = "/etc/pgmoneta/pgmoneta_users.conf";
       ret = pgmoneta_read_users_configuration(shmem, users_path);
-      if (ret == 0)
+      if (ret == 1)
       {
-         memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+         warnx("pgmoneta: USERS configuration not found: %s", users_path);
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=USERS configuration not found: %s", users_path);
+#endif
+         goto error;
+      }
+      else if (ret == 2)
+      {
+         warnx("pgmoneta: Invalid master key file");
+#ifdef HAVE_SYSTEMD
+         sd_notify(0, "STATUS=Invalid master key file");
+#endif
+         goto error;
+      }
+      else if (ret == 3)
+      {
+         warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
+#endif
+         goto error;
       }
    }
+
+   memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
 
    if (admins_path != NULL)
    {
