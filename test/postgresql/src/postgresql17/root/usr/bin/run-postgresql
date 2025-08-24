@@ -69,7 +69,7 @@ sed -i "s/PG_REPL_USER_NAME/$PG_REPL_USER_NAME/g" /conf/setup.sql
 sed -i "s/PG_REPL_PASSWORD/$PG_REPL_PASSWORD/g" /conf/setup.sql
 
 touch /pglog/logfile
-chmod 755 /pglog/logfile
+chmod 666 /pglog/logfile
 
 /usr/pgsql-17/bin/pg_ctl -D /pgdata/ start
 /usr/pgsql-17/bin/psql -q -h /tmp -f /conf/setup.sql postgres
