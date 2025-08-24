@@ -61,7 +61,7 @@ PORT=6432
 
 # Detect container engine: Docker or Podman
 if command -v docker &> /dev/null; then
-  CONTAINER_ENGINE="docker"
+  CONTAINER_ENGINE="sudo docker"
 elif command -v podman &> /dev/null; then
   CONTAINER_ENGINE="podman"
 else
@@ -84,18 +84,14 @@ cleanup() {
      if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
        echo "Force stop pgmoneta"
        kill -9 $(pgrep pgmoneta)
-       sudo rm -f "/tmp/pgmoneta.localhost.pid"
+       rm -f "/tmp/pgmoneta.localhost.pid"
      fi
    fi
 
    echo "Clean Test Resources"
    if [[ -d $PGMONETA_ROOT_DIR ]]; then
-      if ! sudo chown -R "$USER:$USER" "$PGMONETA_ROOT_DIR"; then
-        echo " Could not change ownership. You might need to clean manually."
-      fi
-
       if [[ -d $BASE_DIR ]]; then
-        sudo rm -Rf "$BASE_DIR"
+        rm -Rf "$BASE_DIR"
       fi
 
       if ls "$COVERAGE_DIR"/*.profraw >/dev/null 2>&1; then
@@ -146,7 +142,6 @@ cleanup() {
        echo "Coverage --> $COVERAGE_DIR"
      fi
      echo "Logs --> $LOG_DIR, $PG_LOG_DIR"
-     sudo chmod -R 700 "$PGMONETA_ROOT_DIR"
    else
      echo "$PGMONETA_ROOT_DIR not present ... ok"
    fi
@@ -167,9 +162,9 @@ build_postgresql_image() {
   CUR_DIR=$(pwd)
   cd $TEST_PG17_DIRECTORY
   set +e
-  sudo make clean
+  make clean
   set -e
-  sudo make build
+  make build
   cd $CUR_DIR
 }
 
@@ -178,13 +173,13 @@ cleanup_postgresql_image() {
   echo "Cleanup of the PostgreSQL 17 image $IMAGE_NAME"
   CUR_DIR=$(pwd)
   cd $TEST_PG17_DIRECTORY
-  sudo make clean
+  make clean
   cd $CUR_DIR
   set -e
 }
 
 start_postgresql_container() {
-  sudo $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" \
+  $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" \
   --name $CONTAINER_NAME -d \
   -e PG_DATABASE=$PG_DATABASE \
   -e PG_USER_NAME=$PG_USER_NAME \
@@ -196,16 +191,16 @@ start_postgresql_container() {
 
   echo "Checking PostgreSQL 17 container readiness"
   sleep 3
-  if sudo $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+  if $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
     echo "PostgreSQL 17 is ready!"
   else
     echo "Wait for 10 seconds and retry"
     sleep 10
-    if sudo $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+    if $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
       echo "PostgreSQL 17 is ready!"
     else
       echo "Printing container logs..."
-      sudo $CONTAINER_ENGINE logs $CONTAINER_NAME
+      $CONTAINER_ENGINE logs $CONTAINER_NAME
       echo ""
       echo "PostgreSQL 17 is not ready, exiting"
       cleanup_postgresql_image
@@ -240,8 +235,8 @@ start_postgresql() {
 }
 
 remove_postgresql_container() {
-  sudo $CONTAINER_ENGINE stop $CONTAINER_NAME 2>/dev/null || true
-  sudo $CONTAINER_ENGINE rm -f $CONTAINER_NAME 2>/dev/null || true
+  $CONTAINER_ENGINE stop $CONTAINER_NAME 2>/dev/null || true
+  $CONTAINER_ENGINE rm -f $CONTAINER_NAME 2>/dev/null || true
 }
 
 pgmoneta_initialize_configuration() {
@@ -345,7 +340,7 @@ usage() {
 
 run_tests() {
   echo "Building PostgreSQL 17 image if necessary"
-  if sudo $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+  if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME exists, skip building"
   else
     if [[ $MODE != "ci" ]]; then
@@ -355,11 +350,11 @@ run_tests() {
 
   echo "Preparing the pgmoneta directory"
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p.profraw"
-  sudo rm -Rf "$PGMONETA_ROOT_DIR"
+  rm -Rf "$PGMONETA_ROOT_DIR"
   mkdir -p "$PGMONETA_ROOT_DIR"
   mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR"
   mkdir -p "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY" "$WORKSPACE_DIRECTORY"
-  sudo chmod -R 777 "$PGMONETA_ROOT_DIR"
+  chmod -R 777 $PG_LOG_DIR
 
   echo "Building pgmoneta"
   mkdir -p "$PROJECT_DIRECTORY/build"
@@ -409,10 +404,10 @@ elif [[ $# -eq 1 ]]; then
         check check-devel check-static \
         llvm
    elif [[ "$1" == "clean" ]]; then
-      sudo rm -Rf $COVERAGE_DIR
+      rm -Rf $COVERAGE_DIR
       cleanup
       cleanup_postgresql_image
-      sudo rm -Rf $PGMONETA_ROOT_DIR
+      rm -Rf $PGMONETA_ROOT_DIR
    elif [[ "$1" == "ci" ]]; then
       MODE="ci"
       PORT=5432

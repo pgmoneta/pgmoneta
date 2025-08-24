@@ -52,7 +52,6 @@ RUN mkdir -p /conf /pgconf /pgdata /pgwal /pglog
 COPY conf/* /conf/
 RUN chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
 RUN chmod 700 /conf /pgconf /pgdata /pgwal
-RUN chmod -R 777 /pglog
 RUN chmod +x /usr/bin/run-postgresql
 RUN mkdir -p /usr/local/bin
 

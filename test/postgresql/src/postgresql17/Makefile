@@ -28,7 +28,7 @@ IMAGE_SHORT_NAME = pgmoneta-test-postgresql17
 IMAGE_NAME = pgmoneta-test-postgresql17-rocky9
 CONTAINER_ENGINE := $(shell \
 	if command -v podman >/dev/null 2>&1; then echo podman; \
-	elif command -v docker >/dev/null 2>&1; then echo docker; \
+	elif command -v docker >/dev/null 2>&1; then echo "sudo docker"; \
 	else echo "Neither Docker nor Podman is installed" >&2; exit 1; \
 	fi)
 
