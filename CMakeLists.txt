@@ -216,6 +216,13 @@ else ()
   message(FATAL_ERROR "libssh needed")
 endif()
 
+find_package(LibYAML)
+if (LIBYAML_FOUND)
+  message(STATUS "LibYAML found")
+else ()
+  message(FATAL_ERROR "LibYAML needed")
+endif()
+
 find_package(THREAD)
 if (THREAD_FOUND)
   message(STATUS "pthread found")
