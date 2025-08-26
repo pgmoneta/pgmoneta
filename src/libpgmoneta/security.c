@@ -3083,9 +3083,37 @@ pgmoneta_crc32c_pclmul(const void* buffer, size_t size, uint32_t* crc)
    }
 
    uint64_t crc64 = (uint64_t)initial_crc;
-   for (; p < (const unsigned char*)buffer + size; p += 8)
+   unsigned char* buf_end = (unsigned char*)buffer + size;
+   size_t remaining = buf_end - p;
+
+   while (remaining >= 8)
    {
-      crc64 = _mm_crc32_u64(crc64, *(uint64_t*)p);
+      uint64_t chunk;
+      memcpy(&chunk, p, 8);
+      crc64 = _mm_crc32_u64(crc64, chunk);
+      p += 8;
+      remaining -= 8;
+   }
+
+   if (remaining >= 4)
+   {
+      uint32_t chunk;
+      memcpy(&chunk, p, 4);
+      crc64 = _mm_crc32_u32((uint32_t)crc64, chunk);
+      p += 4;
+      remaining -= 4;
+   }
+   if (remaining >= 2)
+   {
+      uint16_t chunk;
+      memcpy(&chunk, p, 2);
+      crc64 = _mm_crc32_u16((uint32_t)crc64, chunk);
+      p += 2;
+      remaining -= 2;
+   }
+   if (remaining >= 1)
+   {
+      crc64 = _mm_crc32_u8((uint32_t)crc64, *p);
    }
 
    initial_crc = (pg_crc32c)crc64;
