@@ -14,7 +14,7 @@ and you will get output like
 
 ```
 Header:
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: 1
   Output: 0
   Timestamp: 20240928065644
@@ -32,7 +32,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
 ```
 
 ## View backups
@@ -47,7 +47,7 @@ and you will get output like
 
 ```
 Header:
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: 2
   Output: 0
   Timestamp: 20240928065812
@@ -72,7 +72,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
 ```
 
 ## Sorting backups
@@ -103,7 +103,7 @@ and you will get output like
 
 ```
 Header:
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: 1
   Output: 0
   Timestamp: 20240928065730
@@ -122,7 +122,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 48799744
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
 ```
 
 Incremental backups are supported when using [PostgreSQL 17+](https://www.postgresql.org). Note that currently
@@ -141,7 +141,7 @@ and you will get output like
 
 ```
 Header:
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: info
   Output: text
   Timestamp: 20241025163541
@@ -170,7 +170,7 @@ Response:
   NumberOfTablespaces: 0
   RestoreSize: 45.82MB
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
   StartHiLSN: 0
   StartLoLSN: 4F000060
   StartTimeline: 1

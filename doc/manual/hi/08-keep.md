@@ -14,7 +14,7 @@ pgmoneta-cli list-backup primary
 
 ```
 Header: 
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: list-backup
   Output: text
   Timestamp: 20241018092853
@@ -38,7 +38,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
 ```
 
 [जैसा कि आप देख सकते हैं, बैकअप]{lang=hi} `20241012091219` [में]{lang=hi} `Keep` [फ्लैग]{lang=hi} `false` [है।]{lang=hi}
@@ -55,7 +55,7 @@ pgmoneta-cli retain primary 20241012091219
 
 ```
 Header: 
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: retain
   Output: text
   Timestamp: 20241018094129
@@ -74,7 +74,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
   Valid: yes
 ```
 
@@ -88,7 +88,7 @@ Response:
 
 ```
 Header: 
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: retain
   Output: text
   Timestamp: 20241018094129
@@ -107,7 +107,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
   Valid: yes
 ```
 
@@ -123,7 +123,7 @@ pgmoneta-cli annotate primary 20241012091219 add Type "Main fall backup"
 
 ```
 Header: 
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: annotate
   Output: text
   Timestamp: 20241018095906
@@ -154,7 +154,7 @@ Response:
   NumberOfTablespaces: 0
   RestoreSize: 39.13MB
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
   StartHiLSN: 0
   StartLoLSN: 33554472
   StartTimeline: 1
@@ -179,7 +179,7 @@ pgmoneta-cli expunge primary 20241012091219
 
 ```
 Header: 
-  ClientVersion: 0.19.0
+  ClientVersion: 0.19.1
   Command: expunge
   Output: text
   Timestamp: 20241018101839
@@ -198,7 +198,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.19.0
+  ServerVersion: 0.19.1
   Valid: yes
 ```
 
