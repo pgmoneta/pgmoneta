@@ -70,7 +70,7 @@ jobs:
           else
             export CC=/usr/bin/clang
           fi
-          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}  ..
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DDOCS=FALSE ..
           make -j$(nproc)
         working-directory: /home/runner/work/pgmoneta/pgmoneta/
 
@@ -178,7 +178,7 @@ jobs:
           mkdir -p $BUILD_DIR
           cd $BUILD_DIR
           export CC=$(xcrun -find clang)
-          cmake -DCMAKE_BUILD_TYPE=Debug ..
+          cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
           make -j$(sysctl -n hw.ncpu)
       # - name: Run tests with Clang build
       #   working-directory: ${{ env.BUILD_DIR }}
@@ -280,7 +280,7 @@ jobs:
 #        run: |
 #          mkdir -p $GITHUB_WORKSPACE/build
 #          cd $GITHUB_WORKSPACE/build
-#          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} "$GITHUB_WORKSPACE"
+#          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DDOCS=FALSE "$GITHUB_WORKSPACE"
 #          make -j$(sysctl -n hw.ncpu)
 #
 #      - name: Debug Testsuite Path
