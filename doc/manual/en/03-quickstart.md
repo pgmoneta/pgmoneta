@@ -5,7 +5,7 @@
 Make sure that [**pgmoneta**][pgmoneta] is installed and in your path by using `pgmoneta -?`. You should see
 
 ``` console
-pgmoneta 0.19.0
+pgmoneta 0.20.0
   Backup / restore solution for PostgreSQL
 
 Usage:
@@ -118,7 +118,7 @@ If this doesn't give an error, then we are ready to do backups.
 You can see the commands it supports by using `pgmoneta-cli -?` which will give
 
 ``` console
-pgmoneta-cli 0.19.0
+pgmoneta-cli 0.20.0
   Command line utility for pgmoneta
 
 Usage:
@@ -208,7 +208,7 @@ If pgmoneta has both Transport Layer Security (TLS) and `management` enabled the
 You can see the commands it supports by using `pgmoneta-admin -?` which will give
 
 ``` console
-pgmoneta-admin 0.19.0
+pgmoneta-admin 0.20.0
   Administration utility for pgmoneta
 
 Usage:
