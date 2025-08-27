@@ -65,61 +65,57 @@ install(FILES ${PGMONETA_CONF_DST_FILE} DESTINATION share/man/man5)
 #
 # Generate manual
 #
-if(generation)
-  # Files
-  FILE(GLOB EN "manual/en/??-*.md")
-  FILE(GLOB HI "manual/hi/??-*.md")
+FILE(GLOB EN "manual/en/??-*.md")
+FILE(GLOB HI "manual/hi/??-*.md")
 
-  # Manuals definitions
-  set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
-  get_filename_component(PARENT_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
-  set(IMAGE_DIR "${PARENT_DIR}/doc/images")
+# Manuals definitions
+set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
+get_filename_component(PARENT_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
+set(IMAGE_DIR "${PARENT_DIR}/doc/images")
 
-  add_custom_target(
-    copy_images
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${IMAGE_DIR} ${CMAKE_BINARY_DIR}/images
-    COMMENT "Copy images"
-  )
+add_custom_target(
+  copy_images
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${IMAGE_DIR} ${CMAKE_BINARY_DIR}/images
+  COMMENT "Copy images"
+)
 
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf --from markdown --template eisvogel --listings -N --toc ${EN}
-    DEPENDS ${EN}
-    COMMENT "Generating English PDF documentation"
-  )
+add_custom_command(
+  OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf
+  COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf --from markdown --template eisvogel --listings -N --toc ${EN}
+  DEPENDS ${EN}
+  COMMENT "Generating English PDF documentation"
+)
 
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf
-    COMMAND ${PANDOC_EXECUTABLE} --quiet -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf --pdf-engine=lualatex --template eisvogel --listings -N --toc ${HI}
-    DEPENDS ${AG_HI}
-    COMMENT "Generating Hindi PDF documentation"
-  )
+add_custom_command(
+  OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf
+  COMMAND ${PANDOC_EXECUTABLE} --quiet -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf --pdf-engine=lualatex --template eisvogel --listings -N --toc ${HI}
+  DEPENDS ${AG_HI}
+  COMMENT "Generating Hindi PDF documentation"
+)
 
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html -s -f markdown-smart -N --toc -t html5 ${EN}
-    DEPENDS ${EN}
-    COMMENT "Generating English HTML documentation"
-  )
+add_custom_command(
+  OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
+  COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html -s -f markdown-smart -N --toc -t html5 ${EN}
+  DEPENDS ${EN}
+  COMMENT "Generating English HTML documentation"
+)
 
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html -s -f markdown-smart -N --toc -t html5 ${HI}
-    DEPENDS ${HI}
-    COMMENT "Generating Hindi HTML documentation"
-  )
+add_custom_command(
+  OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
+  COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html -s -f markdown-smart -N --toc -t html5 ${HI}
+  DEPENDS ${HI}
+  COMMENT "Generating Hindi HTML documentation"
+)
 
-  add_custom_target(
-    all_docs ALL
-    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf  ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
-  )
+add_custom_target(
+  all_docs ALL
+  DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf  ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
+)
 
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html DESTINATION share/doc/pgmoneta/manual)
-
-endif()
+install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf DESTINATION share/doc/pgmoneta/manual)
+install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html DESTINATION share/doc/pgmoneta/manual)
+install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf DESTINATION share/doc/pgmoneta/manual)
+install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html DESTINATION share/doc/pgmoneta/manual)
 
 #
 # Generate API docs

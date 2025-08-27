@@ -50,7 +50,7 @@ dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl op
 
 #### Generate user and developer guide
 
-This process is optional. If you choose not to generate the PDF and HTML files, you can opt out of downloading these dependencies, and the process will automatically skip the generation.
+This process is optional by using the `cmake` variable `-DDOCS=TRUE` (default), or `-DDOCS=FALSE`. If you choose not to generate the PDF and HTML files, you can opt out of downloading these dependencies, and the process will automatically skip the generation.
 
 1. Download dependencies
 
@@ -81,7 +81,7 @@ This process is optional. If you choose not to generate the PDF and HTML files, 
 
 #### Generate API guide
 
-This process is optional. If you choose not to generate the API HTML files, you can opt out of downloading these dependencies, and the process will automatically skip the generation.
+This process is optional by using the `cmake` variable `-DDOCS=TRUE` (default), or `-DDOCS=FALSE`. If you choose not to generate the API HTML files, you can opt out of downloading these dependencies, and the process will automatically skip the generation.
 
 Download dependencies
 
