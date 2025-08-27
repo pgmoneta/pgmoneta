@@ -251,8 +251,6 @@ endif()
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/src/")
 
-if (DOCS)
-  add_subdirectory(doc)
-endif()
+add_subdirectory(doc)
 add_subdirectory(src)
 add_subdirectory(test)
