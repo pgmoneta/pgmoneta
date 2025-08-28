@@ -167,6 +167,7 @@ add_compile_options(-Wno-deprecated)
 add_compile_options(-Wno-deprecated-declarations)
 add_compile_options(-Wunused)
 add_compile_options(-Wunused-result)
+add_compile_options(-Wsign-compare)
 
 #
 # version number and string management
