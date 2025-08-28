@@ -34,6 +34,8 @@
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <utils.h>
 #include <security.h>
 
@@ -1521,7 +1523,7 @@ int
 pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile)
 {
    uint32_t magic = 0;
-   int nread = 0;
+   uint32_t nread = 0;
    struct rfile* rf = NULL;
    struct main_configuration* config;
    size_t relsegsz = 0;
@@ -1732,7 +1734,7 @@ pgmoneta_backup_size(int server, char* label, unsigned long* size, uint64_t* big
             goto error;
          }
          block_length = rf->truncation_block_length;
-         for (int i = 0; i < rf->num_blocks; i++)
+         for (uint32_t i = 0; i < rf->num_blocks; i++)
          {
             if (rf->relative_block_numbers[i] >= block_length)
             {

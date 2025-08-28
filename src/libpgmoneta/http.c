@@ -796,7 +796,7 @@ pgmoneta_http_read(SSL* ssl, int socket, char** response_text)
       *response_text = pgmoneta_append(*response_text, buffer);
       total_bytes += bytes_read;
 
-      if (strstr(buffer, "\r\n0\r\n\r\n") || bytes_read < sizeof(buffer) - 1)
+      if (strstr(buffer, "\r\n0\r\n\r\n") || bytes_read < (ssize_t)(sizeof(buffer) - 1))
       {
          break;
       }
