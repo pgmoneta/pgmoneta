@@ -1702,7 +1702,6 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    else if (id == MANAGEMENT_MODE)
    {
       char* action = NULL;
-      int ret;
       struct timespec start_t;
       struct timespec end_t;
       struct json* response = NULL;
@@ -1736,21 +1735,6 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 #else
             clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
-
-            SLEEP(5000000L);
-            if (config->common.servers[srv].wal_streaming > 0)
-            {
-               ret = kill(config->common.servers[srv].wal_streaming, SIGTERM);
-
-               if (ret == 0)
-               {
-                  config->common.servers[srv].wal_streaming = -1;
-               }
-               else
-               {
-                  errno = 0;
-               }
-            }
 
             pgmoneta_log_info("Mode: Server %s is offline", config->common.servers[srv].name);
 
