@@ -33,19 +33,8 @@ jobs:
           zlib1g zlib1g-dev libzstd-dev liblz4-dev \
           libssh-dev libatomic1 \
           python3-docutils libbz2-dev libarchive-dev \
-          bzip2 net-tools check graphviz doxygen \
-          pandoc texlive texlive-latex-extra \
-          texlive-fonts-extra texlive-xetex texlive-luatex \
-          texlive-science texlive-extra-utils \
-          texlive-lang-all \
+          bzip2 net-tools check \
           llvm
-
-      - name: Install Eisvogel template for Pandoc
-        run: |
-          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.2.0/Eisvogel-3.2.0.tar.gz
-          tar -xzf Eisvogel-3.2.0.tar.gz
-          mkdir -p ~/.local/share/pandoc/templates
-          mv Eisvogel-3.2.0/eisvogel.latex ~/.local/share/pandoc/templates/
 
       - name: Install PostgreSQL
         run: |
@@ -81,29 +70,6 @@ jobs:
           fi
         working-directory: /home/runner/work/pgmoneta/pgmoneta/
 
- # === Generate coverage reports ===
-#      - name: Generate Detailed HTML Coverage Report
-#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-#        uses: threeal/gcovr-action@v1.1.0
-#        with:
-#          root: /home/runner/work/pgmoneta/pgmoneta
-#          html-details: true
-#          html-out: coverage.html
-#
-#      - name: Generate Cobertura Report
-#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-#        uses: threeal/gcovr-action@v1.1.0
-#        with:
-#          xml-out: cobertura.xml
-#
-#      - name: Generate Coveralls JSON Report and Upload
-#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Debug'
-#        uses: threeal/gcovr-action@v1.1.0
-#        with:
-#          root: /home/runner/work/pgmoneta/pgmoneta
-#          coveralls-out: coveralls.json
-#
-
       - name: Upload All Coverage Reports as Artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,18 +85,6 @@ jobs:
           name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
           path: /tmp/pgmoneta-test/log
           retention-days: 90
-#
-#      - name: Clean Testsuite
-#        run: $(which bash) ./test/check.sh clean
-#        working-directory: /home/runner/work/pgmoneta/pgmoneta
-#
-#      - name: Upload Generated Documentation Artifact
-#        if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: linux-generated-docs
-#          path: /home/runner/work/pgmoneta/pgmoneta/build/doc
-#          retention-days: 90
 
   build-macos:
     runs-on: macos-latest
@@ -153,23 +107,7 @@ jobs:
             libarchive \
             check \
             postgresql${POSTGRESQL_VERSION} \
-            libssh \
-            doxygen \
-            pandoc
-      - name: Install pdflatex
-        run: |
-          curl -LO https://mirror.ctan.org/systems/mac/mactex/MacTeX.pkg && sudo installer -pkg MacTeX.pkg -target /
-          echo "/Library/TeX/texbin" >> $GITHUB_PATH
-      - name: Install eisvogel template for Pandoc
-        run: |
-          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.2.0/Eisvogel-3.2.0.tar.gz
-          tar -xzf Eisvogel-3.2.0.tar.gz
-          mkdir -p ~/.local/share/pandoc/templates
-          mv Eisvogel-3.2.0/eisvogel.latex ~/.local/share/pandoc/templates/
-      - name: Install Devanagari font for Hindi Documentation
-        run: |
-          brew install --cask font-noto-sans-devanagari
-          fc-list | grep "Noto Sans Devanagari"
+            libssh
       - name: Add PostgreSQL to PATH
         run: |
           echo "$(brew --prefix postgresql${POSTGRESQL_VERSION})/bin" >> $GITHUB_PATH
@@ -180,13 +118,6 @@ jobs:
           export CC=$(xcrun -find clang)
           cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
           make -j$(sysctl -n hw.ncpu)
-      # - name: Run tests with Clang build
-      #   working-directory: ${{ env.BUILD_DIR }}
-      #   run: $(which bash) ./testsuite.sh
-
-      # - name: Clean up after Clang tests
-      #   working-directory: ${{ env.BUILD_DIR }}
-      #   run: $(which bash) ./testsuite.sh clean
 
       - name: Show logs on failure
         if: failure()
@@ -266,14 +197,7 @@ jobs:
 #              libssh \
 #              libarchive \
 #              check \
-#              py311-docutils \
-#              doxygen \
-#              hs-pandoc \
-#              texlive-base \
-#              texlive-texmf \
-#              graphviz
-#            # Initialize Graphviz plugins after installation
-#            dot -c
+#              py311-docutils
 #
 #      - name: Build Project
 #        shell: freebsd {0}
