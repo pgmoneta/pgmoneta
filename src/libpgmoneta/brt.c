@@ -29,6 +29,8 @@
 #include <art.h>
 #include <brt.h>
 #include <pgmoneta.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile/wal_reader.h>
@@ -429,7 +431,7 @@ pgmoneta_brt_read(char* file_path, block_ref_table** brt)
             break;
          }
 
-         for (int i = 0; i < nblocks; i++)
+         for (unsigned i = 0; i < nblocks; i++)
          {
             if (pgmoneta_brt_mark_block_modified(b, &rlocator, forknum, blocks[i]))
             {
@@ -607,7 +609,7 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
        * New array size is a power of 2, at least 16, big enough so that
        * chunkno will be a valid array index.
        */
-      max_chunks = MAX(16, entry->nchunks);
+      max_chunks = MAX((uint32_t)16, entry->nchunks);
       while (max_chunks < chunkno + 1)
          max_chunks *= 2;
       extra_chunks = max_chunks - entry->nchunks;
@@ -773,7 +775,7 @@ brt_reader_get_blocks(FILE* f, struct block_ref_table_reader* reader,
                       block_number* blocks,
                       int nblocks)
 {
-   unsigned blocks_found = 0;
+   int blocks_found = 0;
    uint16_t next_chunk_size;
    uint32_t chunkno;
    uint16_t chunk_size;
@@ -858,9 +860,9 @@ pgmoneta_brt_entry_destroy(uintptr_t entry)
    {
       return;
    }
-   unsigned chunknum = e->nchunks;
+   uint32_t chunknum = e->nchunks;
 
-   for (int i = 0; i < chunknum; i++)
+   for (uint32_t i = 0; i < chunknum; i++)
    {
       free(e->chunk_data[i]);
    }
@@ -938,18 +940,18 @@ static void
 brt_write(FILE* f, block_ref_table_buffer* buffer, void* data, int length)
 {
    size_t bytes_written = 0;
-   unsigned long buffer_size = sizeof(buffer->data);
+   size_t buffer_size = sizeof(buffer->data);
 
    /* If the new data can't fit into the buffer, flush the buffer. */
-   if (buffer->used + length > buffer_size)
+   if ((size_t)(buffer->used + length) > buffer_size)
    {
       brt_flush(f, buffer);
    }
 
    /* If the new data would fill the buffer, or more, write it directly. */
-   if (length >= buffer_size)
+   if ((size_t)length >= buffer_size)
    {
-      while (bytes_written < length)
+      while (bytes_written < (size_t)length)
       {
          bytes_written += fwrite((char*)data, sizeof(char), length, f);
       }
@@ -966,7 +968,7 @@ static int
 brt_read(FILE* f, struct block_ref_table_reader* reader, void* data, int length)
 {
    block_ref_table_buffer* buffer = &reader->buffer;
-   unsigned long buffer_size = sizeof(buffer->data);
+   size_t buffer_size = sizeof(buffer->data);
    int bytes_to_copy, bytes_read;
 
    while (length > 0)
@@ -978,7 +980,7 @@ brt_read(FILE* f, struct block_ref_table_reader* reader, void* data, int length)
          buffer->cursor += bytes_to_copy;
          length -= bytes_to_copy;
       }
-      else if (length >= buffer_size) /* Read directly in this case */
+      else if ((size_t)length >= buffer_size) /* Read directly in this case */
       {
          bytes_read = fread(data, sizeof(char), length, f);
          length -= bytes_read;
