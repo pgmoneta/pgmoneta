@@ -412,7 +412,7 @@ pgmoneta_wal_timestamptz_to_str(timestamp_tz dt)
    size_t written = snprintf(buf, sizeof(buf), "%s.%06d %s",
                              ts, (int) (dt % USECS_PER_SEC), zone);
 
-   if (written < 0 || written >= sizeof(buf))
+   if (written == 0 || written >= sizeof(buf))
    {
       // Handle the truncation or error
       pgmoneta_log_fatal("Buffer overflow or encoding error in timestamptz_to_str\n");
