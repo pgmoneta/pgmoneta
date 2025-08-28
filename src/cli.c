@@ -41,6 +41,7 @@
 #include <network.h>
 #include <security.h>
 #include <shmem.h>
+#include <stddef.h>
 #include <utils.h>
 #include <value.h>
 #include <verify.h>
@@ -691,7 +692,7 @@ main(int argc, char** argv)
 
          config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
          memset(&config->common.log_path[0], 0, MISC_LENGTH);
-         memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+         memcpy(&config->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
       }
 
       if (pgmoneta_start_logging())
@@ -722,7 +723,7 @@ main(int argc, char** argv)
 
             config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
             memset(&config->common.log_path[0], 0, MISC_LENGTH);
-            memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+            memcpy(&config->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
          }
 
          if (pgmoneta_start_logging())

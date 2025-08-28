@@ -1760,7 +1760,7 @@ is_full_file(struct rfile* rf)
 static int
 read_block(struct rfile* rf, off_t offset, uint32_t blocksz, uint8_t* buffer)
 {
-   int nread = 0;
+   uint32_t nread = 0;
    if (fseek(rf->fp, offset, SEEK_SET))
    {
       pgmoneta_log_error("unable to locate file pointer to offset %llu in file %s", offset, rf->filepath);

@@ -31,6 +31,7 @@
 #include <logging.h>
 #include <network.h>
 #include <security.h>
+#include <stddef.h>
 #include <utils.h>
 
 /* system */
@@ -120,7 +121,7 @@ static int client_proof(char* password, char* salt, int salt_length, int iterati
                         char* client_first_message_bare, size_t client_first_message_bare_length,
                         char* server_first_message, size_t server_first_message_length,
                         char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                        unsigned char** result, int* result_length);
+                        unsigned char** result, size_t* result_length);
 static int  salted_password(char* password, char* salt, int salt_length, int iterations, unsigned char** result, int* result_length);
 static int  salted_password_key(unsigned char* salted_password, int salted_password_length, char* key,
                                 unsigned char** result, int* result_length);
@@ -341,7 +342,7 @@ pgmoneta_remote_management_scram_sha256(char* username, char* password, int serv
    char* server_first_message = NULL;
    char wo_proof[58];
    unsigned char* proof = NULL;
-   int proof_length;
+   size_t proof_length;
    char* proof_base = NULL;
    size_t proof_base_length;
    char* base64_server_signature = NULL;
@@ -853,7 +854,7 @@ client_scram256(SSL* c_ssl, int client_fd, char* password, int slot)
    char* client_proof_received = NULL;
    size_t client_proof_received_length = 0;
    unsigned char* client_proof_calc = NULL;
-   int client_proof_calc_length = 0;
+   size_t client_proof_calc_length = 0;
    unsigned char* server_signature_calc = NULL;
    size_t server_signature_calc_length = 0;
    char* base64_server_signature_calc = NULL;
@@ -1525,7 +1526,7 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    char* server_first_message = NULL;
    char wo_proof[58];
    unsigned char* proof = NULL;
-   int proof_length;
+   size_t proof_length;
    char* proof_base = NULL;
    size_t proof_base_length;
    char* base64_server_signature = NULL;
@@ -2093,7 +2094,7 @@ client_proof(char* password, char* salt, int salt_length, int iterations,
              char* client_first_message_bare, size_t client_first_message_bare_length,
              char* server_first_message, size_t server_first_message_length,
              char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-             unsigned char** result, int* result_length)
+             unsigned char** result, size_t* result_length)
 {
    size_t size = 32;
    unsigned char* s_p = NULL;
@@ -3326,7 +3327,7 @@ pgmoneta_extract_server_parameters(struct deque** server_parameters)
    int i;
    char* data = NULL;
    ssize_t data_length;
-   size_t offset;
+   ssize_t offset;
    char* name = NULL;
    char* value = NULL;
    struct message* msg = NULL;

@@ -43,10 +43,10 @@ extern "C" {
 struct stream_buffer
 {
    char* buffer;  /**< allocated buffer holding streaming data */
-   size_t size;      /**< allocated buffer size */
-   int start;     /**< offset to the first unconsumed data in buffer */
-   int end;       /**< offset to the first position after available data */
-   int cursor;    /**< next byte to consume */
+   size_t size;   /**< allocated buffer size */
+   size_t start;  /**< offset to the first unconsumed data in buffer */
+   size_t end;    /**< offset to the first position after available data */
+   size_t cursor; /**< next byte to consume */
 } __attribute__ ((aligned (64)));
 
 /**

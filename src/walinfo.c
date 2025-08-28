@@ -35,6 +35,7 @@
 #include <pgmoneta.h>
 #include <security.h>
 #include <shmem.h>
+#include <stddef.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
@@ -392,7 +393,7 @@ main(int argc, char** argv)
       {
          config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
          memset(&config->common.log_path[0], 0, MISC_LENGTH);
-         memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+         memcpy(&config->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
       }
    }
 
@@ -424,7 +425,7 @@ main(int argc, char** argv)
          warnx("pgmoneta: USERS: Too many users defined %d (max %d)", config->common.number_of_users, NUMBER_OF_USERS);
          goto error;
       }
-      memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+      memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), (size_t)MAX_PATH - 1));
    }
    else
    {
@@ -432,7 +433,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_users_configuration(shmem, users_path);
       if (ret == 0)
       {
-         memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+         memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), (size_t)MAX_PATH - 1));
       }
    }
 

@@ -601,7 +601,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
    decoded->max_block_id = -1;
 
    //read id
-   int remaining = 0;
+   uint32_t remaining = 0;
    uint32_t datatotal = 0;
    char* ptr = NULL;
    struct rel_file_locator* rlocator = NULL;

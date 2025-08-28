@@ -52,6 +52,7 @@
 #include <server.h>
 #include <shmem.h>
 #include <status.h>
+#include <stddef.h>
 #include <utils.h>
 #include <verify.h>
 #include <wal.h>
@@ -460,7 +461,7 @@ main(int argc, char** argv)
       }
    }
 
-   memcpy(&config->common.configuration_path[0], configuration_path, MIN(strlen(configuration_path), MAX_PATH - 1));
+   memcpy(&config->common.configuration_path[0], configuration_path, MIN(strlen(configuration_path), (size_t)MAX_PATH - 1));
 
    if (users_path != NULL)
    {
@@ -520,7 +521,7 @@ main(int argc, char** argv)
       }
    }
 
-   memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), MAX_PATH - 1));
+   memcpy(&config->common.users_path[0], users_path, MIN(strlen(users_path), (size_t)MAX_PATH - 1));
 
    if (admins_path != NULL)
    {
@@ -549,7 +550,7 @@ main(int argc, char** argv)
 #endif
          goto error;
       }
-      memcpy(&config->common.admins_path[0], admins_path, MIN(strlen(admins_path), MAX_PATH - 1));
+      memcpy(&config->common.admins_path[0], admins_path, MIN(strlen(admins_path), (size_t)MAX_PATH - 1));
    }
    else
    {
@@ -557,7 +558,7 @@ main(int argc, char** argv)
       ret = pgmoneta_read_admins_configuration(shmem, admins_path);
       if (ret == 0)
       {
-         memcpy(&config->common.admins_path[0], admins_path, MIN(strlen(admins_path), MAX_PATH - 1));
+         memcpy(&config->common.admins_path[0], admins_path, MIN(strlen(admins_path), (size_t)MAX_PATH - 1));
       }
    }
 
