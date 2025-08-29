@@ -464,18 +464,21 @@ pgmoneta_query_response_debug(struct query_response* response);
 
 /**
  * Read the copy stream into the streaming buffer in blocking mode
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The streaming buffer
  * @return 1 upon success, 0 if no data received, otherwise 2
  */
 int
-pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer);
+pgmoneta_read_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer);
 
 /**
- * Consume the data in copy stream buffer, get the next valid message in the copy stream buffer
- * Recognized message types are DataRow, CopyOutResponse, CopyInResponse, CopyData, CopyDone, CopyFail, RowDescription, CommandComplete and ErrorResponse
- * Other message will be ignored
+ * Consume the data in copy stream buffer, get the next valid message in the
+ * copy stream buffer Recognized message types are DataRow, CopyOutResponse,
+ * CopyInResponse, CopyData, CopyDone, CopyFail, RowDescription, CommandComplete
+ * and ErrorResponse Other message will be ignored
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
@@ -483,12 +486,14 @@ pgmoneta_read_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer);
  * @return 1 upon success, 0 if no data to consume, otherwise 2
  */
 int
-pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer, struct message** message);
+pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct message** message);
 
 /**
- * Consume the data in copy stream buffer similar to pgmoneta_consume_copy_stream.
- * Instead of creating a new message each time, reuse the same message buffer each time
- * Must be used with pgmoneta_consume_copy_stream_end
+ * Consume the data in copy stream buffer similar to
+ * pgmoneta_consume_copy_stream. Instead of creating a new message each time,
+ * reuse the same message buffer each time Must be used with
+ * pgmoneta_consume_copy_stream_end
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
@@ -497,7 +502,7 @@ pgmoneta_consume_copy_stream(SSL* ssl, int socket, struct stream_buffer* buffer,
  * @return 1 upon success, 0 if no data to consume, otherwise 2
  */
 int
-pgmoneta_consume_copy_stream_start(SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message, struct token_bucket* network_bucket);
+pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct message* message, struct token_bucket* network_bucket);
 
 /**
  * Finish consuming the buffer, prepare for the next message to be consumed
@@ -509,6 +514,7 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
 
 /**
  * Receive and parse the DataRow messages into tuples
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer holding the messages
@@ -516,10 +522,11 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response);
+pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response);
 
 /**
  * Receive mainfest file from the copy stream and write to disk
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
@@ -529,7 +536,7 @@ pgmoneta_consume_data_row_messages(SSL* ssl, int socket, struct stream_buffer* b
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_manifest_file(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 /**
  * Receive extra file from the server side

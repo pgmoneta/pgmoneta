@@ -74,6 +74,7 @@ pgmoneta_tar_directory(char* src, char* dst, char* destination);
 /**
  * Receive backup tar files from the copy stream and write to disk
  * This functionality is for server version < 15
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
@@ -84,11 +85,12 @@ pgmoneta_tar_directory(char* src, char* dst, char* destination);
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 /**
  * Receive backup tar files from the copy stream and write to disk
  * This functionality is for server version >= 15
+ * @param srv The server
  * @param ssl The SSL structure
  * @param socket The socket
  * @param buffer The stream buffer
@@ -99,7 +101,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
+pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
 
 #ifdef __cplusplus
 }

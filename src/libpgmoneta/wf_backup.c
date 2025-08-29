@@ -276,7 +276,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
       // receive and ignore the result set for UPLOAD_MANIFEST
-      if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+      if (pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response))
       {
          goto error;
       }
@@ -298,7 +298,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    // Receive the first result set, which contains the WAL starting point
-   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response))
    {
       goto error;
    }
@@ -312,7 +312,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    if (config->common.servers[server].version < 15)
    {
-      if (pgmoneta_receive_archive_files(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
+      if (pgmoneta_receive_archive_files(server, ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
@@ -329,7 +329,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    else
    {
-      if (pgmoneta_receive_archive_stream(ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
+      if (pgmoneta_receive_archive_stream(server, ssl, socket, buffer, backup_base, tablespaces, bucket, network_bucket))
       {
          pgmoneta_log_error("Backup: Could not backup %s", config->common.servers[server].name);
 
@@ -346,7 +346,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    // Receive the final result set, which contains the WAL ending point
-   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response))
    {
       goto error;
    }
@@ -380,7 +380,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    // receive and ignore the last result set, it's just a summary
-   pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response);
+   pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response);
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
