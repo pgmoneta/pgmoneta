@@ -377,7 +377,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
+pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
 {
    char directory[MAX_PATH];
    char link_path[MAX_PATH];
@@ -390,7 +390,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
    memset(msg, 0, sizeof (struct message));
 
    // Receive the second result set
-   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(srv, ssl, socket, buffer, &response))
    {
       goto error;
    }
@@ -449,7 +449,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       // get the copy out response
       while (msg == NULL || msg->kind != 'H')
       {
-         pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
+         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, NULL);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -462,7 +462,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       }
       while (msg->kind != 'c')
       {
-         pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, network_bucket);
+         pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, network_bucket);
          if (msg->kind == 'E' || msg->kind == 'f')
          {
             pgmoneta_log_copyfail_message(msg);
@@ -522,7 +522,7 @@ pgmoneta_receive_archive_files(SSL* ssl, int socket, struct stream_buffer* buffe
       tup = tup->next;
    }
 
-   if (pgmoneta_receive_manifest_file(ssl, socket, buffer, basedir, bucket, network_bucket))
+   if (pgmoneta_receive_manifest_file(srv, ssl, socket, buffer, basedir, bucket, network_bucket))
    {
       goto error;
    }
@@ -583,7 +583,7 @@ error:
 }
 
 int
-pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
+pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
 {
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof (struct message));
@@ -612,13 +612,13 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
    memset(msg, 0, sizeof(struct message));
 
    // Receive the second result set
-   if (pgmoneta_consume_data_row_messages(ssl, socket, buffer, &response))
+   if (pgmoneta_consume_data_row_messages(srv, ssl, socket, buffer, &response))
    {
       goto error;
    }
    while (msg == NULL || msg->kind != 'H')
    {
-      pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, NULL);
+      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, NULL);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
@@ -630,7 +630,7 @@ pgmoneta_receive_archive_stream(SSL* ssl, int socket, struct stream_buffer* buff
 
    while (msg->kind != 'c')
    {
-      pgmoneta_consume_copy_stream_start(ssl, socket, buffer, msg, network_bucket);
+      pgmoneta_consume_copy_stream_start(srv, ssl, socket, buffer, msg, network_bucket);
       if (msg->kind == 'E' || msg->kind == 'f')
       {
          pgmoneta_log_copyfail_message(msg);
