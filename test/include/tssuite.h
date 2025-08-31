@@ -81,4 +81,25 @@ pgmoneta_test_wal_utils_suite();
 Suite*
 pgmoneta_test_wal_summary_suite();
 
+/**
+ * Set up an art suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_art_suite();
+
+/**
+ * Set up a deque suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_deque_suite();
+
+/**
+ * Set up a json suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_json_suite();
+
 #endif

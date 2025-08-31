@@ -28,10 +28,10 @@
  */
 
 #include <info.h>
-#include <utils.h>
 #include <tsclient.h>
 #include <tssuite.h>
 #include <tscommon.h>
+#include <utils.h>
 
 // test delete a single full backup
 START_TEST(test_pgmoneta_delete_full)
