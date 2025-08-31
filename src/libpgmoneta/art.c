@@ -769,11 +769,11 @@ art_node_insert(struct art_node* node, struct art_node** node_ref, uint32_t dept
          old_val = GET_LEAF(node)->value;
          if (config != NULL)
          {
-             pgmoneta_value_create_with_config(value, config, &(GET_LEAF(node)->value));
+            pgmoneta_value_create_with_config(value, config, &(GET_LEAF(node)->value));
          }
          else
          {
-             pgmoneta_value_create(type, value, &(GET_LEAF(node)->value));
+            pgmoneta_value_create(type, value, &(GET_LEAF(node)->value));
          }
          return old_val;
       }

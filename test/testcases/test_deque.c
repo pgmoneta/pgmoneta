@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2025 The pgmoneta community
+ * Copyright (C) 2025 The pgmoneta community
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -35,8 +35,8 @@
 
 struct deque_test_obj
 {
-    char* str;
-    int idx;
+   char* str;
+   int idx;
 };
 
 static void test_obj_create(int idx, struct deque_test_obj** obj);
@@ -45,314 +45,306 @@ static void test_obj_destroy_cb(uintptr_t obj);
 
 START_TEST(test_deque_create)
 {
-    struct deque* dq = NULL;
+   struct deque* dq = NULL;
 
-    ck_assert(!pgmoneta_deque_create(false, &dq));
-    ck_assert_ptr_nonnull(dq);
-    ck_assert_int_eq(dq->size, 0);
+   ck_assert(!pgmoneta_deque_create(false, &dq));
+   ck_assert_ptr_nonnull(dq);
+   ck_assert_int_eq(dq->size, 0);
 
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_add_poll)
 {
-    struct deque* dq = NULL;
+   struct deque* dq = NULL;
 
-    pgmoneta_deque_create(false, &dq);
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)-1, ValueInt32));
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)true, ValueBool));
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)"value1", ValueString));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)-1, ValueInt32));
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)true, ValueBool));
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)"value1", ValueString));
+   ck_assert_int_eq(dq->size, 3);
 
-    ck_assert_int_eq((int)pgmoneta_deque_peek(dq, NULL), -1);
+   ck_assert_int_eq((int)pgmoneta_deque_peek(dq, NULL), -1);
 
-    ck_assert_int_eq((int)pgmoneta_deque_poll(dq, NULL), -1);
-    ck_assert_int_eq(dq->size, 2);
+   ck_assert_int_eq((int)pgmoneta_deque_poll(dq, NULL), -1);
+   ck_assert_int_eq(dq->size, 2);
 
-    ck_assert((bool)pgmoneta_deque_poll(dq, NULL));
-    ck_assert_int_eq(dq->size, 1);
+   ck_assert((bool)pgmoneta_deque_poll(dq, NULL));
+   ck_assert_int_eq(dq->size, 1);
 
-    char* value1 = (char*)pgmoneta_deque_poll(dq, NULL);
-    ck_assert_str_eq(value1, "value1");
-    ck_assert_int_eq(dq->size, 0);
-    free(value1);
+   char* value1 = (char*)pgmoneta_deque_poll(dq, NULL);
+   ck_assert_str_eq(value1, "value1");
+   ck_assert_int_eq(dq->size, 0);
+   free(value1);
 
-    ck_assert_int_eq(pgmoneta_deque_poll(dq, NULL), 0);
-    ck_assert_int_eq(dq->size, 0);
+   ck_assert_int_eq(pgmoneta_deque_poll(dq, NULL), 0);
+   ck_assert_int_eq(dq->size, 0);
 
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_add_poll_last)
 {
-    struct deque* dq = NULL;
+   struct deque* dq = NULL;
 
-    pgmoneta_deque_create(false, &dq);
-    pgmoneta_deque_add(dq, NULL, 0, ValueNone);
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)"value1", ValueString));
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)true, ValueBool));
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)-1, ValueInt32));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   pgmoneta_deque_add(dq, NULL, 0, ValueNone);
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)"value1", ValueString));
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)true, ValueBool));
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)-1, ValueInt32));
+   ck_assert_int_eq(dq->size, 3);
 
-    ck_assert_int_eq((int)pgmoneta_deque_peek_last(dq, NULL), -1);
+   ck_assert_int_eq((int)pgmoneta_deque_peek_last(dq, NULL), -1);
 
-    ck_assert_int_eq((int)pgmoneta_deque_poll_last(dq, NULL), -1);
-    ck_assert_int_eq(dq->size, 2);
+   ck_assert_int_eq((int)pgmoneta_deque_poll_last(dq, NULL), -1);
+   ck_assert_int_eq(dq->size, 2);
 
-    ck_assert((bool)pgmoneta_deque_poll_last(dq, NULL));
-    ck_assert_int_eq(dq->size, 1);
+   ck_assert((bool)pgmoneta_deque_poll_last(dq, NULL));
+   ck_assert_int_eq(dq->size, 1);
 
-    char* value1 = (char*)pgmoneta_deque_poll_last(dq, NULL);
-    ck_assert_str_eq(value1, "value1");
-    ck_assert_int_eq(dq->size, 0);
-    free(value1);
+   char* value1 = (char*)pgmoneta_deque_poll_last(dq, NULL);
+   ck_assert_str_eq(value1, "value1");
+   ck_assert_int_eq(dq->size, 0);
+   free(value1);
 
-    ck_assert_int_eq(pgmoneta_deque_poll_last(dq, NULL), 0);
-    ck_assert_int_eq(dq->size, 0);
+   ck_assert_int_eq(pgmoneta_deque_poll_last(dq, NULL), 0);
+   ck_assert_int_eq(dq->size, 0);
 
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_clear)
 {
-    struct deque* dq = NULL;
+   struct deque* dq = NULL;
 
-    pgmoneta_deque_create(false, &dq);
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)"value1", ValueString));
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)true, ValueBool));
-    ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)-1, ValueInt32));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)"value1", ValueString));
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)true, ValueBool));
+   ck_assert(!pgmoneta_deque_add(dq, NULL, (uintptr_t)-1, ValueInt32));
+   ck_assert_int_eq(dq->size, 3);
 
-    pgmoneta_deque_clear(dq);
-    ck_assert_int_eq(dq->size, 0);
-    ck_assert_int_eq(pgmoneta_deque_poll(dq, NULL), 0);
+   pgmoneta_deque_clear(dq);
+   ck_assert_int_eq(dq->size, 0);
+   ck_assert_int_eq(pgmoneta_deque_poll(dq, NULL), 0);
 
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_remove)
 {
-    struct deque* dq = NULL;
-    char* value1 = NULL;
-    char* tag = NULL;
+   struct deque* dq = NULL;
+   char* value1 = NULL;
+   char* tag = NULL;
 
-    pgmoneta_deque_create(false, &dq);
-    ck_assert(!pgmoneta_deque_add(dq, "tag1", (uintptr_t)"value1", ValueString));
-    ck_assert(!pgmoneta_deque_add(dq, "tag2", (uintptr_t)true, ValueBool));
-    ck_assert(!pgmoneta_deque_add(dq, "tag2", (uintptr_t)-1, ValueInt32));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   ck_assert(!pgmoneta_deque_add(dq, "tag1", (uintptr_t)"value1", ValueString));
+   ck_assert(!pgmoneta_deque_add(dq, "tag2", (uintptr_t)true, ValueBool));
+   ck_assert(!pgmoneta_deque_add(dq, "tag2", (uintptr_t)-1, ValueInt32));
+   ck_assert_int_eq(dq->size, 3);
 
-    ck_assert_int_eq(pgmoneta_deque_remove(dq, NULL), 0);
-    ck_assert_int_eq(pgmoneta_deque_remove(NULL, "tag2"), 0);
-    ck_assert_int_eq(pgmoneta_deque_remove(dq, "tag3"), 0);
+   ck_assert_int_eq(pgmoneta_deque_remove(dq, NULL), 0);
+   ck_assert_int_eq(pgmoneta_deque_remove(NULL, "tag2"), 0);
+   ck_assert_int_eq(pgmoneta_deque_remove(dq, "tag3"), 0);
 
-    ck_assert_int_eq(pgmoneta_deque_remove(dq, "tag2"), 2);
-    ck_assert_int_eq(dq->size, 1);
+   ck_assert_int_eq(pgmoneta_deque_remove(dq, "tag2"), 2);
+   ck_assert_int_eq(dq->size, 1);
 
-    value1 = (char*)pgmoneta_deque_peek(dq, &tag);
-    ck_assert_str_eq(value1, "value1");
-    ck_assert_str_eq(tag, "tag1");
+   value1 = (char*)pgmoneta_deque_peek(dq, &tag);
+   ck_assert_str_eq(value1, "value1");
+   ck_assert_str_eq(tag, "tag1");
 
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_add_with_config_and_get)
 {
-    struct deque* dq = NULL;
-    struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
-    struct deque_test_obj* obj1 = NULL;
-    struct deque_test_obj* obj2 = NULL;
-    struct deque_test_obj* obj3 = NULL;
+   struct deque* dq = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+   struct deque_test_obj* obj1 = NULL;
+   struct deque_test_obj* obj2 = NULL;
+   struct deque_test_obj* obj3 = NULL;
 
-    test_obj_create(1, &obj1);
-    test_obj_create(2, &obj2);
-    test_obj_create(3, &obj3);
+   test_obj_create(1, &obj1);
+   test_obj_create(2, &obj2);
+   test_obj_create(3, &obj3);
 
-    pgmoneta_deque_create(false, &dq);
-    ck_assert(!pgmoneta_deque_add_with_config(dq, "tag1", (uintptr_t)obj1, &test_obj_config));
-    ck_assert(!pgmoneta_deque_add_with_config(dq, "tag2", (uintptr_t)obj2, &test_obj_config));
-    ck_assert(!pgmoneta_deque_add_with_config(dq, "tag3", (uintptr_t)obj3, &test_obj_config));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   ck_assert(!pgmoneta_deque_add_with_config(dq, "tag1", (uintptr_t)obj1, &test_obj_config));
+   ck_assert(!pgmoneta_deque_add_with_config(dq, "tag2", (uintptr_t)obj2, &test_obj_config));
+   ck_assert(!pgmoneta_deque_add_with_config(dq, "tag3", (uintptr_t)obj3, &test_obj_config));
+   ck_assert_int_eq(dq->size, 3);
 
-    ck_assert_int_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag1"))->idx, 1);
-    ck_assert_str_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag1"))->str, "obj1");
+   ck_assert_int_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag1"))->idx, 1);
+   ck_assert_str_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag1"))->str, "obj1");
 
-    ck_assert_int_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag2"))->idx, 2);
-    ck_assert_str_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag2"))->str, "obj2");
+   ck_assert_int_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag2"))->idx, 2);
+   ck_assert_str_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag2"))->str, "obj2");
 
-    ck_assert_int_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag3"))->idx, 3);
-    ck_assert_str_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag3"))->str, "obj3");
+   ck_assert_int_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag3"))->idx, 3);
+   ck_assert_str_eq(((struct deque_test_obj*)pgmoneta_deque_get(dq, "tag3"))->str, "obj3");
 
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_iterator_read)
 {
-    struct deque* dq = NULL;
-    struct deque_iterator* iter = NULL;
-    int cnt = 0;
-    char tag[2] = {0};
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+   int cnt = 0;
+   char tag[2] = {0};
 
-    pgmoneta_deque_create(false, &dq);
-    ck_assert(!pgmoneta_deque_add(dq, "1", 1, ValueInt32));
-    ck_assert(!pgmoneta_deque_add(dq, "2", 2, ValueInt32));
-    ck_assert(!pgmoneta_deque_add(dq, "3", 3, ValueInt32));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   ck_assert(!pgmoneta_deque_add(dq, "1", 1, ValueInt32));
+   ck_assert(!pgmoneta_deque_add(dq, "2", 2, ValueInt32));
+   ck_assert(!pgmoneta_deque_add(dq, "3", 3, ValueInt32));
+   ck_assert_int_eq(dq->size, 3);
 
-    ck_assert(pgmoneta_deque_iterator_create(NULL, &iter));
-    ck_assert(!pgmoneta_deque_iterator_create(dq, &iter));
-    ck_assert_ptr_nonnull(iter);
-    ck_assert(pgmoneta_deque_iterator_has_next(iter));
+   ck_assert(pgmoneta_deque_iterator_create(NULL, &iter));
+   ck_assert(!pgmoneta_deque_iterator_create(dq, &iter));
+   ck_assert_ptr_nonnull(iter);
+   ck_assert(pgmoneta_deque_iterator_has_next(iter));
 
-    while(pgmoneta_deque_iterator_next(iter))
-    {
-        cnt++;
-        ck_assert_int_eq(pgmoneta_value_data(iter->value), cnt);
-        tag[0] = '0' + cnt;
-        ck_assert_str_eq(iter->tag, tag);
-    }
-    ck_assert_int_eq(cnt, 3);
-    ck_assert(!pgmoneta_deque_iterator_has_next(iter));
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      cnt++;
+      ck_assert_int_eq(pgmoneta_value_data(iter->value), cnt);
+      tag[0] = '0' + cnt;
+      ck_assert_str_eq(iter->tag, tag);
+   }
+   ck_assert_int_eq(cnt, 3);
+   ck_assert(!pgmoneta_deque_iterator_has_next(iter));
 
-    pgmoneta_deque_iterator_destroy(iter);
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_iterator_remove)
 {
-    struct deque* dq = NULL;
-    struct deque_iterator* iter = NULL;
-    int cnt = 0;
-    char tag[2] = {0};
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+   int cnt = 0;
+   char tag[2] = {0};
 
-    pgmoneta_deque_create(false, &dq);
-    ck_assert(!pgmoneta_deque_add(dq, "1", 1, ValueInt32));
-    ck_assert(!pgmoneta_deque_add(dq, "2", 2, ValueInt32));
-    ck_assert(!pgmoneta_deque_add(dq, "3", 3, ValueInt32));
-    ck_assert_int_eq(dq->size, 3);
+   pgmoneta_deque_create(false, &dq);
+   ck_assert(!pgmoneta_deque_add(dq, "1", 1, ValueInt32));
+   ck_assert(!pgmoneta_deque_add(dq, "2", 2, ValueInt32));
+   ck_assert(!pgmoneta_deque_add(dq, "3", 3, ValueInt32));
+   ck_assert_int_eq(dq->size, 3);
 
-    ck_assert(pgmoneta_deque_iterator_create(NULL, &iter));
-    ck_assert(!pgmoneta_deque_iterator_create(dq, &iter));
-    ck_assert_ptr_nonnull(iter);
-    ck_assert(pgmoneta_deque_iterator_has_next(iter));
+   ck_assert(pgmoneta_deque_iterator_create(NULL, &iter));
+   ck_assert(!pgmoneta_deque_iterator_create(dq, &iter));
+   ck_assert_ptr_nonnull(iter);
+   ck_assert(pgmoneta_deque_iterator_has_next(iter));
 
-    while(pgmoneta_deque_iterator_next(iter))
-    {
-        cnt++;
-        ck_assert_int_eq(pgmoneta_value_data(iter->value), cnt);
-        tag[0] = '0' + cnt;
-        ck_assert_str_eq(iter->tag, tag);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      cnt++;
+      ck_assert_int_eq(pgmoneta_value_data(iter->value), cnt);
+      tag[0] = '0' + cnt;
+      ck_assert_str_eq(iter->tag, tag);
 
-        if (cnt == 2 || cnt == 3)
-        {
-            pgmoneta_deque_iterator_remove(iter);
-        }
-    }
+      if (cnt == 2 || cnt == 3)
+      {
+         pgmoneta_deque_iterator_remove(iter);
+      }
+   }
 
-    // should be no-op
-    pgmoneta_deque_iterator_remove(iter);
+   // should be no-op
+   pgmoneta_deque_iterator_remove(iter);
 
-    ck_assert_int_eq(dq->size, 1);
-    ck_assert(!pgmoneta_deque_iterator_has_next(iter));
+   ck_assert_int_eq(dq->size, 1);
+   ck_assert(!pgmoneta_deque_iterator_has_next(iter));
 
-    ck_assert_int_eq(pgmoneta_deque_peek(dq, NULL), 1);
+   ck_assert_int_eq(pgmoneta_deque_peek(dq, NULL), 1);
 
-    pgmoneta_deque_iterator_destroy(iter);
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
-
 START_TEST(test_deque_sort)
 {
-    struct deque* dq = NULL;
-    struct deque_iterator* iter = NULL;
-    int cnt = 0;
-    char tag[2] = {0};
-    int index[6] = {2, 1, 3, 5, 4, 0};
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+   int cnt = 0;
+   char tag[2] = {0};
+   int index[6] = {2, 1, 3, 5, 4, 0};
 
-    pgmoneta_deque_create(false, &dq);
-    for (int i = 0; i < 6; i++)
-    {
-        tag[0] = '0' + index[i];
-        ck_assert(!pgmoneta_deque_add(dq, tag, index[i], ValueInt32));
-    }
+   pgmoneta_deque_create(false, &dq);
+   for (int i = 0; i < 6; i++)
+   {
+      tag[0] = '0' + index[i];
+      ck_assert(!pgmoneta_deque_add(dq, tag, index[i], ValueInt32));
+   }
 
-    pgmoneta_deque_sort(dq);
+   pgmoneta_deque_sort(dq);
 
-    pgmoneta_deque_iterator_create(dq, &iter);
+   pgmoneta_deque_iterator_create(dq, &iter);
 
-    while(pgmoneta_deque_iterator_next(iter))
-    {
-        ck_assert_int_eq(pgmoneta_value_data(iter->value), cnt);
-        tag[0] = '0' + cnt;
-        ck_assert_str_eq(iter->tag, tag);
-        cnt++;
-    }
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      ck_assert_int_eq(pgmoneta_value_data(iter->value), cnt);
+      tag[0] = '0' + cnt;
+      ck_assert_str_eq(iter->tag, tag);
+      cnt++;
+   }
 
-    pgmoneta_deque_iterator_destroy(iter);
-    pgmoneta_deque_destroy(dq);
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(dq);
 }
 END_TEST
 
 Suite*
 pgmoneta_test_deque_suite()
 {
-    Suite* s;
-    TCase* tc_deque_basic;
+   Suite* s;
+   TCase* tc_deque_basic;
 
-    s = suite_create("pgmoneta_test_deque");
+   s = suite_create("pgmoneta_test_deque");
 
-    tc_deque_basic = tcase_create("deque_basic_test");
-    tcase_set_timeout(tc_deque_basic, 60);
-    tcase_add_checked_fixture(tc_deque_basic, pgmoneta_test_setup, pgmoneta_test_teardown);
-    tcase_add_test(tc_deque_basic, test_deque_create);
-    tcase_add_test(tc_deque_basic, test_deque_add_poll);
-    tcase_add_test(tc_deque_basic, test_deque_add_poll_last);
-    tcase_add_test(tc_deque_basic, test_deque_remove);
-    tcase_add_test(tc_deque_basic, test_deque_add_with_config_and_get);
-    tcase_add_test(tc_deque_basic, test_deque_clear);
-    tcase_add_test(tc_deque_basic, test_deque_iterator_read);
-    tcase_add_test(tc_deque_basic, test_deque_iterator_remove);
-    tcase_add_test(tc_deque_basic, test_deque_sort);
+   tc_deque_basic = tcase_create("deque_basic_test");
+   tcase_set_timeout(tc_deque_basic, 60);
+   tcase_add_checked_fixture(tc_deque_basic, pgmoneta_test_setup, pgmoneta_test_teardown);
+   tcase_add_test(tc_deque_basic, test_deque_create);
+   tcase_add_test(tc_deque_basic, test_deque_add_poll);
+   tcase_add_test(tc_deque_basic, test_deque_add_poll_last);
+   tcase_add_test(tc_deque_basic, test_deque_remove);
+   tcase_add_test(tc_deque_basic, test_deque_add_with_config_and_get);
+   tcase_add_test(tc_deque_basic, test_deque_clear);
+   tcase_add_test(tc_deque_basic, test_deque_iterator_read);
+   tcase_add_test(tc_deque_basic, test_deque_iterator_remove);
+   tcase_add_test(tc_deque_basic, test_deque_sort);
 
-    suite_add_tcase(s, tc_deque_basic);
+   suite_add_tcase(s, tc_deque_basic);
 
-    return s;
+   return s;
 }
 
 static void
 test_obj_create(int idx, struct deque_test_obj** obj)
 {
-    struct deque_test_obj* o = NULL;
+   struct deque_test_obj* o = NULL;
 
-    o = malloc(sizeof(struct deque_test_obj));
-    memset(o, 0, sizeof(struct deque_test_obj));
-    o->idx = idx;
-    o->str = pgmoneta_append(o->str, "obj");
-    o->str = pgmoneta_append_int(o->str, idx);
+   o = malloc(sizeof(struct deque_test_obj));
+   memset(o, 0, sizeof(struct deque_test_obj));
+   o->idx = idx;
+   o->str = pgmoneta_append(o->str, "obj");
+   o->str = pgmoneta_append_int(o->str, idx);
 
-    *obj = o;
+   *obj = o;
 }
 static void
 test_obj_destroy(struct deque_test_obj* obj)
 {
-    if (obj == NULL)
-    {
-        return;
-    }
-    free(obj->str);
-    free(obj);
+   if (obj == NULL)
+   {
+      return;
+   }
+   free(obj->str);
+   free(obj);
 }
 
 static void
 test_obj_destroy_cb(uintptr_t obj)
 {
-    test_obj_destroy((struct deque_test_obj*) obj);
+   test_obj_destroy((struct deque_test_obj*) obj);
 }

@@ -533,71 +533,71 @@ START_TEST(test_art_insert_very_long)
 END_TEST
 START_TEST(test_art_random_delete)
 {
-    struct art* t = NULL;
-    char buf[512];
-    FILE* f = NULL;
-    uintptr_t line = 1;
-    int len = 0;
-    char* path = NULL;
-    path = pgmoneta_append(path, TEST_BASE_DIR);
-    path = pgmoneta_append(path, "/resource/art_advanced_test/words.txt");
+   struct art* t = NULL;
+   char buf[512];
+   FILE* f = NULL;
+   uintptr_t line = 1;
+   int len = 0;
+   char* path = NULL;
+   path = pgmoneta_append(path, TEST_BASE_DIR);
+   path = pgmoneta_append(path, "/resource/art_advanced_test/words.txt");
 
-    f = fopen(path, "r");
-    ck_assert_ptr_nonnull(f);
+   f = fopen(path, "r");
+   ck_assert_ptr_nonnull(f);
 
-    pgmoneta_art_create(&t);
-    while (fgets(buf, sizeof(buf), f))
-    {
-        len = strlen(buf);
-        buf[len - 1] = '\0';
-        ck_assert(!pgmoneta_art_insert(t, buf, line, ValueInt32));
-        line++;
-    }
+   pgmoneta_art_create(&t);
+   while (fgets(buf, sizeof(buf), f))
+   {
+      len = strlen(buf);
+      buf[len - 1] = '\0';
+      ck_assert(!pgmoneta_art_insert(t, buf, line, ValueInt32));
+      line++;
+   }
 
-    uintptr_t nlines = line - 1;
-    // Seek back to the start
-    fseek(f, 0, SEEK_SET);
-    line = 1;
-    while (fgets(buf, sizeof(buf), f))
-    {
-        len = strlen(buf);
-        buf[len - 1] = '\0';
-        int val = (int)pgmoneta_art_search(t, buf);
-        ck_assert_msg(val == line, "test_art_insert_search_advanced Line: %d Val: %d Str: %s\n", (int)line, val, buf);
-        line++;
-    }
+   uintptr_t nlines = line - 1;
+   // Seek back to the start
+   fseek(f, 0, SEEK_SET);
+   line = 1;
+   while (fgets(buf, sizeof(buf), f))
+   {
+      len = strlen(buf);
+      buf[len - 1] = '\0';
+      int val = (int)pgmoneta_art_search(t, buf);
+      ck_assert_msg(val == line, "test_art_insert_search_advanced Line: %d Val: %d Str: %s\n", (int)line, val, buf);
+      line++;
+   }
 
-    ck_assert(!pgmoneta_art_delete(t, "A"));
-    ck_assert(!pgmoneta_art_contains_key(t, "A"));
+   ck_assert(!pgmoneta_art_delete(t, "A"));
+   ck_assert(!pgmoneta_art_contains_key(t, "A"));
 
-    ck_assert(!pgmoneta_art_delete(t, "yard"));
-    ck_assert(!pgmoneta_art_contains_key(t, "yard"));
+   ck_assert(!pgmoneta_art_delete(t, "yard"));
+   ck_assert(!pgmoneta_art_contains_key(t, "yard"));
 
-    ck_assert(!pgmoneta_art_delete(t, "Xenarchi"));
-    ck_assert(!pgmoneta_art_contains_key(t, "Xenarchi"));
+   ck_assert(!pgmoneta_art_delete(t, "Xenarchi"));
+   ck_assert(!pgmoneta_art_contains_key(t, "Xenarchi"));
 
-    ck_assert(!pgmoneta_art_delete(t, "F"));
-    ck_assert(!pgmoneta_art_contains_key(t, "F"));
+   ck_assert(!pgmoneta_art_delete(t, "F"));
+   ck_assert(!pgmoneta_art_contains_key(t, "F"));
 
-    ck_assert(!pgmoneta_art_delete(t, "wirespun"));
-    ck_assert(!pgmoneta_art_contains_key(t, "wirespun"));
+   ck_assert(!pgmoneta_art_delete(t, "wirespun"));
+   ck_assert(!pgmoneta_art_contains_key(t, "wirespun"));
 
-    fclose(f);
-    free(path);
-    pgmoneta_art_destroy(t);
+   fclose(f);
+   free(path);
+   pgmoneta_art_destroy(t);
 }
 END_TEST
 START_TEST(test_art_insert_index_out_of_range)
 {
-    struct art* t;
-    pgmoneta_art_create(&t);
-    char* s1 = "abcdefghijklmnxyz";
-    char* s2 = "abcdefghijklmnopqrstuvw";
-    char* s3 = "abcdefghijk";
-    ck_assert(!pgmoneta_art_insert(t, s1, 1, ValueUInt8));
-    ck_assert(!pgmoneta_art_insert(t, s2, 1, ValueUInt8));
-    ck_assert_int_eq(pgmoneta_art_search(t, s3), 0);
-    pgmoneta_art_destroy(t);
+   struct art* t;
+   pgmoneta_art_create(&t);
+   char* s1 = "abcdefghijklmnxyz";
+   char* s2 = "abcdefghijklmnopqrstuvw";
+   char* s3 = "abcdefghijk";
+   ck_assert(!pgmoneta_art_insert(t, s1, 1, ValueUInt8));
+   ck_assert(!pgmoneta_art_insert(t, s2, 1, ValueUInt8));
+   ck_assert_int_eq(pgmoneta_art_search(t, s3), 0);
+   pgmoneta_art_destroy(t);
 }
 END_TEST
 
