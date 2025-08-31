@@ -28,15 +28,19 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+
 #include <art.h>
-#include <logging.h>
 #include <json.h>
+#include <logging.h>
+#include <memory.h>
 #include <utils.h>
 
 /* System */
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 static int advance_to_first_array_element(struct json_reader* reader);
