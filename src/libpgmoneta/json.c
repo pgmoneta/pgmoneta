@@ -373,6 +373,10 @@ pgmoneta_json_remove(struct json* item, char* key)
    struct art* tree = NULL;
    if (item == NULL || key == NULL || strlen(key) == 0 || item->type != JSONItem)
    {
+      if (item != NULL && item->type == JSONUnknown)
+      {
+          return 0;
+      }
       goto error;
    }
 
@@ -1486,7 +1490,6 @@ type_allowed(enum value_type type)
 {
    switch (type)
    {
-      case ValueNone:
       case ValueInt8:
       case ValueUInt8:
       case ValueInt16:

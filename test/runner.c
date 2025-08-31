@@ -44,6 +44,9 @@ main(int argc, char* argv[])
    Suite* wal_utils_suite;
    Suite* brt_io_suite;
    Suite* wal_summary_suite;
+   Suite* art_suite;
+   Suite* deque_suite;
+   Suite* json_suite;
    SRunner* sr;
 
    pgmoneta_test_environment_create();
@@ -55,6 +58,9 @@ main(int argc, char* argv[])
    wal_utils_suite = pgmoneta_test_wal_utils_suite();
    brt_io_suite = pgmoneta_test_brt_io_suite();
    wal_summary_suite = pgmoneta_test_wal_summary_suite();
+   art_suite = pgmoneta_test_art_suite();
+   deque_suite = pgmoneta_test_deque_suite();
+   json_suite = pgmoneta_test_json_suite();
 
    sr = srunner_create(backup_suite);
    srunner_add_suite(sr, restore_suite);
@@ -63,6 +69,9 @@ main(int argc, char* argv[])
    srunner_add_suite(sr, wal_utils_suite);
    srunner_add_suite(sr, brt_io_suite);
    srunner_add_suite(sr, wal_summary_suite);
+   srunner_add_suite(sr, art_suite);
+   srunner_add_suite(sr, deque_suite);
+   srunner_add_suite(sr, json_suite);
    srunner_set_log (sr, "-");
    srunner_set_fork_status(sr, CK_NOFORK);
    srunner_run(sr, NULL, NULL, CK_VERBOSE);
