@@ -375,7 +375,7 @@ pgmoneta_json_remove(struct json* item, char* key)
    {
       if (item != NULL && item->type == JSONUnknown)
       {
-          return 0;
+         return 0;
       }
       goto error;
    }
