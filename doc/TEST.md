@@ -39,6 +39,12 @@ To add an additional testcase, go to [testcases](https://github.com/pgmoneta/pgm
 
 Create a `.c` file that contains the test suite and define the suite inside `/test/include/tssuite.sh`. Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/runner.c)
 
+**Test Resource**
+
+If you have resources as test case input, place them under `test/resource/<your-test-case-name>/`. The `check.sh` will copy them
+to `TEST_BASE_DIR/resource/<your-test-case-name>/`, i.e. `/tmp/pgmoneta-test/base/resource/<your-test-case-name>/`. And in your
+test code you can open the file from there directly.
+
 **Test Directory**
 
 After running the tests, you will find:
