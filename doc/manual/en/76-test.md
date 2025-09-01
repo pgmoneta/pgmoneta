@@ -4,7 +4,7 @@
 **Dependencies**
 
 To install all the required dependencies, simply run `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh setup`. You need to install docker or podman
-separately.
+separately. The script currently only works on Linux system (we recommend Fedora 39+).
 
 **Running Tests**
 
