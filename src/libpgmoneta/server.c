@@ -53,7 +53,8 @@ static int get_checksums(SSL* ssl, int socket, bool* checksums);
 static int get_segment_size(SSL* ssl, int socket, size_t* segsz);
 static int get_block_size(SSL* ssl, int socket, size_t* blocksz);
 static int get_summarize_wal(SSL* ssl, int socket, bool* sw);
-static int has_user_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role);
+static int has_predefined_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role);
+static int has_superuser_role(SSL* ssl, int socket, char* usr, bool* is_superuser);
 static int has_execute_privilege(SSL* ssl, int socket, char* usr, char* func_name, bool* has_privilege);
 static int transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len);
 static int process_server_parameters(int server, struct deque* server_parameters);
@@ -312,14 +313,14 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    user = config->common.servers[srv].username;
 
    /* Check if the user has pg_read_server_files role */
-   if (has_user_role(ssl, socket, user, "pg_read_server_files", &has_role))
+   if (has_predefined_role(ssl, socket, user, "pg_read_server_files", &has_role))
    {
       goto error;
    }
 
    if (!has_role)
    {
-      pgmoneta_log_debug("Connection user: %s does not have 'pg_read_server_files' role", user);
+      pgmoneta_log_warn("Connection user: %s does not have 'pg_read_server_files' role", user);
       goto error;
    }
 
@@ -331,7 +332,7 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
 
    if (!has_privilege)
    {
-      pgmoneta_log_debug("Connection user: %s does not have EXECUTE privilege on 'pg_read_binary_file(text, bigint, bigint, boolean)' function", user);
+      pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_read_binary_file(text, bigint, bigint, boolean)' function", user);
       goto error;
    }
 
@@ -395,6 +396,135 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
 
+   return 1;
+}
+
+int
+pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn)
+{
+   int version;
+   int ret = 0;
+   int q = 0;
+   char* user = NULL;
+   bool is_superuser = false;
+   bool has_role = false;
+   bool chkpt_success = false;
+   char* chkpt_lsn = NULL;
+   uint32_t chkpt_hi = 0;
+   uint32_t chkpt_lo = 0;
+   struct main_configuration* config = NULL;
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   config = (struct main_configuration*)shmem;
+   
+   /* get postgres version */
+   version = config->common.servers[srv].version;
+   user = config->common.servers[srv].username;
+
+   /* Check for 'pg_checkpoint' role for PostgreSQL +15 and 'SUPERUSER' role for PostgreSQL 13/14 */
+   if (version >= 15)
+   {
+      if (has_predefined_role(ssl, socket, user, "pg_checkpoint", &has_role))
+      {
+         goto error;
+      }
+
+      if (!has_role)
+      {
+         pgmoneta_log_warn("Connection user: %s does not have required 'pg_checkpoint' role", user);
+         goto error;
+      }
+   }
+   else
+   {
+      if (has_superuser_role(ssl, socket, user, &is_superuser))
+      {
+         goto error;
+      }
+
+      if (!is_superuser)
+      {
+         pgmoneta_log_warn("Connection user: %s does not have required 'SUPERUSER' role", user);
+         goto error;
+      }
+   }
+
+   /* Force checkpoint in the server */
+   ret = pgmoneta_create_query_message("CHECKPOINT;", &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   /* response not available */
+   if (response == NULL || response->tuples == NULL || response->tuples->data == NULL || response->tuples->data[0] == NULL)
+   {
+      goto error;
+   }
+
+   if (!chkpt_success)
+   {
+      if (!(response->is_command_complete && strcmp(response->tuples->data[0], "CHECKPOINT") == 0))
+      {
+         goto error;
+      }
+      chkpt_success = true;
+
+      /* reset query message, response pair */
+      pgmoneta_free_message(query_msg);
+      query_msg = NULL;
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      /* Query to get the latest checkpoint LSN */
+      ret = pgmoneta_create_query_message("SELECT checkpoint_lsn FROM pg_control_checkpoint();", &query_msg);
+      if (ret != MESSAGE_STATUS_OK)
+      {
+         goto error;
+      }
+      goto q;
+   }
+   else
+   {
+      if (response->number_of_columns != 1)
+      {
+         goto error;
+      }
+      /* Read the checkpoint LSN */
+      chkpt_lsn = pgmoneta_query_response_get_data(response, 0);
+   }
+
+   sscanf(chkpt_lsn, "%X/%X", &chkpt_hi, &chkpt_lo);
+   *c_lsn = ((uint64_t)chkpt_hi << 32) + (uint64_t)chkpt_lo;
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 0;
+error:
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
    return 1;
 }
 
@@ -898,7 +1028,7 @@ is_valid_response(struct query_response* response)
 }
 
 static int
-has_user_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role)
+has_predefined_role(SSL* ssl, int socket, char* usr, char* role, bool* has_role)
 {
    int q = 0;
    int ret;
@@ -950,6 +1080,73 @@ q:
    if (!strcmp(res, "t"))
    {
       *has_role = true;
+   }
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 0;
+error:
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+
+   return 1;
+}
+
+static int
+has_superuser_role(SSL* ssl, int socket, char* usr, bool* is_superuser)
+{
+   int q = 0;
+   int ret;
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   char res[MISC_LENGTH];
+   char query[MISC_LENGTH];
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT rolsuper FROM pg_roles WHERE rolname = '%s';", usr);
+
+   ret = pgmoneta_create_query_message(query, &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   memset(&res[0], 0, sizeof(res));
+   snprintf(&res[0], sizeof(res), "%s", response->tuples->data[0]);
+
+   if (response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   if (!strcmp(res, "t"))
+   {
+      *is_superuser = true;
    }
 
    pgmoneta_free_query_response(response);

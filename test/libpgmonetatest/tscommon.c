@@ -30,8 +30,6 @@
 #include <configuration.h>
 #include <logging.h>
 #include <message.h>
-#include <network.h>
-#include <security.h>
 #include <shmem.h>
 #include <tsclient.h>
 #include <tscommon.h>
@@ -199,51 +197,14 @@ pgmoneta_test_teardown(void)
 }
 
 int
-pgmoneta_test_execute_query(int srv, char* query, bool is_dummy, struct query_response** qr)
+pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr)
 {
-    int socket = -1;
-    struct main_configuration* config = NULL;
     struct message* msg = NULL;
     struct query_response* response = NULL;
-    int usr = -1;
-    SSL* ssl = NULL;
-
-    config = (struct main_configuration*)shmem;
-
-    /* find the corresponding user's index of the given server */
-    for (int i = 0; i < config->common.number_of_users; i++)
-    {
-        if (!strcmp(config->common.servers[srv].username, config->common.users[i].username))
-        {
-            usr = i;
-        }
-    }
-
-    if (usr == -1)
-    {
-        goto error;
-    }
-
-    if (is_dummy)
-    {
-        /* establish a connection, with dummy user pass and replication flag not set */
-        if (pgmoneta_server_authenticate(srv, "mydb", "myuser", "password", false, &ssl, &socket) != AUTH_SUCCESS)
-        {
-            goto error;
-        }
-    }
-    else
-    {
-        /* establish a connection, with replication flag not set */
-        if (pgmoneta_server_authenticate(srv, "postgres", config->common.users[usr].username, config->common.users[usr].password, false, &ssl, &socket) != AUTH_SUCCESS)
-        {
-            goto error;
-        }
-    }
 
     /* create and execute the query */
     pgmoneta_create_query_message(query, &msg);
-    if (pgmoneta_query_execute(NULL, socket, msg, &response) || response == NULL)
+    if (pgmoneta_query_execute(ssl, skt, msg, &response) || response == NULL)
     {
         goto error;
     }
@@ -251,14 +212,12 @@ pgmoneta_test_execute_query(int srv, char* query, bool is_dummy, struct query_re
     *qr = response;
 
     pgmoneta_free_message(msg);
-    pgmoneta_disconnect(socket);
     return 0;
 
 error:
 
     pgmoneta_free_message(msg);
     pgmoneta_free_query_response(response);
-    pgmoneta_disconnect(socket);
 
     return 1;
 }
