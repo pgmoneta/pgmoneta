@@ -94,6 +94,17 @@ int
 pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, int offset,
                                  int length, int socket, uint8_t** out, int* len);
 
+/**
+ * Force a checkpoint
+ * @param srv The server index
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param [out] chkpt_lsn The corresponding checkpoint LSN
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* chkpt_lsn);
+
 #ifdef __cplusplus
 }
 #endif

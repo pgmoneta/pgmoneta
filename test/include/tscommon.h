@@ -88,13 +88,14 @@ pgmoneta_test_teardown(void);
 /**
  * Execute an SQL query on postgres database
  * @param srv The server index
+ * @param ssl The SSL
+ * @param skt The socket
  * @param query The query to be executed
- * @param is_dummy Use dummy user and password
  * @param qr [out] The query response
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_test_execute_query(int srv, char* query, bool is_dummy, struct query_response** qr);
+pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr);
 
 #ifdef __cplusplus
 }
