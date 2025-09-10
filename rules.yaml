@@ -1,0 +1,9 @@
+source_dir: /home/mohab/Downloads/backup/primary/backup/20250812160334 # Without trailing slash
+target_dir: /home/mohab/Downloads/pgcluster # Without trailing slash
+encryption: aes
+compression: gz
+configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
+
+rules:
+  - exclude:
+      - operations: [ DELETE ]

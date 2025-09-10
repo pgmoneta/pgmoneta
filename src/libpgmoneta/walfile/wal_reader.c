@@ -56,10 +56,8 @@ static bool get_record_block_tag_extended(struct decoded_xlog_record* pRecord, i
 static char* get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint8_t magic_value);
 static int magic_value_to_postgres_version(uint16_t magic_value);
 
-static bool is_included(char* rm, struct deque* rms,
-                        uint64_t s_lsn, uint64_t start_lsn,
-                        uint64_t e_lsn, uint64_t end_lsn,
-                        uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc);
+static bool is_included(char* rm, struct deque* rms, uint64_t s_lsn, uint64_t start_lsn, uint64_t e_lsn, uint64_t end_lsn,
+                        uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc, uint32_t xl_info, rmgr_id rm_id);
 
 static bool xlog_record_get_block_tag(struct decoded_xlog_record* record, int block_id,
                                       struct rel_file_locator* rlocator, enum fork_number* frk,
@@ -1130,15 +1128,26 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 
    if (!record->partial)
    {
+      rm_desc = malloc(1);
+      if (rm_desc)
+      {
+         rm_desc[0] = '\0';
+      }
+
+      backup_str = malloc(1);
+      if (backup_str)
+      {
+         backup_str[0] = '\0';
+      }
+
       rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
       char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
 
-      if (!is_included(rmgr_table[record->header.xl_rmid].name, rms,
-                       record->header.xl_prev, start_lsn,
-                       record->lsn, end_lsn,
-                       record->header.xl_xid, xids, included_objects, record_desc))
+      if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
+                       start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
+                       record_desc, record->header.xl_info, record->header.xl_rmid))
       {
          free(record_desc);
          goto cleanup;
@@ -1248,10 +1257,9 @@ cleanup:
 void
 pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn)
 {
-   if (record->partial || !is_included(rmgr_table[record->header.xl_rmid].name, NULL,
-                                       record->header.xl_prev, start_lsn,
-                                       record->lsn, end_lsn,
-                                       record->header.xl_xid, NULL, NULL, NULL))
+   if (record->partial || !is_included(rmgr_table[record->header.xl_rmid].name, NULL, record->header.xl_prev,
+                                       start_lsn, record->lsn, end_lsn, record->header.xl_xid, NULL, NULL, NULL,
+                                       record->header.xl_info, record->header.xl_rmid))
    {
       return;
    }
@@ -1347,13 +1355,17 @@ error:
 }
 
 static bool
-is_included(char* rm, struct deque* rms,
-            uint64_t s_lsn, uint64_t start_lsn,
-            uint64_t e_lsn, uint64_t end_lsn,
-            uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc)
+is_included(char* rm, struct deque* rms, uint64_t s_lsn, uint64_t start_lsn, uint64_t e_lsn, uint64_t end_lsn,
+            uint32_t xid, struct deque* xids, char** included_objects, char* rm_desc, uint32_t xl_info, rmgr_id rm_id)
 {
    struct deque_iterator* rms_iter = NULL;
    struct deque_iterator* xids_iter = NULL;
+   uint8_t info = xl_info & ~XLR_INFO_MASK;
+
+   if (rm_id == RM_XLOG_ID && info == XLOG_NOOP)
+   {
+      return false;
+   }
 
    if (start_lsn > 0 && s_lsn < start_lsn)
    {
