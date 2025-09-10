@@ -1232,7 +1232,7 @@ static int
 transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
 {
    size_t hex_len;
-   size_t binary_len;
+   size_t binary_len = 0;
    uint8_t* binary_out = NULL;
    char* hb = NULL;
    int hi, lo;
@@ -1248,6 +1248,13 @@ transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
    /* skip '\x' */
    hb = hex_bytea + 2;
    hex_len = strlen(hb);
+
+   /* the requested chunk is not present in the file */
+   if (hex_len == 0)
+   {
+      pgmoneta_log_warn("the requested chunk is not present or exceeds the boundary of the file");
+      goto done;
+   }
 
    if (hex_len % 2 != 0)
    {
@@ -1276,6 +1283,7 @@ transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
       binary_out[i] = (uint8_t)(hi << 4) | (uint8_t)lo;
    }
 
+done:
    *out = binary_out;
    *len = binary_len;
    return 0;
