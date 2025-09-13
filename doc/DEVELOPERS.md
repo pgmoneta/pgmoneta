@@ -269,6 +269,8 @@ SELECT pg_create_physical_replication_slot('repl', true, false);
 \q
 ```
 
+Alternatively, configure automatically slot creation by adding `create_slot = yes` to `[pgmoneta]` or corresponding server section.
+
 #### Verify access
 
 For the user `myuser` (standard) use `mypass`
