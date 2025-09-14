@@ -23,757 +23,781 @@ http://localhost:5001/metrics
 ## Metrics
 
 The following metrics are available.
-
 **pgmoneta_state**
 
-The state of pgmoneta
+Provides the operational status of the pgmoneta backup service itself, indicating if it's running (1) or stopped/failed (0).
+
+| Value | Description |
+| :---- | :---------- |
+| 1 | Running |
+| 0 | Stopped or encountered a fatal error during startup/runtime |
 
 **pgmoneta_version**
 
-The version of pgmoneta
+Exposes the version of the running pgmoneta service through labels.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| version | The version of pgmoneta |
+| version | The semantic version string of the running pgmoneta (e.g., "0.20.0"). |
 
 **pgmoneta_logging_info**
 
-The number of INFO logging statements
+Counts the total number of informational (INFO level) log messages produced by pgmoneta since its last startup.
 
 **pgmoneta_logging_warn**
 
-The number of WARN logging statements
+Accumulates the total count of warning (WARN level) messages logged by pgmoneta, potentially indicating recoverable issues.
 
 **pgmoneta_logging_error**
 
-The number of ERROR logging statements
+Tallies the total number of error (ERROR level) messages from pgmoneta, often signaling problems needing investigation.
 
 **pgmoneta_logging_fatal**
 
-The number of FATAL logging statements
+Records the total count of fatal (FATAL level) errors encountered by pgmoneta, usually indicating service termination.
 
 **pgmoneta_retention_days**
 
-The retention days of pgmoneta
+Shows the global retention policy in days for pgmoneta backups.
+
+| Value | Description |
+| :---- | :---------- |
+| 0 | No day-based retention configured |
 
 **pgmoneta_retention_weeks**
 
-The retention weeks of pgmoneta
+Shows the global retention policy in weeks for pgmoneta backups.
+
+| Value | Description |
+| :---- | :---------- |
+| 0 | No week-based retention configured |
 
 **pgmoneta_retention_months**
 
-The retention months of pgmoneta
+Shows the global retention policy in months for pgmoneta backups.
+
+| Value | Description |
+| :---- | :---------- |
+| 0 | No month-based retention configured |
 
 **pgmoneta_retention_years**
 
-The retention years of pgmoneta
+Shows the global retention policy in years for pgmoneta backups.
+
+| Value | Description |
+| :---- | :---------- |
+| 0 | No year-based retention configured |
 
 **pgmoneta_retention_server**
 
-The retention of a server
+Shows the retention policy for a specific server by parameter type (days, weeks, months, years).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| parameter | The day, week, month or year |
+| name | The configured name/identifier for the PostgreSQL server. |
+| parameter | The retention parameter type (days, weeks, months, years). |
 
 **pgmoneta_compression**
 
-The compression used
+Indicates the compression method used for backups (0=none, 1=gzip, 2=zstd, 3=lz4, 4=bzip2).
+
+| Value | Description |
+| :---- | :---------- |
+| 0 | No compression |
+| 1 | gzip compression |
+| 2 | zstd compression |
+| 3 | lz4 compression |
+| 4 | bzip2 compression |
 
 **pgmoneta_used_space**
 
-The disk space used for pgmoneta
+Reports the total disk space in bytes currently used by pgmoneta for all backups and data.
 
 **pgmoneta_free_space**
 
-The free disk space for pgmoneta
+Reports the free disk space in bytes available to pgmoneta for storing backups.
 
 **pgmoneta_total_space**
 
-The total disk space for pgmoneta
+Reports the total disk space in bytes available to pgmoneta (used + free).
 
 **pgmoneta_wal_shipping**
 
-The disk space used for WAL shipping for a server
+Indicates if WAL shipping is enabled for a server (1=enabled, 0=disabled).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_wal_shipping_used_space**
 
-The disk space used for WAL shipping of a server
+Reports the disk space in bytes used for WAL shipping files for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_wal_shipping_free_space**
 
-The free disk space for WAL shipping of a server
+Reports the free disk space in bytes available for WAL shipping for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_wal_shipping_total_space**
 
-The total disk space for WAL shipping of a server
+Reports the total disk space in bytes allocated for WAL shipping for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_workspace**
 
-The disk space used for workspace for a server
+Reports the disk space in bytes used by the workspace directory for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_workspace_free_space**
 
-The free disk space for workspace of a server
+Reports the free disk space in bytes available in the workspace for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_workspace_total_space**
 
-The total disk space for workspace of a server
+Reports the total disk space in bytes available in the workspace for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_hot_standby**
 
-The disk space used for hot standby for a server
+Reports the disk space in bytes used for hot standby functionality for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_hot_standby_free_space**
 
-The free disk space for hot standby of a server
+Reports the free disk space in bytes available for hot standby for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_hot_standby_total_space**
 
-The total disk space for hot standby of a server
+Reports the total disk space in bytes allocated for hot standby for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_timeline**
 
-The current timeline a server is on
+Shows the current timeline number that a PostgreSQL server is operating on.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_parent_tli**
 
-The parent timeline of a timeline on a server
+Shows the parent timeline identifier for a specific timeline on a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| tli | |
+| name | The configured name/identifier for the PostgreSQL server. |
+| tli | The timeline identifier. |
 
 **pgmoneta_server_timeline_switchpos**
 
-The WAL switch position of a timeline on a server (showed in hex as a parameter)
+Shows the WAL switch position for a timeline on a server (displayed as hexadecimal).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| tli | |
-| walpos | |
+| name | The configured name/identifier for the PostgreSQL server. |
+| tli | The timeline identifier. |
+| walpos | The WAL position in hexadecimal format. |
 
 **pgmoneta_server_workers**
 
-The numbeer of workers for a server
+Reports the number of worker processes currently active for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_online**
 
-Is the server online ?
+Indicates if the PostgreSQL server is online and reachable (1=online, 0=offline).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Server is online and accessible, 0: Server is offline or unreachable |
 
 **pgmoneta_server_primary**
 
-Is the server a primary ?
+Indicates if the PostgreSQL server is operating as a primary (1) or standby (0).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Server is a primary (not in recovery), 0: Server is a standby/replica (in recovery) |
 
 **pgmoneta_server_valid**
 
-Is the server in a valid state
+Indicates if the server configuration and connection are valid (1=valid, 0=invalid).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Server configuration is valid, 0: Server configuration has issues |
 
 **pgmoneta_wal_streaming**
 
-The WAL streaming status of a server
+Indicates if WAL streaming is currently active for a server (1=active, 0=inactive).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: WAL streaming is active, 0: WAL streaming is not active |
 
 **pgmoneta_server_operation_count**
 
-The count of client operations of a server
+Reports the total count of successful client operations performed on a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_failed_operation_count**
 
-The count of failed client operations of a server
+Reports the total count of failed client operations attempted on a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_last_operation_time**
 
-The time of the latest client operation of a server
+Reports the timestamp of the most recent successful client operation on a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_last_failed_operation_time**
 
-The time of the latest failed client operation of a server
+Reports the timestamp of the most recent failed client operation on a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_checksums**
 
-Are checksums enabled
+Indicates if data checksums are enabled on the PostgreSQL server (1=enabled, 0=disabled).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Data checksums are enabled, 0: Data checksums are disabled |
 
 **pgmoneta_server_summarize_wal**
 
-Is summarize_wal enabled
+Indicates if WAL summarization is enabled on the PostgreSQL server (1=enabled, 0=disabled).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: WAL summarization is enabled, 0: WAL summarization is disabled |
 
 **pgmoneta_server_extensions_detected**
 
-The number of extensions detected on server
+Reports the total number of PostgreSQL extensions detected on the server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_server_extension**
 
-Information about installed extensions on server
+Provides information about installed PostgreSQL extensions on the server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| extension | The name of the extension |
-| version | The version of the extension |
-| comment | Description of the extension's functionality |
+| name | The configured name/identifier for the PostgreSQL server. |
+| extension | The name of the installed extension. |
+| version | The version of the installed extension. |
+| comment | A description of what the extension does. |
 
 **pgmoneta_extension_pgmoneta_ext**
 
-Status of the pgmoneta extension
+Reports the status of the pgmoneta extension on the PostgreSQL server.
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
-| version | The version of the pgmoneta extension (or "not_installed" if not present) |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Extension is installed and available, 0: Extension is not installed |
+| version | The version of the pgmoneta extension, or "not_installed" if not present. | |
 
 **pgmoneta_backup_oldest**
 
-The oldest backup for a server
+Shows the label/timestamp of the oldest valid backup for a server, or 0 if no valid backups exist.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_backup_newest**
 
-The newest backup for a server
+Shows the label/timestamp of the newest valid backup for a server, or 0 if no valid backups exist.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_backup_valid**
 
-The number of valid backups for a server
+Reports the total number of valid/healthy backups available for a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_backup_invalid**
 
-The number of invalid backups for a server
+Reports the total number of invalid/corrupted backups for a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_backup**
 
-Is the backup valid for a server
+Indicates if a specific backup is valid (1) or invalid (0).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Backup is valid and usable, 0: Backup is invalid or corrupted |
+| label | The backup identifier/timestamp. | |
 
 **pgmoneta_backup_version**
 
-The version of postgresql for a backup
+Shows the PostgreSQL version information for a specific backup.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
-| major | The PostgreSQL major version |
-| minor | The PostgreSQL minor version |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
+| major | The major version number of PostgreSQL. |
+| minor | The minor version number of PostgreSQL. |
 
 **pgmoneta_backup_total_elapsed_time**
 
-The backup in seconds for a server
+Reports the total time in seconds taken to complete a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_basebackup_elapsed_time**
 
-The duration for basebackup in seconds for a server
+Reports the time in seconds taken for the base backup phase of a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_manifest_elapsed_time**
 
-The duration for manifest in seconds for a server
+Reports the time in seconds taken for manifest processing during a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_zstd_elapsed_time**
 
-The duration for zstd compression in seconds for a server
+Reports the time in seconds taken for zstd compression during a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_gzip_elapsed_time**
 
-The duration for gzip compression in seconds for a server
+Reports the time in seconds taken for gzip compression during a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_bzip2_elapsed_time**
 
-The duration for bzip2 compression in seconds for a server
+Reports the time in seconds taken for bzip2 compression during a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_lz4_elapsed_time**
 
-The duration for lz4 compression in seconds for a server
+Reports the time in seconds taken for lz4 compression during a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_encryption_elapsed_time**
 
-The duration for encryption in seconds for a server
+Reports the time in seconds taken for encryption during a backup operation.
 
 | Attribute | Description |
-|:----------|:------------|
-| name      | The server identifier |
-| label     | The backup label |
+| :-------- | :---------- |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_linking_elapsed_time**
 
-The duration for linking in seconds for a server
+Reports the time in seconds taken for hard linking operations during a backup.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_remote_ssh_elapsed_time**
 
-The duration for remote ssh in seconds for a server
+Reports the time in seconds taken for SSH remote storage operations during a backup.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_remote_s3_elapsed_time**
 
-The duration for remote_s3 in seconds for a server
+Reports the time in seconds taken for S3 remote storage operations during a backup.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_remote_azure_elapsed_time**
 
-The duration for remote_azure in seconds for a server
+Reports the time in seconds taken for Azure remote storage operations during a backup.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_start_timeline**
 
-The starting timeline of a backup for a server
+Shows the timeline number at the start of a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_end_timeline**
 
-The ending timeline of a backup for a server
+Shows the timeline number at the end of a backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_start_walpos**
 
-The starting WAL position of a backup for a server
+Shows the WAL position where the backup started (displayed as hexadecimal).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label|
-| walpos | The WAL position |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
+| walpos | The WAL position in hexadecimal format. |
 
 **pgmoneta_backup_checkpoint_walpos**
 
-The checkpoint WAL position of a backup for a server
+Shows the checkpoint WAL position for a backup (displayed as hexadecimal).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
-| walpos | The WAL position |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
+| walpos | The checkpoint WAL position in hexadecimal format. |
 
 **pgmoneta_backup_end_walpos**
 
-The ending WAL position of a backup for a server
+Shows the WAL position where the backup ended (displayed as hexadecimal).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
-| walpos | The WAL position |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
+| walpos | The ending WAL position in hexadecimal format. |
 
 **pgmoneta_restore_newest_size**
 
-The size of the newest restore for a server
+Reports the size in bytes of the most recent restore operation for a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_backup_newest_size**
 
-The size of the newest backup for a server
+Reports the size in bytes of the most recent backup for a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_restore_size**
 
-The size of a restore for a server
-
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+Reports the total size in bytes of a specific restore operation.
 
 **pgmoneta_restore_size_increment**
 
-The size increment of a restore for a server
+Reports the incremental size in bytes for a specific restore operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup/restore identifier/timestamp. |
 
 **pgmoneta_backup_size**
 
-The size of a backup for a server
+Reports the total size in bytes of a specific backup.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_ratio**
 
-The ratio of backup size to restore size for each backup
+Shows the compression ratio achieved for a specific backup (compressed size / original size).
 
-| Attribute | Description           |
-|:----------|:----------------------|
-| name      | The server identifier |
-| label     | The backup label      |
+| Attribute | Description |
+| :-------- | :---------- |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_throughput**
 
-The throughput of the backup for a server (MB/s)
+Reports the overall backup throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_basebackup_mbs**
 
-The throughput of the basebackup for a server (MB/s)
+Reports the base backup throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_manifest_mbs**
 
-The throughput of the manifest for a server (MB/s)
+Reports the manifest processing throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_zstd_mbs**
 
-The throughput of the zstd compression for a server (MB/s)
+Reports the zstd compression throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_gzip_mbs**
 
-The throughput of the gzip compression for a server (MB/s)
+Reports the gzip compression throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_bzip2_mbs**
 
-The throughput of the bzip2 compression for a server (MB/s)
+Reports the bzip2 compression throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_compression_lz4_mbs**
 
-The throughput of the lz4 compression for a server (MB/s)
+Reports the lz4 compression throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_encryption_mbs**
 
-The throughput of the encryption for a server (MB/s)
+Reports the encryption throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_linking_mbs**
 
-The throughput of the linking for a server (MB/s)
+Reports the hard linking throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_remote_ssh_mbs**
 
-The throughput of the remote_ssh for a server (MB/s)
+Reports the SSH remote storage throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_remote_s3_mbs**
 
-The throughput of the remote_s3 for a server (MB/s)
+Reports the S3 remote storage throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_remote_azure_mbs**
 
-The throughput of the remote_azure for a server (MB/s)
+Reports the Azure remote storage throughput in MB/s for a specific backup operation.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| label | The backup label |
+| name | The configured name/identifier for the PostgreSQL server. |
+| label | The backup identifier/timestamp. |
 
 **pgmoneta_backup_retain**
 
-Retain backup for a server
+Indicates if a backup should be retained (1) or is eligible for deletion (0).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier|
-| label | The backup label |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Backup should be retained, 0: Backup is eligible for deletion |
+| label | The backup identifier/timestamp. | |
 
 **pgmoneta_backup_total_size**
 
-The total size of the backups for a server
+Reports the total size in bytes of all backups for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_wal_total_size**
 
-The total size of the WAL for a server
+Reports the total size in bytes of all WAL files for a specific server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_total_size**
 
-The total size for a server
+Reports the total size in bytes used by a server (backups + WAL + other data).
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
+| name | The configured name/identifier for the PostgreSQL server. |
 
 **pgmoneta_active_backup**
 
-Is there an active backup for a server
+Indicates if a backup operation is currently in progress for a server (1=active, 0=inactive).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Backup is currently running, 0: No backup is currently running |
 
 **pgmoneta_active_restore**
 
-Is there an active restore for a server
+Indicates if a restore operation is currently in progress for a server (1=active, 0=inactive).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Restore is currently running, 0: No restore is currently running |
 
 **pgmoneta_active_archive**
 
-Is there an active archiving for a server
+Indicates if an archive operation is currently in progress for a server (1=active, 0=inactive).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Archive operation is currently running, 0: No archive operation is currently running |
 
 **pgmoneta_active_delete**
 
-Is there an active delete for a server
+Indicates if a delete operation is currently in progress for a server (1=active, 0=inactive).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Delete operation is currently running, 0: No delete operation is currently running |
 
 **pgmoneta_active_retention**
 
-Is there an active archiving for a server
+Indicates if a retention cleanup operation is currently in progress for a server (1=active, 0=inactive).
 
-| Attribute | Description |
-| :-------- | :---------- |
-| name | The server identifier |
+| Attribute | Description | Values |
+| :-------- | :---------- | :----- |
+| name | The configured name/identifier for the PostgreSQL server. | 1: Retention cleanup is currently running, 0: No retention cleanup is currently running |
 
 **pgmoneta_current_wal_file**
 
-The current streaming WAL filename of a server
+Shows the current WAL filename being streamed or processed for a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| file | The WAL file name |
+| name | The configured name/identifier for the PostgreSQL server. |
+| file | The current WAL filename. |
 
 **pgmoneta_current_wal_lsn**
 
-The current WAL log sequence number
+Shows the current WAL Log Sequence Number (LSN) for a server.
 
 | Attribute | Description |
 | :-------- | :---------- |
-| name | The server identifier |
-| lsn | The Logical Sequence Number |
+| name | The configured name/identifier for the PostgreSQL server. |
+| lsn | The current WAL LSN in hexadecimal format. |
+
 
 ## Transport Level Security support
 
