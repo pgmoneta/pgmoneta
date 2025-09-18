@@ -4105,6 +4105,16 @@ pgmoneta_lsn_to_string(uint64_t lsn)
    return result;
 }
 
+uint64_t
+pgmoneta_string_to_lsn(char* lsn)
+{
+   uint32_t hi = 0;
+   uint32_t lo = 0;
+
+   sscanf(lsn, "%X/%X", &hi, &lo);
+   return ((uint64_t)hi << 32) + (uint64_t)lo;
+}
+
 bool
 pgmoneta_is_incremental_path(char* path)
 {

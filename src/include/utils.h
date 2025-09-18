@@ -1288,6 +1288,14 @@ char*
 pgmoneta_lsn_to_string(uint64_t lsn);
 
 /**
+ * Generate the lsn integer given a lsn string format %X/%X
+ * @param lsn string value
+ * @return The lsn integer
+ */
+uint64_t
+pgmoneta_string_to_lsn(char* lsn);
+
+/**
  * Check if the path to a file is an incremental path
  * @param path The file path
  * @return true if the file is an incremental path, false if otherwise

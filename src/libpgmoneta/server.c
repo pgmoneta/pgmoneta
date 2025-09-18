@@ -410,8 +410,6 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn)
    bool has_role = false;
    bool chkpt_success = false;
    char* chkpt_lsn = NULL;
-   uint32_t chkpt_hi = 0;
-   uint32_t chkpt_lo = 0;
    struct main_configuration* config = NULL;
    struct message* query_msg = NULL;
    struct query_response* response = NULL;
@@ -516,8 +514,7 @@ q:
       chkpt_lsn = pgmoneta_query_response_get_data(response, 0);
    }
 
-   sscanf(chkpt_lsn, "%X/%X", &chkpt_hi, &chkpt_lo);
-   *c_lsn = ((uint64_t)chkpt_hi << 32) + (uint64_t)chkpt_lo;
+   *c_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
