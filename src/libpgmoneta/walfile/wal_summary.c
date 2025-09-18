@@ -49,13 +49,9 @@ static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
  * - start_lsn and end_lsn are always the starting of a WAL record and not the middle of WAL record
  */
 int
-pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn)
+pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn, block_ref_table** b)
 {
-   char* summary_dir = NULL;
-   char* summary_filename = NULL;
    char* wal_dir = NULL;
-   char tmp_file[MAX_PATH] = {0};
-   char file[MAX_PATH] = {0};
    block_ref_table* brt = NULL;
 
    /**
@@ -104,7 +100,27 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn)
    free(partial_record);
    partial_record = NULL;
 
-   // /* Generate the WAL summaries */
+   *b = brt;
+
+   free(wal_dir);
+   pgmoneta_brt_destroy(brt);
+   return 0;
+
+error:
+   free(wal_dir);
+   pgmoneta_brt_destroy(brt);
+   return 1;
+}
+
+int
+pgmoneta_wal_summary_save(int srv, uint64_t s_lsn, uint64_t e_lsn, block_ref_table* brt)
+{
+   char* summary_dir = NULL;
+   char* summary_filename = NULL;
+
+   char tmp_file[MAX_PATH] = {0};
+   char file[MAX_PATH] = {0};
+
    summary_dir = pgmoneta_get_server_summary(srv);
    if (!pgmoneta_ends_with(summary_dir, "/"))
    {
@@ -118,8 +134,8 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn)
       goto error;
    }
 
-   summary_filename = summary_file_name(start_lsn, end_lsn);
-
+   summary_filename = summary_file_name(s_lsn, e_lsn);
+   
    if (pgmoneta_ends_with(summary_dir, "/"))
    {
       snprintf(tmp_file, sizeof(tmp_file), "%s%s.partial", summary_dir, summary_filename);
@@ -133,7 +149,7 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn)
 
    if (pgmoneta_brt_write(brt, tmp_file))
    {
-      pgmoneta_log_error("pgmoneta_summarize_wal: unable to generate summary for [%d, %d)", start_lsn, end_lsn);
+      pgmoneta_log_error("pgmoneta_summarize_wal: unable to generate summary for [%d, %d)", s_lsn, e_lsn);
       goto error;
    }
 
@@ -143,17 +159,13 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn)
       goto error;
    }
 
-   free(wal_dir);
    free(summary_dir);
    free(summary_filename);
-   pgmoneta_brt_destroy(brt);
    return 0;
 
 error:
-   free(wal_dir);
    free(summary_dir);
    free(summary_filename);
-   pgmoneta_brt_destroy(brt);
    return 1;
 }
 
