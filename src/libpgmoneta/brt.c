@@ -93,6 +93,7 @@ pgmoneta_brt_set_limit_block(block_ref_table* brt, const struct rel_file_locator
    {
       /* No existing entry, set the limit block for this relation block and initialize other fields */
       brt_entry->limit_block = limit_block;
+      brt_entry->max_block_number = InvalidBlockNumber;
       brt_entry->nchunks = 0;
       brt_entry->chunk_size = NULL;
       brt_entry->chunk_usage = NULL;
@@ -134,6 +135,7 @@ pgmoneta_brt_mark_block_modified(block_ref_table* brt, const struct rel_file_loc
        * than any legal block number. InvalidBlockNumber fits the bill.
        */
       brt_entry->limit_block = InvalidBlockNumber;
+      brt_entry->max_block_number = InvalidBlockNumber;
       brt_entry->nchunks = 0;
       brt_entry->chunk_size = NULL;
       brt_entry->chunk_usage = NULL;
@@ -593,6 +595,14 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
    unsigned chunkoffset;
    unsigned i;
 
+   if (entry->max_block_number == InvalidBlockNumber)
+   {
+      entry->max_block_number = blknum;
+   }
+   else
+   {
+      entry->max_block_number = MAX(entry->max_block_number, blknum);
+   }
    /* get the chunk and offset on which the modified block resides */
    chunkno = blknum / BLOCKS_PER_CHUNK;
    chunkoffset = blknum % BLOCKS_PER_CHUNK;

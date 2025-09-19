@@ -107,6 +107,7 @@ typedef struct block_ref_table_entry
 {
    block_ref_table_key key;           /**< The key used to search for the block entry in the ART */
    block_number limit_block;          /**< The limit block for the relation fork */
+   block_number max_block_number;     /**< The maximum block number encoutered */     
    uint32_t nchunks;                  /**< The number of chunks for the relation fork */
    uint16_t* chunk_size;              /**< The size of each chunk in the relation fork */
    uint16_t* chunk_usage;             /**< The number of used entries in each chunk, if a chunk has bitmap representation, the value of chunk_usage for that chunk is MAX_ENTRIES_PER_CHUNK */
