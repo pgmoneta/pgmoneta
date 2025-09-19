@@ -29,6 +29,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <brt.h>
 #include <configuration.h>
 #include <deque.h>
 #include <logging.h>
@@ -61,6 +62,7 @@ START_TEST(test_pgmoneta_wal_summary)
    int ret;
    char* wal_dir = NULL;
    struct query_response* qr = NULL;
+   block_ref_table* brt = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -129,9 +131,13 @@ START_TEST(test_pgmoneta_wal_summary)
    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);
 
    ck_assert_int_ge(e_lsn, s_lsn);
-   ret = !pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn);
+   ret = !pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn, &brt);
    ck_assert_msg(ret, "failed to summarize the wal");
 
+   ret = !pgmoneta_wal_summary_save(PRIMARY_SERVER, s_lsn, e_lsn, brt);
+   ck_assert_msg(ret, "failed to save the wal summary to disk");
+
+   pgmoneta_brt_destroy(brt);
    pgmoneta_disconnect(srv_socket);
    pgmoneta_disconnect(custom_user_socket);
    free(summary_dir);

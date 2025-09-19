@@ -30,6 +30,7 @@
 #define PGMONETA_WAL_SUMMARY_H
 
 #include <pgmoneta.h>
+#include <brt.h>
 
 /**
  * Summarize the WAL records in the range [start_lsn, end_lsn) for a timeline, assuming that
@@ -42,9 +43,22 @@
  * forward for the start of a valid WAL record.
  * @param end_lsn identifies the point beyond which we can't count on being able to read any
  * more WAL.
+ * @param brt [out] The BRT output
  * @return 0 is success, otherwise failure
  */
 int
-pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn);
+pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn, block_ref_table** brt);
+
+/**
+ * Save the summarization output to a file
+ * @param srv The server
+ * @param s_lsn The start lsn is the point at which we should start summarizing
+ * @param e_lsn identifies the point beyond which we can't count on being able to read any
+ * more WAL.
+ * @param brt The BRT
+ * @return 0 is success, otherwise failure
+ */
+int
+pgmoneta_wal_summary_save(int srv, uint64_t s_lsn, uint64_t e_lsn, block_ref_table* brt);
 
 #endif
