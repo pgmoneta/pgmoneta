@@ -66,6 +66,7 @@ pgmoneta_test_utils_suite()
    s = suite_create("pgmoneta_test_utils");
 
    tc_utils = tcase_create("test_utils");
+   tcase_set_tags(tc_utils, "common");
    tcase_set_timeout(tc_utils, 60);
    tcase_add_checked_fixture(tc_utils, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_utils, test_resolve_path_trailing_env_var);

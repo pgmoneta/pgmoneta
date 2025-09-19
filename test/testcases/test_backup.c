@@ -89,6 +89,7 @@ pgmoneta_test_backup_suite()
    s = suite_create("pgmoneta_test_backup");
 
    tc_backup_basic = tcase_create("backup_basic_test");
+   tcase_set_tags(tc_backup_basic, "common");
    tcase_set_timeout(tc_backup_basic, 60);
    tcase_add_checked_fixture(tc_backup_basic, pgmoneta_test_setup, pgmoneta_test_basedir_cleanup);
    tcase_add_test(tc_backup_basic, test_pgmoneta_backup_full);

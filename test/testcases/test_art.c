@@ -611,6 +611,7 @@ pgmoneta_test_art_suite()
    s = suite_create("pgmoneta_test_art");
 
    tc_art_basic = tcase_create("art_basic_test");
+   tcase_set_tags(tc_art_basic, "common");
    tcase_set_timeout(tc_art_basic, 60);
    tcase_add_checked_fixture(tc_art_basic, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_art_basic, test_art_create);
@@ -623,6 +624,7 @@ pgmoneta_test_art_suite()
    tcase_add_test(tc_art_basic, test_art_iterator_remove);
 
    tc_art_advanced = tcase_create("art_advanced_test");
+   tcase_set_tags(tc_art_advanced, "common");
    tcase_set_timeout(tc_art_advanced, 60);
    tcase_add_checked_fixture(tc_art_advanced, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_art_advanced, test_art_insert_search_extensive);

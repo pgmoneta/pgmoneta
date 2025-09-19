@@ -71,7 +71,6 @@ pgmoneta_test_wal_utils_suite()
    Suite* s;
    TCase* tc_wal_utils;
    s = suite_create("pgmoneta_test_wal_utils");
-
    tc_wal_utils = tcase_create("test_wal_utils");
    tcase_add_checked_fixture(tc_wal_utils, pgmoneta_test_setup, pgmoneta_test_basedir_cleanup);
    tcase_set_timeout(tc_wal_utils, 60);

@@ -390,7 +390,6 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
    user = config->common.servers[srv].username;
 
    /* Check for 'pg_checkpoint' role for PostgreSQL +15 and 'SUPERUSER' role for PostgreSQL 13/14 */
-
    if (version >= 15)
    {
       if (has_predefined_role(ssl, socket, user, "pg_checkpoint", &has_role))
@@ -587,18 +586,18 @@ pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** 
    }
    else
    {
-      if (has_execute_privilege(ssl, socket, user, "pg_start_backup(text, boolean)", &has_privilege))
+      if (has_execute_privilege(ssl, socket, user, "pg_start_backup(text, boolean, boolean)", &has_privilege))
       {
          goto error;
       }
 
       if (!has_privilege)
       {
-         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_start_backup(text, boolean)' function", user);
+         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_start_backup(text, boolean, boolean)' function", user);
          goto error;
       }
       memset(query, 0, sizeof(query));
-      snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', false);", label);
+      snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', false, false);", label);
    }
 
    if (query_execute(ssl, socket, query, &response))
@@ -623,7 +622,7 @@ error:
 }
 
 int
-pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct label_file_contents* lf)
+pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* backup_data, char** lsn, struct label_file_contents* lf)
 {
    int version;
    char* user = NULL;
@@ -633,6 +632,11 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct la
    char query[MISC_LENGTH];
    struct query_response* response = NULL;
    struct main_configuration* config = NULL;
+
+   FILE* file = NULL;
+   char* label_data = NULL;
+   size_t bytes_written = 0;
+   char* backup_label_file = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -662,18 +666,18 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct la
    }
    else
    {
-      if (has_execute_privilege(ssl, socket, user, "pg_stop_backup(boolean)", &has_privilege))
+      if (has_execute_privilege(ssl, socket, user, "pg_stop_backup(boolean, boolean)", &has_privilege))
       {
          goto error;
       }
 
       if (!has_privilege)
       {
-         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_stop_backup(boolean)' function", user);
+         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_stop_backup(boolean, boolean)' function", user);
          goto error;
       }
       memset(query, 0, sizeof(query));
-      snprintf(query, sizeof(query), "SELECT * FROM  pg_stop_backup(false);");
+      snprintf(query, sizeof(query), "SELECT * FROM  pg_stop_backup(false, false);");
    }
 
    if (query_execute(ssl, socket, query, &response))
@@ -687,18 +691,47 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct la
    }
 
    stop_backup_lsn = pgmoneta_append(stop_backup_lsn, pgmoneta_query_response_get_data(response, 0));
-   if (transform_text_to_label_file_contents(pgmoneta_query_response_get_data(response, 1), &label_file))
+   label_data = pgmoneta_query_response_get_data(response, 1);
+
+   if (transform_text_to_label_file_contents(label_data, &label_file))
    {
       goto error;
+   }
+
+   if (backup_data != NULL)
+   {
+      backup_label_file = pgmoneta_append(backup_label_file, backup_data);
+      backup_label_file = pgmoneta_append(backup_label_file, "/backup_label");
+
+      file = fopen(backup_label_file, "w+");
+      if (file == NULL)
+      {
+         pgmoneta_log_error("Failed to open the file at %s", backup_label_file);
+         goto error;
+      }
+
+      bytes_written = fwrite(label_data, 1, strlen(label_data), file);
+      if (bytes_written <= 0)
+      {
+         pgmoneta_log_error("Error writing the file backup_label");
+         goto error;
+      }
+      fclose(file);
    }
 
    *lsn = stop_backup_lsn;
    *lf = label_file;
 
+   free(backup_label_file);
    pgmoneta_free_query_response(response);
    return 0;
 error:
+   free(backup_label_file);
    pgmoneta_free_query_response(response);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
    return 1;
 }
 

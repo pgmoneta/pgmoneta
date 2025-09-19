@@ -125,9 +125,188 @@ Response:
   ServerVersion: 0.20.0
 ```
 
-Incremental backups are supported when using [PostgreSQL 17+](https://www.postgresql.org). Note that currently
-branching is not allowed for incremental backup -- a backup can have at most 1
-incremental backup child.
+Incremental backups are supported when using [PostgreSQL 17+](https://www.postgresql.org). Note that currently branching is not allowed for incremental backup -- a backup can have at most 1
+incremental backup child. 
+
+Note: Support for incremental backups on PostgreSQL versions 14–16 is also provided, at preview level.
+
+## Incremental backup for PostgreSQL 14-16
+
+### Working
+
+This section will provide a brief idea of how `pgmoneta` performs incremental backups
+
+* Fetch the modified blocks within a range of WAL LSN (typically from the checkpoint of preceding backup to the start LSN of current backup) and generate a summary of it
+* Fetch all the server files in the data directory of the server
+* Iterate the server files -
+    * If the file is not in 'base'/'global', perform full file backup (as files not under 'base'/'global' are not WAL-logged properly)
+    * Otherwise, if file was found to be modified using the summary, perform incremental backup of this file.
+    * Otherewise, the file is unchanged, now if the file size is 0 or its limit block intersect the segment (meaning the file is truncated fully/partially)
+        * Perform full file backup
+        * Otherwise, perform empty incremental backup with only a header
+* Copy all the WAL segments after and including the WAL segment in which start LSN is present
+* Generate manifest file over the incremental backup data directory
+
+### Dependencies
+
+For PostgreSQL version 14-16, we rely on `pgmoneta` native block-level incremental solutions for backups. To facilitate this solution `pgmoneta` highly depends on [pgmoneta_ext](https://github.com/pgmoneta/pgmoneta_ext) extension and PostgreSQL's system administration functions. Following are the list of admin functions `pgmoneta` depends on:
+
+| Function                    | System administration function | Minimum Privilege | Parameters | Description                                            |
+|-----------------------------|---|--------|------------|--------------------------------------------------------|
+| `pgmoneta_server_backup_start`    |   pg_start_backup/pg_backup_start |    EXECUTE    | label | Returns a row with the backup start lsn |
+| `pgmoneta_server_backup_stop`    |   pg_stop_backup/pg_backup_stop |    EXECUTE    | None | Returns a row with two columns - backup stop lsn and the backup label file contents  |
+| `pgmoneta_server_read_binary`    |   pg_read_binary_file |    pg_read_server_files & EXECUTE    | (offset, length, path/to/file) | Returns the contents of the file provided from the server of particular length at a particular offset |
+| `pgmoneta_server_file_stat`    |   pg_stat_file |    pg_read_server_files & EXECUTE    | path/to/file | Returns the metadata of the file provided from the server like file size, modification time etc |
+
+For complete information on the server api refer [this](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/en/80-server-api.md)
+
+The extension functions on which the native solution depends are:
+
+- `pgmoneta_ext_get_file('<path/to/file>')`
+- `pgmoneta_ext_get_files('<path/to/dir>')`
+
+You can read more about these functions and their required privileges over [here](https://github.com/pgmoneta/pgmoneta_ext/blob/main/doc/manual/en/04-functions.md)
+
+### Setup
+
+Let's assume we want to make setup for PostgreSQL 14. Make sure PostgreSQL 14 is installed on your system. Since our solution depends on `pgmoneta_ext`, build and install the extension for version 14 using the following commands:
+
+```
+git clone https://github.com/pgmoneta/pgmoneta_ext
+cd pgmoneta_ext
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+If multiple PostgreSQL versions are present modify the `PATH` variable such that binary path of version 14 appears first.
+
+**Initialize a PostgreSQL cluster**
+
+```
+initdb -D <path>
+```
+
+**Modify the `postgresql.conf` to enable the following parameters**
+
+```
+password_encryption = scram-sha-256
+shared_preload_libraries = 'pgmoneta_ext'
+```
+
+**Add the following entry to `pg_hba.conf` file**
+
+```
+host    replication     repl           127.0.0.1/32            scram-sha-256
+```
+
+**Start the cluster using the command**
+
+```
+pg_ctl -D <path> -l logfile start
+```
+
+**Lastly, perform the following commands to create the extension and grant required permissions to the connection user**
+
+```
+cat > init-permissions.sh << 'OUTER_EOF'
+#!/bin/bash
+
+# Check input parameters
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <connection_user_name> <postgres_version>"
+    exit 1
+fi
+
+CONN_USER_NAME="$1"
+PG_VERSION="$2"
+
+SCRIPT_BASE_NAME=$(basename -s .sh "$0")
+OUTPUT_SQL_FILE="${SCRIPT_BASE_NAME}.sql"
+
+# Check if pgmoneta_ext extension exists
+EXT_EXISTS=$(psql -d postgres -Atc \
+    "SELECT 1 FROM pg_extension WHERE extname = 'pgmoneta_ext';")
+
+if [ $? -ne 0 ]; then
+    echo "Failed checking for pgmoneta_ext extension"
+    exit 1
+fi
+
+# -------------------------------------------------------------------
+# Start writing SQL into the output file
+# -------------------------------------------------------------------
+
+cat <<EOF > "$OUTPUT_SQL_FILE"
+SET password_encryption = 'scram-sha-256';
+
+DO \$\$
+BEGIN
+    -- Create new replication user if not present
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$CONN_USER_NAME') THEN
+        EXECUTE 'CREATE ROLE $CONN_USER_NAME WITH LOGIN REPLICATION PASSWORD '"$CONN_USER_NAME"'';
+    END IF;
+
+    -- Create replication slot if missing
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '$CONN_USER_NAME'
+    ) THEN
+        PERFORM pg_create_physical_replication_slot('$CONN_USER_NAME', true, false);
+    END IF;
+END
+\$\$;
+
+-- Create extension if missing
+EOF
+
+if [ "$EXT_EXISTS" != "1" ]; then
+  echo "DROP EXTENSION IF EXISTS pgmoneta_ext;" >> "$OUTPUT_SQL_FILE"
+  echo "CREATE EXTENSION pgmoneta_ext;" >> "$OUTPUT_SQL_FILE"
+fi
+
+cat <<EOF >> "$OUTPUT_SQL_FILE"
+
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_file(text) TO $CONN_USER_NAME;
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO $CONN_USER_NAME;
+
+-- Privilege to read server files
+GRANT pg_read_server_files TO $CONN_USER_NAME;
+
+GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO $CONN_USER_NAME;
+GRANT EXECUTE ON FUNCTION pg_stat_file(text, boolean) TO $CONN_USER_NAME;
+
+-- Backup function privileges depending on version
+EOF
+
+# Version-based backup grants
+if [ "$PG_VERSION" -ge 15 ]; then
+  cat <<EOF >> "$OUTPUT_SQL_FILE"
+  GRANT EXECUTE ON FUNCTION pg_backup_start(text, boolean) TO $CONN_USER_NAME;
+  GRANT EXECUTE ON FUNCTION pg_backup_stop(boolean) TO $CONN_USER_NAME;
+  EOF
+else
+  cat <<EOF >> "$OUTPUT_SQL_FILE"
+  GRANT EXECUTE ON FUNCTION pg_start_backup(text, boolean, boolean) TO $CONN_USER_NAME;
+  GRANT EXECUTE ON FUNCTION pg_stop_backup(boolean, boolean) TO $CONN_USER_NAME;
+  EOF
+fi
+
+OUTER_EOF
+
+chmod 755 ./init-permissions.sh
+./init-permissions.sh repl 14
+psql -f init-permissions.sql postgres
+```
+
+This will generate an sql file `init-permissions.sql` use this to initialize the cluster:
+
+```
+psql -f init-permissions.sql postgres
+```
+
+Once this setup is done you can go ahead and create incremental backups without hassles.
 
 ## Backup information
 

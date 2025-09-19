@@ -47,9 +47,6 @@
 static char* basebackup_name(void);
 static int basebackup_execute(char*, struct art*);
 
-static int send_upload_manifest(SSL* ssl, int socket);
-static int upload_manifest(SSL* ssl, int socket, char* path);
-
 struct workflow*
 pgmoneta_create_basebackup(void)
 {
@@ -98,8 +95,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    double seconds;
    char elapsed[128];
    char* tag = NULL;
-   char* incremental = NULL;
-   char* incremental_label = NULL;
    char* manifest_path = NULL;
    char version[10];
    char minor_version[10];
@@ -152,16 +147,6 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 #else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
-
-   incremental = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_BASE);
-   incremental_label = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_LABEL);
-
-   if ((incremental != NULL && incremental_label == NULL) ||
-       (incremental == NULL && incremental_label != NULL))
-   {
-      pgmoneta_log_error("base and label for incremental should either be both NULL or both non-NULL");
-      goto error;
-   }
 
    pgmoneta_memory_init();
 
@@ -260,34 +245,10 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_memory_stream_buffer_init(&buffer);
 
-   if (incremental != NULL)
-   {
-      // send UPLOAD_MANIFEST
-      if (send_upload_manifest(ssl, socket))
-      {
-         pgmoneta_log_error("Fail to send UPLOAD_MANIFEST to server %s", config->common.servers[server].name);
-         goto error;
-      }
-      manifest_path = pgmoneta_append(NULL, incremental);
-      manifest_path = pgmoneta_append(manifest_path, "data/backup_manifest");
-      if (upload_manifest(ssl, socket, manifest_path))
-      {
-         pgmoneta_log_error("Fail to upload manifest to server %s", config->common.servers[server].name);
-         goto error;
-      }
-      // receive and ignore the result set for UPLOAD_MANIFEST
-      if (pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response))
-      {
-         goto error;
-      }
-      pgmoneta_free_query_response(response);
-      response = NULL;
-   }
-
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
 
-   pgmoneta_create_base_backup_message(config->common.servers[server].version, incremental != NULL, tag, true,
+   pgmoneta_create_base_backup_message(config->common.servers[server].version, false, tag, true,
                                        config->compression_type, config->compression_level,
                                        &basebackup_msg);
 
@@ -398,19 +359,9 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   if (!incremental)
-   {
-      size = pgmoneta_directory_size(backup_data);
-      biggest_file_size = pgmoneta_biggest_file(backup_data);
-   }
-   else
-   {
-      if (pgmoneta_backup_size(server, label, &size, &biggest_file_size))
-      {
-         pgmoneta_log_error("Backup: Could not get incremental size for %s", config->common.servers[server].name);
-         goto error;
-      }
-   }
+   size = pgmoneta_directory_size(backup_data);
+   biggest_file_size = pgmoneta_biggest_file(backup_data);
+
    pgmoneta_read_wal(backup_data, &wal);
    pgmoneta_read_checkpoint_info(backup_data, &chkptpos);
 
@@ -431,15 +382,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    backup->end_timeline = end_timeline;
    backup->basebackup_elapsed_time = basebackup_elapsed_time;
 
-   if (incremental != NULL)
-   {
-      backup->type = TYPE_INCREMENTAL;
-      snprintf(backup->parent_label, sizeof(backup->parent_label), "%s", incremental_label);
-   }
-   else
-   {
-      backup->type = TYPE_FULL;
-   }
+   backup->type = TYPE_FULL;
    // in case of parsing error
    if (chkptpos != NULL)
    {
@@ -516,65 +459,5 @@ error:
    free(tag);
    free(wal);
 
-   return 1;
-}
-
-static int
-send_upload_manifest(SSL* ssl, int socket)
-{
-   struct message* msg = NULL;
-   int status;
-   pgmoneta_create_query_message("UPLOAD_MANIFEST", &msg);
-   status = pgmoneta_write_message(ssl, socket, msg);
-   if (status != MESSAGE_STATUS_OK)
-   {
-      goto error;
-   }
-
-   pgmoneta_free_message(msg);
-   return 0;
-
-error:
-   pgmoneta_free_message(msg);
-   return 1;
-}
-
-static int
-upload_manifest(SSL* ssl, int socket, char* path)
-{
-   FILE* manifest = NULL;
-   size_t nbytes = 0;
-   char buffer[65536];
-
-   manifest = fopen(path, "r");
-   if (manifest == NULL)
-   {
-      pgmoneta_log_error("Upload manifest: failed to open manifest file at %s", path);
-      goto error;
-   }
-   while ((nbytes = fread(buffer, 1, sizeof(buffer), manifest)) > 0)
-   {
-      if (pgmoneta_send_copy_data(ssl, socket, buffer, nbytes))
-      {
-         pgmoneta_log_error("Upload manifest: failed to send copy data");
-         goto error;
-      }
-   }
-   if (pgmoneta_send_copy_done_message(ssl, socket))
-   {
-      goto error;
-   }
-
-   if (manifest != NULL)
-   {
-      fclose(manifest);
-   }
-   return 0;
-
-error:
-   if (manifest != NULL)
-   {
-      fclose(manifest);
-   }
    return 1;
 }

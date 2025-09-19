@@ -95,7 +95,7 @@ pgmoneta_test_brt_io_suite()
    s = suite_create("pgmoneta_test_brt_io");
 
    tc_brt_io = tcase_create("test_brt_io");
-
+   tcase_set_tags(tc_brt_io, "common");
    tcase_set_timeout(tc_brt_io, 60);
    tcase_add_checked_fixture(tc_brt_io, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_brt_io, test_pgmoneta_write_multiple_chunks_multiple_representations);

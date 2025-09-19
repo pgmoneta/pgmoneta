@@ -36,15 +36,23 @@
 #include <utils.h>
 
 /* system */
+#include <dirent.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define MANIFEST_KEY_VERSION "PostgreSQL-Backup-Manifest-Version"
 #define MANIFEST_KEY_SYS_IDENTIFIER "System-Identifier"
 #define MANIFEST_KEY_FILES "Files"
 #define MANIFEST_KEY_WAL_RANGES "WAL-Ranges"
 #define MANIFEST_KEY_CHECKSUM "Manifest-Checksum"
+
+#define MANIFEST_FILE_KEY_CHECKSUM_ALGORITHM "Checksum-Algorithm"
+#define MANIFEST_FILE_KEY_PATH "Path"
+#define MANIFEST_FILE_KEY_SIZE "Size"
+#define MANIFEST_FILE_KEY_LAST_MODIFIED "Last-Modified"
+#define MANIFEST_FILE_KEY_CHECKSUM "Checksum"
 
 static void
 build_deque(struct deque* deque, struct csv_reader* reader, char** f);
@@ -315,6 +323,7 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
 {
    FILE* file = NULL;
    char* checksum = NULL;
+   int version;
    struct json* files = NULL;
    struct json* f = NULL;
    struct json_iterator* fiter = NULL;
@@ -327,11 +336,17 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
       goto error;
    }
 
-   if (!pgmoneta_json_contains_key(manifest, MANIFEST_KEY_VERSION) ||
-       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_SYS_IDENTIFIER) ||
+   if (!pgmoneta_json_contains_key(manifest, MANIFEST_KEY_VERSION))
+   {
+      pgmoneta_log_error("Manifest doesn't contain necessary version entry");
+      goto error;
+   }
+
+   version = (int)pgmoneta_json_get(manifest, MANIFEST_KEY_VERSION);
+
+   if ((version >= 2 && !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_SYS_IDENTIFIER)) ||
        !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_FILES) ||
-       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_WAL_RANGES) ||
-       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_CHECKSUM))
+       !pgmoneta_json_contains_key(manifest, MANIFEST_KEY_WAL_RANGES))
    {
       pgmoneta_log_error("Manifest doesn't contain necessary entries");
       goto error;
@@ -350,20 +365,24 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
       goto error;
    }
 
-   fprintf(file, "{ \"%s\": %d,\n", MANIFEST_KEY_VERSION, (int)pgmoneta_json_get(manifest, MANIFEST_KEY_VERSION));
-   fprintf(file, "\"%s\": %" PRIu64 ",\n", MANIFEST_KEY_SYS_IDENTIFIER,
-           (uint64_t)pgmoneta_json_get(manifest, MANIFEST_KEY_SYS_IDENTIFIER));
+   fprintf(file, "{ \"%s\": %d,\n", MANIFEST_KEY_VERSION, version);
+
+   if (pgmoneta_json_contains_key(manifest, MANIFEST_KEY_SYS_IDENTIFIER))
+   {
+      fprintf(file, "\"%s\": %" PRIu64 ",\n", MANIFEST_KEY_SYS_IDENTIFIER,
+              (uint64_t)pgmoneta_json_get(manifest, MANIFEST_KEY_SYS_IDENTIFIER));
+   }
 
    fprintf(file, "\"%s\": [\n", MANIFEST_KEY_FILES);
    while (pgmoneta_json_iterator_next(fiter))
    {
       f = (struct json*) pgmoneta_value_data(fiter->value);
       fprintf(file, "{ \"Path\": \"%s\", \"Size\": %" PRIu64 ", \"Last-Modified\": \"%s\", \"Checksum-Algorithm\": \"%s\", \"Checksum\": \"%s\" }",
-              (char*)pgmoneta_json_get(f, "Path"),
-              (uint64_t)pgmoneta_json_get(f, "Size"),
-              (char*)pgmoneta_json_get(f, "Last-Modified"),
-              (char*)pgmoneta_json_get(f, "Checksum-Algorithm"),
-              (char*)pgmoneta_json_get(f, "Checksum"));
+              (char*)pgmoneta_json_get(f, MANIFEST_FILE_KEY_PATH),
+              (uint64_t)pgmoneta_json_get(f, MANIFEST_FILE_KEY_SIZE),
+              (char*)pgmoneta_json_get(f, MANIFEST_FILE_KEY_LAST_MODIFIED),
+              (char*)pgmoneta_json_get(f, MANIFEST_FILE_KEY_CHECKSUM_ALGORITHM),
+              (char*)pgmoneta_json_get(f, MANIFEST_FILE_KEY_CHECKSUM));
       if (pgmoneta_json_iterator_has_next(fiter))
       {
          fprintf(file, ",\n");
@@ -417,6 +436,157 @@ error:
    {
       fclose(file);
    }
+   return 1;
+}
+
+int
+pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, struct backup* bck, struct json** m)
+{
+   struct json* manifest = NULL;
+   struct json* wal_ranges = NULL;
+   struct json* files = NULL;
+   struct json* range = NULL;
+   char* start_lsn = NULL;
+   char* end_lsn = NULL;
+
+   pgmoneta_json_create(&manifest);
+   /* put manifest version */
+   pgmoneta_json_put(manifest, MANIFEST_KEY_VERSION, (uintptr_t)version, ValueInt32);
+
+   /* put system identifier */
+   if (version >= 2)
+   {
+      pgmoneta_json_put(manifest, MANIFEST_KEY_SYS_IDENTIFIER, (uintptr_t)system_id, ValueInt64);
+   }
+
+   /* put files */
+   pgmoneta_json_create(&files);
+   if (pgmoneta_generate_files_manifest(backup_data, files))
+   {
+      pgmoneta_json_destroy(files);
+      pgmoneta_log_error("Unable to generate manifest records for: %s", backup_data);
+      goto error;
+   }
+   pgmoneta_json_put(manifest, "Files", (uintptr_t)files, ValueJSON);
+
+   /* put wal ranges */
+   pgmoneta_json_create(&wal_ranges);
+   pgmoneta_json_create(&range);
+   start_lsn = pgmoneta_lsn_to_string((uint64_t)((uint64_t)bck->start_lsn_hi32 << 32) + (uint64_t)bck->start_lsn_lo32);
+   end_lsn = pgmoneta_lsn_to_string((uint64_t)((uint64_t)bck->end_lsn_hi32 << 32) + (uint64_t)bck->end_lsn_lo32);
+
+   pgmoneta_json_put(range, "Timeline", (uintptr_t)bck->start_timeline, ValueInt32);
+   pgmoneta_json_put(range, "Start-LSN", (uintptr_t)start_lsn, ValueString);
+   pgmoneta_json_put(range, "End-LSN", (uintptr_t)end_lsn, ValueString);
+
+   pgmoneta_json_append(wal_ranges, (uintptr_t)range, ValueJSON);
+   pgmoneta_json_put(manifest, "WAL-Ranges", (uintptr_t)wal_ranges, ValueJSON);
+
+   *m = manifest;
+
+   free(start_lsn);
+   free(end_lsn);
+   return 0;
+error:
+   free(start_lsn);
+   free(end_lsn);
+   pgmoneta_json_destroy(manifest);
+   return 1;
+}
+
+int
+pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file)
+{
+   struct json* f = NULL;
+   size_t size = 0;
+   time_t t;
+   struct tm* tinfo;
+   char now[MISC_LENGTH];
+   char* checksum = NULL;
+
+   *file = NULL;
+   pgmoneta_json_create(&f);
+
+   size = pgmoneta_get_file_size(path);
+
+   time(&t);
+   tinfo = gmtime(&t);
+   memset(now, 0, sizeof(now));
+   strftime(now, sizeof(now), "%Y-%m-%d %H:%M:%S GMT", tinfo);
+
+   if (pgmoneta_create_sha512_file(path, &checksum))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(f, MANIFEST_FILE_KEY_CHECKSUM_ALGORITHM, (uintptr_t)"SHA512", ValueString);
+   pgmoneta_json_put(f, MANIFEST_FILE_KEY_PATH, (uintptr_t)manifest_path, ValueString);
+   pgmoneta_json_put(f, MANIFEST_FILE_KEY_SIZE, size, ValueUInt64);
+   pgmoneta_json_put(f, MANIFEST_FILE_KEY_LAST_MODIFIED, (uintptr_t)now, ValueString);
+   pgmoneta_json_put(f, MANIFEST_FILE_KEY_CHECKSUM, (uintptr_t)checksum, ValueString);
+   *file = f;
+
+   free(checksum);
+   return 0;
+
+error:
+   free(checksum);
+   pgmoneta_json_destroy(f);
+   return 1;
+}
+
+int
+pgmoneta_generate_files_manifest(char* source_dir, struct json* files)
+{
+   char real_path[MAX_PATH];
+   struct stat s;
+   struct dirent* dent;
+   struct json* file = NULL;
+
+   DIR* dir = opendir(source_dir);
+   if (!dir)
+   {
+      pgmoneta_log_error("Could not open directory: %s", source_dir);
+      return 1;
+   }
+   while ((dent = readdir(dir)) != NULL)
+   {
+      char* entry_name = dent->d_name;
+
+      if (pgmoneta_compare_string(entry_name, ".") || pgmoneta_compare_string(entry_name, "..") || pgmoneta_compare_string(entry_name, "pg_wal"))
+      {
+         continue;
+      }
+
+      memset(real_path, 0, sizeof(real_path));
+      snprintf(real_path, sizeof(real_path), "%s/%s", source_dir, entry_name);
+
+      lstat(real_path, &s);
+      if (S_ISDIR(s.st_mode))
+      {
+         if (pgmoneta_generate_files_manifest(real_path, files)) // recurse
+         {
+            pgmoneta_log_error("Unable to generate manifest records for: %s", entry_name);
+            goto error;
+         }
+      }
+      else
+      {
+         if (pgmoneta_get_file_manifest(real_path, entry_name, &file))
+         {
+            pgmoneta_log_error("Unable to generate manifest records for: %s", entry_name);
+            goto error;
+         }
+
+         pgmoneta_json_append(files, (uintptr_t)file, ValueJSON);
+         file = NULL;
+      }
+   }
+
+   closedir(dir);
+   return 0;
+error:
+   closedir(dir);
    return 1;
 }
 

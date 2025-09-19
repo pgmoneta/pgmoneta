@@ -16,9 +16,31 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      # Define all possible variables
       matrix:
         compiler: [gcc, clang]
         build_type: [Debug, Release]
+        pg_version: [14, 15, 17]
+        # Exclude the unwanted v14 combinations
+        exclude:
+          - pg_version: 14
+            compiler: gcc
+            build_type: Debug
+          - pg_version: 14
+            compiler: gcc
+            build_type: Release
+          - pg_version: 14
+            compiler: clang
+            build_type: Release
+          - pg_version: 15
+            compiler: gcc
+            build_type: Debug
+          - pg_version: 15
+            compiler: gcc
+            build_type: Release
+          - pg_version: 15
+            compiler: clang
+            build_type: Release
       fail-fast: false
 
     steps:
@@ -35,19 +57,31 @@ jobs:
           python3-docutils libbz2-dev libarchive-dev \
           bzip2 net-tools check libyaml-dev llvm
 
-      - name: Install PostgreSQL
+      - name: Install PostgreSQL v${{ matrix.pg_version }}
         run: |
           sudo apt install curl ca-certificates
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
           sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt update
-          sudo apt install -y postgresql-17
+          sudo apt install -y postgresql-${{ matrix.pg_version }} postgresql-server-dev-${{ matrix.pg_version }}
 
       - name: Set Env Path Variable
         run: |
-          echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
+          echo "PATH=/usr/lib/postgresql/${{ matrix.pg_version }}/bin:$PATH" >> $GITHUB_ENV
           echo $PATH
+
+      - name: Install pgmoneta_ext
+        run: |
+          git_repo="https://github.com/pgmoneta/pgmoneta_ext.git"
+          cd /tmp/
+          git clone --branch "main" --single-branch --depth 1 "$git_repo"
+          cd /tmp/pgmoneta_ext/
+          mkdir build
+          cd /tmp/pgmoneta_ext/build/
+          cmake -DDOCS=false ..
+          make
+          sudo make install
 
       - name: Build Project
         run: |
@@ -64,6 +98,7 @@ jobs:
 
       - name: Run Tests
         run: |
+          export TEST_PG_VERSION=${{ matrix.pg_version }}
           if [ "${{ matrix.compiler }}" = "clang" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
             $(which bash) ./test/check.sh ci
           fi
@@ -73,7 +108,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}
+          name: coverage-reports-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ matrix.pg_version }}
           path: /tmp/pgmoneta-test/coverage
           retention-days: 90
 
@@ -81,7 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
+          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ matrix.pg_version }}
           path: /tmp/pgmoneta-test/log
           retention-days: 90
 

@@ -218,7 +218,7 @@ pgmoneta_test_http_suite()
    s = suite_create("pgmoneta_test_http");
 
    tc_http_basic = tcase_create("http_basic_test");
-
+   tcase_set_tags(tc_http_basic, "common");
    tcase_set_timeout(tc_http_basic, 60);
    tcase_add_checked_fixture(tc_http_basic, setup_echo_server, teardown_echo_server);
    tcase_add_test(tc_http_basic, test_pgmoneta_http_get);

@@ -76,7 +76,7 @@ int
 pgmoneta_ext_get_files(SSL* ssl, int socket, char* file_path, struct query_response** qr)
 {
    char query[MAX_QUERY_LENGTH];
-   snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_get_files('%s');", file_path);
+   snprintf(query, MAX_QUERY_LENGTH, "SELECT * FROM pgmoneta_ext_get_files('%s');", file_path);
    return query_execute(ssl, socket, query, qr);
 }
 

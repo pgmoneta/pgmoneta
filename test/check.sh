@@ -29,14 +29,16 @@
 set -eo pipefail
 
 # Variables
-IMAGE_NAME="pgmoneta-test-postgresql17-rocky9"
-CONTAINER_NAME="pgmoneta-test-postgresql17"
+PG_VERSION="${TEST_PG_VERSION:-17}"
+
+IMAGE_NAME="pgmoneta-test-postgresql$PG_VERSION-rocky9"
+CONTAINER_NAME="pgmoneta-test-postgresql$PG_VERSION"
 
 SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 PROJECT_DIRECTORY=$(realpath "$SCRIPT_DIR/..")
 EXECUTABLE_DIRECTORY=$PROJECT_DIRECTORY/build/src
 TEST_DIRECTORY=$PROJECT_DIRECTORY/build/test
-TEST_PG17_DIRECTORY=$PROJECT_DIRECTORY/test/postgresql/src/postgresql17
+TEST_PG_DIRECTORY="$PROJECT_DIRECTORY/test/postgresql/src/postgresql$PG_VERSION"
 
 PGMONETA_ROOT_DIR="/tmp/pgmoneta-test"
 BASE_DIR="$PGMONETA_ROOT_DIR/base"
@@ -149,7 +151,7 @@ cleanup() {
    fi
 
    if [[ $MODE != "ci" ]]; then
-     echo "Removing postgres 17 container"
+     echo "Removing postgres $PG_VERSION container"
      remove_postgresql_container
    fi
 
@@ -160,9 +162,9 @@ cleanup() {
 }
 
 build_postgresql_image() {
-  echo "Building the PostgreSQL 17 image $IMAGE_NAME"
+  echo "Building the PostgreSQL $PG_VERSION image $IMAGE_NAME"
   CUR_DIR=$(pwd)
-  cd $TEST_PG17_DIRECTORY
+  cd $TEST_PG_DIRECTORY
   set +e
   make clean
   set -e
@@ -172,9 +174,9 @@ build_postgresql_image() {
 
 cleanup_postgresql_image() {
   set +e
-  echo "Cleanup of the PostgreSQL 17 image $IMAGE_NAME"
+  echo "Cleanup of the PostgreSQL $PG_VERSION image $IMAGE_NAME"
   CUR_DIR=$(pwd)
-  cd $TEST_PG17_DIRECTORY
+  cd $TEST_PG_DIRECTORY
   make clean
   cd $CUR_DIR
   set -e
@@ -191,20 +193,20 @@ start_postgresql_container() {
   -e PG_LOG_LEVEL=debug5 \
   $IMAGE_NAME
 
-  echo "Checking PostgreSQL 17 container readiness"
+  echo "Checking PostgreSQL $PG_VERSION container readiness"
   sleep 3
-  if $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
-    echo "PostgreSQL 17 is ready!"
+  if $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-$PG_VERSION/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+    echo "PostgreSQL $PG_VERSION is ready!"
   else
     echo "Wait for 10 seconds and retry"
     sleep 10
-    if $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-17/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
-      echo "PostgreSQL 17 is ready!"
+    if $CONTAINER_ENGINE exec $CONTAINER_NAME /usr/pgsql-$PG_VERSION/bin/pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+      echo "PostgreSQL $PG_VERSION is ready!"
     else
       echo "Printing container logs..."
       $CONTAINER_ENGINE logs $CONTAINER_NAME
       echo ""
-      echo "PostgreSQL 17 is not ready, exiting"
+      echo "PostgreSQL $PG_VERSION is not ready, exiting"
       cleanup_postgresql_image
       exit 1
     fi
@@ -212,13 +214,13 @@ start_postgresql_container() {
 }
 
 start_postgresql() {
-  echo "Setting up PostgreSQL 17 directory"
+  echo "Setting up PostgreSQL $PG_VERSION directory"
   set +e
   sudo rm -Rf /conf /pgconf /pgdata /pgwal
-  sudo cp -R $TEST_PG17_DIRECTORY/root /
+  sudo cp -R $TEST_PG_DIRECTORY/root /
   sudo ls /root
   sudo mkdir -p /conf /pgconf /pgdata /pgwal /pglog
-  sudo cp -R $TEST_PG17_DIRECTORY/conf/* /conf/
+  sudo cp -R $TEST_PG_DIRECTORY/conf/* /conf/
   sudo ls /conf
   sudo chown -R postgres:postgres /conf /pgconf /pgdata /pgwal /pglog
   sudo chmod -R 777 /conf /pgconf /pgdata /pgwal /pglog /root
@@ -295,6 +297,11 @@ export_pgmoneta_test_variables() {
 
   echo "export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY"
   export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY
+
+  if [[ $PG_VERSION -lt 17 ]]; then
+    echo "export CK_INCLUDE_TAGS=common"
+    export CK_INCLUDE_TAGS="common"
+  fi
 }
 
 unset_pgmoneta_test_variables() {
@@ -304,6 +311,9 @@ unset_pgmoneta_test_variables() {
   unset PGMONETA_TEST_CONF_SAMPLE
   unset PGMONETA_TEST_RESTORE_DIR
   unset LLVM_PROFILE_FILE
+  if [[ $PG_VERSION -lt 17 ]]; then
+    unset CK_INCLUDE_TAGS
+  fi
   unset CK_RUN_CASE
   unset CK_RUN_SUITE
   unset CC
@@ -341,7 +351,7 @@ usage() {
 }
 
 run_tests() {
-  echo "Building PostgreSQL 17 image if necessary"
+  echo "Building PostgreSQL $PG_VERSION image if necessary"
   if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME exists, skip building"
   else
@@ -357,7 +367,7 @@ run_tests() {
   mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR"
   mkdir -p "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY" "$WORKSPACE_DIRECTORY" "$RESOURCE_DIRECTORY" "$PGCONF_DIRECTORY"
   cp -R "$PROJECT_DIRECTORY/test/resource" $BASE_DIR
-  cp -R $TEST_PG17_DIRECTORY/conf/* $PGCONF_DIRECTORY/
+  cp -R $TEST_PG_DIRECTORY/conf/* $PGCONF_DIRECTORY/
   chmod -R 777 $PG_LOG_DIR
   chmod -R 777 $PGCONF_DIRECTORY
 
@@ -370,10 +380,10 @@ run_tests() {
   cd ..
 
   if [[ $MODE == "ci" ]]; then
-    echo "Start PostgreSQL 17 locally"
+    echo "Start PostgreSQL $PG_VERSION locally"
     start_postgresql
   else
-    echo "Start PostgreSQL 17 container"
+    echo "Start PostgreSQL $PG_VERSION container"
     start_postgresql_container
   fi
 

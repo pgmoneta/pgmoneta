@@ -737,7 +737,7 @@ wf_incremental_backup(void)
 
    config = (struct main_configuration*)shmem;
 
-   head = pgmoneta_create_basebackup();
+   head = pgmoneta_create_incremental_backup();
    current = head;
 
    current->next = pgmoneta_create_manifest();

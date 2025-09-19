@@ -681,7 +681,14 @@ pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn
 
    for (int i = 0; i < file_count; i++)
    {
-      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+      if (!pgmoneta_ends_with(dir_path, "/"))
+      {
+         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+      }
+      else
+      {
+         snprintf(file_path, MAX_PATH, "%s%s", dir_path, files[i]);
+      }
 
       if (pgmoneta_summarize_walfile(file_path, start_lsn, end_lsn, brt))
       {

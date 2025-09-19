@@ -61,7 +61,7 @@ static int get_number_of_columns(struct message* msg);
 static int get_column_name(struct message* msg, int index, char** name);
 
 static unsigned char* decode_base64(char* base64_data, int* decoded_len);
-static char** get_paths(char* data, int* count);
+static char** get_paths(struct query_response* data, int* count);
 static void extract_file_name(char* path, char* file_name, char* file_path);
 
 int
@@ -1198,7 +1198,7 @@ error:
    pgmoneta_clear_message();
    pgmoneta_free_message(rmsg);
    pgmoneta_memory_dynamic_destroy(data);
-
+   pgmoneta_free_query_response(r);
    free(content);
 
    return 1;
@@ -1230,7 +1230,17 @@ pgmoneta_has_message(char type, void* data, size_t data_size)
       else
       {
          offset += 1;
-         offset += pgmoneta_read_int32(data + offset);
+
+         /* check if the message length is available */
+         if (offset + 4 <= data_size)
+         {
+            offset += pgmoneta_read_int32(data + offset);
+         }
+         else
+         {
+            pgmoneta_log_error("pgmoneta_has_message: message length not available");
+            return false;
+         }
       }
    }
 
@@ -2379,7 +2389,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
       pgmoneta_ext_get_files(ssl, socket, source_dir, &qr);
       if (qr != NULL)
       {
-         paths = get_paths(qr->tuples->data[0], &count);
+         paths = get_paths(qr, &count);
          pgmoneta_free_query_response(qr);
          qr = NULL;
       }
@@ -2513,78 +2523,58 @@ error:
 }
 
 static char**
-get_paths(char* data, int* count)
+get_paths(struct query_response* response, int* c)
 {
-   if (data == NULL || count == NULL)
-   {
-      return NULL;
-   }
+   char** paths = NULL;
+   int count = 0;
+   int idx = 0;
+   struct tuple* tuple = NULL;
 
-   int index;
-   size_t data_length;
-   char* cleaned_data = NULL;
-   char* token = NULL;
-   char** paths;
-
-   // Remove the first '{' and the last '}'
-   data_length = strlen(data);
-   if (data_length < 2 || data[0] != '{' || data[data_length - 1] != '}')
+   if (response == NULL || response->number_of_columns != 3)
    {
-      return NULL;
-   }
-   cleaned_data = (char*)malloc(data_length - 1);
-   strncpy(cleaned_data, data + 1, data_length - 2);
-   cleaned_data[data_length - 2] = '\0';
-
-   if (strlen(cleaned_data) == 0)
-   {
-      *count = 0;
       goto error;
    }
 
-   *count = 1;
-   for (char* tmp = cleaned_data; *tmp; tmp++)
+   /* count the number of server files */
+   tuple = response->tuples;
+   while (tuple != NULL)
    {
-      if (*tmp == ',')
+      if (pgmoneta_compare_string(tuple->data[1], "f"))
       {
-         (*count)++;
+         count++;
       }
+      tuple = tuple->next;
    }
 
-   paths = (char**)malloc(*count * sizeof(char*));
-   if (paths == NULL)
-   {
-      goto error;
-   }
+   paths = (char**)calloc(count + 1, sizeof(char*));
 
-   index = 0;
-   token = strtok(cleaned_data, ",");
-   while (token != NULL)
+   /* get the server files */
+   tuple = response->tuples;
+   while (tuple != NULL && idx < count)
    {
-      paths[index] = strdup(token);
-      if (paths[index] == NULL)
+      if (pgmoneta_compare_string(tuple->data[1], "f"))
       {
-         for (int i = 0; i < index; i++)
+         char* dest_path = NULL;
+
+         if (pgmoneta_starts_with(tuple->data[0], "./"))
          {
-            free(paths[i]);
+            dest_path = pgmoneta_append(dest_path, tuple->data[0] + 2);
          }
-         free(paths);
-         goto error;
+         else
+         {
+            dest_path = pgmoneta_append(dest_path, tuple->data[0]);
+         }
+
+         paths[idx++] = dest_path;
+         dest_path = NULL;
       }
-      index++;
-      token = strtok(NULL, ",");
+      tuple = tuple->next;
    }
 
-   free(cleaned_data);
+   *c = count;
 
    return paths;
-
 error:
-   if (cleaned_data != NULL)
-   {
-      free(cleaned_data);
-   }
-
    return NULL;
 }
 
