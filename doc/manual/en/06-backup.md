@@ -125,9 +125,124 @@ Response:
   ServerVersion: 0.20.0
 ```
 
-Incremental backups are supported when using [PostgreSQL 17+](https://www.postgresql.org). Note that currently
-branching is not allowed for incremental backup -- a backup can have at most 1
-incremental backup child.
+Incremental backups are supported when using [PostgreSQL 17+](https://www.postgresql.org). Note that currently branching is not allowed for incremental backup -- a backup can have at most 1
+incremental backup child. 
+
+Note: Support for incremental backups on PostgreSQL versions 14–16 is also provided, at preview level.
+
+## Incremental backup for PostgreSQL 14-16
+
+### Working
+
+This section will provide a brief idea of how `pgmoneta` performs incremental backups
+
+* Fetch the modified blocks within a range of WAL lsn (typically from the checkpoint of preceding backup to the start lsn of current backup) and generate a summary of it
+* Fetch all the server files in the data directory of the server
+* Iterate the server files -
+    * if the file is not in 'base'/'global', perform full file backup (as files not under 'base'/'global' are not WAL-logged properly)
+    * otherwise, if file was found to be modified using the summary, perform incremental backup of this file.
+    * otherewise, the file is unchanged, now if the file size is 0 or its limit block intersect the segment (meaning the file is truncated fully/partially)
+        * perform full file backup
+        * otherwise, perform empty incremental backup with only a header
+* Copy all the WAL segments after and including the WAL segment in which start lsn is present
+* Generate manifest file over the incremental backup data directory
+
+### Dependencies
+
+For PostgreSQL version 14-16, we rely on `pgmoneta` native block-level incremental solutions for backups. To facilitate this solution `pgmoneta` highly depends on [pgmoneta_ext](github.com/pgmoneta/pgmoneta_ext) extension and PostgreSQL's system administration functions. Following are the list of admin functions `pgmoneta` depends on:
+
+| Function                    | System administration function | Minimum Privilege | Parameters | Description                                            |
+|-----------------------------|---|--------|------------|--------------------------------------------------------|
+| `pgmoneta_server_backup_start`    |   pg_start_backup/pg_backup_start |    EXECUTE    | label | Returns a row with the backup start lsn |
+| `pgmoneta_server_backup_stop`    |   pg_stop_backup/pg_backup_stop |    EXECUTE    | None | Returns a row with two columns - backup stop lsn and the backup label file contents  |
+| `pgmoneta_server_read_binary`    |   pg_read_binary_file |    pg_read_server_files & EXECUTE    | (offset, length, path/to/file) | Returns the contents of the file provided from the server of particular length at a particular offset |
+| `pgmoneta_server_file_stat`    |   pg_stat_file |    pg_read_server_files & EXECUTE    | path/to/file | Returns the metadata of the file provided from the server like file size, modification time etc |
+
+For complete information on the server api refer [this](https://github.com/pgmoneta/pgmoneta/blob/main/doc/manual/en/80-server-api.md)
+
+The extension functions on which the native solution depends are:
+
+- `pgmoneta_ext_get_file('<path/to/file>')`
+- `pgmoneta_ext_get_files('<path/to/dir>')`
+
+You can read more about these functions and their required privileges over [here](https://github.com/pgmoneta/pgmoneta_ext/blob/main/doc/manual/en/04-functions.md)
+
+### Setup
+
+Let's assume we want to make setup for PostgreSQL 14. Make sure PostgreSQL 14 is installed on your system. Since our solution depends on `pgmoneta_ext`, build and install the extension for version 14 using the following commands:
+
+```
+git clone https://github.com/pgmoneta/pgmoneta_ext
+cd pgmoneta_ext
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+If multiple PostgreSQL versions are present modify the `PATH` variable such that binary path of version 14 appears first.
+
+Lastly, perform the following commands to create the extension and grant required permissions to the connection user:
+
+```
+cat > init-permissions.sh << 'OUTER_EOF'
+#!/bin/bash
+# Check if the user name and version are provided
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <connection_user_name> <postgres_version>"
+    exit 1
+fi
+
+CONN_USER_NAME=$1
+PG_VERSION=$2
+
+SCRIPT_BASE_NAME=$(basename -s .sh "$0")
+OUTPUT_SQL_FILE="${SCRIPT_BASE_NAME}.sql"
+
+cat <<EOF > "$OUTPUT_SQL_FILE"
+-- create extension
+DROP EXTENSION IF EXISTS pgmoneta_ext;
+CREATE EXTENSION pgmoneta_ext;
+
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_file(text) TO $CONN_USER_NAME;
+GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO $CONN_USER_NAME;
+
+-- GRANT connection user privilege to fetch file from server
+GRANT pg_read_server_files TO $CONN_USER_NAME;
+
+GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO $CONN_USER_NAME;
+GRANT EXECUTE ON FUNCTION pg_stat_file(text, boolean) TO $CONN_USER_NAME;
+-- GRANT connection user execute privileges on backup admin functions
+EOF
+
+# Append the correct function grants depending on version
+if [ "$(echo "$PG_VERSION > 14" | bc -l)" -eq 1 ]; then
+    echo "GRANT EXECUTE ON FUNCTION pg_backup_start(text, boolean) TO $CONN_USER_NAME;" >> "$OUTPUT_SQL_FILE"
+    echo "GRANT EXECUTE ON FUNCTION pg_backup_stop(boolean) TO $CONN_USER_NAME;" >> "$OUTPUT_SQL_FILE"
+else
+    echo "GRANT EXECUTE ON FUNCTION pg_start_backup(text, boolean, boolean) TO $CONN_USER_NAME;" >> "$OUTPUT_SQL_FILE"
+    echo "GRANT EXECUTE ON FUNCTION pg_stop_backup(boolean, boolean) TO $CONN_USER_NAME;" >> "$OUTPUT_SQL_FILE"
+fi
+
+OUTER_EOF
+./init-permissions.sh repl
+psql -f init-permissions.sql postgres
+```
+
+or run the script `init-permissions.sh` with the connection user like:
+
+```
+./init-permissions.sh repl
+```
+
+this will generate an sql file `init-permissions.sql` use this to initialize the cluster:
+
+```
+psql -f init-permissions.sql postgres
+```
+
+Once this setup is done you can go ahead and create incremental backups without hassles.
 
 ## Backup information
 

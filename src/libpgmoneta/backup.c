@@ -134,7 +134,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    if (incremental != NULL)
    {
       backup_incremental = false;
-      if (config->common.servers[server].version < 17)
+      if (config->common.servers[server].version < 14)
       {
          pgmoneta_log_error("Incremental backup not supported for server %s at version %d",
                             config->common.servers[server].name, config->common.servers[server].version);
@@ -302,6 +302,9 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    exit(0);
 
 error:
+
+   config->common.servers[server].active_backup = false;
+   atomic_store(&config->common.servers[server].repository, false);
 
    pgmoneta_management_response_error(NULL, client_fd, config->common.servers[server].name,
                                       ec != -1 ? ec : MANAGEMENT_ERROR_BACKUP_ERROR,

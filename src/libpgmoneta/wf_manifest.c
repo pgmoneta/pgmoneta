@@ -30,6 +30,7 @@
 #include <info.h>
 #include <logging.h>
 #include <manifest.h>
+#include <security.h>
 #include <utils.h>
 #include <workflow.h>
 
@@ -80,6 +81,7 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    char* backup_data = NULL;
    char* manifest_orig = NULL;
    char* manifest = NULL;
+   char* incremental = NULL;
    char* key_path[1] = {"Files"};
    struct backup* backup = NULL;
    struct json_reader* reader = NULL;
@@ -88,6 +90,8 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    char file_path[MAX_PATH];
    char* info[MANIFEST_COLUMN_COUNT];
    struct main_configuration* config;
+
+   struct json* m = NULL;
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -118,6 +122,8 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    backup_data = (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA);
    server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
+   incremental = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_BASE);
+
    manifest = pgmoneta_append(manifest, backup_base);
    if (!pgmoneta_ends_with(manifest, "/"))
    {
@@ -131,6 +137,24 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
       manifest_orig = pgmoneta_append(manifest_orig, "/");
    }
    manifest_orig = pgmoneta_append(manifest_orig, "backup_manifest");
+
+   /* create manifest file manually for incremental backups for PostgreSQL version 14-16 */
+   if (incremental && config->common.servers[server].version < 17)
+   {
+      if (pgmoneta_generate_manifest(1, 0, backup_data, backup, &m))
+      {
+         pgmoneta_log_error("Could not generate the manifest");
+         goto error;
+      }
+
+      if (pgmoneta_write_postgresql_manifest(m, manifest_orig))
+      {
+         pgmoneta_log_error("Could not write file %s to disk", manifest_orig);
+         goto error;
+      }
+
+      pgmoneta_json_destroy(m);
+   }
 
    if (pgmoneta_csv_writer_init(manifest, &writer))
    {
@@ -182,8 +206,8 @@ manifest_execute(char* name __attribute__((unused)), struct art* nodes)
    free(manifest_orig);
 
    return 0;
-
 error:
+   pgmoneta_json_destroy(m);
    pgmoneta_json_reader_close(reader);
    pgmoneta_csv_writer_destroy(writer);
    pgmoneta_json_destroy(entry);

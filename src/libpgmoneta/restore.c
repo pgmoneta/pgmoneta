@@ -81,8 +81,6 @@ static int restore_backup_incremental(struct art* nodes);
 static int carry_out_workflow(struct workflow* workflow, struct art* nodes);
 
 static void clear_manifest_incremental_entries(struct json* manifest);
-
-static int get_file_manifest(char* path, char* manifest_path, struct json** file);
 /**
  * Combine the provided backups or each of the user defined table-spaces
  * The function will be called for two rounds, the first round would construct the data directory
@@ -1624,7 +1622,7 @@ reconstruct_backup_file(int server,
    }
 
    // Update file entry in manifest
-   if (get_file_manifest(ofullpath, manifest_path, &file))
+   if (pgmoneta_get_file_manifest(ofullpath, manifest_path, &file))
    {
       pgmoneta_log_error("Unable to get manifest for file %s", ofullpath);
       goto error;
@@ -2133,47 +2131,6 @@ clear_manifest_incremental_entries(struct json* manifest)
       }
    }
    pgmoneta_json_iterator_destroy(iter);
-}
-
-static int
-get_file_manifest(char* path, char* manifest_path, struct json** file)
-{
-   struct json* f = NULL;
-   size_t size = 0;
-   time_t t;
-   struct tm* tinfo;
-   char now[MISC_LENGTH];
-   char* checksum = NULL;
-
-   *file = NULL;
-   pgmoneta_json_create(&f);
-
-   size = pgmoneta_get_file_size(path);
-
-   time(&t);
-   tinfo = gmtime(&t);
-   memset(now, 0, sizeof(now));
-   strftime(now, sizeof(now), "%Y-%m-%d %H:%M:%S GMT", tinfo);
-
-   if (pgmoneta_create_sha512_file(path, &checksum))
-   {
-      goto error;
-   }
-
-   pgmoneta_json_put(f, "Checksum-Algorithm", (uintptr_t)"SHA512", ValueString);
-   pgmoneta_json_put(f, "Path", (uintptr_t)manifest_path, ValueString);
-   pgmoneta_json_put(f, "Size", size, ValueUInt64);
-   pgmoneta_json_put(f, "Last-Modified", (uintptr_t)now, ValueString);
-   pgmoneta_json_put(f, "Checksum", (uintptr_t)checksum, ValueString);
-   *file = f;
-
-   free(checksum);
-   return 0;
-
-error:
-   free(checksum);
-   pgmoneta_json_destroy(f);
-   return 1;
 }
 
 static int

@@ -50,12 +50,14 @@ pgmoneta_test_restore_suite()
    s = suite_create("pgmoneta_test_restore");
 
    tc_restore_full = tcase_create("full_restore_test");
+   tcase_set_tags(tc_restore_full, "common");
    tcase_set_timeout(tc_restore_full, 60);
    tcase_add_checked_fixture(tc_restore_full, pgmoneta_test_add_backup, pgmoneta_test_basedir_cleanup);
    tcase_add_test(tc_restore_full, test_pgmoneta_restore);
    suite_add_tcase(s, tc_restore_full);
 
    tc_restore_incremental = tcase_create("incremental_restore_test");
+   tcase_set_tags(tc_restore_incremental, "common");
    tcase_set_timeout(tc_restore_incremental, 60);
    tcase_add_checked_fixture(tc_restore_incremental, pgmoneta_test_add_backup_chain, pgmoneta_test_basedir_cleanup);
    tcase_add_test(tc_restore_incremental, test_pgmoneta_restore);

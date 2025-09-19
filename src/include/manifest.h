@@ -35,6 +35,7 @@ extern "C" {
 
 #include <pgmoneta.h>
 #include <art.h>
+#include <backup.h>
 #include <json.h>
 
 #define MANIFEST_CHUNK_SIZE 8192
@@ -90,6 +91,37 @@ pgmoneta_compare_manifests(char* old_manifest, char* new_manifest, struct art** 
  */
 int
 pgmoneta_write_postgresql_manifest(struct json* manifest, char* path);
+
+/**
+ * Generate the manifest in memory (json format)
+ * @param version The manifest file version
+ * @param system_id The system identifier, an optional parameter for manifest version 2 and above
+ * @param backup_data The data directory
+ * @param backup The backup related to the manifest
+ * @param manifest [out] The json manifest generated
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, struct backup* bck, struct json** manifest);
+
+/**
+ * Get the manifest record of a file
+ * @param path The system path of the file
+ * @param manifest_path The path to be used in manifest record entry
+ * @param file [out] The json returning the manifest record
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_get_file_manifest(char* path, char* manifest_path, struct json** file);
+
+/**
+ * Generate the files manifest (in json format)
+ * @param path The path to walk for manifest creation
+ * @param files The json to append results
+ * @return 0 if success, otherwise 1
+ */
+int
+pgmoneta_generate_files_manifest(char* path, struct json* files);
 
 #ifdef __cplusplus
 }
