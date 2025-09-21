@@ -36,6 +36,14 @@ extern "C" {
 #include <pgmoneta.h>
 
 #include <stdlib.h>
+#include <time.h>
+
+struct file_stats
+{
+   size_t size;             /**< The size of the file */
+   bool is_dir;             /**< Is the file a directory */
+   struct tm timetamps[4];  /**< array of timestamps in the order: access time, modification time, change time and creation time */
+};
 
 /**
  * Get the information for a server
@@ -104,6 +112,18 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
  */
 int
 pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* chkpt_lsn);
+
+/**
+ * Fetch metadata of a file
+ * @param srv The server index
+ * @param ssl The SSL connectiom
+ * @param socket The socket
+ * @param relative_file_path The relative path of the relation file inside the data cluster
+ * @param file_stat [out] The file stat
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_path, struct file_stats* stat);
 
 #ifdef __cplusplus
 }

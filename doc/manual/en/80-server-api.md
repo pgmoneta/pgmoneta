@@ -83,6 +83,8 @@ Privileges:
 - pg_read_server_files | SUPERUSER (PostgreSQL +11)
 - SUPERUSER (otherwise)
 
+Note: connection user must be granted `EXECUTE` privilege on the function `pg_read_binary_file(text, bigint, bigint, boolean)`
+
 **pgmoneta_server_checkpoint**
 
 Force a checkpoint into the cluster. Under the hood, it first calls `CHECKPOINT;` command and then retrieves the checkpoint LSN by executing `SELECT checkpoint_lsn FROM pg_control_checkpoint();`. Useful while performing backups/incremental backups.
@@ -90,3 +92,31 @@ Force a checkpoint into the cluster. Under the hood, it first calls `CHECKPOINT;
 Privileges:
 - pg_checkpoint | SUPERUSER (PostgreSQL 15+)
 - SUPERUSER (PostgreSQL 13/14)
+
+**pgmoneta_server_file_stat**
+
+Fetch metadata of a data file like size, modification time, creation time etc. Exact meta data structure is as follows:
+
+```c
+struct file_stats
+{
+   size_t size;
+   bool is_dir;
+   struct tm timetamps[4];
+};
+```
+
+* `size`: The size of the file at the time of request
+* `is_dir`: if the file is a directory (Note: doesn't differentiate between a regular file and a symlink)
+* `timestamps`: An array (length 4) of timestamp information related to the file
+    * `access time`: time the file was last accessed
+    * `modification time`: time the contents of the file was last changed
+    * `changed time`: time the perms/ownership of a file was last changed
+    * `creation time`: time when the file was created
+
+The timestamps are represented in the format `%Y-%m-%d %H:%M:%S` by the server
+
+Privileges:
+- Default (all PostgreSQL versions)
+
+Note: connection user must be granted `EXECUTE` privilege on the function `pg_stat_file(text, boolean)`

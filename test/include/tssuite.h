@@ -61,6 +61,13 @@ Suite*
 pgmoneta_test_http_suite();
 
 /**
+ * Set up server API test suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_server_api_suite();
+
+/**
  * Set up a brt input/output suite for pgmoneta
  * @return The result
  */

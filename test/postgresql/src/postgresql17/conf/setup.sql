@@ -31,4 +31,8 @@ CREATE ROLE PG_REPL_USER_NAME WITH LOGIN REPLICATION PASSWORD 'PG_REPL_PASSWORD'
 
 -- GRANT REPL_USER priviledge to perform CHECKPOINT and pg_switch_wal
 GRANT pg_checkpoint TO PG_REPL_USER_NAME;
+GRANT pg_read_server_files TO PG_REPL_USER_NAME;
+
 GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO PG_REPL_USER_NAME;
+GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO PG_REPL_USER_NAME;
+GRANT EXECUTE ON FUNCTION pg_stat_file(text, boolean) TO PG_REPL_USER_NAME;

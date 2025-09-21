@@ -421,6 +421,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn)
    user = config->common.servers[srv].username;
 
    /* Check for 'pg_checkpoint' role for PostgreSQL +15 and 'SUPERUSER' role for PostgreSQL 13/14 */
+   printf("version: %d\n", version);
    if (version >= 15)
    {
       if (has_predefined_role(ssl, socket, user, "pg_checkpoint", &has_role))
@@ -515,6 +516,113 @@ q:
    }
 
    *c_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 0;
+error:
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+int
+pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_path, struct file_stats* s)
+{
+   char* user = NULL;
+   char* cell_output = NULL;
+   int ret;
+   int q = 0;
+   bool has_privilege = false;
+   char query[MISC_LENGTH];
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+   struct file_stats stat;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto error;
+   }
+
+   user = config->common.servers[srv].username;
+
+   /* Check if the user has EXECUTE privilege on 'pg_stat_file(text, boolean)' */
+   if (has_execute_privilege(ssl, socket, user, "pg_stat_file(text, boolean)", &has_privilege))
+   {
+      goto error;
+   }
+
+   if (!has_privilege)
+   {
+      pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_stat_file(text, boolean)' function", user);
+      goto error;
+   }
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT * FROM pg_stat_file('%s', false);", relative_file_path);
+
+   ret = pgmoneta_create_query_message(query, &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   if (response == NULL || response->number_of_columns != 6)
+   {
+      goto error;
+   }
+
+   cell_output = pgmoneta_query_response_get_data(response, 0);
+   if (cell_output == NULL || strcmp(cell_output, "") == 0)
+   {
+      goto error;
+   }
+   stat.size = pgmoneta_atoi(cell_output);
+
+   /* populate optional timestamp values */
+   for (int i = 1; i < 5; i++)
+   {
+      cell_output = pgmoneta_query_response_get_data(response, i);
+      if (!(cell_output == NULL || strcmp(cell_output, "") == 0))
+      {
+         strptime(cell_output, "%Y-%m-%d %H:%M:%S", &stat.timetamps[i - 1]);
+      }
+   }
+
+   cell_output = pgmoneta_query_response_get_data(response, 5);
+   if (cell_output == NULL || strcmp(cell_output, "") == 0)
+   {
+      goto error;
+   }
+   stat.is_dir = cell_output[0] == 't' ? true : false;
+
+   *s = stat;
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
