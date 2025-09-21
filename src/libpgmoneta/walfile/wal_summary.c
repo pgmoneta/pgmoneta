@@ -134,7 +134,7 @@ pgmoneta_wal_summary_save(int srv, uint64_t s_lsn, uint64_t e_lsn, block_ref_tab
    }
 
    summary_filename = summary_file_name(s_lsn, e_lsn);
-   
+
    if (pgmoneta_ends_with(summary_dir, "/"))
    {
       snprintf(tmp_file, sizeof(tmp_file), "%s%s.partial", summary_dir, summary_filename);
