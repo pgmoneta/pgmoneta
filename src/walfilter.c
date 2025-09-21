@@ -390,6 +390,98 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, st
    return 0;
 }
 
+/**
+ * Filter out records with specific XIDs from WAL files
+ *
+ * @param file_count Pointer to the number of WAL files
+ * @param walfiles Pointer to the array of WAL file pointers
+ * @param xids Array of XIDs to filter out
+ * @param xid_count Number of XIDs in the array
+ * @return 0 on success, non-zero on failure
+ */
+int
+pgmoneta_filter_xids(int* file_count, struct walfile*** walfiles, int* xids, int xid_count)
+{
+#define XID_IS_FILTERED(xid) \
+        ({ int found = 0; \
+           for (int k = 0; k < xid_count; k++) { \
+              if ((transaction_id) xids[k] == (xid)) { found = 1; break; } \
+           } found; })
+
+   int records_marked = 0;
+   int match = 0;
+   struct deque_iterator* rec_iter = NULL;
+   struct decoded_xlog_record* rec = NULL;
+
+   if (xids == NULL || xid_count <= 0)
+   {
+      pgmoneta_log_info("No XIDs provided for filtering");
+      goto done;
+   }
+
+   /* Mark matching records as NOOP */
+   for (int i = 0; i < *file_count; i++)
+   {
+      struct walfile* wf = (*walfiles)[i];
+      if (wf == NULL || wf->records == NULL)
+      {
+         continue;
+      }
+
+      rec_iter = NULL;
+      if (pgmoneta_deque_iterator_create(wf->records, &rec_iter))
+      {
+         pgmoneta_log_error("Failed to create iterator for WAL file records");
+         goto error;
+      }
+
+      while (pgmoneta_deque_iterator_next(rec_iter))
+      {
+         rec = (struct decoded_xlog_record*)rec_iter->value->data;
+         match = 0;
+
+         /* Check if the record's XID or toplevel_xid matches any of the filtered XIDs */
+         if (XID_IS_FILTERED(rec->header.xl_xid) || XID_IS_FILTERED(rec->toplevel_xid))
+         {
+            match = 1;
+         }
+
+         if (match)
+         {
+            /* Change to NOOP (RM_XLOG, XLOG_NOOP) */
+            rec->header.xl_info = XLOG_NOOP;
+            rec->header.xl_rmid = RM_XLOG_ID;
+
+            records_marked++;
+         }
+      }
+      pgmoneta_deque_iterator_destroy(rec_iter);
+   }
+
+   if (xid_count > 0)
+   {
+      char* filter_xids_str = NULL;
+      for (int i = 0; i < xid_count; i++)
+      {
+         filter_xids_str = pgmoneta_format_and_append(filter_xids_str, "%u%s", xids[i], (i < xid_count - 1) ? ", " : "");
+      }
+      pgmoneta_log_info("Filtered XIDs: %s", filter_xids_str ? filter_xids_str : "");
+      free(filter_xids_str);
+   }
+
+done:
+   return 0;
+
+error:
+   if (rec_iter)
+   {
+      pgmoneta_deque_iterator_destroy(rec_iter);
+      rec_iter = NULL;
+   }
+
+   return 1;
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -637,18 +729,27 @@ main(int argc, char* argv[])
       wf = NULL;
    }
 
-   if (yaml_config.rules != NULL && yaml_config.rules->exclude.operation_count > 0)
+   if (yaml_config.operation_count > 0)
    {
-      for (int i = 0; i < yaml_config.rules->exclude.operation_count; i++)
+      for (int i = 0; i < yaml_config.operation_count; i++)
       {
-         if (!strcmp(yaml_config.rules->exclude.operations[i], OPERATION_DELETE))
+         if (!strcmp(yaml_config.operations[i], OPERATION_DELETE))
          {
             if (pgmoneta_filter_operation_delete(&walfile_count, &walfiles, backup))
             {
-               pgmoneta_log_error("Failed to apply filter on operation %s", yaml_config.rules->exclude.operations[i]);
+               pgmoneta_log_error("Failed to apply filter on operation %s", yaml_config.operations[i]);
                goto error;
             }
          }
+      }
+   }
+
+   if (yaml_config.xid_count > 0)
+   {
+      if (pgmoneta_filter_xids(&walfile_count, &walfiles, yaml_config.xids, yaml_config.xid_count))
+      {
+         pgmoneta_log_error("Failed to apply filter on XIDs");
+         goto error;
       }
    }
 

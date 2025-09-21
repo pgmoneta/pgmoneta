@@ -528,8 +528,8 @@ pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, ui
  */
 void
 pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_t end_lsn,
-                        struct deque* rms, struct deque* xids, char** included_objects,
-                        struct column_widths* widths);
+                                 struct deque* rms, struct deque* xids, char** included_objects,
+                                 struct column_widths* widths);
 
 #ifdef __cplusplus
 }
