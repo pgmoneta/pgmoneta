@@ -30,6 +30,7 @@
 #include <logging.h>
 #include <utils.h>
 #include <walfile.h>
+#include <walfile/wal_reader.h>
 
 #include <dirent.h>
 #include <libgen.h>
@@ -374,6 +375,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
    struct decoded_xlog_record* record = NULL;
    char* from = NULL;
    char* to = NULL;
+   struct column_widths widths = {0};
 
    if (!pgmoneta_is_file(path))
    {
@@ -382,7 +384,6 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
    }
 
    from = pgmoneta_append(from, path);
-   /* Extract the wal file in /tmp/ */
    to = pgmoneta_append(to, "/tmp/");
    to = pgmoneta_append(to, basename(path));
 
@@ -396,6 +397,11 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
    {
       pgmoneta_log_error("Failed to read WAL file at %s", path);
       goto error;
+   }
+
+   if (type == ValueString && !summary)
+   {
+      pgmoneta_calculate_column_widths(wf, start_lsn, end_lsn, rms, xids, included_objects, &widths);
    }
 
    if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
@@ -421,7 +427,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
          else
          {
             pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                        rms, start_lsn, end_lsn, xids, limit, included_objects);
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects, &widths);
          }
       }
 
@@ -442,7 +448,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
          else
          {
             pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
-                                        rms, start_lsn, end_lsn, xids, limit, included_objects);
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects, &widths);
          }
       }
    }
@@ -454,7 +460,6 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
    return 0;
 
 error:
-
    free(from);
    free(to);
    pgmoneta_destroy_walfile(wf);

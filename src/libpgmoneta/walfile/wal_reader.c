@@ -1111,9 +1111,305 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
    return true;
 }
 
+static char*
+enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
+{
+   if (!rm_desc)
+   {
+      return NULL;
+   }
+
+   char* operation_desc = NULL;
+
+   switch (rmid)
+   {
+      case RM_HEAP_ID:
+      {
+         uint8_t heap_info = info & XLOG_HEAP_OPMASK;
+         switch (heap_info)
+         {
+            case XLOG_HEAP_INSERT:
+               operation_desc = pgmoneta_format_and_append(NULL, "INSERT %s", rm_desc);
+               break;
+            case XLOG_HEAP_DELETE:
+               operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", rm_desc);
+               break;
+            case XLOG_HEAP_UPDATE:
+               operation_desc = pgmoneta_format_and_append(NULL, "UPDATE %s", rm_desc);
+               break;
+            case XLOG_HEAP_HOT_UPDATE:
+               operation_desc = pgmoneta_format_and_append(NULL, "HOT_UPDATE %s", rm_desc);
+               break;
+            case XLOG_HEAP_TRUNCATE:
+               operation_desc = pgmoneta_format_and_append(NULL, "TRUNCATE %s", rm_desc);
+               break;
+            case XLOG_HEAP_INPLACE:
+               operation_desc = pgmoneta_format_and_append(NULL, "INPLACE %s", rm_desc);
+               break;
+            default:
+               operation_desc = strdup(rm_desc);
+               break;
+         }
+         break;
+      }
+      case RM_BTREE_ID:
+      {
+         uint8_t btree_info = info & ~XLR_INFO_MASK;
+         switch (btree_info)
+         {
+            case XLOG_BTREE_INSERT_LEAF:
+               operation_desc = pgmoneta_format_and_append(NULL, "INSERT_LEAF %s", rm_desc);
+               break;
+            case XLOG_BTREE_INSERT_UPPER:
+               operation_desc = pgmoneta_format_and_append(NULL, "INSERT_UPPER %s", rm_desc);
+               break;
+            case XLOG_BTREE_SPLIT_L:
+               operation_desc = pgmoneta_format_and_append(NULL, "SPLIT_L %s", rm_desc);
+               break;
+            case XLOG_BTREE_SPLIT_R:
+               operation_desc = pgmoneta_format_and_append(NULL, "SPLIT_R %s", rm_desc);
+               break;
+            case XLOG_BTREE_DELETE:
+               operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", rm_desc);
+               break;
+            default:
+               operation_desc = strdup(rm_desc);
+               break;
+         }
+         break;
+      }
+      case RM_XACT_ID:
+      {
+         uint8_t xact_info = info & XLOG_XACT_OPMASK;
+         switch (xact_info)
+         {
+            case XLOG_XACT_COMMIT:
+               operation_desc = pgmoneta_format_and_append(NULL, "COMMIT %s", rm_desc);
+               break;
+            case XLOG_XACT_ABORT:
+               operation_desc = pgmoneta_format_and_append(NULL, "ABORT %s", rm_desc);
+               break;
+            case XLOG_XACT_PREPARE:
+               operation_desc = pgmoneta_format_and_append(NULL, "PREPARE %s", rm_desc);
+               break;
+            case XLOG_XACT_COMMIT_PREPARED:
+               operation_desc = pgmoneta_format_and_append(NULL, "COMMIT_PREPARED %s", rm_desc);
+               break;
+            case XLOG_XACT_ABORT_PREPARED:
+               operation_desc = pgmoneta_format_and_append(NULL, "ABORT_PREPARED %s", rm_desc);
+               break;
+            default:
+               operation_desc = strdup(rm_desc);
+               break;
+         }
+         break;
+      }
+      case RM_STANDBY_ID:
+      {
+         uint8_t standby_info = info & ~XLR_INFO_MASK;
+         switch (standby_info)
+         {
+            case XLOG_STANDBY_LOCK:
+               operation_desc = pgmoneta_format_and_append(NULL, "LOCK %s", rm_desc);
+               break;
+            case XLOG_RUNNING_XACTS:
+               operation_desc = pgmoneta_format_and_append(NULL, "RUNNING_XACTS %s", rm_desc);
+               break;
+            default:
+               operation_desc = strdup(rm_desc);
+               break;
+         }
+         break;
+      }
+      case RM_XLOG_ID:
+      {
+         uint8_t xlog_info = info & ~XLR_INFO_MASK;
+         switch (xlog_info)
+         {
+            case XLOG_CHECKPOINT_SHUTDOWN:
+               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_SHUTDOWN %s", rm_desc);
+               break;
+            case XLOG_CHECKPOINT_ONLINE:
+               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_ONLINE %s", rm_desc);
+               break;
+            case XLOG_NOOP:
+               operation_desc = pgmoneta_format_and_append(NULL, "NOOP %s", rm_desc);
+               break;
+            case XLOG_NEXTOID:
+               operation_desc = pgmoneta_format_and_append(NULL, "NEXTOID %s", rm_desc);
+               break;
+            case XLOG_SWITCH:
+               operation_desc = pgmoneta_format_and_append(NULL, "SWITCH %s", rm_desc);
+               break;
+            case XLOG_BACKUP_END:
+               operation_desc = pgmoneta_format_and_append(NULL, "BACKUP_END %s", rm_desc);
+               break;
+            case XLOG_PARAMETER_CHANGE:
+               operation_desc = pgmoneta_format_and_append(NULL, "PARAMETER_CHANGE %s", rm_desc);
+               break;
+            case XLOG_RESTORE_POINT:
+               operation_desc = pgmoneta_format_and_append(NULL, "RESTORE_POINT %s", rm_desc);
+               break;
+            case XLOG_FPW_CHANGE:
+               operation_desc = pgmoneta_format_and_append(NULL, "FPW_CHANGE %s", rm_desc);
+               break;
+            case XLOG_END_OF_RECOVERY:
+               operation_desc = pgmoneta_format_and_append(NULL, "END_OF_RECOVERY %s", rm_desc);
+               break;
+            case XLOG_FPI_FOR_HINT:
+               operation_desc = pgmoneta_format_and_append(NULL, "FPI_FOR_HINT %s", rm_desc);
+               break;
+            case XLOG_FPI:
+               operation_desc = pgmoneta_format_and_append(NULL, "FPI %s", rm_desc);
+               break;
+            case XLOG_CHECKPOINT_REDO:
+               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_REDO %s", rm_desc);
+               break;
+            default:
+               operation_desc = strdup(rm_desc);
+               break;
+         }
+         break;
+      }
+      default:
+         // For other resource managers, just use the original description
+         operation_desc = strdup(rm_desc);
+         break;
+   }
+
+   return operation_desc;
+}
+
 void
-pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
-                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, char** included_objects)
+pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_t end_lsn,
+                        struct deque* rms, struct deque* xids, char** included_objects,
+                        struct column_widths* widths)
+{
+   struct deque_iterator* record_iterator = NULL;
+   struct decoded_xlog_record* record = NULL;
+   char* start_lsn_string = NULL;
+   char* end_lsn_string = NULL;
+   char* rm_desc = NULL;
+   char* backup_str = NULL;
+   char* enhanced_desc = NULL;
+   uint32_t rec_len = 0;
+   uint32_t fpi_len = 0;
+   int temp_width;
+
+   widths->rm_width = strlen("Resource Manager");
+   widths->lsn_width = strlen("Begin LSN");
+   widths->rec_width = strlen("Rec Len");
+   widths->tot_width = strlen("Tot Len");
+   widths->xid_width = strlen("XID");
+
+   if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
+   {
+      return;
+   }
+
+   while (pgmoneta_deque_iterator_next(record_iterator))
+   {
+      record = (struct decoded_xlog_record*) record_iterator->value->data;
+
+      if (record->partial)
+      {
+         continue;
+         
+      }
+
+      rm_desc = malloc(1);
+      if (rm_desc)
+      {
+         rm_desc[0] = '\0';
+      }
+      backup_str = malloc(1);
+      if (backup_str)
+      {
+         backup_str[0] = '\0';
+      }
+
+      rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+      enhanced_desc = enhance_description(rm_desc, record->header.xl_rmid, record->header.xl_info);
+      backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, wf->long_phd->std.xlp_magic);
+
+      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", enhanced_desc, backup_str);
+
+      if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
+                       start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
+                       record_desc, record->header.xl_info, record->header.xl_rmid))
+      {
+         free(record_desc);
+         free(rm_desc);
+         free(backup_str);
+         free(enhanced_desc);
+         continue;
+      }
+
+      // Calculate Resource Manager width
+      temp_width = strlen(rmgr_table[record->header.xl_rmid].name);
+      if (temp_width > widths->rm_width)
+      {
+         widths->rm_width = temp_width;
+      }
+
+      // Calculate LSN widths
+      start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
+      end_lsn_string = pgmoneta_lsn_to_string(record->lsn);
+
+      temp_width = strlen(start_lsn_string);
+      if (temp_width > widths->lsn_width)
+      {
+         widths->lsn_width = temp_width;
+      }
+
+      temp_width = strlen(end_lsn_string);
+      if (temp_width > widths->lsn_width)
+      {
+         widths->lsn_width = temp_width;
+      }
+
+      // Calculate record length width
+      get_record_length(record, &rec_len, &fpi_len);
+      temp_width = snprintf(NULL, 0, "%d", rec_len);
+      if (temp_width > widths->rec_width)
+      {
+         widths->rec_width = temp_width;
+      }
+
+      // Calculate total length width
+      temp_width = snprintf(NULL, 0, "%d", record->header.xl_tot_len);
+      if (temp_width > widths->tot_width)
+      {
+         widths->tot_width = temp_width;
+      }
+
+      // Calculate XID width
+      temp_width = snprintf(NULL, 0, "%u", record->header.xl_xid);
+      if (temp_width > widths->xid_width)
+      {
+         widths->xid_width = temp_width;
+      }
+
+      free(record_desc);
+      free(rm_desc);
+      free(backup_str);
+      free(enhanced_desc);
+      free(start_lsn_string);
+      free(end_lsn_string);
+      rm_desc = NULL;
+      backup_str = NULL;
+      enhanced_desc = NULL;
+      start_lsn_string = NULL;
+      end_lsn_string = NULL;
+   }
+
+   pgmoneta_deque_iterator_destroy(record_iterator);
+}
+
+void
+pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out,
+                            bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn,
+                            struct deque* xids, uint32_t limit, char** included_objects, struct column_widths* widths)
 {
    static uint32_t current_limit = 0;
    char* header_str = NULL;
@@ -1121,6 +1417,7 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
    char* backup_str = NULL;
    char* start_lsn_string = NULL;
    char* end_lsn_string = NULL;
+   char* enhanced_desc = NULL;
    struct value* record_serialized = NULL;
    char* value_str = NULL;
    uint32_t rec_len = 0;
@@ -1141,9 +1438,12 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
       }
 
       rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+
+      enhanced_desc = enhance_description(rm_desc, record->header.xl_rmid, record->header.xl_info);
+
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
-      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
+      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", enhanced_desc, backup_str);
 
       if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
@@ -1207,35 +1507,29 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
 
          if (color)
          {
-            header_str = pgmoneta_format_and_append(header_str, "%s%s%s | %s%s%s | %s%s%s | %s%d%s | %s%d%s | %s%d%s",
-                                                    COLOR_RED, rmgr_table[record->header.xl_rmid].name, COLOR_RESET,
-                                                    COLOR_MAGENTA, start_lsn_string, COLOR_RESET,
-                                                    COLOR_MAGENTA, end_lsn_string, COLOR_RESET,
-                                                    COLOR_BLUE, rec_len, COLOR_RESET,
-                                                    COLOR_YELLOW, record->header.xl_tot_len, COLOR_RESET,
-                                                    COLOR_CYAN, record->header.xl_xid, COLOR_RESET);
+            fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%s%s%s%s\n",
+                    COLOR_RED, widths->rm_width, rmgr_table[record->header.xl_rmid].name, COLOR_RESET,
+                    COLOR_MAGENTA, widths->lsn_width, start_lsn_string, COLOR_RESET,
+                    COLOR_MAGENTA, widths->lsn_width, end_lsn_string, COLOR_RESET,
+                    COLOR_BLUE, widths->rec_width, rec_len, COLOR_RESET,
+                    COLOR_YELLOW, widths->tot_width, record->header.xl_tot_len, COLOR_RESET,
+                    COLOR_CYAN, widths->xid_width, record->header.xl_xid, COLOR_RESET,
+                    COLOR_GREEN, enhanced_desc,
+                    backup_str && strlen(backup_str) > 0 ? " " : "",
+                    backup_str ? backup_str : "", COLOR_RESET);
          }
          else
          {
-            header_str = pgmoneta_format_and_append(header_str, "%s | %s | %s | %d | %d | %d",
-                                                    rmgr_table[record->header.xl_rmid].name,
-                                                    start_lsn_string,
-                                                    end_lsn_string,
-                                                    rec_len,
-                                                    record->header.xl_tot_len,
-                                                    record->header.xl_xid);
-         }
-
-         if (color)
-         {
-            fprintf(out, "%s%s%s | %s%s %s%s\n",
-                    COLOR_RED, header_str, COLOR_WHITE,
-                    COLOR_GREEN, rm_desc,
-                    backup_str, COLOR_RESET);
-         }
-         else
-         {
-            fprintf(out, "%s | %s %s\n", header_str, rm_desc, backup_str);
+            fprintf(out, "%-*s | %-*s | %-*s | %-*d | %-*d | %-*u | %s%s%s\n",
+                    widths->rm_width, rmgr_table[record->header.xl_rmid].name,
+                    widths->lsn_width, start_lsn_string,
+                    widths->lsn_width, end_lsn_string,
+                    widths->rec_width, rec_len,
+                    widths->tot_width, record->header.xl_tot_len,
+                    widths->xid_width, record->header.xl_xid,
+                    enhanced_desc,
+                    backup_str && strlen(backup_str) > 0 ? " " : "",
+                    backup_str ? backup_str : "");
          }
       }
       goto cleanup;
@@ -1247,6 +1541,7 @@ cleanup:
    free(backup_str);
    free(start_lsn_string);
    free(end_lsn_string);
+   free(enhanced_desc);
    free(value_str);
    if (record_serialized != NULL)
    {

@@ -367,6 +367,29 @@ struct rel_file_node
    oid relNode;      /**< Relation OID. */
 };
 
+/**
+ * @struct column_widths
+ * @brief Stores the widths of various columns for display formatting.
+ *
+ * This structure holds the widths of different columns used in displaying
+ * WAL record information, ensuring consistent formatting.
+ *
+ * Fields:
+ * - rm_width: Width of the resource manager column.
+ * - lsn_width: Width of the LSN column.
+ * - rec_width: Width of the record type column.
+ * - tot_width: Width of the total length column.
+ * - xid_width: Width of the transaction ID column.
+ */
+struct column_widths
+{
+   int rm_width;                       /**< Width of the resource manager column. */
+   int lsn_width;                      /**< Width of the LSN column. */
+   int rec_width;                      /**< Width of the record type column. */
+   int tot_width;                      /**< Width of the total length column. */
+   int xid_width;                      /**< Width of the transaction ID column. */
+};
+
 /* External variables */
 extern struct server* server_config;
 
@@ -437,10 +460,12 @@ pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count);
  * @param xids The XIDs
  * @param limit The limit
  * @param included_objects Objects that will include wal records that reference them
+ * @param widths The column widths for consistent formatting
  */
 void
-pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out, bool quiet, bool color,
-                            struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, char** included_objects);
+pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_value, enum value_type type, FILE* out,
+                            bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn,
+                            struct deque* xids, uint32_t limit, char** included_objects, struct column_widths* widths);
 
 /**
  * Display the ocuurance of resource manager in WAL records
@@ -486,6 +511,25 @@ pgmoneta_wal_encode_xlog_record(struct decoded_xlog_record* decoded, uint16_t ma
  */
 void
 pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn);
+
+/**
+ * Calculates the widths of various columns for display formatting.
+ *
+ * This function calculates the widths of different columns used in displaying
+ * WAL record information, ensuring consistent formatting.
+ *
+ * @param wf The WAL file structure containing records to analyze.
+ * @param start_lsn The start LSN for filtering records.
+ * @param end_lsn The end LSN for filtering records.
+ * @param rms Deque of resource managers to consider.
+ * @param xids Deque of transaction IDs to consider.
+ * @param included_objects Objects that will include wal records that reference them
+ * @param widths Pointer to the column_widths structure to populate with calculated widths.
+ */
+void
+pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_t end_lsn,
+                        struct deque* rms, struct deque* xids, char** included_objects,
+                        struct column_widths* widths);
 
 #ifdef __cplusplus
 }
