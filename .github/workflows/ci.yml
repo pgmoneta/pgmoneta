@@ -1,4 +1,4 @@
-libyaml-devname: CI
+name: CI
 
 on:
   push:
