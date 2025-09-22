@@ -35,8 +35,10 @@
 #include <utils.h>
 
 /* system */
+#ifdef HAVE_CRC32_SSE42
 #include <nmmintrin.h>
 #include <wmmintrin.h>
+#endif
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -2973,6 +2975,7 @@ error:
    return 1;
 }
 
+#if HAVE_CRC32_SSE42
 static int
 cpu_supports_sse42(void)
 {
@@ -2988,7 +2991,6 @@ cpu_supports_sse42(void)
 #endif
 }
 
-#if HAVE_CRC32_SSE42
 #ifdef __x86_64__
 __attribute__((target("sse4.2")))
 static int
@@ -3024,7 +3026,6 @@ pgmoneta_crc32c_sse42(const void* buffer, size_t size, uint32_t* crc)
    return 0;
 }
 #endif // __x86_64__
-#endif // HAVE_CRC32_SSE42
 
 static int
 pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
@@ -3106,6 +3107,7 @@ pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
 
    return 0;
 }
+#endif // HAVE_CRC32_SSE42
 
 void
 pgmoneta_crc_init(void)

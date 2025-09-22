@@ -44,6 +44,7 @@
 
 /* system */
 #include <dirent.h>
+#include <unistd.h>
 #include <err.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -480,7 +481,7 @@ main(int argc, char* argv[])
       {
          config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
          memset(&config->common.log_path[0], 0, MISC_LENGTH);
-         memcpy(&config->common.log_path[0], logfile, MIN(MISC_LENGTH - 1, strlen(logfile)));
+         memcpy(&config->common.log_path[0], logfile, MIN((size_t)(MISC_LENGTH - 1), strlen(logfile)));
       }
    }
 
