@@ -103,7 +103,6 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn,
    *b = brt;
 
    free(wal_dir);
-   pgmoneta_brt_destroy(brt);
    return 0;
 
 error:
