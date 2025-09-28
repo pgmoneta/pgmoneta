@@ -35,6 +35,8 @@ extern "C" {
 
 #include <pgmoneta.h>
 
+#include <deque.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -46,112 +48,162 @@ extern "C" {
 #define PGMONETA_HTTP_POST 1
 #define PGMONETA_HTTP_PUT  2
 
+/* HTTP status codes */
+#define PGMONETA_HTTP_STATUS_OK    0
+#define PGMONETA_HTTP_STATUS_ERROR 1
+
+/** @struct http_payload
+ * Defines shared HTTP message content
+ */
+struct http_payload
+{
+   struct deque* headers;  /**< HTTP headers as deque */
+   void* data;             /**< Message data */
+   size_t data_size;       /**< Size of message data */
+};
+
+/** @struct http_request
+ * Defines a HTTP request
+ */
+struct http_request
+{
+   struct http_payload payload; /**< Request payload */
+   int method;                  /**< HTTP method */
+   char* path;                  /**< Request path */
+};
+
+/** @struct http_response
+ * Defines a HTTP response
+ */
+struct http_response
+{
+   struct http_payload payload; /**< Response payload */
+   int status_code;             /**< HTTP status code */
+};
+
 /** @struct http
- * Defines a HTTP interaction
+ * Defines a HTTP connection
  */
 struct http
 {
-   int endpoint;           /**< The endpoint */
-   int socket;             /**< The socket descriptor */
-   char* body;             /**< The HTTP response body */
-   char* headers;          /**< The HTTP response headers */
-   char* request_headers;  /**< The HTTP request headers */
-   SSL* ssl;               /**< The SSL connection (NULL for non-secure) */
+   int socket;      /**< The socket descriptor */
+   SSL* ssl;        /**< The SSL connection (NULL for non-secure) */
+   char* hostname;  /**< The hostname */
+   int port;        /**< The port number */
+   bool secure;     /**< Use SSL if true */
 };
 
 /**
- * Connect to an HTTP/HTTPS server
+ * Create a connection to a HTTP/HTTPS server
  * @param hostname The host to connect to
  * @param port The port number
  * @param secure Use SSL if true
- * @param result The resulting HTTP structure
- * @return 0 upon success, otherwise 1
+ * @param result The resulting HTTP connection
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_connect(char* hostname, int port, bool secure, struct http** result);
+pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result);
 
 /**
- * Disconnect and clean up HTTP resources
- * @param http The HTTP structure
- * @return 0 upon success, otherwise 1
+ * Create a HTTP request
+ * @param method The HTTP method
+ * @param path The request path
+ * @param result The resulting HTTP request
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_disconnect(struct http* http);
+pgmoneta_http_request_create(int method, char* path, struct http_request** result);
 
 /**
  * Add a header to the HTTP request
- * @param http The HTTP structure
+ * @param request The HTTP request
  * @param name The header name
  * @param value The header value
- * @return 0 upon success, otherwise 1
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_add_header(struct http* http, char* name, char* value);
+pgmoneta_http_request_add_header(struct http_request* request, char* name, char* value);
 
 /**
- * Read response data directly from a socket
- * @param ssl SSL connection (can be NULL for non-secure connections)
- * @param socket The socket to read from
- * @param response_text Pointer to store the response text
- * @return MESSAGE_STATUS_OK on success, MESSAGE_STATUS_ERROR otherwise
+ * Get a header value from the HTTP request
+ * @param request The HTTP request
+ * @param name The header name
+ * @return The header value, or NULL if not found
  */
-int
-pgmoneta_http_read(SSL* ssl, int socket, char** response_text);
+char*
+pgmoneta_http_request_get_header(struct http_request* request, char* name);
 
 /**
- * Perform HTTP GET request
- * @param http The HTTP structure
- * @param hostname The hostname for the Host header
- * @param path The path for the request
- * @return 0 upon success, otherwise 1
+ * Update a header in the HTTP request
+ * @param request The HTTP request
+ * @param name The header name
+ * @param value The new header value
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_get(struct http* http, char* hostname, char* path);
+pgmoneta_http_request_update_header(struct http_request* request, char* name, char* value);
 
 /**
- * Perform HTTP POST request
- * @param http The HTTP structure
- * @param hostname The hostname for the Host header
- * @param path The path for the request
- * @param data The data to send
- * @param length The length of the data
- * @return 0 upon success, otherwise 1
+ * Remove a header from the HTTP request
+ * @param request The HTTP request
+ * @param name The header name
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_post(struct http* http, char* hostname, char* path, char* data, size_t length);
+pgmoneta_http_request_remove_header(struct http_request* request, char* name);
 
 /**
- * Perform HTTP PUT request
- * @param http The HTTP structure
- * @param hostname The hostname for the Host header
- * @param path The path for the request
- * @param data The data to upload
- * @param length The length of the data
- * @return 0 upon success, otherwise 1
+ * Set data for the HTTP request
+ * @param request The HTTP request
+ * @param data The data to set
+ * @param size The size of the data
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_put(struct http* http, char* hostname, char* path, const void* data, size_t length);
+pgmoneta_http_set_data(struct http_request* request, void* data, size_t size);
 
 /**
- * Perform HTTP PUT request with a file
- * @param http The HTTP structure
- * @param hostname The hostname for the Host header
- * @param path The path for the request
- * @param file The file to upload
- * @param file_size The size of the file
- * @param content_type The content type of the file (can be NULL for default)
- * @return 0 upon success, otherwise 1
+ * Get a header value from the HTTP response
+ * @param response The HTTP response
+ * @param name The header name
+ * @return The header value, or NULL if not found
  */
-int
-pgmoneta_http_put_file(struct http* http, char* hostname, char* path, FILE* file, size_t file_size, char* content_type);
+char*
+pgmoneta_http_get_response_header(struct http_response* response, char* name);
 
 /**
- * Destroy the HTTP structure, free allocated memory
- * @param http The HTTP structure
- * @return 0 upon success, otherwise 1
+ * Execute a HTTP request
+ * @param connection The HTTP connection
+ * @param request The HTTP request
+ * @param response The resulting HTTP response
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
  */
 int
-pgmoneta_http_destroy(struct http* http);
+pgmoneta_http_invoke(struct http* connection, struct http_request* request, struct http_response** response);
+
+/**
+ * Destroy a HTTP request structure
+ * @param request The HTTP request
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
+ */
+int
+pgmoneta_http_request_destroy(struct http_request* request);
+
+/**
+ * Destroy a HTTP response structure
+ * @param response The HTTP response
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
+ */
+int
+pgmoneta_http_response_destroy(struct http_response* response);
+
+/**
+ * Destroy a HTTP connection structure
+ * @param connection The HTTP connection
+ * @return PGMONETA_HTTP_STATUS_OK upon success, otherwise PGMONETA_HTTP_STATUS_ERROR
+ */
+int
+pgmoneta_http_destroy(struct http* connection);
 
 #ifdef __cplusplus
 }

@@ -48,6 +48,7 @@ static int s3_storage_teardown(char*, struct art*);
 
 static int s3_upload_files(char* local_root, char* s3_root, char* relative_path);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path);
+static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date);
 
 static char* s3_get_host(void);
 static char* s3_get_basepath(int server, char* identifier);
@@ -161,6 +162,7 @@ s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 
    free(temp_backup);
    free(local_root);
+   free(base_dir);
    free(s3_root);
 
    return 0;
@@ -168,6 +170,7 @@ s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
 error:
    free(temp_backup);
    free(local_root);
+   free(base_dir);
    free(s3_root);
 
    return 1;
@@ -231,7 +234,14 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path)
             continue;
          }
 
-         snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+         if (strlen(relative_path) > 0)
+         {
+            snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+         }
+         else
+         {
+            snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
+         }
 
          s3_upload_files(local_root, s3_root, relative_dir);
       }
@@ -239,8 +249,11 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path)
       {
          relative_file = NULL;
 
-         relative_file = pgmoneta_append(relative_file, relative_path);
-         relative_file = pgmoneta_append(relative_file, "/");
+         if (strlen(relative_path) > 0)
+         {
+            relative_file = pgmoneta_append(relative_file, relative_path);
+            relative_file = pgmoneta_append(relative_file, "/");
+         }
          relative_file = pgmoneta_append(relative_file, entry->d_name);
 
          if (s3_send_upload_request(local_root, s3_root, relative_file))
@@ -277,9 +290,8 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    char* auth_value = NULL;
    char* string_to_sign = NULL;
    char* s3_host = NULL;
-   char* s3_url = NULL;
    char* s3_path = NULL;
-   char s3_put_path[MAX_PATH];
+   char* request_path = NULL;
    char* file_sha256 = NULL;
    char* canonical_request_sha256 = NULL;
    char* key = NULL;
@@ -293,17 +305,33 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    int hmac_length = 0;
    FILE* file = NULL;
    struct stat file_info;
-   int res = -1;
-   struct http* http = NULL;
+   void* file_data = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
    local_path = pgmoneta_append(local_path, local_root);
-   local_path = pgmoneta_append(local_path, relative_path);
+   if (strlen(relative_path) > 0)
+   {
+      if (!pgmoneta_ends_with(local_root, "/"))
+      {
+         local_path = pgmoneta_append(local_path, "/");
+      }
+      local_path = pgmoneta_append(local_path, relative_path);
+   }
 
    s3_path = pgmoneta_append(s3_path, s3_root);
-   s3_path = pgmoneta_append(s3_path, relative_path);
+   if (strlen(relative_path) > 0)
+   {
+      if (!pgmoneta_ends_with(s3_root, "/"))
+      {
+         s3_path = pgmoneta_append(s3_path, "/");
+      }
+      s3_path = pgmoneta_append(s3_path, relative_path);
+   }
 
    memset(&short_date[0], 0, sizeof(short_date));
    memset(&long_date[0], 0, sizeof(long_date));
@@ -317,7 +345,6 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    s3_host = s3_get_host();
 
-   // Construct canonical request.
    canonical_request = pgmoneta_append(canonical_request, "PUT\n/");
    canonical_request = pgmoneta_append(canonical_request, s3_path);
    canonical_request = pgmoneta_append(canonical_request, "\n\nhost:");
@@ -331,7 +358,6 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
 
-   // Construct string to sign.
    string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
    string_to_sign = pgmoneta_append(string_to_sign, long_date);
    string_to_sign = pgmoneta_append(string_to_sign, "\n");
@@ -380,21 +406,6 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=");
    auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
 
-   // Connect to S3 with our custom HTTP implementation
-   if (pgmoneta_http_connect(s3_host, 443, true, &http))
-   {
-      goto error;
-   }
-
-   // Add headers
-   pgmoneta_http_add_header(http, "Authorization", auth_value);
-   pgmoneta_http_add_header(http, "x-amz-content-sha256", file_sha256);
-   pgmoneta_http_add_header(http, "x-amz-date", long_date);
-   pgmoneta_http_add_header(http, "x-amz-storage-class", "REDUCED_REDUNDANCY");
-
-   // Construct path for PUT request
-   snprintf(s3_put_path, sizeof(s3_put_path), "/%s", s3_path);
-
    file = fopen(local_path, "rb");
    if (file == NULL)
    {
@@ -406,42 +417,61 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
       goto error;
    }
 
-   // Perform the PUT request with file
-   res = pgmoneta_http_put_file(http, s3_host, s3_put_path, file, file_info.st_size, "application/octet-stream");
-   if (res == 0)
+   file_data = malloc(file_info.st_size);
+   if (file_data == NULL)
    {
-      int status_code = 0;
-      if (http->headers && sscanf(http->headers, "HTTP/1.1 %d", &status_code) == 1)
-      {
-         pgmoneta_log_info("S3 HTTP status code: %d", status_code);
-         if (status_code >= 200 && status_code < 300)
-         {
-            pgmoneta_log_info("Successfully uploaded file to S3: %s", s3_path);
-            pgmoneta_log_info("Object URL: https://%s/%s", s3_host, s3_path);
-         }
-         else
-         {
-            pgmoneta_log_error("S3 upload failed with status code: %d. Failed to upload: %s to S3 path: %s. Response headers: %s. Response body: %s",
-                               status_code, s3_put_path, s3_path,
-                               http->headers, http->body ? http->body : "None");
-            goto error;
-         }
-      }
-      else
-      {
-         pgmoneta_log_error("Failed to parse HTTP status code from response. Response headers: %s",
-                            http->headers ? http->headers : "None");
-         goto error;
-      }
-   }
-   else
-   {
-      pgmoneta_log_error("pgmoneta_http_put_file() failed");
       goto error;
    }
 
-   free(s3_url);
+   if (fread(file_data, 1, file_info.st_size, file) != (size_t)file_info.st_size)
+   {
+      goto error;
+   }
+
+   fclose(file);
+   file = NULL;
+
+   if (pgmoneta_http_create(s3_host, 443, true, &connection))
+   {
+      goto error;
+   }
+
+   request_path = pgmoneta_append(request_path, "/");
+   request_path = pgmoneta_append(request_path, s3_path);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_PUT, request_path, &request))
+   {
+      goto error;
+   }
+
+   if (s3_add_request_headers(request, auth_value, file_sha256, long_date))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_set_data(request, file_data, file_info.st_size))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, &response))
+   {
+      goto error;
+   }
+
+   if (response->status_code >= 200 && response->status_code < 300)
+   {
+      pgmoneta_log_info("Successfully uploaded file to URL: https://%s/%s", s3_host, s3_path);
+   }
+   else
+   {
+      pgmoneta_log_error("S3 upload failed with status code: %d. Failed to upload: %s to S3 path: %s",
+                         response->status_code, local_path, s3_path);
+      goto error;
+   }
+
    free(s3_host);
+   free(request_path);
    free(file_sha256);
    free(signature_hex);
    free(signature_hmac);
@@ -456,99 +486,48 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    free(canonical_request);
    free(string_to_sign);
    free(auth_value);
+   free(file_data);
 
-   pgmoneta_http_disconnect(http);
-   pgmoneta_http_destroy(http);
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
 
-   fclose(file);
    return 0;
 
 error:
 
-   if (s3_url != NULL)
+   free(s3_host);
+   free(request_path);
+   free(signature_hex);
+   free(signature_hmac);
+
+   free(signing_key_hmac);
+   free(date_region_service_key_hmac);
+   free(date_region_key_hmac);
+   free(date_key_hmac);
+   free(key);
+   free(local_path);
+   free(s3_path);
+   free(canonical_request_sha256);
+   free(file_sha256);
+   free(canonical_request);
+   free(string_to_sign);
+   free(auth_value);
+   free(file_data);
+
+   if (connection != NULL)
    {
-      free(s3_url);
+      pgmoneta_http_destroy(connection);
    }
 
-   if (s3_host != NULL)
+   if (request != NULL)
    {
-      free(s3_host);
+      pgmoneta_http_request_destroy(request);
    }
 
-   if (signature_hex != NULL)
+   if (response != NULL)
    {
-      free(signature_hex);
-   }
-
-   if (signature_hmac != NULL)
-   {
-      free(signature_hmac);
-   }
-
-   if (signing_key_hmac != NULL)
-   {
-      free(signing_key_hmac);
-   }
-
-   if (date_region_service_key_hmac != NULL)
-   {
-      free(date_region_service_key_hmac);
-   }
-
-   if (date_region_key_hmac != NULL)
-   {
-      free(date_region_key_hmac);
-   }
-
-   if (date_key_hmac != NULL)
-   {
-      free(date_region_key_hmac);
-   }
-
-   if (key != NULL)
-   {
-      free(key);
-   }
-
-   if (local_path != NULL)
-   {
-      free(local_path);
-   }
-
-   if (s3_path != NULL)
-   {
-      free(s3_path);
-   }
-
-   if (canonical_request_sha256 != NULL)
-   {
-      free(canonical_request_sha256);
-   }
-
-   if (file_sha256 != NULL)
-   {
-      free(file_sha256);
-   }
-
-   if (canonical_request != NULL)
-   {
-      free(canonical_request);
-   }
-
-   if (string_to_sign != NULL)
-   {
-      free(string_to_sign);
-   }
-
-   if (auth_value != NULL)
-   {
-      free(auth_value);
-   }
-
-   if (http != NULL)
-   {
-      pgmoneta_http_disconnect(http);
-      pgmoneta_http_destroy(http);
+      pgmoneta_http_response_destroy(response);
    }
 
    if (file != NULL)
@@ -593,4 +572,30 @@ s3_get_basepath(int server, char* identifier)
    d = pgmoneta_append(d, identifier);
 
    return d;
+}
+
+static int
+s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date)
+{
+   if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_http_request_add_header(request, "x-amz-content-sha256", file_sha256))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_http_request_add_header(request, "x-amz-date", long_date))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_http_request_add_header(request, "x-amz-storage-class", "REDUCED_REDUNDANCY"))
+   {
+      return 1;
+   }
+
+   return 0;
 }
