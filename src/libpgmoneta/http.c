@@ -36,248 +36,39 @@
 
 /* system */
 #include <errno.h>
+#include <string.h>
 #include <unistd.h>
 #include <openssl/err.h>
 
-static int http_build_header(int method, char* path, char** request);
-static int http_extract_headers_body(char* response, struct http* http);
+static int http_read_response(SSL* ssl, int socket, char** response);
+static int http_parse_response(char* response, struct http_response* http_response);
+static int http_build_request(struct http* connection, struct http_request* request, char** full_request, size_t* full_request_size);
+static char* http_method_to_string(int method);
 
 int
-pgmoneta_http_add_header(struct http* http, char* name, char* value)
+pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result)
 {
-   char* tmp;
-
-   tmp = pgmoneta_append(http->request_headers, name);
-   if (tmp == NULL)
-   {
-      return 1;
-   }
-   http->request_headers = tmp;
-
-   tmp = pgmoneta_append(http->request_headers, ": ");
-   if (tmp == NULL)
-   {
-      return 1;
-   }
-   http->request_headers = tmp;
-
-   tmp = pgmoneta_append(http->request_headers, value);
-   if (tmp == NULL)
-   {
-      return 1;
-   }
-   http->request_headers = tmp;
-
-   tmp = pgmoneta_append(http->request_headers, "\r\n");
-   if (tmp == NULL)
-   {
-      return 1;
-   }
-   http->request_headers = tmp;
-
-   return 0;
-}
-
-static int
-http_build_header(int method, char* path, char** request)
-{
-   char* r = NULL;
-   *request = NULL;
-
-   if (method == PGMONETA_HTTP_GET)
-   {
-      r = pgmoneta_append(r, "GET ");
-   }
-   else if (method == PGMONETA_HTTP_POST)
-   {
-      r = pgmoneta_append(r, "POST ");
-   }
-   else if (method == PGMONETA_HTTP_PUT)
-   {
-      r = pgmoneta_append(r, "PUT ");
-   }
-   else
-   {
-      pgmoneta_log_error("Invalid HTTP method: %d", method);
-      return 1;
-   }
-
-   r = pgmoneta_append(r, path);
-   r = pgmoneta_append(r, " HTTP/1.1\r\n");
-
-   *request = r;
-
-   return 0;
-}
-
-static int
-http_extract_headers_body(char* response, struct http* http)
-{
-   bool header = true;
-   char* p = NULL;
-   char* response_copy = NULL;
-
-   if (response == NULL)
-   {
-      pgmoneta_log_error("Response is NULL");
-      return 1;
-   }
-
-   response_copy = strdup(response);
-   if (response_copy == NULL)
-   {
-      pgmoneta_log_error("Failed to duplicate response string");
-      return 1;
-   }
-
-   p = strtok(response_copy, "\n");
-   while (p != NULL)
-   {
-      if (*p == '\r')
-      {
-         header = false;
-      }
-      else
-      {
-         if (!pgmoneta_is_number(p, 16))
-         {
-            if (header)
-            {
-               http->headers = pgmoneta_append(http->headers, p);
-               http->headers = pgmoneta_append_char(http->headers, '\n');
-            }
-            else
-            {
-               http->body = pgmoneta_append(http->body, p);
-               http->body = pgmoneta_append_char(http->body, '\n');
-            }
-         }
-      }
-
-      p = strtok(NULL, "\n");
-   }
-
-   free(response_copy);
-   return 0;
-}
-
-int
-pgmoneta_http_get(struct http* http, char* hostname, char* path)
-{
-   struct message* msg_request = NULL;
-   int error = 0;
-   int status;
-   char* request = NULL;
-   char* full_request = NULL;
-   char* response = NULL;
-   char* user_agent = NULL;
-
-   pgmoneta_log_trace("Starting pgmoneta_http_get");
-   if (path == NULL || strlen(path) == 0)
-   {
-      pgmoneta_log_error("GET: Path can not be NULL");
-      goto error;
-   }
-   request = pgmoneta_append(request, "GET ");
-   request = pgmoneta_append(request, path);
-   request = pgmoneta_append(request, " HTTP/1.1\r\n");
-
-   pgmoneta_http_add_header(http, "Host", hostname);
-   user_agent = pgmoneta_append(user_agent, "pgmoneta/");
-   user_agent = pgmoneta_append(user_agent, VERSION);
-   pgmoneta_http_add_header(http, "User-Agent", user_agent);
-   pgmoneta_http_add_header(http, "Accept", "text/*");
-   pgmoneta_http_add_header(http, "Connection", "close");
-
-   full_request = pgmoneta_append(NULL, request);
-   full_request = pgmoneta_append(full_request, http->request_headers);
-   full_request = pgmoneta_append(full_request, "\r\n");
-
-   msg_request = (struct message*)malloc(sizeof(struct message));
-   if (msg_request == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate msg_request");
-      goto error;
-   }
-
-   memset(msg_request, 0, sizeof(struct message));
-   msg_request->data = full_request;
-   msg_request->length = strlen(full_request) + 1;
-
-   error = 0;
-req:
-   if (error < 5)
-   {
-      status = pgmoneta_write_message(http->ssl, http->socket, msg_request);
-      if (status != MESSAGE_STATUS_OK)
-      {
-         error++;
-         pgmoneta_log_debug("Write failed, retrying (%d/5)", error);
-         goto req;
-      }
-   }
-   else
-   {
-      pgmoneta_log_error("Failed to write after 5 attempts");
-      goto error;
-   }
-
-   status = pgmoneta_http_read(http->ssl, http->socket, &response);
-
-   if (response == NULL)
-   {
-      pgmoneta_log_error("GET: No response data collected");
-      goto error;
-   }
-
-   if (http_extract_headers_body(response, http))
-   {
-      pgmoneta_log_error("Failed to extract headers and body");
-      goto error;
-   }
-
-   pgmoneta_log_debug("HTTP Headers: %s", http->headers ? http->headers : "NULL");
-   pgmoneta_log_debug("HTTP Body: %s", http->body ? http->body : "NULL");
-
-   free(request);
-   free(full_request);
-   free(response);
-   free(msg_request);
-   free(user_agent);
-
-   free(http->request_headers);
-   http->request_headers = NULL;
-
-   return 0;
-
-error:
-   free(request);
-   free(full_request);
-   free(response);
-   free(msg_request);
-   free(user_agent);
-   free(http->request_headers);
-   http->request_headers = NULL;
-   return 1;
-}
-
-int
-pgmoneta_http_connect(char* hostname, int port, bool secure, struct http** result)
-{
-   struct http* h = NULL;
+   struct http* connection = NULL;
    int socket_fd = -1;
    SSL* ssl = NULL;
    SSL_CTX* ctx = NULL;
 
-   pgmoneta_log_debug("Connecting to %s:%d (secure: %d)", hostname, port, secure);
-   h = (struct http*) malloc(sizeof(struct http));
-   if (h == NULL)
+   if (hostname == NULL || result == NULL)
    {
-      pgmoneta_log_error("Failed to allocate HTTP structure");
+      pgmoneta_log_error("Invalid parameters for HTTP connection");
       goto error;
    }
 
-   memset(h, 0, sizeof(struct http));
+   pgmoneta_log_debug("Creating HTTP connection to %s:%d (secure: %d)", hostname, port, secure);
+
+   connection = (struct http*)malloc(sizeof(struct http));
+   if (connection == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate HTTP connection structure");
+      goto error;
+   }
+
+   memset(connection, 0, sizeof(struct http));
 
    if (pgmoneta_connect(hostname, port, &socket_fd))
    {
@@ -285,7 +76,10 @@ pgmoneta_http_connect(char* hostname, int port, bool secure, struct http** resul
       goto error;
    }
 
-   h->socket = socket_fd;
+   connection->socket = socket_fd;
+   connection->hostname = strdup(hostname);
+   connection->port = port;
+   connection->secure = secure;
 
    if (secure)
    {
@@ -335,12 +129,12 @@ pgmoneta_http_connect(char* hostname, int port, bool secure, struct http** resul
       }
       while (connect_result != 1);
 
-      h->ssl = ssl;
+      connection->ssl = ssl;
    }
 
-   *result = h;
+   *result = connection;
 
-   return 0;
+   return PGMONETA_HTTP_STATUS_OK;
 
 error:
    if (ssl != NULL)
@@ -355,65 +149,265 @@ error:
    {
       pgmoneta_disconnect(socket_fd);
    }
-   free(h);
-   return 1;
+   if (connection != NULL)
+   {
+      free(connection->hostname);
+      free(connection);
+   }
+
+   return PGMONETA_HTTP_STATUS_ERROR;
 }
 
 int
-pgmoneta_http_post(struct http* http, char* hostname, char* path, char* data, size_t length)
+pgmoneta_http_request_create(int method, char* path, struct http_request** result)
 {
-   struct message* msg_request = NULL;
-   int error = 0;
-   int status;
-   char* request = NULL;
-   char* full_request = NULL;
-   char* response = NULL;
-   char* user_agent = NULL;
-   char content_length[32];
+   struct http_request* request = NULL;
 
-   pgmoneta_log_trace("Starting pgmoneta_http_post");
-   if (http_build_header(PGMONETA_HTTP_POST, path, &request))
+   if (path == NULL || result == NULL)
    {
-      pgmoneta_log_error("Failed to build HTTP header");
+      pgmoneta_log_error("Invalid parameters for HTTP request");
       goto error;
    }
 
-   pgmoneta_http_add_header(http, "Host", hostname);
-   user_agent = pgmoneta_append(user_agent, "pgmoneta/");
-   user_agent = pgmoneta_append(user_agent, VERSION);
-   pgmoneta_http_add_header(http, "User-Agent", user_agent);
-   pgmoneta_http_add_header(http, "Connection", "close");
-
-   sprintf(content_length, "%zu", length);
-   pgmoneta_http_add_header(http, "Content-Length", content_length);
-   pgmoneta_http_add_header(http, "Content-Type", "application/x-www-form-urlencoded");
-
-   full_request = pgmoneta_append(NULL, request);
-   full_request = pgmoneta_append(full_request, http->request_headers);
-   full_request = pgmoneta_append(full_request, "\r\n");
-
-   if (data && length > 0)
+   request = (struct http_request*)malloc(sizeof(struct http_request));
+   if (request == NULL)
    {
-      full_request = pgmoneta_append(full_request, data);
+      pgmoneta_log_error("Failed to allocate HTTP request structure");
+      goto error;
+   }
+
+   memset(request, 0, sizeof(struct http_request));
+
+   request->method = method;
+   request->path = strdup(path);
+   if (request->path == NULL)
+   {
+      pgmoneta_log_error("Failed to duplicate path string");
+      goto error;
+   }
+
+   if (pgmoneta_deque_create(false, &request->payload.headers))
+   {
+      pgmoneta_log_error("Failed to create headers deque");
+      goto error;
+   }
+
+   *result = request;
+
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   if (request != NULL)
+   {
+      free(request->path);
+      pgmoneta_deque_destroy(request->payload.headers);
+      free(request);
+   }
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+int
+pgmoneta_http_request_add_header(struct http_request* request, char* name, char* value)
+{
+   if (request == NULL || name == NULL || value == NULL)
+   {
+      pgmoneta_log_error("Invalid parameters for adding HTTP header");
+      goto error;
+   }
+
+   if (request->payload.headers == NULL)
+   {
+      pgmoneta_log_error("Headers deque is NULL");
+      goto error;
+   }
+
+   if (pgmoneta_deque_add(request->payload.headers, name, (uintptr_t)value, ValueString))
+   {
+      pgmoneta_log_error("Failed to add header to deque");
+      goto error;
+   }
+
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+char*
+pgmoneta_http_request_get_header(struct http_request* request, char* name)
+{
+   if (request == NULL || name == NULL)
+   {
+      return NULL;
+   }
+
+   if (request->payload.headers == NULL)
+   {
+      return NULL;
+   }
+
+   return (char*)pgmoneta_deque_get(request->payload.headers, name);
+}
+
+int
+pgmoneta_http_request_update_header(struct http_request* request, char* name, char* value)
+{
+   if (request == NULL || name == NULL || value == NULL)
+   {
+      pgmoneta_log_error("Invalid parameters for updating HTTP header");
+      goto error;
+   }
+
+   if (request->payload.headers == NULL)
+   {
+      pgmoneta_log_error("Headers deque is NULL");
+      goto error;
+   }
+
+   if (pgmoneta_deque_remove(request->payload.headers, name) > 0)
+   {
+      pgmoneta_log_trace("Removed existing header: %s", name);
+   }
+
+   if (pgmoneta_deque_add(request->payload.headers, name, (uintptr_t)value, ValueString))
+   {
+      pgmoneta_log_error("Failed to add updated header to deque");
+      goto error;
+   }
+
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+int
+pgmoneta_http_request_remove_header(struct http_request* request, char* name)
+{
+   if (request == NULL || name == NULL)
+   {
+      pgmoneta_log_error("Invalid parameters for removing HTTP header");
+      goto error;
+   }
+
+   if (request->payload.headers == NULL)
+   {
+      pgmoneta_log_error("Headers deque is NULL");
+      goto error;
+   }
+
+   int removed = pgmoneta_deque_remove(request->payload.headers, name);
+   if (removed == 0)
+   {
+      pgmoneta_log_debug("Header not found for removal: %s", name);
+   }
+
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+int
+pgmoneta_http_set_data(struct http_request* request, void* data, size_t size)
+{
+   if (request == NULL)
+   {
+      pgmoneta_log_error("Invalid request parameter");
+      goto error;
+   }
+
+   if (request->payload.data != NULL)
+   {
+      free(request->payload.data);
+      request->payload.data = NULL;
+      request->payload.data_size = 0;
+   }
+
+   if (data != NULL && size > 0)
+   {
+      request->payload.data = malloc(size);
+      if (request->payload.data == NULL)
+      {
+         pgmoneta_log_error("Failed to allocate memory for request data");
+         goto error;
+      }
+
+      memcpy(request->payload.data, data, size);
+      request->payload.data_size = size;
+   }
+
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+char*
+pgmoneta_http_get_response_header(struct http_response* response, char* name)
+{
+   if (response == NULL || name == NULL)
+   {
+      return NULL;
+   }
+
+   if (response->payload.headers == NULL)
+   {
+      return NULL;
+   }
+
+   return (char*)pgmoneta_deque_get(response->payload.headers, name);
+}
+
+int
+pgmoneta_http_invoke(struct http* connection, struct http_request* request, struct http_response** response)
+{
+   struct message* msg_request = NULL;
+   char* full_request = NULL;
+   size_t full_request_size = 0;
+   char* response_text = NULL;
+   struct http_response* http_response = NULL;
+   int error = 0;
+   int status;
+
+   if (connection == NULL || request == NULL || response == NULL)
+   {
+      pgmoneta_log_error("Invalid parameters for HTTP invoke");
+      goto error;
+   }
+
+   pgmoneta_log_trace("Invoking HTTP request");
+
+   http_response = (struct http_response*)malloc(sizeof(struct http_response));
+   if (http_response == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate HTTP response structure");
+      goto error;
+   }
+   memset(http_response, 0, sizeof(struct http_response));
+
+   if (http_build_request(connection, request, &full_request, &full_request_size))
+   {
+      pgmoneta_log_error("Failed to build HTTP request");
+      goto error;
    }
 
    msg_request = (struct message*)malloc(sizeof(struct message));
    if (msg_request == NULL)
    {
-      pgmoneta_log_error("Failed to allocate msg_request");
+      pgmoneta_log_error("Failed to allocate message structure");
       goto error;
    }
 
    memset(msg_request, 0, sizeof(struct message));
-
    msg_request->data = full_request;
-   msg_request->length = strlen(full_request) + 1;
+   msg_request->length = full_request_size;
 
    error = 0;
 req:
    if (error < 5)
    {
-      status = pgmoneta_write_message(http->ssl, http->socket, msg_request);
+      status = pgmoneta_write_message(connection->ssl, connection->socket, msg_request);
       if (status != MESSAGE_STATUS_OK)
       {
          error++;
@@ -427,332 +421,90 @@ req:
       goto error;
    }
 
-   status = pgmoneta_http_read(http->ssl, http->socket, &response);
-
-   if (response == NULL)
+   status = http_read_response(connection->ssl, connection->socket, &response_text);
+   if (status != MESSAGE_STATUS_OK)
    {
-      pgmoneta_log_error("No response data collected");
+      pgmoneta_log_error("Failed to read HTTP response");
       goto error;
    }
 
-   if (http_extract_headers_body(response, http))
+   if (http_parse_response(response_text, http_response))
    {
-      pgmoneta_log_error("Failed to extract headers and body");
+      pgmoneta_log_error("Failed to parse HTTP response");
       goto error;
    }
 
-   free(request);
+   *response = http_response;
+
    free(full_request);
-   free(response);
+   free(response_text);
    free(msg_request);
-   free(user_agent);
 
-   free(http->request_headers);
-   http->request_headers = NULL;
-
-   return 0;
+   return PGMONETA_HTTP_STATUS_OK;
 
 error:
-   free(request);
    free(full_request);
-   free(response);
+   free(response_text);
    free(msg_request);
-   free(user_agent);
-   free(http->request_headers);
-   http->request_headers = NULL;
-   return 1;
+   if (http_response != NULL)
+   {
+      pgmoneta_http_response_destroy(http_response);
+   }
+
+   return PGMONETA_HTTP_STATUS_ERROR;
 }
 
 int
-pgmoneta_http_put(struct http* http, char* hostname, char* path, const void* data, size_t length)
+pgmoneta_http_request_destroy(struct http_request* request)
 {
-   struct message* msg_request = NULL;
-   int error = 0;
-   int status;
-   char* request = NULL;
-   char* full_request = NULL;
-   char* response = NULL;
-   char* user_agent = NULL;
-   char* complete_request = NULL;
-   char content_length[32];
-
-   pgmoneta_log_trace("Starting pgmoneta_http_put");
-   if (http_build_header(PGMONETA_HTTP_PUT, path, &request))
+   if (request != NULL)
    {
-      pgmoneta_log_error("Failed to build HTTP header");
-      goto error;
+      free(request->path);
+      pgmoneta_deque_destroy(request->payload.headers);
+      free(request->payload.data);
+      free(request);
    }
 
-   pgmoneta_http_add_header(http, "Host", hostname);
-   user_agent = pgmoneta_append(user_agent, "pgmoneta/");
-   user_agent = pgmoneta_append(user_agent, VERSION);
-   pgmoneta_http_add_header(http, "User-Agent", user_agent);
-   pgmoneta_http_add_header(http, "Connection", "close");
-
-   sprintf(content_length, "%zu", length);
-   pgmoneta_http_add_header(http, "Content-Length", content_length);
-   pgmoneta_http_add_header(http, "Content-Type", "application/octet-stream");
-
-   full_request = pgmoneta_append(NULL, request);
-   full_request = pgmoneta_append(full_request, http->request_headers);
-   full_request = pgmoneta_append(full_request, "\r\n");
-
-   size_t headers_len = strlen(full_request);
-   size_t total_len = headers_len + length;
-
-   complete_request = malloc(total_len + 1);
-   if (complete_request == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate complete request");
-      goto error;
-   }
-
-   memcpy(complete_request, full_request, headers_len);
-
-   if (data && length > 0)
-   {
-      memcpy(complete_request + headers_len, data, length);
-   }
-
-   complete_request[total_len] = '\0';
-
-   msg_request = (struct message*)malloc(sizeof(struct message));
-   if (msg_request == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate msg_request");
-      goto error;
-   }
-
-   memset(msg_request, 0, sizeof(struct message));
-
-   msg_request->data = complete_request;
-   msg_request->length = total_len + 1;
-
-   error = 0;
-req:
-   if (error < 5)
-   {
-      status = pgmoneta_write_message(http->ssl, http->socket, msg_request);
-      if (status != MESSAGE_STATUS_OK)
-      {
-         error++;
-         pgmoneta_log_debug("Write failed, retrying (%d/5)", error);
-         goto req;
-      }
-   }
-   else
-   {
-      pgmoneta_log_error("Failed to write after 5 attempts");
-      goto error;
-   }
-
-   status = pgmoneta_http_read(http->ssl, http->socket, &response);
-
-   if (response == NULL)
-   {
-      pgmoneta_log_error("No response data collected");
-      goto error;
-   }
-
-   if (http_extract_headers_body(response, http))
-   {
-      pgmoneta_log_error("Failed to extract headers and body");
-      goto error;
-   }
-
-   free(request);
-   free(full_request);
-   free(response);
-   free(msg_request->data);
-   free(msg_request);
-   free(user_agent);
-
-   free(http->request_headers);
-   http->request_headers = NULL;
-
-   return 0;
-
-error:
-   free(request);
-   free(full_request);
-   free(response);
-   free(complete_request);
-   free(msg_request);
-   free(user_agent);
-   free(http->request_headers);
-   http->request_headers = NULL;
-
-   return 1;
+   return PGMONETA_HTTP_STATUS_OK;
 }
 
 int
-pgmoneta_http_put_file(struct http* http, char* hostname, char* path, FILE* file, size_t file_size, char* content_type)
+pgmoneta_http_response_destroy(struct http_response* response)
 {
-   struct message* msg_request = NULL;
-   int error = 0;
-   int status;
-   char* request = NULL;
-   char* header_part = NULL;
-   char* response = NULL;
-   char* user_agent = NULL;
-   char* full_request = NULL;
-   char content_length[32];
-   void* file_buffer = NULL;
-
-   pgmoneta_log_trace("Starting pgmoneta_http_put_file");
-   if (file == NULL)
+   if (response != NULL)
    {
-      pgmoneta_log_error("File is NULL");
-      goto error;
+      pgmoneta_deque_destroy(response->payload.headers);
+      free(response->payload.data);
+      free(response);
    }
 
-   if (http_build_header(PGMONETA_HTTP_PUT, path, &request))
-   {
-      pgmoneta_log_error("Failed to build HTTP header");
-      goto error;
-   }
-
-   pgmoneta_http_add_header(http, "Host", hostname);
-   user_agent = pgmoneta_append(user_agent, "pgmoneta/");
-   user_agent = pgmoneta_append(user_agent, VERSION);
-   pgmoneta_http_add_header(http, "User-Agent", user_agent);
-   pgmoneta_http_add_header(http, "Connection", "close");
-
-   sprintf(content_length, "%zu", file_size);
-   pgmoneta_http_add_header(http, "Content-Length", content_length);
-
-   /* default to application/octet-stream if not specified */
-   char* type = content_type ? content_type : "application/octet-stream";
-   pgmoneta_http_add_header(http, "Content-Type", type);
-
-   header_part = pgmoneta_append(NULL, request);
-   header_part = pgmoneta_append(header_part, http->request_headers);
-   header_part = pgmoneta_append(header_part, "\r\n");
-
-   pgmoneta_log_trace("File size: %zu", file_size);
-
-   rewind(file);
-
-   file_buffer = malloc(file_size);
-   if (file_buffer == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate memory for file content: %zu bytes", file_size);
-      goto error;
-   }
-
-   size_t bytes_read = fread(file_buffer, 1, file_size, file);
-   if (bytes_read != file_size)
-   {
-      pgmoneta_log_error("Failed to read entire file. Expected %zu bytes, got %zu", file_size, bytes_read);
-      goto error;
-   }
-
-   pgmoneta_log_trace("Read %zu bytes from file", bytes_read);
-
-   msg_request = (struct message*)malloc(sizeof(struct message));
-   if (msg_request == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate msg_request");
-      goto error;
-   }
-
-   memset(msg_request, 0, sizeof(struct message));
-
-   size_t header_len = strlen(header_part);
-   size_t total_len = header_len + file_size;
-
-   full_request = malloc(total_len + 1);
-   if (full_request == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate memory for full request: %zu bytes", total_len + 1);
-      goto error;
-   }
-
-   memcpy(full_request, header_part, header_len);
-
-   memcpy(full_request + header_len, file_buffer, file_size);
-
-   full_request[total_len] = '\0';
-
-   pgmoneta_log_trace("Setting msg_request data, total size: %zu", total_len);
-   msg_request->data = full_request;
-   msg_request->length = total_len;
-
-   error = 0;
-req:
-   if (error < 5)
-   {
-      status = pgmoneta_write_message(http->ssl, http->socket, msg_request);
-      if (status != MESSAGE_STATUS_OK)
-      {
-         error++;
-         pgmoneta_log_debug("Write failed, retrying (%d/5)", error);
-         goto req;
-      }
-   }
-   else
-   {
-      pgmoneta_log_error("Failed to write after 5 attempts");
-      goto error;
-   }
-
-   status = pgmoneta_http_read(http->ssl, http->socket, &response);
-
-   if (response == NULL)
-   {
-      pgmoneta_log_error("No response data collected");
-      goto error;
-   }
-
-   if (http_extract_headers_body(response, http))
-   {
-      pgmoneta_log_error("Failed to extract headers and body");
-      goto error;
-   }
-
-   int status_code = 0;
-   if (http->headers && sscanf(http->headers, "HTTP/1.1 %d", &status_code) == 1)
-   {
-      pgmoneta_log_debug("HTTP status code: %d", status_code);
-      if (status_code >= 200 && status_code < 300)
-      {
-         pgmoneta_log_debug("HTTP request successful");
-      }
-      else
-      {
-         pgmoneta_log_error("HTTP request failed with status code: %d", status_code);
-      }
-   }
-
-   free(request);
-   free(header_part);
-   free(response);
-   free(file_buffer);
-   free(full_request);
-   free(msg_request);
-   free(user_agent);
-
-   free(http->request_headers);
-   http->request_headers = NULL;
-
-   return (status_code >= 200 && status_code < 300) ? 0 : 1;
-
-error:
-   free(request);
-   free(header_part);
-   free(response);
-   free(file_buffer);
-   free(full_request);
-   free(msg_request);
-   free(user_agent);
-   free(http->request_headers);
-   http->request_headers = NULL;
-
-   return 1;
+   return PGMONETA_HTTP_STATUS_OK;
 }
 
 int
-pgmoneta_http_read(SSL* ssl, int socket, char** response_text)
+pgmoneta_http_destroy(struct http* connection)
+{
+   if (connection != NULL)
+   {
+      if (connection->ssl != NULL)
+      {
+         pgmoneta_close_ssl(connection->ssl);
+      }
+
+      if (connection->socket != -1)
+      {
+         pgmoneta_disconnect(connection->socket);
+      }
+
+      free(connection->hostname);
+      free(connection);
+   }
+
+   return PGMONETA_HTTP_STATUS_OK;
+}
+
+static int
+http_read_response(SSL* ssl, int socket, char** response_text)
 {
    char buffer[8192];
    ssize_t bytes_read;
@@ -805,65 +557,233 @@ pgmoneta_http_read(SSL* ssl, int socket, char** response_text)
    return total_bytes > 0 ? MESSAGE_STATUS_OK : MESSAGE_STATUS_ERROR;
 }
 
-int
-pgmoneta_http_disconnect(struct http* http)
+static int
+http_parse_response(char* response, struct http_response* http_response)
 {
-   int status = 0;
+   bool header = true;
+   char* p = NULL;
+   char* response_copy = NULL;
+   char* status_line = NULL;
+   char* colon = NULL;
+   char* name = NULL;
+   char* value = NULL;
 
-   if (http != NULL)
+   if (response == NULL || http_response == NULL)
    {
-      if (http->ssl != NULL)
-      {
-         pgmoneta_close_ssl(http->ssl);
-         http->ssl = NULL;
-      }
-
-      if (http->socket != -1)
-      {
-         if (pgmoneta_disconnect(http->socket))
-         {
-            pgmoneta_log_error("Failed to disconnect socket in pgmoneta_http_disconnect");
-            status = 1;
-         }
-         http->socket = -1;
-      }
-   }
-
-   if (status != 0)
-   {
+      pgmoneta_log_error("Invalid parameters for parsing HTTP response");
       goto error;
    }
 
-   return 0;
-
-error:
-   return 1;
-}
-
-int
-pgmoneta_http_destroy(struct http* http)
-{
-   if (http != NULL)
+   response_copy = strdup(response);
+   if (response_copy == NULL)
    {
-      if (http->headers != NULL)
-      {
-         free(http->headers);
-         http->headers = NULL;
-      }
-
-      if (http->body != NULL)
-      {
-         free(http->body);
-         http->body = NULL;
-      }
-
-      if (http->request_headers != NULL)
-      {
-         free(http->request_headers);
-         http->request_headers = NULL;
-      }
-      free(http);
+      pgmoneta_log_error("Failed to duplicate response string");
+      goto error;
    }
 
-   return 0;
+   if (pgmoneta_deque_create(false, &http_response->payload.headers))
+   {
+      pgmoneta_log_error("Failed to create headers deque for response");
+      goto error;
+   }
+
+   status_line = strtok(response_copy, "\n");
+   if (status_line != NULL && sscanf(status_line, "HTTP/1.1 %d", &http_response->status_code) != 1)
+   {
+      pgmoneta_log_error("Failed to parse HTTP status code");
+      goto error;
+   }
+
+   free(response_copy);
+   response_copy = strdup(response);
+   if (response_copy == NULL)
+   {
+      pgmoneta_log_error("Failed to duplicate response string");
+      goto error;
+   }
+
+   p = strtok(response_copy, "\n");
+   while (p != NULL)
+   {
+      if (*p == '\r')
+      {
+         header = false;
+      }
+      else
+      {
+         if (!pgmoneta_is_number(p, 16))
+         {
+            if (header)
+            {
+               colon = strchr(p, ':');
+               if (colon != NULL)
+               {
+                  *colon = '\0';
+                  name = p;
+                  value = colon + 1;
+
+                  while (*value == ' ' || *value == '\t')
+                  {
+                     value++;
+                  }
+
+                  size_t len = strlen(value);
+                  while (len > 0 && (value[len - 1] == '\r' || value[len - 1] == '\n'))
+                  {
+                     value[len - 1] = '\0';
+                     len--;
+                  }
+
+                  if (pgmoneta_deque_add(http_response->payload.headers, name, (uintptr_t)value, ValueString))
+                  {
+                     pgmoneta_log_warn("Failed to add response header: %s", name);
+                  }
+               }
+            }
+            else
+            {
+               http_response->payload.data = pgmoneta_append(http_response->payload.data, p);
+               http_response->payload.data = pgmoneta_append_char(http_response->payload.data, '\n');
+            }
+         }
+      }
+
+      p = strtok(NULL, "\n");
+   }
+
+   if (http_response->payload.data != NULL)
+   {
+      http_response->payload.data_size = strlen((char*)http_response->payload.data);
+   }
+
+   free(response_copy);
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   free(response_copy);
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+static int
+http_build_request(struct http* connection, struct http_request* request, char** full_request, size_t* full_request_size)
+{
+   char* method_str = NULL;
+   char* request_line = NULL;
+   char* headers = NULL;
+   char* user_agent = NULL;
+   char content_length[32];
+   size_t header_len = 0;
+   size_t total_len = 0;
+
+   if (connection == NULL || request == NULL || full_request == NULL || full_request_size == NULL)
+   {
+      pgmoneta_log_error("Invalid parameters for HTTP build request");
+      goto error;
+   }
+
+   method_str = http_method_to_string(request->method);
+   if (method_str == NULL)
+   {
+      pgmoneta_log_error("Invalid HTTP method: %d", request->method);
+      goto error;
+   }
+
+   request_line = pgmoneta_append(request_line, method_str);
+   request_line = pgmoneta_append(request_line, " ");
+   request_line = pgmoneta_append(request_line, request->path);
+   request_line = pgmoneta_append(request_line, " HTTP/1.1\r\n");
+
+   headers = pgmoneta_append(headers, "Host: ");
+   headers = pgmoneta_append(headers, connection->hostname);
+   headers = pgmoneta_append(headers, "\r\n");
+
+   user_agent = pgmoneta_append(user_agent, "pgmoneta/");
+   user_agent = pgmoneta_append(user_agent, VERSION);
+   headers = pgmoneta_append(headers, "User-Agent: ");
+   headers = pgmoneta_append(headers, user_agent);
+   headers = pgmoneta_append(headers, "\r\n");
+
+   headers = pgmoneta_append(headers, "Connection: close\r\n");
+
+   sprintf(content_length, "%zu", request->payload.data_size);
+   headers = pgmoneta_append(headers, "Content-Length: ");
+   headers = pgmoneta_append(headers, content_length);
+   headers = pgmoneta_append(headers, "\r\n");
+
+   if (request->method == PGMONETA_HTTP_POST)
+   {
+      headers = pgmoneta_append(headers, "Content-Type: application/x-www-form-urlencoded\r\n");
+   }
+   else if (request->method == PGMONETA_HTTP_PUT)
+   {
+      headers = pgmoneta_append(headers, "Content-Type: application/octet-stream\r\n");
+   }
+
+   if (request->payload.headers != NULL && !pgmoneta_deque_empty(request->payload.headers))
+   {
+      struct deque_iterator* iter = NULL;
+      if (pgmoneta_deque_iterator_create(request->payload.headers, &iter) == 0)
+      {
+         while (pgmoneta_deque_iterator_next(iter))
+         {
+            headers = pgmoneta_append(headers, iter->tag);
+            headers = pgmoneta_append(headers, ": ");
+            headers = pgmoneta_append(headers, (char*)pgmoneta_value_data(iter->value));
+            headers = pgmoneta_append(headers, "\r\n");
+         }
+         pgmoneta_deque_iterator_destroy(iter);
+      }
+   }
+
+   headers = pgmoneta_append(headers, "\r\n");
+
+   header_len = strlen(request_line) + strlen(headers);
+   total_len = header_len + request->payload.data_size;
+
+   *full_request = malloc(total_len + 1);
+   if (*full_request == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate memory for full request");
+      goto error;
+   }
+
+   memcpy(*full_request, request_line, strlen(request_line));
+   memcpy(*full_request + strlen(request_line), headers, strlen(headers));
+
+   if (request->payload.data_size > 0)
+   {
+      memcpy(*full_request + header_len, request->payload.data, request->payload.data_size);
+   }
+
+   (*full_request)[total_len] = '\0';
+   *full_request_size = total_len;
+
+   free(request_line);
+   free(headers);
+   free(user_agent);
+
+   return PGMONETA_HTTP_STATUS_OK;
+
+error:
+   free(request_line);
+   free(headers);
+   free(user_agent);
+
+   return PGMONETA_HTTP_STATUS_ERROR;
+}
+
+static char*
+http_method_to_string(int method)
+{
+   switch (method)
+   {
+      case PGMONETA_HTTP_GET:
+         return "GET";
+      case PGMONETA_HTTP_POST:
+         return "POST";
+      case PGMONETA_HTTP_PUT:
+         return "PUT";
+      default:
+         return NULL;
+   }
 }

@@ -57,62 +57,84 @@ static void teardown_echo_server(void);
 START_TEST(test_pgmoneta_http_get)
 {
    int status;
-   struct http* h = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
 
    const char* hostname = "localhost";
    int port = 9999;
    bool secure = false;
 
-   ck_assert_msg(!pgmoneta_http_connect((char*)hostname, port, secure, &h), "failed to establish connection");
+   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
 
-   status = pgmoneta_http_get(h, (char*)hostname, "/get");
-   ck_assert_msg(status == 0, "HTTP GET request failed");
+   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/get", &request), "failed to create request");
 
-   pgmoneta_http_disconnect(h);
-   pgmoneta_http_destroy(h);
+   status = pgmoneta_http_invoke(connection, request, &response);
+   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP GET request failed");
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
 }
 END_TEST
 START_TEST(test_pgmoneta_http_post)
 {
    int status;
-   struct http* h = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
    const char* hostname = "localhost";
    int port = 9999;
    bool secure = false;
    const char* test_data = "name=pgmoneta&version=1.0";
 
-   ck_assert_msg(!pgmoneta_http_connect((char*)hostname, port, secure, &h), "failed to establish connection");
+   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
 
-   status = pgmoneta_http_post(h, (char*)hostname, "/post", (char*)test_data, strlen(test_data));
-   ck_assert_msg(status == 0, "HTTP POST request failed");
+   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_POST, "/post", &request), "failed to create request");
 
-   pgmoneta_http_disconnect(h);
-   pgmoneta_http_destroy(h);
+   ck_assert_msg(!pgmoneta_http_set_data(request, (void*)test_data, strlen(test_data)), "failed to set request data");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP POST request failed");
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
 }
 END_TEST
 START_TEST(test_pgmoneta_http_put)
 {
    int status;
-   struct http* h = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
    const char* hostname = "localhost";
    int port = 9999;
    bool secure = false;
    const char* test_data = "This is a test file content for PUT request";
 
-   ck_assert_msg(!pgmoneta_http_connect((char*)hostname, port, secure, &h), "failed to establish connection");
+   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
 
-   status = pgmoneta_http_put(h, (char*)hostname, "/put", (void*)test_data, strlen(test_data));
-   ck_assert_msg(status == 0, "HTTP PUT request failed");
+   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), "failed to create request");
 
-   pgmoneta_http_disconnect(h);
-   pgmoneta_http_destroy(h);
+   ck_assert_msg(!pgmoneta_http_set_data(request, (void*)test_data, strlen(test_data)), "failed to set request data");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP PUT request failed");
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
 }
 END_TEST
 START_TEST(test_pgmoneta_http_put_file)
 {
    int status;
-   struct http* h = NULL;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
    FILE* temp_file = NULL;
+   void* file_data = NULL;
    const char* hostname = "localhost";
    int port = 9999;
    bool secure = false;
@@ -126,14 +148,65 @@ START_TEST(test_pgmoneta_http_put_file)
 
    rewind(temp_file);
 
-   ck_assert_msg(!pgmoneta_http_connect((char*)hostname, port, secure, &h), "failed to establish connection");
+   file_data = malloc(data_len);
+   ck_assert_ptr_nonnull(file_data);
 
-   status = pgmoneta_http_put_file(h, (char*)hostname, "/put", temp_file, data_len, "text/plain");
-   ck_assert_msg(status == 0, "HTTP PUT file request failed");
+   ck_assert_msg(fread(file_data, 1, data_len, temp_file) == data_len, "read file incomplete");
 
-   pgmoneta_http_disconnect(h);
-   pgmoneta_http_destroy(h);
+   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
+
+   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), "failed to create request");
+
+   ck_assert_msg(!pgmoneta_http_request_add_header(request, "Content-Type", "text/plain"), "failed to add content type header");
+
+   ck_assert_msg(!pgmoneta_http_set_data(request, file_data, data_len), "failed to set request data");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP PUT file request failed");
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   free(file_data);
    fclose(temp_file);
+}
+END_TEST
+START_TEST(test_pgmoneta_http_header_operations)
+{
+   struct http_request* request = NULL;
+   char* header_value = NULL;
+
+   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), "failed to create request");
+
+   ck_assert_msg(!pgmoneta_http_request_add_header(request, "Authorization", "Bearer token123"), "failed to add Authorization header");
+   ck_assert_msg(!pgmoneta_http_request_add_header(request, "Content-Type", "application/json"), "failed to add Content-Type header");
+
+   header_value = pgmoneta_http_request_get_header(request, "Authorization");
+   ck_assert_ptr_nonnull(header_value);
+   ck_assert_str_eq(header_value, "Bearer token123");
+
+   header_value = pgmoneta_http_request_get_header(request, "Content-Type");
+   ck_assert_ptr_nonnull(header_value);
+   ck_assert_str_eq(header_value, "application/json");
+
+   ck_assert_ptr_null(pgmoneta_http_request_get_header(request, "NonExistent"));
+
+   ck_assert_msg(!pgmoneta_http_request_update_header(request, "Authorization", "Bearer newtoken456"), "failed to update Authorization header");
+
+   header_value = pgmoneta_http_request_get_header(request, "Authorization");
+   ck_assert_ptr_nonnull(header_value);
+   ck_assert_str_eq(header_value, "Bearer newtoken456");
+
+   ck_assert_msg(!pgmoneta_http_request_remove_header(request, "Content-Type"), "failed to remove Content-Type header");
+
+   header_value = pgmoneta_http_request_get_header(request, "Content-Type");
+   ck_assert_ptr_null(header_value);
+
+   header_value = pgmoneta_http_request_get_header(request, "Authorization");
+   ck_assert_ptr_nonnull(header_value);
+   ck_assert_str_eq(header_value, "Bearer newtoken456");
+
+   pgmoneta_http_request_destroy(request);
 }
 END_TEST
 
@@ -152,6 +225,7 @@ pgmoneta_test_http_suite()
    tcase_add_test(tc_http_basic, test_pgmoneta_http_post);
    tcase_add_test(tc_http_basic, test_pgmoneta_http_put);
    tcase_add_test(tc_http_basic, test_pgmoneta_http_put_file);
+   tcase_add_test(tc_http_basic, test_pgmoneta_http_header_operations);
    suite_add_tcase(s, tc_http_basic);
 
    return s;
