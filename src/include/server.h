@@ -38,6 +38,9 @@ extern "C" {
 #include <stdlib.h>
 #include <time.h>
 
+/**
+ * Stores the stats of a file
+ */
 struct file_stats
 {
    size_t size;             /**< The size of the file */

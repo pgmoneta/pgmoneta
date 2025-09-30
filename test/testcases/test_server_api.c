@@ -65,8 +65,6 @@ START_TEST(test_server_api_checkpoint)
     int ret;
     uint64_t chkt;
 
-    printf("");
-
     ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt);
     ck_assert_msg(ret, "failed to perfom checkpoint");
 }
