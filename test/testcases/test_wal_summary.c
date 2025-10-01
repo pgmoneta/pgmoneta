@@ -59,6 +59,7 @@ START_TEST(test_pgmoneta_wal_summary)
    xlog_rec_ptr s_lsn;
    xlog_rec_ptr e_lsn;
    xlog_rec_ptr tmp_lsn;
+   uint32_t tli = 0;
    int ret;
    char* wal_dir = NULL;
    struct query_response* qr = NULL;
@@ -87,7 +88,7 @@ START_TEST(test_pgmoneta_wal_summary)
    pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
 
    /* get the starting lsn for summary */
-   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &s_lsn);
+   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &s_lsn, &tli);
    ck_assert_msg(ret, "failed to create a checkpoint");
 
    /* Create a table  */
@@ -105,7 +106,7 @@ START_TEST(test_pgmoneta_wal_summary)
    qr = NULL;
 
    /* get the ending lsn for summary */
-   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &e_lsn);
+   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &e_lsn, &tli);
    ck_assert_msg(ret, "failed to create a checkpoint");
 
    /* Switch the wal segment so that records won't appear in partial segments */
@@ -116,7 +117,7 @@ START_TEST(test_pgmoneta_wal_summary)
    qr = NULL;
 
    /* Append some more tuples just to ensure that a new wal segment is streamed */
-   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &tmp_lsn);
+   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &tmp_lsn, &tli);
    ck_assert_msg(ret, "failed to create a checkpoint");
 
    pgmoneta_free_query_response(qr);

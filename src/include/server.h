@@ -111,10 +111,11 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
  * @param ssl The SSL connection
  * @param socket The socket
  * @param [out] chkpt_lsn The corresponding checkpoint LSN
+ * @param [out] tli The timeline ID
  * @return return 0 if success, otherwise failure
  */
 int
-pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* chkpt_lsn);
+pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* chkpt_lsn, uint32_t* tli);
 
 /**
  * Fetch metadata of a file

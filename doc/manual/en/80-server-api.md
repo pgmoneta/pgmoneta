@@ -87,7 +87,7 @@ Note: connection user must be granted `EXECUTE` privilege on the function `pg_re
 
 **pgmoneta_server_checkpoint**
 
-Force a checkpoint into the cluster. Under the hood, it first calls `CHECKPOINT;` command and then retrieves the checkpoint LSN by executing `SELECT checkpoint_lsn FROM pg_control_checkpoint();`. Useful while performing backups/incremental backups.
+Force a checkpoint into the cluster. Under the hood, it first calls `CHECKPOINT;` command and then retrieves the checkpoint LSN by executing `SELECT checkpoint_lsn, timeline_id FROM pg_control_checkpoint();`. Useful while performing backups/incremental backups.
 
 Privileges:
 - pg_checkpoint | SUPERUSER (PostgreSQL 15+)

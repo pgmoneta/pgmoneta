@@ -400,7 +400,7 @@ error:
 }
 
 int
-pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn)
+pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint32_t* tli)
 {
    int version;
    int ret = 0;
@@ -410,6 +410,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn)
    bool has_role = false;
    bool chkpt_success = false;
    char* chkpt_lsn = NULL;
+   char* timeline = NULL;
    struct main_configuration* config = NULL;
    struct message* query_msg = NULL;
    struct query_response* response = NULL;
@@ -498,7 +499,7 @@ q:
       response = NULL;
 
       /* Query to get the latest checkpoint LSN */
-      ret = pgmoneta_create_query_message("SELECT checkpoint_lsn FROM pg_control_checkpoint();", &query_msg);
+      ret = pgmoneta_create_query_message("SELECT checkpoint_lsn, timeline_id FROM pg_control_checkpoint();", &query_msg);
       if (ret != MESSAGE_STATUS_OK)
       {
          goto error;
@@ -507,15 +508,17 @@ q:
    }
    else
    {
-      if (response->number_of_columns != 1)
+      if (response->number_of_columns != 2)
       {
          goto error;
       }
       /* Read the checkpoint LSN */
       chkpt_lsn = pgmoneta_query_response_get_data(response, 0);
+      timeline = pgmoneta_query_response_get_data(response, 1);
    }
 
    *c_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
+   *tli = atoi(timeline);
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
