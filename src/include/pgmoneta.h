@@ -64,6 +64,8 @@ extern "C" {
 
 #define MAX_USERNAME_LENGTH  128
 #define MAX_PASSWORD_LENGTH 1024
+#define MAX_PASSWORD_CHARS   256
+#define MIN_MASTER_KEY_CHARS   8
 
 #define MAX_PATH 1024
 #define MISC_LENGTH 128

@@ -36,6 +36,7 @@
 #include <security.h>
 #include <utils.h>
 #include <value.h>
+#include <utf8.h>
 
 /* system */
 #include <ctype.h>
@@ -540,29 +541,36 @@ error:
 static bool
 is_valid_key(char* key)
 {
-   char c;
-
    if (!key)
    {
       return false;
    }
 
-   if (strlen(key) < 8)
+   // Validate key is valid UTF-8
+   if (!pgmoneta_utf8_valid((const unsigned char*)key, strlen(key)))
    {
-      warnx("Master key must be at least 8 characters long");
+      warnx("Master key contains invalid UTF-8 sequence");
       return false;
    }
 
-   for (size_t i = 0; i < strlen(key); i++)
+   // Check character length
+   size_t char_count = pgmoneta_utf8_char_length((const unsigned char*)key, strlen(key));
+   if (char_count == (size_t)-1)
    {
-      c = *(key + i);
+      warnx("Error counting UTF-8 characters in master key");
+      return false;
+   }
 
-      /* Only support ASCII for now */
-      if ((unsigned char)c & 0x80)
-      {
-         warnx("Master key cannot contain non-ASCII characters");
-         return false;
-      }
+   if (char_count < MIN_MASTER_KEY_CHARS)
+   {
+      warnx("Master key must be at least %d characters long", MIN_MASTER_KEY_CHARS);
+      return false;
+   }
+
+   if (char_count > MAX_PASSWORD_CHARS)
+   {
+      warnx("Master key too long (%zu characters). Maximum allowed: %d characters.", char_count, MAX_PASSWORD_CHARS);
+      return false;
    }
 
    return true;
@@ -693,18 +701,38 @@ password:
       printf("\n");
    }
 
-   for (size_t i = 0; i < strlen(password); i++)
+   // Validate password is valid UTF-8
+   if (!pgmoneta_utf8_valid((const unsigned char*)password, strlen(password)))
    {
-      if ((unsigned char)(*(password + i)) & 0x80)
+      warnx("Invalid UTF-8 sequence in password");
+      if (do_free)
       {
-         warnx("Illegal character(s) in password");
-         if (do_free)
-         {
-            free(password);
-         }
-         password = NULL;
-         goto password;
+         free(password);
       }
+      password = NULL;
+      goto password;
+   }
+   // Check character length
+   size_t char_count = pgmoneta_utf8_char_length((const unsigned char*)password, strlen(password));
+   if (char_count == (size_t)-1)
+   {
+      warnx("Error counting UTF-8 characters in password");
+      if (do_free)
+      {
+         free(password);
+      }
+      password = NULL;
+      goto password;
+   }
+   if (char_count > MAX_PASSWORD_CHARS)
+   {
+      warnx("Password too long (%zu characters). Maximum allowed: %d characters.", char_count, MAX_PASSWORD_CHARS);
+      if (do_free)
+      {
+         free(password);
+      }
+      password = NULL;
+      goto password;
    }
 
    if (do_verify)
@@ -720,11 +748,55 @@ password:
       verify = pgmoneta_get_password();
       printf("\n");
 
+      // Validate verification password is valid UTF-8
+      if (!pgmoneta_utf8_valid((const unsigned char*)verify, strlen(verify)))
+      {
+         warnx("Invalid UTF-8 sequence in verification password. Please use valid UTF-8 encoding.");
+         free(verify);
+         verify = NULL;
+         if (do_free)
+         {
+            free(password);
+         }
+         password = NULL;
+         goto password;
+      }
+      // Check character count on verification password
+      size_t verify_char_count = pgmoneta_utf8_char_length((const unsigned char*)verify, strlen(verify));
+      if (verify_char_count == (size_t)-1)
+      {
+         warnx("Error counting UTF-8 characters in verification password");
+         free(verify);
+         verify = NULL;
+         if (do_free)
+         {
+            free(password);
+         }
+         password = NULL;
+         goto password;
+      }
+      if (verify_char_count > MAX_PASSWORD_CHARS)
+      {
+         warnx("Verification password too long (%zu characters). Maximum allowed: %d characters.", verify_char_count, MAX_PASSWORD_CHARS);
+         free(verify);
+         verify = NULL;
+         if (do_free)
+         {
+            free(password);
+         }
+         password = NULL;
+         goto password;
+      }
       if (strlen(password) != strlen(verify) || memcmp(password, verify, strlen(password)) != 0)
       {
-         free(password);
-         password = NULL;
          warnx("Passwords do not match");
+         if (do_free)
+         {
+            free(password);
+         }
+         password = NULL;
+         free(verify);
+         verify = NULL;
          goto password;
       }
    }
@@ -942,18 +1014,38 @@ password:
             printf("\n");
          }
 
-         for (size_t i = 0; i < strlen(password); i++)
+         // Validate password is valid UTF-8
+         if (!pgmoneta_utf8_valid((const unsigned char*)password, strlen(password)))
          {
-            if ((unsigned char)(*(password + i)) & 0x80)
+            warnx("Invalid UTF-8 sequence in password");
+            if (do_free)
             {
-               warnx("Illegal character(s) in password");
-               if (do_free)
-               {
-                  free(password);
-               }
-               password = NULL;
-               goto password;
+               free(password);
             }
+            password = NULL;
+            goto password;
+         }
+         // Check character length
+         size_t char_count = pgmoneta_utf8_char_length((const unsigned char*)password, strlen(password));
+         if (char_count == (size_t)-1)
+         {
+            warnx("Error counting UTF-8 characters in password");
+            if (do_free)
+            {
+               free(password);
+            }
+            password = NULL;
+            goto password;
+         }
+         if (char_count > MAX_PASSWORD_CHARS)
+         {
+            warnx("Password too long (%zu characters). Maximum allowed: %d characters.", char_count, MAX_PASSWORD_CHARS);
+            if (do_free)
+            {
+               free(password);
+            }
+            password = NULL;
+            goto password;
          }
 
          if (do_verify)
@@ -969,11 +1061,55 @@ password:
             verify = pgmoneta_get_password();
             printf("\n");
 
+            // Validate verification password is valid UTF-8
+            if (!pgmoneta_utf8_valid((const unsigned char*)verify, strlen(verify)))
+            {
+               warnx("Invalid UTF-8 sequence in verification password. Please use valid UTF-8 encoding.");
+               free(verify);
+               verify = NULL;
+               if (do_free)
+               {
+                  free(password);
+               }
+               password = NULL;
+               goto password;
+            }
+            // Check character count on verification password
+            size_t verify_char_count = pgmoneta_utf8_char_length((const unsigned char*)verify, strlen(verify));
+            if (verify_char_count == (size_t)-1)
+            {
+               warnx("Error counting UTF-8 characters in verification password");
+               free(verify);
+               verify = NULL;
+               if (do_free)
+               {
+                  free(password);
+               }
+               password = NULL;
+               goto password;
+            }
+            if (verify_char_count > MAX_PASSWORD_CHARS)
+            {
+               warnx("Verification password too long (%zu characters). Maximum allowed: %d characters.", verify_char_count, MAX_PASSWORD_CHARS);
+               free(verify);
+               verify = NULL;
+               if (do_free)
+               {
+                  free(password);
+               }
+               password = NULL;
+               goto password;
+            }
             if (strlen(password) != strlen(verify) || memcmp(password, verify, strlen(password)) != 0)
             {
-               free(password);
-               password = NULL;
                warnx("Passwords do not match");
+               if (do_free)
+               {
+                  free(password);
+               }
+               password = NULL;
+               free(verify);
+               verify = NULL;
                goto password;
             }
          }

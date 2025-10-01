@@ -1282,8 +1282,8 @@ enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
 
 void
 pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_t end_lsn,
-                        struct deque* rms, struct deque* xids, char** included_objects,
-                        struct column_widths* widths)
+                                 struct deque* rms, struct deque* xids, char** included_objects,
+                                 struct column_widths* widths)
 {
    struct deque_iterator* record_iterator = NULL;
    struct decoded_xlog_record* record = NULL;
@@ -1314,7 +1314,7 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
       if (record->partial)
       {
          continue;
-         
+
       }
 
       rm_desc = malloc(1);

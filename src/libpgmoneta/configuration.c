@@ -38,6 +38,7 @@
 #include <tablespace.h>
 #include <utils.h>
 #include <value.h>
+#include <utf8.h>
 
 /* system */
 #include <ctype.h>
@@ -2413,16 +2414,35 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
             goto error;
          }
 
+         // Validate password is valid UTF-8
+         if (!pgmoneta_utf8_valid((unsigned char*)password, strlen(password)))
+         {
+            printf("pgmoneta: Invalid USER entry: invalid UTF-8 password for user '%s'\n", username);
+            printf("%s\n", line);
+            free(password);
+            free(decoded);
+            password = NULL;
+            decoded = NULL;
+            continue;
+         }
+
+         // Check character length
+         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
          if (strlen(username) < MAX_USERNAME_LENGTH &&
-             strlen(password) < MAX_PASSWORD_LENGTH)
+             strlen(password) < MAX_PASSWORD_LENGTH &&
+             char_count != (size_t)-1 && char_count <= MAX_PASSWORD_CHARS)
          {
             memcpy(&config->common.users[index].username, username, strlen(username));
             memcpy(&config->common.users[index].password, password, strlen(password));
          }
          else
          {
-            warnx("pgmoneta: Invalid USER entry");
-            warnx("%s", line);
+            if (char_count > MAX_PASSWORD_CHARS)
+            {
+               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)", username, char_count);
+            }
+            printf("pgmoneta: Invalid USER entry\n");
+            printf("%s\n", line);
          }
 
          free(password);
@@ -2604,16 +2624,35 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
             goto error;
          }
 
+         // Validate password is valid UTF-8
+         if (!pgmoneta_utf8_valid((unsigned char*)password, strlen(password)))
+         {
+            printf("pgmoneta: Invalid ADMIN entry: invalid UTF-8 password for user '%s'\n", username);
+            printf("%s\n", line);
+            free(password);
+            free(decoded);
+            password = NULL;
+            decoded = NULL;
+            continue;
+         }
+
+         // Check character length
+         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
          if (strlen(username) < MAX_USERNAME_LENGTH &&
-             strlen(password) < MAX_PASSWORD_LENGTH)
+             strlen(password) < MAX_PASSWORD_LENGTH &&
+             char_count != (size_t)-1 && char_count <= MAX_PASSWORD_CHARS)
          {
             memcpy(&config->common.admins[index].username, username, strlen(username));
             memcpy(&config->common.admins[index].password, password, strlen(password));
          }
          else
          {
-            warnx("pgmoneta: Invalid ADMIN entry");
-            warnx("%s", line);
+            if (char_count > MAX_PASSWORD_CHARS)
+            {
+               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)", username, char_count);
+            }
+            printf("pgmoneta: Invalid ADMIN entry\n");
+            printf("%s\n", line);
          }
 
          free(password);

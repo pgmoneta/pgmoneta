@@ -43,6 +43,7 @@
 #include <shmem.h>
 #include <stddef.h>
 #include <utils.h>
+#include <utf8.h>
 #include <value.h>
 #include <verify.h>
 #include <zstandard_compression.h>
@@ -814,12 +815,19 @@ password:
          do_free = false;
       }
 
-      for (size_t i = 0; i < strlen(password); i++)
+      // Validate password is valid UTF-8
+      if (!pgmoneta_utf8_valid((unsigned char*)password, strlen(password)))
       {
-         if ((unsigned char)(*(password + i)) & 0x80)
-         {
-            goto password;
-         }
+         printf("pgmoneta-cli: Invalid password: not valid UTF-8\n");
+         goto password;
+      }
+
+      // Check character length
+      size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
+      if (char_count == (size_t)-1 || char_count > MAX_PASSWORD_CHARS)
+      {
+         printf("pgmoneta-cli: Invalid password: too many characters (max %d)\n", MAX_PASSWORD_CHARS);
+         goto password;
       }
 
       /* Authenticate */
