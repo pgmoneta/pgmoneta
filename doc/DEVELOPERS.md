@@ -404,7 +404,7 @@ pgmoneta-cli -c pgmoneta.conf shutdown
 pgmoneta provides two WAL (Write-Ahead Log) tools for working with PostgreSQL WAL files:
 
 - **pgmoneta-walinfo**: Read and display information about WAL files
-- **pgmoneta-walfilter**: Read and process WAL files based on user-defined criteria
+- **pgmoneta-walfilter**: Filter WAL files based on user-defined rules
 
 For detailed user documentation about these tools, please refer to the [WAL Tools chapter](./manual/en/17-wal-tools.md).
 

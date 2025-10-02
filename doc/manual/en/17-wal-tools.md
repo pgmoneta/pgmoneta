@@ -3,7 +3,7 @@
 pgmoneta provides two powerful command-line utilities for working with PostgreSQL Write-Ahead Log (WAL) files:
 
 - **pgmoneta-walinfo**: Read and display information about WAL files
-- **pgmoneta-walfilter**: Read and process WAL files based on user-defined criteria
+- **pgmoneta-walfilter**: Filter WAL files based on user-defined rules.
 
 ## pgmoneta-walinfo
 
@@ -157,7 +157,18 @@ SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c
 
 ## pgmoneta-walfilter
 
-`pgmoneta-walfilter` is a command-line utility that reads PostgreSQL Write-Ahead Log (WAL) files from a source directory, parses them, recalculates CRC checksums, and writes the processed WAL files to a target directory.
+`pgmoneta-walfilter` is a command-line utility that reads PostgreSQL Write-Ahead Log (WAL) files from a source directory, filters them based on user-defined rules, recalculates CRC checksums, and writes the filtered WAL files to a target directory.
+
+### Filtering Rules
+
+The tool supports two types of filtering rules:
+
+1. **Transaction ID (XID) filtering**: Filter out specific transaction IDs
+   - Specify a list of XIDs to remove from the WAL stream
+   - All records associated with these XIDs will be filtered out
+
+2. **Operation-based filtering**: Filter out specific database operations
+   - `DELETE`: Removes all DELETE operations and their associated transactions from the WAL stream
 
 ### Usage
 
@@ -167,16 +178,20 @@ pgmoneta-walfilter <yaml_config_file>
 
 ### Configuration
 
-The tool uses a YAML configuration file to specify source and target directories, encryption/compression, and other settings.
+The tool uses a YAML configuration file to specify source and target directories and other settings.
 
 #### Configuration File Structure
 
 ```yaml
 source_dir: /path/to/source/backup/directory
 target_dir: /path/to/target/directory
-encryption: aes                    # Optional: encryption method
-compression: gz                    # Optional: compression method
 configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
+rules:                             # Optional: filtering rules
+  - xids:                          # Filter by transaction IDs
+    - 752
+    - 753
+  - operations:                    # Filter by operations
+    - DELETE
 ```
 
 #### Configuration Parameters
@@ -184,17 +199,22 @@ configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `source_dir` | String | Yes | Source directory containing the backup and WAL files |
-| `target_dir` | String | Yes | Target directory where generated WAL files will be written |
-| `encryption` | String | No | Encryption method used to encrypt the generated WAL files (e.g., "aes") |
-| `compression` | String | No | Compression method used to compress the generated WAL files (e.g., "gz", "zstd", "lz4", "bz2") |
+| `target_dir` | String | Yes | Target directory where filtered WAL files will be written |
 | `configuration_file` | String | No | Path to pgmoneta_walfilter.conf file |
+| `rules` | Array | No | Filtering rules to apply to WAL files |
+| `rules.xids` | Array of Integers | No | List of transaction IDs (XIDs) to filter out |
+| `rules.operations` | Array of Strings | No | List of operations to filter out |
 
 ### How It Works
 
 1. **Read Configuration**: Parses the YAML configuration file
 2. **Load WAL Files**: Reads all WAL files from the source directory
-3. **Recalculate CRCs**: Updates checksums for modified records
-4. **Write Output**: Saves generated WAL files to the target directory
+3. **Apply Filters**: Applies the specified filtering rules:
+   - Filters out records matching specified operations (e.g., DELETE)
+   - Filters out records with specified transaction IDs (XIDs)
+   - Converts filtered records to NOOP operations
+4. **Recalculate CRCs**: Updates checksums for modified records
+5. **Write Output**: Saves filtered WAL files to the target directory
 
 ### Examples
 
@@ -203,10 +223,8 @@ configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
 Create a configuration file `config.yaml`:
 
 ```yaml
-source_dir: /home/user/backup/primary/backup/20250913014258
-target_dir: /home/user/generated_wal
-encryption: aes
-compression: gz
+source_dir: /path/to/source/directory
+target_dir: /path/to/target/directory
 configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
 ```
 
@@ -216,10 +234,35 @@ Run the tool:
 pgmoneta-walfilter config.yaml
 ```
 
+#### Filtering Example
+
+Create a configuration file with filtering rules:
+
+```yaml
+source_dir: /path/to/source/directory
+target_dir: /path/to/target/directory
+configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
+rules:
+  - xids:
+    - 752
+    - 753
+  - operations:
+    - DELETE
+```
+
+This configuration will:
+- Filter out all DELETE operations and their associated transactions
+- Filter out all records with transaction IDs 752 and 753
+
+Run the tool:
+
+```bash
+pgmoneta-walfilter filter_config.yaml
+```
+
 **Log Files:**
 
 The tool uses the logging configuration from `pgmoneta_walfilter.conf`. Check the log file specified in the configuration for detailed error messages and processing information.
 
 ### Additional Information
 For more detailed information about the internal APIs and developer documentation, see the [WAL Developer Guide](78-wal.md).
-

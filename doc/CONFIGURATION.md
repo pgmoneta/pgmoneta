@@ -184,6 +184,45 @@ The `pgmoneta_walinfo` configuration defines the info needed for `walinfo` to wo
 
 The configuration is loaded from either the path specified by the `-c` flag or `/etc/pgmoneta/pgmoneta_walinfo.conf` if -c wasn't provided.
 
+# pgmoneta_walfilter configuration
+The `pgmoneta_walfilter` configuration defines the info needed for `walfilter` to work.
+
+The tool uses two configuration files:
+1. A YAML configuration file (required) that specifies source/target directories, filtering rules, and other settings
+2. A pgmoneta_walfilter.conf file (optional) for logging configuration
+
+## YAML Configuration Format
+
+The YAML configuration file defines the paths, filtering rules, and other settings for `walfilter`. Below is an example configuration:
+
+```yaml
+source_dir: /path/to/source/backup/directory
+target_dir: /path/to/target/directory
+configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
+rules:                             # Optional: filtering rules
+  - xids:                          # Filter by transaction IDs
+    - 752
+    - 753
+```
+
+### Filtering Rules
+
+The tool supports two types of filtering:
+
+1. **Transaction ID (XID) filtering**: Filter out specific transaction IDs
+   - Specify a list of XIDs to remove from the WAL stream
+2. **Operation-based filtering**: Filter out specific database operations
+   - `DELETE`: Removes all DELETE operations and their associated transactions
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `source_dir` | String | Yes | Source directory containing the backup and WAL files |
+| `target_dir` | String | Yes | Target directory where filtered WAL files will be written |
+| `configuration_file` | String | No | Path to pgmoneta_walfilter.conf file |
+| `rules` | Array | No | Filtering rules to apply to WAL files |
+| `rules.xids` | Array of Integers | No | List of transaction IDs (XIDs) to filter out |
+| `rules.operations` | Array of Strings | No | List of operations to filter out |
+
 ## [pgmoneta_walinfo]
 
 | Property | Default | Unit | Required | Description |
@@ -199,33 +238,6 @@ The configuration is loaded from either the path specified by the `-c` flag or `
 | host | | String | Yes | The address of the PostgreSQL instance |
 | port | | Int | Yes | The port of the PostgreSQL instance |
 | user | | String | Yes | The replication user name |
-
-# pgmoneta_walfilter configuration
-The `pgmoneta_walfilter` configuration defines the info needed for `walfilter` to work.
-
-The tool uses two configuration files:
-1. A YAML configuration file (required) that specifies source/target directories and other settings.
-2. A pgmoneta_walfilter.conf file (optional) for other configurations.
-
-## YAML Configuration Format
-
-The YAML configuration file defines the paths and other settings for `walfilter`. Below is an example configuration:
-
-```yaml
-source_dir: /path/to/source/backup/directory
-target_dir: /path/to/target/directory
-encryption: aes                    # Optional: encryption method
-compression: gz                    # Optional: compression method
-configuration_file: /etc/pgmoneta/pgmoneta_walfilter.conf
-```
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `source_dir` | String | Yes | Source directory containing the backup and WAL files |
-| `target_dir` | String | Yes | Target directory where generated WAL files will be written |
-| `encryption` | String | No | Encryption method used (e.g., "aes") |
-| `compression` | String | No | Compression method used (e.g., "gz", "zstd", "lz4", "bz2") |
-| `configuration_file` | String | No | Path to pgmoneta_walfilter.conf file |
 
 ## [pgmoneta_walfilter]
 

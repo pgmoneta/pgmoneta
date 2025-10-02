@@ -39,13 +39,7 @@
 int
 pgmoneta_parse_yaml_config(const char* filename, config_t* config)
 {
-   config->compression = NULL;
-   config->encryption = NULL;
-   config->source_dir = NULL;
-   config->target_dir = NULL;
-   config->rules = NULL;
-   config->rule_count = 0;
-   config->configuration_file = NULL;
+   memset(config, 0, sizeof(config_t));
 
    FILE* file = fopen(filename, "rb");
    if (!file)
@@ -69,9 +63,6 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
    parser_state_t state = STATE_START;
    char* current_key = NULL;
    int done = 0;
-
-   // Initialize config
-   memset(config, 0, sizeof(config_t));
 
    while (!done)
    {
@@ -97,17 +88,8 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
             }
             else if (state == STATE_RULES_SEQUENCE)
             {
-               // Starting a new rule mapping
+               // Starting a new rule mapping (either operations or xids)
                state = STATE_RULE_MAPPING;
-               config->rules = realloc(config->rules,
-                                       (config->rule_count + 1) * sizeof(rule_t));
-               memset(&config->rules[config->rule_count], 0, sizeof(rule_t));
-               config->rule_count++;
-            }
-            else if (state == STATE_EXCLUDE_SEQUENCE)
-            {
-               // Starting an exclude item mapping (contains operations)
-               state = STATE_EXCLUDE_ITEM_MAPPING;
             }
             break;
 
@@ -115,10 +97,6 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
             if (state == STATE_RULE_MAPPING)
             {
                state = STATE_RULES_SEQUENCE;
-            }
-            else if (state == STATE_EXCLUDE_ITEM_MAPPING)
-            {
-               state = STATE_EXCLUDE_SEQUENCE;
             }
             else if (state == STATE_ROOT)
             {
@@ -135,16 +113,16 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
                current_key = NULL;
             }
             else if (state == STATE_RULE_MAPPING && current_key &&
-                     strcmp(current_key, "exclude") == 0)
-            {
-               state = STATE_EXCLUDE_SEQUENCE;
-               free(current_key);
-               current_key = NULL;
-            }
-            else if (state == STATE_EXCLUDE_ITEM_MAPPING && current_key &&
                      strcmp(current_key, "operations") == 0)
             {
                state = STATE_OPERATIONS_SEQUENCE;
+               free(current_key);
+               current_key = NULL;
+            }
+            else if (state == STATE_RULE_MAPPING && current_key &&
+                     strcmp(current_key, "xids") == 0)
+            {
+               state = STATE_XIDS_SEQUENCE;
                free(current_key);
                current_key = NULL;
             }
@@ -153,9 +131,9 @@ pgmoneta_parse_yaml_config(const char* filename, config_t* config)
          case YAML_SEQUENCE_END_EVENT:
             if (state == STATE_OPERATIONS_SEQUENCE)
             {
-               state = STATE_EXCLUDE_ITEM_MAPPING;
+               state = STATE_RULE_MAPPING;
             }
-            else if (state == STATE_EXCLUDE_SEQUENCE)
+            else if (state == STATE_XIDS_SEQUENCE)
             {
                state = STATE_RULE_MAPPING;
             }
@@ -236,27 +214,29 @@ handle_scalar_event(yaml_event_t* event, parser_state_t* state,
          {
             *current_key = strdup(value);
          }
-         break;
-
-      case STATE_EXCLUDE_ITEM_MAPPING:
-         if (*current_key == NULL)
+         else
          {
-            *current_key = strdup(value);
+            // Handle other rule properties if needed
+            free(*current_key);
+            *current_key = NULL;
          }
          break;
 
       case STATE_OPERATIONS_SEQUENCE:
-         // Add operation to current rule's exclude operations
-         if (config->rule_count > 0)
-         {
-            rule_t* current_rule = &config->rules[config->rule_count - 1];
-            current_rule->exclude.operations = realloc(
-               current_rule->exclude.operations,
-               (current_rule->exclude.operation_count + 1) * sizeof(char*));
-            current_rule->exclude.operations[current_rule->exclude.operation_count] =
-               strdup(value);
-            current_rule->exclude.operation_count++;
-         }
+         // Add operation to operations array
+         config->operations = realloc(
+            config->operations,
+            (config->operation_count + 1) * sizeof(char*));
+         config->operations[config->operation_count] = strdup(value);
+         config->operation_count++;
+         break;
+
+      case STATE_XIDS_SEQUENCE:
+         // Add XID to the XIDs array
+         config->xids = realloc(config->xids,
+                                (config->xid_count + 1) * sizeof(int));
+         config->xids[config->xid_count] = atoi(value);
+         config->xid_count++;
          break;
 
       default:
@@ -288,20 +268,19 @@ cleanup_config(config_t* config)
       free(config->configuration_file);
    }
 
-   for (int i = 0; i < config->rule_count; i++)
+   // Clean up operations
+   for (int i = 0; i < config->operation_count; i++)
    {
-      for (int j = 0; j < config->rules[i].exclude.operation_count; j++)
-      {
-         free(config->rules[i].exclude.operations[j]);
-      }
-      if (config->rules[i].exclude.operations)
-      {
-         free(config->rules[i].exclude.operations);
-      }
+      free(config->operations[i]);
+   }
+   if (config->operations)
+   {
+      free(config->operations);
    }
 
-   if (config->rules)
+   // Clean up XIDs
+   if (config->xids)
    {
-      free(config->rules);
+      free(config->xids);
    }
 }

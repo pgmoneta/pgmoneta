@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <aes.h>
+#include <cmd.h>
 #include <compression.h>
 #include <configuration.h>
 #include <info.h>
@@ -60,11 +61,14 @@ static void
 usage(void)
 {
    printf("pgmoneta-walfilter %s\n", VERSION);
-   printf("  Command line utility to read and filter Write-Ahead Log (WAL) files based on user-defined criteria\n");
+   printf("  Command line utility to filter PostgreSQL Write-Ahead Log (WAL) files based on user-defined rules\n");
    printf("\n");
 
    printf("Usage:\n");
-   printf("  pgmoneta-walfilter <yaml_config_file>\n");
+   printf("  pgmoneta-walfilter <yaml_config_file> [OPTIONS]\n");
+   printf("\n");
+   printf("Options:\n");
+   printf("  -c, --config CONFIG_PATH  Override configuration file path from YAML\n");
    printf("\n");
    printf("pgmoneta: %s\n", PGMONETA_HOMEPAGE);
    printf("Report bugs: %s\n", PGMONETA_ISSUES);
@@ -85,7 +89,7 @@ pgmoneta_process_walfiles(int walfile_count, struct walfile** walfiles)
       return;
    }
 
-   pgmoneta_log_info("Processing %d WAL files for CRC recalculation", walfile_count);
+   pgmoneta_log_debug("Processing %d WAL files for CRC recalculation", walfile_count);
 
    for (int i = 0; i < walfile_count; i++)
    {
@@ -103,7 +107,7 @@ pgmoneta_process_walfiles(int walfile_count, struct walfile** walfiles)
          continue;
       }
 
-      pgmoneta_log_info("Processing WAL file #%d...", i);
+      pgmoneta_log_debug("Processing WAL file #%d...", i);
 
       struct deque_iterator* iter = NULL;
       if (pgmoneta_deque_iterator_create(wf->records, &iter))
@@ -148,7 +152,7 @@ pgmoneta_process_walfiles(int walfile_count, struct walfile** walfiles)
 
       pgmoneta_deque_iterator_destroy(iter);
    }
-   pgmoneta_log_info("WAL files processing completed");
+   pgmoneta_log_debug("WAL files processing completed");
 }
 
 /*
@@ -230,11 +234,10 @@ error:
  *
  * @param file_count Pointer to the number of WAL files
  * @param walfiles Pointer to the array of WAL file pointers
- * @param backup Pointer to the backup information
  * @return 0 on success, non-zero on failure
  */
 int
-pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, struct backup* backup)
+pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles)
 {
 #define XID_IS_DELETED(xid) \
         ({ int found = 0; \
@@ -242,16 +245,10 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, st
               if (delete_xids[k] == (xid)) { found = 1; break; } \
            } found; })
 
-   xlog_rec_ptr end_walpos = 0;
    transaction_id* delete_xids = NULL;
    int delete_xid_count = 0;
    int delete_xid_capacity = 16;
    int records_marked = 0;
-
-   if (backup != NULL)
-   {
-      end_walpos = ((uint64_t)backup->end_lsn_hi32 << 32) | backup->end_lsn_lo32;
-   }
 
    delete_xids = malloc(delete_xid_capacity * sizeof(transaction_id));
    if (!delete_xids)
@@ -280,45 +277,42 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, st
             info &= XLOG_HEAP_OPMASK;
             if (info == XLOG_HEAP_DELETE)
             {
-               if (rec->lsn > end_walpos)
+               struct xl_heap_delete* del = (struct xl_heap_delete*)rec->main_data;
+
+               if (!del)
                {
-                  struct xl_heap_delete* del = (struct xl_heap_delete*)rec->main_data;
-
-                  if (!del)
-                  {
-                     continue;
-                  }
-
-                  int already_exists = 0;
-                  for (int j = 0; j < delete_xid_count; j++)
-                  {
-                     if (delete_xids[j] == del->xmax)
-                     {
-                        already_exists = 1;
-                        break;
-                     }
-                  }
-
-                  if (already_exists)
-                  {
-                     continue;
-                  }
-
-                  if (delete_xid_count == delete_xid_capacity)
-                  {
-                     delete_xid_capacity *= 2;
-                     transaction_id* new_delete_xids = realloc(delete_xids, delete_xid_capacity * sizeof(transaction_id));
-                     if (!new_delete_xids)
-                     {
-                        pgmoneta_deque_iterator_destroy(iter);
-                        free(delete_xids);
-                        return 1;
-                     }
-                     delete_xids = new_delete_xids;
-                  }
-
-                  delete_xids[delete_xid_count++] = del->xmax;
+                  continue;
                }
+
+               int already_exists = 0;
+               for (int j = 0; j < delete_xid_count; j++)
+               {
+                  if (delete_xids[j] == del->xmax)
+                  {
+                     already_exists = 1;
+                     break;
+                  }
+               }
+
+               if (already_exists)
+               {
+                  continue;
+               }
+
+               if (delete_xid_count == delete_xid_capacity)
+               {
+                  delete_xid_capacity *= 2;
+                  transaction_id* new_delete_xids = realloc(delete_xids, delete_xid_capacity * sizeof(transaction_id));
+                  if (!new_delete_xids)
+                  {
+                     pgmoneta_deque_iterator_destroy(iter);
+                     free(delete_xids);
+                     return 1;
+                  }
+                  delete_xids = new_delete_xids;
+               }
+
+               delete_xids[delete_xid_count++] = del->xmax;
             }
          }
       }
@@ -372,8 +366,8 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, st
       pgmoneta_deque_iterator_destroy(rec_iter);
    }
 
-   pgmoneta_log_info("Total records marked as NOOP: %d", records_marked);
-   pgmoneta_log_info("Total XIDs collected from DELETE: %d", delete_xid_count);
+   pgmoneta_log_debug("Total records marked as NOOP: %d", records_marked);
+   pgmoneta_log_debug("Total XIDs collected from DELETE: %d", delete_xid_count);
    if (delete_xid_count > 0)
    {
       char* delete_xids_str = NULL;
@@ -381,7 +375,7 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, st
       {
          delete_xids_str = pgmoneta_format_and_append(delete_xids_str, "%u%s", delete_xids[i], (i < delete_xid_count - 1) ? ", " : "");
       }
-      pgmoneta_log_info("Collected XIDs: %s", delete_xids_str ? delete_xids_str : "");
+      pgmoneta_log_debug("Collected XIDs: %s", delete_xids_str ? delete_xids_str : "");
       free(delete_xids_str);
    }
 
@@ -390,29 +384,107 @@ pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles, st
    return 0;
 }
 
+/**
+ * Filter out records with specific XIDs from WAL files
+ *
+ * @param file_count Pointer to the number of WAL files
+ * @param walfiles Pointer to the array of WAL file pointers
+ * @param xids Array of XIDs to filter out
+ * @param xid_count Number of XIDs in the array
+ * @return 0 on success, non-zero on failure
+ */
+int
+pgmoneta_filter_xids(int* file_count, struct walfile*** walfiles, int* xids, int xid_count)
+{
+#define XID_IS_FILTERED(xid) \
+        ({ int found = 0; \
+           for (int k = 0; k < xid_count; k++) { \
+              if ((transaction_id) xids[k] == (xid)) { found = 1; break; } \
+           } found; })
+
+   int match = 0;
+   struct deque_iterator* rec_iter = NULL;
+   struct decoded_xlog_record* rec = NULL;
+
+   if (xids == NULL || xid_count <= 0)
+   {
+      goto done;
+   }
+
+   /* Mark matching records as NOOP */
+   for (int i = 0; i < *file_count; i++)
+   {
+      struct walfile* wf = (*walfiles)[i];
+      if (wf == NULL || wf->records == NULL)
+      {
+         continue;
+      }
+
+      rec_iter = NULL;
+      if (pgmoneta_deque_iterator_create(wf->records, &rec_iter))
+      {
+         pgmoneta_log_error("Failed to create iterator for WAL file records");
+         goto error;
+      }
+
+      while (pgmoneta_deque_iterator_next(rec_iter))
+      {
+         rec = (struct decoded_xlog_record*)rec_iter->value->data;
+         match = 0;
+
+         /* Check if the record's XID or toplevel_xid matches any of the filtered XIDs */
+         if (XID_IS_FILTERED(rec->header.xl_xid) || XID_IS_FILTERED(rec->toplevel_xid))
+         {
+            match = 1;
+         }
+
+         if (match)
+         {
+            /* Change to NOOP (RM_XLOG, XLOG_NOOP) */
+            rec->header.xl_info = XLOG_NOOP;
+            rec->header.xl_rmid = RM_XLOG_ID;
+         }
+      }
+      pgmoneta_deque_iterator_destroy(rec_iter);
+   }
+
+   if (xid_count > 0)
+   {
+      char* filter_xids_str = NULL;
+      for (int i = 0; i < xid_count; i++)
+      {
+         filter_xids_str = pgmoneta_format_and_append(filter_xids_str, "%u%s", xids[i], (i < xid_count - 1) ? ", " : "");
+      }
+      pgmoneta_log_debug("Filtered XIDs: %s", filter_xids_str ? filter_xids_str : "");
+      free(filter_xids_str);
+   }
+
+done:
+   return 0;
+
+error:
+   if (rec_iter)
+   {
+      pgmoneta_deque_iterator_destroy(rec_iter);
+      rec_iter = NULL;
+   }
+
+   return 1;
+}
+
 int
 main(int argc, char* argv[])
 {
-   if (argc != 2)
-   {
-      usage();
-      return 1;
-   }
-
    config_t yaml_config;
    struct walfilter_configuration* config = NULL;
    char* logfile = NULL;
    int file_count = 0;
    char** files = NULL;
-   char* file_path = malloc(MAX_PATH);
+   char* file_path = NULL;
    char* wal_files_path = NULL;
    int loaded = 1;
    char* configuration_path = NULL;
    size_t size;
-   struct backup* backup = NULL;
-   char* backup_label = NULL;
-   char* parent_dir = NULL;
-   char* last_slash = NULL;
    char* tmp_wal = NULL;
    struct walfile* wf = NULL;
    char* decompressed_file_name = NULL;
@@ -421,25 +493,66 @@ main(int argc, char* argv[])
    bool copy = true;
    struct walfile** walfiles = NULL;
    int walfile_count = 0;
-   char* source_data_dir = NULL;
    char* target_pg_wal_dir = NULL;
+   int optind = 0;
+   char* yaml_file = NULL;
+   int num_results = 0;
+   int num_options = 0;
 
-   if (file_path == NULL)
+   cli_option options[] = {
+      {"c", "config", true},
+      {"q", "quiet", false},
+   };
+
+   num_options = sizeof(options) / sizeof(options[0]);
+   cli_result results[num_options];
+
+   if (argc < 2)
    {
-      warnx("Failed to allocate memory for file_path");
+      usage();
+      return 0;
+   }
+
+   num_results = cmd_parse(argc, argv, options, num_options, results, num_options, true, &yaml_file, &optind);
+
+   if (num_results < 0)
+   {
+      pgmoneta_log_error("Error parsing command line\n");
+      return 1;
+   }
+
+   for (int i = 0; i < num_results; i++)
+   {
+      char* optname = results[i].option_name;
+      char* optarg = results[i].argument;
+
+      if (optname == NULL)
+      {
+         break;
+      }
+      else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
+      {
+         configuration_path = optarg;
+      }
+   }
+
+   if (yaml_file == NULL)
+   {
+      warnx("Missing <yaml_config_file> argument");
+      usage();
       return 1;
    }
 
    size = sizeof(struct walfilter_configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
-      warnx("Error creating shared memory");
+      pgmoneta_log_fatal("Error creating shared memory");
       goto error;
    }
 
-   if (pgmoneta_parse_yaml_config(argv[1], &yaml_config))
+   if (pgmoneta_parse_yaml_config(yaml_file, &yaml_config))
    {
-      pgmoneta_log_error("Failed to parse configuration\n");
+      pgmoneta_log_fatal("Failed to parse configuration\n");
       goto error;
    }
 
@@ -451,7 +564,12 @@ main(int argc, char* argv[])
 
    pgmoneta_init_walfilter_configuration(shmem);
    config = (struct walfilter_configuration*)shmem;
-   configuration_path = yaml_config.configuration_file;
+
+   /* Override configuration_path if provided via CLI, otherwise use from YAML */
+   if (configuration_path == NULL)
+   {
+      configuration_path = yaml_config.configuration_file;
+   }
 
    if (configuration_path != NULL)
    {
@@ -462,8 +580,12 @@ main(int argc, char* argv[])
 
       if (loaded)
       {
-         warnx("Configuration not found: %s", configuration_path);
+         pgmoneta_log_debug("Configuration not found: %s", configuration_path);
       }
+   }
+   else
+   {
+      config->common.log_level = PGMONETA_LOGGING_LEVEL_WARN;
    }
 
    if (loaded && pgmoneta_exists(PGMONETA_WALFILTER_DEFAULT_CONFIG_FILE_PATH))
@@ -495,39 +617,10 @@ main(int argc, char* argv[])
       goto error;
    }
 
-   last_slash = strrchr(yaml_config.source_dir, '/');
-   if (last_slash != NULL && *(last_slash + 1) != '\0')
-   {
-      backup_label = last_slash + 1;
-   }
-   else
-   {
-      backup_label = yaml_config.source_dir;
-   }
+   /* Use source_dir directly as the WAL files directory */
+   wal_files_path = pgmoneta_append(wal_files_path, yaml_config.source_dir);
 
-   parent_dir = pgmoneta_get_parent_dir(yaml_config.source_dir);
-   if (parent_dir == NULL)
-   {
-      pgmoneta_log_error("Failed to allocate memory for parent_dir");
-      goto error;
-   }
-
-   wal_files_path = pgmoneta_get_parent_dir(parent_dir);
-   wal_files_path = pgmoneta_append(wal_files_path, "/wal");
-
-   parent_dir = pgmoneta_append(parent_dir, "/");
-
-   if (pgmoneta_load_info(parent_dir, backup_label, &backup))
-   {
-      pgmoneta_log_error("Failed to load backup information from %s", backup_label);
-      goto error;
-   }
-
-   pgmoneta_log_info("Parent directory: %s", parent_dir);
-   pgmoneta_log_info("Backup label: %s", backup_label);
-   pgmoneta_log_info("WAL files path: %s", wal_files_path);
-   pgmoneta_log_info("Backup END_WALPOS: %X/%X",
-                     backup->end_lsn_hi32, backup->end_lsn_lo32);
+   pgmoneta_log_debug("WAL files path: %s", wal_files_path);
 
    if (pgmoneta_get_files(wal_files_path, &file_count, &files))
    {
@@ -561,6 +654,7 @@ main(int argc, char* argv[])
 
    for (int i = 0; i < file_count; i++)
    {
+      file_path = malloc(MAX_PATH);
       snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, files[i]);
 
       if (!pgmoneta_is_file(file_path))
@@ -635,26 +729,36 @@ main(int argc, char* argv[])
       walfiles[walfile_count] = wf;
       walfile_count++;
       wf = NULL;
+
+      free(file_path);
+      file_path = NULL;
    }
 
-   if (yaml_config.rules != NULL && yaml_config.rules->exclude.operation_count > 0)
+   if (yaml_config.operation_count > 0)
    {
-      for (int i = 0; i < yaml_config.rules->exclude.operation_count; i++)
+      for (int i = 0; i < yaml_config.operation_count; i++)
       {
-         if (!strcmp(yaml_config.rules->exclude.operations[i], OPERATION_DELETE))
+         if (!strcmp(yaml_config.operations[i], OPERATION_DELETE))
          {
-            if (pgmoneta_filter_operation_delete(&walfile_count, &walfiles, backup))
+            if (pgmoneta_filter_operation_delete(&walfile_count, &walfiles))
             {
-               pgmoneta_log_error("Failed to apply filter on operation %s", yaml_config.rules->exclude.operations[i]);
+               pgmoneta_log_error("Failed to apply filter on operation %s", yaml_config.operations[i]);
                goto error;
             }
          }
       }
    }
 
-   pgmoneta_process_walfiles(walfile_count, walfiles);
+   if (yaml_config.xid_count > 0)
+   {
+      if (pgmoneta_filter_xids(&walfile_count, &walfiles, yaml_config.xids, yaml_config.xid_count))
+      {
+         pgmoneta_log_error("Failed to apply filter on XIDs");
+         goto error;
+      }
+   }
 
-   source_data_dir = pgmoneta_format_and_append(source_data_dir, "%s/%s/data", parent_dir, backup_label);
+   pgmoneta_process_walfiles(walfile_count, walfiles);
 
    if (pgmoneta_exists(yaml_config.target_dir))
    {
@@ -671,22 +775,7 @@ main(int argc, char* argv[])
       goto error;
    }
 
-   target_pg_wal_dir = pgmoneta_format_and_append(target_pg_wal_dir, "%s/pg_wal", yaml_config.target_dir);
-
-   if (pgmoneta_exists(target_pg_wal_dir))
-   {
-      if (pgmoneta_delete_directory(target_pg_wal_dir))
-      {
-         pgmoneta_log_error("Failed to remove existing pg_wal directory: %s", target_pg_wal_dir);
-         goto error;
-      }
-   }
-
-   if (pgmoneta_mkdir(target_pg_wal_dir))
-   {
-      pgmoneta_log_error("Failed to create pg_wal directory: %s", target_pg_wal_dir);
-      goto error;
-   }
+   target_pg_wal_dir = pgmoneta_append(target_pg_wal_dir, yaml_config.target_dir);
 
    if (chdir(target_pg_wal_dir))
    {
@@ -713,15 +802,12 @@ main(int argc, char* argv[])
       }
       else
       {
-         pgmoneta_log_info("WAL file %d written successfully: %s", i, files[i]);
+         pgmoneta_log_debug("WAL file %d written successfully: %s", i, files[i]);
       }
    }
 
-   if (source_data_dir != NULL)
-   {
-      free(source_data_dir);
-      source_data_dir = NULL;
-   }
+   pgmoneta_log_info("Filtered WAL files written successfully to %s", target_pg_wal_dir);
+
    if (target_pg_wal_dir != NULL)
    {
       free(target_pg_wal_dir);
@@ -748,14 +834,18 @@ main(int argc, char* argv[])
    wal_path = NULL;
    if (partial_record != NULL)
    {
+      if (partial_record->xlog_record != NULL)
+      {
+         free(partial_record->xlog_record);
+         partial_record->xlog_record = NULL;
+      }
+      if (partial_record->data_buffer != NULL)
+      {
+         free(partial_record->data_buffer);
+         partial_record->data_buffer = NULL;
+      }
       free(partial_record);
       partial_record = NULL;
-   }
-
-   if (parent_dir != NULL)
-   {
-      free(parent_dir);
-      parent_dir = NULL;
    }
    if (file_path != NULL)
    {
@@ -766,11 +856,6 @@ main(int argc, char* argv[])
    {
       free(wal_files_path);
       wal_files_path = NULL;
-   }
-   if (backup != NULL)
-   {
-      free(backup);
-      backup = NULL;
    }
    if (files)
    {
@@ -795,12 +880,6 @@ main(int argc, char* argv[])
    return 0;
 
 error:
-
-   if (source_data_dir != NULL)
-   {
-      free(source_data_dir);
-      source_data_dir = NULL;
-   }
    if (target_pg_wal_dir != NULL)
    {
       free(target_pg_wal_dir);
@@ -827,14 +906,18 @@ error:
    wal_path = NULL;
    if (partial_record != NULL)
    {
+      if (partial_record->xlog_record != NULL)
+      {
+         free(partial_record->xlog_record);
+         partial_record->xlog_record = NULL;
+      }
+      if (partial_record->data_buffer != NULL)
+      {
+         free(partial_record->data_buffer);
+         partial_record->data_buffer = NULL;
+      }
       free(partial_record);
       partial_record = NULL;
-   }
-
-   if (parent_dir != NULL)
-   {
-      free(parent_dir);
-      parent_dir = NULL;
    }
    if (file_path != NULL)
    {
@@ -845,11 +928,6 @@ error:
    {
       free(wal_files_path);
       wal_files_path = NULL;
-   }
-   if (backup != NULL)
-   {
-      free(backup);
-      backup = NULL;
    }
    if (files)
    {
@@ -865,6 +943,7 @@ error:
    }
 
    cleanup_config(&yaml_config);
+   pgmoneta_log_error("An error occurred while processing WAL files. Please check the logs for details.");
 
    if (shmem != NULL)
    {

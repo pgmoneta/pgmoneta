@@ -40,28 +40,9 @@ extern "C" {
 #include <yaml.h>
 
 /**
- * @struct exclude_rule_t
- * @brief Represents a rule for excluding operations in the YAML configuration.
- */
-typedef struct
-{
-   char** operations;               /**< Array of operation names to exclude */
-   int operation_count;             /**< Number of operations in the array */
-} exclude_rule_t;
-
-/**
- * @struct rule_t
- * @brief Represents a rule in the YAML configuration, which includes an exclude rule.
- */
-typedef struct
-{
-   exclude_rule_t exclude;          /**< Exclude rule for this rule */
-} rule_t;
-
-/**
  * @struct config_t
  * @brief Represents the entire configuration parsed from the YAML file.
- * It includes source and target directories, and an array of rules.
+ * It includes source and target directories, and rules for operations and xids.
  */
 typedef struct
 {
@@ -70,8 +51,10 @@ typedef struct
    char* encryption;                /**< Encryption method used in the configuration */
    char* compression;               /**< Compression method used in the configuration */
    char* configuration_file;        /**< Path to the configuration file */
-   rule_t* rules;                   /**< Array of rules defined in the configuration */
-   int rule_count;                  /**< Number of rules in the array */
+   char** operations;               /**< Array of operation names from rules */
+   int operation_count;             /**< Number of operations in the array */
+   int* xids;                       /**< Array of XIDs from rules */
+   int xid_count;                   /**< Number of XIDs in the array */
 } config_t;
 
 /**
@@ -83,10 +66,9 @@ typedef enum {
    STATE_START,                     /**< Initial state of the parser */
    STATE_ROOT,                      /**< Root state of the YAML document */
    STATE_RULES_SEQUENCE,            /**< Parsing the sequence of rules */
-   STATE_RULE_MAPPING,              /**< Parsing a rule mapping */
-   STATE_EXCLUDE_SEQUENCE,          /**< Parsing the exclude sequence */
-   STATE_EXCLUDE_ITEM_MAPPING,      /**< Parsing an exclude item mapping */
-   STATE_OPERATIONS_SEQUENCE        /**< Parsing the operations sequence */
+   STATE_RULE_MAPPING,              /**< Parsing a rule mapping (operations or xids) */
+   STATE_OPERATIONS_SEQUENCE,       /**< Parsing the operations sequence */
+   STATE_XIDS_SEQUENCE              /**< Parsing the XIDs sequence */
 } parser_state_t;
 
 /**
@@ -99,13 +81,12 @@ typedef enum {
 int pgmoneta_parse_yaml_config(const char* filename, config_t* config);
 
 /**
- * Handles the start event of a YAML document.
- * This function initializes the parser state and prepares for parsing.
+ * Handles scalar events during YAML parsing.
+ * This function processes scalar values based on the current parser state.
  * @param event The YAML event to handle.
  * @param state Pointer to the parser state.
  * @param current_key Pointer to the current key being processed.
  * @param config Pointer to the configuration structure to populate.
- * @return 0 on success, non-zero on failure.
  */
 void handle_scalar_event(yaml_event_t* event, parser_state_t* state,
                          char** current_key, config_t* config);
@@ -113,7 +94,7 @@ void handle_scalar_event(yaml_event_t* event, parser_state_t* state,
 /**
  * Cleans up the configuration structure.
  * This function frees allocated memory for the configuration structure,
- * including source_dir, target_dir, and rules.
+ * including source_dir, target_dir, operations, and xids.
  * @param config Pointer to the config_t structure to clean up.
  */
 void cleanup_config(config_t* config);
