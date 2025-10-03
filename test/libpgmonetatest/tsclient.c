@@ -78,6 +78,9 @@ pgmoneta_tsclient_backup(char* server, char* incremental)
       goto error;
    }
 
+   // Wait for 1 second to avoid invoking backup too frequently
+   sleep(1);
+
    pgmoneta_disconnect(socket);
    return 0;
 error:
