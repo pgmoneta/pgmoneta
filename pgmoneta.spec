@@ -4,7 +4,7 @@ Release:       1%{dist}
 Summary:       Backup / restore for PostgreSQL
 License:       BSD
 URL:           https://github.com/pgmoneta/pgmoneta
-Source0:       https://github.com/pgmoneta/pgmoneta/archive/%{version}.tar.gz
+Source0:       %{name}-%{version}.tar.gz
 
 BuildRequires: gcc cmake make python3-docutils zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel bzip2 bzip2-devel
 BuildRequires: libev libev-devel openssl openssl-devel systemd systemd-devel libssh libssh-devel libarchive libarchive-devel
@@ -20,7 +20,7 @@ pgmoneta is a backup / restore solution for PostgreSQL.
 
 %{__mkdir} build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 %{__make}
 
 %install
@@ -60,11 +60,13 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-cli.1 %{buildroot}%{_mandir}/man1/pgmoneta-cli.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.conf.5 %{buildroot}%{_mandir}/man5/pgmoneta.conf.5
-%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-walinfo.1 %{buildroot}%{_mandir}/man5/pgmoneta-walinfo.1
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-walfilter.1 %{buildroot}%{_mandir}/man1/pgmoneta-walfilter.1
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-walinfo.1 %{buildroot}%{_mandir}/man1/pgmoneta-walinfo.1
 
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta %{buildroot}%{_bindir}/pgmoneta
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-cli %{buildroot}%{_bindir}/pgmoneta-cli
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-admin %{buildroot}%{_bindir}/pgmoneta-admin
+%{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-walfilter %{buildroot}%{_bindir}/pgmoneta-walfilter
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/pgmoneta-walinfo %{buildroot}%{_bindir}/pgmoneta-walinfo
 
 %{__install} -m 755 %{_builddir}/%{name}-%{version}/build/src/libpgmoneta.so.%{version} %{buildroot}%{_libdir}/libpgmoneta.so.%{version}
@@ -72,6 +74,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-cli
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-admin
+chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-walfilter
 chrpath -r %{_libdir} %{buildroot}%{_bindir}/pgmoneta-walinfo
 
 cd %{buildroot}%{_libdir}/
@@ -101,11 +104,13 @@ cd %{buildroot}%{_libdir}/
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
 %{_mandir}/man5/pgmoneta.conf.5*
-%{_mandir}/man5/pgmoneta-walinfo.1*
+%{_mandir}/man1/pgmoneta-walfilter.1*
+%{_mandir}/man1/pgmoneta-walinfo.1*
 %config %{_sysconfdir}/pgmoneta/pgmoneta.conf
 %{_bindir}/pgmoneta
 %{_bindir}/pgmoneta-cli
 %{_bindir}/pgmoneta-admin
+%{_bindir}/pgmoneta-walfilter
 %{_bindir}/pgmoneta-walinfo
 %{_libdir}/libpgmoneta.so
 %{_libdir}/libpgmoneta.so.0

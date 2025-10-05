@@ -19,6 +19,7 @@ rpmdev-setuptree
 ```sh
 git clone https://github.com/pgmoneta/pgmoneta.git
 cd pgmoneta
+VERSION=$(grep -Po "Version:\s*\K(\d+\.\d+\.\d+)" pgmoneta.spec)
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
@@ -29,6 +30,7 @@ make package_source
 
 ```sh
 cp pgmoneta-$VERSION.tar.gz ~/rpmbuild/SOURCES
+cd ..
 QA_RPATHS=0x0001 rpmbuild -bb pgmoneta.spec
 ```
 
