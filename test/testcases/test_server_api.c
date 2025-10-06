@@ -69,30 +69,30 @@ START_TEST(test_server_api_checkpoint)
    ck_assert_msg(ret, "failed to perfom checkpoint");
 }
 END_TEST
-/* START_TEST(test_server_api_read_file) */
-/* { */
-/*    int ret; */
-/*    uint8_t* data; */
-/*    int data_length; */
+START_TEST(test_server_api_read_file)
+{
+   int ret;
+   uint8_t* data;
+   int data_length;
 
-/*    char file_path[] = "postgresql.conf"; */
+   char file_path[] = "postgresql.conf";
 
-/*    ret = !pgmoneta_server_read_binary_file(PRIMARY_SERVER, srv_ssl, file_path, 0, 100, srv_socket, &data, &data_length); */
-/*    ck_assert_msg(ret, "failed to read binary file: %s", file_path); */
+   ret = !pgmoneta_server_read_binary_file(PRIMARY_SERVER, srv_ssl, file_path, 0, 100, srv_socket, &data, &data_length);
+   ck_assert_msg(ret, "failed to read binary file: %s", file_path);
 
-/*    free(data); */
-/* } */
-/* END_TEST */
-/* START_TEST(test_server_api_read_file_metadata) */
-/* { */
-/*    int ret; */
-/*    struct file_stats stat; */
-/*    char file_path[] = "postgresql.conf"; */
+   free(data);
+}
+END_TEST
+START_TEST(test_server_api_read_file_metadata)
+{
+   int ret;
+   struct file_stats stat;
+   char file_path[] = "postgresql.conf";
 
-/*    ret = !pgmoneta_server_file_stat(PRIMARY_SERVER, srv_ssl, srv_socket, file_path, &stat); */
-/*    ck_assert_msg(ret, "failed to read metatdata of file: %s", file_path); */
-/* } */
-/* END_TEST */
+   ret = !pgmoneta_server_file_stat(PRIMARY_SERVER, srv_ssl, srv_socket, file_path, &stat);
+   ck_assert_msg(ret, "failed to read metatdata of file: %s", file_path);
+}
+END_TEST
 
 Suite*
 pgmoneta_test_server_api_suite()
@@ -107,8 +107,8 @@ pgmoneta_test_server_api_suite()
    tcase_add_checked_fixture(tc_server_api, setup_server_connection, teardown_server_connection);
    tcase_add_test(tc_server_api, test_server_api_info);
    tcase_add_test(tc_server_api, test_server_api_checkpoint);
-   /* tcase_add_test(tc_server_api, test_server_api_read_file); */
-   /* tcase_add_test(tc_server_api, test_server_api_read_file_metadata); */
+   tcase_add_test(tc_server_api, test_server_api_read_file);
+   tcase_add_test(tc_server_api, test_server_api_read_file_metadata);
    suite_add_tcase(s, tc_server_api);
 
    return s;
