@@ -82,6 +82,7 @@ extern "C" {
 
 #define PG_RMGR(symname, name, desc) {name, desc},
 #define PG_RMGR_SUMMARY(symname, name, number_of_records) {name, number_of_records},
+#define PG_RMGR_STATS(symname, name) {name, 0, 0, 0, 0},
 #define RM_MAX_ID           UINT8_MAX
 
 /**
@@ -113,10 +114,31 @@ struct rmgr_summary
 };
 
 /**
+ * @struct rmgr_stats
+ * @brief Detailed statistics for a Resource Manager similar to pg_get_wal_stats
+ *
+ * Fields:
+ * - name: The name of the resource manager
+ * - count: Number of records for this resource manager
+ * - record_size: Total size of records (excluding FPIs)
+ * - fpi_size: Total size of full page images
+ * - combined_size: Total size (record_size + fpi_size)
+ */
+struct rmgr_stats
+{
+   char* name;                /**< The name of the resource manager */
+   uint64_t count;            /**< Number of records */
+   uint64_t record_size;      /**< Total size of record data (excluding FPIs) */
+   uint64_t fpi_size;         /**< Total size of full page images */
+   uint64_t combined_size;    /**< Total combined size */
+};
+
+/**
  * Table of resource managers. Each entry corresponds to a specific RMGR identified by an ID.
  */
 extern struct rmgr_data rmgr_table[RM_MAX_ID + 1];
 extern struct rmgr_summary rmgr_summary_table[RM_MAX_ID + 1];
+extern struct rmgr_stats rmgr_stats_table[RM_MAX_ID + 1];
 
 #ifdef __cplusplus
 }

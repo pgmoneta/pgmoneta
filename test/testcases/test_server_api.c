@@ -62,12 +62,12 @@ START_TEST(test_server_api_info)
 END_TEST
 START_TEST(test_server_api_checkpoint)
 {
-    int ret;
-    uint64_t chkt;
-    uint32_t tli;
+   int ret;
+   uint64_t chkt;
+   uint32_t tli;
 
-    ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli);
-    ck_assert_msg(ret, "failed to perfom checkpoint");
+   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli);
+   ck_assert_msg(ret, "failed to perfom checkpoint");
 }
 END_TEST
 START_TEST(test_server_api_read_file)

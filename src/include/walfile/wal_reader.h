@@ -478,6 +478,15 @@ void
 pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn);
 
 /**
+ * Collect detailed WAL statistics for resource managers
+ * @param record The decoded WAL record to analyze
+ * @param start_lsn The start LSN
+ * @param end_lsn The end LSN
+ */
+void
+pgmoneta_wal_record_collect_stats(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn);
+
+/**
  * Summarizes the contents of a decoded WAL record
  *
  * @param record The decoded WAL record to summarize.

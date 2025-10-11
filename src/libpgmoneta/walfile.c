@@ -422,7 +422,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
          record = (struct decoded_xlog_record*) record_iterator->value->data;
          if (summary)
          {
-            pgmoneta_wal_record_modify_rmgr_occurance(record, start_lsn, end_lsn);
+            pgmoneta_wal_record_collect_stats(record, start_lsn, end_lsn);
          }
          else
          {
@@ -443,7 +443,7 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
          record = (struct decoded_xlog_record*) record_iterator->value->data;
          if (summary)
          {
-            pgmoneta_wal_record_modify_rmgr_occurance(record, start_lsn, end_lsn);
+            pgmoneta_wal_record_collect_stats(record, start_lsn, end_lsn);
          }
          else
          {

@@ -77,3 +77,28 @@ struct rmgr_summary rmgr_summary_table[RM_MAX_ID + 1] = {
    PG_RMGR_SUMMARY(RM_GENERIC_ID, "Generic", 0)
    PG_RMGR_SUMMARY(RM_LOGICALMSG_ID, "LogicalMessage", 0)
 };
+
+struct rmgr_stats rmgr_stats_table[RM_MAX_ID + 1] = {
+   PG_RMGR_STATS(RM_XLOG_ID, "XLOG")
+   PG_RMGR_STATS(RM_XACT_ID, "Transaction")
+   PG_RMGR_STATS(RM_SMGR_ID, "Storage")
+   PG_RMGR_STATS(RM_CLOG_ID, "CLOG")
+   PG_RMGR_STATS(RM_DBASE_ID, "Database")
+   PG_RMGR_STATS(RM_TBLSPC_ID, "Tablespace")
+   PG_RMGR_STATS(RM_MULTIXACT_ID, "MultiXact")
+   PG_RMGR_STATS(RM_RELMAP_ID, "RelMap")
+   PG_RMGR_STATS(RM_STANDBY_ID, "Standby")
+   PG_RMGR_STATS(RM_HEAP2_ID, "Heap2")
+   PG_RMGR_STATS(RM_HEAP_ID, "Heap")
+   PG_RMGR_STATS(RM_BTREE_ID, "Btree")
+   PG_RMGR_STATS(RM_HASH_ID, "Hash")
+   PG_RMGR_STATS(RM_GIN_ID, "Gin")
+   PG_RMGR_STATS(RM_GIST_ID, "Gist")
+   PG_RMGR_STATS(RM_SEQ_ID, "Sequence")
+   PG_RMGR_STATS(RM_SPGIST_ID, "SPGist")
+   PG_RMGR_STATS(RM_BRIN_ID, "BRIN")
+   PG_RMGR_STATS(RM_COMMIT_TS_ID, "CommitTs")
+   PG_RMGR_STATS(RM_REPLORIGIN_ID, "ReplicationOrigin")
+   PG_RMGR_STATS(RM_GENERIC_ID, "Generic")
+   PG_RMGR_STATS(RM_LOGICALMSG_ID, "LogicalMessage")
+};

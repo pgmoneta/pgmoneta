@@ -1562,6 +1562,35 @@ pgmoneta_wal_record_modify_rmgr_occurance(struct decoded_xlog_record* record, ui
    rmgr_summary_table[record->header.xl_rmid].number_of_records++;
 }
 
+void
+pgmoneta_wal_record_collect_stats(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn)
+{
+   uint64_t rec_len;
+   uint64_t fpi_len = 0;
+
+   if (record->partial || !is_included(rmgr_table[record->header.xl_rmid].name, NULL, record->header.xl_prev,
+                                       start_lsn, record->lsn, end_lsn, record->header.xl_xid, NULL, NULL, NULL,
+                                       record->header.xl_info, record->header.xl_rmid))
+   {
+      return;
+   }
+
+   rec_len = record->header.xl_tot_len;
+
+   for (int block_id = 0; block_id <= record->max_block_id; block_id++)
+   {
+      if (record->blocks[block_id].in_use && record->blocks[block_id].has_image)
+      {
+         fpi_len += record->blocks[block_id].bimg_len;
+      }
+   }
+
+   rmgr_stats_table[record->header.xl_rmid].count++;
+   rmgr_stats_table[record->header.xl_rmid].record_size += (rec_len - fpi_len);
+   rmgr_stats_table[record->header.xl_rmid].fpi_size += fpi_len;
+   rmgr_stats_table[record->header.xl_rmid].combined_size += rec_len;
+}
+
 int
 pgmoneta_wal_record_summary(struct decoded_xlog_record* record, uint64_t start_lsn, uint64_t end_lsn, struct block_ref_table* brt)
 {

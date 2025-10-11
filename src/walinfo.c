@@ -50,6 +50,281 @@
 #include <string.h>
 #include <unistd.h>
 
+/* Column widths for WAL statistics table */
+#define COL_WIDTH_COUNT           9
+#define COL_WIDTH_COUNT_PCT       8
+#define COL_WIDTH_RECORD_SIZE     14
+#define COL_WIDTH_RECORD_PCT      8
+#define COL_WIDTH_FPI_SIZE        10
+#define COL_WIDTH_FPI_PCT         8
+#define COL_WIDTH_COMBINED_SIZE   14
+#define COL_WIDTH_COMBINED_PCT    10
+
+/**
+ * Center-align a string within a given width
+ * @param dest Destination buffer
+ * @param dest_size Size of destination buffer
+ * @param src Source string to center
+ * @param width Total width for alignment
+ */
+static void
+center_align(char* dest, size_t dest_size, const char* src, int width)
+{
+   int src_len = strlen(src);
+   int padding = (width - src_len) / 2;
+   int written = 0;
+
+   if (width >= (int)dest_size)
+   {
+      width = dest_size - 1;
+   }
+
+   for (int i = 0; i < padding && written < width; i++, written++)
+   {
+      dest[written] = ' ';
+   }
+
+   for (int i = 0; i < src_len && written < width; i++, written++)
+   {
+      dest[written] = src[i];
+   }
+
+   while (written < width)
+   {
+      dest[written++] = ' ';
+   }
+
+   dest[written] = '\0';
+}
+
+/**
+ * Right-align a string within a given width
+ * @param dest Destination buffer
+ * @param dest_size Size of destination buffer
+ * @param src Source string to right-align
+ * @param width Total width for alignment
+ */
+static void
+right_align(char* dest, size_t dest_size, const char* src, int width)
+{
+   int src_len = strlen(src);
+   int padding = width - src_len;
+   int written = 0;
+
+   if (width >= (int)dest_size)
+   {
+      width = dest_size - 1;
+   }
+
+   if (padding < 0)
+   {
+      padding = 0;
+   }
+
+   for (int i = 0; i < padding && written < width; i++, written++)
+   {
+      dest[written] = ' ';
+   }
+
+   for (int i = 0; i < src_len && written < width; i++, written++)
+   {
+      dest[written] = src[i];
+   }
+
+   dest[written] = '\0';
+}
+
+/**
+ * Print WAL statistics summary
+ * @param out Output file stream
+ * @param type Output format type (ValueJSON or ValueString)
+ */
+static void
+print_wal_statistics(FILE* out, enum value_type type)
+{
+   uint64_t total_count = 0;
+   uint64_t total_record_size = 0;
+   uint64_t total_fpi_size = 0;
+   uint64_t total_combined_size = 0;
+   int max_rmgr_name_length = 20;
+   bool first = true;
+
+   for (int i = 0; i < RM_MAX_ID + 1; i++)
+   {
+      if (rmgr_stats_table[i].count > 0)
+      {
+         total_count += rmgr_stats_table[i].count;
+         total_record_size += rmgr_stats_table[i].record_size;
+         total_fpi_size += rmgr_stats_table[i].fpi_size;
+         total_combined_size += rmgr_stats_table[i].combined_size;
+         max_rmgr_name_length = MAX(max_rmgr_name_length, (int)strlen(rmgr_stats_table[i].name));
+      }
+   }
+
+   if (type == ValueJSON)
+   {
+      fprintf(out, "{\"wal_stats\": [\n");
+      for (int i = 0; i < RM_MAX_ID + 1; i++)
+      {
+         if (rmgr_stats_table[i].count == 0)
+         {
+            continue;
+         }
+
+         double count_pct = total_count > 0 ? (100.0 * rmgr_stats_table[i].count) / total_count : 0.0;
+         double rec_size_pct = total_record_size > 0 ? (100.0 * rmgr_stats_table[i].record_size) / total_record_size : 0.0;
+         double fpi_size_pct = total_fpi_size > 0 ? (100.0 * rmgr_stats_table[i].fpi_size) / total_fpi_size : 0.0;
+         double combined_size_pct = total_combined_size > 0 ? (100.0 * rmgr_stats_table[i].combined_size) / total_combined_size : 0.0;
+
+         if (!first)
+         {
+            fprintf(out, ",\n");
+         }
+         first = false;
+
+         fprintf(out, "  {\n");
+         fprintf(out, "    \"resource_manager\": \"%s\",\n", rmgr_stats_table[i].name);
+         fprintf(out, "    \"count\": %" PRIu64 ",\n", rmgr_stats_table[i].count);
+         fprintf(out, "    \"count_percentage\": %.2f,\n", count_pct);
+         fprintf(out, "    \"record_size\": %" PRIu64 ",\n", rmgr_stats_table[i].record_size);
+         fprintf(out, "    \"record_size_percentage\": %.2f,\n", rec_size_pct);
+         fprintf(out, "    \"fpi_size\": %" PRIu64 ",\n", rmgr_stats_table[i].fpi_size);
+         fprintf(out, "    \"fpi_size_percentage\": %.2f,\n", fpi_size_pct);
+         fprintf(out, "    \"combined_size\": %" PRIu64 ",\n", rmgr_stats_table[i].combined_size);
+         fprintf(out, "    \"combined_size_percentage\": %.2f\n", combined_size_pct);
+         fprintf(out, "  }");
+      }
+      fprintf(out, "\n]}\n");
+   }
+   else
+   {
+      char count_header[COL_WIDTH_COUNT + 1], count_pct_header[COL_WIDTH_COUNT_PCT + 1];
+      char rec_size_header[COL_WIDTH_RECORD_SIZE + 1], rec_pct_header[COL_WIDTH_RECORD_PCT + 1];
+      char fpi_size_header[COL_WIDTH_FPI_SIZE + 1], fpi_pct_header[COL_WIDTH_FPI_PCT + 1];
+      char comb_size_header[COL_WIDTH_COMBINED_SIZE + 1], comb_pct_header[COL_WIDTH_COMBINED_PCT + 1];
+
+      center_align(count_header, sizeof(count_header), "Count", COL_WIDTH_COUNT);
+      center_align(count_pct_header, sizeof(count_pct_header), "Count %", COL_WIDTH_COUNT_PCT);
+      center_align(rec_size_header, sizeof(rec_size_header), "Record Size", COL_WIDTH_RECORD_SIZE);
+      center_align(rec_pct_header, sizeof(rec_pct_header), "Record %", COL_WIDTH_RECORD_PCT);
+      center_align(fpi_size_header, sizeof(fpi_size_header), "FPI Size", COL_WIDTH_FPI_SIZE);
+      center_align(fpi_pct_header, sizeof(fpi_pct_header), "FPI %", COL_WIDTH_FPI_PCT);
+      center_align(comb_size_header, sizeof(comb_size_header), "Combined Size", COL_WIDTH_COMBINED_SIZE);
+      center_align(comb_pct_header, sizeof(comb_pct_header), "Combined %", COL_WIDTH_COMBINED_PCT);
+
+      fprintf(out, "%-*s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+              max_rmgr_name_length, "Resource Manager",
+              count_header, count_pct_header, rec_size_header, rec_pct_header,
+              fpi_size_header, fpi_pct_header, comb_size_header, comb_pct_header);
+
+      int total_width = max_rmgr_name_length + COL_WIDTH_COUNT + COL_WIDTH_COUNT_PCT +
+                        COL_WIDTH_RECORD_SIZE + COL_WIDTH_RECORD_PCT + COL_WIDTH_FPI_SIZE +
+                        COL_WIDTH_FPI_PCT + COL_WIDTH_COMBINED_SIZE + COL_WIDTH_COMBINED_PCT + 24;
+      for (int i = 0; i < total_width; i++)
+      {
+         fprintf(out, "-");
+      }
+      fprintf(out, "\n");
+
+      for (int i = 0; i < RM_MAX_ID + 1; i++)
+      {
+         if (rmgr_stats_table[i].count == 0)
+         {
+            continue;
+         }
+
+         double count_pct = total_count > 0 ? (100.0 * rmgr_stats_table[i].count) / total_count : 0.0;
+         double rec_size_pct = total_record_size > 0 ? (100.0 * rmgr_stats_table[i].record_size) / total_record_size : 0.0;
+         double fpi_size_pct = total_fpi_size > 0 ? (100.0 * rmgr_stats_table[i].fpi_size) / total_fpi_size : 0.0;
+         double combined_size_pct = total_combined_size > 0 ? (100.0 * rmgr_stats_table[i].combined_size) / total_combined_size : 0.0;
+
+         char count_str[COL_WIDTH_COUNT + 1], count_pct_str[COL_WIDTH_COUNT_PCT + 1];
+         char rec_size_str[COL_WIDTH_RECORD_SIZE + 1], rec_pct_str[COL_WIDTH_RECORD_PCT + 1];
+         char fpi_size_str[COL_WIDTH_FPI_SIZE + 1], fpi_pct_str[COL_WIDTH_FPI_PCT + 1];
+         char comb_size_str[COL_WIDTH_COMBINED_SIZE + 1], comb_pct_str[COL_WIDTH_COMBINED_PCT + 1];
+         char temp_str[64];
+
+         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].count);
+         right_align(count_str, sizeof(count_str), temp_str, COL_WIDTH_COUNT);
+
+         snprintf(temp_str, sizeof(temp_str), "%.2f%%", count_pct);
+         right_align(count_pct_str, sizeof(count_pct_str), temp_str, COL_WIDTH_COUNT_PCT);
+
+         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].record_size);
+         right_align(rec_size_str, sizeof(rec_size_str), temp_str, COL_WIDTH_RECORD_SIZE);
+
+         snprintf(temp_str, sizeof(temp_str), "%.2f%%", rec_size_pct);
+         right_align(rec_pct_str, sizeof(rec_pct_str), temp_str, COL_WIDTH_RECORD_PCT);
+
+         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].fpi_size);
+         right_align(fpi_size_str, sizeof(fpi_size_str), temp_str, COL_WIDTH_FPI_SIZE);
+
+         snprintf(temp_str, sizeof(temp_str), "%.2f%%", fpi_size_pct);
+         right_align(fpi_pct_str, sizeof(fpi_pct_str), temp_str, COL_WIDTH_FPI_PCT);
+
+         snprintf(temp_str, sizeof(temp_str), "%" PRIu64, rmgr_stats_table[i].combined_size);
+         right_align(comb_size_str, sizeof(comb_size_str), temp_str, COL_WIDTH_COMBINED_SIZE);
+
+         snprintf(temp_str, sizeof(temp_str), "%.2f%%", combined_size_pct);
+         right_align(comb_pct_str, sizeof(comb_pct_str), temp_str, COL_WIDTH_COMBINED_PCT);
+
+         fprintf(out, "%-*s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+                 max_rmgr_name_length, rmgr_stats_table[i].name,
+                 count_str, count_pct_str, rec_size_str, rec_pct_str,
+                 fpi_size_str, fpi_pct_str, comb_size_str, comb_pct_str);
+      }
+
+      for (int i = 0; i < total_width; i++)
+      {
+         fprintf(out, "-");
+      }
+      fprintf(out, "\n");
+
+      char count_str[COL_WIDTH_COUNT + 1], count_pct_str[COL_WIDTH_COUNT_PCT + 1];
+      char rec_size_str[COL_WIDTH_RECORD_SIZE + 1], rec_pct_str[COL_WIDTH_RECORD_PCT + 1];
+      char fpi_size_str[COL_WIDTH_FPI_SIZE + 1], fpi_pct_str[COL_WIDTH_FPI_PCT + 1];
+      char comb_size_str[COL_WIDTH_COMBINED_SIZE + 1], comb_pct_str[COL_WIDTH_COMBINED_PCT + 1];
+      char temp_str[64];
+
+      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_count);
+      right_align(count_str, sizeof(count_str), temp_str, COL_WIDTH_COUNT);
+
+      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      right_align(count_pct_str, sizeof(count_pct_str), temp_str, COL_WIDTH_COUNT_PCT);
+
+      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_record_size);
+      right_align(rec_size_str, sizeof(rec_size_str), temp_str, COL_WIDTH_RECORD_SIZE);
+
+      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      right_align(rec_pct_str, sizeof(rec_pct_str), temp_str, COL_WIDTH_RECORD_PCT);
+
+      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_fpi_size);
+      right_align(fpi_size_str, sizeof(fpi_size_str), temp_str, COL_WIDTH_FPI_SIZE);
+
+      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      right_align(fpi_pct_str, sizeof(fpi_pct_str), temp_str, COL_WIDTH_FPI_PCT);
+
+      snprintf(temp_str, sizeof(temp_str), "%" PRIu64, total_combined_size);
+      right_align(comb_size_str, sizeof(comb_size_str), temp_str, COL_WIDTH_COMBINED_SIZE);
+
+      snprintf(temp_str, sizeof(temp_str), "%.2f%%", 100.0);
+      right_align(comb_pct_str, sizeof(comb_pct_str), temp_str, COL_WIDTH_COMBINED_PCT);
+
+      fprintf(out, "%-*s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+              max_rmgr_name_length, "Total",
+              count_str, count_pct_str, rec_size_str, rec_pct_str,
+              fpi_size_str, fpi_pct_str, comb_size_str, comb_pct_str);
+   }
+
+   for (int i = 0; i < RM_MAX_ID + 1; i++)
+   {
+      rmgr_stats_table[i].count = 0;
+      rmgr_stats_table[i].record_size = 0;
+      rmgr_stats_table[i].fpi_size = 0;
+      rmgr_stats_table[i].combined_size = 0;
+   }
+}
+
 static void
 version(void)
 {
@@ -85,7 +360,7 @@ usage(void)
    printf("  -x,  --xid         Filter on an XID\n");
    printf("  -l,  --limit       Limit number of outputs\n");
    printf("  -v,  --verbose     Output result\n");
-   printf("  -S,  --summary     Show a summary of WAL record counts grouped by resource manager\n");
+   printf("  -S,  --summary     Show detailed WAL statistics including counts, sizes, and percentages by resource manager\n");
    printf("  -V,  --version     Display version information\n");
    printf("  -m,  --mapping     Provide mappings file for OID translation\n");
    printf("  -t,  --translate   Translate OIDs to object names in XLOG records\n");
@@ -339,7 +614,7 @@ main(int argc, char** argv)
       {
          verbose = true;
       }
-      else if (!strcmp(optname, "S") || !strcmp(optname, "summmary"))
+      else if (!strcmp(optname, "S") || !strcmp(optname, "summary"))
       {
          summary = true;
       }
@@ -645,105 +920,7 @@ main(int argc, char** argv)
 
    if (summary)
    {
-      int max_rmgr_name_length = 6; // Corresponds to the length of string `Record`
-      int max_digit_length = 6; // Corresponds to the length of string `Number`
-      int total_records = 0;
-      char* number_string = NULL;
-      char* rmgr_name = NULL;
-
-      for (int i = 0; i < RM_MAX_ID + 1; i++)
-      {
-         if (!rmgr_summary_table[i].number_of_records)
-         {
-            continue;
-         }
-         max_rmgr_name_length = MAX(max_rmgr_name_length, (int)strlen(rmgr_summary_table[i].name));
-         total_records += rmgr_summary_table[i].number_of_records;
-      }
-      number_string = pgmoneta_append_int(number_string, total_records);
-      max_digit_length = MAX(max_digit_length, (int)strlen(number_string));
-      free(number_string);
-      number_string = NULL;
-
-      if (type == ValueJSON)
-      {
-         fprintf(out, "{\"Summary\": {\n");
-         for (int i = 0; i < RM_MAX_ID + 1; i++)
-         {
-            if (!rmgr_summary_table[i].number_of_records)
-            {
-               continue;
-            }
-            if (i == 0)
-            {
-               fprintf(out, "\"%s\": %d", rmgr_summary_table[i].name, rmgr_summary_table[i].number_of_records);
-            }
-            else
-            {
-               fprintf(out, ",\"%s\": %d", rmgr_summary_table[i].name, rmgr_summary_table[i].number_of_records);
-            }
-
-            /* Revert the state of rmgr_summary_table */
-            rmgr_summary_table[i].number_of_records = 0;
-         }
-         fprintf(out, "},\n\"Total\": %d}\n", total_records);
-      }
-      else
-      {
-         /* Print the first row */
-         if (max_digit_length == 6)
-         {
-            fprintf(out, "Number | Record%*s\n", max_rmgr_name_length - 6, " ");
-         }
-         else
-         {
-            fprintf(out, "%*sNumber | Record%*s\n", max_digit_length - 6, " ", max_rmgr_name_length - 6, " ");
-         }
-         /* Print horizontal line '---------' */
-         for (int i = 0; i < max_digit_length + max_rmgr_name_length + 3; i++)
-         {
-            fprintf(out, "-");
-         }
-         fprintf(out, "\n");
-
-         for (int i = 0; i < RM_MAX_ID + 1; i++)
-         {
-            if (!rmgr_summary_table[i].number_of_records)
-            {
-               continue;
-            }
-            number_string = pgmoneta_append_int(number_string, rmgr_summary_table[i].number_of_records);
-            rmgr_name = rmgr_summary_table[i].name;
-            fprintf(out, "%*s%s | %s%*s\n", max_digit_length - (int)strlen(number_string), " ",
-                    number_string, rmgr_name, max_rmgr_name_length - (int)strlen(rmgr_name), " ");
-            free(number_string);
-            number_string = NULL;
-
-            /* Revert the state of rmgr_summary_table */
-            rmgr_summary_table[i].number_of_records = 0;
-         }
-
-         /* Print horizontal line '---------' */
-         for (int i = 0; i < max_digit_length + max_rmgr_name_length + 3; i++)
-         {
-            fprintf(out, "-");
-         }
-         fprintf(out, "\n");
-         /* Print total records */
-         number_string = pgmoneta_append_int(number_string, total_records);
-         if (max_digit_length == 6)
-         {
-            fprintf(out, "%*s%s | Total%*s\n", max_digit_length - (int)strlen(number_string), " ",
-                    number_string, max_rmgr_name_length - 5, " ");
-         }
-         else
-         {
-            fprintf(out, "%s | Total%*s\n",
-                    number_string, max_rmgr_name_length - 5, " ");
-         }
-         free(number_string);
-         number_string = NULL;
-      }
+      print_wal_statistics(out, type);
    }
 
    if (included_objects)
