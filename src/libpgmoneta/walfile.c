@@ -454,16 +454,28 @@ pgmoneta_describe_walfile(char* path, enum value_type type, FILE* out, bool quie
    }
 
    free(from);
-   free(to);
    pgmoneta_deque_iterator_destroy(record_iterator);
    pgmoneta_destroy_walfile(wf);
+
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+
    return 0;
 
 error:
    free(from);
-   free(to);
    pgmoneta_destroy_walfile(wf);
    pgmoneta_deque_iterator_destroy(record_iterator);
+
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+
    return 1;
 }
 
@@ -560,16 +572,28 @@ pgmoneta_summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, blo
    }
 
    free(from);
-   free(to);
    pgmoneta_deque_iterator_destroy(record_iterator);
    pgmoneta_destroy_walfile(wf);
+
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+
    return 0;
 
 error:
    free(from);
-   free(to);
    pgmoneta_deque_iterator_destroy(record_iterator);
    pgmoneta_destroy_walfile(wf);
+
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+
    return 1;
 }
 

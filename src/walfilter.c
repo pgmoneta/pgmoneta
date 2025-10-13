@@ -622,7 +622,7 @@ main(int argc, char* argv[])
 
    pgmoneta_log_debug("WAL files path: %s", wal_files_path);
 
-   if (pgmoneta_get_files(wal_files_path, &file_count, &files))
+   if (pgmoneta_get_wal_files(wal_files_path, &file_count, &files))
    {
       pgmoneta_log_error("Failed to get WAL files from %s\n", wal_files_path);
       goto error;

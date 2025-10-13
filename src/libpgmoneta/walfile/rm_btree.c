@@ -521,7 +521,7 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
       case XLOG_BTREE_INSERT_META:
       case XLOG_BTREE_INSERT_POST: {
          struct xl_btree_insert* xlrec = (struct xl_btree_insert*) rec;
-         buf = pgmoneta_format_and_append(buf, " off: %u", xlrec->offnum);
+         buf = pgmoneta_format_and_append(buf, "off: %u", xlrec->offnum);
          break;
       }
       case XLOG_BTREE_SPLIT_L:

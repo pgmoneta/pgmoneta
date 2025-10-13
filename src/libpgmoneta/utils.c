@@ -1678,11 +1678,6 @@ pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (pgmoneta_ends_with(entry->d_name, ".partial"))
-      {
-         continue;
-      }
-
       if (strstr(entry->d_name, ".history") != NULL)
       {
          continue;
@@ -1706,11 +1701,6 @@ pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
 
       while ((entry = readdir(dir)) != NULL)
       {
-         if (pgmoneta_ends_with(entry->d_name, ".partial"))
-         {
-            continue;
-         }
-
          if (strstr(entry->d_name, ".history") != NULL)
          {
             continue;

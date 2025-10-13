@@ -1112,9 +1112,9 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
 }
 
 static char*
-enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
+enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
 {
-   if (!rm_desc)
+   if (!record_desc)
    {
       return NULL;
    }
@@ -1129,25 +1129,25 @@ enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
          switch (heap_info)
          {
             case XLOG_HEAP_INSERT:
-               operation_desc = pgmoneta_format_and_append(NULL, "INSERT %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "INSERT %s", record_desc);
                break;
             case XLOG_HEAP_DELETE:
-               operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", record_desc);
                break;
             case XLOG_HEAP_UPDATE:
-               operation_desc = pgmoneta_format_and_append(NULL, "UPDATE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "UPDATE %s", record_desc);
                break;
             case XLOG_HEAP_HOT_UPDATE:
-               operation_desc = pgmoneta_format_and_append(NULL, "HOT_UPDATE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "HOT_UPDATE %s", record_desc);
                break;
             case XLOG_HEAP_TRUNCATE:
-               operation_desc = pgmoneta_format_and_append(NULL, "TRUNCATE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "TRUNCATE %s", record_desc);
                break;
             case XLOG_HEAP_INPLACE:
-               operation_desc = pgmoneta_format_and_append(NULL, "INPLACE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "INPLACE %s", record_desc);
                break;
             default:
-               operation_desc = strdup(rm_desc);
+               operation_desc = strdup(record_desc);
                break;
          }
          break;
@@ -1158,22 +1158,22 @@ enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
          switch (btree_info)
          {
             case XLOG_BTREE_INSERT_LEAF:
-               operation_desc = pgmoneta_format_and_append(NULL, "INSERT_LEAF %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "INSERT_LEAF %s", record_desc);
                break;
             case XLOG_BTREE_INSERT_UPPER:
-               operation_desc = pgmoneta_format_and_append(NULL, "INSERT_UPPER %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "INSERT_UPPER %s", record_desc);
                break;
             case XLOG_BTREE_SPLIT_L:
-               operation_desc = pgmoneta_format_and_append(NULL, "SPLIT_L %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "SPLIT_L %s", record_desc);
                break;
             case XLOG_BTREE_SPLIT_R:
-               operation_desc = pgmoneta_format_and_append(NULL, "SPLIT_R %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "SPLIT_R %s", record_desc);
                break;
             case XLOG_BTREE_DELETE:
-               operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "DELETE %s", record_desc);
                break;
             default:
-               operation_desc = strdup(rm_desc);
+               operation_desc = strdup(record_desc);
                break;
          }
          break;
@@ -1184,22 +1184,22 @@ enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
          switch (xact_info)
          {
             case XLOG_XACT_COMMIT:
-               operation_desc = pgmoneta_format_and_append(NULL, "COMMIT %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "COMMIT %s", record_desc);
                break;
             case XLOG_XACT_ABORT:
-               operation_desc = pgmoneta_format_and_append(NULL, "ABORT %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "ABORT %s", record_desc);
                break;
             case XLOG_XACT_PREPARE:
-               operation_desc = pgmoneta_format_and_append(NULL, "PREPARE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "PREPARE %s", record_desc);
                break;
             case XLOG_XACT_COMMIT_PREPARED:
-               operation_desc = pgmoneta_format_and_append(NULL, "COMMIT_PREPARED %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "COMMIT_PREPARED %s", record_desc);
                break;
             case XLOG_XACT_ABORT_PREPARED:
-               operation_desc = pgmoneta_format_and_append(NULL, "ABORT_PREPARED %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "ABORT_PREPARED %s", record_desc);
                break;
             default:
-               operation_desc = strdup(rm_desc);
+               operation_desc = strdup(record_desc);
                break;
          }
          break;
@@ -1210,13 +1210,13 @@ enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
          switch (standby_info)
          {
             case XLOG_STANDBY_LOCK:
-               operation_desc = pgmoneta_format_and_append(NULL, "LOCK %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "LOCK %s", record_desc);
                break;
             case XLOG_RUNNING_XACTS:
-               operation_desc = pgmoneta_format_and_append(NULL, "RUNNING_XACTS %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "RUNNING_XACTS %s", record_desc);
                break;
             default:
-               operation_desc = strdup(rm_desc);
+               operation_desc = strdup(record_desc);
                break;
          }
          break;
@@ -1227,53 +1227,53 @@ enhance_description(char* rm_desc, uint8_t rmid, uint8_t info)
          switch (xlog_info)
          {
             case XLOG_CHECKPOINT_SHUTDOWN:
-               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_SHUTDOWN %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_SHUTDOWN %s", record_desc);
                break;
             case XLOG_CHECKPOINT_ONLINE:
-               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_ONLINE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_ONLINE %s", record_desc);
                break;
             case XLOG_NOOP:
-               operation_desc = pgmoneta_format_and_append(NULL, "NOOP %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "NOOP %s", record_desc);
                break;
             case XLOG_NEXTOID:
-               operation_desc = pgmoneta_format_and_append(NULL, "NEXTOID %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "NEXTOID %s", record_desc);
                break;
             case XLOG_SWITCH:
-               operation_desc = pgmoneta_format_and_append(NULL, "SWITCH %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "SWITCH %s", record_desc);
                break;
             case XLOG_BACKUP_END:
-               operation_desc = pgmoneta_format_and_append(NULL, "BACKUP_END %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "BACKUP_END %s", record_desc);
                break;
             case XLOG_PARAMETER_CHANGE:
-               operation_desc = pgmoneta_format_and_append(NULL, "PARAMETER_CHANGE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "PARAMETER_CHANGE %s", record_desc);
                break;
             case XLOG_RESTORE_POINT:
-               operation_desc = pgmoneta_format_and_append(NULL, "RESTORE_POINT %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "RESTORE_POINT %s", record_desc);
                break;
             case XLOG_FPW_CHANGE:
-               operation_desc = pgmoneta_format_and_append(NULL, "FPW_CHANGE %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "FPW_CHANGE %s", record_desc);
                break;
             case XLOG_END_OF_RECOVERY:
-               operation_desc = pgmoneta_format_and_append(NULL, "END_OF_RECOVERY %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "END_OF_RECOVERY %s", record_desc);
                break;
             case XLOG_FPI_FOR_HINT:
-               operation_desc = pgmoneta_format_and_append(NULL, "FPI_FOR_HINT %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "FPI_FOR_HINT %s", record_desc);
                break;
             case XLOG_FPI:
-               operation_desc = pgmoneta_format_and_append(NULL, "FPI %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "FPI %s", record_desc);
                break;
             case XLOG_CHECKPOINT_REDO:
-               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_REDO %s", rm_desc);
+               operation_desc = pgmoneta_format_and_append(NULL, "CHECKPOINT_REDO %s", record_desc);
                break;
             default:
-               operation_desc = strdup(rm_desc);
+               operation_desc = strdup(record_desc);
                break;
          }
          break;
       }
       default:
          // For other resource managers, just use the original description
-         operation_desc = strdup(rm_desc);
+         operation_desc = strdup(record_desc);
          break;
    }
 
@@ -1289,9 +1289,6 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
    struct decoded_xlog_record* record = NULL;
    char* start_lsn_string = NULL;
    char* end_lsn_string = NULL;
-   char* rm_desc = NULL;
-   char* backup_str = NULL;
-   char* enhanced_desc = NULL;
    uint32_t rec_len = 0;
    uint32_t fpi_len = 0;
    int temp_width;
@@ -1314,34 +1311,12 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
       if (record->partial)
       {
          continue;
-
       }
-
-      rm_desc = malloc(1);
-      if (rm_desc)
-      {
-         rm_desc[0] = '\0';
-      }
-      backup_str = malloc(1);
-      if (backup_str)
-      {
-         backup_str[0] = '\0';
-      }
-
-      rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
-      enhanced_desc = enhance_description(rm_desc, record->header.xl_rmid, record->header.xl_info);
-      backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, wf->long_phd->std.xlp_magic);
-
-      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", enhanced_desc, backup_str);
 
       if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
-                       record_desc, record->header.xl_info, record->header.xl_rmid))
+                       NULL, record->header.xl_info, record->header.xl_rmid))
       {
-         free(record_desc);
-         free(rm_desc);
-         free(backup_str);
-         free(enhanced_desc);
          continue;
       }
 
@@ -1390,15 +1365,8 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
          widths->xid_width = temp_width;
       }
 
-      free(record_desc);
-      free(rm_desc);
-      free(backup_str);
-      free(enhanced_desc);
       free(start_lsn_string);
       free(end_lsn_string);
-      rm_desc = NULL;
-      backup_str = NULL;
-      enhanced_desc = NULL;
       start_lsn_string = NULL;
       end_lsn_string = NULL;
    }
@@ -1438,12 +1406,17 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
       }
 
       rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
-
-      enhanced_desc = enhance_description(rm_desc, record->header.xl_rmid, record->header.xl_info);
-
       backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", rm_desc, backup_str);
 
-      char* record_desc = pgmoneta_format_and_append(NULL, "%s %s", enhanced_desc, backup_str);
+      if (rm_desc == NULL || !strcmp(rm_desc, ""))
+      {
+         enhanced_desc = enhance_description(backup_str, record->header.xl_rmid, record->header.xl_info);
+      }
+      else
+      {
+         enhanced_desc = enhance_description(record_desc, record->header.xl_rmid, record->header.xl_info);
+      }
 
       if (!is_included(rmgr_table[record->header.xl_rmid].name, rms, record->header.xl_prev,
                        start_lsn, record->lsn, end_lsn, record->header.xl_xid, xids, included_objects,
