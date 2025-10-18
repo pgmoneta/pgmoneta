@@ -605,12 +605,6 @@ pgmoneta_summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, blo
    char* from = NULL;
    char* to = NULL;
 
-   if (!pgmoneta_is_file(path))
-   {
-      pgmoneta_log_error("WAL file at %s does not exist", path);
-      goto error;
-   }
-
    from = pgmoneta_append(from, path);
    /* Extract the wal file in /tmp/ */
    to = pgmoneta_append(to, "/tmp/");

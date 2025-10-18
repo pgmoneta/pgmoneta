@@ -1959,6 +1959,7 @@ static void
 do_copy_file(struct worker_common* wc)
 {
    struct worker_input* fi = (struct worker_input*)wc;
+   char* from = NULL;
    int fd_from = -1;
    int fd_to = -1;
    char buffer[8192];
@@ -1967,17 +1968,27 @@ do_copy_file(struct worker_common* wc)
    char* dn = NULL;
    char* to = NULL;
 
-   fd_from = open(fi->from, O_RDONLY);
+   /* if the file is partial try for complete file */
+   if (!pgmoneta_is_file(fi->from) && pgmoneta_ends_with(fi->from, ".partial"))
+   {
+      pgmoneta_strip_extension(fi->from, &from);
+   }
+   else
+   {
+      from = pgmoneta_append(from, fi->from);
+   }
+
+   fd_from = open(from, O_RDONLY);
 
    if (fd_from < 0)
    {
-      pgmoneta_log_error("File doesn't exists: %s", fi->from);
+      pgmoneta_log_error("File doesn't exists: %s", from);
       goto error;
    }
 
-   if (get_permissions(fi->from, &permissions))
+   if (get_permissions(from, &permissions))
    {
-      pgmoneta_log_error("Unable to get file permissions: %s", fi->from);
+      pgmoneta_log_error("Unable to get file permissions: %s", from);
       goto error;
    }
 
@@ -2042,6 +2053,7 @@ do_copy_file(struct worker_common* wc)
    }
 
    free(dn);
+   free(from);
    free(to);
    free(fi);
 
@@ -2070,6 +2082,7 @@ error:
    }
 
    free(dn);
+   free(from);
    free(to);
    free(fi);
 }
@@ -2954,6 +2967,22 @@ pgmoneta_is_wal_file(char* file)
    }
 
    return true;
+}
+
+char*
+pgmoneta_wal_file_name(uint32_t tli, size_t segno, int segsize)
+{
+   char hex[128];
+   char* f = NULL;
+
+   memset(&hex[0], 0, sizeof(hex));
+   int segments_per_id = 0x100000000ULL / segsize;
+   int seg_id = segno / segments_per_id;
+   int seg_offset = segno % segments_per_id;
+
+   snprintf(&hex[0], sizeof(hex), "%08X%08X%08X", tli, seg_id, seg_offset);
+   f = pgmoneta_append(f, hex);
+   return f;
 }
 
 int

@@ -57,7 +57,6 @@ int mappings_size = 0;
 oid_mapping* oidMappings = NULL;
 bool enable_translation = false;
 
-static char* wal_file_name(uint32_t timeline, size_t segno, int segsize);
 static int wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket);
 static FILE* wal_open(char* root, char* filename, int segsize);
 static int wal_close(char* root, char* filename, bool partial, FILE* file);
@@ -387,7 +386,7 @@ pgmoneta_wal(int srv, char** argv)
                      // new wal file
                      segno = xlogptr / segsize;
                      curr_xlogoff = 0;
-                     filename = wal_file_name(timeline, segno, segsize);
+                     filename = pgmoneta_wal_file_name(timeline, segno, segsize);
                      if ((wal_file = wal_open(d, filename, segsize)) == NULL)
                      {
                         pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
@@ -483,7 +482,7 @@ pgmoneta_wal(int srv, char** argv)
                            /* Write the rest of the data for the next WAL segment */
                            segno = xlogptr / segsize;
                            curr_xlogoff = 0;
-                           filename = wal_file_name(timeline, segno, segsize);
+                           filename = pgmoneta_wal_file_name(timeline, segno, segsize);
                            if ((wal_file = wal_open(d, filename, segsize)) == NULL)
                            {
                               pgmoneta_log_error("Could not create or open WAL segment file at %s", d);
@@ -863,22 +862,6 @@ pgmoneta_free_timeline_history(struct timeline_history* history)
       free(h);
       h = next;
    }
-}
-
-static char*
-wal_file_name(uint32_t timeline, size_t segno, int segsize)
-{
-   char hex[128];
-   char* f = NULL;
-
-   memset(&hex[0], 0, sizeof(hex));
-   int segments_per_id = 0x100000000ULL / segsize;
-   int seg_id = segno / segments_per_id;
-   int seg_offset = segno % segments_per_id;
-
-   snprintf(&hex[0], sizeof(hex), "%08X%08X%08X", timeline, seg_id, seg_offset);
-   f = pgmoneta_append(f, hex);
-   return f;
 }
 
 static int

@@ -1404,6 +1404,17 @@ bool
 pgmoneta_is_wal_file(char* file);
 
 /**
+ * Derive the file name from the timeline_id, segment number and segment size
+ * 
+ * @param tli The timeline id
+ * @param segno The segment number
+ * @param segsize The WAL segemnt size
+ * @return The WAL segment name
+ */
+char*
+pgmoneta_wal_file_name(uint32_t tli, size_t segno, int segsize);
+
+/**
  * Is the string a number ?
  * @param str The string
  * @param base The base (10 or 16)
