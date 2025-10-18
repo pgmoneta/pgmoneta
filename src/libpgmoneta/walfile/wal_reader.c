@@ -1293,12 +1293,6 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
    uint32_t fpi_len = 0;
    int temp_width;
 
-   widths->rm_width = 0;
-   widths->lsn_width = 0;
-   widths->rec_width = 0;
-   widths->tot_width = 0;
-   widths->xid_width = 0;
-
    if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
    {
       return;
