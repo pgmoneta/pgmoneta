@@ -436,6 +436,8 @@ pgmoneta_wal(int srv, char** argv)
                         pgmoneta_log_error("Could not write %d bytes to WAL file %s", bytes_to_write, filename);
                         goto error;
                      }
+                     fflush(wal_file);
+
                      if (sftp_wal_file != NULL)
                      {
                         sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_to_write);
@@ -506,6 +508,7 @@ pgmoneta_wal(int srv, char** argv)
                            }
                            curr_xlogoff += bytes_left;
                            fwrite(msg->data + hdrlen + bytes_written, 1, bytes_left, wal_file);
+                           fflush(wal_file);
                            if (sftp_wal_file != NULL)
                            {
                               sftp_write(sftp_wal_file, msg->data + hdrlen + bytes_written, bytes_left);
