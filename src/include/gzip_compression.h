@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <compression.h>
 #include <json.h>
 #include <workers.h>
 
@@ -138,6 +139,14 @@ pgmoneta_gzip_string(char* s, unsigned char** buffer, size_t* buffer_size);
  */
 int
 pgmoneta_gunzip_string(unsigned char* compressed_buffer, size_t compressed_size, char** output_string);
+
+/**
+ * Create a gzip compressor
+ * @param compressor [out] The compressor
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_gzip_compressor_create(struct compressor** compressor);
 
 #ifdef __cplusplus
 }

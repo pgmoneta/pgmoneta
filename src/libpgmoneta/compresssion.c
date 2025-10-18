@@ -32,7 +32,20 @@
 #include <logging.h>
 #include <lz4_compression.h>
 #include <utils.h>
+#include <zlib.h>
 #include <zstandard_compression.h>
+
+static int
+create_noop_compressor(struct compressor** compressor);
+
+static int
+noop_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+
+static int
+noop_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+
+static void
+noop_close(struct compressor* compressor);
 
 static int
 pgmoneta_decompression_file_callback(char* path, compression_func* decompress_cb)
@@ -73,4 +86,155 @@ pgmoneta_decompress(char* from, char* to)
    return decompress_cb(from, to);
 error:
    return 1;
+}
+
+int
+pgmoneta_compressor_create(int compression_type, struct compressor** compressor)
+{
+   *compressor = NULL;
+   switch (compression_type)
+   {
+      case COMPRESSION_CLIENT_ZSTD:
+      case COMPRESSION_SERVER_ZSTD:
+         return pgmoneta_zstd_compressor_create(compressor);
+      case COMPRESSION_CLIENT_LZ4:
+      case COMPRESSION_SERVER_LZ4:
+         return pgmoneta_lz4_compressor_create(compressor);
+      case COMPRESSION_CLIENT_BZIP2:
+         return pgmoneta_bzip2_compressor_create(compressor);
+      case COMPRESSION_CLIENT_GZIP:
+      case COMPRESSION_SERVER_GZIP:
+         return pgmoneta_gzip_compressor_create(compressor);
+      default:
+         return create_noop_compressor(compressor);
+   }
+}
+
+void
+pgmoneta_compressor_prepare(struct compressor* compressor, void* in_buffer, size_t in_size, bool last_chunk)
+{
+   if (compressor == NULL)
+   {
+      return;
+   }
+   compressor->in_buf = in_buffer;
+   compressor->in_size = in_size;
+   compressor->in_pos = 0;
+   compressor->last_chunk = last_chunk;
+}
+
+int
+pgmoneta_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   if (compressor == NULL || compressor->in_buf == NULL)
+   {
+      goto error;
+   }
+
+   if (compressor->compress(compressor, out_buf, out_capacity, out_size, finished))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+int
+pgmoneta_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   if (compressor == NULL || compressor->in_buf == NULL)
+   {
+      goto error;
+   }
+
+   if (compressor->decompress(compressor, out_buf, out_capacity, out_size, finished))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+void
+pgmoneta_compressor_destroy(struct compressor* compressor)
+{
+   if (compressor == NULL)
+   {
+      return;
+   }
+   compressor->close(compressor);
+   free(compressor);
+}
+
+static int
+noop_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   size_t bytes_to_write = 0;
+
+   if (compressor == NULL || compressor->in_buf == NULL)
+   {
+      goto error;
+   }
+
+   bytes_to_write = MIN(compressor->in_size - compressor->in_pos, out_capacity);
+   memcpy(out_buf, compressor->in_buf + compressor->in_pos, bytes_to_write);
+
+   *out_size = bytes_to_write;
+   compressor->in_pos += bytes_to_write;
+   *finished = compressor->in_pos == compressor->in_size;
+   return 0;
+
+error:
+   return 1;
+}
+
+static int
+noop_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   size_t bytes_to_write = 0;
+
+   if (compressor == NULL || compressor->in_buf == NULL)
+   {
+      goto error;
+   }
+
+   bytes_to_write = MIN(compressor->in_size - compressor->in_pos, out_capacity);
+   memcpy(out_buf, compressor->in_buf + compressor->in_pos, bytes_to_write);
+
+   *out_size = bytes_to_write;
+   compressor->in_pos += bytes_to_write;
+   *finished = compressor->in_pos == compressor->in_size;
+   return 0;
+
+error:
+   return 1;
+}
+
+static void
+noop_close(struct compressor* compressor)
+{
+   compressor->in_buf = NULL;
+   compressor->in_pos = 0;
+   compressor->in_size = 0;
+}
+
+static int
+create_noop_compressor(struct compressor** compressor)
+{
+   struct compressor* c = NULL;
+   c = malloc(sizeof(struct compressor));
+   memset(c, 0, sizeof(struct compressor));
+
+   c->close = noop_close;
+   c->compress = noop_compress;
+   c->decompress = noop_decompress;
+   *compressor = c;
+
+   return 0;
 }

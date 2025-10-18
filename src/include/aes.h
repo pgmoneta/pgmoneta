@@ -39,6 +39,55 @@ extern "C" {
 
 #include <openssl/ssl.h>
 
+struct encryptor
+{
+   /**
+    * Encrypt callback
+    * @param encryptor The encryptor
+    * @param in_buf The input buffer size
+    * @param in_size The input buffer data size
+    * @param last_chunk If current input is the last chunk
+    * @param out_buf [out] The output buffer
+    * @param out_size [out] The output buffer data size
+    * @return 0 upon success, 1 if otherwise
+    */
+   int (*encrypt)(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+
+   /**
+    * Decrypt callback
+    * @param encryptor The encryptor
+    * @param in_buf The input buffer size
+    * @param in_size The input buffer data size
+    * @param last_chunk If current input is the last chunk
+    * @param out_buf [out] The output buffer
+    * @param out_size [out] The output buffer data size
+    * @return 0 upon success, 1 if otherwise
+    */
+   int (*decrypt)(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+
+   /**
+    * Close the encryptor, this does not free encryptor
+    * @param encryptor The encryptor
+    */
+   void (*close)(struct encryptor* encryptor);
+};
+
+/**
+ * Create an encryptor
+ * @param encryption_type The encryption type
+ * @param encryptor [out] The encryptor
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encryptor_create(int encryption_type, struct encryptor** encryptor);
+
+/**
+ * Destroy an encryptor
+ * @param encryptor The encryptor
+ */
+void
+pgmoneta_encryptor_destroy(struct encryptor* encryptor);
+
 /**
  * Encrypt a string
  * @param plaintext The string

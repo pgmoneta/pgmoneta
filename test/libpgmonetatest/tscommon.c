@@ -49,10 +49,12 @@
 #define ENV_VAR_CONF_SAMPLE_PATH "PGMONETA_TEST_CONF_SAMPLE"
 #define ENV_VAR_USER_CONF        "PGMONETA_TEST_USER_CONF"
 #define ENV_VAR_RESTORE_DIR      "PGMONETA_TEST_RESTORE_DIR"
+#define ENV_VAR_RETROSPECT_DIR   "PGMONETA_TEST_RETROSPECT_DIR"
 
 char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 char TEST_RESTORE_DIR[MAX_PATH];
 char TEST_BASE_DIR[MAX_PATH];
+char TEST_RETROSPECT_DIR[MAX_PATH];
 
 /* In-process snapshot of the configuration used for save/restore */
 static struct main_configuration config_snapshot;
@@ -66,6 +68,7 @@ pgmoneta_test_environment_create(void)
    char* user_conf_path = NULL;
    char* restore_dir = NULL;
    char* base_dir = NULL;
+   char* retrospect_dir = NULL;
    int ret = 0;
    size_t size = 0;
 
@@ -83,10 +86,10 @@ pgmoneta_test_environment_create(void)
 
    // Try reading configuration from the configuration path
    assert(!pgmoneta_read_main_configuration(shmem, conf_path));
-   
+
    // Validate the configuration is valid
    assert(!pgmoneta_test_validate_configuration(shmem));
-   
+
    config = (struct main_configuration*)shmem;
 
    // some validations just to be safe
@@ -105,6 +108,10 @@ pgmoneta_test_environment_create(void)
    base_dir = getenv(ENV_VAR_BASE_DIR);
    assert(base_dir != NULL);
    memcpy(TEST_BASE_DIR, base_dir, strlen(base_dir));
+
+   retrospect_dir = getenv(ENV_VAR_RETROSPECT_DIR);
+   assert(retrospect_dir != NULL);
+   memcpy(TEST_RETROSPECT_DIR, retrospect_dir, strlen(retrospect_dir));
 
    user_conf_path = getenv(ENV_VAR_USER_CONF);
    assert(user_conf_path != NULL);
@@ -171,17 +178,17 @@ pgmoneta_test_add_backup_chain(void)
    {
       return 1;
    }
-   
+
    if (pgmoneta_tsclient_backup("primary", "newest", 0))
    {
       return 1;
    }
-   
+
    if (pgmoneta_tsclient_backup("primary", "newest", 0))
    {
       return 1;
    }
-   
+
    return 0;
 }
 
@@ -226,14 +233,13 @@ pgmoneta_test_basedir_cleanup(void)
    }
    else
    {
-   pgmoneta_reload_configuration(&restart);
+      pgmoneta_reload_configuration(&restart);
    }
 
    if (pgmoneta_tsclient_reload(0))
    {
       pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to reload configuration");
    }
-
 
    free(backup_dir);
    free(wal_dir);

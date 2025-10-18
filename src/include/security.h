@@ -39,6 +39,15 @@ extern "C" {
 #include <stdlib.h>
 #include <openssl/ssl.h>
 
+struct hasher
+{
+   char* hash;
+   uint32_t hash_len;
+   EVP_MD_CTX* md_ctx;
+   const EVP_MD* md;
+   unsigned char md_value[EVP_MAX_MD_SIZE];
+};
+
 /**
  * Authenticate a user
  * @param server The server
@@ -219,6 +228,33 @@ pgmoneta_compare_crc32c(uint32_t c1, uint32_t c2);
  */
 int
 pgmoneta_finalize_crc32c(uint32_t* crc);
+
+/**
+ * Create a hasher
+ * @param algorithm The algorithm
+ * @param hasher [out] The hasher
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_hasher_create(char* algorithm, struct hasher** hasher);
+
+/**
+ * Destroy a haser
+ * @param hasher The haser
+ */
+void
+pgmoneta_hasher_destroy(struct hasher* hasher);
+
+/**
+ * Update hasher with new input
+ * @param hasher The hasher
+ * @param buffer The input buffer
+ * @param size The input buffer data size
+ * @param last_chunk If current input is the last chunk
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_hasher_update(struct hasher* hasher, void* buffer, size_t size, bool last_chunk);
 
 #ifdef __cplusplus
 }

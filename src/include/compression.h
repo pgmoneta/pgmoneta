@@ -33,6 +33,65 @@
 
 typedef int (*compression_func)(char*, char*);
 
+struct compressor
+{
+   /**
+    * The compress callback
+    * @param compressor The compressor
+    * @param out_buf The output buffer
+    * @param out_capacity The output buffer capacity
+    * @param out_size The output data size
+    * @param finished If compressor has finished flushing output for current chunk
+    * @return 0 upon success, 1 if otherwise
+    */
+   int (*compress)(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+   /**
+    * The decompress callback
+    * @param compressor The compressor
+    * @param out_buf The output buffer
+    * @param out_capacity The output buffer capacity
+    * @param out_size The output data size
+    * @param finished If compressor has finished flushing output for current chunk
+    * @return 0 upon success, 1 if otherwise
+    */
+   int (*decompress)(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+   /**
+    * Close the compressor
+    * @param compressor The compressor
+    */
+   void (*close)(struct compressor* compressor);
+   void* in_buf;    /* The input buffer */
+   size_t in_size;  /* The input data size */
+   size_t in_pos;   /* Current postition the compressor has processed */
+   bool last_chunk; /* If current chunk is the last chunk */
+};
+
+/**
+ * Create a compressor according to compression type
+ * @param compression_type The compression type
+ * @param compressor [out] The compressor
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_compressor_create(int compression_type, struct compressor** compressor);
+
+/**
+ * Prepare the compressor with the input buffer to compress or decompress
+ * @param compressor The compressor
+ * @param in_buffer The input buffer
+ * @param in_size The input size
+ * @param last_chunk True if the current chunk is the last, false if otherwise
+ */
+void
+pgmoneta_compressor_prepare(struct compressor* compressor, void* in_buffer, size_t in_size, bool last_chunk);
+
+/**
+ * Destroy the compressor
+ * @param compressor The compressor
+ */
+void
+pgmoneta_compressor_destroy(struct compressor* compressor);
+
 /**
  * Decompress a file using the appropriate decompression method.
  *

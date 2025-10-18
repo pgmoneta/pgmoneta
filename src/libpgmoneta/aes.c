@@ -55,6 +55,28 @@ static void do_decrypt_file(struct worker_common* wc);
 
 static int encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigned char** res_buffer, size_t* res_size, int enc, int mode);
 
+static int create_aes_encryptor(int mode, struct encryptor** encryptor);
+static int create_noop_encryptor(struct encryptor** encryptor);
+
+static void aes_encryptor_close(struct encryptor* encryptor);
+static int aes_encryptor_encrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+static int aes_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+static int aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, int enc, void** out_buf, size_t* out_size);
+
+static void noop_encryptor_close(struct encryptor* encryptor);
+static int noop_encryptor_encrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+static int noop_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size);
+
+struct aes_encryptor
+{
+   struct encryptor super;
+   const EVP_CIPHER* (*cipher_fp)(void);
+   EVP_CIPHER_CTX* ctx;
+   int cipher_block_size;
+   unsigned char key[EVP_MAX_KEY_LENGTH];
+   unsigned char iv[EVP_MAX_IV_LENGTH];
+};
+
 int
 pgmoneta_encrypt_data(char* d, struct workers* workers)
 {
@@ -621,6 +643,28 @@ error:
    }
 
    return 1;
+}
+
+void
+pgmoneta_encryptor_destroy(struct encryptor* encryptor)
+{
+   if (encryptor == NULL)
+   {
+      return;
+   }
+   encryptor->close(encryptor);
+   free(encryptor);
+}
+
+int
+pgmoneta_encryptor_create(int encryption_type, struct encryptor** encryptor)
+{
+   if (encryption_type == ENCRYPTION_NONE)
+   {
+      //create noop encryptor
+      return create_noop_encryptor(encryptor);
+   }
+   return create_aes_encryptor(encryption_type, encryptor);
 }
 
 static void
@@ -1222,4 +1266,196 @@ static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void)
       return &EVP_aes_128_cbc;
    }
    return &EVP_aes_256_cbc;
+}
+
+static int
+create_aes_encryptor(int mode, struct encryptor** encryptor)
+{
+   struct aes_encryptor* ae = NULL;
+   char* master_key = NULL;
+   ae = (struct aes_encryptor*)malloc(sizeof(struct aes_encryptor));
+   memset(ae, 0, sizeof(struct aes_encryptor));
+
+   ae->super.close = aes_encryptor_close;
+   ae->super.decrypt = aes_encryptor_decrypt;
+   ae->super.encrypt = aes_encryptor_encrypt;
+   ae->cipher_fp = get_cipher(mode);
+   ae->cipher_block_size = EVP_CIPHER_block_size(ae->cipher_fp());
+   if (pgmoneta_get_master_key(&master_key))
+   {
+      pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
+      goto error;
+   }
+
+   if (derive_key_iv(master_key, ae->key, ae->iv, mode) != 0)
+   {
+      pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
+      goto error;
+   }
+
+   free(master_key);
+   *encryptor = (struct encryptor*)ae;
+
+   return 0;
+
+error:
+   free(master_key);
+   pgmoneta_encryptor_destroy((struct encryptor*)ae);
+   return 1;
+}
+
+static int
+create_noop_encryptor(struct encryptor** encryptor)
+{
+   struct encryptor* e = NULL;
+   e = malloc(sizeof(struct encryptor));
+   e->close = noop_encryptor_close;
+   e->encrypt = noop_encryptor_encrypt;
+   e->decrypt = noop_encryptor_decrypt;
+   *encryptor = e;
+   return 0;
+}
+
+static void
+aes_encryptor_close(struct encryptor* encryptor)
+{
+   struct aes_encryptor* this = (struct aes_encryptor*)encryptor;
+   if (this == NULL)
+   {
+      return;
+   }
+   if (this->ctx)
+   {
+      EVP_CIPHER_CTX_free(this->ctx);
+   }
+}
+
+static int
+aes_encryptor_encrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size)
+{
+   return aes_encryptor_process(encryptor, in_buf, in_size, last_chunk, 1, out_buf, out_size);
+}
+
+static int
+aes_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size)
+{
+   return aes_encryptor_process(encryptor, in_buf, in_size, last_chunk, 0, out_buf, out_size);
+}
+
+static int
+aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, int enc, void** out_buf, size_t* out_size)
+{
+   struct aes_encryptor* this = (struct aes_encryptor*)encryptor;
+   void* buf = NULL;
+   size_t capacity = 0;
+   int size = 0;
+   int final_size = 0;
+
+   if (this == NULL || in_buf == NULL || in_size == 0)
+   {
+      goto error;
+   }
+   *out_buf = NULL;
+   *out_size = 0;
+
+   capacity = in_size + this->cipher_block_size - 1;
+   buf = malloc(capacity);
+   if (buf == NULL)
+   {
+      pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
+      goto error;
+   }
+
+   if (this->ctx == NULL)
+   {
+      if (!(this->ctx = EVP_CIPHER_CTX_new()))
+      {
+         pgmoneta_log_error("EVP_CIPHER_CTX_new: Failed to get context");
+         goto error;
+      }
+
+      if (EVP_CipherInit_ex(this->ctx, this->cipher_fp(), NULL, this->key, this->iv, enc) == 0)
+      {
+         pgmoneta_log_error("EVP_CipherInit_ex: failed to initialize context");
+         goto error;
+      }
+   }
+
+   if (EVP_CipherUpdate(this->ctx, buf, &size, in_buf, (int)in_size) == 0)
+   {
+      pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
+      goto error;
+   }
+
+   if (last_chunk)
+   {
+      buf = realloc(buf, size + capacity);
+      if (buf == NULL)
+      {
+         pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
+         goto error;
+      }
+      if (EVP_CipherFinal_ex(this->ctx, buf + size, &final_size) == 0)
+      {
+         pgmoneta_log_error("EVP_CipherFinal_ex: failed to process final cipher block");
+         goto error;
+      }
+      size += final_size;
+   }
+
+   *out_buf = (void*)buf;
+   *out_size = (size_t)size;
+
+   return 0;
+error:
+   free(buf);
+   return 1;
+}
+
+static void
+noop_encryptor_close(struct encryptor* encryptor)
+{
+   (void)encryptor;
+}
+
+static int
+noop_encryptor_encrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size)
+{
+   void* out = NULL;
+
+   if (encryptor == NULL || in_buf == NULL || in_size == 0)
+   {
+      goto error;
+   }
+
+   (void)last_chunk;
+   out = malloc(in_size);
+   memcpy(out, in_buf, in_size);
+   *out_buf = out;
+   *out_size = in_size;
+
+   return 0;
+error:
+   return 1;
+}
+
+static int
+noop_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size)
+{
+   void* out = NULL;
+
+   if (encryptor == NULL || in_buf == NULL || in_size == 0)
+   {
+      goto error;
+   }
+
+   (void)last_chunk;
+   out = malloc(in_size);
+   memcpy(out, in_buf, in_size);
+   *out_buf = out;
+   *out_size = in_size;
+
+   return 0;
+error:
+   return 1;
 }

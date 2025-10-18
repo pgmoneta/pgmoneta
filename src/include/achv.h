@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <art.h>
 #include <json.h>
 #include <message.h>
 #include <tablespace.h>
@@ -93,6 +94,17 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
  */
 int
 pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket);
+
+/**
+ * Extract from a tar file to a given directory
+ * @param file_path The tar file path
+ * @param destination The destination to extract to
+ * @param checksums [out] The file checksums
+ * @param sizes [out] The file sizes
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes);
 
 #ifdef __cplusplus
 }

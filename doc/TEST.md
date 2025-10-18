@@ -96,7 +96,10 @@ The `MCTF_ASSERT` macro supports optional error messages with printf-style forma
 
 If you have resources as test case input, place them under `test/resource/<your-test-case-name>/`. The `check.sh` will copy them
 to `TEST_BASE_DIR/resource/<your-test-case-name>/`, i.e. `/tmp/pgmoneta-test/base/resource/<your-test-case-name>/`. And in your
-test code you can open the file from there directly.
+test code you can open the file from there directly. 
+
+During the test, you need to save some input for later inspection in case of test failures, save 
+them under the `restrospect/` directory.
 
 **Test Directory**
 
@@ -105,6 +108,7 @@ After running the tests, you will find:
 * **pgmoneta log:** `/tmp/pgmoneta-test/log/`
 * **postgres log:** `/tmp/pgmoneta-test/pg_log/`, the log level is set to debug5 and has the application name (**pgmoneta**) shown in the log.
 * **code coverage reports:** `/tmp/pgmoneta-test/coverage/`
+* **test resources for retrospect:** `/tmp/pgmoneta-test/retrospect/`
 
 If you need to create a directory runtime, create it under `/tmp/pgmoneta-test/base/`, which also contains `backup/`, `restore/`, `conf` and `workspace/`.
 Base directory will be cleaned up after tests are done. In `tscommon.h` you will find `TEST_BASE_DIR` and other global variables holding corresponding directories, 

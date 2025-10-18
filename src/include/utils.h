@@ -599,7 +599,7 @@ pgmoneta_snprintf(char* buf, size_t n, const char* fmt, ...);
  * @return The resulting string
  */
 char*
-pgmoneta_append(char* orig, char* s);
+pgmoneta_append(char* orig, const char* s);
 
 /**
  * Append a char
@@ -853,7 +853,7 @@ pgmoneta_compare_files(char* f1, char* f2);
  * @return The result
  */
 int
-pgmoneta_symlink_file(char* from, char* to);
+pgmoneta_symlink_file(const char* from, const char* to);
 
 /**
  * Symlinkat file

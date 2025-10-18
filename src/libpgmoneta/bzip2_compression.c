@@ -55,6 +55,17 @@ static int bzip2_decompress_file(char* from, char* to);
 static void do_bzip2_compress(struct worker_common* wc);
 static void do_bzip2_decompress(struct worker_common* wc);
 
+static int bzip2_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static int bzip2_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static void bzip2_compressor_close(struct compressor* compressor);
+
+struct bzip2_compressor
+{
+   struct compressor super;
+   bz_stream* compress_strm;
+   bz_stream* decompress_strm;
+};
+
 int
 pgmoneta_bzip2_data(char* directory, struct workers* workers)
 {
@@ -1049,4 +1060,146 @@ error:
    free(o);
 
    return 1;
+}
+
+int
+pgmoneta_bzip2_compressor_create(struct compressor** compressor)
+{
+   struct bzip2_compressor* bcompressor = NULL;
+   bcompressor = malloc(sizeof(struct bzip2_compressor));
+   memset(bcompressor, 0, sizeof(struct bzip2_compressor));
+   bcompressor->super.close = bzip2_compressor_close;
+   bcompressor->super.compress = bzip2_compressor_compress;
+   bcompressor->super.decompress = bzip2_compressor_decompress;
+   *compressor = (struct compressor*)bcompressor;
+   return 0;
+}
+
+static int
+bzip2_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct bzip2_compressor* this = NULL;
+   int ret = BZ_OK;
+   int flush;
+
+   this = (struct bzip2_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *out_size = 0;
+      *finished = true;
+      goto error;
+   }
+   if (this->compress_strm == NULL)
+   {
+      // init the stream only for the first time
+      this->compress_strm = malloc(sizeof(bz_stream));
+      memset(this->compress_strm, 0, sizeof(bz_stream));
+      ret = BZ2_bzCompressInit(this->compress_strm, 9, 0, 30);
+      if (ret != BZ_OK)
+      {
+         pgmoneta_log_error("bzip2 compressor: failed to initialize compression stream for the compressor");
+         goto error;
+      }
+      this->compress_strm->avail_out = out_capacity;
+      this->compress_strm->next_out = out_buf;
+   }
+   if (this->compress_strm->avail_in == 0 && this->compress_strm->avail_out > 0)
+   {
+      this->compress_strm->avail_in = this->super.in_size;
+      this->compress_strm->next_in = this->super.in_buf;
+   }
+   this->compress_strm->avail_out = out_capacity;
+   this->compress_strm->next_out = out_buf;
+   flush = this->super.last_chunk ? BZ_FINISH : BZ_RUN;
+   ret = BZ2_bzCompress(this->compress_strm, flush);
+   if (ret != BZ_RUN_OK && ret != BZ_FINISH_OK && ret != BZ_STREAM_END)
+   {
+      pgmoneta_log_error("bzip2 compressor: failed to compress");
+      goto error;
+   }
+
+   *out_size = out_capacity - this->compress_strm->avail_out;
+   *finished = ret == BZ_STREAM_END || (this->compress_strm->avail_in == 0 && this->compress_strm->avail_out > 0);
+   this->super.in_pos = this->super.in_size - this->compress_strm->avail_in;
+
+   return 0;
+error:
+   return 1;
+}
+
+static int
+bzip2_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct bzip2_compressor* this = NULL;
+   int ret = BZ_OK;
+
+   this = (struct bzip2_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *out_size = 0;
+      *finished = true;
+      goto error;
+   }
+
+   if (this->decompress_strm == NULL)
+   {
+      this->decompress_strm = malloc(sizeof(bz_stream));
+      memset(this->decompress_strm, 0, sizeof(bz_stream));
+      ret = BZ2_bzDecompressInit(this->decompress_strm, 0, 0);
+      if (ret != BZ_OK)
+      {
+         pgmoneta_log_error("bzip2 compressor: failed to initialize decompression stream for the compressor");
+         goto error;
+      }
+      this->decompress_strm->avail_out = out_capacity;
+      this->decompress_strm->next_out = out_buf;
+   }
+
+   if (this->decompress_strm->avail_in == 0 && this->decompress_strm->avail_out > 0)
+   {
+      this->decompress_strm->avail_in = this->super.in_size;
+      this->decompress_strm->next_in = this->super.in_buf;
+   }
+   this->decompress_strm->avail_out = out_capacity;
+   this->decompress_strm->next_out = out_buf;
+
+   ret = BZ2_bzDecompress(this->decompress_strm);
+   if (ret != BZ_OK && ret != BZ_STREAM_END)
+   {
+      pgmoneta_log_error("bzip2 compressor: failed to decompress");
+      goto error;
+   }
+
+   *out_size = out_capacity - this->decompress_strm->avail_out;
+   *finished = ret == BZ_STREAM_END ||
+               (this->decompress_strm->avail_in == 0 && this->decompress_strm->avail_out > 0);
+   this->super.in_pos = this->super.in_size - this->decompress_strm->avail_in;
+
+   return 0;
+error:
+   return 1;
+}
+
+static void
+bzip2_compressor_close(struct compressor* compressor)
+{
+   if (compressor == NULL)
+   {
+      return;
+   }
+
+   struct bzip2_compressor* this = (struct bzip2_compressor*)compressor;
+   if (this->compress_strm != NULL)
+   {
+      BZ2_bzCompressEnd(this->compress_strm);
+      free(this->compress_strm);
+      this->compress_strm = NULL;
+   }
+
+   if (this->decompress_strm != NULL)
+   {
+      BZ2_bzDecompressEnd(this->decompress_strm);
+      free(this->decompress_strm);
+      this->decompress_strm = NULL;
+   }
 }
