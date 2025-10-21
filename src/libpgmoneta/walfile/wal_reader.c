@@ -1472,6 +1472,10 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
          start_lsn_string = pgmoneta_lsn_to_string(record->header.xl_prev);
          end_lsn_string = pgmoneta_lsn_to_string(record->lsn);
 
+         bool has_desc = enhanced_desc && strlen(enhanced_desc) > 0;
+         bool has_backup = backup_str && strlen(backup_str) > 0;
+         bool both_empty = !has_desc && !has_backup;
+
          if (color)
          {
             fprintf(out, "%s%-*s%s | %s%-*s%s | %s%-*s%s | %s%-*d%s | %s%-*d%s | %s%-*u%s | %s%s%s%s%s\n",
@@ -1481,9 +1485,9 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                     COLOR_BLUE, widths->rec_width, rec_len, COLOR_RESET,
                     COLOR_YELLOW, widths->tot_width, record->header.xl_tot_len, COLOR_RESET,
                     COLOR_CYAN, widths->xid_width, record->header.xl_xid, COLOR_RESET,
-                    COLOR_GREEN, enhanced_desc,
-                    backup_str && strlen(backup_str) > 0 ? " " : "",
-                    backup_str ? backup_str : "", COLOR_RESET);
+                    COLOR_GREEN, both_empty ? "<empty>" : (has_desc ? enhanced_desc : ""),
+                    has_backup ? " " : "",
+                    has_backup ? backup_str : "", COLOR_RESET);
          }
          else
          {
@@ -1494,9 +1498,9 @@ pgmoneta_wal_record_display(struct decoded_xlog_record* record, uint16_t magic_v
                     widths->rec_width, rec_len,
                     widths->tot_width, record->header.xl_tot_len,
                     widths->xid_width, record->header.xl_xid,
-                    enhanced_desc,
-                    backup_str && strlen(backup_str) > 0 ? " " : "",
-                    backup_str ? backup_str : "");
+                    both_empty ? "<empty>" : (has_desc ? enhanced_desc : ""),
+                    has_backup ? " " : "",
+                    has_backup ? backup_str : "");
          }
       }
       goto cleanup;
