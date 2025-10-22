@@ -422,7 +422,6 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
    user = config->common.servers[srv].username;
 
    /* Check for 'pg_checkpoint' role for PostgreSQL +15 and 'SUPERUSER' role for PostgreSQL 13/14 */
-   printf("version: %d\n", version);
    if (version >= 15)
    {
       if (has_predefined_role(ssl, socket, user, "pg_checkpoint", &has_role))
