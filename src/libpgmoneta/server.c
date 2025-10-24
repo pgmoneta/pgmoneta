@@ -57,7 +57,9 @@ static int has_predefined_role(SSL* ssl, int socket, char* usr, char* role, bool
 static int has_superuser_role(SSL* ssl, int socket, char* usr, bool* is_superuser);
 static int has_execute_privilege(SSL* ssl, int socket, char* usr, char* func_name, bool* has_privilege);
 static int transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len);
+static int transform_text_to_label_file_contents(char* text, struct label_file_contents* lf);
 static int process_server_parameters(int server, struct deque* server_parameters);
+static int query_execute(SSL* ssl, int socket, char* query, struct query_response** response);
 
 static bool is_valid_response(struct query_response* response);
 
@@ -290,15 +292,12 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
                                  int length, int socket, uint8_t** out, int* len)
 {
    char* user = NULL;
-   int ret;
-   int q = 0;
    bool has_role = false;
    bool has_privilege = false;
    char bytea_data_buffer[DEFAULT_BURST];
    uint8_t* b_out = NULL;
    int b_len = 0;
    char query[MISC_LENGTH];
-   struct message* query_msg = NULL;
    struct query_response* response = NULL;
    struct main_configuration* config;
 
@@ -307,7 +306,7 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    if (ssl == NULL && socket < 0)
    {
       pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
-      goto done;
+      goto error;
    }
 
    user = config->common.servers[srv].username;
@@ -339,32 +338,9 @@ pgmoneta_server_read_binary_file(int srv, SSL* ssl, char* relative_file_path, in
    memset(query, 0, sizeof(query));
    snprintf(query, sizeof(query), "SELECT pg_read_binary_file('%s', %d, %d, false);", relative_file_path, offset, length);
 
-   ret = pgmoneta_create_query_message(query, &query_msg);
-   if (ret != MESSAGE_STATUS_OK)
+   if (query_execute(ssl, socket, query, &response))
    {
       goto error;
-   }
-
-q:
-   pgmoneta_query_execute(ssl, socket, query_msg, &response);
-
-   if (!is_valid_response(response))
-   {
-      pgmoneta_free_query_response(response);
-      response = NULL;
-
-      SLEEP(5000000L);
-
-      q++;
-
-      if (q < 5)
-      {
-         goto q;
-      }
-      else
-      {
-         goto error;
-      }
    }
 
    if (response->number_of_columns != 1)
@@ -384,18 +360,13 @@ q:
       goto error;
    }
 
-done:
    *out = b_out;
    *len = b_len;
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
-
    return 0;
 error:
    free(b_out);
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
-
    return 1;
 }
 
@@ -403,16 +374,13 @@ int
 pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint32_t* tli)
 {
    int version;
-   int ret = 0;
-   int q = 0;
    char* user = NULL;
    bool is_superuser = false;
    bool has_role = false;
-   bool chkpt_success = false;
    char* chkpt_lsn = NULL;
    char* timeline = NULL;
+   char query[MISC_LENGTH];
    struct main_configuration* config = NULL;
-   struct message* query_msg = NULL;
    struct query_response* response = NULL;
 
    config = (struct main_configuration*)shmem;
@@ -422,7 +390,7 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
    user = config->common.servers[srv].username;
 
    /* Check for 'pg_checkpoint' role for PostgreSQL +15 and 'SUPERUSER' role for PostgreSQL 13/14 */
-   printf("version: %d\n", version);
+
    if (version >= 15)
    {
       if (has_predefined_role(ssl, socket, user, "pg_checkpoint", &has_role))
@@ -451,31 +419,12 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* c_lsn, uint3
    }
 
    /* Force checkpoint in the server */
-   ret = pgmoneta_create_query_message("CHECKPOINT;", &query_msg);
-   if (ret != MESSAGE_STATUS_OK)
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "CHECKPOINT;");
+
+   if (query_execute(ssl, socket, query, &response))
    {
       goto error;
-   }
-q:
-   pgmoneta_query_execute(ssl, socket, query_msg, &response);
-
-   if (!is_valid_response(response))
-   {
-      pgmoneta_free_query_response(response);
-      response = NULL;
-
-      SLEEP(5000000L);
-
-      q++;
-
-      if (q < 5)
-      {
-         goto q;
-      }
-      else
-      {
-         goto error;
-      }
    }
 
    /* response not available */
@@ -484,48 +433,39 @@ q:
       goto error;
    }
 
-   if (!chkpt_success)
+   if (!(response->is_command_complete && strcmp(response->tuples->data[0], "CHECKPOINT") == 0))
    {
-      if (!(response->is_command_complete && strcmp(response->tuples->data[0], "CHECKPOINT") == 0))
-      {
-         goto error;
-      }
-      chkpt_success = true;
-
-      /* reset query message, response pair */
-      pgmoneta_free_message(query_msg);
-      query_msg = NULL;
-      pgmoneta_free_query_response(response);
-      response = NULL;
-
-      /* Query to get the latest checkpoint LSN */
-      ret = pgmoneta_create_query_message("SELECT checkpoint_lsn, timeline_id FROM pg_control_checkpoint();", &query_msg);
-      if (ret != MESSAGE_STATUS_OK)
-      {
-         goto error;
-      }
-      goto q;
+      goto error;
    }
-   else
+
+   /* reset response pair */
+   pgmoneta_free_query_response(response);
+   response = NULL;
+
+   /* Query to get the latest checkpoint LSN */
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT checkpoint_lsn, timeline_id FROM pg_control_checkpoint();");
+
+   if (query_execute(ssl, socket, query, &response))
    {
-      if (response->number_of_columns != 2)
-      {
-         goto error;
-      }
-      /* Read the checkpoint LSN */
-      chkpt_lsn = pgmoneta_query_response_get_data(response, 0);
-      timeline = pgmoneta_query_response_get_data(response, 1);
+      goto error;
    }
+
+   if (response->number_of_columns != 2)
+   {
+      goto error;
+   }
+   /* Read the checkpoint LSN */
+   chkpt_lsn = pgmoneta_query_response_get_data(response, 0);
+   timeline = pgmoneta_query_response_get_data(response, 1);
 
    *c_lsn = pgmoneta_string_to_lsn(chkpt_lsn);
    *tli = atoi(timeline);
 
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
    return 0;
 error:
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
    return 1;
 }
 
@@ -534,11 +474,8 @@ pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_pat
 {
    char* user = NULL;
    char* cell_output = NULL;
-   int ret;
-   int q = 0;
    bool has_privilege = false;
    char query[MISC_LENGTH];
-   struct message* query_msg = NULL;
    struct query_response* response = NULL;
    struct file_stats stat;
    struct main_configuration* config;
@@ -568,32 +505,9 @@ pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_pat
    memset(query, 0, sizeof(query));
    snprintf(query, sizeof(query), "SELECT * FROM pg_stat_file('%s', false);", relative_file_path);
 
-   ret = pgmoneta_create_query_message(query, &query_msg);
-   if (ret != MESSAGE_STATUS_OK)
+   if (query_execute(ssl, socket, query, &response))
    {
       goto error;
-   }
-
-q:
-   pgmoneta_query_execute(ssl, socket, query_msg, &response);
-
-   if (!is_valid_response(response))
-   {
-      pgmoneta_free_query_response(response);
-      response = NULL;
-
-      SLEEP(5000000L);
-
-      q++;
-
-      if (q < 5)
-      {
-         goto q;
-      }
-      else
-      {
-         goto error;
-      }
    }
 
    if (response == NULL || response->number_of_columns != 6)
@@ -628,11 +542,163 @@ q:
    *s = stat;
 
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
    return 0;
 error:
    pgmoneta_free_query_response(response);
-   pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+int
+pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** lsn)
+{
+   int version;
+   char* user = NULL;
+   char* start_backup_lsn = NULL;
+   bool has_privilege = false;
+   char query[MISC_LENGTH];
+   struct query_response* response = NULL;
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto error;
+   }
+
+   user = config->common.servers[srv].username;
+   version = config->common.servers[srv].version;
+
+   if (version >= 15)
+   {
+      if (has_execute_privilege(ssl, socket, user, "pg_backup_start(text, boolean)", &has_privilege))
+      {
+         goto error;
+      }
+
+      if (!has_privilege)
+      {
+         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_backup_start(text, boolean)' function", user);
+         goto error;
+      }
+      memset(query, 0, sizeof(query));
+      snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_start('%s', false);", label);
+   }
+   else
+   {
+      if (has_execute_privilege(ssl, socket, user, "pg_start_backup(text, boolean)", &has_privilege))
+      {
+         goto error;
+      }
+
+      if (!has_privilege)
+      {
+         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_start_backup(text, boolean)' function", user);
+         goto error;
+      }
+      memset(query, 0, sizeof(query));
+      snprintf(query, sizeof(query), "SELECT * FROM  pg_start_backup('%s', false);", label);
+   }
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   if (response == NULL || response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   start_backup_lsn = pgmoneta_append(start_backup_lsn, pgmoneta_query_response_get_data(response, 0));
+   *lsn = start_backup_lsn;
+
+   pgmoneta_free_query_response(response);
+   return 0;
+error:
+   free(start_backup_lsn);
+   pgmoneta_free_query_response(response);
+   return 1;
+}
+
+int
+pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct label_file_contents* lf)
+{
+   int version;
+   char* user = NULL;
+   char* stop_backup_lsn = NULL;
+   struct label_file_contents label_file = {0};
+   bool has_privilege = false;
+   char query[MISC_LENGTH];
+   struct query_response* response = NULL;
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto error;
+   }
+
+   user = config->common.servers[srv].username;
+   version = config->common.servers[srv].version;
+
+   if (version >= 15)
+   {
+      if (has_execute_privilege(ssl, socket, user, "pg_backup_stop(boolean)", &has_privilege))
+      {
+         goto error;
+      }
+
+      if (!has_privilege)
+      {
+         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_backup_stop(boolean)' function", user);
+         goto error;
+      }
+      memset(query, 0, sizeof(query));
+      snprintf(query, sizeof(query), "SELECT * FROM  pg_backup_stop(false);");
+   }
+   else
+   {
+      if (has_execute_privilege(ssl, socket, user, "pg_stop_backup(boolean)", &has_privilege))
+      {
+         goto error;
+      }
+
+      if (!has_privilege)
+      {
+         pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_stop_backup(boolean)' function", user);
+         goto error;
+      }
+      memset(query, 0, sizeof(query));
+      snprintf(query, sizeof(query), "SELECT * FROM  pg_stop_backup(false);");
+   }
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   if (response == NULL || response->number_of_columns != 3)
+   {
+      goto error;
+   }
+
+   stop_backup_lsn = pgmoneta_append(stop_backup_lsn, pgmoneta_query_response_get_data(response, 0));
+   if (transform_text_to_label_file_contents(pgmoneta_query_response_get_data(response, 1), &label_file))
+   {
+      goto error;
+   }
+
+   *lsn = stop_backup_lsn;
+   *lf = label_file;
+
+   pgmoneta_free_query_response(response);
+   return 0;
+error:
+   pgmoneta_free_query_response(response);
    return 1;
 }
 
@@ -1402,6 +1468,96 @@ error:
 }
 
 static int
+transform_text_to_label_file_contents(char* text, struct label_file_contents* lf)
+{
+   char** lines = NULL;
+   char* key = NULL;
+   char* value = NULL;
+   int number_of_lines = 0;
+
+   memset(lf, 0, sizeof(struct label_file_contents));
+
+   if (pgmoneta_split(text, &lines, &number_of_lines, '\n'))
+   {
+      goto error;
+   }
+
+   for (int i = 0; i < number_of_lines; i++)
+   {
+      if (!lines[i] || strlen(lines[i]) == 0)
+      {
+         continue;
+      }
+
+      // Split at first ':'
+      char* colon = strchr(lines[i], ':');
+      if (!colon)
+      {
+         continue;
+      }
+
+      *colon = '\0';
+      key = lines[i];
+      value = colon + 1;
+
+      // trim the leading whitespaces
+      while (*value == ' ' || *value == '\t')
+         value++;
+
+      if (!strcmp(key, "CHECKPOINT LOCATION"))
+      {
+         memcpy(lf->checkpoint_lsn, value, strlen(value) + 1);
+      }
+      else if (!strcmp(key, "BACKUP METHOD"))
+      {
+         memcpy(lf->backup_method, value, strlen(value) + 1);
+      }
+      else if (!strcmp(key, "BACKUP FROM"))
+      {
+         memcpy(lf->backup_from, value, strlen(value) + 1);
+      }
+      else if (!strcmp(key, "START TIME"))
+      {
+         strptime(value, "%Y-%m-%d %H:%M:%S", &lf->start_time);
+      }
+      else if (!strcmp(key, "LABEL"))
+      {
+         memcpy(lf->label, value, strlen(value) + 1);
+      }
+      else if (!strcmp(key, "START TIMELINE"))
+      {
+         lf->start_tli = pgmoneta_atoi(value);
+      }
+      else
+      {
+         // ignore
+      }
+   }
+
+   if (lines)
+   {
+      for (int i = 0; lines[i] != NULL; i++)
+      {
+         free(lines[i]);
+      }
+      free(lines);
+   }
+
+   return 0;
+error:
+   if (lines)
+   {
+      for (int i = 0; lines[i] != NULL; i++)
+      {
+         free(lines[i]);
+      }
+      free(lines);
+   }
+
+   return 1;
+}
+
+static int
 process_server_parameters(int server, struct deque* server_parameters)
 {
    int status = 0;
@@ -1445,4 +1601,51 @@ process_server_parameters(int server, struct deque* server_parameters)
 
    pgmoneta_deque_iterator_destroy(iter);
    return status;
+}
+
+static int
+query_execute(SSL* ssl, int socket, char* query, struct query_response** r)
+{
+   int ret;
+   int q = 0;
+   struct message* query_msg = NULL;
+   struct query_response* response = NULL;
+
+   ret = pgmoneta_create_query_message(query, &query_msg);
+   if (ret != MESSAGE_STATUS_OK)
+   {
+      goto error;
+   }
+
+q:
+   pgmoneta_query_execute(ssl, socket, query_msg, &response);
+
+   if (!is_valid_response(response))
+   {
+      pgmoneta_free_query_response(response);
+      response = NULL;
+
+      SLEEP(5000000L);
+
+      q++;
+
+      if (q < 5)
+      {
+         goto q;
+      }
+      else
+      {
+         goto error;
+      }
+   }
+
+   *r = response;
+
+   pgmoneta_free_message(query_msg);
+   return 0;
+error:
+
+   pgmoneta_free_query_response(response);
+   pgmoneta_free_message(query_msg);
+   return 1;
 }

@@ -94,6 +94,23 @@ START_TEST(test_server_api_read_file_metadata)
    ck_assert_msg(ret, "failed to read metatdata of file: %s", file_path);
 }
 END_TEST
+START_TEST(test_server_api_backup)
+{
+   int ret;
+   char* start_lsn = NULL;
+   char* stop_lsn = NULL;
+   struct label_file_contents lf = {0};
+
+   ret = !pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn);
+   ck_assert_msg(ret, "failed to start backup");
+
+   ret = !pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, &stop_lsn, &lf);
+   ck_assert_msg(ret, "failed to stop backup");
+
+   free(start_lsn);
+   free(stop_lsn);
+}
+END_TEST
 
 Suite*
 pgmoneta_test_server_api_suite()
@@ -110,6 +127,7 @@ pgmoneta_test_server_api_suite()
    tcase_add_test(tc_server_api, test_server_api_checkpoint);
    tcase_add_test(tc_server_api, test_server_api_read_file);
    tcase_add_test(tc_server_api, test_server_api_read_file_metadata);
+   tcase_add_test(tc_server_api, test_server_api_backup);
    suite_add_tcase(s, tc_server_api);
 
    return s;

@@ -1405,7 +1405,7 @@ pgmoneta_is_wal_file(char* file);
 
 /**
  * Derive the file name from the timeline_id, segment number and segment size
- * 
+ *
  * @param tli The timeline id
  * @param segno The segment number
  * @param segsize The WAL segemnt size

@@ -49,6 +49,32 @@ struct file_stats
 };
 
 /**
+ * Store the contents of label file returned from backup stop
+ *
+ * Format of label file column (returned from pg_backup_stop)
+ * - START WAL LOCATION: <start_wal_lsn> (file <wal_segment_name>)
+ * - CHECKPOINT LOCATION: <checkpoint_lsn>
+ * - BACKUP METHOD: <method>
+ * - BACKUP FROM: <server_name>
+ * - START TIME: <year>-<month>-<day> <hour>:<minutes>:<seconds> <time_zone>
+ * - LABEL: <label>
+ * - START TIMELINE: <timeline>
+ *
+ * Since we have already captured start wal location during pg_bacup_start(), we won't trouble
+ * ourselves parsing it here.
+ *
+ */
+struct label_file_contents
+{
+   char checkpoint_lsn[MISC_LENGTH];    /**< The checkpoint location */
+   char backup_method[MISC_LENGTH];     /**< The backup method */
+   char backup_from[MISC_LENGTH];       /**< The backup server */
+   struct tm start_time;                /**< The start time */
+   char label[MISC_LENGTH];             /**< The label */
+   uint32_t start_tli;                  /**< The start timeline */
+};
+
+/**
  * Get the information for a server
  * @param srv The server index
  * @param ssl The SSL connection
@@ -128,6 +154,31 @@ pgmoneta_server_checkpoint(int srv, SSL* ssl, int socket, uint64_t* chkpt_lsn, u
  */
 int
 pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_path, struct file_stats* stat);
+
+/**
+ * Start the backup
+ *
+ * @param srv The server index
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param label The backup label
+ * @param lsn [out] The start backup lsn
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** lsn);
+
+/**
+ * Stop the backup
+ *
+ * @param srv The server index
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param label The backup label
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct label_file_contents* lf);
 
 #ifdef __cplusplus
 }
