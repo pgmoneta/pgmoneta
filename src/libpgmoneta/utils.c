@@ -4244,6 +4244,7 @@ pgmoneta_split(const char* string, char*** results, int* count, char delimiter)
       goto error;
    }
 
+   free(temp);
    temp = strdup(string);
    if (!temp)
    {
