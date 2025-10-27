@@ -1,31 +1,29 @@
 /*
- * Copyright (C) 2021 Red Hat
+ * Copyright (C) 2025 The pgmoneta community
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * 1. Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
  *
- * 3. Neither the name of the copyright holder nor the names of its contributors
- * may be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * 3. Neither the name of the copyright holder nor the names of its contributors may
+ * be used to endorse or promote products derived from this software without specific
+ * prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+ * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /* pgmoneta */
@@ -90,39 +88,42 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
             continue;
          }
 
-         from = pgmoneta_append(from, directory);
-         from = pgmoneta_append(from, "/");
-         from = pgmoneta_append(from, entry->d_name);
-
-         to = pgmoneta_append(to, directory);
-         to = pgmoneta_append(to, "/");
-         to = pgmoneta_append(to, entry->d_name);
-         to = pgmoneta_append(to, ".lz4");
-
-         if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+         if (!pgmoneta_is_compressed(entry->d_name) && !pgmoneta_is_encrypted(entry->d_name))
          {
-            if (workers != NULL)
+            from = pgmoneta_append(from, directory);
+            from = pgmoneta_append(from, "/");
+            from = pgmoneta_append(from, entry->d_name);
+
+            to = pgmoneta_append(to, directory);
+            to = pgmoneta_append(to, "/");
+            to = pgmoneta_append(to, entry->d_name);
+            to = pgmoneta_append(to, ".lz4");
+
+            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
             {
-               if (workers->outcome)
+               if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
+                  }
+               }
+               else
+               {
+                  do_lz4_compress((struct worker_common*)wi);
                }
             }
             else
             {
-               do_lz4_compress((struct worker_common*)wi);
+               goto error;
             }
-         }
-         else
-         {
-            goto error;
-         }
 
-         free(from);
-         free(to);
+            free(from);
+            free(to);
 
-         from = NULL;
-         to = NULL;
+            from = NULL;
+            to = NULL;
+         }
       }
    }
 
@@ -204,7 +205,15 @@ pgmoneta_lz4c_wal(char* directory)
          to = pgmoneta_append(to, entry->d_name);
          to = pgmoneta_append(to, ".lz4");
 
-         lz4_compress(from, to);
+         if (lz4_compress(from, to))
+         {
+            pgmoneta_log_error("LZ4: Could not compress %s/%s", directory, entry->d_name);
+            free(from);
+            free(to);
+            from = NULL;
+            to = NULL;
+            break;
+         }
 
          if (pgmoneta_exists(from))
          {
@@ -289,50 +298,49 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
       }
       else
       {
-         from = pgmoneta_append(from, directory);
-         from = pgmoneta_append(from, "/");
-         from = pgmoneta_append(from, entry->d_name);
-
-         name = malloc(strlen(entry->d_name) - 3);
-
-         if (name == NULL)
+         if (pgmoneta_ends_with(entry->d_name, ".lz4"))
          {
-            goto error;
-         }
+            from = pgmoneta_append(from, directory);
+            from = pgmoneta_append(from, "/");
+            from = pgmoneta_append(from, entry->d_name);
 
-         memset(name, 0, strlen(entry->d_name) - 3);
-         memcpy(name, entry->d_name, strlen(entry->d_name) - 4);
-
-         to = pgmoneta_append(to, directory);
-         to = pgmoneta_append(to, "/");
-         to = pgmoneta_append(to, name);
-
-         if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
-         {
-            if (workers != NULL)
+            name = pgmoneta_remove_suffix(entry->d_name, ".lz4");
+            if (name == NULL)
             {
-               if (workers->outcome)
+               goto error;
+            }
+
+            to = pgmoneta_append(to, directory);
+            to = pgmoneta_append(to, "/");
+            to = pgmoneta_append(to, name);
+
+            if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
+            {
+               if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
+                  }
+               }
+               else
+               {
+                  do_lz4_decompress((struct worker_common*)wi);
                }
             }
             else
             {
-               do_lz4_decompress((struct worker_common*)wi);
+               goto error;
             }
-         }
-         else
-         {
-            goto error;
-         }
 
-         free(name);
-         free(from);
-         free(to);
+            free(name);
+            free(from);
+            free(to);
 
-         name = NULL;
-         from = NULL;
-         to = NULL;
+            name = NULL;
+            from = NULL;
+            to = NULL;
+         }
       }
    }
 
@@ -493,7 +501,7 @@ pgmoneta_lz4d_file(char* from, char* to)
    }
    else
    {
-      goto error;
+   goto error;
    }
 
    return 0;
@@ -626,15 +634,19 @@ lz4_compress(char* from, char* to)
    char buffOut[LZ4_COMPRESSBOUND(BLOCK_BYTES)];
 
    lz4Stream = LZ4_createStream();
-   fin = fopen(from, "rb");
+   if (lz4Stream == NULL)
+   {
+      goto error;
+   }
+   LZ4_resetStream(lz4Stream);
 
+   fin = fopen(from, "rb");
    if (fin == NULL)
    {
       goto error;
    }
 
    fout = fopen(to, "wb");
-
    if (fout == NULL)
    {
       goto error;
@@ -648,14 +660,20 @@ lz4_compress(char* from, char* to)
          break;
       }
 
-      int compression = LZ4_compress_fast_continue(lz4Stream, buffIn[buffInIndex], buffOut, read, sizeof(buffOut), 1);
+      int compression = LZ4_compress_fast_continue(lz4Stream, buffIn[buffInIndex], buffOut, (int)read, (int)sizeof(buffOut), 1);
       if (compression <= 0)
       {
-         break;
+         goto error;
       }
 
-      fwrite(&compression, sizeof(compression), 1, fout);
-      fwrite(buffOut, sizeof(char), (size_t)compression, fout);
+      if (fwrite(&compression, sizeof(compression), 1, fout) != 1)
+      {
+         goto error;
+      }
+      if (fwrite(buffOut, sizeof(char), (size_t)compression, fout) != (size_t)compression)
+      {
+         goto error;
+      }
 
       buffInIndex = (buffInIndex + 1) % 2;
    }
@@ -676,6 +694,11 @@ error:
    if (fout != NULL)
    {
       fclose(fout);
+   }
+
+   if (lz4Stream != NULL)
+   {
+      LZ4_freeStream(lz4Stream);
    }
 
    return 1;
@@ -714,8 +737,6 @@ lz4_decompress(char* from, char* to)
    {
       int compression = 0;
 
-      //If return value 1,read bytes == sizeof(int)
-      //If return value 0,read bytes  < sizeof(int)
       read = fread(&compression, 1, sizeof(compression), fin);
       if (read == 0)
       {
@@ -727,19 +748,23 @@ lz4_decompress(char* from, char* to)
          goto error;
       }
 
-      read = fread(buffOut, sizeof(char), compression, fin);
-      if (read == 0)
+      read = fread(buffOut, sizeof(char), (size_t)compression, fin);
+      if (read != (size_t)compression)
       {
-         break;
+         pgmoneta_log_error("lz4_decompression read truncated compressed block");
+         goto error;
       }
 
       int decompression = LZ4_decompress_safe_continue(lz4StreamDecode, buffOut, buffIn[buffInIndex], compression, BLOCK_BYTES);
       if (decompression <= 0)
       {
-         break;
+         goto error;
       }
 
-      fwrite(buffIn[buffInIndex], sizeof(char), decompression, fout);
+      if (fwrite(buffIn[buffInIndex], sizeof(char), (size_t)decompression, fout) != (size_t)decompression)
+      {
+         goto error;
+      }
 
       buffInIndex = (buffInIndex + 1) % 2;
    }
@@ -780,7 +805,7 @@ pgmoneta_lz4c_string(char* s, unsigned char** buffer, size_t* buffer_size)
       return 1;
    }
 
-   compressed_size = LZ4_compress_default(s, (char*)*buffer, input_size, max_compressed_size);
+   compressed_size = LZ4_compress_default(s, (char*)*buffer, (int)input_size, (int)max_compressed_size);
    if (compressed_size <= 0)
    {
       pgmoneta_log_error("LZ4: Compress failed");
@@ -808,7 +833,7 @@ pgmoneta_lz4d_string(unsigned char* compressed_buffer, size_t compressed_size, c
       return 1;
    }
 
-   decompressed_size = LZ4_decompress_safe((char*)compressed_buffer, *output_string, compressed_size, max_decompressed_size);
+   decompressed_size = LZ4_decompress_safe((char*)compressed_buffer, *output_string, (int)compressed_size, (int)max_decompressed_size);
    if (decompressed_size < 0)
    {
       pgmoneta_log_error("LZ4: Decompress failed");

@@ -277,6 +277,12 @@ pgmoneta_bzip2_wal(char* directory)
                pgmoneta_log_error("Bzip2: Could not compress %s/%s", directory, entry->d_name);
                break;
             }
+
+            if (pgmoneta_exists(from))
+            {
+               pgmoneta_delete_file(from, NULL);
+            }
+            pgmoneta_permission(to, 6, 0, 0);
          }
 
          free(from);
@@ -314,7 +320,7 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
       {
          char path[MAX_PATH];
 
-         if (!strcmp(entry->d_name, ".") || strcmp(entry->d_name, ".."))
+         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
          {
             continue;
          }
@@ -327,22 +333,24 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
       {
          if (pgmoneta_ends_with(entry->d_name, ".bz2"))
          {
-            from = pgmoneta_append(from, entry->d_name);
-            from = pgmoneta_append(from, "/");
+            from = pgmoneta_append(from, directory);
+            if (!pgmoneta_ends_with(from, "/"))
+            {
+               from = pgmoneta_append(from, "/");
+            }
             from = pgmoneta_append(from, entry->d_name);
 
-            name = malloc(strlen(entry->d_name) - 2);
-
+            name = pgmoneta_remove_suffix(entry->d_name, ".bz2");
             if (name == NULL)
             {
                goto error;
             }
 
-            memset(name, 0, strlen(entry->d_name) - 2);
-            memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
-
             to = pgmoneta_append(to, directory);
-            to = pgmoneta_append(to, "/");
+            if (!pgmoneta_ends_with(to, "/"))
+            {
+               to = pgmoneta_append(to, "/");
+            }
             to = pgmoneta_append(to, name);
 
             if (!pgmoneta_create_worker_input(directory, from, to, 0, workers, &wi))
@@ -652,13 +660,13 @@ bzip2_compress(char* from, int level, char* to)
    size_t length;
    int bzip2_err = 1;
 
-   from_ptr = fopen(from, "r");
+   from_ptr = fopen(from, "rb");
    if (!from_ptr)
    {
       goto error;
    }
 
-   to_ptr = fopen(to, "wb+");
+   to_ptr = fopen(to, "wb");
    if (!to_ptr)
    {
       goto error;
@@ -674,13 +682,11 @@ bzip2_compress(char* from, int level, char* to)
 
    while ((length = fread(buf, sizeof(char), buf_len, from_ptr)) > 0)
    {
-      BZ2_bzWrite(&bzip2_err, zip_file, buf, strlen(buf));
+      BZ2_bzWrite(&bzip2_err, zip_file, buf, (int)length);
       if (bzip2_err != BZ_OK)
       {
          goto error_zip;
       }
-
-      memset(buf, 0, buf_len);
    }
 
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
@@ -719,13 +725,13 @@ bzip2_decompress(char* from, char* to)
    int bzip2_err;
    BZFILE* zip_file = NULL;
 
-   from_ptr = fopen(from, "r");
+   from_ptr = fopen(from, "rb");
    if (!from_ptr)
    {
       goto error;
    }
 
-   to_ptr = fopen(to, "wb+");
+   to_ptr = fopen(to, "wb");
    if (!to_ptr)
    {
       goto error;
@@ -747,14 +753,14 @@ bzip2_decompress(char* from, char* to)
 
       if (length > 0)
       {
-         if (fwrite(buf, 1, length, to_ptr) != (size_t)length)
+         if (fwrite(buf, 1, (size_t)length, to_ptr) != (size_t)length)
          {
             goto error_unzip;
          }
       }
 
    }
-   while (bzip2_err == BZ_STREAM_END && length == BUFFER_LENGTH);
+   while (bzip2_err != BZ_STREAM_END);
 
    BZ2_bzReadClose(&bzip2_err, zip_file);
 
@@ -795,13 +801,13 @@ bzip2_decompress_file(char* from, char* to)
    int bzip2_err = 1;
    BZFILE* zip_file = NULL;
 
-   from_ptr = fopen(from, "r");
+   from_ptr = fopen(from, "rb");
    if (!from_ptr)
    {
       goto error;
    }
 
-   to_ptr = fopen(to, "wb+");
+   to_ptr = fopen(to, "wb");
    if (!to_ptr)
    {
       goto error;
@@ -823,7 +829,7 @@ bzip2_decompress_file(char* from, char* to)
 
       if (length > 0)
       {
-         if (fwrite(buf, 1, length, to_ptr) != (size_t)length)
+         if (fwrite(buf, 1, (size_t)length, to_ptr) != (size_t)length)
          {
             goto error_unzip;
          }

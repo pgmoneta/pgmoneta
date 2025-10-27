@@ -283,7 +283,7 @@ pgmoneta_gzip_wal(char* directory)
             }
             else
             {
-               pgmoneta_log_debug("%s doesn't exists", from);
+               pgmoneta_log_debug("%s doesn't exist", from);
             }
             pgmoneta_permission(to, 6, 0, 0);
          }
@@ -596,15 +596,11 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
             from = pgmoneta_append(from, "/");
             from = pgmoneta_append(from, entry->d_name);
 
-            name = malloc(strlen(entry->d_name) - 2);
-
+            name = pgmoneta_remove_suffix(entry->d_name, ".gz");
             if (name == NULL)
             {
                goto error;
             }
-
-            memset(name, 0, strlen(entry->d_name) - 2);
-            memcpy(name, entry->d_name, strlen(entry->d_name) - 3);
 
             to = pgmoneta_append(to, directory);
             to = pgmoneta_append(to, "/");
@@ -923,7 +919,6 @@ gz_decompress(char* from, char* to)
    FILE* out = NULL;
    char mode[3];
    gzFile in = NULL;
-   size_t length;
 
    memset(&mode[0], 0, sizeof(mode));
    mode[0] = 'r';
@@ -941,19 +936,28 @@ gz_decompress(char* from, char* to)
       goto error;
    }
 
-   do
+   for (;;)
    {
-      length = (int)gzread(in, buf, (unsigned)BUFFER_LENGTH);
-
-      if (length > 0)
+      int n = gzread(in, buf, (unsigned)BUFFER_LENGTH);
+      if (n > 0)
       {
-         if (fwrite(buf, 1, length, out) != length)
+         if (fwrite(buf, 1, (size_t)n, out) != (size_t)n)
          {
             goto error;
          }
       }
+      else if (n == 0)
+      {
+         break; /* EOF */
+      }
+      else
+      {
+         int errnum = 0;
+         const char* msg = gzerror(in, &errnum);
+         pgmoneta_log_error("Gzip: Read error: %s", msg != NULL ? msg : "unknown error");
+         goto error;
+      }
    }
-   while (length > 0);
 
    if (gzclose(in) != Z_OK)
    {

@@ -35,6 +35,7 @@
 
 /* system */
 #include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,14 +53,14 @@ static int zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_siz
 void
 pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 {
-   size_t zin_size = -1;
+   size_t zin_size = 0;
    void* zin = NULL;
-   size_t zout_size = -1;
+   size_t zout_size = 0;
    void* zout = NULL;
    ZSTD_CCtx* cctx = NULL;
    char* from = NULL;
    char* to = NULL;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
    int level;
    int ws;
@@ -86,12 +87,24 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
 
    zin_size = ZSTD_CStreamInSize();
    zin = malloc(zin_size);
+   if (zin == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (input buffer)");
+      goto error;
+   }
+
    zout_size = ZSTD_CStreamOutSize();
    zout = malloc(zout_size);
+   if (zout == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (output buffer)");
+      goto error;
+   }
 
    cctx = ZSTD_createCCtx();
    if (cctx == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not create compression context");
       goto error;
    }
 
@@ -150,6 +163,7 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
                {
                   pgmoneta_delete_file(from, NULL);
                }
+               pgmoneta_permission(to, 6, 0, 0);
 
                memset(zin, 0, zin_size);
                memset(zout, 0, zout_size);
@@ -177,6 +191,11 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
    return;
 
 error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
 
    if (cctx != NULL)
    {
@@ -224,14 +243,14 @@ pgmoneta_zstandardc_tablespaces(char* root, struct workers* workers)
 void
 pgmoneta_zstandardc_wal(char* directory)
 {
-   size_t zin_size = -1;
+   size_t zin_size = 0;
    void* zin = NULL;
-   size_t zout_size = -1;
+   size_t zout_size = 0;
    void* zout = NULL;
    ZSTD_CCtx* cctx = NULL;
    char* from = NULL;
    char* to = NULL;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
    int level;
    int workers;
@@ -258,12 +277,23 @@ pgmoneta_zstandardc_wal(char* directory)
 
    zin_size = ZSTD_CStreamInSize();
    zin = malloc(zin_size);
+   if (zin == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (input buffer)");
+      goto error;
+   }
    zout_size = ZSTD_CStreamOutSize();
    zout = malloc(zout_size);
+   if (zout == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (output buffer)");
+      goto error;
+   }
 
    cctx = ZSTD_createCCtx();
    if (cctx == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not create compression context");
       goto error;
    }
 
@@ -336,6 +366,11 @@ pgmoneta_zstandardc_wal(char* directory)
 
 error:
 
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
    if (cctx != NULL)
    {
       ZSTD_freeCCtx(cctx);
@@ -391,7 +426,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
    if (pgmoneta_zstandardd_file(from, to))
    {
       ec = MANAGEMENT_ERROR_ZSTD_ERROR;
-      pgmoneta_log_error("ZSTD: Error ztsd %s", from);
+      pgmoneta_log_error("ZSTD: Error zstd %s", from);
       goto error;
    }
 
@@ -435,7 +470,7 @@ pgmoneta_zstandardd_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
 error:
 
    pgmoneta_management_response_error(ssl, client_fd, NULL,
-                                      ec != -1 ? ec : MANAGEMENT_ERROR_LZ4_ERROR, en != NULL ? en : NAME,
+                                      ec != -1 ? ec : MANAGEMENT_ERROR_ZSTD_ERROR, en != NULL ? en : NAME,
                                       compression, encryption, payload);
 
    free(orig);
@@ -449,21 +484,33 @@ int
 pgmoneta_zstandardd_file(char* from, char* to)
 {
    ZSTD_DCtx* dctx = NULL;
-   size_t zin_size = -1;
+   size_t zin_size = 0;
    void* zin = NULL;
-   size_t zout_size = -1;
+   size_t zout_size = 0;
    void* zout = NULL;
 
    if (pgmoneta_ends_with(from, ".zstd"))
    {
       zin_size = ZSTD_DStreamInSize();
       zin = malloc(zin_size);
+      if (zin == NULL)
+      {
+         pgmoneta_log_error("ZSTD: Allocation failed (input buffer)");
+         goto error;
+      }
+
       zout_size = ZSTD_DStreamOutSize();
       zout = malloc(zout_size);
+      if (zout == NULL)
+      {
+         pgmoneta_log_error("ZSTD: Allocation failed (output buffer)");
+         goto error;
+      }
 
       dctx = ZSTD_createDCtx();
       if (dctx == NULL)
       {
+         pgmoneta_log_error("ZSTD: Could not create decompression context");
          goto error;
       }
 
@@ -479,7 +526,7 @@ pgmoneta_zstandardd_file(char* from, char* to)
       }
       else
       {
-         pgmoneta_log_debug("%s doesn't exists", from);
+         pgmoneta_log_debug("%s doesn't exist", from);
       }
    }
    else
@@ -511,14 +558,14 @@ void
 pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 {
    ZSTD_DCtx* dctx = NULL;
-   size_t zin_size = -1;
+   size_t zin_size = 0;
    void* zin = NULL;
-   size_t zout_size = -1;
+   size_t zout_size = 0;
    void* zout = NULL;
    char* from = NULL;
    char* to = NULL;
    char* name = NULL;
-   DIR* dir;
+   DIR* dir = NULL;
    struct dirent* entry;
 
    if (!(dir = opendir(directory)))
@@ -531,6 +578,7 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 
    if (zin == NULL)
    {
+      pgmoneta_log_error("ZSTD: Allocation failed (input buffer)");
       goto error;
    }
 
@@ -539,12 +587,14 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
 
    if (zout == NULL)
    {
+      pgmoneta_log_error("ZSTD: Allocation failed (output buffer)");
       goto error;
    }
 
    dctx = ZSTD_createDCtx();
    if (dctx == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not create decompression context");
       goto error;
    }
 
@@ -576,15 +626,12 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
             }
             from = pgmoneta_append(from, entry->d_name);
 
-            name = malloc(strlen(entry->d_name) - 4);
-
+            name = pgmoneta_remove_suffix(entry->d_name, ".zstd");
             if (name == NULL)
             {
+               pgmoneta_log_error("ZSTD: Allocation error");
                goto error;
             }
-
-            memset(name, 0, strlen(entry->d_name) - 4);
-            memcpy(name, entry->d_name, strlen(entry->d_name) - 5);
 
             to = NULL;
 
@@ -607,7 +654,7 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
             }
             else
             {
-               pgmoneta_log_debug("%s doesn't exists", from);
+               pgmoneta_log_debug("%s doesn't exist", from);
             }
 
             memset(zin, 0, zin_size);
@@ -638,6 +685,11 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
    return;
 
 error:
+
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
 
    if (dctx != NULL)
    {
@@ -694,7 +746,7 @@ pgmoneta_zstandardc_request(SSL* ssl, int client_fd, uint8_t compression, uint8_
    if (pgmoneta_zstandardc_file(from, to))
    {
       ec = MANAGEMENT_ERROR_ZSTD_ERROR;
-      pgmoneta_log_error("ZSTD: Error ztsd %s", from);
+      pgmoneta_log_error("ZSTD: Error zstd %s", from);
       goto error;
    }
 
@@ -749,9 +801,9 @@ error:
 int
 pgmoneta_zstandardc_file(char* from, char* to)
 {
-   size_t zin_size = -1;
+   size_t zin_size = 0;
    void* zin = NULL;
-   size_t zout_size = -1;
+   size_t zout_size = 0;
    void* zout = NULL;
    ZSTD_CCtx* cctx = NULL;
    int level;
@@ -774,12 +826,23 @@ pgmoneta_zstandardc_file(char* from, char* to)
 
    zin_size = ZSTD_CStreamInSize();
    zin = malloc(zin_size);
+   if (zin == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (input buffer)");
+      goto error;
+   }
    zout_size = ZSTD_CStreamOutSize();
    zout = malloc(zout_size);
+   if (zout == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (output buffer)");
+      goto error;
+   }
 
    cctx = ZSTD_createCCtx();
    if (cctx == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not create compression context");
       goto error;
    }
 
@@ -799,8 +862,9 @@ pgmoneta_zstandardc_file(char* from, char* to)
       }
       else
       {
-         pgmoneta_log_debug("%s doesn't exists", from);
+         pgmoneta_log_debug("%s doesn't exist", from);
       }
+      pgmoneta_permission(to, 6, 0, 0);
    }
 
    ZSTD_freeCCtx(cctx);
@@ -903,6 +967,7 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
 
    if (fin == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not open input file %s: %s", from, strerror(errno));
       goto error;
    }
 
@@ -910,6 +975,7 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
 
    if (fout == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
       goto error;
    }
 
@@ -930,7 +996,15 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
             pgmoneta_log_error("ZSTD: Compression error: %s", ZSTD_getErrorName(remaining));
             goto error;
          }
-         fwrite(zout, sizeof(char), output.pos, fout);
+         if (output.pos > 0)
+         {
+            size_t written = fwrite(zout, sizeof(char), output.pos, fout);
+            if (written != output.pos)
+            {
+               pgmoneta_log_error("ZSTD: Write error while compressing %s: %s", to, strerror(errno));
+               goto error;
+            }
+         }
          finished = lastChunk ? (remaining == 0) : (input.pos == input.size);
       }
       while (!finished);
@@ -974,6 +1048,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
 
    if (fin == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not open input file %s: %s", from, strerror(errno));
       goto error;
    }
 
@@ -981,23 +1056,32 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
 
    if (fout == NULL)
    {
+      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
       goto error;
    }
 
    toRead = zin_size;
    while ((read = fread(zin, sizeof(char), toRead, fin)))
    {
-      ZSTD_inBuffer input = {zin, read, 0};
+      ZSTD_inBuffer input = (ZSTD_inBuffer){zin, read, 0};
       while (input.pos < input.size)
       {
-         ZSTD_outBuffer output = {zout, zout_size, 0};
+         ZSTD_outBuffer output = (ZSTD_outBuffer){zout, zout_size, 0};
          size_t ret = ZSTD_decompressStream(dctx, &output, &input);
          if (ZSTD_isError(ret))
          {
             pgmoneta_log_error("ZSTD: Decompression error: %s", ZSTD_getErrorName(ret));
             goto error;
          }
-         fwrite(zout, sizeof(char), output.pos, fout);
+         if (output.pos > 0)
+         {
+            size_t written = fwrite(zout, sizeof(char), output.pos, fout);
+            if (written != output.pos)
+            {
+               pgmoneta_log_error("ZSTD: Write error while decompressing %s: %s", to, strerror(errno));
+               goto error;
+            }
+         }
          lastRet = ret;
       }
    }
