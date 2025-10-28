@@ -501,7 +501,7 @@ pgmoneta_lz4d_file(char* from, char* to)
    }
    else
    {
-   goto error;
+      goto error;
    }
 
    return 0;
