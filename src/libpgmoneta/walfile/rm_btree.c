@@ -519,13 +519,15 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
       case XLOG_BTREE_INSERT_LEAF:
       case XLOG_BTREE_INSERT_UPPER:
       case XLOG_BTREE_INSERT_META:
-      case XLOG_BTREE_INSERT_POST: {
+      case XLOG_BTREE_INSERT_POST:
+      {
          struct xl_btree_insert* xlrec = (struct xl_btree_insert*) rec;
          buf = pgmoneta_format_and_append(buf, "off: %u", xlrec->offnum);
          break;
       }
       case XLOG_BTREE_SPLIT_L:
-      case XLOG_BTREE_SPLIT_R: {
+      case XLOG_BTREE_SPLIT_R:
+      {
          struct xl_btree_split* xlrec = (struct xl_btree_split*) rec;
 
          buf = pgmoneta_format_and_append(buf, "level: %u, firstrightoff: %d, newitemoff: %d, postingoff: %d",
@@ -533,13 +535,15 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
                                           xlrec->newitemoff, xlrec->postingoff);
          break;
       }
-      case XLOG_BTREE_DEDUP: {
+      case XLOG_BTREE_DEDUP:
+      {
          struct xl_btree_dedup* xlrec = (struct xl_btree_dedup*) rec;
 
          buf = pgmoneta_format_and_append(buf, "nintervals: %u", xlrec->nintervals);
          break;
       }
-      case XLOG_BTREE_VACUUM: {
+      case XLOG_BTREE_VACUUM:
+      {
          struct xl_btree_vacuum* xlrec = (struct xl_btree_vacuum*) rec;
 
          buf = pgmoneta_format_and_append(buf, "ndeleted: %u, nupdated: %u",
@@ -552,14 +556,16 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
          }
          break;
       }
-      case XLOG_BTREE_DELETE: {
+      case XLOG_BTREE_DELETE:
+      {
          struct xl_btree_delete* xlrec = pgmoneta_wal_create_xl_btree_delete();
          xlrec->parse(xlrec, rec);
          buf = xlrec->format(xlrec, buf);
          free(xlrec);
          break;
       }
-      case XLOG_BTREE_MARK_PAGE_HALFDEAD: {
+      case XLOG_BTREE_MARK_PAGE_HALFDEAD:
+      {
          struct xl_btree_mark_page_halfdead* xlrec = (struct xl_btree_mark_page_halfdead*) rec;
 
          buf = pgmoneta_format_and_append(buf, "topparent: %u, leaf: %u, left: %u, right: %u",
@@ -567,7 +573,8 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
          break;
       }
       case XLOG_BTREE_UNLINK_PAGE_META:
-      case XLOG_BTREE_UNLINK_PAGE: {
+      case XLOG_BTREE_UNLINK_PAGE:
+      {
          struct xl_btree_unlink_page* xlrec = pgmoneta_wal_create_xl_btree_unlink_page();
          xlrec->parse(xlrec, rec);
          buf = xlrec->format(xlrec, buf);
@@ -575,20 +582,23 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
 
          break;
       }
-      case XLOG_BTREE_NEWROOT: {
+      case XLOG_BTREE_NEWROOT:
+      {
          struct xl_btree_newroot* xlrec = (struct xl_btree_newroot*) rec;
 
          buf = pgmoneta_format_and_append(buf, "level: %u", xlrec->level);
          break;
       }
-      case XLOG_BTREE_REUSE_PAGE: {
+      case XLOG_BTREE_REUSE_PAGE:
+      {
          struct xl_btree_reuse_page* xlrec = pgmoneta_wal_create_xl_btree_reuse_page();
          xlrec->parse(xlrec, rec);
          buf = xlrec->format(xlrec, buf);
          free(xlrec);
          break;
       }
-      case XLOG_BTREE_META_CLEANUP: {
+      case XLOG_BTREE_META_CLEANUP:
+      {
          struct xl_btree_metadata* xlrec = pgmoneta_wal_create_xl_btree_metadata();
 
          xlrec->parse(xlrec, pgmoneta_wal_get_record_block_data(record, 0, NULL));

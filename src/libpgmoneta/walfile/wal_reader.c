@@ -484,7 +484,8 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          }
          if (initialized)
          {
-            next_record = temp_next_record; initialized = false;
+            next_record = temp_next_record;
+            initialized = false;
          }
       }
 

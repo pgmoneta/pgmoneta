@@ -109,7 +109,9 @@ static void
 relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number forknum, struct rel_file_locator* r, enum fork_number* frk)
 {
    struct rel_file_locator rlocator;
-   rlocator.spcOid = spcoid; rlocator.dbOid = dboid; rlocator.relNumber = relnum;
+   rlocator.spcOid = spcoid;
+   rlocator.dbOid = dboid;
+   rlocator.relNumber = relnum;
 
    *r = rlocator;
    *frk = forknum;

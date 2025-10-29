@@ -94,7 +94,8 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
       case XLOG_GIN_CREATE_PTREE:
          /* no further information */
          break;
-      case XLOG_GIN_INSERT: {
+      case XLOG_GIN_INSERT:
+      {
          struct gin_xlog_insert* xlrec = (struct gin_xlog_insert*) rec;
 
          buf = pgmoneta_format_and_append(buf, "isdata: %c isleaf: %c",
@@ -150,7 +151,8 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
          }
       }
       break;
-      case XLOG_GIN_SPLIT: {
+      case XLOG_GIN_SPLIT:
+      {
          struct gin_xlog_split* xlrec = (struct gin_xlog_split*) rec;
 
          buf = pgmoneta_format_and_append(buf, "isrootsplit: %c",
@@ -163,7 +165,8 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
       case XLOG_GIN_VACUUM_PAGE:
          /* no further information */
          break;
-      case XLOG_GIN_VACUUM_DATA_LEAF_PAGE: {
+      case XLOG_GIN_VACUUM_DATA_LEAF_PAGE:
+      {
          if (XLogRecHasBlockImage(record, 0))
          {
             if (XLOG_REC_BLOCK_IMAGE_APPLY(record, 0))

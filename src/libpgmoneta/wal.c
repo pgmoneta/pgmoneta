@@ -366,7 +366,8 @@ pgmoneta_wal(int srv, char** argv)
             type = *((char*)msg->data);
             switch (type)
             {
-               case 'w': {
+               case 'w':
+               {
                   // wal data
                   if (msg->length < hdrlen)
                   {
@@ -527,7 +528,8 @@ pgmoneta_wal(int srv, char** argv)
                   wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
                   break;
                }
-               case 'k': {
+               case 'k':
+               {
                   // keep alive request
                   update_wal_lsn(srv, xlogptr);
                   wal_send_status_report(ssl, socket, xlogptr, xlogptr, 0);
