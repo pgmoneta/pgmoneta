@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #define LINE_LENGTH 32
+#define MAX_LENGTH  4096
 
 FILE* log_file;
 
@@ -57,6 +58,8 @@ static bool log_rotation_required(void);
 static bool log_rotation_set_next_rotation_age(void);
 static int log_file_open(void);
 static void log_file_rotate(void);
+
+static void output_log_line(char* l);
 
 static char *levels[] =
 {
@@ -229,7 +232,7 @@ retry:
 #ifdef DEBUG
          if (level > 4)
          {
-            char *bt = NULL;
+            char* bt = NULL;
             pgmoneta_backtrace_string(&bt);
             if (bt != NULL)
             {
@@ -300,7 +303,9 @@ retry:
          atomic_store(&config->common.log_lock, STATE_FREE);
       }
       else
-        SLEEP_AND_GOTO(1000000L,retry)
+      {
+         SLEEP_AND_GOTO(1000000L, retry)
+      }
    }
 }
 
@@ -317,76 +322,199 @@ pgmoneta_log_mem(void* data, size_t size)
       return;
    }
 
-   if (config->common.log_level == PGMONETA_LOGGING_LEVEL_DEBUG5 &&
-       size > 0 &&
-       (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE || config->common.log_type == PGMONETA_LOGGING_TYPE_FILE))
+   if (size > 0)
    {
-retry:
-      isfree = STATE_FREE;
-
-      if (atomic_compare_exchange_strong(&config->common.log_lock, &isfree, STATE_IN_USE))
+      if (config->common.log_level == PGMONETA_LOGGING_LEVEL_DEBUG5 &&
+          (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE || config->common.log_type == PGMONETA_LOGGING_TYPE_FILE))
       {
-         char buf[(3 * size) + (2 * ((size / LINE_LENGTH) + 1)) + 1 + 1];
-         int j = 0;
-         int k = 0;
+retry:
+         isfree = STATE_FREE;
 
-         memset(&buf, 0, sizeof(buf));
-
-         for (size_t i = 0; i < size; i++)
+         if (atomic_compare_exchange_strong(&config->common.log_lock, &isfree, STATE_IN_USE))
          {
-            if (k == LINE_LENGTH)
+            if (size > MAX_LENGTH)
             {
-               buf[j] = '\n';
-               j++;
-               k = 0;
-            }
-            sprintf(&buf[j], "%02X", (signed char) *((char*)data + i));
-            j += 2;
-            k++;
-         }
+               int index = 0;
+               size_t count = 0;
 
-         buf[j] = '\n';
-         j++;
-         k = 0;
+               /* Display the first 1024 bytes */
+               index = 0;
+               count = 1024;
+               while (count > 0)
+               {
+                  char* t = NULL;
+                  char* n = NULL;
+                  char* l = NULL;
 
-         for (size_t i = 0; i < size; i++)
-         {
-            signed char c = (signed char) *((char*)data + i);
-            if (k == LINE_LENGTH)
-            {
-               buf[j] = '\n';
-               j++;
-               k = 0;
-            }
-            if (c >= 32)
-            {
-               buf[j] = c;
+                  for (int i = 0; i < LINE_LENGTH; i++)
+                  {
+                     signed char c;
+                     char buf[3] = {0};
+
+                     c = (signed char)*((char*)data + index + i);
+                     pgmoneta_snprintf(&buf[0], sizeof(buf), "%02X", c);
+
+                     l = pgmoneta_append(l, &buf[0]);
+
+                     if (c >= 32)
+                     {
+                        n = pgmoneta_append_char(n, c);
+                     }
+                     else
+                     {
+                        n = pgmoneta_append_char(n, '?');
+                     }
+                  }
+
+                  t = pgmoneta_append(t, l);
+                  t = pgmoneta_append_char(t, ' ');
+                  t = pgmoneta_append(t, n);
+
+                  output_log_line(t);
+
+                  free(t);
+                  t = NULL;
+
+                  free(l);
+                  l = NULL;
+
+                  free(n);
+                  n = NULL;
+
+                  count -= LINE_LENGTH;
+                  index += LINE_LENGTH;
+               }
+
+               output_log_line("---------------------------------------------------------------- --------------------------------");
+
+               /* Display the last 1024 bytes */
+               index = size - 1024;
+               count = 1024;
+               while (count > 0)
+               {
+                  char* t = NULL;
+                  char* n = NULL;
+                  char* l = NULL;
+
+                  for (int i = 0; i < LINE_LENGTH; i++)
+                  {
+                     signed char c;
+                     char buf[3] = {0};
+
+                     c = (signed char)*((char*)data + index + i);
+                     pgmoneta_snprintf(&buf[0], sizeof(buf), "%02X", c);
+
+                     l = pgmoneta_append(l, &buf[0]);
+
+                     if (c >= 32)
+                     {
+                        n = pgmoneta_append_char(n, c);
+                     }
+                     else
+                     {
+                        n = pgmoneta_append_char(n, '?');
+                     }
+                  }
+
+                  t = pgmoneta_append(t, l);
+                  t = pgmoneta_append_char(t, ' ');
+                  t = pgmoneta_append(t, n);
+
+                  output_log_line(t);
+
+                  free(t);
+                  t = NULL;
+
+                  free(l);
+                  l = NULL;
+
+                  free(n);
+                  n = NULL;
+
+                  count -= LINE_LENGTH;
+                  index += LINE_LENGTH;
+               }
             }
             else
             {
-               buf[j] = '?';
+               size_t offset = 0;
+               size_t remaining = size;
+
+               while (remaining > 0)
+               {
+                  char* t = NULL;
+                  char* n = NULL;
+                  char* l = NULL;
+                  size_t count = MIN((int)remaining, (int)LINE_LENGTH);
+
+                  for (size_t i = 0; i < count; i++)
+                  {
+                     signed char c;
+                     char buf[3] = {0};
+
+                     c = (signed char)*((char*)data + offset + i);
+                     pgmoneta_snprintf(&buf[0], sizeof(buf), "%02X", c);
+
+                     l = pgmoneta_append(l, &buf[0]);
+
+                     if (c >= 32)
+                     {
+                        n = pgmoneta_append_char(n, c);
+                     }
+                     else
+                     {
+                        n = pgmoneta_append_char(n, '?');
+                     }
+                  }
+
+                  t = pgmoneta_append(t, l);
+                  t = pgmoneta_append_char(t, ' ');
+                  t = pgmoneta_append(t, n);
+
+                  output_log_line(t);
+
+                  free(t);
+                  t = NULL;
+
+                  free(l);
+                  l = NULL;
+
+                  free(n);
+                  n = NULL;
+
+                  remaining -= count;
+                  offset += count;
+               }
             }
-            j++;
-            k++;
-         }
 
-         if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
-         {
-            fprintf(stdout, "%s", buf);
-            fprintf(stdout, "\n");
-            fflush(stdout);
+            atomic_store(&config->common.log_lock, STATE_FREE);
          }
-         else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+         else
          {
-            fprintf(log_file, "%s", buf);
-            fprintf(log_file, "\n");
-            fflush(log_file);
+            SLEEP_AND_GOTO(1000000L, retry)
          }
-
-         atomic_store(&config->common.log_lock, STATE_FREE);
       }
-      else
-        SLEEP_AND_GOTO(1000000L,retry)
+   }
+}
+
+static void
+output_log_line(char* l)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+   {
+      fprintf(stdout, "%s", l);
+      fprintf(stdout, "\n");
+      fflush(stdout);
+   }
+   else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+   {
+      fprintf(log_file, "%s", l);
+      fprintf(log_file, "\n");
+      fflush(log_file);
    }
 }
 

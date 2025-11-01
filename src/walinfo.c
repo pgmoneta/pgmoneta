@@ -642,14 +642,18 @@ main(int argc, char** argv)
 
    if (configuration_path != NULL)
    {
-      if (pgmoneta_exists(configuration_path))
+      if (!pgmoneta_exists(configuration_path))
       {
-         loaded = pgmoneta_read_walinfo_configuration(shmem, configuration_path);
+         warnx("Configuration file not found: %s", configuration_path);
+         goto error;
       }
-
+      
+      loaded = pgmoneta_read_walinfo_configuration(shmem, configuration_path);
+      
       if (loaded)
       {
          warnx("Configuration not found: %s", configuration_path);
+         goto error;
       }
    }
 
