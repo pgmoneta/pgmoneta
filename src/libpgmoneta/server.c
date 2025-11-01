@@ -1502,7 +1502,9 @@ transform_text_to_label_file_contents(char* text, struct label_file_contents* lf
 
       // trim the leading whitespaces
       while (*value == ' ' || *value == '\t')
+      {
          value++;
+      }
 
       if (!strcmp(key, "CHECKPOINT LOCATION"))
       {

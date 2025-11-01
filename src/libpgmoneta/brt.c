@@ -323,7 +323,9 @@ pgmoneta_brt_write(block_ref_table* brt, char* file_path)
          /* trim trailing zero entries */
          while (sentry->nchunks > 0 &&
                 brtentry->chunk_usage[sentry->nchunks - 1] == 0)
+         {
             sentry->nchunks--;
+         }
       }
       pgmoneta_art_iterator_destroy(it);
       qsort(sdata, i, sizeof(block_ref_table_serialized_entry), brt_comparator);
@@ -621,7 +623,9 @@ brt_mark_block_modified(block_ref_table_entry* entry, block_number blknum)
        */
       max_chunks = MAX((uint32_t)16, entry->nchunks);
       while (max_chunks < chunkno + 1)
+      {
          max_chunks *= 2;
+      }
       extra_chunks = max_chunks - entry->nchunks;
 
       if (entry->nchunks == 0)
