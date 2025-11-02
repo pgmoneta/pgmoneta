@@ -445,7 +445,7 @@ retry:
                   char* t = NULL;
                   char* n = NULL;
                   char* l = NULL;
-                  size_t count = MIN(remaining, LINE_LENGTH);
+                  size_t count = MIN((int)remaining, (int)LINE_LENGTH);
 
                   for (size_t i = 0; i < count; i++)
                   {
