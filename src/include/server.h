@@ -156,6 +156,19 @@ int
 pgmoneta_server_file_stat(int srv, SSL* ssl, int socket, char* relative_file_path, struct file_stats* stat);
 
 /**
+ * Fetch the list of files inside a directory
+ * @param srv The server index
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param relative_dir_path The relative path of the directory
+ * @param oids [out] The list of oids inside the directory
+ * @param num_of_oids [out] The number of oids captured
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_file_ls(int srv, SSL* ssl, int socket, char* relative_dir_path, char*** oids, int* num_of_oids);
+
+/**
  * Start the backup
  *
  * @param srv The server index

@@ -549,6 +549,97 @@ error:
 }
 
 int
+pgmoneta_server_file_ls(int srv, SSL* ssl, int socket, char* relative_dir_path, char*** o, int* num_of_oids)
+{
+   char* user = NULL;
+   bool has_privilege = false;
+   char query[MISC_LENGTH];
+   int i = 0;
+   char** oids = NULL;
+   int number_of_oids = 0;
+   struct query_response* response = NULL;
+   struct tuple* tuple = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto error;
+   }
+
+   user = config->common.servers[srv].username;
+
+   /* Check if the user has EXECUTE privilege on 'pg_stat_file(text, boolean)' */
+   if (has_execute_privilege(ssl, socket, user, "pg_ls_dir(text, boolean, boolean)", &has_privilege))
+   {
+      goto error;
+   }
+
+   if (!has_privilege)
+   {
+      pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_ls_dir(text, boolean, boolean)' function", user);
+      goto error;
+   }
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT * FROM pg_ls_dir('%s', false, false);", relative_dir_path);
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   if (response == NULL || response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   tuple = response->tuples;
+   while (tuple)
+   {
+      if (tuple->data[0] != NULL && pgmoneta_atoi(tuple->data[0]) != 0)
+      {
+         number_of_oids++;
+      }
+      tuple = tuple->next;
+   }
+   
+   oids = (char**)malloc(number_of_oids * sizeof(char*));
+   if (oids == NULL)
+   {
+      goto error;
+   }
+   
+   tuple = response->tuples;
+   while(tuple)
+   {
+      if (tuple->data[0] != NULL && pgmoneta_atoi(tuple->data[0]) != 0)
+      {
+         size_t sz = strlen(tuple->data[0]);
+         char* oid = (char*)malloc((sz + 1) * sizeof(char));
+
+         memset(oid, 0, sz + 1);
+         memcpy(oid, tuple->data[0], sz);
+
+         oids[i] = oid;
+         i++;
+      }
+      tuple = tuple->next;  
+   }
+
+   *o = oids;
+   *num_of_oids = number_of_oids;
+
+   pgmoneta_free_query_response(response);
+   return 0;
+error:
+   pgmoneta_free_query_response(response);
+   return 1;
+}
+
+int
 pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** lsn)
 {
    int version;
