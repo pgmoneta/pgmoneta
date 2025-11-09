@@ -427,19 +427,24 @@ pgmoneta_art_insert(struct art* t, char* key, uintptr_t value, enum value_type t
       pgmoneta_log_debug("pgmoneta_art_insert: Key exists: %s", key);
    }
 
-   pgmoneta_value_create(pgmoneta_value_to_ref(type), value, &v);
-   vs = pgmoneta_value_to_string(v, FORMAT_TEXT, NULL, 0);
-   if (key == NULL)
+   if (pgmoneta_value_create(pgmoneta_value_to_ref(type), value, &v))
    {
-      pgmoneta_log_trace("pgmoneta_art_insert: %p %s (%s)", t, vs, pgmoneta_value_type_to_string(type));
+      pgmoneta_log_debug("pgmoneta_art_insert: pgmoneta_value_create() failed");
    }
    else
    {
-      pgmoneta_log_trace("pgmoneta_art_insert: %p %s -> %s (%s)", t, key, vs, pgmoneta_value_type_to_string(type));
+      vs = pgmoneta_value_to_string(v, FORMAT_TEXT, NULL, 0);
+      if (key == NULL)
+      {
+         pgmoneta_log_trace("pgmoneta_art_insert: %p %s (%s)", t, vs, pgmoneta_value_type_to_string(type));
+      }
+      else
+      {
+         pgmoneta_log_trace("pgmoneta_art_insert: %p %s -> %s (%s)", t, key, vs, pgmoneta_value_type_to_string(type));
+      }
+      free(vs);
+      pgmoneta_value_destroy(v);
    }
-
-   free(vs);
-   pgmoneta_value_destroy(v);
 #endif
 
    if (t == NULL || key == NULL || type == ValueNone)
