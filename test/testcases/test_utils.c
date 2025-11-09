@@ -27,93 +27,49 @@
  *
  */
 
-#ifndef PGMONETA_TEST_SUITE_H
-#define PGMONETA_TEST_SUITE_H
+#include <pgmoneta.h>
+#include <tscommon.h>
+#include <tssuite.h>
+#include <utils.h>
 
-#include <check.h>
+#include <stdlib.h>
 
-/**
- * Set up a retore test suite for pgmoneta
- * @return The result
- */
+START_TEST(test_resolve_path_trailing_env_var)
+{
+   char* resolved = NULL;
+   char* env_key = "PGMONETA_TEST_PATH_KEY";
+   char* env_value = "PGMONETA_TEST_PATH_VALUE";
+   char* expected = "/pgmoneta/PGMONETA_TEST_PATH_VALUE";
+   int result;
+
+   setenv(env_key, env_value, 1);
+
+   result = pgmoneta_resolve_path("/pgmoneta/$PGMONETA_TEST_PATH_KEY", &resolved);
+
+   ck_assert_int_eq(result, 0);
+
+   ck_assert_ptr_nonnull(resolved);
+
+   ck_assert_str_eq(resolved, expected);
+
+   unsetenv(env_key);
+   free(resolved);
+}
+END_TEST
+
 Suite*
-pgmoneta_test_restore_suite();
+pgmoneta_test_utils_suite()
+{
+   Suite* s;
+   TCase* tc_utils;
 
-/**
- * Set up a backup test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_backup_suite();
+   s = suite_create("pgmoneta_test_utils");
 
-/**
- * Set up delete test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_delete_suite();
+   tc_utils = tcase_create("test_utils");
+   tcase_set_timeout(tc_utils, 60);
+   tcase_add_checked_fixture(tc_utils, pgmoneta_test_setup, pgmoneta_test_teardown);
+   tcase_add_test(tc_utils, test_resolve_path_trailing_env_var);
 
-/**
- * Set up http test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_http_suite();
-
-/**
- * Set up server API test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_server_api_suite();
-
-/**
- * Set up a brt input/output suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_brt_io_suite();
-
-/**
- * Set up a wal utils test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_wal_utils_suite();
-
-/**
- * Set up a wal summary test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_wal_summary_suite();
-
-/**
- * Set up an art suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_art_suite();
-
-/**
- * Set up a deque suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_deque_suite();
-
-/**
- * Set up a json suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_json_suite();
-
-/**
- * Set up a utils suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_utils_suite();
-
-#endif
+   suite_add_tcase(s, tc_utils);
+   return s;
+}
