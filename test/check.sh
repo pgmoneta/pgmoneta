@@ -62,10 +62,10 @@ MODE="dev"
 PORT=6432
 
 # Detect container engine: Docker or Podman
-if command -v docker &> /dev/null; then
-  CONTAINER_ENGINE="sudo docker"
-elif command -v podman &> /dev/null; then
+if command -v podman &> /dev/null; then
   CONTAINER_ENGINE="podman"
+elif command -v docker &> /dev/null; then
+  CONTAINER_ENGINE="sudo docker"
 else
   echo "Neither Docker nor Podman is installed. Please install one to proceed."
   exit 1
