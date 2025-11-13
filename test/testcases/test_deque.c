@@ -302,6 +302,7 @@ pgmoneta_test_deque_suite()
    s = suite_create("pgmoneta_test_deque");
 
    tc_deque_basic = tcase_create("deque_basic_test");
+   tcase_set_tags(tc_deque_basic, "common");
    tcase_set_timeout(tc_deque_basic, 60);
    tcase_add_checked_fixture(tc_deque_basic, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_deque_basic, test_deque_create);

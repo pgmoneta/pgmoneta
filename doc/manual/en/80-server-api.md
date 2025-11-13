@@ -28,7 +28,7 @@ You can checkout the list of all pre-defined roles available in PostgreSQL 17 [h
 
 **pgmoneta_server_info**
 
-Fetch trivial information about a configured postgres server like:
+Fetch trivial information about a configured PostgreSQL server like:
 - PostgreSQL version of the server
 - status of checksums (enabled/disabled)
 - type of server (primary/non-primary)
@@ -120,3 +120,30 @@ Privileges:
 - Default (all PostgreSQL versions)
 
 Note: connection user must be granted `EXECUTE` privilege on the function `pg_stat_file(text, boolean)`
+
+**pgmoneta_server_backup_start**
+
+Accepts a backup label as input and invokes `do_pg_backup_start()` internally, this marks the onset of a backup. It returns a LSN which represents the starting point of backup.
+
+Privileges:
+- Default (for all PostgreSQL 14+)
+
+Note: connection user must be granted `EXECUTE` privilege on the function `pg_backup_start(text, boolean)` for PostgreSQL version 15+ and `pg_start_backup(text, boolean, boolean)` for PostgreSQL version < 15.
+
+**pgmoneta_server_backup_stop**
+
+Invokes `do_pg_backup_stop()` internally, this marks the end of a backup, that was previously started. It returns a LSN which represents the ending point of backup and also the contents of a `backup_label` file.
+
+Label file contents (returned by this API):
+- START WAL LOCATION
+- CHECKPOINT LOCATION
+- BACKUP METHOD
+- BACKUP FROM
+- LABEL
+- START TIMELINE
+- START TIME
+
+Privileges:
+- Default (for all PostgreSQL 14+)
+
+Note: connection user must be granted `EXECUTE` privilege on the function `pg_backup_stop(boolean)` for PostgreSQL version 15+ and `pg_stop_backup(boolean, boolean)` for PostgreSQL version < 15.

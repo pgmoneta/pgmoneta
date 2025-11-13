@@ -154,7 +154,6 @@ pgmoneta_test_wal_summary_suite()
    s = suite_create("pgmoneta_test_wal_summary");
 
    tc_wal_summary = tcase_create("test_wal_summary");
-
    tcase_set_timeout(tc_wal_summary, 60);
    tcase_add_checked_fixture(tc_wal_summary, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_wal_summary, test_pgmoneta_wal_summary);

@@ -174,11 +174,13 @@ pgmoneta_server_start_backup(int srv, SSL* ssl, int socket, char* label, char** 
  * @param srv The server index
  * @param ssl The SSL connection
  * @param socket The socket
- * @param label The backup label
+ * @param bl_dir The directory where the file must be generated
+ * @param lsn [out] The stop backup lsn
+ * @param lf [out] The label file contents
  * @return return 0 if success, otherwise failure
  */
 int
-pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char** lsn, struct label_file_contents* lf);
+pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* bl_dir, char** lsn, struct label_file_contents* lf);
 
 #ifdef __cplusplus
 }

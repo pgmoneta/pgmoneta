@@ -104,7 +104,7 @@ START_TEST(test_server_api_backup)
    ret = !pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn);
    ck_assert_msg(ret, "failed to start backup");
 
-   ret = !pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, &stop_lsn, &lf);
+   ret = !pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, NULL, &stop_lsn, &lf);
    ck_assert_msg(ret, "failed to stop backup");
 
    free(start_lsn);
@@ -120,7 +120,6 @@ pgmoneta_test_server_api_suite()
    s = suite_create("pgmoneta_test_server_api");
 
    tc_server_api = tcase_create("test_server_api");
-
    tcase_set_timeout(tc_server_api, 60);
    tcase_add_checked_fixture(tc_server_api, setup_server_connection, teardown_server_connection);
    tcase_add_test(tc_server_api, test_server_api_info);

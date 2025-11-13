@@ -318,6 +318,7 @@ pgmoneta_test_json_suite()
    s = suite_create("pgmoneta_test_json");
 
    tc_json_basic = tcase_create("json_basic_test");
+   tcase_set_tags(tc_json_basic, "common");
    tcase_set_timeout(tc_json_basic, 60);
    tcase_add_checked_fixture(tc_json_basic, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_json_basic, test_json_create);
