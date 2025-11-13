@@ -4707,17 +4707,17 @@ pgmoneta_resolve_path(char* orig_path, char** new_path)
          in_env = false;
          if (env_res == NULL)
          {
-            return 1;
+            goto error;
          }
          char* env_value = GET_ENV(env_res);
          free(env_res);
+         env_res = NULL;
          if (env_value == NULL)
          {
-            return 1;
+            goto error;
          }
          res = pgmoneta_append(res, env_value);
          res_len += strlen(env_value);
-         env_res = NULL;
       }
 
       if (orig_path[idx] == '\"' && !single_quote)
@@ -4740,7 +4740,7 @@ pgmoneta_resolve_path(char* orig_path, char** new_path)
          }
          else
          {
-            return 1;
+            goto error;
          }
       }
       else if (orig_path[idx] == '$')
@@ -4772,6 +4772,23 @@ pgmoneta_resolve_path(char* orig_path, char** new_path)
       free(ch);
    }
 
+   if (in_env)
+   {
+      if (env_res == NULL)
+      {
+         goto error;
+      }
+      char* env_value = GET_ENV(env_res);
+      free(env_res);
+      env_res = NULL;
+      if (env_value == NULL)
+      {
+         goto error;
+      }
+      res = pgmoneta_append(res, env_value);
+      res_len += strlen(env_value);
+   }
+
    if (res_len > MAX_PATH)
    {
       goto error;
@@ -4780,6 +4797,8 @@ pgmoneta_resolve_path(char* orig_path, char** new_path)
    return 0;
 
 error:
+   free(res);
+   free(env_res);
    return 1;
 }
 

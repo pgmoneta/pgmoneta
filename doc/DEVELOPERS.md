@@ -121,14 +121,6 @@ make install
 
 This will install [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) in the `/usr/local` hierarchy with the debug profile.
 
-You can do
-
-```
-cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-DCORE_DEBUG" ..
-```
-
-in order to get information from the core libraries too.
-
 ### Check version
 
 You can navigate to `build/src` and execute `./pgmoneta -?` to make the call. Alternatively, you can install it into `/usr/local/` and call it directly using:
