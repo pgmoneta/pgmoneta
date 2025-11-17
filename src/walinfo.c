@@ -647,9 +647,9 @@ main(int argc, char** argv)
          warnx("Configuration not found: %s", configuration_path);
          goto error;
       }
-      
+
       loaded = pgmoneta_read_walinfo_configuration(shmem, configuration_path);
-      
+
       if (loaded)
       {
          warnx("Configuration not found: %s", configuration_path);
