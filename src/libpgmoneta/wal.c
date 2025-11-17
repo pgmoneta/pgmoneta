@@ -173,6 +173,11 @@ pgmoneta_wal(int srv, char** argv)
       goto error;
    }
 
+   if (pgmoneta_art_insert(nodes, NODE_LABEL, (uintptr_t)"wal", ValueString))
+   {
+      goto error;
+   }
+
    if (config->storage_engine & STORAGE_ENGINE_SSH)
    {
       head = pgmoneta_storage_create_ssh(WORKFLOW_TYPE_WAL_SHIPPING);
