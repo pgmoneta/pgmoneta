@@ -122,11 +122,6 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
    ssh_key srv_pubkey = NULL;
    ssh_key client_pubkey = NULL;
    ssh_key client_privkey = NULL;
-   char* pubkey_path = NULL;
-   char* privkey_path = NULL;
-   char* pubkey_full_path = NULL;
-   char* privkey_full_path = NULL;
-   char* homedir = NULL;
    char* hexa = NULL;
    unsigned char* srv_pubkey_hash = NULL;
    size_t hash_length;
@@ -147,10 +142,6 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
 
    pgmoneta_log_debug("SSH storage engine (setup): %s/%s", config->common.servers[server].name, label);
-
-   homedir = getenv("HOME");
-   pubkey_path = "/.ssh/id_rsa.pub";
-   privkey_path = "/.ssh/id_rsa";
 
    session = ssh_new();
 
@@ -219,20 +210,14 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
          goto error;
    }
 
-   pubkey_full_path = pgmoneta_append(pubkey_full_path, homedir);
-   pubkey_full_path = pgmoneta_append(pubkey_full_path, pubkey_path);
-
-   rc = ssh_pki_import_pubkey_file(pubkey_full_path, &client_pubkey);
+   rc = ssh_pki_import_pubkey_file(config->ssh_public_key_file, &client_pubkey);
    if (rc != SSH_OK)
    {
       pgmoneta_log_error("could not import host's public key: %s", strerror(errno));
       goto error;
    }
 
-   privkey_full_path = pgmoneta_append(privkey_full_path, homedir);
-   privkey_full_path = pgmoneta_append(privkey_full_path, privkey_path);
-
-   rc = ssh_pki_import_privkey_file(privkey_full_path, NULL, NULL, NULL,
+   rc = ssh_pki_import_privkey_file(config->ssh_private_key_file, NULL, NULL, NULL,
                                     &client_privkey);
    if (rc != SSH_OK)
    {
@@ -270,9 +255,6 @@ ssh_storage_setup(char* name __attribute__((unused)), struct art* nodes)
    ssh_key_free(client_pubkey);
    ssh_key_free(client_privkey);
 
-   free(pubkey_full_path);
-   free(privkey_full_path);
-
    return 0;
 
 error:
@@ -284,9 +266,6 @@ error:
    ssh_key_free(srv_pubkey);
    ssh_key_free(client_pubkey);
    ssh_key_free(client_privkey);
-
-   free(pubkey_full_path);
-   free(privkey_full_path);
 
    sftp_free(sftp);
 

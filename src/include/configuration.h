@@ -97,6 +97,8 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY   "s3_secret_access_key"
 #define CONFIGURATION_ARGUMENT_SSH_BASE_DIR           "ssh_base_dir"
 #define CONFIGURATION_ARGUMENT_SSH_CIPHERS            "ssh_ciphers"
+#define CONFIGURATION_ARGUMENT_SSH_PUBLIC_KEY_FILE    "ssh_public_key_file"
+#define CONFIGURATION_ARGUMENT_SSH_PRIVATE_KEY_FILE   "ssh_private_key_file"
 #define CONFIGURATION_ARGUMENT_SSH_HOSTNAME           "ssh_hostname"
 #define CONFIGURATION_ARGUMENT_SSH_USERNAME           "ssh_username"
 #define CONFIGURATION_ARGUMENT_STORAGE_ENGINE         "storage_engine"

@@ -399,6 +399,8 @@ struct main_configuration
    char ssh_username[MISC_LENGTH];              /**< The SSH username */
    char ssh_base_dir[MAX_PATH];                 /**< The SSH base directory */
    char ssh_ciphers[MISC_LENGTH];               /**< The SSH supported ciphers */
+   char ssh_public_key_file[MAX_PATH];          /**< The SSH public key path */
+   char ssh_private_key_file[MAX_PATH];         /**< The SSH private key path */
 
    char s3_aws_region[MISC_LENGTH];             /**< The AWS region */
    char s3_access_key_id[MISC_LENGTH];          /**< The IAM Access Key ID */

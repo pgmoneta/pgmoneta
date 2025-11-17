@@ -121,6 +121,12 @@ ssh_ciphers
 
   Otherwise verbatim. Default is aes-256-ctr, aes-192-ctr, aes-128-ctr
 
+ssh_public_key_file
+  The SSH public key file path. Supports environment variable interpolation (e.g., $HOME). Default is $HOME/.ssh/id_rsa.pub
+
+ssh_private_key_file
+  The SSH private key file path. Supports environment variable interpolation (e.g., $HOME). Default is $HOME/.ssh/id_rsa
+
 s3_aws_region
   The AWS region
 

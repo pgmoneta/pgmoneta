@@ -262,6 +262,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
          {
             if (pgmoneta_starts_with(trimmed_line, "unix_socket_dir") || pgmoneta_starts_with(trimmed_line, "base_dir")
                 || pgmoneta_starts_with(trimmed_line, "workspace") || pgmoneta_starts_with(trimmed_line, "ssh_base_dir")
+                || pgmoneta_starts_with(trimmed_line, "ssh_private_key_file") || pgmoneta_starts_with(trimmed_line, "ssh_public_key_file")
                 || pgmoneta_starts_with(trimmed_line, "log_path") || pgmoneta_starts_with(trimmed_line, "tls_cert_file")
                 || pgmoneta_starts_with(trimmed_line, "tls_key_file") || pgmoneta_starts_with(trimmed_line, "tls_ca_file")
                 || pgmoneta_starts_with(trimmed_line, "pidfile"))
@@ -1165,6 +1166,38 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "ssh_public_key_file"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(&config->ssh_public_key_file[0], value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "ssh_private_key_file"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(&config->ssh_private_key_file[0], value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "s3_aws_region"))
                {
                   if (!strcmp(section, "pgmoneta"))
@@ -1544,6 +1577,7 @@ error:
 int
 pgmoneta_validate_main_configuration(void* shm)
 {
+   char* buf = NULL;
    bool found = false;
    struct stat st;
    struct main_configuration* config;
@@ -1739,6 +1773,58 @@ pgmoneta_validate_main_configuration(void* shm)
          memset(config->metrics_cert_file, 0, sizeof(config->metrics_cert_file));
          memset(config->metrics_key_file, 0, sizeof(config->metrics_key_file));
          memset(config->metrics_ca_file, 0, sizeof(config->metrics_ca_file));
+      }
+   }
+
+   if (config->storage_engine & STORAGE_ENGINE_SSH)
+   {
+      if (!strlen(config->ssh_base_dir))
+      {
+         pgmoneta_log_fatal("ssh_base_dir is not specified");
+         return 1;
+      }
+
+      if (!strlen(config->ssh_public_key_file))
+      {
+         pgmoneta_log_debug("ssh_public_key_file is not specified, falling back to '${HOME}/.ssh/id_rsa.pub");
+         if (pgmoneta_resolve_path("$HOME/.ssh/id_rsa.pub", &buf))
+         {
+            pgmoneta_log_fatal("Failed to resolve ~/.ssh/id_rsa.pub");
+            return 1;
+         }
+         else
+         {
+            memcpy(config->ssh_public_key_file, buf, strlen(buf));
+            free(buf);
+            buf = NULL;
+         }
+      }
+
+      if (!strlen(config->ssh_private_key_file))
+      {
+         pgmoneta_log_debug("ssh_private_key_file is not specified, falling back to '${HOME}/.ssh/id_rsa");
+         if (pgmoneta_resolve_path("$HOME/.ssh/id_rsa", &buf))
+         {
+            pgmoneta_log_fatal("Failed to resolve ~/.ssh/id_rsa");
+            return 1;
+         }
+         else
+         {
+            memcpy(config->ssh_private_key_file, buf, strlen(buf));
+            free(buf);
+            buf = NULL;
+         }
+      }
+
+      if (!pgmoneta_exists(config->ssh_public_key_file))
+      {
+         pgmoneta_log_fatal("ssh_public_key_file does not exist: %s", config->ssh_public_key_file);
+         return 1;
+      }
+      if (!pgmoneta_exists(config->ssh_private_key_file))
+      {
+         pgmoneta_log_fatal("ssh_private_key_file does not exist: %s", config->ssh_private_key_file);
+         return 1;
       }
    }
 
@@ -2852,6 +2938,8 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_USERNAME, (uintptr_t)config->ssh_username, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_BASE_DIR, (uintptr_t)config->ssh_base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_CIPHERS, (uintptr_t)config->ssh_ciphers, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PUBLIC_KEY_FILE, (uintptr_t)config->ssh_public_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PRIVATE_KEY_FILE, (uintptr_t)config->ssh_private_key_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_AWS_REGION, (uintptr_t)config->s3_aws_region, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID, (uintptr_t)config->s3_access_key_id, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->s3_secret_access_key, ValueString);

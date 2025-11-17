@@ -72,3 +72,16 @@ ssh_base_dir = the-path-of-the-directory-where-backups-stored-in
 ```
 
 under the `[pgmoneta]` section.
+
+## Optional: Custom SSH Key Files
+
+By default, pgmoneta uses the standard SSH key pair located at `~/.ssh/id_rsa` (private key) and `~/.ssh/id_rsa.pub` (public key).
+
+If you need to use a different SSH key pair, you can specify custom paths:
+
+```sh
+ssh_public_key_file = /path/to/custom/public_key.pub
+ssh_private_key_file = /path/to/custom/private_key
+```
+
+Both parameters support environment variable interpolation (e.g., `$HOME`, `$USER`).
