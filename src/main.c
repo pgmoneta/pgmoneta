@@ -439,25 +439,104 @@ main(int argc, char** argv)
 
    if (configuration_path != NULL)
    {
+      if (!pgmoneta_exists(configuration_path))
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration file not found: %s", configuration_path);
+#endif
+         errx(1, "Configuration file not found: %s", configuration_path);
+      }
+
+      if (!pgmoneta_is_file(configuration_path))
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration path is not a file: %s", configuration_path);
+#endif
+         errx(1, "Configuration path is not a file: %s", configuration_path);
+      }
+
+      if (access(configuration_path, R_OK) != 0)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Can't read configuration file: %s", configuration_path);
+#endif
+         errx(1, "Can't read configuration file: %s", configuration_path);
+      }
+
+      int cfg_ret = pgmoneta_validate_config_file(configuration_path);
+      if (cfg_ret == 4)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration file contains binary data: %s", configuration_path);
+#endif
+         errx(1, "Configuration file contains binary data: %s", configuration_path);
+      }
+      else if (cfg_ret != 0)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration file validation failed: %s", configuration_path);
+#endif
+         errx(1, "Failed to read configuration file: %s", configuration_path);
+      }
+
       if (pgmoneta_read_main_configuration(shmem, configuration_path))
       {
-         warnx("pgmoneta: Configuration not found: %s", configuration_path);
+         warnx("Failed to read configuration file: %s", configuration_path);
 #ifdef HAVE_SYSTEMD
-         sd_notifyf(0, "STATUS=Configuration not found: %s", configuration_path);
+         sd_notifyf(0, "STATUS=Failed to read configuration file: %s", configuration_path);
 #endif
-         goto error;
       }
    }
    else
    {
       configuration_path = "/etc/pgmoneta/pgmoneta.conf";
+
+      if (!pgmoneta_exists(configuration_path))
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration file not found: %s", configuration_path);
+#endif
+         errx(1, "Configuration file not found: %s", configuration_path);
+      }
+
+      if (!pgmoneta_is_file(configuration_path))
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration path is not a file: %s", configuration_path);
+#endif
+         errx(1, "Configuration path is not a file: %s", configuration_path);
+      }
+
+      if (access(configuration_path, R_OK) != 0)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Can't read configuration file: %s", configuration_path);
+#endif
+         errx(1, "Can't read configuration file: %s", configuration_path);
+      }
+
+      int cfg_ret = pgmoneta_validate_config_file(configuration_path);
+      if (cfg_ret == 4)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration file contains binary data: %s", configuration_path);
+#endif
+         errx(1, "Configuration file contains binary data: %s", configuration_path);
+      }
+      else if (cfg_ret != 0)
+      {
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Configuration file validation failed: %s", configuration_path);
+#endif
+         errx(1, "Configuration file validation failed: %s", configuration_path);
+      }
+
       if (pgmoneta_read_main_configuration(shmem, configuration_path))
       {
-         warnx("pgmoneta: Configuration not found: /etc/pgmoneta/pgmoneta.conf");
+         warnx("Failed to read configuration file: %s", configuration_path);
 #ifdef HAVE_SYSTEMD
-         sd_notify(0, "STATUS=Configuration not found: /etc/pgmoneta/pgmoneta.conf");
+         sd_notifyf(0, "STATUS=Failed to read configuration file: %s", configuration_path);
 #endif
-         goto error;
       }
    }
 

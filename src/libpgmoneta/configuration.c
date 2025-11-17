@@ -96,8 +96,42 @@ static int write_config_value(char* buffer, char* config_key, size_t buffer_size
 static bool is_valid_config_key(const char* config_key, struct config_key_info* key_info);
 static bool is_empty_string(char* s);
 static int remove_leading_whitespace_and_comments(char* s, char** trimmed_line);
+static bool pgmoneta_is_binary_file(const char* path);
 
 static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count);
+
+/**
+ *
+ */
+int
+pgmoneta_validate_config_file(const char* path)
+{
+   if (path == NULL)
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_exists((char*)path))
+   {
+      return 1;
+   }
+
+   if (!pgmoneta_is_file((char*)path))
+   {
+      return 2;
+   }
+   if (access(path, R_OK) != 0)
+   {
+      return 3;
+   }
+
+   if (pgmoneta_is_binary_file(path))
+   {
+      return 4;
+   }
+
+   return 0;
+}
 
 /**
  *
@@ -5337,44 +5371,70 @@ is_empty_string(char* s)
 static int
 remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
 {
-   // Find the index of the first non-whitespace character
-   int i = 0;
-   int last_non_whitespace_index = -1;
-   char* result = NULL; // Temporary variable to hold the trimmed line
+   char* result = NULL;
+   int trimmed_length = 0;
+   bool seen_non_whitespace = false;
 
-   while (s[i] != '\0' && isspace(s[i]))
+   if (trimmed_line == NULL)
    {
-      i++;
+      return 1;
    }
 
-   // Loop through the string starting from non-whitespace character
-   for (; s[i] != '\0'; i++)
+   while (*s != '\0' && isspace((unsigned char)*s))
    {
-      if (s[i] == ';' || s[i] == '#')
+      s++;
+   }
+
+   while (*s != '\0')
+   {
+      if (*s == ';' || *s == '#')
       {
-         break; // Break loop if a comment character is encountered
+         break;
       }
-      if (!isspace(s[i]))
+
+      result = pgmoneta_append_char(result, *s);
+      if (result == NULL)
       {
-         last_non_whitespace_index = i; // Update the index of the last non-whitespace character
+         goto error;
       }
-      result = pgmoneta_append_char(result, s[i]); // Append the current character to result
+      trimmed_length++;
+
+      if (!isspace((unsigned char)*s))
+      {
+         seen_non_whitespace = true;
+      }
+
+      s++;
+   }
+
+   if (result != NULL)
+   {
+      while (trimmed_length > 0 && isspace((unsigned char)result[trimmed_length - 1]))
+      {
+         trimmed_length--;
+      }
+      result[trimmed_length] = '\0';
+   }
+   else
+   {
+      result = pgmoneta_append(result, "");
       if (result == NULL)
       {
          goto error;
       }
    }
-   if (last_non_whitespace_index != -1)
+
+   if (!seen_non_whitespace)
    {
-      result[last_non_whitespace_index + 1] = '\0'; // Null-terminate the string at the last non-whitespace character
+      result[0] = '\0';
    }
 
-   *trimmed_line = result; // Assign result to trimmed_line
+   *trimmed_line = result;
 
    return 0;
 
 error:
-   free(result); // Free memory in case of error
+   free(result);
    *trimmed_line = NULL;
    return 1;
 }
@@ -5401,4 +5461,39 @@ split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
    }
 
    *count = i;
+}
+
+static bool
+pgmoneta_is_binary_file(const char* path)
+{
+   FILE* fp = NULL;
+   unsigned char buffer[1024];
+   size_t bytes;
+   int error;
+
+   fp = fopen(path, "rb");
+   if (fp == NULL)
+   {
+      goto error;
+   }
+
+   while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
+   {
+      for (size_t i = 0; i < bytes; i++)
+      {
+         if (buffer[i] == '\0')
+         {
+            fclose(fp);
+            goto error;
+         }
+      }
+   }
+
+   error = ferror(fp);
+   fclose(fp);
+
+   return error != 0;
+
+error:
+   return true;
 }
