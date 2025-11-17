@@ -573,10 +573,35 @@ main(int argc, char* argv[])
 
    if (configuration_path != NULL)
    {
-      if (pgmoneta_exists(configuration_path))
+
+      if (!pgmoneta_exists(configuration_path))
       {
-         loaded = pgmoneta_read_walfilter_configuration(shmem, configuration_path);
+         errx(1, "Configuration file not found: %s", configuration_path);
       }
+
+      if (!pgmoneta_is_file(configuration_path))
+      {
+         errx(1, "Configuration path is not a file: %s", configuration_path);
+      }
+
+      if (access(configuration_path, R_OK) != 0)
+      {
+         errx(1, "Can't read configuration file: %s", configuration_path);
+      }
+
+      {
+         int cfg_ret = pgmoneta_validate_config_file(configuration_path);
+         if (cfg_ret == 4)
+         {
+            errx(1, "Configuration file contains binary data: %s", configuration_path);
+         }
+         else if (cfg_ret != 0)
+         {
+            goto error;
+         }
+      }
+
+      loaded = pgmoneta_read_walfilter_configuration(shmem, configuration_path);
 
       if (loaded)
       {
