@@ -800,6 +800,18 @@ main(int argc, char** argv)
 
    pgmoneta_os_kernel_version(&os, &kernel_major, &kernel_minor, &kernel_patch);
 
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (config->common.servers[i].online)
+      {
+         pgmoneta_log_info("Server %s is online", config->common.servers[i].name);
+      }
+      else
+      {
+         pgmoneta_log_info("Server %s is offline", config->common.servers[i].name);
+      }
+   }
+
    free(os);
 
 #ifdef HAVE_SYSTEMD
@@ -1764,18 +1776,18 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                if (init_replication_slot(srv))
                {
                   pgmoneta_server_set_online(srv, false);
-                  pgmoneta_log_warn("Server %s is offline (replication slot)", config->common.servers[srv].name);
+                  pgmoneta_log_warn("Replication: Server %s is offline", config->common.servers[srv].name);
                }
                if (init_receivewal(srv))
                {
                   pgmoneta_server_set_online(srv, false);
-                  pgmoneta_log_warn("Server %s is offline (receive wal)", config->common.servers[srv].name);
+                  pgmoneta_log_warn("WAL: Server %s is offline", config->common.servers[srv].name);
                }
             }
             else
             {
                pgmoneta_server_set_online(srv, false);
-               pgmoneta_log_warn("Server %s is offline (verify connection)", config->common.servers[srv].name);
+               pgmoneta_log_warn("Verify: Server %s is offline", config->common.servers[srv].name);
             }
 
 #ifdef HAVE_FREEBSD
@@ -2523,7 +2535,7 @@ init_receivewals(void)
       if (init_receivewal(i))
       {
          pgmoneta_server_set_online(i, false);
-         pgmoneta_log_debug("Server %s is offline", config->common.servers[i].name);
+         pgmoneta_log_debug("WAL: Server %s is offline", config->common.servers[i].name);
       }
    }
 }
@@ -2576,7 +2588,7 @@ init_replication_slots(void)
       if (init_replication_slot(srv))
       {
          pgmoneta_server_set_online(srv, false);
-         pgmoneta_log_debug("Server %s is offline", config->common.servers[srv].name);
+         pgmoneta_log_debug("Replication: Server %s is offline", config->common.servers[srv].name);
       }
    }
 
@@ -2681,10 +2693,6 @@ init_replication_slot(int server)
       {
          pgmoneta_log_error("Authentication failed for user %s on %s",
                             config->common.users[usr].username, config->common.servers[server].name);
-      }
-      else
-      {
-         pgmoneta_log_debug("Server %s is offline", config->common.servers[server].name);
       }
 
 server_done:

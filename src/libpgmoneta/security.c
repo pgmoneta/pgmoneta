@@ -1625,6 +1625,12 @@ server_scram256(char* username, char* password, SSL* ssl, int server_fd)
    memcpy(&security_messages[auth_index], msg->data, msg->length);
    auth_index++;
 
+   if (pgmoneta_has_message('N', msg->data, msg->length))
+   {
+      pgmoneta_log_error("Received notice during startup - verify cluster");
+      goto error;
+   }
+
    if (pgmoneta_extract_message('R', msg, &sasl_final))
    {
       goto error;

@@ -101,13 +101,13 @@ query_execute(SSL* ssl, int socket, char* qs, struct query_response** qr)
 
    if (pgmoneta_create_query_message(qs, &query_msg) != MESSAGE_STATUS_OK || query_msg == NULL)
    {
-      pgmoneta_log_info("Failed to create query message");
+      pgmoneta_log_debug("Failed to create query message");
       goto error;
    }
 
    if (pgmoneta_query_execute(ssl, socket, query_msg, qr) != 0 || qr == NULL)
    {
-      pgmoneta_log_info("Failed to execute query");
+      pgmoneta_log_debug("Failed to execute query: %s", qs);
       goto error;
    }
 
@@ -116,10 +116,8 @@ query_execute(SSL* ssl, int socket, char* qs, struct query_response** qr)
    return 0;
 
 error:
-   if (query_msg != NULL)
-   {
-      pgmoneta_free_message(query_msg);
-   }
+
+   pgmoneta_free_message(query_msg);
 
    return 1;
 }

@@ -183,7 +183,10 @@ pgmoneta_log_error_response_message(struct message* msg)
    pgmoneta_extract_error_fields('M', msg, &error);
    pgmoneta_extract_error_fields('C', msg, &error_code);
 
-   pgmoneta_log_error("error response message: %s (SQLSTATE code: %s)", error, error_code);
+   if (error != NULL || error_code != NULL)
+   {
+      pgmoneta_log_error("Error response message: %s (SQLSTATE code: %s)", error, error_code);
+   }
 
    while (offset < msg->length)
    {
@@ -198,7 +201,7 @@ pgmoneta_log_error_response_message(struct message* msg)
 
       if (field_type != 'M' && field_type != 'C')
       {
-         pgmoneta_log_debug("error response field type: %c, message: %s", field_type, msg->data + offset);
+         pgmoneta_log_debug("Error response field type: %c=%s", field_type, msg->data + offset);
       }
 
       offset += (strlen(msg->data + offset) + 1);
@@ -224,7 +227,10 @@ pgmoneta_log_notice_response_message(struct message* msg)
    pgmoneta_extract_error_fields('M', msg, &error);
    pgmoneta_extract_error_fields('C', msg, &error_code);
 
-   pgmoneta_log_warn("notice response message: %s (SQLSTATE code: %s)", error, error_code);
+   if (error != NULL || error_code != NULL)
+   {
+      pgmoneta_log_warn("Notice response message: %s (SQLSTATE code: %s)", error, error_code);
+   }
 
    while (offset < msg->length)
    {
@@ -239,7 +245,7 @@ pgmoneta_log_notice_response_message(struct message* msg)
 
       if (field_type != 'M' && field_type != 'C')
       {
-         pgmoneta_log_debug("notice response field type: %c, message: %s", field_type, msg->data + offset);
+         pgmoneta_log_debug("Notice response field type: %c=%s", field_type, msg->data + offset);
       }
 
       offset += (strlen(msg->data + offset) + 1);
@@ -1196,6 +1202,7 @@ error:
    pgmoneta_disconnect(fd);
 
    pgmoneta_clear_message();
+   pgmoneta_free_query_response(r);
    pgmoneta_free_message(rmsg);
    pgmoneta_memory_dynamic_destroy(data);
    pgmoneta_free_query_response(r);
@@ -1207,24 +1214,28 @@ error:
 bool
 pgmoneta_has_message(char type, void* data, size_t data_size)
 {
-   size_t offset;
-
-   offset = 0;
+   size_t offset = 0;
 
    while (offset < data_size)
    {
+      struct message* msg = NULL;
       char t = (char)pgmoneta_read_byte(data + offset);
+
+      pgmoneta_extract_message_offset(offset, data, &msg);
+
+      if (type == 'E')
+      {
+         pgmoneta_log_error_response_message(msg);
+      }
+      else if (type == 'N')
+      {
+         pgmoneta_log_notice_response_message(msg);
+      }
+
+      pgmoneta_free_message(msg);
 
       if (type == t)
       {
-         // log error response message when we find it
-         if (type == 'E')
-         {
-            struct message* msg = NULL;
-            pgmoneta_extract_message_offset(offset, data, &msg);
-            pgmoneta_log_error_response_message(msg);
-            pgmoneta_free_message(msg);
-         }
          return true;
       }
       else
@@ -1283,6 +1294,7 @@ pgmoneta_free_query_response(struct query_response* response)
       }
 
       free(response);
+      response = NULL;
    }
 
    return 0;
