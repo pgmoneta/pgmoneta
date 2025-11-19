@@ -1221,18 +1221,21 @@ pgmoneta_has_message(char type, void* data, size_t data_size)
       struct message* msg = NULL;
       char t = (char)pgmoneta_read_byte(data + offset);
 
-      pgmoneta_extract_message_offset(offset, data, &msg);
-
-      if (type == 'E')
+      if (t == 'E' || t == 'N')
       {
-         pgmoneta_log_error_response_message(msg);
-      }
-      else if (type == 'N')
-      {
-         pgmoneta_log_notice_response_message(msg);
-      }
+         pgmoneta_extract_message_offset(offset, data, &msg);
 
-      pgmoneta_free_message(msg);
+         if (t == 'E')
+         {
+            pgmoneta_log_error_response_message(msg);
+         }
+         else if (t == 'N')
+         {
+            pgmoneta_log_notice_response_message(msg);
+         }
+
+         pgmoneta_free_message(msg);
+      }
 
       if (type == t)
       {
@@ -1249,7 +1252,7 @@ pgmoneta_has_message(char type, void* data, size_t data_size)
          }
          else
          {
-            pgmoneta_log_error("pgmoneta_has_message: message length not available");
+            pgmoneta_log_error("Message length not available");
             return false;
          }
       }
