@@ -88,7 +88,6 @@ endif()
 #
 if (DOCS)
   FILE(GLOB EN "manual/en/??-*.md")
-  FILE(GLOB HI "manual/hi/??-*.md")
 
   # Manuals definitions
   set(MANUAL_OUTPUT_DIR "${CMAKE_BINARY_DIR}/doc")
@@ -109,35 +108,19 @@ if (DOCS)
   )
 
   add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf
-    COMMAND ${PANDOC_EXECUTABLE} --quiet -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf --pdf-engine=lualatex --template eisvogel --listings -N --toc ${HI}
-    DEPENDS ${AG_HI}
-    COMMENT "Generating Hindi PDF documentation"
-  )
-
-  add_custom_command(
     OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
     COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html -s -f markdown-smart -N --toc -t html5 ${EN}
     DEPENDS ${EN}
     COMMENT "Generating English HTML documentation"
   )
 
-  add_custom_command(
-    OUTPUT ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
-    COMMAND ${PANDOC_EXECUTABLE} -o ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html -s -f markdown-smart -N --toc -t html5 ${HI}
-    DEPENDS ${HI}
-    COMMENT "Generating Hindi HTML documentation"
-  )
-
   add_custom_target(
     all_docs ALL
-    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf  ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html
+    DEPENDS copy_images ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html
   )
 
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.pdf DESTINATION share/doc/pgmoneta/manual)
   install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-en.html DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.pdf DESTINATION share/doc/pgmoneta/manual)
-  install(FILES ${MANUAL_OUTPUT_DIR}/pgmoneta-hi.html DESTINATION share/doc/pgmoneta/manual)
 
   #
   # Generate API docs

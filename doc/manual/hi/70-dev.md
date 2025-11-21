@@ -1,4 +1,0 @@
-\newpage
-
-# Developer information
-
