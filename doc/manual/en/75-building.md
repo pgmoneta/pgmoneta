@@ -6,7 +6,82 @@
 
 The main build system is defined in [CMakeLists.txt][cmake_txt]. The flags for Sanitizers are added in compile options in [src/CMakeLists.txt][src/cmake_txt]
 
-### Dependencies
+### Compiling
+
+Install the dependencies with
+
+```sh
+dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
+```
+
+To build [**pgmoneta**][pgmoneta] in release mode:
+
+```
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+make
+```
+
+or in debug mode:
+
+```
+mkdir build
+cd build
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug ..
+make
+```
+
+The compiler can also be specified for example
+```
+cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Debug ..
+# or
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug .
+```
+
+The build system will automatically detect the compiler version and enable the appropriate flags based on support.
+
+### Compiling the documentation
+
+[**pgmoneta**][pgmoneta]'s documentation requires
+
+* [pandoc](https://pandoc.org/)
+* [texlive](https://www.tug.org/texlive/)
+
+```sh
+dnf install pandoc texlive-scheme-basic \
+            'tex(footnote.sty)' 'tex(footnotebackref.sty)' \
+            'tex(pagecolor.sty)' 'tex(hardwrap.sty)' \
+            'tex(mdframed.sty)' 'tex(sourcesanspro.sty)' \
+            'tex(ly1enc.def)' 'tex(sourcecodepro.sty)' \
+            'tex(titling.sty)' 'tex(csquotes.sty)' \
+            'tex(zref-abspage.sty)' 'tex(needspace.sty)'
+```
+
+You will need the `Eisvogel` template as well which you can install through
+
+```sh
+wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.2.1/Eisvogel-3.2.1.tar.gz
+tar -xzf Eisvogel-3.2.1.tar.gz
+mkdir -p ~/.local/share/pandoc/templates
+mv Eisvogel-3.2.1/eisvogel.latex ~/.local/share/pandoc/templates/
+```
+
+where `$HOME` is your home directory.
+
+### Generate API guide
+
+This process is optional. If you choose not to generate the API HTML files, you can opt out of downloading these dependencies, and the process will automatically skip the generation.
+
+Download dependencies
+
+``` sh
+dnf install graphviz doxygen
+```
+
+These packages will be detected during `cmake` and built as part of the main build.
+
+### Sanitizer
 
 Before building pgmoneta with sanitizer support, ensure you have the required packages installed:
 
@@ -19,12 +94,6 @@ sudo dnf install libasan libasan-static
 ```
 
 Package names and versions may vary depending on your distribution and compiler version.
-
-### Debug Mode
-
-When building in Debug mode, [**pgmoneta**][pgmoneta] automatically enables various compiler flags to help with debugging, including AddressSanitizer (ASAN) and UndefinedBehaviorSanitizer (UBSAN) support when available.
-
-The Debug mode can be enabled by adding `-DCMAKE_BUILD_TYPE=Debug` to your CMake command.
 
 ### Sanitizer Flags
 
