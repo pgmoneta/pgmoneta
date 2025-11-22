@@ -680,10 +680,41 @@ main(int argc, char** argv)
 
    if (configuration_path != NULL)
    {
+      if (!pgmoneta_exists(configuration_path))
+      {
+         warnx("pgmoneta-cli: Configuration file not found: %s", configuration_path);
+         exit(1);
+      }
+
+      if (!pgmoneta_is_file(configuration_path))
+      {
+         warnx("pgmoneta-cli: Configuration path is not a file: %s", configuration_path);
+         exit(1);
+      }
+
+      if (access(configuration_path, R_OK) != 0)
+      {
+         warnx("pgmoneta-cli: Can't read configuration file: %s", configuration_path);
+         exit(1);
+      }
+
+      {
+         int cfg_ret = pgmoneta_validate_config_file(configuration_path);
+         if (cfg_ret == 4)
+         {
+            warnx("pgmoneta-cli: Configuration file contains binary data: %s", configuration_path);
+            exit(1);
+         }
+         else if (cfg_ret != 0)
+         {
+            exit(1);
+         }
+      }
+
       ret = pgmoneta_read_main_configuration(shmem, configuration_path);
       if (ret)
       {
-         warnx("pgmoneta-cli: Configuration file not found at '%s'. Ensure the file exists and the path is correct.", configuration_path);
+         warnx("pgmoneta-cli: Failed to read configuration file: %s", configuration_path);
          exit(1);
       }
 
@@ -705,7 +736,8 @@ main(int argc, char** argv)
    }
    else
    {
-      ret = pgmoneta_read_main_configuration(shmem, "/etc/pgmoneta/pgmoneta.conf");
+      const char* default_conf = "/etc/pgmoneta/pgmoneta.conf";
+      ret = pgmoneta_read_main_configuration(shmem, (char*)default_conf);
       if (ret)
       {
          if (need_server_conn && (host == NULL || port == NULL))
@@ -716,7 +748,7 @@ main(int argc, char** argv)
       }
       else
       {
-         configuration_path = "/etc/pgmoneta/pgmoneta.conf";
+         configuration_path = (char*)default_conf;
 
          if (logfile)
          {

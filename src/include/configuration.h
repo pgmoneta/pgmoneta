@@ -237,6 +237,18 @@ int
 pgmoneta_validate_walfilter_configuration(void);
 
 /**
+ * Validate a configuration file for existence, type, readability and binary content
+ * @param path The file path
+ * @return 0 if the file is ok, otherwise:
+ *         1 = not exists
+ *         2 = not a regular file
+ *         3 = not readable
+ *         4 = contains binary data or read error
+ */
+int
+pgmoneta_validate_config_file(const char* path);
+
+/**
  * Read the USERS configuration from a file
  * @param shmem The shared memory segment
  * @param filename The file name
