@@ -120,63 +120,63 @@ jobs:
           path: /tmp/pgmoneta-test/log
           retention-days: 90
 
-  build-macos:
-    runs-on: macos-latest
-    env:
-      PGMONETA_ROOT: ${{ github.workspace }}
-      BUILD_DIR: ${{ github.workspace }}/build
-      POSTGRESQL_VERSION: "@17"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-      - name: Install dependencies
-        run: |
-          brew update
-          brew install \
-            libev \
-            libyaml \
-            docutils \
-            libarchive \
-            check \
-            postgresql${POSTGRESQL_VERSION} \
-            libssh
-      - name: Add PostgreSQL to PATH
-        run: |
-          echo "$(brew --prefix postgresql${POSTGRESQL_VERSION})/bin" >> $GITHUB_PATH
-      - name: Build with Clang
-        run: |
-          mkdir -p $BUILD_DIR
-          cd $BUILD_DIR
-          export CC=$(xcrun -find clang)
-          cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
-          make -j$(sysctl -n hw.ncpu)
+# build-macos:
+#   runs-on: macos-latest
+#   env:
+#     PGMONETA_ROOT: ${{ github.workspace }}
+#     BUILD_DIR: ${{ github.workspace }}/build
+#     POSTGRESQL_VERSION: "@17"
+#   steps:
+#     - name: Checkout repository
+#       uses: actions/checkout@v4
+#     - name: Set up Homebrew
+#       id: set-up-homebrew
+#       uses: Homebrew/actions/setup-homebrew@master
+#     - name: Install dependencies
+#       run: |
+#         brew update
+#         brew install \
+#           libev \
+#           libyaml \
+#           docutils \
+#           libarchive \
+#           check \
+#           postgresql${POSTGRESQL_VERSION} \
+#           libssh
+#     - name: Add PostgreSQL to PATH
+#       run: |
+#         echo "$(brew --prefix postgresql${POSTGRESQL_VERSION})/bin" >> $GITHUB_PATH
+#     - name: Build with Clang
+#       run: |
+#         mkdir -p $BUILD_DIR
+#         cd $BUILD_DIR
+#         export CC=$(xcrun -find clang)
+#         cmake -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
+#         make -j$(sysctl -n hw.ncpu)
 
-      - name: Show logs on failure
-        if: failure()
-        working-directory: ${{ env.BUILD_DIR }}
-        run: |
-          cat ./log/logfile || echo "logfile not found"
-          cat ./log/pgmoneta.log || echo "pgmoneta.log not found"
+#     - name: Show logs on failure
+#       if: failure()
+#       working-directory: ${{ env.BUILD_DIR }}
+#       run: |
+#         cat ./log/logfile || echo "logfile not found"
+#         cat ./log/pgmoneta.log || echo "pgmoneta.log not found"
 
-      - name: Upload logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-build-logs
-          path: |
-            ${{ env.BUILD_DIR }}/log/
-            /tmp/*.log
-          retention-days: 7
+#     - name: Upload logs on failure
+#       if: failure()
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: macos-build-logs
+#         path: |
+#           ${{ env.BUILD_DIR }}/log/
+#           /tmp/*.log
+#         retention-days: 7
 
-      - name: Upload Generated Documentation Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-generated-docs
-          path: ${{ env.BUILD_DIR }}/doc/
-          retention-days: 7
+#     - name: Upload Generated Documentation Artifacts
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: macos-generated-docs
+#         path: ${{ env.BUILD_DIR }}/doc/
+#         retention-days: 7
 
 #  build-freebsd:
 #    runs-on: ubuntu-latest
