@@ -239,14 +239,13 @@ pgmoneta_validate_walfilter_configuration(void);
 /**
  * Validate a configuration file for existence, type, readability and binary content
  * @param path The file path
- * @return 0 if the file is ok, otherwise:
- *         1 = not exists
- *         2 = not a regular file
- *         3 = not readable
- *         4 = contains binary data or read error
+ * @return 0 if the file is valid, otherwise a positive error value:
+ *         ENOENT  = file does not exist or is not a regular file
+ *         EACCES  = file is not readable
+ *         EINVAL  = path is NULL or file contains binary data
  */
 int
-pgmoneta_validate_config_file(const char* path);
+pgmoneta_validate_config_file(char* path);
 
 /**
  * Read the USERS configuration from a file

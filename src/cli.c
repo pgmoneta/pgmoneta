@@ -58,6 +58,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #include <openssl/ssl.h>
 
@@ -680,25 +681,27 @@ main(int argc, char** argv)
 
    if (configuration_path != NULL)
    {
-      if (!pgmoneta_exists(configuration_path))
-      {
-         errx(1, "pgmoneta-cli: Configuration file not found: %s", configuration_path);
-      }
+      ret = pgmoneta_validate_config_file(configuration_path);
 
-      if (!pgmoneta_is_file(configuration_path))
+      if (ret)
       {
-         errx(1, "pgmoneta-cli: Configuration path is not a file: %s", configuration_path);
-      }
+         switch (ret)
+         {
+            case ENOENT:
+               errx(1, "Configuration file not found or not a regular file: %s", configuration_path);
+               break;
 
-      if (access(configuration_path, R_OK) != 0)
-      {
-         errx(1, "pgmoneta-cli: Can't read configuration file: %s", configuration_path);
-      }
+            case EACCES:
+               errx(1, "Can't read configuration file: %s", configuration_path);
+               break;
 
-      int cfg_ret = pgmoneta_validate_config_file(configuration_path);
-      if (cfg_ret == 4)
-      {
-         errx(1, "pgmoneta-cli: Configuration file contains binary data: %s", configuration_path);
+            case EINVAL:
+               errx(1, "Configuration file contains binary data or invalid path: %s", configuration_path);
+               break;
+
+            default:
+               errx(1, "Configuration file validation failed: %s", configuration_path);
+         }
       }
 
       ret = pgmoneta_read_main_configuration(shmem, configuration_path);

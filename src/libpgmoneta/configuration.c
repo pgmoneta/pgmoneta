@@ -104,30 +104,31 @@ static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* c
  *
  */
 int
-pgmoneta_validate_config_file(const char* path)
+pgmoneta_validate_config_file(char* path)
 {
    if (path == NULL)
    {
-      return 1;
+      return EINVAL;
    }
 
-   if (!pgmoneta_exists((char*)path))
+   if (!pgmoneta_exists(path))
    {
-      return 1;
+      return ENOENT;
    }
 
-   if (!pgmoneta_is_file((char*)path))
+   if (!pgmoneta_is_file(path))
    {
-      return 2;
+      return ENOENT;
    }
+
    if (access(path, R_OK) != 0)
    {
-      return 3;
+      return EACCES;
    }
 
    if (pgmoneta_is_binary_file(path))
    {
-      return 4;
+      return EINVAL;
    }
 
    return 0;
