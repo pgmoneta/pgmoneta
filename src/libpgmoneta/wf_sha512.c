@@ -75,12 +75,23 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    char* label = NULL;
+   struct timespec start_t;
+   struct timespec end_t;
    char* root = NULL;
    char* d = NULL;
    char* sha512_path = NULL;
+   char* server_backup = NULL;
+   struct backup* backup = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   //Start timer
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
 
 #ifdef DEBUG
    pgmoneta_dump_art(nodes);
@@ -91,10 +102,16 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
+   server_backup = (char*)pgmoneta_art_search(nodes, NODE_SERVER_BACKUP);
 
    pgmoneta_log_debug("SHA512 (execute): %s/%s", config->common.servers[server].name, label);
 
    root = pgmoneta_get_server_backup_identifier(server, label);
+   if (root == NULL)
+   {
+      goto error;
+   }
 
    sha512_path = pgmoneta_append(sha512_path, root);
    sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
@@ -113,6 +130,23 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    pgmoneta_permission(sha512_path, 6, 0, 0);
+
+   //Stop timer
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+   if (backup != NULL)
+   {
+      backup->hash_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+   }
+
+   if (server_backup != NULL && backup != NULL)
+   {
+      pgmoneta_save_info(server_backup, backup);
+   }
 
    fclose(sha512_file);
 

@@ -91,6 +91,10 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
    pgmoneta_log_debug("SHA256 (execute): %s/%s", config->common.servers[server].name, label);
 
    root = pgmoneta_get_server_backup_identifier(server, label);
+   if (root == NULL)
+   {
+      goto error;
+   }
 
    sha256_path = pgmoneta_append(sha256_path, root);
    sha256_path = pgmoneta_append(sha256_path, "backup.sha256");

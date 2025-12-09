@@ -42,6 +42,7 @@ Mingzhuo Yin <yinmingzhuo@gmail.com>
 Vanes Angelo <k124k3n@gmail.com>
 Bassam Adnan <mailbassam@gmail.com>
 Sara Nabih <nabihsara8@gmail.com>
+Shashank Singh <shashanksgh3@gmail.com>
 ```
 
 ## Committers

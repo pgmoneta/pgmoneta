@@ -3440,6 +3440,11 @@ pgmoneta_get_server_backup(int server)
    char* d = NULL;
 
    d = get_server_basepath(server);
+   if (d == NULL)
+   {
+      return NULL;
+   }
+
    d = pgmoneta_append(d, "backup/");
 
    return d;
@@ -3451,6 +3456,11 @@ pgmoneta_get_server_wal(int server)
    char* d = NULL;
 
    d = get_server_basepath(server);
+   if (d == NULL)
+   {
+      return NULL;
+   }
+
    d = pgmoneta_append(d, "wal/");
 
    return d;
@@ -3462,6 +3472,11 @@ pgmoneta_get_server_summary(int server)
    char* d = NULL;
 
    d = get_server_basepath(server);
+   if (d == NULL)
+   {
+      return NULL;
+   }
+
    d = pgmoneta_append(d, "summary/");
 
    return d;
@@ -3473,6 +3488,10 @@ pgmoneta_get_server_wal_shipping(int server)
    struct main_configuration* config;
    char* ws = NULL;
    config = (struct main_configuration*) shmem;
+   if (server < 0 || server >= config->common.number_of_servers)
+   {
+      return NULL;
+   }
    if (strlen(config->common.servers[server].wal_shipping) > 0)
    {
       ws = pgmoneta_append(ws, config->common.servers[server].wal_shipping);
@@ -3510,6 +3529,11 @@ pgmoneta_get_server_workspace(int server)
    char* ws = NULL;
 
    config = (struct main_configuration*)shmem;
+
+   if (server < 0 || server >= config->common.number_of_servers)
+   {
+      goto error;
+   }
 
    if (strlen(config->common.servers[server].workspace) > 0)
    {
@@ -3556,6 +3580,10 @@ pgmoneta_delete_server_workspace(int server, char* label)
    char* ws = NULL;
 
    ws = pgmoneta_get_server_workspace(server);
+   if (ws == NULL)
+   {
+      goto error;
+   }
 
    if (label != NULL && strlen(label) > 0)
    {
@@ -3584,6 +3612,10 @@ pgmoneta_get_server_backup_identifier(int server, char* identifier)
    char* d = NULL;
 
    d = pgmoneta_get_server_backup(server);
+   if (d == NULL)
+   {
+      return NULL;
+   }
    d = pgmoneta_append(d, identifier);
    d = pgmoneta_append(d, "/");
 
@@ -3596,6 +3628,10 @@ pgmoneta_get_server_extra_identifier(int server, char* identifier)
    char* d = NULL;
 
    d = pgmoneta_get_server_backup(server);
+   if (d == NULL)
+   {
+      return NULL;
+   }
    d = pgmoneta_append(d, identifier);
    d = pgmoneta_append(d, "/extra/");
 
@@ -3608,6 +3644,10 @@ pgmoneta_get_server_backup_identifier_data(int server, char* identifier)
    char* d = NULL;
 
    d = pgmoneta_get_server_backup_identifier(server, identifier);
+   if (d == NULL)
+   {
+      return NULL;
+   }
    d = pgmoneta_append(d, "data/");
 
    return d;
@@ -3619,6 +3659,10 @@ pgmoneta_get_server_backup_identifier_tablespace(int server, char* identifier, c
    char* d = NULL;
 
    d = pgmoneta_get_server_backup_identifier(server, identifier);
+   if (d == NULL)
+   {
+      return NULL;
+   }
    d = pgmoneta_append(d, name);
    d = pgmoneta_append(d, "/");
 
@@ -3631,6 +3675,10 @@ pgmoneta_get_server_backup_identifier_data_wal(int server, char* identifier)
    char* d = NULL;
 
    d = pgmoneta_get_server_backup_identifier_data(server, identifier);
+   if (d == NULL)
+   {
+      return NULL;
+   }
    d = pgmoneta_append(d, "pg_wal/");
 
    return d;
@@ -3809,6 +3857,11 @@ get_server_basepath(int server)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   if (server < 0 || server >= config->common.number_of_servers)
+   {
+      return NULL;
+   }
 
    d = pgmoneta_append(d, config->base_dir);
    if (!pgmoneta_ends_with(config->base_dir, "/"))
