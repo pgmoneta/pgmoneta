@@ -383,7 +383,7 @@ struct pgmoneta_command command_table[] = {
    {
       .command = "conf",
       .subcommand = "get",
-      .accepted_argument_count = {0, 1},
+      .accepted_argument_count = {0, 1, 3},
       .action = MANAGEMENT_CONF_GET,
       .deprecated = false,
       .log_message = "<conf get> [%s]"
@@ -1018,7 +1018,14 @@ execute:
    {
       if (parsed.args[0])
       {
-         exit_code = conf_get(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+         if (!strcmp(parsed.args[0], "postgresql"))
+         {
+            exit_code = conf_get_postgresql(s_ssl, socket, parsed.args[1], parsed.args[2], compression, encryption, output_format);
+         }
+         else
+         {
+            exit_code = conf_get(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
+         }
       }
       else
       {
@@ -1964,6 +1971,27 @@ conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t com
 error:
 
    return 1;
+}
+
+static int
+conf_get_postgresql(SSL* ssl, int socket, char* server, char* guc_param, 
+                    uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+    if (pgmoneta_management_request_conf_get_postgresql(ssl, socket, server, guc_param, 
+                                                        compression, encryption, output_format))
+    {
+        goto error;
+    }
+    
+    if (process_get_result(ssl, socket, NULL, output_format))
+    {
+        goto error;
+    }
+    
+    return 0;
+    
+error:
+    return 1;
 }
 
 static int

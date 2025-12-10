@@ -1421,6 +1421,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
    else if (id == MANAGEMENT_CONF_GET)
    {
+      struct json* request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+      char* query_type = (char*)pgmoneta_json_get(request, "type");
+    
       pid = fork();
       if (pid == -1)
       {
@@ -1436,8 +1439,16 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_json_clone(payload, &pyl);
 
-         pgmoneta_set_proc_title(1, ai->argv, "conf get", NULL);
-         pgmoneta_conf_get(NULL, client_fd, compression, encryption, pyl);
+         if (query_type && !strcmp(query_type, "postgresql"))
+         {
+            pgmoneta_set_proc_title(1, ai->argv, "conf get postgresql", NULL);
+            pgmoneta_conf_get_postgresql(NULL, client_fd, compression, encryption, pyl);
+         }
+         else
+         {
+            pgmoneta_set_proc_title(1, ai->argv, "conf get", NULL);
+            pgmoneta_conf_get(NULL, client_fd, compression, encryption, pyl);
+         }
       }
    }
    else if (id == MANAGEMENT_CONF_SET)
