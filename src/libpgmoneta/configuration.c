@@ -3196,7 +3196,7 @@ error:
 
 }
 
-int
+void
 pgmoneta_conf_get_postgresql(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
     int usr = -1;
@@ -3208,12 +3208,13 @@ pgmoneta_conf_get_postgresql(SSL* ssl, int client_fd, uint8_t compression, uint8
     int server_idx = -1;
     SSL* pg_ssl = NULL;
     int pg_socket = -1;
-    int auth_result = AUTH_ERROR;
     struct main_configuration* config = NULL;
     struct timespec start_t;
     struct timespec end_t;
     char* elapsed = NULL;
     double total_seconds;
+    struct message* query = NULL;
+    struct query_response* query_result = NULL;
     
     pgmoneta_start_logging();
     pgmoneta_memory_init();
@@ -3267,20 +3268,15 @@ pgmoneta_conf_get_postgresql(SSL* ssl, int client_fd, uint8_t compression, uint8
                            server_name);
         goto error;
     }
-    
-    auth_result = pgmoneta_server_authenticate(server_idx, "postgres",
+        
+    if (pgmoneta_server_authenticate(server_idx, "postgres",
                                               config->common.users[usr].username,
                                               config->common.users[usr].password,
-                                              true, &pg_ssl, &pg_socket);
-    
-    if (auth_result != AUTH_SUCCESS)
+                                              true, &pg_ssl, &pg_socket))
     {
         pgmoneta_log_error("Failed to authenticate to server '%s'", server_name);
         goto error;
     }
-    
-    struct message* query = NULL;
-    struct query_response* query_result = NULL;
     
     char query_str[256];
     snprintf(query_str, sizeof(query_str), "SHOW %s;", guc_param);

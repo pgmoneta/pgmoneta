@@ -302,6 +302,17 @@ void
 pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
+ * Get a postgresql configuration parameter value
+ * @param ssl The SSL connection
+ * @param client_fd The client
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param payload The payload
+ */
+void
+pgmoneta_conf_get_postgresql(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
  * Set a configuration parameter value
  * @param ssl The SSL connection
  * @param client_fd The client

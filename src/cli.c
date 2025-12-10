@@ -142,6 +142,7 @@ static int annotate(SSL* ssl, int socket, char* server, char* backup, char* comm
 static int mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_get(SSL* ssl, int socket, char* config_key, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int conf_get_postgresql(SSL* ssl, int socket, char* server, char* guc_param, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 static int process_result(SSL* ssl, int socket, int32_t output_format);
