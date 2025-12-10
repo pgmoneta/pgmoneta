@@ -440,15 +440,15 @@ pgmoneta_read_int64(void* data)
    else
    {
       unsigned char* bytes = (unsigned char*)data;
-      int64_t res = ((int64_t)bytes[0] << 56) |
-                    ((int64_t)bytes[1] << 48) |
-                    ((int64_t)bytes[2] << 40) |
-                    ((int64_t)bytes[3] << 32) |
-                    ((int64_t)bytes[4] << 24) |
-                    ((int64_t)bytes[5] << 16) |
-                    ((int64_t)bytes[6] << 8) |
-                    ((int64_t)bytes[7]);
-      return res;
+      uint64_t res = ((uint64_t)bytes[0] << 56) |
+                     ((uint64_t)bytes[1] << 48) |
+                     ((uint64_t)bytes[2] << 40) |
+                     ((uint64_t)bytes[3] << 32) |
+                     ((uint64_t)bytes[4] << 24) |
+                     ((uint64_t)bytes[5] << 16) |
+                     ((uint64_t)bytes[6] << 8) |
+                     ((uint64_t)bytes[7]);
+      return (int64_t)res;
    }
 }
 
@@ -1538,11 +1538,11 @@ pgmoneta_append_bool(char* orig, bool b)
 {
    if (b)
    {
-      orig = pgmoneta_append(orig, "1");
+      orig = pgmoneta_append(orig, "true");
    }
    else
    {
-      orig = pgmoneta_append(orig, "0");
+      orig = pgmoneta_append(orig, "false");
    }
 
    return orig;
@@ -2030,10 +2030,13 @@ pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
 
          if (entry->d_type == DT_REG)
          {
-            array[n] = (char*)malloc(strlen(entry->d_name) + 1);
-            memset(array[n], 0, strlen(entry->d_name) + 1);
-            memcpy(array[n], entry->d_name, strlen(entry->d_name));
-            n++;
+            if (n < nof)
+            {
+               array[n] = (char*)malloc(strlen(entry->d_name) + 1);
+               memset(array[n], 0, strlen(entry->d_name) + 1);
+               memcpy(array[n], entry->d_name, strlen(entry->d_name));
+               n++;
+            }
          }
       }
 
@@ -3090,7 +3093,7 @@ error:
 bool
 pgmoneta_starts_with(char* str, char* prefix)
 {
-   if (str == NULL)
+   if (str == NULL || prefix == NULL)
    {
       return false;
    }
@@ -3117,6 +3120,10 @@ pgmoneta_ends_with(char* str, char* suffix)
 bool
 pgmoneta_contains(char* str, char* s)
 {
+   if (str == NULL || s == NULL)
+   {
+      return false;
+   }
    return strstr(str, s) != NULL;
 }
 
@@ -3124,16 +3131,28 @@ char*
 pgmoneta_remove_first(char* str)
 {
    char* new_str = NULL;
+   size_t len;
 
-   new_str = (char*)malloc(strlen(str));
+   if (str == NULL)
+   {
+      return NULL;
+   }
+
+   len = strlen(str);
+   if (len == 0)
+   {
+      return str;
+   }
+
+   new_str = (char*)malloc(len);
 
    if (new_str == NULL)
    {
       goto error;
    }
 
-   memset(new_str, 0, strlen(str));
-   memcpy(new_str, str + 1, strlen(str) - 1);
+   memset(new_str, 0, len);
+   memcpy(new_str, str + 1, len - 1);
 
    free(str);
 
@@ -3148,16 +3167,28 @@ char*
 pgmoneta_remove_last(char* str)
 {
    char* new_str = NULL;
+   size_t len;
 
-   new_str = (char*)malloc(strlen(str));
+   if (str == NULL)
+   {
+      return NULL;
+   }
+
+   len = strlen(str);
+   if (len == 0)
+   {
+      return str;
+   }
+
+   new_str = (char*)malloc(len);
 
    if (new_str == NULL)
    {
       goto error;
    }
 
-   memset(new_str, 0, strlen(str));
-   memcpy(new_str, str, strlen(str) - 1);
+   memset(new_str, 0, len);
+   memcpy(new_str, str, len - 1);
 
    free(str);
 
@@ -4435,7 +4466,7 @@ pgmoneta_escape_string(char* str)
    len = strlen(str);
    for (int i = 0; i < len; i++)
    {
-      if (str[i] == '\"' || str[i] == '\\' || str[i] == '\n' || str[i] == '\t' || str[i] == '\r')
+      if (str[i] == '\"' || str[i] == '\'' || str[i] == '\\' || str[i] == '\n' || str[i] == '\t' || str[i] == '\r')
       {
          translated_len++;
       }
@@ -4448,6 +4479,7 @@ pgmoneta_escape_string(char* str)
       switch (str[i])
       {
          case '\\':
+         case '\'':
          case '\"':
             translated_ec_string[idx] = '\\';
             idx++;
@@ -4500,6 +4532,11 @@ pgmoneta_string_to_lsn(char* lsn)
    uint32_t hi = 0;
    uint32_t lo = 0;
 
+   if (lsn == NULL)
+   {
+      return 0;
+   }
+
    sscanf(lsn, "%X/%X", &hi, &lo);
    return ((uint64_t)hi << 32) + (uint64_t)lo;
 }
@@ -4543,6 +4580,10 @@ pgmoneta_is_number(char* str, int base)
 
    for (int i = 0; str[i] != '\0'; i++)
    {
+      if (i == 0 && str[i] == '-' && strlen(str) > 1)
+      {
+         continue;
+      }
       if (str[i] >= 48 && str[i] <= 57)
       {
          /* Standard numbers */
