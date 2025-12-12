@@ -3197,6 +3197,152 @@ error:
 
 }
 
+void
+pgmoneta_conf_get_postgresql(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+{
+    int usr = -1;
+    struct json* response = NULL;
+    struct json* request = NULL;
+    char* server_name = NULL;
+    char* guc_param = NULL;
+    char* guc_value = NULL;
+    int server_idx = -1;
+    SSL* pg_ssl = NULL;
+    int pg_socket = -1;
+    struct main_configuration* config = NULL;
+    struct timespec start_t;
+    struct timespec end_t;
+    char* elapsed = NULL;
+    double total_seconds;
+    struct message* query = NULL;
+    struct query_response* query_result = NULL;
+    
+    pgmoneta_start_logging();
+    pgmoneta_memory_init();
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+    
+    request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+    server_name = (char*)pgmoneta_json_get(request, "server");
+    guc_param = (char*)pgmoneta_json_get(request, "parameter");
+    
+    config = (struct main_configuration*)shmem;
+    
+    for (int i = 0; i < config->common.number_of_servers; i++)
+    {
+        if (!strcmp(config->common.servers[i].name, server_name))
+        {
+            server_idx = i;
+            break;
+        }
+    }
+    
+    if (server_idx == -1)
+    {
+        pgmoneta_log_error("Server '%s' not found", server_name);
+        goto error;
+    }
+
+    if (!config->common.servers[server_idx].online)
+    {
+         pgmoneta_log_error("Server %s is not online", config->common.servers[server_idx].name);
+         goto error;
+    }
+    
+    for (int i = 0; usr == -1 && i < config->common.number_of_users; i++)
+    {
+        if (!strcmp(config->common.servers[server_idx].username, config->common.users[i].username))
+        {
+            usr = i;
+            break;
+        }
+    }
+
+    if (usr == -1)
+    {
+        pgmoneta_log_error("User '%s' not found for server '%s'",
+                           config->common.servers[server_idx].username,
+                           server_name);
+        goto error;
+    }
+        
+    if (pgmoneta_server_authenticate(server_idx, "postgres",
+                                              config->common.users[usr].username,
+                                              config->common.users[usr].password,
+                                              true, &pg_ssl, &pg_socket))
+    {
+        pgmoneta_log_error("Failed to authenticate to server '%s'", server_name);
+        goto error;
+    }
+    
+    char query_str[256];
+    snprintf(query_str, sizeof(query_str), "SHOW %s;", guc_param);
+    
+    pgmoneta_create_query_message(query_str, &query);
+    
+    if (pgmoneta_query_execute(pg_ssl, pg_socket, query, &query_result))
+    {
+        pgmoneta_log_error("Failed to execute SHOW query for '%s'", guc_param);
+        goto error;
+    }
+    
+    if (query_result && query_result->tuples)
+    {
+        guc_value = query_result->tuples->data[0];
+    }
+    
+    if (pgmoneta_management_create_response(payload, -1, &response))
+    {
+        goto error;
+    }
+    
+    pgmoneta_json_put(response, guc_param, (uintptr_t)guc_value, ValueString);
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+    
+    if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
+    {
+        pgmoneta_log_error("Failed to send response");
+        goto error;
+    }
+
+    elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+    pgmoneta_log_info("Conf Get (Elapsed: %s)", elapsed);
+    
+    free(elapsed);
+    pgmoneta_close_ssl(pg_ssl);
+    pgmoneta_disconnect(pg_socket);
+    pgmoneta_free_message(query);
+    pgmoneta_free_query_response(query_result);
+    pgmoneta_json_destroy(payload);
+    pgmoneta_disconnect(client_fd);
+    pgmoneta_memory_destroy();
+    pgmoneta_stop_logging();
+    exit(0);
+    
+error:
+    pgmoneta_management_response_error(ssl, client_fd, NULL, MANAGEMENT_ERROR_CONF_GET_POSTGRESQL,
+                                          NAME, compression, encryption, payload);
+
+    pgmoneta_close_ssl(pg_ssl);
+    pgmoneta_disconnect(pg_socket);
+    pgmoneta_free_message(query);
+    pgmoneta_free_query_response(query_result);
+    pgmoneta_json_destroy(payload);
+    pgmoneta_disconnect(client_fd);
+    pgmoneta_memory_destroy();
+    pgmoneta_stop_logging();
+    exit(1);
+}
+
 int
 pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required)
 {

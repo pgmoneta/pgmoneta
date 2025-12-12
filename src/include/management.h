@@ -346,6 +346,7 @@ extern "C" {
 #define MANAGEMENT_ERROR_CONF_GET_NOFORK  2600
 #define MANAGEMENT_ERROR_CONF_GET_NETWORK 2602
 #define MANAGEMENT_ERROR_CONF_GET_ERROR   2603
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL 2604
 
 #define MANAGEMENT_ERROR_CONF_SET_NOFORK                    2700
 #define MANAGEMENT_ERROR_CONF_SET_NOREQUEST                 2701
@@ -598,6 +599,23 @@ pgmoneta_management_request_conf_ls(SSL* ssl, int socket, uint8_t compression, u
  */
 int
 pgmoneta_management_request_conf_get(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a conf get request for postgresql query
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The postgresql server
+ * @param guc_param The postgresql GUC parameter
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_conf_get_postgresql(SSL* ssl, int socket, 
+                                               char* server, char* guc_param,
+                                               uint8_t compression, uint8_t encryption, 
+                                               int32_t output_format);
 
 /**
  * Create a conf get request

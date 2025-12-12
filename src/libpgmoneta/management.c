@@ -526,6 +526,43 @@ error:
 }
 
 int
+pgmoneta_management_request_conf_get_postgresql(SSL* ssl, int socket, 
+                                               char* server, char* guc_param,
+                                               uint8_t compression, uint8_t encryption, 
+                                               int32_t output_format)
+{
+    struct json* j = NULL;
+    struct json* request = NULL;
+    
+    if (pgmoneta_management_create_header(MANAGEMENT_CONF_GET, compression, encryption, 
+                                         output_format, &j))
+    {
+        goto error;
+    }
+    
+    if (pgmoneta_management_create_request(j, &request))
+    {
+        goto error;
+    }
+    
+    pgmoneta_json_put(request, "type", (uintptr_t)"postgresql", ValueString);
+    pgmoneta_json_put(request, "server", (uintptr_t)server, ValueString);
+    pgmoneta_json_put(request, "parameter", (uintptr_t)guc_param, ValueString);
+    
+    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+    {
+        goto error;
+    }
+    
+    pgmoneta_json_destroy(j);
+    return 0;
+    
+error:
+    pgmoneta_json_destroy(j);
+    return 1;
+}
+
+int
 pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
