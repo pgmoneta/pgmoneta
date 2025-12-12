@@ -57,6 +57,7 @@ extern "C" {
 #define INFO_END_TIMELINE              "END_TIMELINE"
 #define INFO_END_WALPOS                "END_WALPOS"
 #define INFO_EXTRA                     "EXTRA"
+#define INFO_HASH_ELAPSED              "HASH_ELAPSED"
 #define INFO_KEEP                      "KEEP"
 #define INFO_LABEL                     "LABEL"
 #define INFO_LINKING_ELAPSED           "LINKING_ELAPSED"
@@ -126,6 +127,7 @@ struct backup
    uint64_t biggest_file_size;                                    /**< The biggest file */
    double total_elapsed_time;                                     /**< The total elapsed time in seconds */
    double basebackup_elapsed_time;                                /**< The basebackup elapsed time in seconds */
+   double hash_elapsed_time;                                      /**< The hash elapsed time in seconds */
    double manifest_elapsed_time;                                  /**< The manifest elapsed time in seconds */
    double compression_gzip_elapsed_time;                          /**< The compression elapsed time in seconds */
    double compression_zstd_elapsed_time;                          /**< The compression elapsed time in seconds */

@@ -581,6 +581,10 @@ pgmoneta_load_info(char* directory, char* identifier, struct backup** backup)
          {
             bck->basebackup_elapsed_time = atof(&value[0]);
          }
+         else if (!strcmp(INFO_HASH_ELAPSED, &key[0]))
+         {
+            bck->hash_elapsed_time = atof(&value[0]);
+         }
          else if (!strcmp(INFO_MANIFEST_ELAPSED, &key[0]))
          {
             bck->manifest_elapsed_time = atof(&value[0]);
@@ -1380,6 +1384,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    write_info(sfile, "%s=%lu\n", INFO_BIGGEST_FILE, backup->biggest_file_size);
    write_info(sfile, "%s=%.4f\n", INFO_ELAPSED, backup->total_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_BASEBACKUP_ELAPSED, backup->basebackup_elapsed_time);
+   write_info(sfile, "%s=%.4f\n", INFO_HASH_ELAPSED, backup->hash_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_ZSTD_ELAPSED, backup->compression_zstd_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_GZIP_ELAPSED, backup->compression_gzip_elapsed_time);
    write_info(sfile, "%s=%.4f\n", INFO_COMPRESSION_BZIP2_ELAPSED, backup->compression_bzip2_elapsed_time);
