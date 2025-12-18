@@ -41,8 +41,12 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | ssh_base_dir | | String | Yes | The base directory for the remote backup. |
 | ssh_ciphers | aes-256-ctr, aes-192-ctr, aes-128-ctr | String | No | The supported ciphers for communication. `aes \| aes-256 \| aes-256-cbc`: AES CBC (Cipher Block Chaining) mode with 256 bit key length<br/> `aes-192 \| aes-192-cbc`: AES CBC mode with 192 bit key length<br/> `aes-128 \| aes-128-cbc`: AES CBC mode with 128 bit key length<br/> `aes-256-ctr`: AES CTR (Counter) mode with 256 bit key length<br/> `aes-192-ctr`: AES CTR mode with 192 bit key length<br/> `aes-128-ctr`: AES CTR mode with 128 bit key length. Otherwise verbatim |
 | ssh_public_key_file | `$HOME/.ssh/id_rsa.pub` | String | No | The SSH public key file path. Can interpolate environment variables (e.g., `$HOME`).   |
-| ssh_private_key_file | `$HOME/.ssh/id_rsa` | String | No | The SSH private key file path. Can interpolate environment variables (e.g., `$HOME`) |
-| s3_aws_region | | String | Yes | The AWS region |
+| ssh_private_key_file | `$HOME/.ssh/id_rsa` | String | No | The SSH private key file path. Can interpolate environment variables (e.g., `$HOME`) | 
+| s3_storage_class | REDUCED_REDUNDANCY | String | No | The S3 storage class | 
+| s3_port   | | Int | No | The port number for the S3 endpoint |
+| s3_use_tls | `off` | Bool | No | Use TLS for S3 connections |
+| s3_endpoint | String | No | s3 endpoint url |
+| s3_region | | String | Yes | The AWS region |
 | s3_access_key_id | | String | Yes | The IAM access key ID |
 | s3_secret_access_key | | String | Yes | The IAM secret access key |
 | s3_bucket | | String | Yes | The AWS S3 bucket name |

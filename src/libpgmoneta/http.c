@@ -108,6 +108,12 @@ pgmoneta_http_create(char* hostname, int port, bool secure, struct http** result
          goto error;
       }
 
+      if (SSL_set_tlsext_host_name(ssl, hostname) == 0)
+      {
+         pgmoneta_log_error("Failed to set SNI hostname");
+         goto error;
+      }
+
       int connect_result;
       do
       {

@@ -48,7 +48,7 @@ static int s3_storage_teardown(char*, struct art*);
 
 static int s3_upload_files(char* local_root, char* s3_root, char* relative_path);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path);
-static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date);
+static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class);
 
 static char* s3_get_host(void);
 static char* s3_get_basepath(int server, char* identifier);
@@ -310,8 +310,14 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    struct http_request* request = NULL;
    struct http_response* response = NULL;
    struct main_configuration* config;
+   bool use_storage_class = false;
 
    config = (struct main_configuration*)shmem;
+
+   if (strlen(config->s3_storage_class) > 0 && strlen(config->s3_endpoint) == 0)
+   {
+      use_storage_class = true;
+   }
 
    local_path = pgmoneta_append(local_path, local_root);
    if (strlen(relative_path) > 0)
@@ -345,6 +351,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    s3_host = s3_get_host();
 
+   // Build canonical request
    canonical_request = pgmoneta_append(canonical_request, "PUT\n/");
    canonical_request = pgmoneta_append(canonical_request, s3_path);
    canonical_request = pgmoneta_append(canonical_request, "\n\nhost:");
@@ -353,7 +360,20 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    canonical_request = pgmoneta_append(canonical_request, file_sha256);
    canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
    canonical_request = pgmoneta_append(canonical_request, long_date);
-   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-storage-class:REDUCED_REDUNDANCY\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-storage-class\n");
+
+   if (use_storage_class)
+   {
+      // Add storage class to canonical request (for AWS)
+      canonical_request = pgmoneta_append(canonical_request, "\nx-amz-storage-class:");
+      canonical_request = pgmoneta_append(canonical_request, config->s3_storage_class);
+      canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-storage-class\n");
+   }
+   else
+   {
+      // No storage class (works for both AWS and Cloudflare)
+      canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
+   }
+
    canonical_request = pgmoneta_append(canonical_request, file_sha256);
 
    pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
@@ -363,7 +383,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    string_to_sign = pgmoneta_append(string_to_sign, "\n");
    string_to_sign = pgmoneta_append(string_to_sign, short_date);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, config->s3_aws_region);
+   string_to_sign = pgmoneta_append(string_to_sign, config->s3_region);
    string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
    string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
 
@@ -375,7 +395,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, config->s3_aws_region, strlen(config->s3_aws_region), &date_region_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, config->s3_region, strlen(config->s3_region), &date_region_key_hmac, &hmac_length))
    {
       goto error;
    }
@@ -397,13 +417,23 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
 
+   // Build authorization header with matching signed headers
    auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
    auth_value = pgmoneta_append(auth_value, config->s3_access_key_id);
    auth_value = pgmoneta_append(auth_value, "/");
    auth_value = pgmoneta_append(auth_value, short_date);
    auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, config->s3_aws_region);
-   auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=");
+   auth_value = pgmoneta_append(auth_value, config->s3_region);
+
+   if (use_storage_class)
+   {
+      auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=");
+   }
+   else
+   {
+      auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
+   }
+
    auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
 
    file = fopen(local_path, "rb");
@@ -431,7 +461,24 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    fclose(file);
    file = NULL;
 
-   if (pgmoneta_http_create(s3_host, 443, true, &connection))
+   int s3_port;
+
+   if (config->s3_port != 0)
+   {
+      s3_port = config->s3_port;
+   }
+   else
+   {
+      s3_port = config->s3_use_tls? 443 : 80;
+   }
+   bool use_tls = config->s3_use_tls;
+   if (s3_port == 443)
+   {
+      use_tls = true;
+   }
+   // we can check the validity of a flag to another(port with the correct tls or not)
+
+   if (pgmoneta_http_create(s3_host, s3_port, use_tls, &connection))
    {
       goto error;
    }
@@ -444,7 +491,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
       goto error;
    }
 
-   if (s3_add_request_headers(request, auth_value, file_sha256, long_date))
+   if (s3_add_request_headers(request, auth_value, file_sha256, long_date, config->s3_storage_class))
    {
       goto error;
    }
@@ -546,9 +593,24 @@ s3_get_host(void)
 
    config = (struct main_configuration*)shmem;
 
+   char* endpoint = NULL;
+   if (strlen(config->s3_endpoint) > 0)
+   {
+      endpoint = config->s3_endpoint;
+      if (!strncmp(endpoint, "http://", 7))
+      {
+         endpoint += 7;
+      }
+      else if (!strncmp(endpoint, "https://", 8))
+      {
+         endpoint += 8;
+      }
+      host = pgmoneta_append(host, endpoint);
+      return host;
+   }
    host = pgmoneta_append(host, config->s3_bucket);
    host = pgmoneta_append(host, ".s3.");
-   host = pgmoneta_append(host, config->s3_aws_region);
+   host = pgmoneta_append(host, config->s3_region);
    host = pgmoneta_append(host, ".amazonaws.com");
 
    return host;
@@ -562,6 +624,11 @@ s3_get_basepath(int server, char* identifier)
 
    config = (struct main_configuration*)shmem;
 
+   if (strlen(config->s3_endpoint) > 0)
+   {
+      d = pgmoneta_append(d, config->s3_bucket);
+      d = pgmoneta_append(d, "/");
+   }
    d = pgmoneta_append(d, config->s3_base_dir);
    if (!pgmoneta_ends_with(config->s3_base_dir, "/"))
    {
@@ -575,8 +642,9 @@ s3_get_basepath(int server, char* identifier)
 }
 
 static int
-s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date)
+s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class)
 {
+
    if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
    {
       return 1;
@@ -592,7 +660,7 @@ s3_add_request_headers(struct http_request* request, char* auth_value, char* fil
       return 1;
    }
 
-   if (pgmoneta_http_request_add_header(request, "x-amz-storage-class", "REDUCED_REDUNDANCY"))
+   if (strlen(storage_class) && pgmoneta_http_request_add_header(request, "x-amz-storage-class", storage_class))
    {
       return 1;
    }
