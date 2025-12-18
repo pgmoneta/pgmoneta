@@ -256,6 +256,7 @@ base_dir = $BACKUP_DIRECTORY
 compression = zstd
 
 retention = 7
+retention_interval = 3600
 
 log_type = file
 log_level = debug5

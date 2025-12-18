@@ -28,6 +28,7 @@
  */
 
 #include <info.h>
+#include <server.h>
 #include <tsclient.h>
 #include <tssuite.h>
 #include <tscommon.h>
@@ -50,7 +51,11 @@ START_TEST(test_pgmoneta_delete_chain_last)
    int num_bck_after = 0;
    struct backup** bcks_before = NULL;
    struct backup** bcks_after = NULL;
+
+   ck_assert_msg(pgmoneta_server_is_online(PRIMARY_SERVER), "server not online");
+   ck_assert_msg(pgmoneta_server_valid(PRIMARY_SERVER), "server not valid");
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   ck_assert_msg(d != NULL, "server backup not valid");
    pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
    ck_assert_int_eq(num_bck_before, 3);
 
