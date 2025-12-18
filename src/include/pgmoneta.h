@@ -402,7 +402,11 @@ struct main_configuration
    char ssh_public_key_file[MAX_PATH];          /**< The SSH public key path */
    char ssh_private_key_file[MAX_PATH];         /**< The SSH private key path */
 
-   char s3_aws_region[MISC_LENGTH];             /**< The AWS region */
+   int s3_port;                                 /**< The S3 port */
+   bool s3_use_tls;                             /**< Use TLS  for S3 */
+   char s3_storage_class[MISC_LENGTH];          /**< The S3 storage class */
+   char s3_endpoint[MISC_LENGTH];               /**< The S3 endpoint */
+   char s3_region[MISC_LENGTH];                 /**< The AWS region */
    char s3_access_key_id[MISC_LENGTH];          /**< The IAM Access Key ID */
    char s3_secret_access_key[MISC_LENGTH];      /**< The IAM Secret Access Key */
    char s3_bucket[MISC_LENGTH];                 /**< The S3 bucket */

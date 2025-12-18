@@ -1233,7 +1233,21 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "s3_aws_region"))
+               else if (!strcmp(key, "s3_use_tls"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_bool(value, &config->s3_use_tls))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_storage_class"))
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
@@ -1242,7 +1256,53 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_aws_region, value, max);
+                     memcpy(config->s3_storage_class, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_port"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->s3_port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_endpoint"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->s3_endpoint, value, max);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "s3_region"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(config->s3_region, value, max);
                   }
                   else
                   {
@@ -2975,7 +3035,11 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_CIPHERS, (uintptr_t)config->ssh_ciphers, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PUBLIC_KEY_FILE, (uintptr_t)config->ssh_public_key_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PRIVATE_KEY_FILE, (uintptr_t)config->ssh_private_key_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_AWS_REGION, (uintptr_t)config->s3_aws_region, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_USE_TLS, (uintptr_t)config->s3_use_tls, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_STORAGE_CLASS, (uintptr_t)config->s3_storage_class, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ENDPOINT, (uintptr_t)config->s3_endpoint, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_PORT, (uintptr_t)config->s3_port, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_REGION, (uintptr_t)config->s3_region, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID, (uintptr_t)config->s3_access_key_id, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->s3_secret_access_key, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET, (uintptr_t)config->s3_bucket, ValueString);

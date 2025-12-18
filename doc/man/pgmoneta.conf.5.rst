@@ -127,7 +127,7 @@ ssh_public_key_file
 ssh_private_key_file
   The SSH private key file path. Supports environment variable interpolation (e.g., $HOME). Default is $HOME/.ssh/id_rsa
 
-s3_aws_region
+s3_region
   The AWS region
 
 s3_access_key_id

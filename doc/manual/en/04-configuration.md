@@ -105,10 +105,10 @@ Note, that if `host` starts with a `/` it represents a path and `pgmoneta` will 
 
 | Property | Default | Unit | Required | Description |
 | :------- | :------ | :--- | :------- | :---------- |
-| s3_aws_region | | String | Yes | The AWS region |
+| s3_region | | String | Yes | The AWS region |
 | s3_access_key_id | | String | Yes | The IAM access key ID |
 | s3_secret_access_key | | String | Yes | The IAM secret access key |
-| s3_bucket | | String | Yes | The AWS S3 bucket name |
+| s3_bucket | | String | Yes | The  S3 bucket name |
 | s3_base_dir | | String | Yes | The base directory for the S3 bucket |
 
 **Azure**
