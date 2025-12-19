@@ -61,6 +61,7 @@ static void destroy_walfile(struct walfile* wf);
 
 START_TEST(test_check_point_shutdown_v17)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    test_walfile(pgmoneta_test_generate_check_point_shutdown_v17);
 }
 END_TEST

@@ -31,9 +31,11 @@
 #include <tscommon.h>
 #include <tssuite.h>
 #include <utils.h>
+#include <stdio.h>
 
 START_TEST(test_json_create)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct json* obj = NULL;
 
    ck_assert(!pgmoneta_json_create(&obj));
@@ -45,6 +47,7 @@ START_TEST(test_json_create)
 END_TEST
 START_TEST(test_json_put_basic)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct json* obj = NULL;
 
    ck_assert(!pgmoneta_json_create(&obj));
@@ -68,6 +71,7 @@ START_TEST(test_json_put_basic)
 END_TEST
 START_TEST(test_json_append_basic)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct json* obj = NULL;
 
    ck_assert(!pgmoneta_json_create(&obj));
@@ -85,6 +89,7 @@ START_TEST(test_json_append_basic)
 END_TEST
 START_TEST(test_json_parse_to_string)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct json* obj = NULL;
    struct json* obj_parsed = NULL;
    char* str_obj = NULL;
@@ -219,6 +224,7 @@ START_TEST(test_json_parse_to_string)
 END_TEST
 START_TEST(test_json_remove)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct json* obj = NULL;
    struct json* array = NULL;
    pgmoneta_json_create(&obj);
@@ -255,6 +261,7 @@ START_TEST(test_json_remove)
 END_TEST
 START_TEST(test_json_iterator)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct json* item = NULL;
    struct json* array = NULL;
    struct json_iterator* iiter = NULL;

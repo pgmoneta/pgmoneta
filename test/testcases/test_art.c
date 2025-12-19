@@ -49,6 +49,7 @@ static void test_obj_destroy_cb(uintptr_t obj);
 
 START_TEST(test_art_create)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    pgmoneta_art_create(&t);
 
@@ -59,6 +60,7 @@ START_TEST(test_art_create)
 END_TEST
 START_TEST(test_art_insert)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    void* mem = NULL;
    struct art_test_obj* obj = NULL;
@@ -89,6 +91,7 @@ START_TEST(test_art_insert)
 END_TEST
 START_TEST(test_art_search)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    struct art_test_obj* obj1 = NULL;
    struct art_test_obj* obj2 = NULL;
@@ -149,6 +152,7 @@ START_TEST(test_art_search)
 END_TEST
 START_TEST(test_art_basic_delete)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    void* mem = NULL;
    struct art_test_obj* obj = NULL;
@@ -213,6 +217,7 @@ START_TEST(test_art_basic_delete)
 END_TEST
 START_TEST(test_art_double_delete)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    pgmoneta_art_create(&t);
 
@@ -237,6 +242,7 @@ START_TEST(test_art_double_delete)
 END_TEST
 START_TEST(test_art_clear)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    void* mem = NULL;
    struct art_test_obj* obj = NULL;
@@ -274,6 +280,7 @@ START_TEST(test_art_clear)
 END_TEST
 START_TEST(test_art_iterator_read)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    struct art_iterator* iter = NULL;
    void* mem = NULL;
@@ -350,6 +357,7 @@ START_TEST(test_art_iterator_read)
 END_TEST
 START_TEST(test_art_iterator_remove)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    struct art_iterator* iter = NULL;
    void* mem = NULL;
@@ -442,6 +450,7 @@ START_TEST(test_art_iterator_remove)
 END_TEST
 START_TEST(test_art_insert_search_extensive)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    char buf[512];
    FILE* f = NULL;
@@ -483,6 +492,7 @@ START_TEST(test_art_insert_search_extensive)
 END_TEST
 START_TEST(test_art_insert_very_long)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t;
    pgmoneta_art_create(&t);
 
@@ -533,6 +543,7 @@ START_TEST(test_art_insert_very_long)
 END_TEST
 START_TEST(test_art_random_delete)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    char buf[512];
    FILE* f = NULL;
@@ -589,6 +600,7 @@ START_TEST(test_art_random_delete)
 END_TEST
 START_TEST(test_art_insert_index_out_of_range)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t;
    pgmoneta_art_create(&t);
    char* s1 = "abcdefghijklmnxyz";

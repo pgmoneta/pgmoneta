@@ -33,11 +33,14 @@
 #include <tscommon.h>
 #include <tssuite.h>
 
+#include <stdio.h>
+
 #include "logging.h"
 
 // test backup
 START_TEST(test_pgmoneta_backup_full)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret = 0;
    ret = !pgmoneta_tsclient_backup("primary", NULL);
    ck_assert_msg(ret, "failed to add full backup");
@@ -45,6 +48,7 @@ START_TEST(test_pgmoneta_backup_full)
 END_TEST
 START_TEST(test_pgmoneta_backup_incremental_basic)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret = 0;
    char* d = NULL;
    int num_backups = 0;

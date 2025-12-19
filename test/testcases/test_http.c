@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 struct echo_server
 {
@@ -56,6 +57,7 @@ static void teardown_echo_server(void);
 
 START_TEST(test_pgmoneta_http_get)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -79,6 +81,7 @@ START_TEST(test_pgmoneta_http_get)
 END_TEST
 START_TEST(test_pgmoneta_http_post)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -104,6 +107,7 @@ START_TEST(test_pgmoneta_http_post)
 END_TEST
 START_TEST(test_pgmoneta_http_put)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -129,6 +133,7 @@ START_TEST(test_pgmoneta_http_put)
 END_TEST
 START_TEST(test_pgmoneta_http_put_file)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -173,6 +178,7 @@ START_TEST(test_pgmoneta_http_put_file)
 END_TEST
 START_TEST(test_pgmoneta_http_header_operations)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct http_request* request = NULL;
    char* header_value = NULL;
 

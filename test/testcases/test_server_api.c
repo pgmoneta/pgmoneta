@@ -45,6 +45,7 @@ static void teardown_server_connection(void);
 
 START_TEST(test_server_api_info)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret;
    struct main_configuration* config = NULL;
    struct server srv;
@@ -62,6 +63,7 @@ START_TEST(test_server_api_info)
 END_TEST
 START_TEST(test_server_api_checkpoint)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret;
    uint64_t chkt;
    uint32_t tli;
@@ -72,6 +74,7 @@ START_TEST(test_server_api_checkpoint)
 END_TEST
 START_TEST(test_server_api_read_file)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret;
    uint8_t* data;
    int data_length;
@@ -86,6 +89,7 @@ START_TEST(test_server_api_read_file)
 END_TEST
 START_TEST(test_server_api_read_file_metadata)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret;
    struct file_stats stat;
    char file_path[] = "postgresql.conf";
@@ -96,6 +100,7 @@ START_TEST(test_server_api_read_file_metadata)
 END_TEST
 START_TEST(test_server_api_backup)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret;
    char* start_lsn = NULL;
    char* stop_lsn = NULL;

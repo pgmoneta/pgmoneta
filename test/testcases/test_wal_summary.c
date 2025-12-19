@@ -46,9 +46,11 @@
 #include <walfile.h>
 #include <walfile/wal_reader.h>
 #include <walfile/wal_summary.h>
+#include <stdio.h>
 
 START_TEST(test_pgmoneta_wal_summary)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    char* summary_dir = NULL;
    struct main_configuration* config = NULL;
    SSL* srv_ssl = NULL;

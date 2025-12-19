@@ -33,10 +33,12 @@
 #include <tssuite.h>
 #include <tscommon.h>
 #include <utils.h>
+#include <stdio.h>
 
 // test delete a single full backup
 START_TEST(test_pgmoneta_delete_full)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
    found = !pgmoneta_tsclient_delete("primary", "oldest");
    ck_assert_msg(found, "success status not found");
@@ -45,6 +47,7 @@ END_TEST
 // test delete the last incremental backup in the chain
 START_TEST(test_pgmoneta_delete_chain_last)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
    char* d = NULL;
    int num_bck_before = 0;
@@ -80,6 +83,7 @@ END_TEST
 // test delete the middle incremental backup in the chain
 START_TEST(test_pgmoneta_delete_chain_middle)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
    char* d = NULL;
    int num_bck_before = 0;
@@ -116,6 +120,7 @@ END_TEST
 // test delete the root full backup in the chain
 START_TEST(test_pgmoneta_delete_chain_root)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
    char* d = NULL;
    int num_bck_before = 0;

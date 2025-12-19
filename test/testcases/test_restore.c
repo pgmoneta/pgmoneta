@@ -30,10 +30,12 @@
 #include <tssuite.h>
 #include <tsclient.h>
 #include <tscommon.h>
+#include <stdio.h>
 
 // test restore
 START_TEST(test_pgmoneta_restore)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
    found = !pgmoneta_tsclient_restore("primary", "newest", "current");
    ck_assert_msg(found, "success status not found");

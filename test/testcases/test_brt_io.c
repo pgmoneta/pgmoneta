@@ -34,6 +34,7 @@
 #include <tssuite.h>
 #include <utils.h>
 #include <walfile/wal_reader.h>
+#include <stdio.h>
 
 static void relation_fork_init(int spcoid, int dboid, int relnum, enum fork_number forknum, struct rel_file_locator* r, enum fork_number* frk);
 static void consecutive_mark_block_modified(block_ref_table* brt, struct rel_file_locator* rlocator, enum fork_number frk, block_number blkno, int n);
@@ -43,6 +44,7 @@ static char* get_backup_summary_path();
 
 START_TEST(test_pgmoneta_write_multiple_chunks_multiple_representations)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    block_ref_table* brt;
    // This test will create a block reference table with multiple chunks
    // and switch from bitmap representation to array representation
@@ -62,6 +64,7 @@ START_TEST(test_pgmoneta_write_multiple_chunks_multiple_representations)
 END_TEST
 START_TEST(test_pgmoneta_read_chunks)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    int size = 4096;
    int nblocks;
    block_number start_blk = 0;

@@ -32,6 +32,7 @@
 #include <tssuite.h>
 #include <utils.h>
 #include <value.h>
+#include <stdio.h>
 
 struct deque_test_obj
 {
@@ -45,6 +46,7 @@ static void test_obj_destroy_cb(uintptr_t obj);
 
 START_TEST(test_deque_create)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
 
    ck_assert(!pgmoneta_deque_create(false, &dq));
@@ -56,6 +58,7 @@ START_TEST(test_deque_create)
 END_TEST
 START_TEST(test_deque_add_poll)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
 
    pgmoneta_deque_create(false, &dq);
@@ -85,6 +88,7 @@ START_TEST(test_deque_add_poll)
 END_TEST
 START_TEST(test_deque_add_poll_last)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
 
    pgmoneta_deque_create(false, &dq);
@@ -115,6 +119,7 @@ START_TEST(test_deque_add_poll_last)
 END_TEST
 START_TEST(test_deque_clear)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
 
    pgmoneta_deque_create(false, &dq);
@@ -132,6 +137,7 @@ START_TEST(test_deque_clear)
 END_TEST
 START_TEST(test_deque_remove)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
    char* value1 = NULL;
    char* tag = NULL;
@@ -158,6 +164,7 @@ START_TEST(test_deque_remove)
 END_TEST
 START_TEST(test_deque_add_with_config_and_get)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
    struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
    struct deque_test_obj* obj1 = NULL;
@@ -188,6 +195,7 @@ START_TEST(test_deque_add_with_config_and_get)
 END_TEST
 START_TEST(test_deque_iterator_read)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
    struct deque_iterator* iter = NULL;
    int cnt = 0;
@@ -220,6 +228,7 @@ START_TEST(test_deque_iterator_read)
 END_TEST
 START_TEST(test_deque_iterator_remove)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
    struct deque_iterator* iter = NULL;
    int cnt = 0;
@@ -263,6 +272,7 @@ START_TEST(test_deque_iterator_remove)
 END_TEST
 START_TEST(test_deque_sort)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    struct deque* dq = NULL;
    struct deque_iterator* iter = NULL;
    int cnt = 0;

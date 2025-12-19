@@ -33,9 +33,11 @@
 #include <utils.h>
 
 #include <stdlib.h>
+#include <stdio.h>
 
 START_TEST(test_resolve_path_trailing_env_var)
 {
+   fprintf(stderr, "TEST START: %s\n", __func__);
    char* resolved = NULL;
    char* env_key = "PGMONETA_TEST_PATH_KEY";
    char* env_value = "PGMONETA_TEST_PATH_VALUE";
