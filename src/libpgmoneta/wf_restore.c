@@ -46,13 +46,13 @@ static int restore_execute(char*, struct art*);
 static char* combine_incremental_name(void);
 static int combine_incremental_execute(char*, struct art*);
 
-static char*recovery_info_name(void);
+static char* recovery_info_name(void);
 static int recovery_info_execute(char*, struct art*);
 
 static char* copy_wal_name(void);
 static int copy_wal_execute(char*, struct art*);
 
-static char*restore_excluded_files_name(void);
+static char* restore_excluded_files_name(void);
 static int restore_excluded_files_execute(char*, struct art*);
 static int restore_excluded_files_teardown(char*, struct art*);
 
@@ -298,7 +298,7 @@ combine_incremental_execute(char* name __attribute__((unused)), struct art* node
    bck = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
    prior_labels = (struct deque*)pgmoneta_art_search(nodes, NODE_LABELS);
-   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    if (prior_labels == NULL || pgmoneta_deque_size(prior_labels) < 1)
    {
       pgmoneta_log_error("Combine incremental: should have at least 1 previous backup");
@@ -306,8 +306,8 @@ combine_incremental_execute(char* name __attribute__((unused)), struct art* node
    }
 
    input_dir = pgmoneta_get_server_backup_identifier_data(server, label);
-   base = (char*) pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
-   output_dir = (char*) pgmoneta_art_search(nodes, NODE_TARGET_BASE);
+   base = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
+   output_dir = (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE);
    manifest = (struct json*)pgmoneta_art_search(nodes, NODE_MANIFEST);
    if (manifest == NULL)
    {
@@ -739,7 +739,7 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP));
 #endif
 
-   copy_wal = (bool) pgmoneta_art_search(nodes, NODE_COPY_WAL);
+   copy_wal = (bool)pgmoneta_art_search(nodes, NODE_COPY_WAL);
    if (!copy_wal)
    {
       return 0;
@@ -752,7 +752,7 @@ copy_wal_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*) pgmoneta_art_search(nodes, NODE_LABEL);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
    directory = (char*)pgmoneta_art_search(nodes, NODE_TARGET_ROOT);
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 

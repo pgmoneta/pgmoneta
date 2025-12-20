@@ -44,7 +44,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "zstd"
+#define NAME                           "zstd"
 #define ZSTD_DEFAULT_NUMBER_OF_WORKERS 4
 
 static int zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);

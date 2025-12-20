@@ -59,7 +59,7 @@ static int bind_host(char* hostname, int port, int** fds, int* length);
 int
 pgmoneta_bind(char* hostname, int port, int** fds, int* length)
 {
-   struct ifaddrs* ifaddr, * ifa;
+   struct ifaddrs *ifaddr, *ifa;
    struct sockaddr_in* sa4;
    struct sockaddr_in6* sa6;
    char addr[50];
@@ -88,12 +88,12 @@ pgmoneta_bind(char* hostname, int port, int** fds, int* length)
 
             if (ifa->ifa_addr->sa_family == AF_INET)
             {
-               sa4 = (struct sockaddr_in*) ifa->ifa_addr;
+               sa4 = (struct sockaddr_in*)ifa->ifa_addr;
                inet_ntop(AF_INET, &sa4->sin_addr, addr, sizeof(addr));
             }
             else
             {
-               sa6 = (struct sockaddr_in6*) ifa->ifa_addr;
+               sa6 = (struct sockaddr_in6*)ifa->ifa_addr;
                inet_ntop(AF_INET6, &sa6->sin6_addr, addr, sizeof(addr));
             }
 
@@ -567,7 +567,7 @@ bind_host(char* hostname, int port, int** fds, int* length)
    int* result = NULL;
    int index, size;
    int sockfd;
-   struct addrinfo hints, * servinfo, * addr;
+   struct addrinfo hints, *servinfo, *addr;
    int yes = 1;
    int rv;
    char* sport;

@@ -39,7 +39,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define MAX_QUERY_LENGTH 16384
+#define MAX_QUERY_LENGTH    16384
 #define PGMONETA_CHUNK_SIZE 8192
 
 /**

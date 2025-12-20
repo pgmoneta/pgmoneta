@@ -41,7 +41,7 @@ pgmoneta_wal_generic_desc(char* buf, struct decoded_xlog_record* record)
    while (ptr < end)
    {
       offset_number offset,
-                    length;
+         length;
 
       memcpy(&offset, ptr, sizeof(offset));
       ptr += sizeof(offset);

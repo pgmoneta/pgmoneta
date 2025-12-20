@@ -68,9 +68,9 @@ enum parse_state {
 struct json
 {
    // a json object can only be item or array
-   enum json_type type;            /**< The json object type */
+   enum json_type type; /**< The json object type */
    // if the object is an array, it can have at most one json element
-   void* elements;                /**< The json elements, could be an array or some kv pairs */
+   void* elements; /**< The json elements, could be an array or some kv pairs */
 };
 
 /** @struct json_reader
@@ -80,7 +80,7 @@ struct json_reader
 {
    struct stream_buffer* buffer; /**< The buffer */
    int fd;                       /**< The file descriptor */
-   enum parse_state state; /**< The current reader state of the JSON reader */
+   enum parse_state state;       /**< The current reader state of the JSON reader */
 };
 
 /** @struct json_iterator
@@ -88,10 +88,10 @@ struct json_reader
  */
 struct json_iterator
 {
-   void* iter;            /**< The internal iterator */
-   struct json* obj;      /**< The json object */
-   char* key;             /**< The current key, if it's json item */
-   struct value* value;   /**< The current value or entry */
+   void* iter;          /**< The internal iterator */
+   struct json* obj;    /**< The json object */
+   char* key;           /**< The current key, if it's json item */
+   struct value* value; /**< The current value or entry */
 };
 
 /**

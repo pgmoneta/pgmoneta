@@ -36,16 +36,16 @@ extern "C" {
 #include <walfile/wal_reader.h>
 
 // #define variables
-#define XLOG_DBASE_CREATE                    0x00     /**< Create database log type */
-#define XLOG_DBASE_DROP                      0x10     /**< Drop database log type */
+#define XLOG_DBASE_CREATE 0x00 /**< Create database log type */
+#define XLOG_DBASE_DROP   0x10 /**< Drop database log type */
 
 // v17 and later
-#define XLOG_DBASE_CREATE_FILE_COPY         0x00     /**< Create database log type */
-#define XLOG_DBASE_CREATE_WAL_LOG           0x10     /**< Create database log type */
-#define XLOG_DBASE_DROP_V17                 0x20     /**< Drop database log type */
+#define XLOG_DBASE_CREATE_FILE_COPY 0x00 /**< Create database log type */
+#define XLOG_DBASE_CREATE_WAL_LOG   0x10 /**< Create database log type */
+#define XLOG_DBASE_DROP_V17         0x20 /**< Drop database log type */
 
 // #define macros
-#define MIN_SIZE_OF_DBASE_DROP_REC           offsetof(xl_dbase_drop_rec, tablespace_ids) /**< Minimum size of xl_dbase_drop_rec */
+#define MIN_SIZE_OF_DBASE_DROP_REC offsetof(xl_dbase_drop_rec, tablespace_ids) /**< Minimum size of xl_dbase_drop_rec */
 
 // Structs
 /**
@@ -60,10 +60,10 @@ extern "C" {
  */
 struct xl_dbase_create_rec
 {
-   oid db_id;                 /**< Database ID */
-   oid tablespace_id;         /**< Tablespace ID */
-   oid src_db_id;             /**< Source Database ID */
-   oid src_tablespace_id;     /**< Source Tablespace ID */
+   oid db_id;             /**< Database ID */
+   oid tablespace_id;     /**< Tablespace ID */
+   oid src_db_id;         /**< Source Database ID */
+   oid src_tablespace_id; /**< Source Tablespace ID */
 };
 
 /**
@@ -77,9 +77,9 @@ struct xl_dbase_create_rec
  */
 struct xl_dbase_drop_rec
 {
-   oid db_id;                          /**< Database ID */
-   int ntablespaces;                   /**< Number of tablespace IDs */
-   oid tablespace_ids[FLEXIBLE_ARRAY_MEMBER];   /**< Array of tablespace IDs */
+   oid db_id;                                 /**< Database ID */
+   int ntablespaces;                          /**< Number of tablespace IDs */
+   oid tablespace_ids[FLEXIBLE_ARRAY_MEMBER]; /**< Array of tablespace IDs */
 };
 
 /**
@@ -94,10 +94,10 @@ struct xl_dbase_drop_rec
  */
 struct xl_dbase_create_file_copy_rec
 {
-   oid db_id;                  /**< Database ID */
-   oid tablespace_id;          /**< Tablespace ID */
-   oid src_db_id;              /**< Source Database ID */
-   oid src_tablespace_id;      /**< Source Tablespace ID */
+   oid db_id;             /**< Database ID */
+   oid tablespace_id;     /**< Tablespace ID */
+   oid src_db_id;         /**< Source Database ID */
+   oid src_tablespace_id; /**< Source Tablespace ID */
 };
 
 /**
@@ -110,8 +110,8 @@ struct xl_dbase_create_file_copy_rec
  */
 struct xl_dbase_create_wal_log_rec
 {
-   oid db_id;                  /**< Database ID */
-   oid tablespace_id;          /**< Tablespace ID */
+   oid db_id;         /**< Database ID */
+   oid tablespace_id; /**< Tablespace ID */
 };
 
 // Functions

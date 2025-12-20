@@ -938,7 +938,6 @@ get_remote_server_wal(int server)
 int
 pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file)
 {
-
    char* root = NULL;
    char* path = NULL;
 
@@ -1012,7 +1011,6 @@ error:
 int
 pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* file)
 {
-
    char* root = NULL;
    char tmp_file_path[MAX_PATH] = {0};
    char file_path[MAX_PATH] = {0};

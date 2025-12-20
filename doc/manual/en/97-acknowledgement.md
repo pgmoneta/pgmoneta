@@ -43,6 +43,7 @@ Vanes Angelo <k124k3n@gmail.com>
 Bassam Adnan <mailbassam@gmail.com>
 Sara Nabih <nabihsara8@gmail.com>
 Shashank Singh <shashanksgh3@gmail.com>
+Mahmoud Hamdy (TutTrue) <mahmoud.hamdy5113@gmail.com>
 Amr Shams <amr.shams2015.a@gmail.com>
 ```
 

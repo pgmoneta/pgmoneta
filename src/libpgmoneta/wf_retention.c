@@ -197,7 +197,6 @@ retention_execute(char* name __attribute__((unused)), struct art* nodes)
          {
             if (number_of_backups == 0)
             {
-
                for (int j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
                {
                   char* hs = NULL;
@@ -264,7 +263,7 @@ mark_retention(int server, int retention_days, int retention_weeks, int retentio
 
    config = (struct main_configuration*)shmem;
 
-   keep = (bool*) malloc(sizeof (bool*) * number_of_backups);
+   keep = (bool*)malloc(sizeof(bool*) * number_of_backups);
 
    if (keep == NULL)
    {

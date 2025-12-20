@@ -452,7 +452,7 @@ pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint
 
    /* Output deleted page offset number array */
    buf = pgmoneta_format_and_append(buf, ", deleted:");
-   deletedoffsets = (offset_number*) block_data;
+   deletedoffsets = (offset_number*)block_data;
    buf = pgmoneta_wal_array_desc(buf, deletedoffsets, sizeof(offset_number), ndeleted);
 
    /*
@@ -462,11 +462,11 @@ pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint
     * that we could use.  Readability seems more important here.)
     */
    buf = pgmoneta_format_and_append(buf, ", updated: [");
-   updatedoffsets = (offset_number*) (block_data + ndeleted *
-                                      sizeof(offset_number));
-   updates = (struct xl_btree_update*) ((char*) updatedoffsets +
-                                        nupdated *
-                                        sizeof(offset_number));
+   updatedoffsets = (offset_number*)(block_data + ndeleted *
+                                                     sizeof(offset_number));
+   updates = (struct xl_btree_update*)((char*)updatedoffsets +
+                                       nupdated *
+                                          sizeof(offset_number));
    for (int i = 0; i < nupdated; i++)
    {
       offset_number off = updatedoffsets[i];
@@ -485,7 +485,7 @@ pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint
       {
          uint16_t* ptid;
 
-         ptid = (uint16_t*) ((char*) updates + SIZE_OF_BTREE_UPDATE) + p;
+         ptid = (uint16_t*)((char*)updates + SIZE_OF_BTREE_UPDATE) + p;
          buf = pgmoneta_format_and_append(buf, "%u", *ptid);
 
          if (p < updates->ndeletedtids - 1)
@@ -499,9 +499,8 @@ pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint
          buf = pgmoneta_format_and_append(buf, ", ");
       }
 
-      updates = (struct xl_btree_update*)
-                ((char*) updates + SIZE_OF_BTREE_UPDATE +
-                 updates->ndeletedtids * sizeof(uint16_t));
+      updates = (struct xl_btree_update*)((char*)updates + SIZE_OF_BTREE_UPDATE +
+                                          updates->ndeletedtids * sizeof(uint16_t));
    }
    buf = pgmoneta_format_and_append(buf, "]");
 
@@ -521,14 +520,14 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
       case XLOG_BTREE_INSERT_META:
       case XLOG_BTREE_INSERT_POST:
       {
-         struct xl_btree_insert* xlrec = (struct xl_btree_insert*) rec;
+         struct xl_btree_insert* xlrec = (struct xl_btree_insert*)rec;
          buf = pgmoneta_format_and_append(buf, "off: %u", xlrec->offnum);
          break;
       }
       case XLOG_BTREE_SPLIT_L:
       case XLOG_BTREE_SPLIT_R:
       {
-         struct xl_btree_split* xlrec = (struct xl_btree_split*) rec;
+         struct xl_btree_split* xlrec = (struct xl_btree_split*)rec;
 
          buf = pgmoneta_format_and_append(buf, "level: %u, firstrightoff: %d, newitemoff: %d, postingoff: %d",
                                           xlrec->level, xlrec->firstrightoff,
@@ -537,14 +536,14 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_BTREE_DEDUP:
       {
-         struct xl_btree_dedup* xlrec = (struct xl_btree_dedup*) rec;
+         struct xl_btree_dedup* xlrec = (struct xl_btree_dedup*)rec;
 
          buf = pgmoneta_format_and_append(buf, "nintervals: %u", xlrec->nintervals);
          break;
       }
       case XLOG_BTREE_VACUUM:
       {
-         struct xl_btree_vacuum* xlrec = (struct xl_btree_vacuum*) rec;
+         struct xl_btree_vacuum* xlrec = (struct xl_btree_vacuum*)rec;
 
          buf = pgmoneta_format_and_append(buf, "ndeleted: %u, nupdated: %u",
                                           xlrec->ndeleted, xlrec->nupdated);
@@ -566,7 +565,7 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_BTREE_MARK_PAGE_HALFDEAD:
       {
-         struct xl_btree_mark_page_halfdead* xlrec = (struct xl_btree_mark_page_halfdead*) rec;
+         struct xl_btree_mark_page_halfdead* xlrec = (struct xl_btree_mark_page_halfdead*)rec;
 
          buf = pgmoneta_format_and_append(buf, "topparent: %u, leaf: %u, left: %u, right: %u",
                                           xlrec->topparent, xlrec->leafblk, xlrec->leftblk, xlrec->rightblk);
@@ -584,7 +583,7 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_BTREE_NEWROOT:
       {
-         struct xl_btree_newroot* xlrec = (struct xl_btree_newroot*) rec;
+         struct xl_btree_newroot* xlrec = (struct xl_btree_newroot*)rec;
 
          buf = pgmoneta_format_and_append(buf, "level: %u", xlrec->level);
          break;
@@ -611,7 +610,7 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
 }
 
 char*
-pgmoneta_wal_btree_identify (uint8_t info)
+pgmoneta_wal_btree_identify(uint8_t info)
 {
    {
       char* id = NULL;

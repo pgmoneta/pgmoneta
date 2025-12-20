@@ -42,7 +42,7 @@ pgmoneta_wal_replorigin_desc(char* buf, struct decoded_xlog_record* record)
       {
          struct xl_replorigin_set* xlrec;
 
-         xlrec = (struct xl_replorigin_set*) rec;
+         xlrec = (struct xl_replorigin_set*)rec;
 
          buf = pgmoneta_format_and_append(buf, "set %u; lsn %X/%X; force: %d",
                                           xlrec->node_id,
@@ -54,7 +54,7 @@ pgmoneta_wal_replorigin_desc(char* buf, struct decoded_xlog_record* record)
       {
          struct xl_replorigin_drop* xlrec;
 
-         xlrec = (struct xl_replorigin_drop*) rec;
+         xlrec = (struct xl_replorigin_drop*)rec;
 
          buf = pgmoneta_format_and_append(buf, "drop %u", xlrec->node_id);
          break;

@@ -7,16 +7,19 @@ and documentation.
 
 This document will hopefully help you contribute to pgmoneta.
 
-* [Legal](#legal)
-* [Reporting an issue](#reporting-an-issue)
-* [Setup your build environment](#setup-your-build-environment)
-* [Building the main branch](#building-the-main-branch)
-* [Before you contribute](#before-you-contribute)
-* [Code reviews](#code-reviews)
-* [Coding Guidelines](#coding-guidelines)
-* [Discuss a Feature](#discuss-a-feature)
-* [Development](#development)
-* [Code Style](#code-style)
+- [Contributing guide](#contributing-guide)
+  - [Legal](#legal)
+  - [Reporting an issue](#reporting-an-issue)
+  - [Setup your build environment](#setup-your-build-environment)
+  - [Building the main branch](#building-the-main-branch)
+  - [Before you contribute](#before-you-contribute)
+  - [Code reviews](#code-reviews)
+  - [Coding Guidelines](#coding-guidelines)
+  - [Discuss a Feature](#discuss-a-feature)
+  - [Development](#development)
+  - [Policy and guidelines for using AI](#policy-and-guidelines-for-using-ai)
+    - [Using AI for communication](#using-ai-for-communication)
+  - [Code Style](#code-style)
 
 ## Legal
 
@@ -34,7 +37,7 @@ Don't forget to indicate your pgmoneta version.
 You can use the follow command, if you are using a [Fedora](https://getfedora.org/) based platform:
 
 ```
-dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
+dnf install git gcc clang clang-analyzer clang-tools-extra cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
 ```
 
 in order to get the necessary dependencies.
@@ -199,10 +202,17 @@ Here are some concrete guidelines for using LLMs as part of your communication w
 
 Please, follow the coding style of the project.
 
-You can use the [uncrustify](http://uncrustify.sourceforge.net/) tool to help with the formatting, by running
+You can use the [clang-format](https://clang.llvm.org/docs/ClangFormat.html) tool to help with the formatting, by running
 
 ```
-./uncrustify.sh
+./clang-format.sh
 ```
 
 and verify the changes.
+
+**Note:** This project uses clang-format version 18. The CI uses `clang-format` to ensure consistent formatting. Please install `clang-format` locally to match the CI environment.
+
+Installation:
+* **Fedora**: `dnf install clang-tools-extra`
+* **Ubuntu/Debian**: `apt install clang-format`
+* **RHEL/Rocky**: `dnf install clang-tools-extra` (or version-specific package if available)

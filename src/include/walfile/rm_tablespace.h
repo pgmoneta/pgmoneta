@@ -32,8 +32,8 @@
 #include <walfile/wal_reader.h>
 
 /* XLOG stuff */
-#define XLOG_TBLSPC_CREATE    0x00       /**< XLOG opcode for creating a tablespace. */
-#define XLOG_TBLSPC_DROP      0x10       /**< XLOG opcode for dropping a tablespace. */
+#define XLOG_TBLSPC_CREATE 0x00 /**< XLOG opcode for creating a tablespace. */
+#define XLOG_TBLSPC_DROP   0x10 /**< XLOG opcode for dropping a tablespace. */
 
 /**
  * @struct xl_tblspc_create_rec
@@ -43,8 +43,8 @@
  */
 struct xl_tblspc_create_rec
 {
-   oid ts_id;                             /**< ID of the tablespace. */
-   char ts_path[FLEXIBLE_ARRAY_MEMBER];   /**< Null-terminated string containing the path to the tablespace. */
+   oid ts_id;                           /**< ID of the tablespace. */
+   char ts_path[FLEXIBLE_ARRAY_MEMBER]; /**< Null-terminated string containing the path to the tablespace. */
 };
 
 /**
@@ -55,7 +55,7 @@ struct xl_tblspc_create_rec
  */
 struct xl_tblspc_drop_rec
 {
-   oid ts_id;                             /**< ID of the tablespace being dropped. */
+   oid ts_id; /**< ID of the tablespace being dropped. */
 };
 
 /**

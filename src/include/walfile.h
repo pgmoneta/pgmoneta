@@ -37,11 +37,11 @@
 extern struct partial_xlog_record* partial_record;
 
 /* Return Codes */
-#define PGMONETA_WAL_SUCCESS      0   /**< WAL operation succeeded */
-#define PGMONETA_WAL_ERR_IO       1   /**< I/O error (e.g., file read/write failure) */
-#define PGMONETA_WAL_ERR_MEMORY   2   /**< Memory allocation failure */
-#define PGMONETA_WAL_ERR_FORMAT   3   /**< Invalid WAL file format */
-#define PGMONETA_WAL_ERR_PARAM    4   /**< Invalid input parameters */
+#define PGMONETA_WAL_SUCCESS    0 /**< WAL operation succeeded */
+#define PGMONETA_WAL_ERR_IO     1 /**< I/O error (e.g., file read/write failure) */
+#define PGMONETA_WAL_ERR_MEMORY 2 /**< Memory allocation failure */
+#define PGMONETA_WAL_ERR_FORMAT 3 /**< Invalid WAL file format */
+#define PGMONETA_WAL_ERR_PARAM  4 /**< Invalid input parameters */
 
 /**
  * @struct xlog_long_page_header_data
@@ -58,10 +58,10 @@ extern struct partial_xlog_record* partial_record;
  */
 struct xlog_long_page_header_data
 {
-   struct xlog_page_header_data std;       /**< Standard header fields. */
-   uint64_t xlp_sysid;                     /**< System identifier from pg_control. */
-   uint32_t xlp_seg_size;                  /**< Segment size for cross-checking. */
-   uint32_t xlp_xlog_blcksz;               /**< XLOG block size for cross-checking. */
+   struct xlog_page_header_data std; /**< Standard header fields. */
+   uint64_t xlp_sysid;               /**< System identifier from pg_control. */
+   uint32_t xlp_seg_size;            /**< Segment size for cross-checking. */
+   uint32_t xlp_xlog_blcksz;         /**< XLOG block size for cross-checking. */
 };
 
 /**
@@ -90,10 +90,10 @@ struct xlog_long_page_header_data
  */
 struct walfile
 {
-   uint32_t magic_number;                         /**< Magic number for the WAL file. */
-   struct xlog_long_page_header_data* long_phd;   /**< Extended XLOG page header. */
-   struct deque* page_headers;                    /**< Deque of page headers in the WAL file. */
-   struct deque* records;                         /**< Deque of records in the WAL file. */
+   uint32_t magic_number;                       /**< Magic number for the WAL file. */
+   struct xlog_long_page_header_data* long_phd; /**< Extended XLOG page header. */
+   struct deque* page_headers;                  /**< Deque of page headers in the WAL file. */
+   struct deque* records;                       /**< Deque of records in the WAL file. */
 };
 
 /**

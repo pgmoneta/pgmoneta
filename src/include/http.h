@@ -57,9 +57,9 @@ extern "C" {
  */
 struct http_payload
 {
-   struct deque* headers;  /**< HTTP headers as deque */
-   void* data;             /**< Message data */
-   size_t data_size;       /**< Size of message data */
+   struct deque* headers; /**< HTTP headers as deque */
+   void* data;            /**< Message data */
+   size_t data_size;      /**< Size of message data */
 };
 
 /** @struct http_request
@@ -86,11 +86,11 @@ struct http_response
  */
 struct http
 {
-   int socket;      /**< The socket descriptor */
-   SSL* ssl;        /**< The SSL connection (NULL for non-secure) */
-   char* hostname;  /**< The hostname */
-   int port;        /**< The port number */
-   bool secure;     /**< Use SSL if true */
+   int socket;     /**< The socket descriptor */
+   SSL* ssl;       /**< The SSL connection (NULL for non-secure) */
+   char* hostname; /**< The hostname */
+   int port;       /**< The port number */
+   bool secure;    /**< Use SSL if true */
 };
 
 /**

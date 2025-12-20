@@ -57,33 +57,33 @@ extern "C" {
 
 #include <stdint.h>
 
-#define RM_XLOG_ID         0
-#define RM_XACT_ID         1
-#define RM_SMGR_ID         2
-#define RM_CLOG_ID         3
-#define RM_DBASE_ID        4
-#define RM_TBLSPC_ID       5
-#define RM_MULTIXACT_ID    6
-#define RM_RELMAP_ID       7
-#define RM_STANDBY_ID      8
-#define RM_HEAP2_ID        9
-#define RM_HEAP_ID         10
-#define RM_BTREE_ID        11
-#define RM_HASH_ID         12
-#define RM_GIN_ID          13
-#define RM_GIST_ID         14
-#define RM_SEQ_ID          15
-#define RM_SPGIST_ID       16
-#define RM_BRIN_ID         17
-#define RM_COMMIT_TS_ID    18
-#define RM_REPLORIGIN_ID   19
-#define RM_GENERIC_ID      20
-#define RM_LOGICALMSG_ID   21
+#define RM_XLOG_ID                                        0
+#define RM_XACT_ID                                        1
+#define RM_SMGR_ID                                        2
+#define RM_CLOG_ID                                        3
+#define RM_DBASE_ID                                       4
+#define RM_TBLSPC_ID                                      5
+#define RM_MULTIXACT_ID                                   6
+#define RM_RELMAP_ID                                      7
+#define RM_STANDBY_ID                                     8
+#define RM_HEAP2_ID                                       9
+#define RM_HEAP_ID                                        10
+#define RM_BTREE_ID                                       11
+#define RM_HASH_ID                                        12
+#define RM_GIN_ID                                         13
+#define RM_GIST_ID                                        14
+#define RM_SEQ_ID                                         15
+#define RM_SPGIST_ID                                      16
+#define RM_BRIN_ID                                        17
+#define RM_COMMIT_TS_ID                                   18
+#define RM_REPLORIGIN_ID                                  19
+#define RM_GENERIC_ID                                     20
+#define RM_LOGICALMSG_ID                                  21
 
-#define PG_RMGR(symname, name, desc) {name, desc},
-#define PG_RMGR_SUMMARY(symname, name, number_of_records) {name, number_of_records},
-#define PG_RMGR_STATS(symname, name) {name, 0, 0, 0, 0},
-#define RM_MAX_ID           UINT8_MAX
+#define PG_RMGR(symname, name, desc)                      {name, desc}
+#define PG_RMGR_SUMMARY(symname, name, number_of_records) {name, number_of_records}
+#define PG_RMGR_STATS(symname, name)                      {name, 0, 0, 0, 0}
+#define RM_MAX_ID                                         UINT8_MAX
 
 /**
  * @struct rmgr_data
@@ -95,8 +95,8 @@ extern "C" {
  */
 struct rmgr_data
 {
-   char* name;                                    /**< The name of the resource manager */
-   char* (*rm_desc)(char* buf, struct decoded_xlog_record* record);  /**< Function pointer to the RMGR description function */
+   char* name;                                                      /**< The name of the resource manager */
+   char* (*rm_desc)(char* buf, struct decoded_xlog_record* record); /**< Function pointer to the RMGR description function */
 };
 
 /**
@@ -109,8 +109,8 @@ struct rmgr_data
  */
 struct rmgr_summary
 {
-   char* name;             /**< The name of the resource manager */
-   int number_of_records;  /**< The number of records of a specific type */
+   char* name;            /**< The name of the resource manager */
+   int number_of_records; /**< The number of records of a specific type */
 };
 
 /**
@@ -126,11 +126,11 @@ struct rmgr_summary
  */
 struct rmgr_stats
 {
-   char* name;                /**< The name of the resource manager */
-   uint64_t count;            /**< Number of records */
-   uint64_t record_size;      /**< Total size of record data (excluding FPIs) */
-   uint64_t fpi_size;         /**< Total size of full page images */
-   uint64_t combined_size;    /**< Total combined size */
+   char* name;             /**< The name of the resource manager */
+   uint64_t count;         /**< Number of records */
+   uint64_t record_size;   /**< Total size of record data (excluding FPIs) */
+   uint64_t fpi_size;      /**< Total size of full page images */
+   uint64_t combined_size; /**< Total combined size */
 };
 
 /**

@@ -57,7 +57,7 @@
 #include <systemd/sd-daemon.h>
 #endif
 
-#define NAME "configuration"
+#define NAME        "configuration"
 #define LINE_LENGTH 512
 
 static int extract_syskey_value(char* str, char** key, char** value);
@@ -295,12 +295,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
          }
          else
          {
-            if (pgmoneta_starts_with(trimmed_line, "unix_socket_dir") || pgmoneta_starts_with(trimmed_line, "base_dir")
-                || pgmoneta_starts_with(trimmed_line, "workspace") || pgmoneta_starts_with(trimmed_line, "ssh_base_dir")
-                || pgmoneta_starts_with(trimmed_line, "ssh_private_key_file") || pgmoneta_starts_with(trimmed_line, "ssh_public_key_file")
-                || pgmoneta_starts_with(trimmed_line, "log_path") || pgmoneta_starts_with(trimmed_line, "tls_cert_file")
-                || pgmoneta_starts_with(trimmed_line, "tls_key_file") || pgmoneta_starts_with(trimmed_line, "tls_ca_file")
-                || pgmoneta_starts_with(trimmed_line, "pidfile"))
+            if (pgmoneta_starts_with(trimmed_line, "unix_socket_dir") || pgmoneta_starts_with(trimmed_line, "base_dir") || pgmoneta_starts_with(trimmed_line, "workspace") || pgmoneta_starts_with(trimmed_line, "ssh_base_dir") || pgmoneta_starts_with(trimmed_line, "ssh_private_key_file") || pgmoneta_starts_with(trimmed_line, "ssh_public_key_file") || pgmoneta_starts_with(trimmed_line, "log_path") || pgmoneta_starts_with(trimmed_line, "tls_cert_file") || pgmoneta_starts_with(trimmed_line, "tls_key_file") || pgmoneta_starts_with(trimmed_line, "tls_ca_file") || pgmoneta_starts_with(trimmed_line, "pidfile"))
             {
                extract_syskey_value(trimmed_line, &key, &value);
             }
@@ -2557,7 +2552,6 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-
       if (!is_empty_string(line))
       {
          if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
@@ -2633,7 +2627,6 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
          decoded = NULL;
 
          index++;
-
       }
       free(trimmed_line);
       trimmed_line = NULL;
@@ -2767,7 +2760,6 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
 
    while (fgets(line, sizeof(line), file))
    {
-
       if (!is_empty_string(line))
       {
          if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
@@ -2843,7 +2835,6 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
          decoded = NULL;
 
          index++;
-
       }
       free(trimmed_line);
       trimmed_line = NULL;
@@ -3258,7 +3249,6 @@ error:
    pgmoneta_stop_logging();
 
    exit(1);
-
 }
 
 int

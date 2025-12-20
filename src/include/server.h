@@ -43,9 +43,9 @@ extern "C" {
  */
 struct file_stats
 {
-   size_t size;             /**< The size of the file */
-   bool is_dir;             /**< Is the file a directory */
-   struct tm timetamps[4];  /**< array of timestamps in the order: access time, modification time, change time and creation time */
+   size_t size;            /**< The size of the file */
+   bool is_dir;            /**< Is the file a directory */
+   struct tm timetamps[4]; /**< array of timestamps in the order: access time, modification time, change time and creation time */
 };
 
 /**
@@ -66,12 +66,12 @@ struct file_stats
  */
 struct label_file_contents
 {
-   char checkpoint_lsn[MISC_LENGTH];    /**< The checkpoint location */
-   char backup_method[MISC_LENGTH];     /**< The backup method */
-   char backup_from[MISC_LENGTH];       /**< The backup server */
-   struct tm start_time;                /**< The start time */
-   char label[MISC_LENGTH];             /**< The label */
-   uint32_t start_tli;                  /**< The start timeline */
+   char checkpoint_lsn[MISC_LENGTH]; /**< The checkpoint location */
+   char backup_method[MISC_LENGTH];  /**< The backup method */
+   char backup_from[MISC_LENGTH];    /**< The backup server */
+   struct tm start_time;             /**< The start time */
+   char label[MISC_LENGTH];          /**< The label */
+   uint32_t start_tli;               /**< The start timeline */
 };
 
 /**

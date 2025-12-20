@@ -53,11 +53,10 @@ struct timeline_history
 /**
  * @brief Enum representing types of PostgreSQL objects
  */
-typedef enum
-{
-   OBJ_TABLESPACE,  /**< Tablespace object */
-   OBJ_DATABASE,    /**< Database object */
-   OBJ_RELATION     /**< Relation (table/view) object */
+typedef enum {
+   OBJ_TABLESPACE, /**< Tablespace object */
+   OBJ_DATABASE,   /**< Database object */
+   OBJ_RELATION    /**< Relation (table/view) object */
 } object_type;
 
 /**
@@ -65,9 +64,9 @@ typedef enum
  */
 typedef struct
 {
-   int oid;           /**< Object identifier (OID) */
-   object_type type;  /**< Type of object (tablespace/database/relation) */
-   char* name;        /**< Name of the object (read-only) */
+   int oid;          /**< Object identifier (OID) */
+   object_type type; /**< Type of object (tablespace/database/relation) */
+   char* name;       /**< Name of the object (read-only) */
 } oid_mapping;
 
 /**

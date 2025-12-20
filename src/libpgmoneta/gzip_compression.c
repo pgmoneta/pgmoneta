@@ -43,7 +43,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "gzip"
+#define NAME          "gzip"
 #define BUFFER_LENGTH 8192
 
 static int gz_compress(char* from, int level, char* to);

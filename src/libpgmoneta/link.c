@@ -484,7 +484,7 @@ trim_suffix(char* str)
    char* res = NULL;
    struct main_configuration* config;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct main_configuration*)shmem;
    int len = 0;
    if (str == NULL)
    {

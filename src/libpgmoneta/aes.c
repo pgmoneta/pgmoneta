@@ -37,7 +37,7 @@
 /* System */
 #include <dirent.h>
 
-#define NAME "aes"
+#define NAME         "aes"
 #define ENC_BUF_SIZE (1024 * 1024)
 
 static int encrypt_file(char* from, char* to, int enc);
@@ -702,7 +702,7 @@ static int
 derive_key_iv(char* password, unsigned char* key, unsigned char* iv, int mode)
 {
    if (!EVP_BytesToKey(get_cipher(mode)(), EVP_sha1(), NULL,
-                       (unsigned char*) password, strlen(password), 1,
+                       (unsigned char*)password, strlen(password), 1,
                        key, iv))
    {
       return 1;
@@ -720,7 +720,7 @@ aes_encrypt(char* plaintext, unsigned char* key, unsigned char* iv, char** ciphe
    size_t size;
    unsigned char* ct = NULL;
    int ct_length;
-   const EVP_CIPHER* (* cipher_fp)(void) = get_cipher(mode);
+   const EVP_CIPHER* (*cipher_fp)(void) = get_cipher(mode);
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
       goto error;
@@ -784,7 +784,7 @@ aes_decrypt(char* ciphertext, int ciphertext_length, unsigned char* key, unsigne
    int length;
    size_t size;
    char* pt = NULL;
-   const EVP_CIPHER* (* cipher_fp)(void) = get_cipher(mode);
+   const EVP_CIPHER* (*cipher_fp)(void) = get_cipher(mode);
 
    if (!(ctx = EVP_CIPHER_CTX_new()))
    {
@@ -878,7 +878,7 @@ encrypt_file(char* from, char* to, int enc)
    char* master_key = NULL;
    EVP_CIPHER_CTX* ctx = NULL;
    struct main_configuration* config;
-   const EVP_CIPHER* (* cipher_fp)(void) = NULL;
+   const EVP_CIPHER* (*cipher_fp)(void) = NULL;
    int cipher_block_size = 0;
    int inbuf_size = 0;
    int outbuf_size = 0;

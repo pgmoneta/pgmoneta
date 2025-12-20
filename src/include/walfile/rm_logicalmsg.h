@@ -31,7 +31,7 @@
 
 #include <walfile/wal_reader.h>
 
-#define XLOG_LOGICAL_MESSAGE  0x00
+#define XLOG_LOGICAL_MESSAGE 0x00
 
 /**
  * @struct xl_logical_message
@@ -43,11 +43,11 @@
  */
 struct xl_logical_message
 {
-   oid db_id;                /**< OID of the database the message was emitted from. */
-   bool transactional;      /**< Indicates if the message is transactional. */
-   size_t prefix_size;      /**< Length of the message prefix. */
-   size_t message_size;     /**< Size of the message content. */
-   char message[FLEXIBLE_ARRAY_MEMBER];  /**< The message payload, including the null-terminated prefix. */
+   oid db_id;                           /**< OID of the database the message was emitted from. */
+   bool transactional;                  /**< Indicates if the message is transactional. */
+   size_t prefix_size;                  /**< Length of the message prefix. */
+   size_t message_size;                 /**< Size of the message content. */
+   char message[FLEXIBLE_ARRAY_MEMBER]; /**< The message payload, including the null-terminated prefix. */
 };
 
 /**

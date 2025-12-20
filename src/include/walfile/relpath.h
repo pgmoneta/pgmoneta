@@ -32,20 +32,20 @@
 
 #include <walfile/wal_reader.h>
 
-typedef int backend_id;        /* unique currently active backend identifier */
+typedef int backend_id; /* unique currently active backend identifier */
 
-#define INVALID_BACKEND_ID       (-1)
+#define INVALID_BACKEND_ID    (-1)
 
-#define DEFAULTTABLESPACE_OID    1663
-#define GLOBALTABLESPACE_OID     1664
+#define DEFAULTTABLESPACE_OID 1663
+#define GLOBALTABLESPACE_OID  1664
 
-#define RELPATHBACKEND(rnode, backend, forknum) \
-        pgmoneta_wal_get_relation_path((rnode).dbNode, (rnode).spcNode, (rnode).relNode, \
-                                       backend, forknum)
+#define RELPATHBACKEND(rnode, backend, forknum)                                     \
+   pgmoneta_wal_get_relation_path((rnode).dbNode, (rnode).spcNode, (rnode).relNode, \
+                                  backend, forknum)
 
 /* First argument is a rel_file_node */
 #define RELPATHPERM(rnode, forknum) \
-        RELPATHBACKEND(rnode, INVALID_BACKEND_ID, forknum)
+   RELPATHBACKEND(rnode, INVALID_BACKEND_ID, forknum)
 
 /**
  * @brief Generates the filesystem path for a relation file.

@@ -33,11 +33,10 @@
 static char*
 database_desc_v17(char* buf, char* rec, uint8_t info)
 {
-
    if (info == XLOG_DBASE_CREATE_FILE_COPY)
    {
       struct xl_dbase_create_file_copy_rec* xlrec =
-         (struct xl_dbase_create_file_copy_rec*) rec;
+         (struct xl_dbase_create_file_copy_rec*)rec;
 
       buf = pgmoneta_format_and_append(buf, "copy dir %u/%u to %u/%u",
                                        xlrec->src_tablespace_id, xlrec->src_db_id,
@@ -46,14 +45,14 @@ database_desc_v17(char* buf, char* rec, uint8_t info)
    else if (info == XLOG_DBASE_CREATE_WAL_LOG)
    {
       struct xl_dbase_create_wal_log_rec* xlrec =
-         (struct xl_dbase_create_wal_log_rec*) rec;
+         (struct xl_dbase_create_wal_log_rec*)rec;
 
       buf = pgmoneta_format_and_append(buf, "create dir %u/%u",
                                        xlrec->tablespace_id, xlrec->db_id);
    }
    else if (info == XLOG_DBASE_DROP_V17)
    {
-      struct xl_dbase_drop_rec* xlrec = (struct xl_dbase_drop_rec*) rec;
+      struct xl_dbase_drop_rec* xlrec = (struct xl_dbase_drop_rec*)rec;
       int i;
 
       buf = pgmoneta_format_and_append(buf, "dir");
@@ -80,7 +79,7 @@ pgmoneta_wal_database_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_DBASE_CREATE)
    {
-      struct xl_dbase_create_rec* xlrec = (struct xl_dbase_create_rec*) rec;
+      struct xl_dbase_create_rec* xlrec = (struct xl_dbase_create_rec*)rec;
 
       buf = pgmoneta_format_and_append(buf, "copy dir %u/%u to %u/%u",
                                        xlrec->src_tablespace_id, xlrec->src_db_id,
@@ -88,7 +87,7 @@ pgmoneta_wal_database_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_DBASE_DROP)
    {
-      struct xl_dbase_drop_rec* xlrec = (struct xl_dbase_drop_rec*) rec;
+      struct xl_dbase_drop_rec* xlrec = (struct xl_dbase_drop_rec*)rec;
       int i;
 
       buf = pgmoneta_format_and_append(buf, "dir");

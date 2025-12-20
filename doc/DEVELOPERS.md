@@ -45,7 +45,7 @@ This will install PostgreSQL 17.
 #### Basic dependencies
 
 ``` sh
-dnf install git gcc clang clang-analyzer cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
+dnf install git gcc clang clang-analyzer clang-tools-extra cmake make libev libev-devel openssl openssl-devel systemd systemd-devel zlib zlib-devel libzstd libzstd-devel lz4 lz4-devel libssh libssh-devel python3-docutils libatomic bzip2 bzip2-devel libarchive libarchive-devel libasan libasan-static
 ```
 
 #### Generate user and developer guide
@@ -419,7 +419,7 @@ Now that we've attempted our first backup, take a moment to relax. There are a f
 
 1. Since we initialized the database in `/tmp`, the data in this directory might be removed after you go offline, depending on your OS configuration. If you want to make it permanent, choose a different directory.
 
-2. Always use uncrustify to format your code when you make modifications.
+2. Always use clang-format to format your code when you make modifications.
 
 ## Testing
 

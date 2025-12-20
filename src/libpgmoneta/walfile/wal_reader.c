@@ -119,7 +119,7 @@ static inline int
 xlog_from_file_name(char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wal_segsz_bytes)
 {
 #define XLogSegmentsPerXLogId(wal_segsz_bytes) \
-        (0x100000000UL / (wal_segsz_bytes))
+   (0x100000000UL / (wal_segsz_bytes))
    uint32_t log;
    uint32_t seg;
    int items_scanned;
@@ -130,7 +130,7 @@ xlog_from_file_name(char* fname, timeline_id* tli, xlog_seg_no* logSegNo, int wa
       return 1;
    }
 
-   *logSegNo = (uint64_t) log * XLogSegmentsPerXLogId(wal_segsz_bytes) + seg;
+   *logSegNo = (uint64_t)log * XLogSegmentsPerXLogId(wal_segsz_bytes) + seg;
    return 0;
 }
 
@@ -145,7 +145,7 @@ pgmoneta_wal_array_desc(char* buf, void* array, size_t elem_size, int count)
    buf = pgmoneta_format_and_append(buf, " [");
    for (int i = 0; i < count; i++)
    {
-      buf = pgmoneta_format_and_append(buf, "%u", *(offset_number*) ((char*) array + elem_size * i));
+      buf = pgmoneta_format_and_append(buf, "%u", *(offset_number*)((char*)array + elem_size * i));
       if (i < count - 1)
       {
          buf = pgmoneta_format_and_append(buf, ", ");
@@ -175,7 +175,7 @@ read_all_page_headers(FILE* file, struct xlog_long_page_header_data* long_header
          pgmoneta_log_error("Error: Failed to read the complete data");
          goto error;
       }
-      pgmoneta_deque_add(wal_file->page_headers, NULL, (uintptr_t) page_header, ValueRef);
+      pgmoneta_deque_add(wal_file->page_headers, NULL, (uintptr_t)page_header, ValueRef);
       page_number++;
    }
 finish:
@@ -188,13 +188,13 @@ error:
 int
 pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 {
-#define MALLOC(pointer, size) \
-        pointer = malloc(size); \
-        if (pointer == NULL) \
-        { \
-           pgmoneta_log_fatal("Error: Could not allocate memory for %s", #pointer); \
-           goto error; \
-        }
+#define MALLOC(pointer, size)                                                  \
+   pointer = malloc(size);                                                     \
+   if (pointer == NULL)                                                        \
+   {                                                                           \
+      pgmoneta_log_fatal("Error: Could not allocate memory for %s", #pointer); \
+      goto error;                                                              \
+   }
 
    struct xlog_record* record = NULL;
    struct xlog_long_page_header_data* long_header = NULL;
@@ -223,7 +223,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       goto error;
    }
 
-   config = (struct walinfo_configuration*) shmem;
+   config = (struct walinfo_configuration*)shmem;
 
    file = fopen(path, "rb");
    if (file == NULL)
@@ -275,8 +275,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       next_record = MAXALIGN(
          ftell(file) +
          ((long_header->std.xlp_rem_len / long_header->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
-         long_header->std.xlp_rem_len % long_header->xlp_xlog_blcksz
-         );
+         long_header->std.xlp_rem_len % long_header->xlp_xlog_blcksz);
 
       if (partial_record->xlog_record_bytes_read == 0)
       {
@@ -287,7 +286,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
             goto error;
          }
          decoded->partial = true;
-         if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
+         if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t)decoded, ValueRef))
          {
             free(decoded);
             decoded = NULL;
@@ -327,7 +326,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
                goto error;
             }
             decoded->partial = true;
-            if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
+            if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t)decoded, ValueRef))
             {
                free(decoded);
                decoded = NULL;
@@ -377,7 +376,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          }
 
          assert(bytes_read == SIZE_OF_XLOG_RECORD);
-         record = (struct xlog_record*) temp_buffer;
+         record = (struct xlog_record*)temp_buffer;
          temp_buffer = NULL;
          page_number++;
       }
@@ -517,7 +516,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
          lsn_array[lsn_array_size] = lsn;
          lsn_array_size++;
 
-         if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t) decoded, ValueRef))
+         if (pgmoneta_deque_add(wal_file->records, NULL, (uintptr_t)decoded, ValueRef))
          {
             free(decoded);
             decoded = NULL;
@@ -540,7 +539,7 @@ finish:
 
    while (pgmoneta_deque_iterator_next(iter))
    {
-      decoded = (struct decoded_xlog_record*) iter->value->data;
+      decoded = (struct decoded_xlog_record*)iter->value->data;
       decoded->next_lsn = lsn_array[idx++];
    }
 
@@ -581,14 +580,16 @@ error:
 static int
 decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn)
 {
-#define COPY_HEADER_FIELD(_dst, _size)          \
-        do {                                        \
-           if (remaining < _size)                  \
-           goto shortdata_err;                 \
-           memcpy(_dst, ptr, _size);               \
-           ptr += _size;                           \
-           remaining -= _size;                     \
-        } while (0)
+#define COPY_HEADER_FIELD(_dst, _size) \
+   do                                  \
+   {                                   \
+      if (remaining < _size)           \
+         goto shortdata_err;           \
+      memcpy(_dst, ptr, _size);        \
+      ptr += _size;                    \
+      remaining -= _size;              \
+   }                                   \
+   while (0)
 
    decoded->header = *record;
    decoded->lsn = lsn;
@@ -809,8 +810,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
       decoded->main_data = malloc(decoded->main_data_len);
       if (decoded->main_data == NULL)
       {
-         goto
-         shortdata_err;
+         goto shortdata_err;
       }
       memcpy(decoded->main_data, ptr, decoded->main_data_len);
       ptr += decoded->main_data_len;
@@ -877,7 +877,7 @@ get_record_length(struct decoded_xlog_record* record, uint32_t* rec_len, uint32_
       }
    }
 
-/*
+   /*
  * Calculate the length of the record as the total length - the length of
  * all the block images.
  */
@@ -980,21 +980,19 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
                buf = pgmoneta_format_and_append(buf,
                                                 " (FPW%s); hole: offset: %u, length: %u, "
                                                 "compression saved: %u, method: %s",
-                                                record->blocks[block_id].apply_image ?
-                                                "" : " for WAL verification",
+                                                record->blocks[block_id].apply_image ? "" : " for WAL verification",
                                                 record->blocks[block_id].hole_offset,
                                                 record->blocks[block_id].hole_length,
                                                 8192 -
-                                                record->blocks[block_id].hole_length -
-                                                record->blocks[block_id].bimg_len,
+                                                   record->blocks[block_id].hole_length -
+                                                   record->blocks[block_id].bimg_len,
                                                 method);
             }
             else
             {
                buf = pgmoneta_format_and_append(buf,
                                                 " (FPW%s); hole: offset: %u, length: %u",
-                                                XLOG_REC_BLOCK_IMAGE_APPLY(record, block_id) ?
-                                                "" : " for WAL verification",
+                                                XLOG_REC_BLOCK_IMAGE_APPLY(record, block_id) ? "" : " for WAL verification",
                                                 XLOG_REC_GET_BLOCK(record, block_id)->hole_offset,
                                                 XLOG_REC_GET_BLOCK(record, block_id)->hole_length);
             }
@@ -1301,7 +1299,7 @@ pgmoneta_calculate_column_widths(struct walfile* wf, uint64_t start_lsn, uint64_
 
    while (pgmoneta_deque_iterator_next(record_iterator))
    {
-      record = (struct decoded_xlog_record*) record_iterator->value->data;
+      record = (struct decoded_xlog_record*)record_iterator->value->data;
 
       if (record->partial)
       {
@@ -1829,7 +1827,7 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct valu
    backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
 
    // Header serialization
-   pgmoneta_json_put(record_json, "ResourceManager", (uintptr_t) rmgr_table[record->header.xl_rmid].name, ValueString);
+   pgmoneta_json_put(record_json, "ResourceManager", (uintptr_t)rmgr_table[record->header.xl_rmid].name, ValueString);
    pgmoneta_json_put(record_json, "RecordLength", rec_len, ValueUInt32);
    pgmoneta_json_put(record_json, "TotalLength", record->header.xl_tot_len, ValueUInt32);
    pgmoneta_json_put(record_json, "Xid", record->header.xl_xid, ValueUInt32);
@@ -1840,14 +1838,14 @@ record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct valu
    pgmoneta_json_put(record_json, "Crc", record->header.xl_crc, ValueUInt32);
 
    // Data serialization
-   pgmoneta_json_put(record_json, "Data", (uintptr_t) rm_desc, ValueString);
+   pgmoneta_json_put(record_json, "Data", (uintptr_t)rm_desc, ValueString);
 
    // Backup serialization
    get_record_length(record, &rec_len, &fpi_len);
-   pgmoneta_json_put(record_json, "Description", (uintptr_t) backup_str, ValueString);
+   pgmoneta_json_put(record_json, "Description", (uintptr_t)backup_str, ValueString);
 
 finish:
-   pgmoneta_value_create(ValueJSON, (uintptr_t) record_json, value);
+   pgmoneta_value_create(ValueJSON, (uintptr_t)record_json, value);
    free(rm_desc);
    free(backup_str);
 }
@@ -1999,7 +1997,7 @@ summarize_dbase_record(struct decoded_xlog_record* record, block_ref_table* brt)
       struct xl_dbase_create_file_copy_rec* xlrec;
       struct rel_file_locator rlocator;
 
-      xlrec = (struct xl_dbase_create_file_copy_rec*) XLOG_REC_GET_DATA(record);
+      xlrec = (struct xl_dbase_create_file_copy_rec*)XLOG_REC_GET_DATA(record);
       rlocator.spcOid = xlrec->tablespace_id;
       rlocator.dbOid = xlrec->db_id;
       rlocator.relNumber = 0;
@@ -2010,7 +2008,7 @@ summarize_dbase_record(struct decoded_xlog_record* record, block_ref_table* brt)
       struct xl_dbase_create_wal_log_rec* xlrec;
       struct rel_file_locator rlocator;
 
-      xlrec = (struct xl_dbase_create_wal_log_rec*) XLOG_REC_GET_DATA(record);
+      xlrec = (struct xl_dbase_create_wal_log_rec*)XLOG_REC_GET_DATA(record);
       rlocator.spcOid = xlrec->tablespace_id;
       rlocator.dbOid = xlrec->db_id;
       rlocator.relNumber = 0;
@@ -2021,7 +2019,7 @@ summarize_dbase_record(struct decoded_xlog_record* record, block_ref_table* brt)
       struct xl_dbase_drop_rec* xlrec;
       struct rel_file_locator rlocator;
 
-      xlrec = (struct xl_dbase_drop_rec*) XLOG_REC_GET_DATA(record);
+      xlrec = (struct xl_dbase_drop_rec*)XLOG_REC_GET_DATA(record);
       rlocator.dbOid = xlrec->db_id;
       rlocator.relNumber = 0;
       for (int i = 0; i < xlrec->ntablespaces; ++i)
@@ -2049,7 +2047,7 @@ summarize_smgr_record(struct decoded_xlog_record* record, block_ref_table* brt)
        * changed — the entire fork is considered new. So, we set its limit block to 0. The FSM
        * (Free Space Map) fork is skipped here since it's not fully logged in WAL.
        */
-      xlrec = (struct xl_smgr_create*) XLOG_REC_GET_DATA(record);
+      xlrec = (struct xl_smgr_create*)XLOG_REC_GET_DATA(record);
 
       rlocator.spcOid = xlrec->rnode.spcNode;
       rlocator.dbOid = xlrec->rnode.dbNode;
@@ -2065,7 +2063,7 @@ summarize_smgr_record(struct decoded_xlog_record* record, block_ref_table* brt)
    {
       struct xl_smgr_truncate* xlrec;
 
-      xlrec = (struct xl_smgr_truncate*) XLOG_REC_GET_DATA(record);
+      xlrec = (struct xl_smgr_truncate*)XLOG_REC_GET_DATA(record);
 
       rlocator.spcOid = xlrec->rnode.spcNode;
       rlocator.dbOid = xlrec->rnode.dbNode;

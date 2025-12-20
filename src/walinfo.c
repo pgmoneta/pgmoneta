@@ -51,14 +51,14 @@
 #include <unistd.h>
 
 /* Column widths for WAL statistics table */
-#define COL_WIDTH_COUNT           9
-#define COL_WIDTH_COUNT_PCT       8
-#define COL_WIDTH_RECORD_SIZE     14
-#define COL_WIDTH_RECORD_PCT      8
-#define COL_WIDTH_FPI_SIZE        10
-#define COL_WIDTH_FPI_PCT         8
-#define COL_WIDTH_COMBINED_SIZE   14
-#define COL_WIDTH_COMBINED_PCT    10
+#define COL_WIDTH_COUNT         9
+#define COL_WIDTH_COUNT_PCT     8
+#define COL_WIDTH_RECORD_SIZE   14
+#define COL_WIDTH_RECORD_PCT    8
+#define COL_WIDTH_FPI_SIZE      10
+#define COL_WIDTH_FPI_PCT       8
+#define COL_WIDTH_COMBINED_SIZE 14
+#define COL_WIDTH_COMBINED_PCT  10
 
 /**
  * Center-align a string within a given width
@@ -538,7 +538,7 @@ main(int argc, char** argv)
          }
          else
          {
-            start_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+            start_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
          }
       }
       else if (!strcmp(optname, "e") || !strcmp(optname, "end"))
@@ -558,7 +558,7 @@ main(int argc, char** argv)
          }
          else
          {
-            end_lsn = strtoull(optarg, NULL, 10);    // Assuming optarg is a decimal number
+            end_lsn = strtoull(optarg, NULL, 10); // Assuming optarg is a decimal number
          }
       }
       else if (!strcmp(optname, "x") || !strcmp(optname, "xid"))

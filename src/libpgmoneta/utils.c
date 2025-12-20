@@ -68,10 +68,10 @@
 #endif
 
 #ifndef EVBACKEND_IOURING
-#define EVBACKEND_IOURING  0x00000080U
+#define EVBACKEND_IOURING 0x00000080U
 #endif
 
-#ifdef  HAVE_EXECINFO_H
+#ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
 
@@ -288,7 +288,7 @@ pgmoneta_extract_error_fields(char type, struct message* msg, char** extracted)
 
       if (type == t)
       {
-         result = (char*) malloc(field_len);
+         result = (char*)malloc(field_len);
          memset(result, 0, field_len);
          strcpy(result, msg->data + offset + 1);
 
@@ -387,13 +387,13 @@ pgmoneta_extract_message_from_data(char type, void* data, size_t data_size, stru
 signed char
 pgmoneta_read_byte(void* data)
 {
-   return (signed char) *((char*)data);
+   return (signed char)*((char*)data);
 }
 
 uint8_t
 pgmoneta_read_uint8(void* data)
 {
-   return (uint8_t) *((char*)data);
+   return (uint8_t)*((char*)data);
 }
 
 int16_t
@@ -479,7 +479,7 @@ pgmoneta_read_uint64(void* data)
 bool
 pgmoneta_read_bool(void* data)
 {
-   return (bool) *((bool*)data);
+   return (bool)*((bool*)data);
 }
 
 void
@@ -776,9 +776,9 @@ pgmoneta_get_home_directory(void)
    char* dir = NULL;
 
 #if defined(HAVE_DARWIN) || defined(HAVE_OSX)
-   #define GET_ENV(name) getenv(name)
+#define GET_ENV(name) getenv(name)
 #else
-   #define GET_ENV(name) secure_getenv(name)
+#define GET_ENV(name) secure_getenv(name)
 #endif
 
    dir = pgmoneta_append(dir, GET_ENV("HOME"));
@@ -1039,9 +1039,7 @@ pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
 unsigned int
 pgmoneta_version_as_number(unsigned int major, unsigned int minor, unsigned int patch)
 {
-   return (patch % 100)
-          + (minor % 100) * 100
-          + (major % 100) * 10000;
+   return (patch % 100) + (minor % 100) * 100 + (major % 100) * 10000;
 }
 
 unsigned int
@@ -1194,7 +1192,10 @@ hvsnprintf(char* buf, size_t n, const char* fmt, va_list ap)
       }
 
       /* Length modifier */
-      enum { LM_NONE, LM_L, LM_LL, LM_Z } lm = LM_NONE;
+      enum { LM_NONE,
+             LM_L,
+             LM_LL,
+             LM_Z } lm = LM_NONE;
       if (*p == 'l')
       {
          p++;
@@ -2692,7 +2693,6 @@ pgmoneta_symlink_at_file(char* from, char* to)
    free(dir_path);
 
    return ret;
-
 }
 
 bool
@@ -3487,7 +3487,7 @@ pgmoneta_get_server_wal_shipping(int server)
 {
    struct main_configuration* config;
    char* ws = NULL;
-   config = (struct main_configuration*) shmem;
+   config = (struct main_configuration*)shmem;
    if (server < 0 || server >= config->common.number_of_servers)
    {
       return NULL;
@@ -4179,13 +4179,13 @@ parse_command(int argc,
       command_index = default_command_match;
       subcommand = "";
    }
-   else if (command_index == -1)  /* Command was matched, but subcommand was not */
+   else if (command_index == -1) /* Command was matched, but subcommand was not */
    {
       if (subcommand)
       {
          warnx("Unknown subcommand '%s' for command '%s'\n", subcommand, command);
       }
-      else  /* User did not type a subcommand */
+      else /* User did not type a subcommand */
       {
          warnx("Command '%s' requires a subcommand\n", command);
       }
@@ -4221,12 +4221,11 @@ parse_command(int argc,
    {
       parsed->args[i] = argv[i + offset];
    }
-   parsed->args[0] = parsed->args[0] ? parsed->args[0] : (char*) parsed->cmd->default_argument;
+   parsed->args[0] = parsed->args[0] ? parsed->args[0] : (char*)parsed->cmd->default_argument;
 
    /* Warn the user if there is enough information about deprecation */
-   if (parsed->cmd->deprecated
-       && pgmoneta_version_ge(parsed->cmd->deprecated_since_major,
-                              parsed->cmd->deprecated_since_minor, 0))
+   if (parsed->cmd->deprecated && pgmoneta_version_ge(parsed->cmd->deprecated_since_major,
+                                                      parsed->cmd->deprecated_since_minor, 0))
    {
       warnx("command <%s> has been deprecated by <%s> since version %d.%d",
             parsed->cmd->command,
@@ -4280,7 +4279,7 @@ pgmoneta_token_bucket_add(struct token_bucket* tb)
    unsigned long cur_time;
 
    expected_time = atomic_load(&tb->last_time);
-   cur_time = (unsigned long) time(NULL);
+   cur_time = (unsigned long)time(NULL);
    diff = cur_time - expected_time;
 
    if (diff < (unsigned long)tb->every)
@@ -4292,7 +4291,7 @@ pgmoneta_token_bucket_add(struct token_bucket* tb)
    while (!atomic_compare_exchange_weak(&tb->last_time, &expected_time, cur_time))
    {
       expected_time = atomic_load(&tb->last_time);
-      cur_time = (unsigned long) time(NULL);
+      cur_time = (unsigned long)time(NULL);
       diff = cur_time - expected_time;
       if (diff < (unsigned long)tb->every)
       {
@@ -4336,7 +4335,6 @@ pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens)
       unsigned long cur_tokens;
       while (accum < tokens)
       {
-
          cur_tokens = atomic_load(&tb->cur_tokens);
          if (!pgmoneta_token_bucket_once(tb, cur_tokens))
          {
@@ -4348,7 +4346,6 @@ pgmoneta_token_bucket_consume(struct token_bucket* tb, unsigned long tokens)
          }
       }
       return 0;
-
    }
 }
 
@@ -4395,7 +4392,6 @@ pgmoneta_format_and_append(char* buf, char* format, ...)
    free(formatted_str);
 
    return buf;
-
 }
 
 int
@@ -4726,11 +4722,11 @@ pgmoneta_is_substring(char* a, char* b)
 int
 pgmoneta_resolve_path(char* orig_path, char** new_path)
 {
-   #if defined(HAVE_DARWIN) || defined(HAVE_OSX)
-      #define GET_ENV(name) getenv(name)
-   #else
-      #define GET_ENV(name) secure_getenv(name)
-   #endif
+#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+#define GET_ENV(name) getenv(name)
+#else
+#define GET_ENV(name) secure_getenv(name)
+#endif
 
    char* res = NULL;
    char* env_res = NULL;
@@ -4751,10 +4747,7 @@ pgmoneta_resolve_path(char* orig_path, char** new_path)
    {
       char* ch = NULL;
 
-      bool valid_env_char = orig_path[idx] == '_'
-                            || (orig_path[idx] >= 'A' && orig_path[idx] <= 'Z')
-                            || (orig_path[idx] >= 'a' && orig_path[idx] <= 'z')
-                            || (orig_path[idx] >= '0' && orig_path[idx] <= '9');
+      bool valid_env_char = orig_path[idx] == '_' || (orig_path[idx] >= 'A' && orig_path[idx] <= 'Z') || (orig_path[idx] >= 'a' && orig_path[idx] <= 'z') || (orig_path[idx] >= '0' && orig_path[idx] <= '9');
       if (in_env && !valid_env_char)
       {
          in_env = false;
@@ -4855,13 +4848,12 @@ error:
    return 1;
 }
 
-__attribute__((unused))
-static bool
+__attribute__((unused)) static bool
 calculate_offset(uint64_t addr, uint64_t* offset, char** filepath)
 {
 #if defined(HAVE_LINUX) && defined(HAVE_EXECINFO_H)
    char line[256];
-   char* start, * end, * base_offset, * filepath_ptr;
+   char *start, *end, *base_offset, *filepath_ptr;
    uint64_t start_addr, end_addr, base_offset_value;
    FILE* fp;
    bool success = false;
@@ -4942,7 +4934,7 @@ pgmoneta_backtrace(void)
 int
 pgmoneta_backtrace_string(char** s)
 {
-#ifdef  HAVE_EXECINFO_H
+#ifdef HAVE_EXECINFO_H
    void* bt[1024];
    char* log_str = NULL;
    size_t bt_size;
@@ -5107,17 +5099,13 @@ pgmoneta_os_kernel_version(char** os, int* kernel_major, int* kernel_minor, int*
    if (!bsd)
 
    {
-
       pgmoneta_log_debug("OS: %s | Kernel Version: %d.%d.%d", *os, *kernel_major, *kernel_minor, *kernel_patch);
-
    }
 
    else
 
    {
-
       pgmoneta_log_debug("OS: %s | Version: %d.%d", *os, *kernel_major, *kernel_minor);
-
    }
 
    return 0;

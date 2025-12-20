@@ -53,7 +53,7 @@
 #include <string.h>
 
 #define SPCOID_PG_DEFAULT 1663
-#define SPCOID_PG_GLOBAL 1664
+#define SPCOID_PG_GLOBAL  1664
 
 /* fetch/compute these from server configuration inside create workflow */
 size_t block_size;       // size of each block (default 8KB)
@@ -344,7 +344,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
       }
 
       /* handle base and global directories */
-      if (pgmoneta_ends_with(server_files[i], "pg_internal.init"))   // ignore this file for backup
+      if (pgmoneta_ends_with(server_files[i], "pg_internal.init")) // ignore this file for backup
       {
          continue;
       }
@@ -698,7 +698,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
 
    config = (struct main_configuration*)shmem;
 
-   #ifdef DEBUG
+#ifdef DEBUG
    pgmoneta_dump_art(nodes);
 
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
@@ -707,7 +707,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_BASE));
    assert(pgmoneta_art_contains_key(nodes, NODE_BACKUP_DATA));
    assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_BACKUP));
-   #endif
+#endif
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
@@ -718,11 +718,11 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
 
    pgmoneta_log_debug("Incremental backup (execute): %s", config->common.servers[server].name, label);
 
-   #ifdef HAVE_FREEBSD
+#ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
-   #else
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
-   #endif
+#endif
 
    incremental = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_BASE);
    incremental_label = (char*)pgmoneta_art_search(nodes, NODE_INCREMENTAL_LABEL);
@@ -929,11 +929,11 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    // receive and ignore the last result set, it's just a summary
    pgmoneta_consume_data_row_messages(server, ssl, socket, buffer, &response);
 
-   #ifdef HAVE_FREEBSD
+#ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
-   #else
+#else
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
-   #endif
+#endif
 
    basebackup_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
    hours = (int)basebackup_elapsed_time / 3600;

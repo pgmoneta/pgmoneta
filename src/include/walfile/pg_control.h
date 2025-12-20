@@ -38,23 +38,23 @@
 typedef int64_t pg_time_t;
 
 /* XLOG info values for XLOG rmgr */
-#define XLOG_CHECKPOINT_SHUTDOWN      0x00   /**< XLOG record type for a shutdown checkpoint */
-#define XLOG_CHECKPOINT_ONLINE        0x10   /**< XLOG record type for an online checkpoint */
-#define XLOG_NOOP                     0x20   /**< XLOG record type for a no-op */
-#define XLOG_NEXTOID                  0x30   /**< XLOG record type for the next OID */
-#define XLOG_SWITCH                   0x40   /**< XLOG record type for a switch */
-#define XLOG_BACKUP_END               0x50   /**< XLOG record type for the end of a backup */
-#define XLOG_PARAMETER_CHANGE         0x60   /**< XLOG record type for a parameter change */
-#define XLOG_RESTORE_POINT            0x70   /**< XLOG record type for a restore point */
-#define XLOG_FPW_CHANGE               0x80   /**< XLOG record type for a full-page writes change */
-#define XLOG_END_OF_RECOVERY          0x90   /**< XLOG record type for the end of recovery */
-#define XLOG_FPI_FOR_HINT             0xA0   /**< XLOG record type for a full-page image for hint bits */
-#define XLOG_FPI                      0xB0   /**< XLOG record type for a full-page image */
-#define XLOG_OVERWRITE_CONTRECORD     0xD0   /**< XLOG record type for overwriting a continuation record */
-#define XLOG_CHECKPOINT_REDO          0x0E   /**< XLOG record type for a redo point */
+#define XLOG_CHECKPOINT_SHUTDOWN  0x00 /**< XLOG record type for a shutdown checkpoint */
+#define XLOG_CHECKPOINT_ONLINE    0x10 /**< XLOG record type for an online checkpoint */
+#define XLOG_NOOP                 0x20 /**< XLOG record type for a no-op */
+#define XLOG_NEXTOID              0x30 /**< XLOG record type for the next OID */
+#define XLOG_SWITCH               0x40 /**< XLOG record type for a switch */
+#define XLOG_BACKUP_END           0x50 /**< XLOG record type for the end of a backup */
+#define XLOG_PARAMETER_CHANGE     0x60 /**< XLOG record type for a parameter change */
+#define XLOG_RESTORE_POINT        0x70 /**< XLOG record type for a restore point */
+#define XLOG_FPW_CHANGE           0x80 /**< XLOG record type for a full-page writes change */
+#define XLOG_END_OF_RECOVERY      0x90 /**< XLOG record type for the end of recovery */
+#define XLOG_FPI_FOR_HINT         0xA0 /**< XLOG record type for a full-page image for hint bits */
+#define XLOG_FPI                  0xB0 /**< XLOG record type for a full-page image */
+#define XLOG_OVERWRITE_CONTRECORD 0xD0 /**< XLOG record type for overwriting a continuation record */
+#define XLOG_CHECKPOINT_REDO      0x0E /**< XLOG record type for a redo point */
 
-#define MOCK_AUTH_NONCE_LEN      32
-#define PG_CONTROL_MAX_SAFE_SIZE 512
+#define MOCK_AUTH_NONCE_LEN       32
+#define PG_CONTROL_MAX_SAFE_SIZE  512
 
 /**
  * @struct check_point_v13
@@ -80,22 +80,22 @@ typedef int64_t pg_time_t;
  */
 struct check_point_v13
 {
-   xlog_rec_ptr redo;                      /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
-   timeline_id this_timeline_id;           /**< Current timeline ID. */
-   timeline_id prev_timeline_id;           /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
-   bool full_page_writes;                  /**< Indicates the current full_page_writes setting. */
-   struct full_transaction_id next_xid;    /**< Next free transaction ID. */
-   oid next_oid;                           /**< Next free OID. */
-   multi_xact_id next_multi;               /**< Next free multi_xact_id. */
-   multi_xact_offset next_multi_offset;    /**< Next free MultiXact offset. */
-   transaction_id oldest_xid;              /**< Cluster-wide minimum datfrozenxid. */
-   oid oldest_xid_db;                      /**< Database with minimum datfrozenxid. */
-   multi_xact_id oldest_multi;             /**< Cluster-wide minimum datminmxid. */
-   oid oldest_multi_db;                    /**< Database with minimum datminmxid. */
-   pg_time_t time;                         /**< Timestamp of the checkpoint. */
-   transaction_id oldest_commit_ts_xid;    /**< Oldest XID with a valid commit timestamp. */
-   transaction_id newest_commit_ts_xid;    /**< Newest XID with a valid commit timestamp. */
-   transaction_id oldest_active_xid;       /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
+   xlog_rec_ptr redo;                   /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
+   timeline_id this_timeline_id;        /**< Current timeline ID. */
+   timeline_id prev_timeline_id;        /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
+   bool full_page_writes;               /**< Indicates the current full_page_writes setting. */
+   struct full_transaction_id next_xid; /**< Next free transaction ID. */
+   oid next_oid;                        /**< Next free OID. */
+   multi_xact_id next_multi;            /**< Next free multi_xact_id. */
+   multi_xact_offset next_multi_offset; /**< Next free MultiXact offset. */
+   transaction_id oldest_xid;           /**< Cluster-wide minimum datfrozenxid. */
+   oid oldest_xid_db;                   /**< Database with minimum datfrozenxid. */
+   multi_xact_id oldest_multi;          /**< Cluster-wide minimum datminmxid. */
+   oid oldest_multi_db;                 /**< Database with minimum datminmxid. */
+   pg_time_t time;                      /**< Timestamp of the checkpoint. */
+   transaction_id oldest_commit_ts_xid; /**< Oldest XID with a valid commit timestamp. */
+   transaction_id newest_commit_ts_xid; /**< Newest XID with a valid commit timestamp. */
+   transaction_id oldest_active_xid;    /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
 };
 
 /**
@@ -123,23 +123,23 @@ struct check_point_v13
  */
 struct check_point_v17
 {
-   xlog_rec_ptr redo;                      /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
-   timeline_id this_timeline_id;           /**< Current timeline ID. */
-   timeline_id prev_timeline_id;           /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
-   bool full_page_writes;                  /**< Indicates the current full_page_writes setting. */
-   int wal_level;                          /**< Current wal_level. */
-   struct full_transaction_id next_xid;    /**< Next free transaction ID. */
-   oid next_oid;                           /**< Next free OID. */
-   multi_xact_id next_multi;               /**< Next free multi_xact_id. */
-   multi_xact_offset next_multi_offset;    /**< Next free MultiXact offset. */
-   transaction_id oldest_xid;              /**< Cluster-wide minimum datfrozenxid. */
-   oid oldest_xid_db;                      /**< Database with minimum datfrozenxid. */
-   multi_xact_id oldest_multi;             /**< Cluster-wide minimum datminmxid. */
-   oid oldest_multi_db;                    /**< Database with minimum datminmxid. */
-   pg_time_t time;                         /**< Timestamp of the checkpoint. */
-   transaction_id oldest_commit_ts_xid;    /**< Oldest XID with a valid commit timestamp. */
-   transaction_id newest_commit_ts_xid;    /**< Newest XID with a valid commit timestamp. */
-   transaction_id oldest_active_xid;       /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
+   xlog_rec_ptr redo;                   /**< Next RecPtr available when the checkpoint was created (i.e., REDO start point). */
+   timeline_id this_timeline_id;        /**< Current timeline ID. */
+   timeline_id prev_timeline_id;        /**< Previous timeline ID, if the record begins a new timeline (equals this_timeline_id otherwise). */
+   bool full_page_writes;               /**< Indicates the current full_page_writes setting. */
+   int wal_level;                       /**< Current wal_level. */
+   struct full_transaction_id next_xid; /**< Next free transaction ID. */
+   oid next_oid;                        /**< Next free OID. */
+   multi_xact_id next_multi;            /**< Next free multi_xact_id. */
+   multi_xact_offset next_multi_offset; /**< Next free MultiXact offset. */
+   transaction_id oldest_xid;           /**< Cluster-wide minimum datfrozenxid. */
+   oid oldest_xid_db;                   /**< Database with minimum datfrozenxid. */
+   multi_xact_id oldest_multi;          /**< Cluster-wide minimum datminmxid. */
+   oid oldest_multi_db;                 /**< Database with minimum datminmxid. */
+   pg_time_t time;                      /**< Timestamp of the checkpoint. */
+   transaction_id oldest_commit_ts_xid; /**< Oldest XID with a valid commit timestamp. */
+   transaction_id newest_commit_ts_xid; /**< Newest XID with a valid commit timestamp. */
+   transaction_id oldest_active_xid;    /**< Oldest XID still running, calculated only for online checkpoints and when wal_level is replica. */
 };
 
 /**
@@ -153,13 +153,13 @@ struct check_point_v17
  */
 struct check_point
 {
-   void (*parse)(struct check_point* wrapper, void* rec);     /**< Parse function pointer */
-   char* (*format)(struct check_point* wrapper, char* buf);          /**< Format function pointer */
+   void (*parse)(struct check_point* wrapper, void* rec);   /**< Parse function pointer */
+   char* (*format)(struct check_point* wrapper, char* buf); /**< Format function pointer */
    union
    {
-      struct check_point_v13 v13;       /**< Version 13 data */
-      struct check_point_v17 v17;       /**< Version 17 data */
-   } data;   /**< Union holding version-specific checkpoint data */
+      struct check_point_v13 v13; /**< Version 13 data */
+      struct check_point_v17 v17; /**< Version 17 data */
+   } data;                        /**< Union holding version-specific checkpoint data */
 };
 
 /**
@@ -211,8 +211,7 @@ check_point_format_v17(struct check_point* wrapper, char* buf);
 /*
  * System status indicator.  Note this is stored in pg_control.
  */
-typedef enum db_state
-{
+typedef enum db_state {
    DB_STARTUP = 0,
    DB_SHUTDOWNED,
    DB_SHUTDOWNED_IN_RECOVERY,
@@ -265,53 +264,53 @@ typedef enum db_state
  */
 struct control_file_data_v13
 {
-   uint64_t system_identifier;                          /**< Unique system identifier for WAL file matching. */
-   uint32_t pg_control_version;                         /**< Version of the pg_control file format. */
-   uint32_t catalog_version_no;                         /**< Version of the system catalog format. */
-   db_state state;                                      /**< Current state of the database system. */
-   pg_time_t time;                                      /**< Timestamp of the last pg_control update. */
-   xlog_rec_ptr checkpoint;                             /**< Last checkpoint record pointer. */
+   uint64_t system_identifier;  /**< Unique system identifier for WAL file matching. */
+   uint32_t pg_control_version; /**< Version of the pg_control file format. */
+   uint32_t catalog_version_no; /**< Version of the system catalog format. */
+   db_state state;              /**< Current state of the database system. */
+   pg_time_t time;              /**< Timestamp of the last pg_control update. */
+   xlog_rec_ptr checkpoint;     /**< Last checkpoint record pointer. */
 
-   struct check_point_v13 checkpoint_copy;              /**< Copy of the last checkpoint record. */
+   struct check_point_v13 checkpoint_copy; /**< Copy of the last checkpoint record. */
 
-   xlog_rec_ptr unlogged_lsn;                           /**< Fake LSN value for unlogged relations. */
-   xlog_rec_ptr min_recovery_point;                     /**< Minimum recovery LSN before startup. */
-   timeline_id min_recovery_point_tli;                  /**< Timeline ID for min_recovery_point. */
-   xlog_rec_ptr backup_start_point;                     /**< Redo pointer of backup start checkpoint. */
-   xlog_rec_ptr backup_end_point;                       /**< LSN marking the backup end location. */
-   bool backup_end_required;                            /**< Indicates if an end-of-backup record is required before startup. */
+   xlog_rec_ptr unlogged_lsn;          /**< Fake LSN value for unlogged relations. */
+   xlog_rec_ptr min_recovery_point;    /**< Minimum recovery LSN before startup. */
+   timeline_id min_recovery_point_tli; /**< Timeline ID for min_recovery_point. */
+   xlog_rec_ptr backup_start_point;    /**< Redo pointer of backup start checkpoint. */
+   xlog_rec_ptr backup_end_point;      /**< LSN marking the backup end location. */
+   bool backup_end_required;           /**< Indicates if an end-of-backup record is required before startup. */
 
-   int wal_level;                                       /**< WAL logging level. */
-   bool wal_log_hints;                                  /**< Indicates if full-page writes are logged for hints. */
-   int max_connections;                                 /**< Maximum number of allowed concurrent connections. */
-   int max_worker_processes;                            /**< Maximum number of worker processes. */
-   int max_wal_senders;                                 /**< Maximum number of WAL sender processes. */
-   int max_prepared_xacts;                              /**< Maximum number of prepared transactions. */
-   int max_locks_per_xact;                              /**< Maximum number of locks per transaction. */
-   bool track_commit_timestamp;                         /**< Indicates if commit timestamps are tracked. */
+   int wal_level;               /**< WAL logging level. */
+   bool wal_log_hints;          /**< Indicates if full-page writes are logged for hints. */
+   int max_connections;         /**< Maximum number of allowed concurrent connections. */
+   int max_worker_processes;    /**< Maximum number of worker processes. */
+   int max_wal_senders;         /**< Maximum number of WAL sender processes. */
+   int max_prepared_xacts;      /**< Maximum number of prepared transactions. */
+   int max_locks_per_xact;      /**< Maximum number of locks per transaction. */
+   bool track_commit_timestamp; /**< Indicates if commit timestamps are tracked. */
 
-   uint32_t max_align;                                  /**< Alignment requirement for tuples. */
-   double float_format;                                 /**< Floating point format validation constant. */
+   uint32_t max_align;  /**< Alignment requirement for tuples. */
+   double float_format; /**< Floating point format validation constant. */
 
-   uint32_t blcksz;                                     /**< Block size for database storage. */
-   uint32_t relseg_size;                                /**< Blocks per segment for large relations. */
+   uint32_t blcksz;      /**< Block size for database storage. */
+   uint32_t relseg_size; /**< Blocks per segment for large relations. */
 
-   uint32_t xlog_blcksz;                                /**< Block size for WAL files. */
-   uint32_t xlog_seg_size;                              /**< Size of each WAL segment. */
+   uint32_t xlog_blcksz;   /**< Block size for WAL files. */
+   uint32_t xlog_seg_size; /**< Size of each WAL segment. */
 
-   uint32_t name_data_len;                              /**< Maximum length of catalog names. */
-   uint32_t index_max_keys;                             /**< Maximum number of columns in an index. */
+   uint32_t name_data_len;  /**< Maximum length of catalog names. */
+   uint32_t index_max_keys; /**< Maximum number of columns in an index. */
 
-   uint32_t toast_max_chunk_size;                       /**< Maximum chunk size in TOAST tables. */
-   uint32_t loblksize;                                  /**< Chunk size in pg_largeobject. */
+   uint32_t toast_max_chunk_size; /**< Maximum chunk size in TOAST tables. */
+   uint32_t loblksize;            /**< Chunk size in pg_largeobject. */
 
-   bool float8_by_val;                                  /**< Indicates if float8/int8 values are passed by value. */
+   bool float8_by_val; /**< Indicates if float8/int8 values are passed by value. */
 
-   uint32_t data_checksum_version;                      /**< Version of data checksum, zero if disabled. */
+   uint32_t data_checksum_version; /**< Version of data checksum, zero if disabled. */
 
    char mock_authentication_nonce[MOCK_AUTH_NONCE_LEN]; /**< Random nonce for authentication. */
 
-   pg_crc32c crc;                                       /**< CRC checksum for control file integrity. */
+   pg_crc32c crc; /**< CRC checksum for control file integrity. */
 };
 
 /**
@@ -357,53 +356,53 @@ struct control_file_data_v13
  */
 struct control_file_data_v17
 {
-   uint64_t system_identifier;                          /**< Unique system identifier for WAL file matching. */
-   uint32_t pg_control_version;                         /**< Version of the pg_control file format. */
-   uint32_t catalog_version_no;                         /**< Version of the system catalog format. */
-   db_state state;                                      /**< Current state of the database system. */
-   pg_time_t time;                                      /**< Timestamp of the last pg_control update. */
-   xlog_rec_ptr checkpoint;                             /**< Last checkpoint record pointer. */
+   uint64_t system_identifier;  /**< Unique system identifier for WAL file matching. */
+   uint32_t pg_control_version; /**< Version of the pg_control file format. */
+   uint32_t catalog_version_no; /**< Version of the system catalog format. */
+   db_state state;              /**< Current state of the database system. */
+   pg_time_t time;              /**< Timestamp of the last pg_control update. */
+   xlog_rec_ptr checkpoint;     /**< Last checkpoint record pointer. */
 
-   struct check_point_v17 checkpoint_copy;              /**< Copy of the last checkpoint record. */
+   struct check_point_v17 checkpoint_copy; /**< Copy of the last checkpoint record. */
 
-   xlog_rec_ptr unlogged_lsn;                           /**< Fake LSN value for unlogged relations. */
-   xlog_rec_ptr min_recovery_point;                     /**< Minimum recovery LSN before startup. */
-   timeline_id min_recovery_point_tli;                  /**< Timeline ID for min_recovery_point. */
-   xlog_rec_ptr backup_start_point;                     /**< Redo pointer of backup start checkpoint. */
-   xlog_rec_ptr backup_end_point;                       /**< LSN marking the backup end location. */
-   bool backup_end_required;                            /**< Indicates if an end-of-backup record is required before startup. */
+   xlog_rec_ptr unlogged_lsn;          /**< Fake LSN value for unlogged relations. */
+   xlog_rec_ptr min_recovery_point;    /**< Minimum recovery LSN before startup. */
+   timeline_id min_recovery_point_tli; /**< Timeline ID for min_recovery_point. */
+   xlog_rec_ptr backup_start_point;    /**< Redo pointer of backup start checkpoint. */
+   xlog_rec_ptr backup_end_point;      /**< LSN marking the backup end location. */
+   bool backup_end_required;           /**< Indicates if an end-of-backup record is required before startup. */
 
-   int wal_level;                                       /**< WAL logging level. */
-   bool wal_log_hints;                                  /**< Indicates if full-page writes are logged for hints. */
-   int max_connections;                                 /**< Maximum number of allowed concurrent connections. */
-   int max_worker_processes;                            /**< Maximum number of worker processes. */
-   int max_wal_senders;                                 /**< Maximum number of WAL sender processes. */
-   int max_prepared_xacts;                              /**< Maximum number of prepared transactions. */
-   int max_locks_per_xact;                              /**< Maximum number of locks per transaction. */
-   bool track_commit_timestamp;                         /**< Indicates if commit timestamps are tracked. */
+   int wal_level;               /**< WAL logging level. */
+   bool wal_log_hints;          /**< Indicates if full-page writes are logged for hints. */
+   int max_connections;         /**< Maximum number of allowed concurrent connections. */
+   int max_worker_processes;    /**< Maximum number of worker processes. */
+   int max_wal_senders;         /**< Maximum number of WAL sender processes. */
+   int max_prepared_xacts;      /**< Maximum number of prepared transactions. */
+   int max_locks_per_xact;      /**< Maximum number of locks per transaction. */
+   bool track_commit_timestamp; /**< Indicates if commit timestamps are tracked. */
 
-   uint32_t max_align;                                  /**< Alignment requirement for tuples. */
-   double float_format;                                 /**< Floating point format validation constant. */
+   uint32_t max_align;  /**< Alignment requirement for tuples. */
+   double float_format; /**< Floating point format validation constant. */
 
-   uint32_t blcksz;                                     /**< Block size for database storage. */
-   uint32_t relseg_size;                                /**< Blocks per segment for large relations. */
+   uint32_t blcksz;      /**< Block size for database storage. */
+   uint32_t relseg_size; /**< Blocks per segment for large relations. */
 
-   uint32_t xlog_blcksz;                                /**< Block size for WAL files. */
-   uint32_t xlog_seg_size;                              /**< Size of each WAL segment. */
+   uint32_t xlog_blcksz;   /**< Block size for WAL files. */
+   uint32_t xlog_seg_size; /**< Size of each WAL segment. */
 
-   uint32_t name_data_len;                              /**< Maximum length of catalog names. */
-   uint32_t index_max_keys;                             /**< Maximum number of columns in an index. */
+   uint32_t name_data_len;  /**< Maximum length of catalog names. */
+   uint32_t index_max_keys; /**< Maximum number of columns in an index. */
 
-   uint32_t toast_max_chunk_size;                       /**< Maximum chunk size in TOAST tables. */
-   uint32_t loblksize;                                  /**< Chunk size in pg_largeobject. */
+   uint32_t toast_max_chunk_size; /**< Maximum chunk size in TOAST tables. */
+   uint32_t loblksize;            /**< Chunk size in pg_largeobject. */
 
-   bool float8_by_val;                                  /**< Indicates if float8/int8 values are passed by value. */
+   bool float8_by_val; /**< Indicates if float8/int8 values are passed by value. */
 
-   uint32_t data_checksum_version;                      /**< Version of data checksum, zero if disabled. */
+   uint32_t data_checksum_version; /**< Version of data checksum, zero if disabled. */
 
    char mock_authentication_nonce[MOCK_AUTH_NONCE_LEN]; /**< Random nonce for authentication. */
 
-   pg_crc32c crc;                                       /**< CRC checksum for control file integrity. */
+   pg_crc32c crc; /**< CRC checksum for control file integrity. */
 };
 
 /**
@@ -450,59 +449,58 @@ struct control_file_data_v17
  */
 struct control_file_data_v18
 {
-   uint64_t system_identifier;                          /**< Unique system identifier for WAL file matching. */
-   uint32_t pg_control_version;                         /**< Version of the pg_control file format. */
-   uint32_t catalog_version_no;                         /**< Version of the system catalog format. */
-   db_state state;                                      /**< Current state of the database system. */
-   pg_time_t time;                                      /**< Timestamp of the last pg_control update. */
-   xlog_rec_ptr checkpoint;                             /**< Last checkpoint record pointer. */
+   uint64_t system_identifier;  /**< Unique system identifier for WAL file matching. */
+   uint32_t pg_control_version; /**< Version of the pg_control file format. */
+   uint32_t catalog_version_no; /**< Version of the system catalog format. */
+   db_state state;              /**< Current state of the database system. */
+   pg_time_t time;              /**< Timestamp of the last pg_control update. */
+   xlog_rec_ptr checkpoint;     /**< Last checkpoint record pointer. */
 
-   struct check_point_v17 checkpoint_copy;              /**< Copy of the last checkpoint record. */
+   struct check_point_v17 checkpoint_copy; /**< Copy of the last checkpoint record. */
 
-   xlog_rec_ptr unlogged_lsn;                           /**< Fake LSN value for unlogged relations. */
-   xlog_rec_ptr min_recovery_point;                     /**< Minimum recovery LSN before startup. */
-   timeline_id min_recovery_point_tli;                  /**< Timeline ID for min_recovery_point. */
-   xlog_rec_ptr backup_start_point;                     /**< Redo pointer of backup start checkpoint. */
-   xlog_rec_ptr backup_end_point;                       /**< LSN marking the backup end location. */
-   bool backup_end_required;                            /**< Indicates if an end-of-backup record is required before startup. */
+   xlog_rec_ptr unlogged_lsn;          /**< Fake LSN value for unlogged relations. */
+   xlog_rec_ptr min_recovery_point;    /**< Minimum recovery LSN before startup. */
+   timeline_id min_recovery_point_tli; /**< Timeline ID for min_recovery_point. */
+   xlog_rec_ptr backup_start_point;    /**< Redo pointer of backup start checkpoint. */
+   xlog_rec_ptr backup_end_point;      /**< LSN marking the backup end location. */
+   bool backup_end_required;           /**< Indicates if an end-of-backup record is required before startup. */
 
-   int wal_level;                                       /**< WAL logging level. */
-   bool wal_log_hints;                                  /**< Indicates if full-page writes are logged for hints. */
-   int max_connections;                                 /**< Maximum number of allowed concurrent connections. */
-   int max_worker_processes;                            /**< Maximum number of worker processes. */
-   int max_wal_senders;                                 /**< Maximum number of WAL sender processes. */
-   int max_prepared_xacts;                              /**< Maximum number of prepared transactions. */
-   int max_locks_per_xact;                              /**< Maximum number of locks per transaction. */
-   bool track_commit_timestamp;                         /**< Indicates if commit timestamps are tracked. */
+   int wal_level;               /**< WAL logging level. */
+   bool wal_log_hints;          /**< Indicates if full-page writes are logged for hints. */
+   int max_connections;         /**< Maximum number of allowed concurrent connections. */
+   int max_worker_processes;    /**< Maximum number of worker processes. */
+   int max_wal_senders;         /**< Maximum number of WAL sender processes. */
+   int max_prepared_xacts;      /**< Maximum number of prepared transactions. */
+   int max_locks_per_xact;      /**< Maximum number of locks per transaction. */
+   bool track_commit_timestamp; /**< Indicates if commit timestamps are tracked. */
 
-   uint32_t max_align;                                  /**< Alignment requirement for tuples. */
-   double float_format;                                 /**< Floating point format validation constant. */
+   uint32_t max_align;  /**< Alignment requirement for tuples. */
+   double float_format; /**< Floating point format validation constant. */
 
-   uint32_t blcksz;                                     /**< Block size for database storage. */
-   uint32_t relseg_size;                                /**< Blocks per segment for large relations. */
+   uint32_t blcksz;      /**< Block size for database storage. */
+   uint32_t relseg_size; /**< Blocks per segment for large relations. */
 
-   uint32_t xlog_blcksz;                                /**< Block size for WAL files. */
-   uint32_t xlog_seg_size;                              /**< Size of each WAL segment. */
+   uint32_t xlog_blcksz;   /**< Block size for WAL files. */
+   uint32_t xlog_seg_size; /**< Size of each WAL segment. */
 
-   uint32_t name_data_len;                              /**< Maximum length of catalog names. */
-   uint32_t index_max_keys;                             /**< Maximum number of columns in an index. */
+   uint32_t name_data_len;  /**< Maximum length of catalog names. */
+   uint32_t index_max_keys; /**< Maximum number of columns in an index. */
 
-   uint32_t toast_max_chunk_size;                       /**< Maximum chunk size in TOAST tables. */
-   uint32_t loblksize;                                  /**< Chunk size in pg_largeobject. */
+   uint32_t toast_max_chunk_size; /**< Maximum chunk size in TOAST tables. */
+   uint32_t loblksize;            /**< Chunk size in pg_largeobject. */
 
-   bool float8_by_val;                                  /**< Indicates if float8/int8 values are passed by value. */
+   bool float8_by_val; /**< Indicates if float8/int8 values are passed by value. */
 
-   uint32_t data_checksum_version;                      /**< Version of data checksum, zero if disabled. */
+   uint32_t data_checksum_version; /**< Version of data checksum, zero if disabled. */
 
-   bool default_char_signedness;                        /**< Indicates if default char is signed. */
+   bool default_char_signedness; /**< Indicates if default char is signed. */
 
    char mock_authentication_nonce[MOCK_AUTH_NONCE_LEN]; /**< Random nonce for authentication. */
 
-   pg_crc32c crc;                                       /**< CRC checksum for control file integrity. */
+   pg_crc32c crc; /**< CRC checksum for control file integrity. */
 };
 
-enum control_file_version
-{
+enum control_file_version {
    CONTROL_FILE_V13,
    CONTROL_FILE_V14,
    CONTROL_FILE_V15,
@@ -521,16 +519,16 @@ enum control_file_version
  */
 struct control_file_data
 {
-   enum control_file_version version;           /**< Holds data version */
+   enum control_file_version version; /**< Holds data version */
    union
    {
-      struct control_file_data_v13 v13;         /**< Version 13 data */
-      struct control_file_data_v13 v14;         /**< Version 14 data */
-      struct control_file_data_v13 v15;         /**< Version 15 data */
-      struct control_file_data_v13 v16;         /**< Version 16 data */
-      struct control_file_data_v17 v17;         /**< Version 17 data */
-      struct control_file_data_v18 v18;         /**< Version 18 data */
-   } data;                                      /**< Version-specific control file data */
+      struct control_file_data_v13 v13; /**< Version 13 data */
+      struct control_file_data_v13 v14; /**< Version 14 data */
+      struct control_file_data_v13 v15; /**< Version 15 data */
+      struct control_file_data_v13 v16; /**< Version 16 data */
+      struct control_file_data_v17 v17; /**< Version 17 data */
+      struct control_file_data_v18 v18; /**< Version 18 data */
+   } data;                              /**< Version-specific control file data */
 };
 
 /**

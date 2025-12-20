@@ -47,7 +47,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#define CHUNK_SIZE 32768
+#define CHUNK_SIZE   32768
 
 #define PAGE_UNKNOWN 0
 #define PAGE_HOME    1
@@ -2525,7 +2525,6 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
       }
 
       data = pgmoneta_append(data, "\n");
-
    }
    data = pgmoneta_append(data, "\n");
 
@@ -2541,7 +2540,6 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
    data = pgmoneta_append(data, "#TYPE pgmoneta_backup_newest gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-
       data = pgmoneta_append(data, "pgmoneta_backup_newest{");
 
       data = pgmoneta_append(data, "name=\"");
@@ -2564,7 +2562,6 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
       }
 
       data = pgmoneta_append(data, "\n");
-
    }
    data = pgmoneta_append(data, "\n");
 
@@ -4321,7 +4318,6 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
       if (d != NULL)
       {
-
          size += pgmoneta_directory_size(d);
       }
 
@@ -4470,7 +4466,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
    data = pgmoneta_append(data, "\n");
 
    data = pgmoneta_append(data, "#HELP pgmoneta_active_retention Is there an "
-                          "active archiving for a server\n");
+                                "active archiving for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_active_retention gauge\n");
 
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -4652,7 +4648,7 @@ pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem)
    cache_size = metrics_cache_size_to_alloc();
    struct_size = sizeof(struct prometheus_cache);
 
-   if (pgmoneta_create_shared_memory(struct_size + cache_size, config->hugepage, (void*) &cache))
+   if (pgmoneta_create_shared_memory(struct_size + cache_size, config->hugepage, (void*)&cache))
    {
       goto error;
    }
@@ -4701,8 +4697,8 @@ metrics_cache_size_to_alloc(void)
    if (is_metrics_cache_configured())
    {
       cache_size = config->metrics_cache_max_size > 0
-            ? MIN(config->metrics_cache_max_size, PROMETHEUS_MAX_CACHE_SIZE)
-            : PROMETHEUS_DEFAULT_CACHE_SIZE;
+                      ? MIN(config->metrics_cache_max_size, PROMETHEUS_MAX_CACHE_SIZE)
+                      : PROMETHEUS_DEFAULT_CACHE_SIZE;
    }
 
    return cache_size;

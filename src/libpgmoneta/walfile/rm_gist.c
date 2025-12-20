@@ -259,7 +259,7 @@ pgmoneta_wal_gist_desc(char* buf, struct decoded_xlog_record* record)
    switch (info)
    {
       case XLOG_GIST_PAGE_UPDATE:
-         buf = out_gistxlogPageUpdate(buf, (struct gist_xlog_page_update*) rec);
+         buf = out_gistxlogPageUpdate(buf, (struct gist_xlog_page_update*)rec);
          break;
       case XLOG_GIST_PAGE_REUSE:
          xlrec_reuse = create_gist_xlog_page_reuse();
@@ -274,10 +274,10 @@ pgmoneta_wal_gist_desc(char* buf, struct decoded_xlog_record* record)
          free(xlrec_delete);
          break;
       case XLOG_GIST_PAGE_SPLIT:
-         buf = out_gistxlogPageSplit(buf, (struct gist_xlog_page_split*) rec);
+         buf = out_gistxlogPageSplit(buf, (struct gist_xlog_page_split*)rec);
          break;
       case XLOG_GIST_PAGE_DELETE:
-         buf = out_gistxlogPageDelete(buf, (struct gist_xlog_page_delete*) rec);
+         buf = out_gistxlogPageDelete(buf, (struct gist_xlog_page_delete*)rec);
          break;
       case XLOG_GIST_ASSIGN_LSN:
          /* No details to write out */

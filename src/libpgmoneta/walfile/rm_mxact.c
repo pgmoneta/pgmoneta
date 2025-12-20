@@ -77,7 +77,7 @@ pgmoneta_wal_multixact_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_MULTIXACT_CREATE_ID)
    {
-      struct xl_multixact_create* xlrec = (struct xl_multixact_create*) rec;
+      struct xl_multixact_create* xlrec = (struct xl_multixact_create*)rec;
       int i;
 
       buf = pgmoneta_format_and_append(buf, "%u offset %u nmembers %d: ", xlrec->mid,
@@ -89,7 +89,7 @@ pgmoneta_wal_multixact_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_MULTIXACT_TRUNCATE_ID)
    {
-      struct xl_multixact_truncate* xlrec = (struct xl_multixact_truncate*) rec;
+      struct xl_multixact_truncate* xlrec = (struct xl_multixact_truncate*)rec;
 
       buf = pgmoneta_format_and_append(buf, "offsets [%u, %u), members [%u, %u)",
                                        xlrec->start_trunc_off, xlrec->end_trunc_off,

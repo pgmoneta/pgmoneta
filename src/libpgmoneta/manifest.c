@@ -42,17 +42,17 @@
 #include <string.h>
 #include <time.h>
 
-#define MANIFEST_KEY_VERSION "PostgreSQL-Backup-Manifest-Version"
-#define MANIFEST_KEY_SYS_IDENTIFIER "System-Identifier"
-#define MANIFEST_KEY_FILES "Files"
-#define MANIFEST_KEY_WAL_RANGES "WAL-Ranges"
-#define MANIFEST_KEY_CHECKSUM "Manifest-Checksum"
+#define MANIFEST_KEY_VERSION                 "PostgreSQL-Backup-Manifest-Version"
+#define MANIFEST_KEY_SYS_IDENTIFIER          "System-Identifier"
+#define MANIFEST_KEY_FILES                   "Files"
+#define MANIFEST_KEY_WAL_RANGES              "WAL-Ranges"
+#define MANIFEST_KEY_CHECKSUM                "Manifest-Checksum"
 
 #define MANIFEST_FILE_KEY_CHECKSUM_ALGORITHM "Checksum-Algorithm"
-#define MANIFEST_FILE_KEY_PATH "Path"
-#define MANIFEST_FILE_KEY_SIZE "Size"
-#define MANIFEST_FILE_KEY_LAST_MODIFIED "Last-Modified"
-#define MANIFEST_FILE_KEY_CHECKSUM "Checksum"
+#define MANIFEST_FILE_KEY_PATH               "Path"
+#define MANIFEST_FILE_KEY_SIZE               "Size"
+#define MANIFEST_FILE_KEY_LAST_MODIFIED      "Last-Modified"
+#define MANIFEST_FILE_KEY_CHECKSUM           "Checksum"
 
 static void
 build_deque(struct deque* deque, struct csv_reader* reader, char** f);
@@ -352,8 +352,8 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
       goto error;
    }
 
-   files = (struct json*) pgmoneta_json_get(manifest, MANIFEST_KEY_FILES);
-   wal_ranges = (struct json*) pgmoneta_json_get(manifest, MANIFEST_KEY_WAL_RANGES);
+   files = (struct json*)pgmoneta_json_get(manifest, MANIFEST_KEY_FILES);
+   wal_ranges = (struct json*)pgmoneta_json_get(manifest, MANIFEST_KEY_WAL_RANGES);
 
    pgmoneta_json_iterator_create(files, &fiter);
    pgmoneta_json_iterator_create(wal_ranges, &riter);
@@ -376,7 +376,7 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
    fprintf(file, "\"%s\": [\n", MANIFEST_KEY_FILES);
    while (pgmoneta_json_iterator_next(fiter))
    {
-      f = (struct json*) pgmoneta_value_data(fiter->value);
+      f = (struct json*)pgmoneta_value_data(fiter->value);
       fprintf(file, "{ \"Path\": \"%s\", \"Size\": %" PRIu64 ", \"Last-Modified\": \"%s\", \"Checksum-Algorithm\": \"%s\", \"Checksum\": \"%s\" }",
               (char*)pgmoneta_json_get(f, MANIFEST_FILE_KEY_PATH),
               (uint64_t)pgmoneta_json_get(f, MANIFEST_FILE_KEY_SIZE),
@@ -397,7 +397,7 @@ pgmoneta_write_postgresql_manifest(struct json* manifest, char* path)
    fprintf(file, "\"%s\": [\n", MANIFEST_KEY_WAL_RANGES);
    while (pgmoneta_json_iterator_next(riter))
    {
-      r = (struct json*) pgmoneta_value_data(riter->value);
+      r = (struct json*)pgmoneta_value_data(riter->value);
       fprintf(file, "{ \"Timeline\": %d, \"Start-LSN\": \"%s\", \"End-LSN\": \"%s\" }",
               (int)pgmoneta_json_get(r, "Timeline"),
               (char*)pgmoneta_json_get(r, "Start-LSN"),

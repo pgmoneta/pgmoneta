@@ -1485,7 +1485,7 @@ pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_fi
    {
       goto error;
    }
-   rf = (struct rfile*) malloc(sizeof(struct rfile));
+   rf = (struct rfile*)malloc(sizeof(struct rfile));
    memset(rf, 0, sizeof(struct rfile));
 
    rf->fp = fp;

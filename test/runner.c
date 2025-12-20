@@ -78,7 +78,7 @@ main(int argc, char* argv[])
    srunner_add_suite(sr, json_suite);
    srunner_add_suite(sr, server_api_suite);
    srunner_add_suite(sr, utils_suite);
-   srunner_set_log (sr, "-");
+   srunner_set_log(sr, "-");
    srunner_set_fork_status(sr, CK_NOFORK);
    srunner_run(sr, NULL, NULL, CK_VERBOSE);
    number_failed = srunner_ntests_failed(sr);

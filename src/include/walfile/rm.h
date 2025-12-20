@@ -39,8 +39,8 @@ typedef uint16_t offset_number;
 typedef struct block_id_data* block_id;
 
 // #define Variables
-#define XLR_INFO_MASK           0x0F
-#define XLR_RMGR_INFO_MASK      0xF0
+#define XLR_INFO_MASK      0x0F
+#define XLR_RMGR_INFO_MASK 0xF0
 
 // #define Macros
 /**
@@ -50,9 +50,8 @@ typedef struct block_id_data* block_id;
  * @return The offset number.
  */
 #define ITEM_POINTER_GET_OFFSET_NUMBER_NO_CHECK(pointer) \
-        ( \
-           (pointer)->ip_posid \
-        )
+   (                                                     \
+      (pointer)->ip_posid)
 
 /**
  * @def ITEM_POINTER_GET_OFFSET_NUMBER(pointer)
@@ -61,9 +60,8 @@ typedef struct block_id_data* block_id;
  * @return The offset number.
  */
 #define ITEM_POINTER_GET_OFFSET_NUMBER(pointer) \
-        ( \
-           ITEM_POINTER_GET_OFFSET_NUMBER_NO_CHECK(pointer) \
-        )
+   (                                            \
+      ITEM_POINTER_GET_OFFSET_NUMBER_NO_CHECK(pointer))
 
 /**
  * @def ITEM_POINTER_GET_BLOCK_NUMBER_NO_CHECK(pointer)
@@ -72,9 +70,8 @@ typedef struct block_id_data* block_id;
  * @return The block number.
  */
 #define ITEM_POINTER_GET_BLOCK_NUMBER_NO_CHECK(pointer) \
-        ( \
-           BLOCK_ID_GET_BLOCK_NUMBER(&(pointer)->ip_blkid) \
-        )
+   (                                                    \
+      BLOCK_ID_GET_BLOCK_NUMBER(&(pointer)->ip_blkid))
 
 /**
  * @def ITEM_POINTER_GET_BLOCK_NUMBER(pointer)
@@ -83,9 +80,8 @@ typedef struct block_id_data* block_id;
  * @return The block number.
  */
 #define ITEM_POINTER_GET_BLOCK_NUMBER(pointer) \
-        ( \
-           ITEM_POINTER_GET_BLOCK_NUMBER_NO_CHECK(pointer) \
-        )
+   (                                           \
+      ITEM_POINTER_GET_BLOCK_NUMBER_NO_CHECK(pointer))
 
 /**
  * @def BLOCK_ID_GET_BLOCK_NUMBER(blockId)
@@ -94,9 +90,8 @@ typedef struct block_id_data* block_id;
  * @return The block number.
  */
 #define BLOCK_ID_GET_BLOCK_NUMBER(blockId) \
-        ( \
-           ((((block_number) (blockId)->bi_hi) << 16) | ((block_number) (blockId)->bi_lo)) \
-        )
+   (                                       \
+      ((((block_number)(blockId)->bi_hi) << 16) | ((block_number)(blockId)->bi_lo)))
 
 /**
  * @def POSTING_ITEM_GET_BLOCK_NUMBER(pointer)
@@ -105,7 +100,7 @@ typedef struct block_id_data* block_id;
  * @return The block number.
  */
 #define POSTING_ITEM_GET_BLOCK_NUMBER(pointer) \
-        BLOCK_ID_GET_BLOCK_NUMBER(&(pointer)->child_blkno)
+   BLOCK_ID_GET_BLOCK_NUMBER(&(pointer)->child_blkno)
 
 /**
  * @def PostingItemSetBlockNumber(pointer, blockNumber)
@@ -114,7 +109,7 @@ typedef struct block_id_data* block_id;
  * @param blockNumber Block number to set.
  */
 #define PostingItemSetBlockNumber(pointer, blockNumber) \
-        BlockIdSet(&((pointer)->child_blkno), (blockNumber))
+   BlockIdSet(&((pointer)->child_blkno), (blockNumber))
 
 // Structs
 /**
@@ -126,8 +121,8 @@ typedef struct block_id_data* block_id;
  */
 struct block_id_data
 {
-   uint16_t bi_hi;   /**< High part of the block identifier. */
-   uint16_t bi_lo;   /**< Low part of the block identifier. */
+   uint16_t bi_hi; /**< High part of the block identifier. */
+   uint16_t bi_lo; /**< Low part of the block identifier. */
 };
 
 /**
@@ -139,8 +134,8 @@ struct block_id_data
  */
 struct item_pointer_data
 {
-   struct block_id_data ip_blkid;   /**< Block identifier. */
-   offset_number ip_posid;          /**< Offset within the block. */
+   struct block_id_data ip_blkid; /**< Block identifier. */
+   offset_number ip_posid;        /**< Offset within the block. */
 };
 
 #ifdef __cplusplus

@@ -47,7 +47,7 @@ struct stream_buffer
    size_t start;  /**< offset to the first unconsumed data in buffer */
    size_t end;    /**< offset to the first position after available data */
    size_t cursor; /**< next byte to consume */
-} __attribute__ ((aligned (64)));
+} __attribute__((aligned(64)));
 
 /**
  * Initialize a memory segment for the process local message structure

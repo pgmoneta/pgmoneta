@@ -195,7 +195,7 @@ pgmoneta_workers_destroy(struct workers* workers)
       worker_total = workers->number_of_alive;
       worker_keepalive = 0;
 
-      time (&start);
+      time(&start);
       while (tpassed < timeout && workers->number_of_alive)
       {
          semaphore_post_all(workers->has_tasks);
@@ -311,7 +311,7 @@ worker_init(struct workers* workers, struct worker** worker)
 
    w->workers = workers;
 
-   pthread_create(&w->pthread, NULL, (void* (*)(void*)) worker_do, w);
+   pthread_create(&w->pthread, NULL, (void* (*)(void*))worker_do, w);
    pthread_detach(w->pthread);
 
    *worker = w;
@@ -358,7 +358,6 @@ worker_do(struct worker* worker)
             pthread_cond_signal(&workers->worker_all_idle);
          }
          pthread_mutex_unlock(&workers->worker_lock);
-
       }
    }
    pthread_mutex_lock(&workers->worker_lock);

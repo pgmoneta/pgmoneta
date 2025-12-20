@@ -354,7 +354,7 @@ pgmoneta_tar_directory(char* src, char* dst, char* destination)
    int status;
 
    a = archive_write_new();
-   archive_write_set_format_ustar(a);  // Set tar format
+   archive_write_set_format_ustar(a); // Set tar format
    status = archive_write_open_filename(a, dst);
 
    if (status != ARCHIVE_OK)
@@ -384,10 +384,10 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    char null_buffer[2 * 512]; // 2 tar block size of terminator null bytes
    FILE* file = NULL;
    struct query_response* response = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct tuple* tup = NULL;
 
-   memset(msg, 0, sizeof (struct message));
+   memset(msg, 0, sizeof(struct message));
 
    // Receive the second result set
    if (pgmoneta_consume_data_row_messages(srv, ssl, socket, buffer, &response))
@@ -474,7 +474,6 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
 
          if (msg->kind == 'd' && msg->length > 0)
          {
-
             if (bucket)
             {
                while (1)
@@ -586,7 +585,7 @@ int
 pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
 {
    struct query_response* response = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct tuple* tup = NULL;
    struct tablespace* tblspc = NULL;
    char null_buffer[2 * 512];

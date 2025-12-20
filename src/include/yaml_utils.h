@@ -46,15 +46,15 @@ extern "C" {
  */
 typedef struct
 {
-   char* source_dir;                /**< Source directory for the configuration */
-   char* target_dir;                /**< Target directory for the configuration */
-   char* encryption;                /**< Encryption method used in the configuration */
-   char* compression;               /**< Compression method used in the configuration */
-   char* configuration_file;        /**< Path to the configuration file */
-   char** operations;               /**< Array of operation names from rules */
-   int operation_count;             /**< Number of operations in the array */
-   int* xids;                       /**< Array of XIDs from rules */
-   int xid_count;                   /**< Number of XIDs in the array */
+   char* source_dir;         /**< Source directory for the configuration */
+   char* target_dir;         /**< Target directory for the configuration */
+   char* encryption;         /**< Encryption method used in the configuration */
+   char* compression;        /**< Compression method used in the configuration */
+   char* configuration_file; /**< Path to the configuration file */
+   char** operations;        /**< Array of operation names from rules */
+   int operation_count;      /**< Number of operations in the array */
+   int* xids;                /**< Array of XIDs from rules */
+   int xid_count;            /**< Number of XIDs in the array */
 } config_t;
 
 /**
@@ -63,12 +63,12 @@ typedef struct
  * This enum is used to track the current parsing context.
  */
 typedef enum {
-   STATE_START,                     /**< Initial state of the parser */
-   STATE_ROOT,                      /**< Root state of the YAML document */
-   STATE_RULES_SEQUENCE,            /**< Parsing the sequence of rules */
-   STATE_RULE_MAPPING,              /**< Parsing a rule mapping (operations or xids) */
-   STATE_OPERATIONS_SEQUENCE,       /**< Parsing the operations sequence */
-   STATE_XIDS_SEQUENCE              /**< Parsing the XIDs sequence */
+   STATE_START,               /**< Initial state of the parser */
+   STATE_ROOT,                /**< Root state of the YAML document */
+   STATE_RULES_SEQUENCE,      /**< Parsing the sequence of rules */
+   STATE_RULE_MAPPING,        /**< Parsing a rule mapping (operations or xids) */
+   STATE_OPERATIONS_SEQUENCE, /**< Parsing the operations sequence */
+   STATE_XIDS_SEQUENCE        /**< Parsing the XIDs sequence */
 } parser_state_t;
 
 /**

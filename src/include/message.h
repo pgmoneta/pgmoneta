@@ -51,19 +51,19 @@ extern struct token_bucket bucket;
  */
 struct message
 {
-   signed char kind;  /**< The kind of the message */
-   ssize_t length;    /**< The length of the message */
-   void* data;        /**< The message data */
-} __attribute__ ((aligned (64)));
+   signed char kind; /**< The kind of the message */
+   ssize_t length;   /**< The length of the message */
+   void* data;       /**< The message data */
+} __attribute__((aligned(64)));
 
 /** @struct tuple
  * Defines a tuple
  */
 struct tuple
 {
-   char** data;                   /**< The data */
-   struct tuple* next;            /**< The next tuple */
-} __attribute__ ((aligned (64)));
+   char** data;        /**< The data */
+   struct tuple* next; /**< The next tuple */
+} __attribute__((aligned(64)));
 
 /** @struct query_response
  * Defines the response to a query
@@ -74,7 +74,7 @@ struct query_response
    int number_of_columns;                          /**< The number of columns */
    bool is_command_complete;                       /**< The response is command complete or not */
    struct tuple* tuples;                           /**< The resulting tuples */
-} __attribute__ ((aligned (64)));
+} __attribute__((aligned(64)));
 
 /**
  * Read a message in blocking mode

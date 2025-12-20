@@ -44,7 +44,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NAME "bzip2"
+#define NAME          "bzip2"
 #define BUFFER_LENGTH 8192
 
 static int bzip2_compress(char* from, int level, char* to);
@@ -219,7 +219,6 @@ pgmoneta_bzip2_tablespaces(char* root, struct workers* workers)
 void
 pgmoneta_bzip2_wal(char* directory)
 {
-
    char* from = NULL;
    char* to = NULL;
 
@@ -619,7 +618,7 @@ pgmoneta_bzip2_file(char* from, char* to)
    int level;
    struct main_configuration* config;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct main_configuration*)shmem;
 
    level = config->compression_level;
    if (level < 1)
@@ -745,7 +744,7 @@ bzip2_decompress(char* from, char* to)
 
    do
    {
-      length = BZ2_bzRead(&bzip2_err, zip_file, buf, (int) buf_len);
+      length = BZ2_bzRead(&bzip2_err, zip_file, buf, (int)buf_len);
       if (bzip2_err != BZ_OK && bzip2_err != BZ_STREAM_END)
       {
          goto error_unzip;
@@ -758,7 +757,6 @@ bzip2_decompress(char* from, char* to)
             goto error_unzip;
          }
       }
-
    }
    while (bzip2_err != BZ_STREAM_END);
 
@@ -834,7 +832,6 @@ bzip2_decompress_file(char* from, char* to)
             goto error_unzip;
          }
       }
-
    }
    while (bzip2_err != BZ_STREAM_END);
 

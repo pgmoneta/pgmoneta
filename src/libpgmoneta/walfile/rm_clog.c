@@ -96,7 +96,7 @@ pgmoneta_wal_clog_desc(char* buf, struct decoded_xlog_record* record)
    {
       int64_t pageno;
 
-      memcpy(&pageno, rec, server_config->version >= 17 ? sizeof(int): sizeof(int64_t));
+      memcpy(&pageno, rec, server_config->version >= 17 ? sizeof(int) : sizeof(int64_t));
       buf = pgmoneta_format_and_append(buf, "page %d", pageno);
    }
    else if (info == CLOG_TRUNCATE)

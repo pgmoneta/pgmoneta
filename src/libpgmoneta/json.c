@@ -278,7 +278,6 @@ pgmoneta_json_locate(struct json_reader* reader, char** key_path, int key_path_l
          {
             goto error;
          }
-
       }
       free(cur_key);
       cur_key = NULL;
@@ -538,8 +537,8 @@ pgmoneta_json_iterator_create(struct json* object, struct json_iterator** iter)
    {
       return 1;
    }
-   i = malloc(sizeof (struct json_iterator));
-   memset(i, 0, sizeof (struct json_iterator));
+   i = malloc(sizeof(struct json_iterator));
+   memset(i, 0, sizeof(struct json_iterator));
    i->obj = object;
    if (object->type == JSONItem)
    {
@@ -824,10 +823,10 @@ static bool
 value_start(char ch)
 {
    return (isdigit(ch) || ch == '-' || ch == '+') || // number
-          (ch == '[') || // array
-          (ch == '{') || // item
-          (ch == '"' || ch == 'n') || // string or null string
-          (ch == 't' || ch == 'f'); // potential boolean value
+          (ch == '[') ||                             // array
+          (ch == '{') ||                             // item
+          (ch == '"' || ch == 'n') ||                // string or null string
+          (ch == 't' || ch == 'f');                  // potential boolean value
 }
 
 static int
@@ -963,7 +962,7 @@ handle_escape_char(char* str, uint64_t* index, uint64_t len, char* ch)
 {
    uint64_t idx = *index;
    idx++;
-   if (idx == len)   // security check
+   if (idx == len) // security check
    {
       return 1;
    }
@@ -1017,8 +1016,7 @@ advance_to_first_array_element(struct json_reader* reader)
    return 1;
 }
 
-__attribute__((used))
-static void
+__attribute__((used)) static void
 print_json_state(enum parse_state state)
 {
    switch (state)

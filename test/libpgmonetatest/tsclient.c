@@ -191,8 +191,8 @@ pgmoneta_tsclient_reload()
 
    pgmoneta_disconnect(socket);
    return 0;
-   error:
-      pgmoneta_disconnect(socket);
+error:
+   pgmoneta_disconnect(socket);
    return 1;
 }
 

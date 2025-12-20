@@ -37,8 +37,8 @@ extern "C" {
 #include <walfile/wal_reader.h>
 
 /* XLOG stuff */
-#define COMMIT_TS_ZEROPAGE      0x00
-#define COMMIT_TS_TRUNCATE      0x10
+#define COMMIT_TS_ZEROPAGE 0x00
+#define COMMIT_TS_TRUNCATE 0x10
 
 /**
  * @struct xl_commit_ts_set
@@ -52,9 +52,9 @@ extern "C" {
  */
 struct xl_commit_ts_set
 {
-   timestamp_tz timestamp;        /**< Commit timestamp */
-   rep_origin_id nodeid;          /**< Replication origin node ID */
-   transaction_id mainxid;        /**< Main transaction ID */
+   timestamp_tz timestamp; /**< Commit timestamp */
+   rep_origin_id nodeid;   /**< Replication origin node ID */
+   transaction_id mainxid; /**< Main transaction ID */
    /* subxact Xids follow */
 };
 
@@ -68,8 +68,8 @@ struct xl_commit_ts_set
  */
 struct xl_commit_ts_truncate_17
 {
-   int64_t pageno;                /**< Page number to truncate */
-   transaction_id oldestXid;      /**< Oldest transaction ID */
+   int64_t pageno;           /**< Page number to truncate */
+   transaction_id oldestXid; /**< Oldest transaction ID */
 };
 
 /**
@@ -82,8 +82,8 @@ struct xl_commit_ts_truncate_17
  */
 struct xl_commit_ts_truncate_16
 {
-   int pageno;                    /**< Page number to truncate */
-   transaction_id oldestXid;      /**< Oldest transaction ID */
+   int pageno;               /**< Page number to truncate */
+   transaction_id oldestXid; /**< Oldest transaction ID */
 };
 
 /**
@@ -97,13 +97,13 @@ struct xl_commit_ts_truncate_16
  */
 struct xl_commit_ts_truncate
 {
-   void (*parse)(struct xl_commit_ts_truncate* wrapper, char* rec);     /**< Function pointer to parse the record */
-   char* (*format)(struct xl_commit_ts_truncate* wrapper, char* buf);   /**< Function pointer to format the record */
+   void (*parse)(struct xl_commit_ts_truncate* wrapper, char* rec);   /**< Function pointer to parse the record */
+   char* (*format)(struct xl_commit_ts_truncate* wrapper, char* buf); /**< Function pointer to format the record */
    union
    {
-      struct xl_commit_ts_truncate_16 v16;                              /**< Truncate record for version 16 */
-      struct xl_commit_ts_truncate_17 v17;                              /**< Truncate record for version 17 */
-   } data;                                                              /**< Version-specific truncate record data */
+      struct xl_commit_ts_truncate_16 v16; /**< Truncate record for version 16 */
+      struct xl_commit_ts_truncate_17 v17; /**< Truncate record for version 17 */
+   } data;                                 /**< Version-specific truncate record data */
 };
 
 /**

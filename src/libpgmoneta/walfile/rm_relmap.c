@@ -26,10 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- #include <utils.h>
- #include <wal.h>
- #include <walfile/rm.h>
- #include <walfile/rm_relmap.h>
+#include <utils.h>
+#include <wal.h>
+#include <walfile/rm.h>
+#include <walfile/rm_relmap.h>
 
 char*
 pgmoneta_wal_relmap_desc(char* buf, struct decoded_xlog_record* record)
@@ -41,7 +41,7 @@ pgmoneta_wal_relmap_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_RELMAP_UPDATE)
    {
-      struct xl_relmap_update* xlrec = (struct xl_relmap_update*) rec;
+      struct xl_relmap_update* xlrec = (struct xl_relmap_update*)rec;
 
       if (pgmoneta_get_database_name(xlrec->db_id, &dbname))
       {
@@ -55,7 +55,6 @@ pgmoneta_wal_relmap_desc(char* buf, struct decoded_xlog_record* record)
 
       buf = pgmoneta_format_and_append(buf, "database %s tablespace %s size %u",
                                        dbname, spcname, xlrec->nbytes);
-
    }
 
    free(dbname);

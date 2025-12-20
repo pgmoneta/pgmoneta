@@ -39,11 +39,10 @@
 struct config_enum_entry wal_level_options[] = {
    {"minimal", WAL_LEVEL_MINIMAL, false},
    {"replica", WAL_LEVEL_REPLICA, false},
-   {"archive", WAL_LEVEL_REPLICA, true},        /* deprecated */
-   {"hot_standby", WAL_LEVEL_REPLICA, true},       /* deprecated */
+   {"archive", WAL_LEVEL_REPLICA, true},     /* deprecated */
+   {"hot_standby", WAL_LEVEL_REPLICA, true}, /* deprecated */
    {"logical", WAL_LEVEL_LOGICAL, false},
-   {NULL, 0, false}
-};
+   {NULL, 0, false}};
 
 static char*
 get_wal_level_string(int wal_level)
@@ -117,10 +116,10 @@ check_point_format_v13(struct check_point* wrapper, char* buf)
    }
 
    buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
-                                    "tli %u; prev tli %u; fpw %s; xid %u:%u; oid %u; multi %u; offset %u; "
-                                    "oldest xid %u in DB %s; oldest multi %u in DB %s; "
-                                    "oldest/newest commit timestamp xid: %u/%u; "
-                                    "oldest running xid %u;",
+                                         "tli %u; prev tli %u; fpw %s; xid %u:%u; oid %u; multi %u; offset %u; "
+                                         "oldest xid %u in DB %s; oldest multi %u in DB %s; "
+                                         "oldest/newest commit timestamp xid: %u/%u; "
+                                         "oldest running xid %u;",
                                     LSN_FORMAT_ARGS(checkpoint.redo),
                                     checkpoint.this_timeline_id,
                                     checkpoint.prev_timeline_id,
@@ -148,7 +147,6 @@ error:
    free(oldest_multi_db);
 
    return NULL;
-
 }
 
 char*
@@ -170,10 +168,10 @@ check_point_format_v17(struct check_point* wrapper, char* buf)
    }
 
    buf = pgmoneta_format_and_append(buf, "redo %X/%X; "
-                                    "tli %u; prev tli %u; fpw %s; wal_level %s; xid %u:%u; oid %u; multi %u; offset %u; "
-                                    "oldest xid %u in DB %s; oldest multi %u in DB %s; "
-                                    "oldest/newest commit timestamp xid: %u/%u; "
-                                    "oldest running xid %u",
+                                         "tli %u; prev tli %u; fpw %s; wal_level %s; xid %u:%u; oid %u; multi %u; offset %u; "
+                                         "oldest xid %u in DB %s; oldest multi %u in DB %s; "
+                                         "oldest/newest commit timestamp xid: %u/%u; "
+                                         "oldest running xid %u",
                                     LSN_FORMAT_ARGS(checkpoint.redo),
                                     checkpoint.this_timeline_id,
                                     checkpoint.prev_timeline_id,
@@ -314,7 +312,7 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_RESTORE_POINT)
    {
-      struct xl_restore_point* xlrec = (struct xl_restore_point*) rec;
+      struct xl_restore_point* xlrec = (struct xl_restore_point*)rec;
 
       buf = pgmoneta_format_and_append(buf, xlrec->rp_name);
    }
@@ -349,9 +347,9 @@ pgmoneta_wal_xlog_desc(char* buf, struct decoded_xlog_record* record)
       }
 
       buf = pgmoneta_format_and_append(buf, "max_connections=%d max_worker_processes=%d "
-                                       "max_wal_senders=%d max_prepared_xacts=%d "
-                                       "max_locks_per_xact=%d wal_level=%s "
-                                       "wal_log_hints=%s track_commit_timestamp=%s",
+                                            "max_wal_senders=%d max_prepared_xacts=%d "
+                                            "max_locks_per_xact=%d wal_level=%s "
+                                            "wal_log_hints=%s track_commit_timestamp=%s",
                                        xlrec.max_connections,
                                        xlrec.max_worker_processes,
                                        xlrec.max_wal_senders,
@@ -392,8 +390,8 @@ timestamptz_to_time_t(timestamp_tz t)
 {
    pg_time_t result;
 
-   result = (pg_time_t) (t / USECS_PER_SEC +
-                         ((POSTGRES_EPOCH_JDATE - UNIX_EPOCH_JDATE) * SECS_PER_DAY));
+   result = (pg_time_t)(t / USECS_PER_SEC +
+                        ((POSTGRES_EPOCH_JDATE - UNIX_EPOCH_JDATE) * SECS_PER_DAY));
    return result;
 }
 
@@ -403,20 +401,20 @@ pgmoneta_wal_timestamptz_to_str(timestamp_tz dt)
    static char buf[MAXDATELEN + 1];
    char ts[MAXDATELEN + 1];
    char zone[MAXDATELEN + 1];
-   time_t result = (time_t) timestamptz_to_time_t(dt);
+   time_t result = (time_t)timestamptz_to_time_t(dt);
    struct tm* ltime = localtime(&result);
 
    strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", ltime);
    strftime(zone, sizeof(zone), "%Z", ltime);
 
    size_t written = snprintf(buf, sizeof(buf), "%s.%06d %s",
-                             ts, (int) (dt % USECS_PER_SEC), zone);
+                             ts, (int)(dt % USECS_PER_SEC), zone);
 
    if (written == 0 || written >= sizeof(buf))
    {
       // Handle the truncation or error
       pgmoneta_log_fatal("Buffer overflow or encoding error in timestamptz_to_str\n");
-      buf[0] = '\0';   // Ensure buffer is null-terminated
+      buf[0] = '\0'; // Ensure buffer is null-terminated
    }
 
    return buf;

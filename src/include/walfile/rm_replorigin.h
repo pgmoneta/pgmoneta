@@ -35,9 +35,9 @@ extern "C" {
 
 #include <walfile/wal_reader.h>
 
-#define INVALID_REP_ORIGIN_ID 0            /**< Invalid replication origin ID. */
-#define XLOG_REPLORIGIN_SET   0x00         /**< XLOG opcode for setting a replication origin. */
-#define XLOG_REPLORIGIN_DROP  0x10         /**< XLOG opcode for dropping a replication origin. */
+#define INVALID_REP_ORIGIN_ID 0    /**< Invalid replication origin ID. */
+#define XLOG_REPLORIGIN_SET   0x00 /**< XLOG opcode for setting a replication origin. */
+#define XLOG_REPLORIGIN_DROP  0x10 /**< XLOG opcode for dropping a replication origin. */
 
 /**
  * @struct xl_replorigin_set
@@ -48,9 +48,9 @@ extern "C" {
  */
 struct xl_replorigin_set
 {
-   xlog_rec_ptr remote_lsn;   /**< Remote LSN associated with the replication origin. */
-   rep_origin_id node_id;     /**< Replication origin ID. */
-   bool force;                /**< Indicates if the operation should be forced. */
+   xlog_rec_ptr remote_lsn; /**< Remote LSN associated with the replication origin. */
+   rep_origin_id node_id;   /**< Replication origin ID. */
+   bool force;              /**< Indicates if the operation should be forced. */
 };
 
 /**
@@ -61,7 +61,7 @@ struct xl_replorigin_set
  */
 struct xl_replorigin_drop
 {
-   rep_origin_id node_id;   /**< Replication origin ID of the node being dropped. */
+   rep_origin_id node_id; /**< Replication origin ID of the node being dropped. */
 };
 
 /**

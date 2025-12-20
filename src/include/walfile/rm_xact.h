@@ -34,44 +34,44 @@
 #include <walfile/sinval.h>
 #include <walfile/wal_reader.h>
 
-#define GIDSIZE                                     200  /**< Maximum size of Global Transaction ID (including '\0'). */
-#define XLOG_XACT_OPMASK                            0x70 /**< Mask for filtering opcodes out of xl_info. */
-#define XLOG_XACT_HAS_INFO                          0x80 /**< Indicates if this record has a 'xinfo' field. */
-#define XLOG_XACT_COMMIT                            0x00
-#define XLOG_XACT_PREPARE                           0x10
-#define XLOG_XACT_ABORT                             0x20
-#define XLOG_XACT_COMMIT_PREPARED                   0x30
-#define XLOG_XACT_ABORT_PREPARED                    0x40
-#define XLOG_XACT_ASSIGNMENT                        0x50
-#define XLOG_XACT_INVALIDATIONS                     0x60
+#define GIDSIZE                                   200  /**< Maximum size of Global Transaction ID (including '\0'). */
+#define XLOG_XACT_OPMASK                          0x70 /**< Mask for filtering opcodes out of xl_info. */
+#define XLOG_XACT_HAS_INFO                        0x80 /**< Indicates if this record has a 'xinfo' field. */
+#define XLOG_XACT_COMMIT                          0x00
+#define XLOG_XACT_PREPARE                         0x10
+#define XLOG_XACT_ABORT                           0x20
+#define XLOG_XACT_COMMIT_PREPARED                 0x30
+#define XLOG_XACT_ABORT_PREPARED                  0x40
+#define XLOG_XACT_ASSIGNMENT                      0x50
+#define XLOG_XACT_INVALIDATIONS                   0x60
 
-#define XACT_XINFO_HAS_DBINFO                       (1U << 0)
-#define XACT_XINFO_HAS_SUBXACTS                     (1U << 1)
-#define XACT_XINFO_HAS_RELFILENODES                 (1U << 2)
-#define XACT_XINFO_HAS_INVALS                       (1U << 3)
-#define XACT_XINFO_HAS_TWOPHASE                     (1U << 4)
-#define XACT_XINFO_HAS_ORIGIN                       (1U << 5)
-#define XACT_XINFO_HAS_AE_LOCKS                     (1U << 6)
-#define XACT_XINFO_HAS_GID                          (1U << 7)
-#define XACT_XINFO_HAS_DROPPED_STATS                (1U << 8)
+#define XACT_XINFO_HAS_DBINFO                     (1U << 0)
+#define XACT_XINFO_HAS_SUBXACTS                   (1U << 1)
+#define XACT_XINFO_HAS_RELFILENODES               (1U << 2)
+#define XACT_XINFO_HAS_INVALS                     (1U << 3)
+#define XACT_XINFO_HAS_TWOPHASE                   (1U << 4)
+#define XACT_XINFO_HAS_ORIGIN                     (1U << 5)
+#define XACT_XINFO_HAS_AE_LOCKS                   (1U << 6)
+#define XACT_XINFO_HAS_GID                        (1U << 7)
+#define XACT_XINFO_HAS_DROPPED_STATS              (1U << 8)
 
-#define XACT_COMPLETION_APPLY_FEEDBACK_FLAG         (1U << 29)
-#define XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG   (1U << 30)
-#define XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG      (1U << 31)
+#define XACT_COMPLETION_APPLY_FEEDBACK_FLAG       (1U << 29)
+#define XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG (1U << 30)
+#define XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG    (1U << 31)
 
 #define XACT_COMPLETION_APPLY_FEEDBACK(xinfo) \
-        ((xinfo & XACT_COMPLETION_APPLY_FEEDBACK_FLAG) != 0)
+   ((xinfo & XACT_COMPLETION_APPLY_FEEDBACK_FLAG) != 0)
 #define XACT_COMPLETION_RELCACHE_INIT_FILE_INVAL(xinfo) \
-        ((xinfo & XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG) != 0)
+   ((xinfo & XACT_COMPLETION_UPDATE_RELCACHE_FILE_FLAG) != 0)
 #define XACT_COMPLETION_FORCE_SYNC_COMMIT(xinfo) \
-        ((xinfo & XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG) != 0)
+   ((xinfo & XACT_COMPLETION_FORCE_SYNC_COMMIT_FLAG) != 0)
 
-#define MIN_SIZE_OF_XACT_STATS_ITEMS    offsetof(struct xl_xact_stats_items, items)
-#define MIN_SIZE_OF_XACT_SUBXACTS       offsetof(struct xl_xact_subxacts, subxacts)
-#define MIN_SIZE_OF_XACT_RELFILENODES   offsetof(struct xl_xact_relfilenodes, xnodes)
-#define MIN_SIZE_OF_XACT_INVALS         offsetof(struct xl_xact_invals, msgs)
-#define MIN_SIZE_OF_XACT_COMMIT         (offsetof(struct xl_xact_commit, xact_time) + sizeof(timestamp_tz))
-#define MIN_SIZE_OF_XACT_ABORT          sizeof(struct xl_xact_abort)
+#define MIN_SIZE_OF_XACT_STATS_ITEMS  offsetof(struct xl_xact_stats_items, items)
+#define MIN_SIZE_OF_XACT_SUBXACTS     offsetof(struct xl_xact_subxacts, subxacts)
+#define MIN_SIZE_OF_XACT_RELFILENODES offsetof(struct xl_xact_relfilenodes, xnodes)
+#define MIN_SIZE_OF_XACT_INVALS       offsetof(struct xl_xact_invals, msgs)
+#define MIN_SIZE_OF_XACT_COMMIT       (offsetof(struct xl_xact_commit, xact_time) + sizeof(timestamp_tz))
+#define MIN_SIZE_OF_XACT_ABORT        sizeof(struct xl_xact_abort)
 
 /**
  * @struct xl_xact_stats_item
@@ -90,9 +90,9 @@
  */
 struct xl_xact_stats_item
 {
-   int kind;          /**< Type of transaction statistic */
-   oid dboid;         /**< Database OID */
-   oid objoid;        /**< Object OID */
+   int kind;   /**< Type of transaction statistic */
+   oid dboid;  /**< Database OID */
+   oid objoid; /**< Object OID */
 };
 
 /**
@@ -111,8 +111,8 @@ struct xl_xact_stats_item
  */
 struct xl_xact_stats_items
 {
-   int nitems;                                               /**< Number of transaction statistic items */
-   struct xl_xact_stats_item items[FLEXIBLE_ARRAY_MEMBER];   /**< Array of transaction statistic items */
+   int nitems;                                             /**< Number of transaction statistic items */
+   struct xl_xact_stats_item items[FLEXIBLE_ARRAY_MEMBER]; /**< Array of transaction statistic items */
 };
 
 /**
@@ -123,9 +123,9 @@ struct xl_xact_stats_items
  */
 struct xl_xact_assignment
 {
-   transaction_id xtop;                         /**< Assigned XID's top-level XID. */
-   int nsubxacts;                               /**< Number of subtransaction XIDs. */
-   transaction_id xsub[FLEXIBLE_ARRAY_MEMBER];  /**< Array of assigned subxids. */
+   transaction_id xtop;                        /**< Assigned XID's top-level XID. */
+   int nsubxacts;                              /**< Number of subtransaction XIDs. */
+   transaction_id xsub[FLEXIBLE_ARRAY_MEMBER]; /**< Array of assigned subxids. */
 };
 
 /**
@@ -137,7 +137,7 @@ struct xl_xact_assignment
  */
 struct xl_xact_xinfo
 {
-   uint32_t xinfo;   /**< Flags indicating additional information in the record. */
+   uint32_t xinfo; /**< Flags indicating additional information in the record. */
 };
 
 /**
@@ -148,8 +148,8 @@ struct xl_xact_xinfo
  */
 struct xl_xact_dbinfo
 {
-   oid db_id;     /**< Database ID. */
-   oid ts_id;     /**< Tablespace ID. */
+   oid db_id; /**< Database ID. */
+   oid ts_id; /**< Tablespace ID. */
 };
 
 /**
@@ -160,8 +160,8 @@ struct xl_xact_dbinfo
  */
 struct xl_xact_subxacts
 {
-   int nsubxacts;                                   /**< Number of subtransaction XIDs. */
-   transaction_id subxacts[FLEXIBLE_ARRAY_MEMBER];  /**< Array of subtransaction IDs. */
+   int nsubxacts;                                  /**< Number of subtransaction XIDs. */
+   transaction_id subxacts[FLEXIBLE_ARRAY_MEMBER]; /**< Array of subtransaction IDs. */
 };
 
 /**
@@ -172,8 +172,8 @@ struct xl_xact_subxacts
  */
 struct xl_xact_relfilenodes
 {
-   int nrels;                                           /**< Number of relations. */
-   struct rel_file_node xnodes[FLEXIBLE_ARRAY_MEMBER];  /**< Array of relation file nodes. */
+   int nrels;                                          /**< Number of relations. */
+   struct rel_file_node xnodes[FLEXIBLE_ARRAY_MEMBER]; /**< Array of relation file nodes. */
 };
 
 /**
@@ -184,8 +184,8 @@ struct xl_xact_relfilenodes
  */
 struct xl_xact_invals
 {
-   int nmsgs;                                                      /**< Number of shared invalidation messages. */
-   union shared_invalidation_message msgs[FLEXIBLE_ARRAY_MEMBER];  /**< Array of invalidation messages. */
+   int nmsgs;                                                     /**< Number of shared invalidation messages. */
+   union shared_invalidation_message msgs[FLEXIBLE_ARRAY_MEMBER]; /**< Array of invalidation messages. */
 };
 
 /**
@@ -196,7 +196,7 @@ struct xl_xact_invals
  */
 struct xl_xact_twophase
 {
-   transaction_id xid;   /**< Transaction ID for the two-phase commit. */
+   transaction_id xid; /**< Transaction ID for the two-phase commit. */
 };
 
 /**
@@ -207,8 +207,8 @@ struct xl_xact_twophase
  */
 struct xl_xact_origin
 {
-   xlog_rec_ptr origin_lsn;          /**< LSN of this record at the origin node. */
-   timestamp_tz origin_timestamp;    /**< Timestamp of the transaction at the origin node. */
+   xlog_rec_ptr origin_lsn;       /**< LSN of this record at the origin node. */
+   timestamp_tz origin_timestamp; /**< Timestamp of the transaction at the origin node. */
 };
 
 /**
@@ -220,7 +220,7 @@ struct xl_xact_origin
  */
 struct xl_xact_commit
 {
-   timestamp_tz xact_time;   /**< Time of commit. */
+   timestamp_tz xact_time; /**< Time of commit. */
 
    /* Additional structures follow based on flags in `xinfo`:
     * - xl_xact_xinfo
@@ -243,7 +243,7 @@ struct xl_xact_commit
  */
 struct xl_xact_abort
 {
-   timestamp_tz xact_time;   /**< Time of abort. */
+   timestamp_tz xact_time; /**< Time of abort. */
 
    /* Additional structures follow based on flags in `xinfo`:
     * - xl_xact_xinfo
@@ -264,20 +264,20 @@ struct xl_xact_abort
  */
 struct xl_xact_prepare_v14
 {
-   uint32_t magic;                    /**< Format identifier. */
-   uint32_t total_len;                /**< Actual file length. */
-   transaction_id xid;                /**< Original transaction XID. */
-   oid database;                      /**< OID of the database it was in. */
-   timestamp_tz prepared_at;          /**< Time of preparation. */
-   oid owner;                         /**< User running the transaction. */
-   int32_t nsubxacts;                 /**< Number of following subxact XIDs. */
-   int32_t ncommitrels;               /**< Number of delete-on-commit rels. */
-   int32_t nabortrels;                /**< Number of delete-on-abort rels. */
-   int32_t ninvalmsgs;                /**< Number of cache invalidation messages. */
-   bool initfileinval;                /**< Does relcache init file need invalidation? */
-   uint16_t gidlen;                   /**< Length of the GID - GID follows the header. */
-   xlog_rec_ptr origin_lsn;           /**< LSN of this record at origin node. */
-   timestamp_tz origin_timestamp;     /**< Time of prepare at origin node. */
+   uint32_t magic;                /**< Format identifier. */
+   uint32_t total_len;            /**< Actual file length. */
+   transaction_id xid;            /**< Original transaction XID. */
+   oid database;                  /**< OID of the database it was in. */
+   timestamp_tz prepared_at;      /**< Time of preparation. */
+   oid owner;                     /**< User running the transaction. */
+   int32_t nsubxacts;             /**< Number of following subxact XIDs. */
+   int32_t ncommitrels;           /**< Number of delete-on-commit rels. */
+   int32_t nabortrels;            /**< Number of delete-on-abort rels. */
+   int32_t ninvalmsgs;            /**< Number of cache invalidation messages. */
+   bool initfileinval;            /**< Does relcache init file need invalidation? */
+   uint16_t gidlen;               /**< Length of the GID - GID follows the header. */
+   xlog_rec_ptr origin_lsn;       /**< LSN of this record at origin node. */
+   timestamp_tz origin_timestamp; /**< Time of prepare at origin node. */
 };
 
 /**
@@ -288,22 +288,22 @@ struct xl_xact_prepare_v14
  */
 struct xl_xact_prepare_v15
 {
-   uint32_t magic;                     /**< Format identifier. */
-   uint32_t total_len;                 /**< Actual file length. */
-   transaction_id xid;                 /**< Original transaction XID. */
-   oid database;                       /**< OID of the database it was in. */
-   timestamp_tz prepared_at;           /**< Time of preparation. */
-   oid owner;                          /**< User running the transaction. */
-   int32_t nsubxacts;                  /**< Number of following subxact XIDs. */
-   int32_t ncommitrels;                /**< Number of delete-on-commit rels. */
-   int32_t nabortrels;                 /**< Number of delete-on-abort rels. */
-   int32_t ncommitstats;               /**< Number of stats to drop on commit. */
-   int32_t nabortstats;                /**< Number of stats to drop on abort. */
-   int32_t ninvalmsgs;                 /**< Number of cache invalidation messages. */
-   bool initfileinval;                 /**< Does relcache init file need invalidation? */
-   uint16_t gidlen;                    /**< Length of the GID - GID follows the header. */
-   xlog_rec_ptr origin_lsn;            /**< LSN of this record at origin node. */
-   timestamp_tz origin_timestamp;      /**< Time of prepare at origin node. */
+   uint32_t magic;                /**< Format identifier. */
+   uint32_t total_len;            /**< Actual file length. */
+   transaction_id xid;            /**< Original transaction XID. */
+   oid database;                  /**< OID of the database it was in. */
+   timestamp_tz prepared_at;      /**< Time of preparation. */
+   oid owner;                     /**< User running the transaction. */
+   int32_t nsubxacts;             /**< Number of following subxact XIDs. */
+   int32_t ncommitrels;           /**< Number of delete-on-commit rels. */
+   int32_t nabortrels;            /**< Number of delete-on-abort rels. */
+   int32_t ncommitstats;          /**< Number of stats to drop on commit. */
+   int32_t nabortstats;           /**< Number of stats to drop on abort. */
+   int32_t ninvalmsgs;            /**< Number of cache invalidation messages. */
+   bool initfileinval;            /**< Does relcache init file need invalidation? */
+   uint16_t gidlen;               /**< Length of the GID - GID follows the header. */
+   xlog_rec_ptr origin_lsn;       /**< LSN of this record at origin node. */
+   timestamp_tz origin_timestamp; /**< Time of prepare at origin node. */
 };
 
 /**
@@ -314,13 +314,13 @@ struct xl_xact_prepare_v15
  */
 struct xl_xact_prepare
 {
-   void (*parse)(struct xl_xact_prepare* wrapper, void* rec);         /**< Parsing function. */
-   char* (*format)(struct xl_xact_prepare* wrapper, char* rec, char* buf);  /**< Formatting function. */
+   void (*parse)(struct xl_xact_prepare* wrapper, void* rec);              /**< Parsing function. */
+   char* (*format)(struct xl_xact_prepare* wrapper, char* rec, char* buf); /**< Formatting function. */
    union
    {
-      struct xl_xact_prepare_v14 v14;                                       /**< Version 14 structure. */
-      struct xl_xact_prepare_v15 v15;                                       /**< Version 15 structure. */
-   } data;                                                                  /**< Union holding different structure versions. */
+      struct xl_xact_prepare_v14 v14; /**< Version 14 structure. */
+      struct xl_xact_prepare_v15 v15; /**< Version 15 structure. */
+   } data;                            /**< Union holding different structure versions. */
 };
 
 /**
@@ -331,28 +331,28 @@ struct xl_xact_prepare
  */
 struct xl_xact_parsed_commit_v14
 {
-   timestamp_tz xact_time;                   /**< Transaction commit timestamp. */
-   uint32_t xinfo;                           /**< Additional commit info flags. */
+   timestamp_tz xact_time; /**< Transaction commit timestamp. */
+   uint32_t xinfo;         /**< Additional commit info flags. */
 
-   oid db_id;                                /**< Database ID for the transaction. */
-   oid ts_id;                                /**< Tablespace ID for the transaction. */
+   oid db_id; /**< Database ID for the transaction. */
+   oid ts_id; /**< Tablespace ID for the transaction. */
 
-   int nsubxacts;                            /**< Number of subtransactions. */
-   transaction_id* subxacts;                 /**< Array of subtransaction IDs. */
+   int nsubxacts;            /**< Number of subtransactions. */
+   transaction_id* subxacts; /**< Array of subtransaction IDs. */
 
-   int nrels;                                /**< Number of relations involved. */
-   struct rel_file_node* xnodes;             /**< Array of relation file nodes. */
+   int nrels;                    /**< Number of relations involved. */
+   struct rel_file_node* xnodes; /**< Array of relation file nodes. */
 
-   int nmsgs;                                /**< Number of invalidation messages. */
-   union shared_invalidation_message* msgs;  /**< Array of invalidation messages. */
+   int nmsgs;                               /**< Number of invalidation messages. */
+   union shared_invalidation_message* msgs; /**< Array of invalidation messages. */
 
-   transaction_id twophase_xid;              /**< 2PC transaction ID. */
-   char twophase_gid[GIDSIZE];               /**< Global ID for 2PC. */
-   int nabortrels;                           /**< Number of relations aborted in 2PC. */
-   struct rel_file_node* abortnodes;         /**< Array of aborted relation file nodes. */
+   transaction_id twophase_xid;      /**< 2PC transaction ID. */
+   char twophase_gid[GIDSIZE];       /**< Global ID for 2PC. */
+   int nabortrels;                   /**< Number of relations aborted in 2PC. */
+   struct rel_file_node* abortnodes; /**< Array of aborted relation file nodes. */
 
-   xlog_rec_ptr origin_lsn;                  /**< Log sequence number of the origin. */
-   timestamp_tz origin_timestamp;            /**< Timestamp of the origin. */
+   xlog_rec_ptr origin_lsn;       /**< Log sequence number of the origin. */
+   timestamp_tz origin_timestamp; /**< Timestamp of the origin. */
 };
 
 typedef struct xl_xact_parsed_commit_v14 xl_xact_parsed_prepare_v14;
@@ -365,26 +365,26 @@ typedef struct xl_xact_parsed_commit_v14 xl_xact_parsed_prepare_v14;
  */
 struct xl_xact_parsed_commit_v15
 {
-   timestamp_tz xact_time;                    /**< Transaction commit timestamp. */
-   uint32_t xinfo;                            /**< Additional commit info flags. */
-   oid db_id;                                 /**< Database ID for the transaction. */
-   oid ts_id;                                 /**< Tablespace ID for the transaction. */
-   int nsubxacts;                             /**< Number of subtransactions. */
-   transaction_id* subxacts;                  /**< Array of subtransaction IDs. */
-   int nrels;                                 /**< Number of relations involved. */
-   struct rel_file_node* xnodes;              /**< Array of relation file nodes. */
-   int nstats;                                /**< Number of statistical records. */
-   struct xl_xact_stats_item* stats;          /**< Array of statistical records. */
-   int nmsgs;                                 /**< Number of invalidation messages. */
-   union shared_invalidation_message* msgs;   /**< Array of invalidation messages. */
-   transaction_id twophase_xid;               /**< 2PC transaction ID. */
-   char twophase_gid[GIDSIZE];                /**< Global ID for 2PC. */
-   int nabortrels;                            /**< Number of relations aborted in 2PC. */
-   struct rel_file_node* abortnodes;          /**< Array of aborted relation file nodes. */
-   int nabortstats;                           /**< Number of aborted statistical records in 2PC. */
-   struct xl_xact_stats_item* abortstats;     /**< Array of aborted statistical records in 2PC. */
-   xlog_rec_ptr origin_lsn;                   /**< Log sequence number of the origin. */
-   timestamp_tz origin_timestamp;             /**< Timestamp of the origin. */
+   timestamp_tz xact_time;                  /**< Transaction commit timestamp. */
+   uint32_t xinfo;                          /**< Additional commit info flags. */
+   oid db_id;                               /**< Database ID for the transaction. */
+   oid ts_id;                               /**< Tablespace ID for the transaction. */
+   int nsubxacts;                           /**< Number of subtransactions. */
+   transaction_id* subxacts;                /**< Array of subtransaction IDs. */
+   int nrels;                               /**< Number of relations involved. */
+   struct rel_file_node* xnodes;            /**< Array of relation file nodes. */
+   int nstats;                              /**< Number of statistical records. */
+   struct xl_xact_stats_item* stats;        /**< Array of statistical records. */
+   int nmsgs;                               /**< Number of invalidation messages. */
+   union shared_invalidation_message* msgs; /**< Array of invalidation messages. */
+   transaction_id twophase_xid;             /**< 2PC transaction ID. */
+   char twophase_gid[GIDSIZE];              /**< Global ID for 2PC. */
+   int nabortrels;                          /**< Number of relations aborted in 2PC. */
+   struct rel_file_node* abortnodes;        /**< Array of aborted relation file nodes. */
+   int nabortstats;                         /**< Number of aborted statistical records in 2PC. */
+   struct xl_xact_stats_item* abortstats;   /**< Array of aborted statistical records in 2PC. */
+   xlog_rec_ptr origin_lsn;                 /**< Log sequence number of the origin. */
+   timestamp_tz origin_timestamp;           /**< Timestamp of the origin. */
 };
 
 typedef struct xl_xact_parsed_commit_v15 xl_xact_parsed_prepare_v15;
@@ -397,13 +397,13 @@ typedef struct xl_xact_parsed_commit_v15 xl_xact_parsed_prepare_v15;
  */
 struct xl_xact_parsed_commit
 {
-   void (*parse)(struct xl_xact_parsed_commit* wrapper, void* rec);           /**< Parsing function pointer. */
-   char* (*format)(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf);    /**< Formatting function pointer. */
+   void (*parse)(struct xl_xact_parsed_commit* wrapper, void* rec);              /**< Parsing function pointer. */
+   char* (*format)(struct xl_xact_parsed_commit* wrapper, char* rec, char* buf); /**< Formatting function pointer. */
    union
    {
-      struct xl_xact_parsed_commit_v14 v14;                                         /**< Parsed commit record for version 14. */
-      struct xl_xact_parsed_commit_v15 v15;                                         /**< Parsed commit record for version 15. */
-   } data;                                                                          /**< Union of parsed commit records. */
+      struct xl_xact_parsed_commit_v14 v14; /**< Parsed commit record for version 14. */
+      struct xl_xact_parsed_commit_v15 v15; /**< Parsed commit record for version 15. */
+   } data;                                  /**< Union of parsed commit records. */
 };
 
 /**
@@ -414,18 +414,18 @@ struct xl_xact_parsed_commit
  */
 struct xl_xact_parsed_abort_v14
 {
-   timestamp_tz xact_time;             /**< Transaction commit timestamp. */
-   uint32_t xinfo;                     /**< Additional info flags. */
-   oid dbId;                           /**< Database OID. */
-   oid tsId;                           /**< Tablespace OID. */
-   int nsubxacts;                      /**< Number of subtransactions. */
-   transaction_id* subxacts;           /**< Array of subtransaction IDs. */
-   int nrels;                          /**< Number of relations involved. */
-   struct rel_file_node* xnodes;       /**< Array of relation file nodes. */
-   transaction_id twophase_xid;        /**< Two-phase transaction ID. */
-   char twophase_gid[GIDSIZE];         /**< Two-phase transaction GID. */
-   xlog_rec_ptr origin_lsn;            /**< Replication origin LSN. */
-   timestamp_tz origin_timestamp;      /**< Replication origin timestamp. */
+   timestamp_tz xact_time;        /**< Transaction commit timestamp. */
+   uint32_t xinfo;                /**< Additional info flags. */
+   oid dbId;                      /**< Database OID. */
+   oid tsId;                      /**< Tablespace OID. */
+   int nsubxacts;                 /**< Number of subtransactions. */
+   transaction_id* subxacts;      /**< Array of subtransaction IDs. */
+   int nrels;                     /**< Number of relations involved. */
+   struct rel_file_node* xnodes;  /**< Array of relation file nodes. */
+   transaction_id twophase_xid;   /**< Two-phase transaction ID. */
+   char twophase_gid[GIDSIZE];    /**< Two-phase transaction GID. */
+   xlog_rec_ptr origin_lsn;       /**< Replication origin LSN. */
+   timestamp_tz origin_timestamp; /**< Replication origin timestamp. */
 };
 
 /**
@@ -436,20 +436,20 @@ struct xl_xact_parsed_abort_v14
  */
 struct xl_xact_parsed_abort_v15
 {
-   timestamp_tz xact_time;             /**< Transaction commit timestamp. */
-   uint32_t xinfo;                     /**< Additional info flags. */
-   oid db_id;                          /**< Database OID. */
-   oid ts_id;                          /**< Tablespace OID. */
-   int nsubxacts;                      /**< Number of subtransactions. */
-   transaction_id* subxacts;           /**< Array of subtransaction IDs. */
-   int nrels;                          /**< Number of relations involved. */
-   struct rel_file_node* xnodes;       /**< Array of relation file nodes. */
-   int nstats;                         /**< Number of statistical changes. */
-   struct xl_xact_stats_item* stats;   /**< Array of statistical changes. */
-   transaction_id twophase_xid;        /**< Two-phase transaction ID. */
-   char twophase_gid[GIDSIZE];         /**< Two-phase transaction GID. */
-   xlog_rec_ptr origin_lsn;            /**< Replication origin LSN. */
-   timestamp_tz origin_timestamp;      /**< Replication origin timestamp. */
+   timestamp_tz xact_time;           /**< Transaction commit timestamp. */
+   uint32_t xinfo;                   /**< Additional info flags. */
+   oid db_id;                        /**< Database OID. */
+   oid ts_id;                        /**< Tablespace OID. */
+   int nsubxacts;                    /**< Number of subtransactions. */
+   transaction_id* subxacts;         /**< Array of subtransaction IDs. */
+   int nrels;                        /**< Number of relations involved. */
+   struct rel_file_node* xnodes;     /**< Array of relation file nodes. */
+   int nstats;                       /**< Number of statistical changes. */
+   struct xl_xact_stats_item* stats; /**< Array of statistical changes. */
+   transaction_id twophase_xid;      /**< Two-phase transaction ID. */
+   char twophase_gid[GIDSIZE];       /**< Two-phase transaction GID. */
+   xlog_rec_ptr origin_lsn;          /**< Replication origin LSN. */
+   timestamp_tz origin_timestamp;    /**< Replication origin timestamp. */
 };
 
 /**
@@ -461,13 +461,13 @@ struct xl_xact_parsed_abort_v15
  */
 struct xl_xact_parsed_abort
 {
-   void (*parse)(struct xl_xact_parsed_abort* wrapper, void* rec);         /**< Parse function pointer. */
-   char* (*format)(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf);  /**< Format function pointer. */
+   void (*parse)(struct xl_xact_parsed_abort* wrapper, void* rec);              /**< Parse function pointer. */
+   char* (*format)(struct xl_xact_parsed_abort* wrapper, char* rec, char* buf); /**< Format function pointer. */
    union
    {
-      struct xl_xact_parsed_abort_v14 v14;                                       /**< Parsed abort transaction data for version 14. */
-      struct xl_xact_parsed_abort_v15 v15;                                       /**< Parsed abort transaction data for version 15. */
-   } data;                                                                       /**< Union of parsed abort transaction data. */
+      struct xl_xact_parsed_abort_v14 v14; /**< Parsed abort transaction data for version 14. */
+      struct xl_xact_parsed_abort_v15 v15; /**< Parsed abort transaction data for version 15. */
+   } data;                                 /**< Union of parsed abort transaction data. */
 };
 
 /**

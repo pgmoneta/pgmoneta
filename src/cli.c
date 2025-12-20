@@ -62,7 +62,7 @@
 
 #include <openssl/ssl.h>
 
-#define HELP 99
+#define HELP                   99
 
 #define COMMAND_ANNOTATE       "annotate"
 #define COMMAND_ARCHIVE        "archive"
@@ -88,10 +88,10 @@
 #define COMMAND_STATUS_DETAILS "status-details"
 #define COMMAND_VERIFY         "verify"
 
-#define OUTPUT_FORMAT_JSON "json"
-#define OUTPUT_FORMAT_TEXT "text"
+#define OUTPUT_FORMAT_JSON     "json"
+#define OUTPUT_FORMAT_TEXT     "text"
 
-#define UNSPECIFIED "Unspecified"
+#define UNSPECIFIED            "Unspecified"
 
 /* Global variables */
 static void help_backup(void);
@@ -269,30 +269,24 @@ struct pgmoneta_command command_table[] = {
       .deprecated = false,
       .log_message = "<verify> [%s]",
    },
-   {
-      .command = "archive",
-      .subcommand = "",
-      .accepted_argument_count = {3, 4},
-      .action = MANAGEMENT_ARCHIVE,
-      .deprecated = false,
-      .log_message = "<archive> [%s]"
-   },
-   {
-      .command = "delete",
-      .subcommand = "",
-      .accepted_argument_count = {2},
-      .action = MANAGEMENT_DELETE,
-      .deprecated = false,
-      .log_message = "<delete> [%s]"
-   },
-   {
-      .command = "retain",
-      .subcommand = "",
-      .accepted_argument_count = {2},
-      .action = MANAGEMENT_RETAIN,
-      .deprecated = false,
-      .log_message = "<retain> [%s]"
-   },
+   {.command = "archive",
+    .subcommand = "",
+    .accepted_argument_count = {3, 4},
+    .action = MANAGEMENT_ARCHIVE,
+    .deprecated = false,
+    .log_message = "<archive> [%s]"},
+   {.command = "delete",
+    .subcommand = "",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_DELETE,
+    .deprecated = false,
+    .log_message = "<delete> [%s]"},
+   {.command = "retain",
+    .subcommand = "",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_RETAIN,
+    .deprecated = false,
+    .log_message = "<retain> [%s]"},
    {
       .command = "expunge",
       .subcommand = "",
@@ -301,135 +295,102 @@ struct pgmoneta_command command_table[] = {
       .deprecated = false,
       .log_message = "<expunge [%s]>",
    },
-   {
-      .command = "decrypt",
-      .subcommand = "",
-      .accepted_argument_count = {1},
-      .action = MANAGEMENT_DECRYPT,
-      .deprecated = false,
-      .log_message = "<decrypt> [%s]"
-   },
-   {
-      .command = "encrypt",
-      .subcommand = "",
-      .accepted_argument_count = {1},
-      .action = MANAGEMENT_ENCRYPT,
-      .deprecated = false,
-      .log_message = "<encrypt> [%s]"
-   },
-   {
-      .command = "decompress",
-      .subcommand = "",
-      .accepted_argument_count = {1},
-      .action = MANAGEMENT_DECOMPRESS,
-      .deprecated = false,
-      .log_message = "<decompress> [%s]"
-   },
-   {
-      .command = "compress",
-      .subcommand = "",
-      .accepted_argument_count = {1},
-      .action = MANAGEMENT_COMPRESS,
-      .deprecated = false,
-      .log_message = "<compress> [%s]"
-   },
-   {
-      .command = "ping",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_PING,
-      .deprecated = false,
-      .log_message = "<ping>"
-   },
-   {
-      .command = "shutdown",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_SHUTDOWN,
-      .deprecated = false,
-      .log_message = "<shutdown>"
-   },
-   {
-      .command = "status",
-      .subcommand = "",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_STATUS,
-      .deprecated = false,
-      .log_message = "<status>"
-   },
-   {
-      .command = "status",
-      .subcommand = "details",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_STATUS_DETAILS,
-      .deprecated = false,
-      .log_message = "<status details>"
-   },
-   {
-      .command = "conf",
-      .subcommand = "reload",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_RELOAD,
-      .deprecated = false,
-      .log_message = "<conf reload>"
-   },
-   {
-      .command = "conf",
-      .subcommand = "ls",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_CONF_LS,
-      .deprecated = false,
-      .log_message = "<conf ls>"
-   },
-   {
-      .command = "conf",
-      .subcommand = "get",
-      .accepted_argument_count = {0, 1},
-      .action = MANAGEMENT_CONF_GET,
-      .deprecated = false,
-      .log_message = "<conf get> [%s]"
-   },
-   {
-      .command = "conf",
-      .subcommand = "set",
-      .accepted_argument_count = {2},
-      .action = MANAGEMENT_CONF_SET,
-      .deprecated = false,
-      .log_message = "<conf set> [%s]"
-   },
-   {
-      .command = "clear",
-      .subcommand = "prometheus",
-      .accepted_argument_count = {0},
-      .action = MANAGEMENT_RESET,
-      .deprecated = false,
-      .log_message = "<clear prometheus>"
-   },
-   {
-      .command = "info",
-      .subcommand = "",
-      .accepted_argument_count = {2},
-      .action = MANAGEMENT_INFO,
-      .deprecated = false,
-      .log_message = "<info> [%s]"
-   },
-   {
-      .command = "annotate",
-      .subcommand = "",
-      .accepted_argument_count = {4, 5},
-      .action = MANAGEMENT_ANNOTATE,
-      .deprecated = false,
-      .log_message = "<annotate> [%s]"
-   },
-   {
-      .command = "mode",
-      .subcommand = "",
-      .accepted_argument_count = {2},
-      .action = MANAGEMENT_MODE,
-      .deprecated = false,
-      .log_message = "<mode> [%s]"
-   }
-};
+   {.command = "decrypt",
+    .subcommand = "",
+    .accepted_argument_count = {1},
+    .action = MANAGEMENT_DECRYPT,
+    .deprecated = false,
+    .log_message = "<decrypt> [%s]"},
+   {.command = "encrypt",
+    .subcommand = "",
+    .accepted_argument_count = {1},
+    .action = MANAGEMENT_ENCRYPT,
+    .deprecated = false,
+    .log_message = "<encrypt> [%s]"},
+   {.command = "decompress",
+    .subcommand = "",
+    .accepted_argument_count = {1},
+    .action = MANAGEMENT_DECOMPRESS,
+    .deprecated = false,
+    .log_message = "<decompress> [%s]"},
+   {.command = "compress",
+    .subcommand = "",
+    .accepted_argument_count = {1},
+    .action = MANAGEMENT_COMPRESS,
+    .deprecated = false,
+    .log_message = "<compress> [%s]"},
+   {.command = "ping",
+    .subcommand = "",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_PING,
+    .deprecated = false,
+    .log_message = "<ping>"},
+   {.command = "shutdown",
+    .subcommand = "",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_SHUTDOWN,
+    .deprecated = false,
+    .log_message = "<shutdown>"},
+   {.command = "status",
+    .subcommand = "",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_STATUS,
+    .deprecated = false,
+    .log_message = "<status>"},
+   {.command = "status",
+    .subcommand = "details",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_STATUS_DETAILS,
+    .deprecated = false,
+    .log_message = "<status details>"},
+   {.command = "conf",
+    .subcommand = "reload",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_RELOAD,
+    .deprecated = false,
+    .log_message = "<conf reload>"},
+   {.command = "conf",
+    .subcommand = "ls",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_CONF_LS,
+    .deprecated = false,
+    .log_message = "<conf ls>"},
+   {.command = "conf",
+    .subcommand = "get",
+    .accepted_argument_count = {0, 1},
+    .action = MANAGEMENT_CONF_GET,
+    .deprecated = false,
+    .log_message = "<conf get> [%s]"},
+   {.command = "conf",
+    .subcommand = "set",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_CONF_SET,
+    .deprecated = false,
+    .log_message = "<conf set> [%s]"},
+   {.command = "clear",
+    .subcommand = "prometheus",
+    .accepted_argument_count = {0},
+    .action = MANAGEMENT_RESET,
+    .deprecated = false,
+    .log_message = "<clear prometheus>"},
+   {.command = "info",
+    .subcommand = "",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_INFO,
+    .deprecated = false,
+    .log_message = "<info> [%s]"},
+   {.command = "annotate",
+    .subcommand = "",
+    .accepted_argument_count = {4, 5},
+    .action = MANAGEMENT_ANNOTATE,
+    .deprecated = false,
+    .log_message = "<annotate> [%s]"},
+   {.command = "mode",
+    .subcommand = "",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_MODE,
+    .deprecated = false,
+    .log_message = "<mode> [%s]"}};
 
 int
 main(int argc, char** argv)
@@ -478,8 +439,7 @@ main(int argc, char** argv)
       {"E", "encrypt", true},
       {"s", "sort", true},
       {"", "cascade", false},
-      {"?", "help", false}
-   };
+      {"?", "help", false}};
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
    setbuf(stdout, NULL);
@@ -864,7 +824,7 @@ password:
          }
          else
          {
-            goto  execute;
+            goto execute;
          }
       }
 
@@ -2034,7 +1994,7 @@ process_get_result(SSL* ssl, int socket, char* config_key, int32_t output_format
       goto error;
    }
 
-   if (!config_key)  // error response | complete configuration
+   if (!config_key) // error response | complete configuration
    {
       json_res = (struct json*)res;
 
@@ -2246,7 +2206,7 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
       goto error;
    }
    memcpy(config_key_copy, config_key, config_key_len);
-   config_key_copy[config_key_len] = '\0';  // Null terminate
+   config_key_copy[config_key_len] = '\0'; // Null terminate
 
    if (!config_key_copy)
    {
@@ -2395,7 +2355,7 @@ get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t ou
 
    pgmoneta_json_iterator_destroy(iter);
 
-   if (!config_value)  // if key doesn't match with any field in configuration
+   if (!config_value) // if key doesn't match with any field in configuration
    {
       goto error;
    }
@@ -2870,7 +2830,7 @@ translate_backup_argument(struct json* response)
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN))
    {
       translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN));
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN, (uintptr_t) translated_lsn, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN, (uintptr_t)translated_lsn, ValueString);
       free(translated_lsn);
       translated_lsn = NULL;
    }
@@ -2878,7 +2838,7 @@ translate_backup_argument(struct json* response)
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN))
    {
       translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN));
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN, (uintptr_t) translated_lsn, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_CHECKPOINT_LOLSN, (uintptr_t)translated_lsn, ValueString);
       free(translated_lsn);
       translated_lsn = NULL;
    }
@@ -2886,7 +2846,7 @@ translate_backup_argument(struct json* response)
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_START_HILSN))
    {
       translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_START_HILSN));
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_HILSN, (uintptr_t) translated_lsn, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_HILSN, (uintptr_t)translated_lsn, ValueString);
       free(translated_lsn);
       translated_lsn = NULL;
    }
@@ -2894,7 +2854,7 @@ translate_backup_argument(struct json* response)
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_START_LOLSN))
    {
       translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_START_LOLSN));
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_LOLSN, (uintptr_t) translated_lsn, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_START_LOLSN, (uintptr_t)translated_lsn, ValueString);
       free(translated_lsn);
       translated_lsn = NULL;
    }
@@ -2902,7 +2862,7 @@ translate_backup_argument(struct json* response)
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_END_HILSN))
    {
       translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_END_HILSN));
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_HILSN, (uintptr_t) translated_lsn, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_HILSN, (uintptr_t)translated_lsn, ValueString);
       free(translated_lsn);
       translated_lsn = NULL;
    }
@@ -2910,7 +2870,7 @@ translate_backup_argument(struct json* response)
    if (pgmoneta_json_contains_key(response, MANAGEMENT_ARGUMENT_END_LOLSN))
    {
       translated_lsn = int_to_hex((uint32_t)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_END_LOLSN));
-      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_LOLSN, (uintptr_t) translated_lsn, ValueString);
+      pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_END_LOLSN, (uintptr_t)translated_lsn, ValueString);
       free(translated_lsn);
       translated_lsn = NULL;
    }

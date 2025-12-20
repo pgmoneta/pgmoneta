@@ -45,7 +45,7 @@ pgmoneta_read_control_data(int server, char* directory, struct control_file_data
 
    *controldata = NULL;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct main_configuration*)shmem;
 
    control_data_dir = pgmoneta_append(control_data_dir, directory);
    control_data_dir = pgmoneta_append(control_data_dir, "/global/pg_control");

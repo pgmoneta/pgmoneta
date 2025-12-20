@@ -35,13 +35,13 @@ extern "C" {
 
 #include <walfile/wal_reader.h>
 
-#define TRANSACTION_STATUS_IN_PROGRESS    0x00    /**< Transaction is in progress */
-#define TRANSACTION_STATUS_COMMITTED      0x01    /**< Transaction has been committed */
-#define TRANSACTION_STATUS_ABORTED        0x02    /**< Transaction has been aborted */
-#define TRANSACTION_STATUS_SUB_COMMITTED  0x03    /**< Transaction is sub-committed */
+#define TRANSACTION_STATUS_IN_PROGRESS   0x00 /**< Transaction is in progress */
+#define TRANSACTION_STATUS_COMMITTED     0x01 /**< Transaction has been committed */
+#define TRANSACTION_STATUS_ABORTED       0x02 /**< Transaction has been aborted */
+#define TRANSACTION_STATUS_SUB_COMMITTED 0x03 /**< Transaction is sub-committed */
 
-#define CLOG_ZEROPAGE      0x00    /**< CLOG zero page */
-#define CLOG_TRUNCATE      0x10    /**< CLOG truncate */
+#define CLOG_ZEROPAGE                    0x00 /**< CLOG zero page */
+#define CLOG_TRUNCATE                    0x10 /**< CLOG truncate */
 
 /**
  * @struct xl_clog_truncate_17
@@ -57,9 +57,9 @@ extern "C" {
  */
 struct xl_clog_truncate_17
 {
-   int pageno;                      /**< The page number of the CLOG to truncate */
-   transaction_id oldestXact;       /**< The oldest transaction ID to retain */
-   oid oldestXactDb;                /**< The database ID of the oldest transaction */
+   int pageno;                /**< The page number of the CLOG to truncate */
+   transaction_id oldestXact; /**< The oldest transaction ID to retain */
+   oid oldestXactDb;          /**< The database ID of the oldest transaction */
 };
 
 /**
@@ -76,9 +76,9 @@ struct xl_clog_truncate_17
  */
 struct xl_clog_truncate_16
 {
-   int64_t pageno;                  /**< The page number of the CLOG to truncate */
-   transaction_id oldestXact;       /**< The oldest transaction ID to retain */
-   oid oldestXactDb;                /**< The database ID of the oldest transaction */
+   int64_t pageno;            /**< The page number of the CLOG to truncate */
+   transaction_id oldestXact; /**< The oldest transaction ID to retain */
+   oid oldestXactDb;          /**< The database ID of the oldest transaction */
 };
 
 /**
@@ -98,13 +98,13 @@ struct xl_clog_truncate_16
  */
 struct xl_clog_truncate
 {
-   void (*parse)(struct xl_clog_truncate* wrapper, char* rec);      /**< Function pointer to parse the record */
-   char* (*format)(struct xl_clog_truncate* wrapper, char* buf);    /**< Function pointer to format the record */
+   void (*parse)(struct xl_clog_truncate* wrapper, char* rec);   /**< Function pointer to parse the record */
+   char* (*format)(struct xl_clog_truncate* wrapper, char* buf); /**< Function pointer to format the record */
    union
    {
-      struct xl_clog_truncate_16 v16;                               /**< Truncate record for version 16 */
-      struct xl_clog_truncate_17 v17;                               /**< Truncate record for version 17 */
-   } data;                                                          /**< Version-specific truncate record data */
+      struct xl_clog_truncate_16 v16; /**< Truncate record for version 16 */
+      struct xl_clog_truncate_17 v17; /**< Truncate record for version 17 */
+   } data;                            /**< Version-specific truncate record data */
 };
 
 /**

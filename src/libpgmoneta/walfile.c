@@ -139,8 +139,8 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
    uint32_t block_size = wf->long_phd->xlp_xlog_blcksz;
    uint64_t seg_size = wf->long_phd->xlp_seg_size;
    int current_page = 0;
-   size_t current_pos = SIZE_OF_XLOG_LONG_PHD;  /* Position in current page */
-   size_t file_pos = current_pos;               /* Absolute file position */
+   size_t current_pos = SIZE_OF_XLOG_LONG_PHD; /* Position in current page */
+   size_t file_pos = current_pos;              /* Absolute file position */
    char* encoded_record = NULL;
    struct decoded_xlog_record* record = NULL;
    uint32_t written = 0;
@@ -236,12 +236,11 @@ pgmoneta_write_walfile(struct walfile* wf, int server __attribute__((unused)), c
          space_left = block_size - current_pos;
          if (space_left == 0)
          {
-            continue;                      /* Page is full, go to next */
+            continue; /* Page is full, go to next */
          }
 
          /* Calculate how much to write in this chunk */
-         to_write = (total_length - written) < space_left ?
-                    (total_length - written) : space_left;
+         to_write = (total_length - written) < space_left ? (total_length - written) : space_left;
 
          /* Write record data */
          if (fwrite(encoded_record + written, 1, to_write, file) != to_write)
@@ -332,7 +331,7 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 
    while (pgmoneta_deque_iterator_next(record_iterator))
    {
-      struct decoded_xlog_record* record = (struct decoded_xlog_record*) record_iterator->value->data;
+      struct decoded_xlog_record* record = (struct decoded_xlog_record*)record_iterator->value->data;
       if (record->partial)
       {
          free(record);
@@ -360,7 +359,7 @@ pgmoneta_destroy_walfile(struct walfile* wf)
 
    while (pgmoneta_deque_iterator_next(page_header_iterator))
    {
-      struct xlog_page_header_data* page_header = (struct xlog_page_header_data*) page_header_iterator->value->data;
+      struct xlog_page_header_data* page_header = (struct xlog_page_header_data*)page_header_iterator->value->data;
       free(page_header);
    }
    pgmoneta_deque_iterator_destroy(page_header_iterator);
@@ -439,7 +438,7 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
 
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         record = (struct decoded_xlog_record*)record_iterator->value->data;
          if (summary)
          {
             pgmoneta_wal_record_collect_stats(record, start_lsn, end_lsn);
@@ -460,7 +459,7 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
    {
       while (pgmoneta_deque_iterator_next(record_iterator))
       {
-         record = (struct decoded_xlog_record*) record_iterator->value->data;
+         record = (struct decoded_xlog_record*)record_iterator->value->data;
          if (summary)
          {
             pgmoneta_wal_record_collect_stats(record, start_lsn, end_lsn);

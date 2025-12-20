@@ -53,7 +53,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NAME "admin"
+#define NAME                    "admin"
 #define DEFAULT_PASSWORD_LENGTH 64
 
 static char CHARS[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -71,6 +71,7 @@ static int list_users(char* users_path, int32_t output_format);
 static char* generate_password(int pwd_length);
 static int create_response(char* users_path, struct json* json, struct json** response);
 
+// clang-format off
 struct pgmoneta_command command_table[] =
 {
    {
@@ -114,6 +115,7 @@ struct pgmoneta_command command_table[] =
       .log_message = "<user ls>",
    },
 };
+// clang-format on
 
 static void
 version(void)
@@ -293,7 +295,6 @@ main(int argc, char** argv)
       }
       else if (parsed.cmd->action == MANAGEMENT_REMOVE_USER)
       {
-
          if (remove_user(file_path, username, output_format))
          {
             errx(1, "Error for <user del>");
@@ -301,12 +302,10 @@ main(int argc, char** argv)
       }
       else if (parsed.cmd->action == MANAGEMENT_LIST_USERS)
       {
-
          if (list_users(file_path, output_format))
          {
             errx(1, "Error for <user ls>");
          }
-
       }
    }
 
@@ -418,11 +417,11 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       goto error;
    }
 
-   #if defined(HAVE_DARWIN) || defined(HAVE_OSX)
-      #define GET_ENV(name) getenv(name)
-   #else
-      #define GET_ENV(name) secure_getenv(name)
-   #endif
+#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+#define GET_ENV(name) getenv(name)
+#else
+#define GET_ENV(name) secure_getenv(name)
+#endif
 
    if (password == NULL)
    {

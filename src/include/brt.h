@@ -57,14 +57,14 @@
  * and when it is serialized to disk.
  *
  */
-#define BITS_PER_BYTE               8
+#define BITS_PER_BYTE             8
 #define BLOCKS_PER_CHUNK          (1 << 16)
 #define BLOCKS_PER_ENTRY          (BITS_PER_BYTE * sizeof(uint16_t))
 #define MAX_ENTRIES_PER_CHUNK     (BLOCKS_PER_CHUNK / BLOCKS_PER_ENTRY)
-#define INITIAL_ENTRIES_PER_CHUNK   16
-#define  BLOCKS_PER_READ             512
+#define INITIAL_ENTRIES_PER_CHUNK 16
+#define BLOCKS_PER_READ           512
 /* Magic number for serialization file format. */
-#define BLOCKREFTABLE_MAGIC         0x652b137b
+#define BLOCKREFTABLE_MAGIC 0x652b137b
 
 typedef uint16_t* block_ref_table_chunk;
 
@@ -119,7 +119,7 @@ typedef struct block_ref_table_entry
  */
 typedef struct block_ref_table
 {
-   struct art* table;  /**< The ART (Adaptive Radix Tree) used to store the block reference table entries */
+   struct art* table; /**< The ART (Adaptive Radix Tree) used to store the block reference table entries */
 } block_ref_table;
 
 /**
@@ -138,9 +138,9 @@ typedef struct block_ref_table_serialized_entry
  */
 typedef struct block_ref_table_buffer
 {
-   char data[65536];      /**< the memory buffer storing the serialized form of block reference table, if the given space is exhausted it call the brt_io callback to write its content to disk */
-   int used;              /**< Number of bytes used in the data buffer */
-   int cursor;            /**< The current position in the data buffer, used to track where to write next */
+   char data[65536]; /**< the memory buffer storing the serialized form of block reference table, if the given space is exhausted it call the brt_io callback to write its content to disk */
+   int used;         /**< Number of bytes used in the data buffer */
+   int cursor;       /**< The current position in the data buffer, used to track where to write next */
 } block_ref_table_buffer;
 
 /**
@@ -158,12 +158,12 @@ struct block_ref_table_writer
  */
 struct block_ref_table_reader
 {
-   block_ref_table_buffer buffer;                 /**< The buffer used for reading the serialized form of block reference table from disk */
-   uint32_t total_chunks;                         /**< The total number of chunks for the RelFileLocator/ForkNumber combination being read */
-   uint32_t consumed_chunks;                      /**< The number of chunks that have been read so far */
-   uint16_t* chunk_size;                          /**< The array of chunk sizes for the relation fork */
-   uint16_t chunk_data[MAX_ENTRIES_PER_CHUNK];    /**< The current chunk being read, it can be either an array or a bitmap */
-   uint32_t chunk_position;                       /**< The current position in the chunk_data, used to track how many blocks have been processed */
+   block_ref_table_buffer buffer;              /**< The buffer used for reading the serialized form of block reference table from disk */
+   uint32_t total_chunks;                      /**< The total number of chunks for the RelFileLocator/ForkNumber combination being read */
+   uint32_t consumed_chunks;                   /**< The number of chunks that have been read so far */
+   uint16_t* chunk_size;                       /**< The array of chunk sizes for the relation fork */
+   uint16_t chunk_data[MAX_ENTRIES_PER_CHUNK]; /**< The current chunk being read, it can be either an array or a bitmap */
+   uint32_t chunk_position;                    /**< The current position in the chunk_data, used to track how many blocks have been processed */
 };
 
 /****  BRT MANIPULATION APIs *****/

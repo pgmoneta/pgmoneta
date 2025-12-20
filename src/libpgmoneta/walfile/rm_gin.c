@@ -35,21 +35,21 @@ static char*
 desc_recompress_leaf(char* buf, struct gin_xlog_recompress_data_leaf* insertData)
 {
    int i;
-   char* walbuf = ((char*) insertData) + sizeof(struct gin_xlog_recompress_data_leaf);
+   char* walbuf = ((char*)insertData) + sizeof(struct gin_xlog_recompress_data_leaf);
 
-   buf = pgmoneta_format_and_append(buf, " %d segments:", (int) insertData->nactions);
+   buf = pgmoneta_format_and_append(buf, " %d segments:", (int)insertData->nactions);
 
    for (i = 0; i < insertData->nactions; i++)
    {
-      uint8_t a_segno = *((uint8_t*) (walbuf++));
-      uint8_t a_action = *((uint8_t*) (walbuf++));
+      uint8_t a_segno = *((uint8_t*)(walbuf++));
+      uint8_t a_action = *((uint8_t*)(walbuf++));
       uint16_t nitems = 0;
       int newsegsize = 0;
 
       if (a_action == GIN_SEGMENT_INSERT ||
           a_action == GIN_SEGMENT_REPLACE)
       {
-         newsegsize = SIZE_OF_GIN_POSTING_LIST((struct gin_posting_list*) walbuf);
+         newsegsize = SIZE_OF_GIN_POSTING_LIST((struct gin_posting_list*)walbuf);
          walbuf += SHORTALIGN(newsegsize);
       }
 
@@ -96,7 +96,7 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
          break;
       case XLOG_GIN_INSERT:
       {
-         struct gin_xlog_insert* xlrec = (struct gin_xlog_insert*) rec;
+         struct gin_xlog_insert* xlrec = (struct gin_xlog_insert*)rec;
 
          buf = pgmoneta_format_and_append(buf, "isdata: %c isleaf: %c",
                                           (xlrec->flags & GIN_INSERT_ISDATA) ? 'T' : 'F',
@@ -107,9 +107,9 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
             block_number leftChildBlkno;
             block_number rightChildBlkno;
 
-            leftChildBlkno = BLOCK_ID_GET_BLOCK_NUMBER((block_id) payload);
+            leftChildBlkno = BLOCK_ID_GET_BLOCK_NUMBER((block_id)payload);
             payload += sizeof(struct block_id_data);
-            rightChildBlkno = BLOCK_ID_GET_BLOCK_NUMBER((block_id) payload);
+            rightChildBlkno = BLOCK_ID_GET_BLOCK_NUMBER((block_id)payload);
             payload += sizeof(block_number);
             buf = pgmoneta_format_and_append(buf, " children: %u/%u",
                                              leftChildBlkno, rightChildBlkno);
@@ -132,16 +132,16 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
             if (!(xlrec->flags & GIN_INSERT_ISDATA))
             {
                buf = pgmoneta_format_and_append(buf, " isdelete: %c",
-                                                (((struct gin_xlog_insert_entry*) payload)->isDelete) ? 'T' : 'F');
+                                                (((struct gin_xlog_insert_entry*)payload)->isDelete) ? 'T' : 'F');
             }
             else if (xlrec->flags & GIN_INSERT_ISLEAF)
             {
-               buf = desc_recompress_leaf(buf, (struct gin_xlog_recompress_data_leaf*) payload);
+               buf = desc_recompress_leaf(buf, (struct gin_xlog_recompress_data_leaf*)payload);
             }
             else
             {
                struct gin_xlog_insert_data_internal* insertData =
-                  (struct gin_xlog_insert_data_internal*) payload;
+                  (struct gin_xlog_insert_data_internal*)payload;
 
                buf = pgmoneta_format_and_append(buf, " pitem: %u-%u/%u",
                                                 POSTING_ITEM_GET_BLOCK_NUMBER(&insertData->newitem),
@@ -153,10 +153,10 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
       break;
       case XLOG_GIN_SPLIT:
       {
-         struct gin_xlog_split* xlrec = (struct gin_xlog_split*) rec;
+         struct gin_xlog_split* xlrec = (struct gin_xlog_split*)rec;
 
          buf = pgmoneta_format_and_append(buf, "isrootsplit: %c",
-                                          (((struct gin_xlog_split*) rec)->flags & GIN_SPLIT_ROOT) ? 'T' : 'F');
+                                          (((struct gin_xlog_split*)rec)->flags & GIN_SPLIT_ROOT) ? 'T' : 'F');
          buf = pgmoneta_format_and_append(buf, " isdata: %c isleaf: %c",
                                           (xlrec->flags & GIN_INSERT_ISDATA) ? 'T' : 'F',
                                           (xlrec->flags & GIN_INSERT_ISLEAF) ? 'T' : 'F');
@@ -181,7 +181,7 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
          else
          {
             struct gin_xlog_vacuum_data_leaf_page* xlrec =
-               (struct gin_xlog_vacuum_data_leaf_page*) pgmoneta_wal_get_record_block_data(record, 0, NULL);
+               (struct gin_xlog_vacuum_data_leaf_page*)pgmoneta_wal_get_record_block_data(record, 0, NULL);
 
             buf = desc_recompress_leaf(buf, &xlrec->data);
          }
@@ -198,7 +198,7 @@ pgmoneta_wal_gin_desc(char* buf, struct decoded_xlog_record* record)
          break;
       case XLOG_GIN_DELETE_LISTPAGE:
          buf = pgmoneta_format_and_append(buf, "ndeleted: %d",
-                                          ((struct gin_xlog_delete_list_pages*) rec)->ndeleted);
+                                          ((struct gin_xlog_delete_list_pages*)rec)->ndeleted);
          break;
    }
    return buf;

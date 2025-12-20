@@ -81,8 +81,8 @@
 #include <systemd/sd-daemon.h>
 #endif
 
-#define NAME "main"
-#define MAX_FDS 64
+#define NAME           "main"
+#define MAX_FDS        64
 #define SIGNALS_NUMBER 6
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
@@ -106,7 +106,7 @@ static int init_receivewal(int server);
 static int init_replication_slots(void);
 static int init_replication_slot(int server);
 static int verify_replication_slot(char* slot_name, int srv, SSL* ssl, int socket);
-static int  create_pidfile(void);
+static int create_pidfile(void);
 static void remove_pidfile(void);
 static void shutdown_ports(void);
 
@@ -827,12 +827,12 @@ main(int argc, char** argv)
    init_receivewals();
 
    /* Start to validate server configuration */
-   ev_periodic_init (&valid, valid_cb, 0., 600, 0);
-   ev_periodic_start (main_loop, &valid);
+   ev_periodic_init(&valid, valid_cb, 0., 600, 0);
+   ev_periodic_start(main_loop, &valid);
 
    /* Start to verify WAL streaming */
-   ev_periodic_init (&wal_streaming, wal_streaming_cb, 0., 60, 0);
-   ev_periodic_start (main_loop, &wal_streaming);
+   ev_periodic_init(&wal_streaming, wal_streaming_cb, 0., 60, 0);
+   ev_periodic_start(main_loop, &wal_streaming);
 
    /* Start WAL compression */
    if (config->compression_type != COMPRESSION_NONE ||
@@ -887,7 +887,8 @@ main(int argc, char** argv)
    sd_notifyf(0,
               "READY=1\n"
               "STATUS=Running\n"
-              "MAINPID=%lu", (unsigned long)getpid());
+              "MAINPID=%lu",
+              (unsigned long)getpid());
 #endif
 
    while (keep_running)
@@ -2121,7 +2122,6 @@ reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t e
    {
       pgmoneta_log_info("Configuration applied successfully, reloading services");
       kill(getppid(), SIGUSR1);
-
    }
 
    exit(0);
@@ -2415,7 +2415,6 @@ wal_streaming_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __
 
    for (int i = 0; i < config->common.number_of_servers; i++)
    {
-
       if (keep_running && config->common.servers[i].wal_streaming <= 0)
       {
          start = false;
@@ -2906,7 +2905,6 @@ create_pidfile(void)
 
    if (strlen(config->pidfile) > 0)
    {
-
       // check pidfile is not there
       if (access(config->pidfile, F_OK) == 0)
       {

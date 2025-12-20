@@ -35,18 +35,18 @@
 
 typedef struct xl_xact_xinfo xl_xact_xinfo;
 
-static char*xact_desc_relations(char* buf, char* label, int nrels, struct rel_file_node* xnodes);
+static char* xact_desc_relations(char* buf, char* label, int nrels, struct rel_file_node* xnodes);
 
-static char*xact_desc_commit_v14(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
-static char*xact_desc_abort_v14(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
-static char*xact_desc_prepare_v14(char* buf, uint8_t info, struct xl_xact_prepare_v14* xlrec);
+static char* xact_desc_commit_v14(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
+static char* xact_desc_abort_v14(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
+static char* xact_desc_prepare_v14(char* buf, uint8_t info, struct xl_xact_prepare_v14* xlrec);
 
-static char*xact_desc_commit_v15(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
-static char*xact_desc_abort_v15(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
-static char*xact_desc_prepare_v15(char* buf, uint8_t info, struct xl_xact_prepare_v15* xlrec);
+static char* xact_desc_commit_v15(char* buf, uint8_t info, struct xl_xact_commit* xlrec, rep_origin_id origin_id);
+static char* xact_desc_abort_v15(char* buf, uint8_t info, struct xl_xact_abort* xlrec);
+static char* xact_desc_prepare_v15(char* buf, uint8_t info, struct xl_xact_prepare_v15* xlrec);
 
-static char*xact_desc_assignment(char* buf, struct xl_xact_assignment* xlrec);
-static char*xact_desc_subxacts(char* buf, int nsubxacts, transaction_id* subxacts);
+static char* xact_desc_assignment(char* buf, struct xl_xact_assignment* xlrec);
+static char* xact_desc_subxacts(char* buf, int nsubxacts, transaction_id* subxacts);
 
 void parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v14* parsed);
 void parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v15* parsed);
@@ -618,7 +618,7 @@ pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_XACT_COMMIT || info == XLOG_XACT_COMMIT_PREPARED)
    {
-      struct xl_xact_commit* xlrec = (struct xl_xact_commit*) rec;
+      struct xl_xact_commit* xlrec = (struct xl_xact_commit*)rec;
 
       if (server_config->version >= 15)
       {
@@ -631,7 +631,7 @@ pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_XACT_ABORT || info == XLOG_XACT_ABORT_PREPARED)
    {
-      struct xl_xact_abort* xlrec = (struct xl_xact_abort*) rec;
+      struct xl_xact_abort* xlrec = (struct xl_xact_abort*)rec;
       if (server_config->version >= 15)
       {
          buf = xact_desc_abort_v15(buf, XLOG_REC_GET_INFO(record), xlrec);
@@ -640,26 +640,23 @@ pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record)
       {
          buf = xact_desc_abort_v14(buf, XLOG_REC_GET_INFO(record), xlrec);
       }
-
    }
    else if (info == XLOG_XACT_PREPARE)
    {
-
       if (server_config->version >= 15)
       {
-         struct xl_xact_prepare_v15* xlrec = (struct xl_xact_prepare_v15*) rec;
+         struct xl_xact_prepare_v15* xlrec = (struct xl_xact_prepare_v15*)rec;
          buf = xact_desc_prepare_v15(buf, XLOG_REC_GET_INFO(record), xlrec);
       }
       else
       {
-         struct xl_xact_prepare_v14* xlrec = (struct xl_xact_prepare_v14*) rec;
+         struct xl_xact_prepare_v14* xlrec = (struct xl_xact_prepare_v14*)rec;
          buf = xact_desc_prepare_v14(buf, XLOG_REC_GET_INFO(record), xlrec);
       }
-
    }
    else if (info == XLOG_XACT_ASSIGNMENT)
    {
-      struct xl_xact_assignment* xlrec = (struct xl_xact_assignment*) rec;
+      struct xl_xact_assignment* xlrec = (struct xl_xact_assignment*)rec;
 
       /*
        * Note that we ignore the WAL record's xid, since we're more
@@ -671,7 +668,7 @@ pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_XACT_INVALIDATIONS)
    {
-      struct xl_xact_invals* xlrec = (struct xl_xact_invals*) rec;
+      struct xl_xact_invals* xlrec = (struct xl_xact_invals*)rec;
 
       buf = pgmoneta_wal_standby_desc_invalidations(buf, xlrec->nmsgs, xlrec->msgs, InvalidOid,
                                                     InvalidOid, false);
@@ -684,18 +681,18 @@ pgmoneta_wal_xact_desc(char* buf, struct decoded_xlog_record* record)
 void
 parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v14* parsed)
 {
-   char* data = ((char*) xlrec) + MIN_SIZE_OF_XACT_ABORT;
+   char* data = ((char*)xlrec) + MIN_SIZE_OF_XACT_ABORT;
 
    memset(parsed, 0, sizeof(*parsed));
 
-   parsed->xinfo = 0;         /* default, if no XLOG_XACT_HAS_INFO is
+   parsed->xinfo = 0; /* default, if no XLOG_XACT_HAS_INFO is
                                * present */
 
    parsed->xact_time = xlrec->xact_time;
 
    if (info & XLOG_XACT_HAS_INFO)
    {
-      xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*) data;
+      xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*)data;
 
       parsed->xinfo = xl_xinfo->xinfo;
 
@@ -704,7 +701,7 @@ parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_DBINFO)
    {
-      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*) data;
+      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*)data;
 
       parsed->dbId = xl_dbinfo->db_id;
       parsed->tsId = xl_dbinfo->ts_id;
@@ -714,7 +711,7 @@ parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_SUBXACTS)
    {
-      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*) data;
+      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*)data;
 
       parsed->nsubxacts = xl_subxacts->nsubxacts;
       parsed->subxacts = xl_subxacts->subxacts;
@@ -725,7 +722,7 @@ parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_RELFILENODES)
    {
-      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*) data;
+      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*)data;
 
       parsed->nrels = xl_relfilenodes->nrels;
       parsed->xnodes = xl_relfilenodes->xnodes;
@@ -736,7 +733,7 @@ parse_abort_record_v14(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_TWOPHASE)
    {
-      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*) data;
+      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*)data;
 
       parsed->twophase_xid = xl_twophase->xid;
 
@@ -771,7 +768,7 @@ parse_prepare_record_v14(uint8_t info __attribute__((unused)), struct xl_xact_pr
 {
    char* bufptr;
 
-   bufptr = ((char*) xlrec) + MAXALIGN(sizeof(struct xl_xact_prepare));
+   bufptr = ((char*)xlrec) + MAXALIGN(sizeof(struct xl_xact_prepare));
 
    memset(parsed, 0, sizeof(*parsed));
 
@@ -788,34 +785,34 @@ parse_prepare_record_v14(uint8_t info __attribute__((unused)), struct xl_xact_pr
    strncpy(parsed->twophase_gid, bufptr, xlrec->gidlen);
    bufptr += MAXALIGN(xlrec->gidlen);
 
-   parsed->subxacts = (transaction_id*) bufptr;
+   parsed->subxacts = (transaction_id*)bufptr;
    bufptr += MAXALIGN(xlrec->nsubxacts * sizeof(transaction_id));
 
-   parsed->xnodes = (struct rel_file_node*) bufptr;
+   parsed->xnodes = (struct rel_file_node*)bufptr;
    bufptr += MAXALIGN(xlrec->ncommitrels * sizeof(struct rel_file_node));
 
-   parsed->abortnodes = (struct rel_file_node*) bufptr;
+   parsed->abortnodes = (struct rel_file_node*)bufptr;
    bufptr += MAXALIGN(xlrec->nabortrels * sizeof(struct rel_file_node));
 
-   parsed->msgs = (union shared_invalidation_message*) bufptr;
+   parsed->msgs = (union shared_invalidation_message*)bufptr;
    bufptr += MAXALIGN(xlrec->ninvalmsgs * sizeof(union shared_invalidation_message));
 }
 
 void
 parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xact_parsed_commit_v14* parsed)
 {
-   char* data = ((char*) xlrec) + MIN_SIZE_OF_XACT_COMMIT;
+   char* data = ((char*)xlrec) + MIN_SIZE_OF_XACT_COMMIT;
 
    memset(parsed, 0, sizeof(*parsed));
 
-   parsed->xinfo = 0;         /* default, if no XLOG_XACT_HAS_INFO is
+   parsed->xinfo = 0; /* default, if no XLOG_XACT_HAS_INFO is
                                * present */
 
    parsed->xact_time = xlrec->xact_time;
 
    if (info & XLOG_XACT_HAS_INFO)
    {
-      xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*) data;
+      xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*)data;
 
       parsed->xinfo = xl_xinfo->xinfo;
 
@@ -824,7 +821,7 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_DBINFO)
    {
-      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*) data;
+      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*)data;
 
       parsed->db_id = xl_dbinfo->db_id;
       parsed->ts_id = xl_dbinfo->ts_id;
@@ -834,7 +831,7 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_SUBXACTS)
    {
-      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*) data;
+      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*)data;
 
       parsed->nsubxacts = xl_subxacts->nsubxacts;
       parsed->subxacts = xl_subxacts->subxacts;
@@ -845,7 +842,7 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_RELFILENODES)
    {
-      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*) data;
+      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*)data;
 
       parsed->nrels = xl_relfilenodes->nrels;
       parsed->xnodes = xl_relfilenodes->xnodes;
@@ -856,7 +853,7 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_INVALS)
    {
-      struct xl_xact_invals* xl_invals = (struct xl_xact_invals*) data;
+      struct xl_xact_invals* xl_invals = (struct xl_xact_invals*)data;
 
       parsed->nmsgs = xl_invals->nmsgs;
       parsed->msgs = xl_invals->msgs;
@@ -867,7 +864,7 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_TWOPHASE)
    {
-      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*) data;
+      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*)data;
 
       parsed->twophase_xid = xl_twophase->xid;
 
@@ -901,18 +898,18 @@ parse_commit_record_v14(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 void
 parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact_parsed_abort_v15* parsed)
 {
-   char* data = ((char*) xlrec) + MIN_SIZE_OF_XACT_ABORT;
+   char* data = ((char*)xlrec) + MIN_SIZE_OF_XACT_ABORT;
 
    memset(parsed, 0, sizeof(*parsed));
 
-   parsed->xinfo = 0;         /* default, if no XLOG_XACT_HAS_INFO is
+   parsed->xinfo = 0; /* default, if no XLOG_XACT_HAS_INFO is
                                * present */
 
    parsed->xact_time = xlrec->xact_time;
 
    if (info & XLOG_XACT_HAS_INFO)
    {
-      struct xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*) data;
+      struct xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*)data;
 
       parsed->xinfo = xl_xinfo->xinfo;
 
@@ -921,7 +918,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_DBINFO)
    {
-      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*) data;
+      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*)data;
 
       parsed->db_id = xl_dbinfo->db_id;
       parsed->ts_id = xl_dbinfo->ts_id;
@@ -931,7 +928,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_SUBXACTS)
    {
-      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*) data;
+      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*)data;
 
       parsed->nsubxacts = xl_subxacts->nsubxacts;
       parsed->subxacts = xl_subxacts->subxacts;
@@ -942,7 +939,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_RELFILENODES)
    {
-      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*) data;
+      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*)data;
 
       parsed->nrels = xl_relfilenodes->nrels;
       parsed->xnodes = xl_relfilenodes->xnodes;
@@ -953,7 +950,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_DROPPED_STATS)
    {
-      struct xl_xact_stats_items* xl_drops = (struct xl_xact_stats_items*) data;
+      struct xl_xact_stats_items* xl_drops = (struct xl_xact_stats_items*)data;
 
       parsed->nstats = xl_drops->nitems;
       parsed->stats = xl_drops->items;
@@ -964,7 +961,7 @@ parse_abort_record_v15(uint8_t info, struct xl_xact_abort* xlrec, struct xl_xact
 
    if (parsed->xinfo & XACT_XINFO_HAS_TWOPHASE)
    {
-      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*) data;
+      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*)data;
 
       parsed->twophase_xid = xl_twophase->xid;
 
@@ -1002,7 +999,7 @@ parse_prepare_record_v15(uint8_t info __attribute__((unused)), struct xl_xact_pr
 {
    char* bufptr;
 
-   bufptr = ((char*) xlrec) + MAXALIGN(sizeof(struct xl_xact_prepare));
+   bufptr = ((char*)xlrec) + MAXALIGN(sizeof(struct xl_xact_prepare));
 
    memset(parsed, 0, sizeof(*parsed));
 
@@ -1019,40 +1016,40 @@ parse_prepare_record_v15(uint8_t info __attribute__((unused)), struct xl_xact_pr
    strncpy(parsed->twophase_gid, bufptr, xlrec->gidlen);
    bufptr += MAXALIGN(xlrec->gidlen);
 
-   parsed->subxacts = (transaction_id*) bufptr;
+   parsed->subxacts = (transaction_id*)bufptr;
    bufptr += MAXALIGN(xlrec->nsubxacts * sizeof(transaction_id));
 
-   parsed->xnodes = (struct rel_file_node*) bufptr;
+   parsed->xnodes = (struct rel_file_node*)bufptr;
    bufptr += MAXALIGN(xlrec->ncommitrels * sizeof(struct rel_file_node));
 
-   parsed->abortnodes = (struct rel_file_node*) bufptr;
+   parsed->abortnodes = (struct rel_file_node*)bufptr;
    bufptr += MAXALIGN(xlrec->nabortrels * sizeof(struct rel_file_node));
 
-   parsed->stats = (struct xl_xact_stats_item*) bufptr;
+   parsed->stats = (struct xl_xact_stats_item*)bufptr;
    bufptr += MAXALIGN(xlrec->ncommitstats * sizeof(struct xl_xact_stats_item));
 
-   parsed->abortstats = (struct xl_xact_stats_item*) bufptr;
+   parsed->abortstats = (struct xl_xact_stats_item*)bufptr;
    bufptr += MAXALIGN(xlrec->nabortstats * sizeof(struct xl_xact_stats_item));
 
-   parsed->msgs = (union shared_invalidation_message*) bufptr;
+   parsed->msgs = (union shared_invalidation_message*)bufptr;
    bufptr += MAXALIGN(xlrec->ninvalmsgs * sizeof(union shared_invalidation_message));
 }
 
 void
 parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xact_parsed_commit_v15* parsed)
 {
-   char* data = ((char*) xlrec) + MIN_SIZE_OF_XACT_COMMIT;
+   char* data = ((char*)xlrec) + MIN_SIZE_OF_XACT_COMMIT;
 
    memset(parsed, 0, sizeof(*parsed));
 
-   parsed->xinfo = 0;         /* default, if no XLOG_XACT_HAS_INFO is
+   parsed->xinfo = 0; /* default, if no XLOG_XACT_HAS_INFO is
                                * present */
 
    parsed->xact_time = xlrec->xact_time;
 
    if (info & XLOG_XACT_HAS_INFO)
    {
-      xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*) data;
+      xl_xact_xinfo* xl_xinfo = (xl_xact_xinfo*)data;
 
       parsed->xinfo = xl_xinfo->xinfo;
 
@@ -1061,7 +1058,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_DBINFO)
    {
-      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*) data;
+      struct xl_xact_dbinfo* xl_dbinfo = (struct xl_xact_dbinfo*)data;
 
       parsed->db_id = xl_dbinfo->db_id;
       parsed->ts_id = xl_dbinfo->ts_id;
@@ -1071,7 +1068,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_SUBXACTS)
    {
-      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*) data;
+      struct xl_xact_subxacts* xl_subxacts = (struct xl_xact_subxacts*)data;
 
       parsed->nsubxacts = xl_subxacts->nsubxacts;
       parsed->subxacts = xl_subxacts->subxacts;
@@ -1082,7 +1079,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_RELFILENODES)
    {
-      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*) data;
+      struct xl_xact_relfilenodes* xl_relfilenodes = (struct xl_xact_relfilenodes*)data;
 
       parsed->nrels = xl_relfilenodes->nrels;
       parsed->xnodes = xl_relfilenodes->xnodes;
@@ -1093,7 +1090,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_DROPPED_STATS)
    {
-      struct xl_xact_stats_items* xl_drops = (struct xl_xact_stats_items*) data;
+      struct xl_xact_stats_items* xl_drops = (struct xl_xact_stats_items*)data;
 
       parsed->nstats = xl_drops->nitems;
       parsed->stats = xl_drops->items;
@@ -1104,7 +1101,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_INVALS)
    {
-      struct xl_xact_invals* xl_invals = (struct xl_xact_invals*) data;
+      struct xl_xact_invals* xl_invals = (struct xl_xact_invals*)data;
 
       parsed->nmsgs = xl_invals->nmsgs;
       parsed->msgs = xl_invals->msgs;
@@ -1115,7 +1112,7 @@ parse_commit_record_v15(uint8_t info, struct xl_xact_commit* xlrec, struct xl_xa
 
    if (parsed->xinfo & XACT_XINFO_HAS_TWOPHASE)
    {
-      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*) data;
+      struct xl_xact_twophase* xl_twophase = (struct xl_xact_twophase*)data;
 
       parsed->twophase_xid = xl_twophase->xid;
 

@@ -39,31 +39,31 @@ extern "C" {
 
 #include <stdint.h>
 
-#define INVALID_OFFSET_NUMBER          ((offset_number) 0)
-#define FIRST_OFFSET_NUMBER            ((offset_number) 1)
-#define MAX_OFFSET_NUMBER              ((offset_number) (8192 / sizeof(struct item_id_data))) // TODO: Replace 8192 with block size from pg_control
+#define INVALID_OFFSET_NUMBER         ((offset_number)0)
+#define FIRST_OFFSET_NUMBER           ((offset_number)1)
+#define MAX_OFFSET_NUMBER             ((offset_number)(8192 / sizeof(struct item_id_data))) // TODO: Replace 8192 with block size from pg_control
 
-#define XLOG_BTREE_INSERT_LEAF         0x00  /**< Add index tuple without split */
-#define XLOG_BTREE_INSERT_UPPER        0x10  /**< Same, on a non-leaf page */
-#define XLOG_BTREE_INSERT_META         0x20  /**< Same, plus update metapage */
-#define XLOG_BTREE_SPLIT_L             0x30  /**< Add index tuple with split */
-#define XLOG_BTREE_SPLIT_R             0x40  /**< As above, new item on right */
-#define XLOG_BTREE_INSERT_POST         0x50  /**< Add index tuple with posting split */
-#define XLOG_BTREE_DEDUP               0x60  /**< Deduplicate tuples for a page */
-#define XLOG_BTREE_DELETE              0x70  /**< Delete leaf index tuples for a page */
-#define XLOG_BTREE_UNLINK_PAGE         0x80  /**< Delete a half-dead page */
-#define XLOG_BTREE_UNLINK_PAGE_META    0x90  /**< Same, and update metapage */
-#define XLOG_BTREE_NEWROOT             0xA0  /**< New root page */
-#define XLOG_BTREE_MARK_PAGE_HALFDEAD  0xB0  /**< Mark a leaf as half-dead */
-#define XLOG_BTREE_VACUUM              0xC0  /**< Delete entries on a page during vacuum */
-#define XLOG_BTREE_REUSE_PAGE          0xD0  /**< Old page is about to be reused from FSM */
-#define XLOG_BTREE_META_CLEANUP        0xE0  /**< Update cleanup-related data in the metapage */
+#define XLOG_BTREE_INSERT_LEAF        0x00 /**< Add index tuple without split */
+#define XLOG_BTREE_INSERT_UPPER       0x10 /**< Same, on a non-leaf page */
+#define XLOG_BTREE_INSERT_META        0x20 /**< Same, plus update metapage */
+#define XLOG_BTREE_SPLIT_L            0x30 /**< Add index tuple with split */
+#define XLOG_BTREE_SPLIT_R            0x40 /**< As above, new item on right */
+#define XLOG_BTREE_INSERT_POST        0x50 /**< Add index tuple with posting split */
+#define XLOG_BTREE_DEDUP              0x60 /**< Deduplicate tuples for a page */
+#define XLOG_BTREE_DELETE             0x70 /**< Delete leaf index tuples for a page */
+#define XLOG_BTREE_UNLINK_PAGE        0x80 /**< Delete a half-dead page */
+#define XLOG_BTREE_UNLINK_PAGE_META   0x90 /**< Same, and update metapage */
+#define XLOG_BTREE_NEWROOT            0xA0 /**< New root page */
+#define XLOG_BTREE_MARK_PAGE_HALFDEAD 0xB0 /**< Mark a leaf as half-dead */
+#define XLOG_BTREE_VACUUM             0xC0 /**< Delete entries on a page during vacuum */
+#define XLOG_BTREE_REUSE_PAGE         0xD0 /**< Old page is about to be reused from FSM */
+#define XLOG_BTREE_META_CLEANUP       0xE0 /**< Update cleanup-related data in the metapage */
 
-#define SIZE_OF_BTREE_UPDATE           (offsetof(struct xl_btree_update, ndeletedtids) + sizeof(uint16_t))
+#define SIZE_OF_BTREE_UPDATE          (offsetof(struct xl_btree_update, ndeletedtids) + sizeof(uint16_t))
 
-#define OFFSET_NUMBER_IS_VALID(offsetNumber) \
-        ((bool) ((offsetNumber != INVALID_OFFSET_NUMBER) && \
-                 (offsetNumber <= MAX_OFFSET_NUMBER)))
+#define OFFSET_NUMBER_IS_VALID(offsetNumber)          \
+   ((bool)((offsetNumber != INVALID_OFFSET_NUMBER) && \
+           (offsetNumber <= MAX_OFFSET_NUMBER)))
 
 /**
  * @struct item_id_data
@@ -76,9 +76,9 @@ extern "C" {
  */
 struct item_id_data
 {
-   unsigned lp_off : 15;         /**< Offset to tuple (from start of page) */
-   unsigned lp_flags : 2;        /**< State of line pointer */
-   unsigned lp_len : 15;         /**< Byte length of tuple */
+   unsigned lp_off : 15;  /**< Offset to tuple (from start of page) */
+   unsigned lp_flags : 2; /**< State of line pointer */
+   unsigned lp_len : 15;  /**< Byte length of tuple */
 };
 
 /**
@@ -89,14 +89,14 @@ struct item_id_data
  */
 struct xl_btree_metadata_v13
 {
-   uint32_t version;                           /**< Version number. */
-   block_number root;                          /**< Block number of the root. */
-   uint32_t level;                             /**< Level of the btree. */
-   block_number fastroot;                      /**< Fast root block number. */
-   uint32_t fastlevel;                         /**< Fast root level. */
-   transaction_id oldest_btpo_xact;            /**< Oldest B-tree page transaction. */
-   double last_cleanup_num_heap_tuples;        /**< Number of heap tuples after last cleanup. */
-   bool allequalimage;                         /**< All equal image flag. */
+   uint32_t version;                    /**< Version number. */
+   block_number root;                   /**< Block number of the root. */
+   uint32_t level;                      /**< Level of the btree. */
+   block_number fastroot;               /**< Fast root block number. */
+   uint32_t fastlevel;                  /**< Fast root level. */
+   transaction_id oldest_btpo_xact;     /**< Oldest B-tree page transaction. */
+   double last_cleanup_num_heap_tuples; /**< Number of heap tuples after last cleanup. */
+   bool allequalimage;                  /**< All equal image flag. */
 };
 
 /**
@@ -107,13 +107,13 @@ struct xl_btree_metadata_v13
  */
 struct xl_btree_metadata_v14
 {
-   uint32_t version;                        /**< Version number. */
-   block_number root;                       /**< Block number of the root. */
-   uint32_t level;                          /**< Level of the btree. */
-   block_number fastroot;                   /**< Fast root block number. */
-   uint32_t fastlevel;                      /**< Fast root level. */
-   uint32_t last_cleanup_num_delpages;      /**< Number of deleted pages after last cleanup. */
-   bool allequalimage;                      /**< All equal image flag. */
+   uint32_t version;                   /**< Version number. */
+   block_number root;                  /**< Block number of the root. */
+   uint32_t level;                     /**< Level of the btree. */
+   block_number fastroot;              /**< Fast root block number. */
+   uint32_t fastlevel;                 /**< Fast root level. */
+   uint32_t last_cleanup_num_delpages; /**< Number of deleted pages after last cleanup. */
+   bool allequalimage;                 /**< All equal image flag. */
 };
 
 /**
@@ -124,13 +124,13 @@ struct xl_btree_metadata_v14
  */
 struct xl_btree_metadata
 {
-   void (*parse)(struct xl_btree_metadata* wrapper, char* rec);  /**< Pointer to parse function.*/
-   char* (*format)(struct xl_btree_metadata* wrapper, char* buf);      /**< Pointer to format function.*/
+   void (*parse)(struct xl_btree_metadata* wrapper, char* rec);   /**< Pointer to parse function.*/
+   char* (*format)(struct xl_btree_metadata* wrapper, char* buf); /**< Pointer to format function.*/
    union
    {
-      struct xl_btree_metadata_v13 v13;                                /**< Version 13 of btree metadata.*/
-      struct xl_btree_metadata_v14 v14;                                /**< Version 14 of btree metadata.*/
-   } data;                                                             /**< Union of version-specific metadata.*/
+      struct xl_btree_metadata_v13 v13; /**< Version 13 of btree metadata.*/
+      struct xl_btree_metadata_v14 v14; /**< Version 14 of btree metadata.*/
+   } data;                              /**< Union of version-specific metadata.*/
 };
 
 /**
@@ -145,10 +145,10 @@ struct xl_btree_metadata
  */
 struct xl_btree_insert
 {
-   offset_number offnum;   /**< Offset number for the new tuple */
+   offset_number offnum; /**< Offset number for the new tuple */
 };
 
-#define SizeOfBtreeInsert   (offsetof(xl_btree_insert, offnum) + sizeof(OffsetNumber))
+#define SizeOfBtreeInsert (offsetof(xl_btree_insert, offnum) + sizeof(OffsetNumber))
 
 /**
  * @struct xl_btree_split
@@ -165,10 +165,10 @@ struct xl_btree_insert
  */
 struct xl_btree_split
 {
-   uint32_t level;                      /**< Tree level of the page being split */
-   offset_number firstrightoff;         /**< First original page item on the right page */
-   offset_number newitemoff;            /**< Offset number of the new item */
-   uint16_t postingoff;                 /**< Offset inside the original posting tuple */
+   uint32_t level;              /**< Tree level of the page being split */
+   offset_number firstrightoff; /**< First original page item on the right page */
+   offset_number newitemoff;    /**< Offset number of the new item */
+   uint16_t postingoff;         /**< Offset inside the original posting tuple */
 };
 
 /**
@@ -182,7 +182,7 @@ struct xl_btree_split
  */
 struct xl_btree_dedup
 {
-   uint16_t nintervals;   /**< Number of deduplication intervals */
+   uint16_t nintervals; /**< Number of deduplication intervals */
 };
 
 /**
@@ -194,9 +194,9 @@ struct xl_btree_dedup
  */
 struct xl_btree_reuse_page_v13
 {
-   struct rel_file_node node;                              /**< Identifier for a specific relation. */
-   block_number block;                                     /**< Block number being reused. */
-   transaction_id latest_removed_xid;                      /**< Transaction ID of the latest removed full transaction. */
+   struct rel_file_node node;         /**< Identifier for a specific relation. */
+   block_number block;                /**< Block number being reused. */
+   transaction_id latest_removed_xid; /**< Transaction ID of the latest removed full transaction. */
 };
 
 /**
@@ -208,9 +208,9 @@ struct xl_btree_reuse_page_v13
  */
 struct xl_btree_reuse_page_v15
 {
-   struct rel_file_node node;                              /**< Identifier for a specific relation. */
-   block_number block;                                     /**< Block number being reused. */
-   struct full_transaction_id latest_removed_full_xid;     /**< Transaction ID of the latest removed full transaction. */
+   struct rel_file_node node;                          /**< Identifier for a specific relation. */
+   block_number block;                                 /**< Block number being reused. */
+   struct full_transaction_id latest_removed_full_xid; /**< Transaction ID of the latest removed full transaction. */
 };
 
 /**
@@ -222,10 +222,10 @@ struct xl_btree_reuse_page_v15
  */
 struct xl_btree_reuse_page_v16
 {
-   struct rel_file_locator locator;                        /**< Locator for a specific relation. */
-   block_number block;                                     /**< Block number being reused. */
-   struct full_transaction_id snapshot_conflict_horizon_id;  /**< Transaction ID for snapshot conflict horizon. */
-   bool is_catalog_rel;                                    /**< Flag indicating if it's a catalog relation. */
+   struct rel_file_locator locator;                         /**< Locator for a specific relation. */
+   block_number block;                                      /**< Block number being reused. */
+   struct full_transaction_id snapshot_conflict_horizon_id; /**< Transaction ID for snapshot conflict horizon. */
+   bool is_catalog_rel;                                     /**< Flag indicating if it's a catalog relation. */
 };
 
 /**
@@ -236,14 +236,14 @@ struct xl_btree_reuse_page_v16
  */
 struct xl_btree_reuse_page
 {
-   void (*parse)(struct xl_btree_reuse_page* wrapper, void* rec);  /**< Function pointer to parse the structure.*/
-   char* (*format)(struct xl_btree_reuse_page* wrapper, char* buf);      /**< Function pointer to format the structure.*/
+   void (*parse)(struct xl_btree_reuse_page* wrapper, void* rec);   /**< Function pointer to parse the structure.*/
+   char* (*format)(struct xl_btree_reuse_page* wrapper, char* buf); /**< Function pointer to format the structure.*/
    union
    {
-      struct xl_btree_reuse_page_v13 v13;                                /**< Version 13 of xl_btree_reuse_page.*/
-      struct xl_btree_reuse_page_v15 v15;                                /**< Version 15 of xl_btree_reuse_page.*/
-      struct xl_btree_reuse_page_v16 v16;                                /**< Version 16 of xl_btree_reuse_page.*/
-   } data;                                                               /**< Union of version-specific xl_btree_reuse_page structures.*/
+      struct xl_btree_reuse_page_v13 v13; /**< Version 13 of xl_btree_reuse_page.*/
+      struct xl_btree_reuse_page_v15 v15; /**< Version 15 of xl_btree_reuse_page.*/
+      struct xl_btree_reuse_page_v16 v16; /**< Version 16 of xl_btree_reuse_page.*/
+   } data;                                /**< Union of version-specific xl_btree_reuse_page structures.*/
 };
 
 /**
@@ -259,8 +259,8 @@ struct xl_btree_reuse_page
  */
 struct xl_btree_vacuum
 {
-   uint16_t ndeleted;    /**< Number of deleted tuples */
-   uint16_t nupdated;    /**< Number of updated tuples */
+   uint16_t ndeleted; /**< Number of deleted tuples */
+   uint16_t nupdated; /**< Number of updated tuples */
 };
 
 /**
@@ -271,8 +271,8 @@ struct xl_btree_vacuum
  */
 struct xl_btree_delete_v13
 {
-   transaction_id latest_removed_xid;   /**< The latest transaction ID removed by this operation. */
-   uint32_t ndeleted;                  /**< Number of deleted tuples. */
+   transaction_id latest_removed_xid; /**< The latest transaction ID removed by this operation. */
+   uint32_t ndeleted;                 /**< Number of deleted tuples. */
 };
 
 /**
@@ -283,9 +283,9 @@ struct xl_btree_delete_v13
  */
 struct xl_btree_delete_v15
 {
-   transaction_id latestRemovedXid;    /**< The latest transaction ID removed by this operation. */
-   uint16_t ndeleted;                  /**< Number of deleted tuples. */
-   uint16_t nupdated;                  /**< Number of updated tuples. */
+   transaction_id latestRemovedXid; /**< The latest transaction ID removed by this operation. */
+   uint16_t ndeleted;               /**< Number of deleted tuples. */
+   uint16_t nupdated;               /**< Number of updated tuples. */
    /* DELETED TARGET OFFSET NUMBERS FOLLOW */
    /* UPDATED TARGET OFFSET NUMBERS FOLLOW */
    /* UPDATED TUPLES METADATA (xl_btree_update) ARRAY FOLLOWS */
@@ -299,10 +299,10 @@ struct xl_btree_delete_v15
  */
 struct xl_btree_delete_v16
 {
-   transaction_id snapshot_conflict_horizon;   /**< Transaction ID snapshot conflict horizon. */
-   uint16_t ndeleted;                          /**< Number of deleted tuples. */
-   uint16_t nupdated;                          /**< Number of updated tuples. */
-   bool is_catalog_rel;                        /**< Indicates if the relation is a catalog relation. */
+   transaction_id snapshot_conflict_horizon; /**< Transaction ID snapshot conflict horizon. */
+   uint16_t ndeleted;                        /**< Number of deleted tuples. */
+   uint16_t nupdated;                        /**< Number of updated tuples. */
+   bool is_catalog_rel;                      /**< Indicates if the relation is a catalog relation. */
    /*----
     * In payload of blk 0 :
     * - DELETED TARGET OFFSET NUMBERS
@@ -318,14 +318,14 @@ struct xl_btree_delete_v16
  */
 struct xl_btree_delete
 {
-   void (*parse)(struct xl_btree_delete* wrapper, void* rec);    /**< Function pointer to parse the structure. */
-   char* (*format)(struct xl_btree_delete* wrapper, char* buf);        /**< Function pointer to format the structure. */
+   void (*parse)(struct xl_btree_delete* wrapper, void* rec);   /**< Function pointer to parse the structure. */
+   char* (*format)(struct xl_btree_delete* wrapper, char* buf); /**< Function pointer to format the structure. */
    union
    {
-      struct xl_btree_delete_v13 v13;     /**< Version 13 of the structure. */
-      struct xl_btree_delete_v15 v15;     /**< Version 15 of the structure. */
-      struct xl_btree_delete_v16 v16;     /**< Version 16 of the structure. */
-   } data;                               /**< Union of version-specific structures. */
+      struct xl_btree_delete_v13 v13; /**< Version 13 of the structure. */
+      struct xl_btree_delete_v15 v15; /**< Version 15 of the structure. */
+      struct xl_btree_delete_v16 v16; /**< Version 16 of the structure. */
+   } data;                            /**< Union of version-specific structures. */
 };
 
 /**
@@ -340,7 +340,7 @@ struct xl_btree_delete
  */
 struct xl_btree_update
 {
-   uint16_t ndeletedtids;   /**< Number of deleted TIDs */
+   uint16_t ndeletedtids; /**< Number of deleted TIDs */
 };
 
 /**
@@ -358,11 +358,11 @@ struct xl_btree_update
  */
 struct xl_btree_mark_page_halfdead
 {
-   offset_number poffset;         /**< Offset of the deleted tuple in the parent page */
-   block_number leafblk;          /**< Leaf block being deleted */
-   block_number leftblk;          /**< Left sibling block of the leaf */
-   block_number rightblk;         /**< Right sibling block of the leaf */
-   block_number topparent;        /**< Topmost internal page in the subtree */
+   offset_number poffset;  /**< Offset of the deleted tuple in the parent page */
+   block_number leafblk;   /**< Leaf block being deleted */
+   block_number leftblk;   /**< Left sibling block of the leaf */
+   block_number rightblk;  /**< Right sibling block of the leaf */
+   block_number topparent; /**< Topmost internal page in the subtree */
 };
 
 /**
@@ -374,12 +374,12 @@ struct xl_btree_mark_page_halfdead
  */
 struct xl_btree_unlink_page_v13
 {
-   block_number leftsib;             /**< Target block's left sibling, if any. */
-   block_number rightsib;            /**< Target block's right sibling. */
-   block_number leafleftsib;         /**< Left sibling of the leaf page. */
-   block_number leafrightsib;        /**< Right sibling of the leaf page. */
-   block_number topparent;           /**< Next child down in the branch. */
-   transaction_id btpo_xact;         /**< Value of btpo.xact for use in recovery. */
+   block_number leftsib;      /**< Target block's left sibling, if any. */
+   block_number rightsib;     /**< Target block's right sibling. */
+   block_number leafleftsib;  /**< Left sibling of the leaf page. */
+   block_number leafrightsib; /**< Right sibling of the leaf page. */
+   block_number topparent;    /**< Next child down in the branch. */
+   transaction_id btpo_xact;  /**< Value of btpo.xact for use in recovery. */
 };
 
 /**
@@ -391,13 +391,13 @@ struct xl_btree_unlink_page_v13
  */
 struct xl_btree_unlink_page_v14
 {
-   block_number leftsib;                     /**< Target block's left sibling, if any. */
-   block_number rightsib;                    /**< Target block's right sibling. */
-   uint32_t level;                           /**< Target block's level. */
-   struct full_transaction_id safexid;       /**< XID of BTPageSetDeleted operation. */
-   block_number leafleftsib;                 /**< Left sibling of the leaf page. */
-   block_number leafrightsib;                /**< Right sibling of the leaf page. */
-   block_number leaftopparent;               /**< Next child down in the subtree. */
+   block_number leftsib;               /**< Target block's left sibling, if any. */
+   block_number rightsib;              /**< Target block's right sibling. */
+   uint32_t level;                     /**< Target block's level. */
+   struct full_transaction_id safexid; /**< XID of BTPageSetDeleted operation. */
+   block_number leafleftsib;           /**< Left sibling of the leaf page. */
+   block_number leafrightsib;          /**< Right sibling of the leaf page. */
+   block_number leaftopparent;         /**< Next child down in the subtree. */
 };
 
 /**
@@ -409,13 +409,13 @@ struct xl_btree_unlink_page_v14
  */
 struct xl_btree_unlink_page
 {
-   void (*parse)(struct xl_btree_unlink_page* wrapper, void* rec);    /**< Function to parse the record.*/
-   char* (*format)(struct xl_btree_unlink_page* wrapper, char* buf);        /**< Function to format the record as a string.*/
+   void (*parse)(struct xl_btree_unlink_page* wrapper, void* rec);   /**< Function to parse the record.*/
+   char* (*format)(struct xl_btree_unlink_page* wrapper, char* buf); /**< Function to format the record as a string.*/
    union
    {
-      struct xl_btree_unlink_page_v13 v13;                                  /**< Version 13 of the structure.*/
-      struct xl_btree_unlink_page_v14 v14;                                  /**< Version 14 of the structure.*/
-   } data;                                                                  /**< Union of version-specific structures.*/
+      struct xl_btree_unlink_page_v13 v13; /**< Version 13 of the structure.*/
+      struct xl_btree_unlink_page_v14 v14; /**< Version 14 of the structure.*/
+   } data;                                 /**< Union of version-specific structures.*/
 };
 
 /**
@@ -431,8 +431,8 @@ struct xl_btree_unlink_page
  */
 struct xl_btree_newroot
 {
-   block_number rootblk;   /**< Block number of the new root */
-   uint32_t level;         /**< Tree level of the new root */
+   block_number rootblk; /**< Block number of the new root */
+   uint32_t level;       /**< Tree level of the new root */
 };
 
 /**

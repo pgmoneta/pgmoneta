@@ -65,8 +65,7 @@ cmd_parse(
    int num_results,
    bool use_last_arg_as_filename,
    char** filename,
-   int* optind
-   )
+   int* optind)
 {
    int result_count = 0;
    *filename = NULL;
@@ -205,9 +204,7 @@ cmd_parse(
             {
                option_matched = true;
 
-               results[result_count].option_name = is_long_option ?
-                                                   option->long_name :
-                                                   option->short_name;
+               results[result_count].option_name = is_long_option ? option->long_name : option->short_name;
 
                if (option->requires_arg)
                {

@@ -42,32 +42,32 @@ extern "C" {
 #include <openssl/asn1.h>
 #include <sys/types.h>
 
-#define SHORT_TIME_LENGTH  8 + 1
+#define SHORT_TIME_LENGTH 8 + 1
 #define LONG_TIME_LENGTH  16 + 1
 #define UTC_TIME_LENGTH   29 + 1
 
 /** Define Windows 20 palette colors as constants using ANSI codes **/
-#define COLOR_BLACK         "\033[30m"
-#define COLOR_DARK_RED      "\033[31m"
-#define COLOR_DARK_GREEN    "\033[32m"
-#define COLOR_DARK_YELLOW   "\033[33m"
-#define COLOR_DARK_BLUE     "\033[34m"
-#define COLOR_DARK_MAGENTA  "\033[35m"
-#define COLOR_DARK_CYAN     "\033[36m"
-#define COLOR_LIGHT_GREY    "\033[37m"
-#define COLOR_MONEY_GREEN   "\033[32m"   /* Close approximation */
-#define COLOR_SKY_BLUE      "\033[36m"   /* Close approximation */
-#define COLOR_CREAM         "\033[97m"   /* Close approximation */
-#define COLOR_MEDIUM_GREY   "\033[90m"
-#define COLOR_DARK_GREY     "\033[90m"
-#define COLOR_RED           "\033[31m"
-#define COLOR_GREEN         "\033[32m"
-#define COLOR_YELLOW        "\033[33m"
-#define COLOR_BLUE          "\033[34m"
-#define COLOR_MAGENTA       "\033[35m"
-#define COLOR_CYAN          "\033[36m"
-#define COLOR_WHITE         "\033[97m"
-#define COLOR_RESET         "\033[0m"    /* Reset to default color */
+#define COLOR_BLACK        "\033[30m"
+#define COLOR_DARK_RED     "\033[31m"
+#define COLOR_DARK_GREEN   "\033[32m"
+#define COLOR_DARK_YELLOW  "\033[33m"
+#define COLOR_DARK_BLUE    "\033[34m"
+#define COLOR_DARK_MAGENTA "\033[35m"
+#define COLOR_DARK_CYAN    "\033[36m"
+#define COLOR_LIGHT_GREY   "\033[37m"
+#define COLOR_MONEY_GREEN  "\033[32m" /* Close approximation */
+#define COLOR_SKY_BLUE     "\033[36m" /* Close approximation */
+#define COLOR_CREAM        "\033[97m" /* Close approximation */
+#define COLOR_MEDIUM_GREY  "\033[90m"
+#define COLOR_DARK_GREY    "\033[90m"
+#define COLOR_RED          "\033[31m"
+#define COLOR_GREEN        "\033[32m"
+#define COLOR_YELLOW       "\033[33m"
+#define COLOR_BLUE         "\033[34m"
+#define COLOR_MAGENTA      "\033[35m"
+#define COLOR_CYAN         "\033[36m"
+#define COLOR_WHITE        "\033[97m"
+#define COLOR_RESET        "\033[0m" /* Reset to default color */
 
 /** @struct signal_info
  * Defines the signal structure
@@ -103,15 +103,15 @@ struct pgmoneta_command
    char* subcommand;                         /**< The subcommand if there is one */
    int accepted_argument_count[MISC_LENGTH]; /**< The argument count */
 
-   int action;                               /**< The specific action */
-   char* default_argument;                   /**< The default argument */
-   char* log_message;                        /**< The log message used */
+   int action;             /**< The specific action */
+   char* default_argument; /**< The default argument */
+   char* log_message;      /**< The log message used */
 
    /* Deprecation information */
-   bool deprecated;                                /**< Is the command deprecated */
-   unsigned int deprecated_since_major;            /**< Deprecated since major version */
-   unsigned int deprecated_since_minor;            /**< Deprecated since minor version */
-   char* deprecated_by;                      /**< Deprecated by this command */
+   bool deprecated;                     /**< Is the command deprecated */
+   unsigned int deprecated_since_major; /**< Deprecated since major version */
+   unsigned int deprecated_since_minor; /**< Deprecated since minor version */
+   char* deprecated_by;                 /**< Deprecated by this command */
 };
 
 /** @struct pgmoneta_parsed_command
@@ -124,7 +124,7 @@ struct pgmoneta_command
 struct pgmoneta_parsed_command
 {
    struct pgmoneta_command* cmd; /**< The command */
-   char* args[MISC_LENGTH];            /**< The arguments */
+   char* args[MISC_LENGTH];      /**< The arguments */
 };
 
 /** @struct token_bucket

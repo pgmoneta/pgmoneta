@@ -48,14 +48,14 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NAME "restore"
+#define NAME                  "restore"
 #define RESTORE_OK            0
 #define RESTORE_MISSING_LABEL 1
 #define RESTORE_NO_DISK_SPACE 2
 #define RESTORE_TYPE_UNKNOWN  3
 #define RESTORE_ERROR         4
-#define MAX_PATH_CONCAT (MAX_PATH * 2)
-#define TMP_SUFFIX ".tmp"
+#define MAX_PATH_CONCAT       (MAX_PATH * 2)
+#define TMP_SUFFIX            ".tmp"
 
 struct build_backup_file_input
 {
@@ -1259,7 +1259,6 @@ combine_backups_recursive(uint32_t tsoid,
    }
    while ((entry = readdir(dir)) != NULL)
    {
-
       if (pgmoneta_compare_string(entry->d_name, ".") || pgmoneta_compare_string(entry->d_name, ".."))
       {
          continue;
@@ -1418,14 +1417,14 @@ reconstruct_backup_file(int server,
                         bool incremental,
                         struct json* files)
 {
-   struct deque* sources = NULL; // bookkeeping of each incr/full backup rfile, so that we can free them conveniently
+   struct deque* sources = NULL;             // bookkeeping of each incr/full backup rfile, so that we can free them conveniently
    struct deque_iterator* label_iter = NULL; // the iterator for backup directories
-   struct rfile* latest_source = NULL; // the metadata of current incr backup file
-   struct rfile** source_map = NULL; // source to find each block
-   off_t* offset_map = NULL; // offsets to find each block in corresponding file
-   uint32_t block_length = 0; // total number of blocks in the reconstructed file
-   bool full_copy_possible = true; // whether we could just copy over directly instead of block by block
-   uint32_t b = 0; // temp variable for block numbers
+   struct rfile* latest_source = NULL;       // the metadata of current incr backup file
+   struct rfile** source_map = NULL;         // source to find each block
+   off_t* offset_map = NULL;                 // offsets to find each block in corresponding file
+   uint32_t block_length = 0;                // total number of blocks in the reconstructed file
+   bool full_copy_possible = true;           // whether we could just copy over directly instead of block by block
+   uint32_t b = 0;                           // temp variable for block numbers
    struct main_configuration* config;
    size_t blocksz = 0;
    char incr_file_name[MAX_PATH];
@@ -1742,7 +1741,7 @@ find_reconstructed_block_length(struct rfile* s)
 static void
 rfile_destroy_cb(uintptr_t data)
 {
-   pgmoneta_rfile_destroy((struct rfile*) data);
+   pgmoneta_rfile_destroy((struct rfile*)data);
 }
 
 static bool
@@ -1938,7 +1937,6 @@ error:
       fclose(wfp);
    }
    return 1;
-
 }
 
 static int
@@ -2120,11 +2118,11 @@ clear_manifest_incremental_entries(struct json* manifest)
    }
    pgmoneta_json_iterator_create(files, &iter);
    // a tiny hack to get the internal deque iterator of the json iterator
-   diter = (struct deque_iterator*) iter->iter;
+   diter = (struct deque_iterator*)iter->iter;
    while (pgmoneta_deque_iterator_next(diter))
    {
       f = (struct json*)pgmoneta_value_data(diter->value);
-      path = (char*) pgmoneta_json_get(f, "Path");
+      path = (char*)pgmoneta_json_get(f, "Path");
       if (pgmoneta_is_incremental_path(path))
       {
          pgmoneta_deque_iterator_remove(diter);
@@ -2654,7 +2652,7 @@ create_reconstruct_backup_file_input(int server,
                                      struct build_backup_file_input** wi)
 {
    struct build_backup_file_input* input = NULL;
-   input = (struct build_backup_file_input*) malloc(sizeof(struct build_backup_file_input));
+   input = (struct build_backup_file_input*)malloc(sizeof(struct build_backup_file_input));
    memset(input, 0, sizeof(struct build_backup_file_input));
    input->common.workers = workers;
    input->server = server;
@@ -2681,7 +2679,7 @@ create_copy_backup_file_input(
    struct build_backup_file_input** wi)
 {
    struct build_backup_file_input* input = NULL;
-   input = (struct build_backup_file_input*) malloc(sizeof(struct build_backup_file_input));
+   input = (struct build_backup_file_input*)malloc(sizeof(struct build_backup_file_input));
    memset(input, 0, sizeof(struct build_backup_file_input));
    input->common.workers = workers;
    input->server = server;

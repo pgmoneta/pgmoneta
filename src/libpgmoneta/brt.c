@@ -551,8 +551,7 @@ brt_set_limit_block(block_ref_table_entry* entry, block_number limit_block)
 
    if (limit_chunkno >= entry->nchunks)
    {
-      return;                                    /* Safety check */
-
+      return; /* Safety check */
    }
    /* Discard entire contents of any higher-numbered chunks. */
    for (chunkno = limit_chunkno + 1; chunkno < entry->nchunks; ++chunkno)
@@ -563,7 +562,7 @@ brt_set_limit_block(block_ref_table_entry* entry, block_number limit_block)
    /* get actual chunk data */
    limit_chunk = entry->chunk_data[limit_chunkno];
 
-   if (entry->chunk_usage[limit_chunkno] == MAX_ENTRIES_PER_CHUNK)  /* bitmap representation */
+   if (entry->chunk_usage[limit_chunkno] == MAX_ENTRIES_PER_CHUNK) /* bitmap representation */
    {
       unsigned chunkoffset;
       for (chunkoffset = limit_chunkoffset; chunkoffset < BLOCKS_PER_CHUNK;
@@ -573,10 +572,10 @@ brt_set_limit_block(block_ref_table_entry* entry, block_number limit_block)
             ~(1 << (chunkoffset % BLOCKS_PER_ENTRY));
       }
    }
-   else  /* array representation */
+   else /* array representation */
    {
       unsigned i,
-               j = 0;
+         j = 0;
 
       /* It's an offset array. Filter out large offsets. */
       for (i = 0; i < entry->chunk_usage[limit_chunkno]; ++i)

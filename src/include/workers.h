@@ -90,7 +90,7 @@ struct workers
  */
 struct worker_common
 {
-   struct workers* workers;  /**< The root structure */
+   struct workers* workers; /**< The root structure */
 };
 
 /** @struct worker_input

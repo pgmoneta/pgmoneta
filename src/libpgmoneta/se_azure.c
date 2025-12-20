@@ -428,7 +428,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   pgmoneta_base64_encode((char*) signature_hmac, hmac_length, &base64_signature, &base64_signature_length);
+   pgmoneta_base64_encode((char*)signature_hmac, hmac_length, &base64_signature, &base64_signature_length);
 
    auth_value = pgmoneta_append(auth_value, "SharedKey ");
    auth_value = pgmoneta_append(auth_value, config->azure_storage_account);

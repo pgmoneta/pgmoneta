@@ -76,18 +76,18 @@ extern "C" {
 #define INFO_TYPE                      "TYPE"
 #define INFO_WAL                       "WAL"
 
-#define TYPE_FULL        0
-#define TYPE_INCREMENTAL 1
+#define TYPE_FULL                      0
+#define TYPE_INCREMENTAL               1
 
-#define VALID_UNKNOWN -1
-#define VALID_FALSE    0
-#define VALID_TRUE     1
+#define VALID_UNKNOWN                  -1
+#define VALID_FALSE                    0
+#define VALID_TRUE                     1
 
-#define INCREMENTAL_MAGIC 0xd3ae1f0d
-#define INCREMENTAL_PREFIX_LENGTH (sizeof(INCREMENTAL_PREFIX) - 1)
-#define MANIFEST_FILES "Files"
+#define INCREMENTAL_MAGIC              0xd3ae1f0d
+#define INCREMENTAL_PREFIX_LENGTH      (sizeof(INCREMENTAL_PREFIX) - 1)
+#define MANIFEST_FILES                 "Files"
 
-#define INFO_BUFFER_SIZE 8192
+#define INFO_BUFFER_SIZE               8192
 
 /**
  * @struct rfile
@@ -106,12 +106,12 @@ extern "C" {
  */
 struct rfile
 {
-   char* filepath;                     /**< The path of the backup file  */
-   FILE* fp;                           /**< The file descriptor corresponding to the backup file */
-   size_t header_length;               /**< The header length */
-   uint32_t num_blocks;                /**< The number of blocks present inside an incremental file */
-   uint32_t* relative_block_numbers;   /**< relative_block_numbers are the relative BlockNumber of each block in the file */
-   uint32_t truncation_block_length;   /**< truncation_block_length only reflects length until the checkpoint before backup starts. */
+   char* filepath;                   /**< The path of the backup file  */
+   FILE* fp;                         /**< The file descriptor corresponding to the backup file */
+   size_t header_length;             /**< The header length */
+   uint32_t num_blocks;              /**< The number of blocks present inside an incremental file */
+   uint32_t* relative_block_numbers; /**< relative_block_numbers are the relative BlockNumber of each block in the file */
+   uint32_t truncation_block_length; /**< truncation_block_length only reflects length until the checkpoint before backup starts. */
 };
 
 /** @struct backup
@@ -160,7 +160,7 @@ struct backup
    char extra[MAX_EXTRA_PATH];                                    /**< The extra directory */
    int type;                                                      /**< The backup type */
    char parent_label[MISC_LENGTH];                                /**< The label of backup's parent, only used when backup is incremental */
-} __attribute__ ((aligned (64)));
+} __attribute__((aligned(64)));
 
 /**
  * Update backup information: annotate

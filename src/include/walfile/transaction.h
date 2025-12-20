@@ -41,12 +41,12 @@ typedef transaction_id multi_xact_id;
 typedef uint32_t multi_xact_offset;
 
 // #define variables
-#define INVALID_TRANSACTION_ID              ((transaction_id) 0)
+#define INVALID_TRANSACTION_ID ((transaction_id)0)
 
 // #define macros
-#define EPOCH_FROM_FULL_TRANSACTION_ID(x)   ((uint32_t) ((x).value >> 32))
-#define XID_FROM_FULL_TRANSACTION_ID(x)     ((uint32_t) (x).value)
-#define TRANSACTION_ID_IS_VALID(xid)        ((xid) != INVALID_TRANSACTION_ID)
+#define EPOCH_FROM_FULL_TRANSACTION_ID(x) ((uint32_t)((x).value >> 32))
+#define XID_FROM_FULL_TRANSACTION_ID(x)   ((uint32_t)(x).value)
+#define TRANSACTION_ID_IS_VALID(xid)      ((xid) != INVALID_TRANSACTION_ID)
 
 // Structs
 /**
@@ -58,7 +58,7 @@ typedef uint32_t multi_xact_offset;
  */
 struct full_transaction_id
 {
-   uint64_t value;   /**< The full 64-bit transaction ID value */
+   uint64_t value; /**< The full 64-bit transaction ID value */
 };
 
 #ifdef __cplusplus

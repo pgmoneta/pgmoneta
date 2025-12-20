@@ -139,13 +139,13 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    info &= XLOG_HEAP_OPMASK;
    if (info == XLOG_HEAP_INSERT)
    {
-      struct xl_heap_insert* xlrec = (struct xl_heap_insert*) rec;
+      struct xl_heap_insert* xlrec = (struct xl_heap_insert*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u flags 0x%02X", xlrec->offnum, xlrec->flags);
    }
    else if (info == XLOG_HEAP_DELETE)
    {
-      struct xl_heap_delete* xlrec = (struct xl_heap_delete*) rec;
+      struct xl_heap_delete* xlrec = (struct xl_heap_delete*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u flags 0x%02X ",
                                        xlrec->offnum,
@@ -154,7 +154,7 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP_UPDATE)
    {
-      struct xl_heap_update* xlrec = (struct xl_heap_update*) rec;
+      struct xl_heap_update* xlrec = (struct xl_heap_update*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u xmax %u flags 0x%02X ",
                                        xlrec->old_offnum,
@@ -167,7 +167,7 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP_HOT_UPDATE)
    {
-      struct xl_heap_update* xlrec = (struct xl_heap_update*) rec;
+      struct xl_heap_update* xlrec = (struct xl_heap_update*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u xmax %u flags 0x%02X ",
                                        xlrec->old_offnum,
@@ -180,7 +180,7 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP_TRUNCATE)
    {
-      struct xl_heap_truncate* xlrec = (struct xl_heap_truncate*) rec;
+      struct xl_heap_truncate* xlrec = (struct xl_heap_truncate*)rec;
       size_t i;
 
       if (xlrec->flags & XLH_TRUNCATE_CASCADE)
@@ -199,13 +199,13 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP_CONFIRM)
    {
-      struct xl_heap_confirm* xlrec = (struct xl_heap_confirm*) rec;
+      struct xl_heap_confirm* xlrec = (struct xl_heap_confirm*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u", xlrec->offnum);
    }
    else if (info == XLOG_HEAP_LOCK)
    {
-      struct xl_heap_lock* xlrec = (struct xl_heap_lock*) rec;
+      struct xl_heap_lock* xlrec = (struct xl_heap_lock*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u: xid %u: flags 0x%02X ",
                                        xlrec->offnum, xlrec->locking_xid, xlrec->flags);
@@ -213,7 +213,7 @@ pgmoneta_wal_heap_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP_INPLACE)
    {
-      struct xl_heap_inplace* xlrec = (struct xl_heap_inplace*) rec;
+      struct xl_heap_inplace* xlrec = (struct xl_heap_inplace*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u", xlrec->offnum);
    }
@@ -231,9 +231,9 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
 
    info &= XLOG_HEAP_OPMASK;
 
-   if ((server_config->version >= 17) && (info == XLOG_HEAP2_PRUNE_ON_ACCESS || info == XLOG_HEAP2_PRUNE_VACUUM_SCAN || info == XLOG_HEAP2_PRUNE_VACUUM_CLEANUP)) \
+   if ((server_config->version >= 17) && (info == XLOG_HEAP2_PRUNE_ON_ACCESS || info == XLOG_HEAP2_PRUNE_VACUUM_SCAN || info == XLOG_HEAP2_PRUNE_VACUUM_CLEANUP))
    {
-      struct xl_heap_prune_v17* xlrec = (struct xl_heap_prune_v17*) rec;
+      struct xl_heap_prune_v17* xlrec = (struct xl_heap_prune_v17*)rec;
 
       if (xlrec->flags & XLHP_HAS_CONFLICT_HORIZON)
       {
@@ -294,11 +294,10 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
             buf = pgmoneta_wal_array_desc(buf, nowunused, sizeof(offset_number), nunused);
          }
       }
-
    }
    else if (server_config->version < 17 && info == XLOG_HEAP2_PRUNE)
    {
-      struct xl_heap_prune_v16* xlrec = (struct xl_heap_prune_v16*) rec;
+      struct xl_heap_prune_v16* xlrec = (struct xl_heap_prune_v16*)rec;
 
       buf = pgmoneta_format_and_append(buf, "snapshot_conflict_horizon_id %u nredirected %u ndead %u",
                                        xlrec->snapshotConflictHorizon,
@@ -307,13 +306,12 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP2_VACUUM)
    {
-      struct xl_heap_vacuum* xlrec = (struct xl_heap_vacuum*) rec;
+      struct xl_heap_vacuum* xlrec = (struct xl_heap_vacuum*)rec;
 
       buf = pgmoneta_format_and_append(buf, "nunused %u", xlrec->nunused);
    }
    else if (info == XLOG_HEAP2_FREEZE_PAGE)
    {
-
       struct xl_heap_freeze_page* xlrec = pgmoneta_wal_create_xl_heap_freeze_page();
       xlrec->parse(xlrec, rec);
       buf = xlrec->format(xlrec, buf);
@@ -321,21 +319,21 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP2_VISIBLE)
    {
-      struct xl_heap_visible* xlrec = (struct xl_heap_visible*) rec;
+      struct xl_heap_visible* xlrec = (struct xl_heap_visible*)rec;
 
       buf = pgmoneta_format_and_append(buf, "cutoff xid %u flags 0x%02X",
                                        xlrec->cutoff_xid, xlrec->flags);
    }
    else if (info == XLOG_HEAP2_MULTI_INSERT)
    {
-      struct xl_heap_multi_insert* xlrec = (struct xl_heap_multi_insert*) rec;
+      struct xl_heap_multi_insert* xlrec = (struct xl_heap_multi_insert*)rec;
 
       buf = pgmoneta_format_and_append(buf, "%d tuples flags 0x%02X", xlrec->ntuples,
                                        xlrec->flags);
    }
    else if (info == XLOG_HEAP2_LOCK_UPDATED)
    {
-      struct xl_heap_lock_updated* xlrec = (struct xl_heap_lock_updated*) rec;
+      struct xl_heap_lock_updated* xlrec = (struct xl_heap_lock_updated*)rec;
 
       buf = pgmoneta_format_and_append(buf, "off %u: xmax %u: flags 0x%02X ",
                                        xlrec->offnum, xlrec->xmax, xlrec->flags);
@@ -343,7 +341,7 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_HEAP2_NEW_CID)
    {
-      struct xl_heap_new_cid* xlrec = (struct xl_heap_new_cid*) rec;
+      struct xl_heap_new_cid* xlrec = (struct xl_heap_new_cid*)rec;
 
       if (pgmoneta_get_database_name(xlrec->target_node.dbNode, &dbname))
       {
@@ -368,7 +366,6 @@ pgmoneta_wal_heap2_desc(char* buf, struct decoded_xlog_record* record)
                                        ITEM_POINTER_GET_OFFSET_NUMBER(&(xlrec->target_tid)));
       buf = pgmoneta_format_and_append(buf, "; cmin: %u, cmax: %u, combo: %u",
                                        xlrec->cmin, xlrec->cmax, xlrec->combocid);
-
    }
 
    free(dbname);
@@ -392,7 +389,7 @@ heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
 {
    if (flags & XLHP_HAS_FREEZE_PLANS)
    {
-      struct xlhp_freeze_plans* freeze_plans = (struct xlhp_freeze_plans*) cursor;
+      struct xlhp_freeze_plans* freeze_plans = (struct xlhp_freeze_plans*)cursor;
 
       *nplans = freeze_plans->nplans;
       assert(*nplans > 0);
@@ -409,14 +406,14 @@ heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
 
    if (flags & XLHP_HAS_REDIRECTIONS)
    {
-      struct xlhp_prune_items* subrecord = (struct xlhp_prune_items*) cursor;
+      struct xlhp_prune_items* subrecord = (struct xlhp_prune_items*)cursor;
 
       *nredirected = subrecord->ntargets;
       assert(*nredirected > 0);
       *redirected = &subrecord->data[0];
 
       cursor += offsetof(struct xlhp_prune_items, data);
-      cursor += sizeof(offset_number [2]) * *nredirected;
+      cursor += sizeof(offset_number[2]) * *nredirected;
    }
    else
    {
@@ -426,7 +423,7 @@ heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
 
    if (flags & XLHP_HAS_DEAD_ITEMS)
    {
-      struct xlhp_prune_items* subrecord = (struct xlhp_prune_items*) cursor;
+      struct xlhp_prune_items* subrecord = (struct xlhp_prune_items*)cursor;
 
       *ndead = subrecord->ntargets;
       assert(*ndead > 0);
@@ -443,7 +440,7 @@ heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
 
    if (flags & XLHP_HAS_NOW_UNUSED_ITEMS)
    {
-      struct xlhp_prune_items* subrecord = (struct xlhp_prune_items*) cursor;
+      struct xlhp_prune_items* subrecord = (struct xlhp_prune_items*)cursor;
 
       *nunused = subrecord->ntargets;
       assert(*nunused > 0);
@@ -458,20 +455,20 @@ heap_xlog_deserialize_prune_and_freeze(char* cursor, uint8_t flags,
       *nowunused = NULL;
    }
 
-   *frz_offsets = (offset_number*) cursor;
+   *frz_offsets = (offset_number*)cursor;
 }
 
 char*
 offset_elem_desc(char* buf, void* offset, void* data __attribute__((unused)))
 {
-   buf = pgmoneta_format_and_append(buf, "%u", *(offset_number*) offset);
+   buf = pgmoneta_format_and_append(buf, "%u", *(offset_number*)offset);
    return buf;
 }
 
 char*
 plan_elem_desc(char* buf, void* plan, void* data)
 {
-   struct xlhp_freeze_plan* new_plan = (struct xlhp_freeze_plan*) plan;
+   struct xlhp_freeze_plan* new_plan = (struct xlhp_freeze_plan*)plan;
    offset_number** offsets = data;
 
    buf = pgmoneta_format_and_append(buf, "{ xmax: %u, infomask: %u, infomask2: %u, ntuples: %u",
@@ -491,7 +488,7 @@ plan_elem_desc(char* buf, void* plan, void* data)
 char*
 redirect_elem_desc(char* buf, void* offset, void* data __attribute__((unused)))
 {
-   offset_number* new_offset = (offset_number*) offset;
+   offset_number* new_offset = (offset_number*)offset;
 
    buf = pgmoneta_format_and_append(buf, "%u->%u", new_offset[0], new_offset[1]);
    return buf;
@@ -502,7 +499,7 @@ oid_elem_desc(char* buf, void* relid, void* data __attribute__((unused)))
 {
    char* relname = NULL;
 
-   if (pgmoneta_get_relation_name(*(oid*) relid, &relname))
+   if (pgmoneta_get_relation_name(*(oid*)relid, &relname))
    {
       free(relname);
       return NULL;

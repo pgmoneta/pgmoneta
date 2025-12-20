@@ -174,7 +174,7 @@ summary_file_name(uint64_t s_lsn, uint64_t e_lsn)
    char hex[128];
    char* f = NULL;
    memset(&hex[0], 0, sizeof(hex));
-   snprintf(&hex[0], sizeof(hex), "%08X%08X%08X%08X", (uint32_t)(s_lsn >> 32), (uint32_t) s_lsn, (uint32_t)(e_lsn >> 32), (uint32_t) e_lsn);
+   snprintf(&hex[0], sizeof(hex), "%08X%08X%08X%08X", (uint32_t)(s_lsn >> 32), (uint32_t)s_lsn, (uint32_t)(e_lsn >> 32), (uint32_t)e_lsn);
    f = pgmoneta_append(f, hex);
    return f;
 }

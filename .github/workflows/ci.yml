@@ -12,7 +12,34 @@ on:
   workflow_dispatch:
 
 jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang-format
+        run: |
+          sudo apt update -y
+          sudo apt install -y lsb-release wget software-properties-common gnupg
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt update -y
+          sudo apt remove -y clang-format 2>/dev/null || true
+          sudo apt install -y clang-format-21
+          sudo ln -sf /usr/bin/clang-format-21 /usr/bin/clang-format
+
+      - name: Check code formatting
+        run: |
+          ./clang-format.sh
+          if ! git diff --quiet; then
+            git diff --name-only
+            echo ""
+            echo "Please run './clang-format.sh' and commit the changes."
+            exit 1
+          fi
+
   build-linux:
+    needs: [format-check]
     runs-on: ubuntu-latest
 
     strategy:

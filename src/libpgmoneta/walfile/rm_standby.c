@@ -65,8 +65,7 @@ standby_desc_running_xacts(char* buf, struct xl_running_xacts* xlrec)
 }
 
 char*
-pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_invalidation_message* msgs, oid dbId, oid tsId, bool rel_cache_init_file_inval
-                                        )
+pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_invalidation_message* msgs, oid dbId, oid tsId, bool rel_cache_init_file_inval)
 {
    int i;
 
@@ -84,7 +83,6 @@ pgmoneta_wal_standby_desc_invalidations(char* buf, int nmsgs, union shared_inval
    buf = pgmoneta_format_and_append(buf, "; inval msgs:");
    for (i = 0; i < nmsgs; i++)
    {
-
       union shared_invalidation_message* msg = &msgs[i];
 
       if (msg->id >= 0)
@@ -140,7 +138,7 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_STANDBY_LOCK)
    {
-      struct xl_standby_locks* xlrec = (struct xl_standby_locks*) rec;
+      struct xl_standby_locks* xlrec = (struct xl_standby_locks*)rec;
       int i;
 
       for (i = 0; i < xlrec->nlocks; i++)
@@ -165,13 +163,13 @@ pgmoneta_wal_standby_desc(char* buf, struct decoded_xlog_record* record)
    }
    else if (info == XLOG_RUNNING_XACTS)
    {
-      struct xl_running_xacts* xlrec = (struct xl_running_xacts*) rec;
+      struct xl_running_xacts* xlrec = (struct xl_running_xacts*)rec;
 
       buf = standby_desc_running_xacts(buf, xlrec);
    }
    else if (info == XLOG_INVALIDATIONS)
    {
-      struct xl_invalidations* xlrec = (struct xl_invalidations*) rec;
+      struct xl_invalidations* xlrec = (struct xl_invalidations*)rec;
       buf = pgmoneta_wal_standby_desc_invalidations(buf, xlrec->nmsgs, xlrec->msgs,
                                                     xlrec->dbId, xlrec->tsId,
                                                     xlrec->relcacheInitFileInval);
@@ -183,5 +181,4 @@ error:
    free(dbname);
    free(relname);
    return NULL;
-
 }

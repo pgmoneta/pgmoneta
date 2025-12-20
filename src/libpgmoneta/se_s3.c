@@ -469,7 +469,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    }
    else
    {
-      s3_port = config->s3_use_tls? 443 : 80;
+      s3_port = config->s3_use_tls ? 443 : 80;
    }
    bool use_tls = config->s3_use_tls;
    if (s3_port == 443)
@@ -644,7 +644,6 @@ s3_get_basepath(int server, char* identifier)
 static int
 s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class)
 {
-
    if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
    {
       return 1;

@@ -47,6 +47,7 @@ is_valid_fork_number(enum fork_number forkNumber)
    return forkNumber >= MAIN_FORKNUM && forkNumber <= INIT_FORKNUM;
 }
 
+// clang-format off
 static const char* const FORK_NAMES[] =
 {
    "main",
@@ -54,6 +55,7 @@ static const char* const FORK_NAMES[] =
    "vm",
    "init"
 };
+// clang-format on
 
 char*
 pgmoneta_wal_get_relation_path(oid dbNode, oid spcNode, oid relNode,
@@ -189,14 +191,18 @@ error:
 char*
 pgmoneta_wal_get_catalog_version_number(void)
 {
-
    switch (server_config->version)
    {
-      case 13: return "202004022";
-      case 14: return "202104081";
-      case 15: return "202204062";
-      case 16: return "202303311";
-      case 17: return "202407111";
+      case 13:
+         return "202004022";
+      case 14:
+         return "202104081";
+      case 15:
+         return "202204062";
+      case 16:
+         return "202303311";
+      case 17:
+         return "202407111";
       default:
          return NULL;
    }

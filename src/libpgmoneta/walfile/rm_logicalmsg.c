@@ -41,7 +41,7 @@ pgmoneta_wal_logicalmsg_desc(char* buf, struct decoded_xlog_record* record)
 
    if (info == XLOG_LOGICAL_MESSAGE)
    {
-      struct xl_logical_message* xlrec = (struct xl_logical_message*) rec;
+      struct xl_logical_message* xlrec = (struct xl_logical_message*)rec;
       char* prefix = xlrec->message;
       char* message = xlrec->message + xlrec->prefix_size;
       char* sep = "";
@@ -54,7 +54,7 @@ pgmoneta_wal_logicalmsg_desc(char* buf, struct decoded_xlog_record* record)
       /* Write message payload as a series of hex bytes */
       for (size_t cnt = 0; cnt < xlrec->message_size; cnt++)
       {
-         buf = pgmoneta_format_and_append(buf, "%s%02X", sep, (unsigned char) message[cnt]);
+         buf = pgmoneta_format_and_append(buf, "%s%02X", sep, (unsigned char)message[cnt]);
          sep = " ";
       }
    }

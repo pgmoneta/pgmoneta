@@ -103,14 +103,14 @@ pgmoneta_wal(int srv, char** argv)
    struct query_response* identify_system_response = NULL;
    struct query_response* end_of_timeline_response = NULL;
    struct message* start_replication_msg = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct main_configuration* config;
    struct stream_buffer* buffer = NULL;
    struct workflow* head = NULL;
    struct workflow* current = NULL;
    struct art* nodes = NULL;
 
-   config = (struct main_configuration*) shmem;
+   config = (struct main_configuration*)shmem;
 
    pgmoneta_start_logging();
    pgmoneta_memory_init();
@@ -256,7 +256,7 @@ pgmoneta_wal(int srv, char** argv)
                                        config->common.servers[srv].name,
                                        segsize, &high32, &low32, &timeline))
          {
-            read_replication = 0;    // Fallback if not PostgreSQL 15+
+            read_replication = 0; // Fallback if not PostgreSQL 15+
          }
       }
 
@@ -761,7 +761,7 @@ error:
 static void
 update_wal_lsn(int srv, size_t xlogptr)
 {
-   struct main_configuration* config = (struct main_configuration*) shmem;
+   struct main_configuration* config = (struct main_configuration*)shmem;
    uint32_t low32 = xlogptr & 0xffffffff;
    uint32_t high32 = xlogptr >> 32 & 0xffffffff;
    memset(config->common.servers[srv].current_wal_lsn, 0, MISC_LENGTH);
@@ -808,7 +808,7 @@ pgmoneta_get_timeline_history(int srv, uint32_t tli, struct timeline_history** h
       {
          continue;
       }
-      nexth = (struct timeline_history*) malloc(sizeof(struct timeline_history));
+      nexth = (struct timeline_history*)malloc(sizeof(struct timeline_history));
 
       if (nexth == NULL)
       {
@@ -1308,8 +1308,7 @@ pgmoneta_read_mappings_from_server(int server_index)
    char* queries[] = {
       "SELECT spcname, oid FROM pg_tablespace",
       "SELECT datname, oid FROM pg_database",
-      "SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid"
-   };
+      "SELECT nspname || '.' || relname, c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid"};
 
    config = (struct walinfo_configuration*)shmem;
    pgmoneta_memory_init();

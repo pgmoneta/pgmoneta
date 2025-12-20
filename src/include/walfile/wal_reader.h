@@ -59,81 +59,81 @@ typedef oid rel_file_number;
 typedef int64_t timestamp_tz;
 
 /* #define variables */
-#define MAXIMUM_ALIGNOF            8  // TODO: double check this value
-#define ALIGNOF_SHORT              2  // TODO: double check this value
-#define InvalidXLogRecPtr          0
-#define InvalidBlockNumber         ((uint32_t) 0xFFFFFFFF)
-#define InvalidBuffer              0
-#define XLOG_PAGE_MAGIC            0xD10D  // WAL version indicator
-#define InvalidOid                 ((oid) 0)
-#define FLEXIBLE_ARRAY_MEMBER      /* empty */
-#define INVALID_REP_ORIGIN_ID      0
-#define XLR_MAX_BLOCK_ID           32
-#define XLR_BLOCK_ID_DATA_SHORT    255
-#define XLR_BLOCK_ID_DATA_LONG     254
-#define XLR_BLOCK_ID_ORIGIN        253
-#define XLR_BLOCK_ID_TOPLEVEL_XID  252
-#define BKPBLOCK_FORK_MASK         0x0F
-#define BKPBLOCK_FLAG_MASK         0xF0
-#define BKPBLOCK_HAS_IMAGE         0x10    /* Block data is an XLogRecordBlockImage */
-#define BKPBLOCK_HAS_DATA          0x20
-#define BKPBLOCK_WILL_INIT         0x40    /* Redo will re-init the page */
-#define BKPBLOCK_SAME_REL          0x80    /* rel_file_locator omitted, same as previous */
-#define BKPIMAGE_HAS_HOLE          0x01    /* Page image has a "hole" */
-#define BKPIMAGE_IS_COMPRESSED     0x02    /* Page image is compressed */
-#define BKPIMAGE_COMPRESS_PGLZ     0x04
-#define BKPIMAGE_COMPRESS_LZ4      0x08
-#define BKPIMAGE_COMPRESS_ZSTD     0x10
+#define MAXIMUM_ALIGNOF           8 // TODO: double check this value
+#define ALIGNOF_SHORT             2 // TODO: double check this value
+#define InvalidXLogRecPtr         0
+#define InvalidBlockNumber        ((uint32_t)0xFFFFFFFF)
+#define InvalidBuffer             0
+#define XLOG_PAGE_MAGIC           0xD10D // WAL version indicator
+#define InvalidOid                ((oid)0)
+#define FLEXIBLE_ARRAY_MEMBER     /* empty */
+#define INVALID_REP_ORIGIN_ID     0
+#define XLR_MAX_BLOCK_ID          32
+#define XLR_BLOCK_ID_DATA_SHORT   255
+#define XLR_BLOCK_ID_DATA_LONG    254
+#define XLR_BLOCK_ID_ORIGIN       253
+#define XLR_BLOCK_ID_TOPLEVEL_XID 252
+#define BKPBLOCK_FORK_MASK        0x0F
+#define BKPBLOCK_FLAG_MASK        0xF0
+#define BKPBLOCK_HAS_IMAGE        0x10 /* Block data is an XLogRecordBlockImage */
+#define BKPBLOCK_HAS_DATA         0x20
+#define BKPBLOCK_WILL_INIT        0x40 /* Redo will re-init the page */
+#define BKPBLOCK_SAME_REL         0x80 /* rel_file_locator omitted, same as previous */
+#define BKPIMAGE_HAS_HOLE         0x01 /* Page image has a "hole" */
+#define BKPIMAGE_IS_COMPRESSED    0x02 /* Page image is compressed */
+#define BKPIMAGE_COMPRESS_PGLZ    0x04
+#define BKPIMAGE_COMPRESS_LZ4     0x08
+#define BKPIMAGE_COMPRESS_ZSTD    0x10
 
-#define SIZE_OF_XLOG_LONG_PHD      MAXALIGN(sizeof(struct xlog_long_page_header_data))
-#define SIZE_OF_XLOG_SHORT_PHD     MAXALIGN(sizeof(struct xlog_page_header_data))
-#define SIZE_OF_XLOG_RECORD        (offsetof(struct xlog_record, xl_crc) + sizeof(pg_crc32c))
+#define SIZE_OF_XLOG_LONG_PHD     MAXALIGN(sizeof(struct xlog_long_page_header_data))
+#define SIZE_OF_XLOG_SHORT_PHD    MAXALIGN(sizeof(struct xlog_page_header_data))
+#define SIZE_OF_XLOG_RECORD       (offsetof(struct xlog_record, xl_crc) + sizeof(pg_crc32c))
 
-#define DEFAULT_WAL_SEGZ_BYTES     16 * 1024 * 1024
+#define DEFAULT_WAL_SEGZ_BYTES    16 * 1024 * 1024
 
 /* #define macros */
-#define MAXALIGN(x)                (((x) + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1))
-#define TYPEALIGN(ALIGNVAL, LEN)   (((uintptr_t)(LEN) + ((ALIGNVAL) -1)) & ~((uintptr_t)((ALIGNVAL) -1)))
-#define MAXALIGNTYPE(LEN)          TYPEALIGN(MAXIMUM_ALIGNOF, (LEN))
-#define SHORTALIGN(LEN)            TYPEALIGN(ALIGNOF_SHORT, (LEN))
+#define MAXALIGN(x)              (((x) + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1))
+#define TYPEALIGN(ALIGNVAL, LEN) (((uintptr_t)(LEN) + ((ALIGNVAL) - 1)) & ~((uintptr_t)((ALIGNVAL) - 1)))
+#define MAXALIGNTYPE(LEN)        TYPEALIGN(MAXIMUM_ALIGNOF, (LEN))
+#define SHORTALIGN(LEN)          TYPEALIGN(ALIGNOF_SHORT, (LEN))
 
 /* When record crosses page boundary, set this flag in new page's header */
-#define XLP_FIRST_IS_CONTRECORD              0x0001
+#define XLP_FIRST_IS_CONTRECORD 0x0001
 
 /* This flag indicates a "long" page header */
-#define XLP_LONG_HEADER                      0x0002
+#define XLP_LONG_HEADER 0x0002
 
 /* This flag indicates backup blocks starting in this page are optional */
-#define XLP_BKP_REMOVABLE                    0x0004
+#define XLP_BKP_REMOVABLE 0x0004
 
 /* Replaces a missing contrecord; see CreateOverwriteContrecordRecord */
-#define XLP_FIRST_IS_OVERWRITE_CONTRECORD    0x0008
+#define XLP_FIRST_IS_OVERWRITE_CONTRECORD 0x0008
 
 /* All defined flag bits in xlp_info (used for validity checking of header) */
-#define XLP_ALL_FLAGS                        0x000F
+#define XLP_ALL_FLAGS 0x000F
 
 #define XLogRecHasBlockRef(record, block_id) \
-        ((record->max_block_id >= (block_id)) && \
-         (record->blocks[block_id].in_use))
+   ((record->max_block_id >= (block_id)) &&  \
+    (record->blocks[block_id].in_use))
 
 #define XLogRecHasBlockImage(record, block_id) \
-        (record->blocks[block_id].has_image)
+   (record->blocks[block_id].has_image)
 
 #define XLogRecHasBlockData(record, block_id) \
-        (record->blocks[block_id].has_data)
+   (record->blocks[block_id].has_data)
 
-#define LSN_FORMAT_ARGS(lsn)    ((uint32_t)((lsn) >> 32)), ((uint32_t)(lsn))
-#define XLOG_REC_GET_DATA(record) ((record)->main_data)
-#define XLOG_REC_GET_INFO(record) ((record)->header.xl_info)
-#define XLOG_REC_GET_BLOCK(record, i) (&record->blocks[(i)])
+#define LSN_FORMAT_ARGS(lsn)                         ((uint32_t)((lsn) >> 32)), ((uint32_t)(lsn))
+#define XLOG_REC_GET_DATA(record)                    ((record)->main_data)
+#define XLOG_REC_GET_INFO(record)                    ((record)->header.xl_info)
+#define XLOG_REC_GET_BLOCK(record, i)                (&record->blocks[(i)])
 #define XLOG_REC_BLOCK_IMAGE_APPLY(record, block_id) (record->blocks[block_id].apply_image)
-#define XLOG_REC_GET_ORIGIN(record) (record->record_origin)
-#define XLOG_REC_GET_DATA_LEN(record) (record->main_data_len)
+#define XLOG_REC_GET_ORIGIN(record)                  (record->record_origin)
+#define XLOG_REC_GET_DATA_LEN(record)                (record->main_data_len)
 
 #define XLOG_SEG_NO_OFFEST_TO_REC_PTR(segno, offset, wal_segsz_bytes, dest) \
-        (dest) = (segno) * (wal_segsz_bytes) + (offset)
+   (dest) = (segno) * (wal_segsz_bytes) + (offset)
 #define XLOG_REC_HAS_BLOCK_REF(record, block_id) \
-        ((record->max_block_id >= (block_id)) && (record->blocks[block_id].in_use))
+   ((record->max_block_id >= (block_id)) && (record->blocks[block_id].in_use))
 /* Enums */
 
 /**
@@ -142,13 +142,12 @@ typedef int64_t timestamp_tz;
  *
  * This enum represents various fork types used in PostgreSQL.
  */
-enum fork_number
-{
-   InvalidForkNumber = -1,     /**< Invalid fork number. */
-   MAIN_FORKNUM = 0,           /**< Main fork. */
-   FSM_FORKNUM,                /**< Free space map fork. */
-   VISIBILITYMAP_FORKNUM,      /**< Visibility map fork. */
-   INIT_FORKNUM,               /**< Initialization fork. */
+enum fork_number {
+   InvalidForkNumber = -1, /**< Invalid fork number. */
+   MAIN_FORKNUM = 0,       /**< Main fork. */
+   FSM_FORKNUM,            /**< Free space map fork. */
+   VISIBILITYMAP_FORKNUM,  /**< Visibility map fork. */
+   INIT_FORKNUM,           /**< Initialization fork. */
 
    /*
     * NOTE: if you add a new fork, change MAX_FORKNUM and possibly
@@ -163,18 +162,17 @@ enum fork_number
  *
  * Represents the various levels of WAL (Write-Ahead Logging).
  */
-enum wal_level
-{
-   WAL_LEVEL_MINIMAL = 0,     /**< Minimal WAL logging. */
-   WAL_LEVEL_REPLICA,         /**< WAL logging for replication. */
-   WAL_LEVEL_LOGICAL          /**< Logical WAL logging. */
+enum wal_level {
+   WAL_LEVEL_MINIMAL = 0, /**< Minimal WAL logging. */
+   WAL_LEVEL_REPLICA,     /**< WAL logging for replication. */
+   WAL_LEVEL_LOGICAL      /**< Logical WAL logging. */
 };
 
 /* Structs */
 
-struct walfile;                         /* Forward declaration of walfile, defined in walfile.h. */
-struct xlog_long_page_header_data;      /* Forward declaration of xlog_long_page_header_data, defined in walfile.h */
-struct block_ref_table;                 /* Forward declaration of block reference table structure, defined in brt.h */
+struct walfile;                    /* Forward declaration of walfile, defined in walfile.h. */
+struct xlog_long_page_header_data; /* Forward declaration of xlog_long_page_header_data, defined in walfile.h */
+struct block_ref_table;            /* Forward declaration of block reference table structure, defined in brt.h */
 /**
  * @struct xlog_page_header_data
  * @brief Represents the header of an XLOG page.
@@ -191,11 +189,11 @@ struct block_ref_table;                 /* Forward declaration of block referenc
  */
 struct xlog_page_header_data
 {
-   uint16_t xlp_magic;          /**< Magic value for correctness checks. */
-   uint16_t xlp_info;           /**< Flag bits for the page. */
-   timeline_id xlp_tli;         /**< Timeline ID of the first record on the page. */
-   xlog_rec_ptr xlp_pageaddr;   /**< XLOG address of this page. */
-   uint32_t xlp_rem_len;        /**< Remaining length of data for the record. */
+   uint16_t xlp_magic;        /**< Magic value for correctness checks. */
+   uint16_t xlp_info;         /**< Flag bits for the page. */
+   timeline_id xlp_tli;       /**< Timeline ID of the first record on the page. */
+   xlog_rec_ptr xlp_pageaddr; /**< XLOG address of this page. */
+   uint32_t xlp_rem_len;      /**< Remaining length of data for the record. */
 };
 
 /**
@@ -215,12 +213,12 @@ struct xlog_page_header_data
  */
 struct xlog_record
 {
-   uint32_t xl_tot_len;         /**< Total length of the entire record. */
-   transaction_id xl_xid;       /**< Transaction ID associated with the record. */
-   xlog_rec_ptr xl_prev;        /**< Pointer to the previous record in the log. */
-   uint8_t xl_info;             /**< Flag bits for the record. */
-   rmgr_id xl_rmid;             /**< Resource manager ID for this record. */
-   pg_crc32c xl_crc;            /**< CRC for this record. */
+   uint32_t xl_tot_len;   /**< Total length of the entire record. */
+   transaction_id xl_xid; /**< Transaction ID associated with the record. */
+   xlog_rec_ptr xl_prev;  /**< Pointer to the previous record in the log. */
+   uint8_t xl_info;       /**< Flag bits for the record. */
+   rmgr_id xl_rmid;       /**< Resource manager ID for this record. */
+   pg_crc32c xl_crc;      /**< CRC for this record. */
 };
 
 /**
@@ -239,10 +237,10 @@ struct xlog_record
 
 struct partial_xlog_record
 {
-   char* data_buffer;                  /**< Data portion of the record. */
-   char* xlog_record;                  /**< Pointer to the xlog record. */
-   uint32_t data_buffer_bytes_read;    /**< Length of the total data read in data_buffer. */
-   uint32_t xlog_record_bytes_read;    /**< Length of the total data read in xlog_record buffer. */
+   char* data_buffer;               /**< Data portion of the record. */
+   char* xlog_record;               /**< Pointer to the xlog record. */
+   uint32_t data_buffer_bytes_read; /**< Length of the total data read in data_buffer. */
+   uint32_t xlog_record_bytes_read; /**< Length of the total data read in xlog_record buffer. */
 };
 
 /**
@@ -258,9 +256,9 @@ struct partial_xlog_record
  */
 struct rel_file_locator
 {
-   oid spcOid;                   /**< Tablespace OID. */
-   oid dbOid;                    /**< Database OID. */
-   rel_file_number relNumber;    /**< Relation file number. */
+   oid spcOid;                /**< Tablespace OID. */
+   oid dbOid;                 /**< Database OID. */
+   rel_file_number relNumber; /**< Relation file number. */
 };
 
 /**
@@ -291,23 +289,23 @@ struct rel_file_locator
  */
 struct decoded_bkp_block
 {
-   bool in_use;                         /**< Indicates if this block reference is in use. */
-   struct rel_file_locator rlocator;    /**< Locator for the referenced block. */
-   enum fork_number forknum;            /**< Fork number of the block. */
-   block_number blkno;                  /**< Block number. */
-   buffer prefetch_buffer;              /**< Prefetching workspace. */
-   uint8_t flags;                       /**< Copy of the fork_flags field from the block header. */
-   bool has_image;                      /**< Indicates if the block has an image. */
-   bool apply_image;                    /**< Indicates if the image should be applied. */
-   char* bkp_image;                     /**< Backup image of the block. */
-   uint16_t hole_offset;                /**< Offset of the hole in the image. */
-   uint16_t hole_length;                /**< Length of the hole in the image. */
-   uint16_t bimg_len;                   /**< Length of the backup image. */
-   uint8_t bimg_info;                   /**< Additional information about the backup image. */
-   bool has_data;                       /**< Indicates if the block has associated data. */
-   char* data;                          /**< Data associated with the block. */
-   uint16_t data_len;                   /**< Length of the data. */
-   uint16_t data_bufsz;                 /**< Buffer size for the data. */
+   bool in_use;                      /**< Indicates if this block reference is in use. */
+   struct rel_file_locator rlocator; /**< Locator for the referenced block. */
+   enum fork_number forknum;         /**< Fork number of the block. */
+   block_number blkno;               /**< Block number. */
+   buffer prefetch_buffer;           /**< Prefetching workspace. */
+   uint8_t flags;                    /**< Copy of the fork_flags field from the block header. */
+   bool has_image;                   /**< Indicates if the block has an image. */
+   bool apply_image;                 /**< Indicates if the image should be applied. */
+   char* bkp_image;                  /**< Backup image of the block. */
+   uint16_t hole_offset;             /**< Offset of the hole in the image. */
+   uint16_t hole_length;             /**< Length of the hole in the image. */
+   uint16_t bimg_len;                /**< Length of the backup image. */
+   uint8_t bimg_info;                /**< Additional information about the backup image. */
+   bool has_data;                    /**< Indicates if the block has associated data. */
+   char* data;                       /**< Data associated with the block. */
+   uint16_t data_len;                /**< Length of the data. */
+   uint16_t data_bufsz;              /**< Buffer size for the data. */
 };
 
 /**
@@ -334,19 +332,19 @@ struct decoded_bkp_block
  */
 struct decoded_xlog_record
 {
-   size_t size;                                               /**< Total size of the decoded record. */
-   bool oversized;                                            /**< Indicates if the record is outside the regular decode buffer. */
-   struct decoded_xlog_record* next;                          /**< Link to the next decoded record in the queue. */
-   xlog_rec_ptr lsn;                                          /**< Location of the record. */
-   xlog_rec_ptr next_lsn;                                     /**< Location of the next record. */
-   struct xlog_record header;                                 /**< Header of the record. */
-   rep_origin_id record_origin;                               /**< Origin ID of the record. */
-   transaction_id toplevel_xid;                               /**< Top-level transaction ID. */
-   char* main_data;                                           /**< Main data portion of the record. */
-   uint32_t main_data_len;                                    /**< Length of the main data portion. */
-   int max_block_id;                                          /**< Highest block ID in use (-1 if none). */
-   struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1];     /**< Array of decoded backup blocks. */
-   bool partial;                                              /**< Indicates if the record is partial. */
+   size_t size;                                           /**< Total size of the decoded record. */
+   bool oversized;                                        /**< Indicates if the record is outside the regular decode buffer. */
+   struct decoded_xlog_record* next;                      /**< Link to the next decoded record in the queue. */
+   xlog_rec_ptr lsn;                                      /**< Location of the record. */
+   xlog_rec_ptr next_lsn;                                 /**< Location of the next record. */
+   struct xlog_record header;                             /**< Header of the record. */
+   rep_origin_id record_origin;                           /**< Origin ID of the record. */
+   transaction_id toplevel_xid;                           /**< Top-level transaction ID. */
+   char* main_data;                                       /**< Main data portion of the record. */
+   uint32_t main_data_len;                                /**< Length of the main data portion. */
+   int max_block_id;                                      /**< Highest block ID in use (-1 if none). */
+   struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1]; /**< Array of decoded backup blocks. */
+   bool partial;                                          /**< Indicates if the record is partial. */
 };
 
 /**
@@ -362,9 +360,9 @@ struct decoded_xlog_record
  */
 struct rel_file_node
 {
-   oid spcNode;      /**< Tablespace OID. */
-   oid dbNode;       /**< Database OID. */
-   oid relNode;      /**< Relation OID. */
+   oid spcNode; /**< Tablespace OID. */
+   oid dbNode;  /**< Database OID. */
+   oid relNode; /**< Relation OID. */
 };
 
 /**
@@ -383,11 +381,11 @@ struct rel_file_node
  */
 struct column_widths
 {
-   int rm_width;                       /**< Width of the resource manager column. */
-   int lsn_width;                      /**< Width of the LSN column. */
-   int rec_width;                      /**< Width of the record type column. */
-   int tot_width;                      /**< Width of the total length column. */
-   int xid_width;                      /**< Width of the transaction ID column. */
+   int rm_width;  /**< Width of the resource manager column. */
+   int lsn_width; /**< Width of the LSN column. */
+   int rec_width; /**< Width of the record type column. */
+   int tot_width; /**< Width of the total length column. */
+   int xid_width; /**< Width of the transaction ID column. */
 };
 
 /* External variables */

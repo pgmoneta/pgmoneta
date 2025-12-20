@@ -26,24 +26,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- #include <utils.h>
- #include <wal.h>
- #include <walfile/rm.h>
- #include <walfile/rm_seq.h>
+#include <utils.h>
+#include <wal.h>
+#include <walfile/rm.h>
+#include <walfile/rm_seq.h>
 
 char*
 pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
 {
    char* rec = XLOG_REC_GET_DATA(record);
    uint8_t info = XLOG_REC_GET_INFO(record) & ~XLR_INFO_MASK;
-   struct xl_seq_rec* xlrec = (struct xl_seq_rec*) rec;
+   struct xl_seq_rec* xlrec = (struct xl_seq_rec*)rec;
    char* dbname = NULL;
    char* relname = NULL;
    char* spcname = NULL;
 
    if (info == XLOG_SEQ_LOG)
    {
-
       if (pgmoneta_get_database_name(xlrec->node.dbNode, &dbname))
       {
          goto error;
@@ -62,7 +61,6 @@ pgmoneta_wal_seq_desc(char* buf, struct decoded_xlog_record* record)
       buf = pgmoneta_format_and_append(buf, "rel %s/%s/%s",
                                        spcname, dbname,
                                        relname);
-
    }
 
    free(dbname);

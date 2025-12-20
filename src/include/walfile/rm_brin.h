@@ -37,16 +37,16 @@ extern "C" {
 #include <walfile/wal_reader.h>
 
 // WAL record definitions for BRIN's WAL operations
-#define XLOG_BRIN_CREATE_INDEX      0x00
-#define XLOG_BRIN_INSERT            0x10
-#define XLOG_BRIN_UPDATE            0x20
-#define XLOG_BRIN_SAMEPAGE_UPDATE   0x30
-#define XLOG_BRIN_REVMAP_EXTEND     0x40
-#define XLOG_BRIN_DESUMMARIZE       0x50
+#define XLOG_BRIN_CREATE_INDEX    0x00
+#define XLOG_BRIN_INSERT          0x10
+#define XLOG_BRIN_UPDATE          0x20
+#define XLOG_BRIN_SAMEPAGE_UPDATE 0x30
+#define XLOG_BRIN_REVMAP_EXTEND   0x40
+#define XLOG_BRIN_DESUMMARIZE     0x50
 
-#define XLOG_BRIN_OPMASK            0x70
+#define XLOG_BRIN_OPMASK          0x70
 
-#define XLOG_BRIN_INIT_PAGE         0x80
+#define XLOG_BRIN_INIT_PAGE       0x80
 
 /**
  * @struct xl_brin_createidx
@@ -58,8 +58,8 @@ extern "C" {
  */
 struct xl_brin_createidx
 {
-   block_number pagesPerRange;   /**< Number of pages per range */
-   uint16_t version;             /**< Version of the BRIN index */
+   block_number pagesPerRange; /**< Number of pages per range */
+   uint16_t version;           /**< Version of the BRIN index */
 };
 
 /**
@@ -73,9 +73,9 @@ struct xl_brin_createidx
  */
 struct xl_brin_insert
 {
-   block_number heapBlk;          /**< Block number of the heap */
-   block_number pagesPerRange;    /**< Pages per range information */
-   offset_number offnum;          /**< Offset number for tuple insertion */
+   block_number heapBlk;       /**< Block number of the heap */
+   block_number pagesPerRange; /**< Pages per range information */
+   offset_number offnum;       /**< Offset number for tuple insertion */
 };
 
 /**
@@ -89,8 +89,8 @@ struct xl_brin_insert
  */
 struct xl_brin_update
 {
-   offset_number oldOffnum;   /**< Offset number of old tuple on old page */
-   struct xl_brin_insert insert;   /**< Insert operation data */
+   offset_number oldOffnum;      /**< Offset number of old tuple on old page */
+   struct xl_brin_insert insert; /**< Insert operation data */
 };
 
 /**
@@ -102,7 +102,7 @@ struct xl_brin_update
  */
 struct xl_brin_samepage_update
 {
-   offset_number offnum;   /**< Offset number of the updated tuple */
+   offset_number offnum; /**< Offset number of the updated tuple */
 };
 
 /**
@@ -114,7 +114,7 @@ struct xl_brin_samepage_update
  */
 struct xl_brin_revmap_extend
 {
-   block_number targetBlk;   /**< Target block number */
+   block_number targetBlk; /**< Target block number */
 };
 
 /**
@@ -128,9 +128,9 @@ struct xl_brin_revmap_extend
  */
 struct xl_brin_desummarize
 {
-   block_number pagesPerRange;   /**< Number of pages per range */
-   block_number heapBlk;         /**< Page number location to set to invalid */
-   offset_number regOffset;      /**< Offset of item to delete in the regular index page */
+   block_number pagesPerRange; /**< Number of pages per range */
+   block_number heapBlk;       /**< Page number location to set to invalid */
+   offset_number regOffset;    /**< Offset of item to delete in the regular index page */
 };
 
 /**

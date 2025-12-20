@@ -35,7 +35,7 @@ extern "C" {
 
 #include <walfile/wal_reader.h>
 
-#define XLOG_SEQ_LOG  0x00 /**< XLOG opcode for sequence log operation. */
+#define XLOG_SEQ_LOG 0x00 /**< XLOG opcode for sequence log operation. */
 
 /**
  * @struct xl_seq_rec
@@ -46,7 +46,7 @@ extern "C" {
  */
 struct xl_seq_rec
 {
-   struct rel_file_node node;  /**< Relation file node for the sequence. */
+   struct rel_file_node node; /**< Relation file node for the sequence. */
    /* SEQUENCE TUPLE DATA FOLLOWS AT THE END */
 };
 

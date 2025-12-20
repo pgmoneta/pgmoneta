@@ -192,7 +192,7 @@ compare_deque(struct deque* dq1, struct deque* dq2, void (*compare)(void*, void*
       uintptr_t data1 = iter1->value->data;
       uintptr_t data2 = iter2->value->data;
 
-      compare((void*) data1, (void*) data2);
+      compare((void*)data1, (void*)data2);
    }
 
    ck_assert((!pgmoneta_deque_iterator_next(iter1)) && (!pgmoneta_deque_iterator_next(iter2)));
@@ -242,13 +242,14 @@ compare_xlog_record(void* a, void* b)
          ck_assert_msg(rec1->blocks[i].bimg_len == rec2->blocks[i].bimg_len, "xlog_record blocks[%d] bimg_len mismatch\n", i);
 
          ck_assert_msg(rec1->blocks[i].bimg_len == 0 ||
-                       memcmp(rec1->blocks[i].bkp_image, rec2->blocks[i].bkp_image, rec1->blocks[i].bimg_len) == 0,
+                          memcmp(rec1->blocks[i].bkp_image, rec2->blocks[i].bkp_image, rec1->blocks[i].bimg_len) == 0,
                        "xlog_record blocks[%d] bkp_image mismatch\n", i);
 
          ck_assert_msg(rec1->blocks[i].data_len == rec2->blocks[i].data_len, "xlog_record blocks[%d] data_len mismatch", i);
 
          ck_assert_msg(rec1->blocks[i].data_len == 0 ||
-                       memcmp(rec1->blocks[i].data, rec2->blocks[i].data, rec1->blocks[i].data_len) == 0, "xlog_record blocks[%d] data mismatch\n", i);
+                          memcmp(rec1->blocks[i].data, rec2->blocks[i].data, rec1->blocks[i].data_len) == 0,
+                       "xlog_record blocks[%d] data mismatch\n", i);
       }
    }
 

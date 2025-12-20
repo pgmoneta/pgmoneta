@@ -240,7 +240,7 @@ int
 pgmoneta_filter_operation_delete(int* file_count, struct walfile*** walfiles)
 {
 #define XID_IS_DELETED(xid) \
-        ({ int found = 0; \
+   ({ int found = 0; \
            for (int k = 0; k < delete_xid_count; k++) { \
               if (delete_xids[k] == (xid)) { found = 1; break; } \
            } found; })
@@ -397,7 +397,7 @@ int
 pgmoneta_filter_xids(int* file_count, struct walfile*** walfiles, int* xids, int xid_count)
 {
 #define XID_IS_FILTERED(xid) \
-        ({ int found = 0; \
+   ({ int found = 0; \
            for (int k = 0; k < xid_count; k++) { \
               if ((transaction_id) xids[k] == (xid)) { found = 1; break; } \
            } found; })
@@ -573,7 +573,6 @@ main(int argc, char* argv[])
 
    if (configuration_path != NULL)
    {
-
       if (!pgmoneta_exists(configuration_path))
       {
          errx(1, "Configuration file not found: %s", configuration_path);

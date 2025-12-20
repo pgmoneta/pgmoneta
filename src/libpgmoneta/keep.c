@@ -170,7 +170,7 @@ keep(char* prefix, SSL* ssl, int client_fd, int srv, bool k, uint8_t compression
 
       if (backups[backup_index]->type != TYPE_FULL)
       {
-         bck = (struct backup*) malloc(sizeof(struct backup));
+         bck = (struct backup*)malloc(sizeof(struct backup));
          memcpy(bck, backups[backup_index], sizeof(struct backup));
 
          while (!pgmoneta_get_backup_parent(srv, bck, &temp_bck))

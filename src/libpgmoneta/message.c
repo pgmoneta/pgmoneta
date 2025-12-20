@@ -164,7 +164,7 @@ pgmoneta_log_copyfail_message(struct message* msg)
       return;
    }
 
-   pgmoneta_log_error("COPY-failure: %s", (char*) msg->data);
+   pgmoneta_log_error("COPY-failure: %s", (char*)msg->data);
 }
 
 void
@@ -2021,7 +2021,7 @@ pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer
 
       if (m->kind != 'D' && m->kind != 'T' && m->kind != 'E')
       {
-         m->data = (void*) malloc(length - 4 + 1);
+         m->data = (void*)malloc(length - 4 + 1);
          m->length = length - 4;
          memset(m->data, 0, m->length + 1);
          memcpy(m->data, buffer->buffer + (buffer->cursor + 4), m->length);
@@ -2032,7 +2032,7 @@ pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer
           * if it's a DataRow, RowDescription or ErrorResponse message
           * This is to accommodate our existing message parsing APIs for these types of messages
           */
-         m->data = (void*) malloc(length + 1);
+         m->data = (void*)malloc(length + 1);
          m->length = length + 1;
          memcpy(m->data, buffer->buffer + buffer->cursor - 1, m->length);
       }
@@ -2042,7 +2042,6 @@ pgmoneta_consume_copy_stream(int srv, SSL* ssl, int socket, struct stream_buffer
       buffer->start = buffer->cursor;
 
       keep_read = false;
-
    }
    while (keep_read);
 
@@ -2146,7 +2145,6 @@ pgmoneta_consume_copy_stream_start(int srv, SSL* ssl, int socket, struct stream_
       }
 
       keep_read = false;
-
    }
    while (keep_read && config->running && pgmoneta_server_is_online(srv));
 
@@ -2188,7 +2186,7 @@ pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_
    int cols;
    int status;
    char* name = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct tuple* current = NULL;
    struct query_response* r = NULL;
    struct main_configuration* config;
@@ -2200,7 +2198,7 @@ pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_
       goto error;
    }
 
-   memset(msg, 0, sizeof (struct message));
+   memset(msg, 0, sizeof(struct message));
 
    // consume DataRow messages from stream buffer until CommandComplete
    while (config->running && pgmoneta_server_is_online(srv) && (msg == NULL || msg->kind != 'C'))
@@ -2291,14 +2289,14 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
    char tmp_file_path[MAX_PATH];
    char file_path[MAX_PATH];
    FILE* file = NULL;
-   struct message* msg = (struct message*)malloc(sizeof (struct message));
+   struct message* msg = (struct message*)malloc(sizeof(struct message));
 
    if (msg == NULL)
    {
       goto error;
    }
 
-   memset(msg, 0, sizeof (struct message));
+   memset(msg, 0, sizeof(struct message));
 
    memset(tmp_file_path, 0, sizeof(tmp_file_path));
    memset(file_path, 0, sizeof(file_path));
@@ -2345,7 +2343,6 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
       }
       if (msg->kind == 'd' && msg->length > 0)
       {
-
          if (bucket)
          {
             while (1)
@@ -2610,7 +2607,7 @@ extract_file_name(char* path, char* file_name, char* file_path)
       // Copy the path up to and including the last '/'
       path_length = last_slash - path + 1;
       strncpy(file_path, path, path_length);
-      file_path[path_length] = '\0';   // Null-terminate the file_path string
+      file_path[path_length] = '\0'; // Null-terminate the file_path string
    }
    else
    {

@@ -62,18 +62,18 @@
 #include <sys/types.h>
 
 #if defined(__x86_64__) || defined(__i386__)
-#include <cpuid.h>   /* for __get_cpuid */
+#include <cpuid.h> /* for __get_cpuid */
 #endif
 
-#define SECURITY_INVALID  -2
-#define SECURITY_REJECT   -1
-#define SECURITY_TRUST     0
-#define SECURITY_PASSWORD  3
-#define SECURITY_MD5       5
-#define SECURITY_SCRAM256 10
-#define SECURITY_ALL      99
+#define SECURITY_INVALID            -2
+#define SECURITY_REJECT             -1
+#define SECURITY_TRUST              0
+#define SECURITY_PASSWORD           3
+#define SECURITY_MD5                5
+#define SECURITY_SCRAM256           10
+#define SECURITY_ALL                99
 
-#define NUMBER_OF_SECURITY_MESSAGES    5
+#define NUMBER_OF_SECURITY_MESSAGES 5
 #define SECURITY_BUFFER_SIZE        1024
 
 static signed char has_security;
@@ -101,19 +101,19 @@ static int client_proof(char* password, char* salt, int salt_length, int iterati
                         char* server_first_message, size_t server_first_message_length,
                         char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
                         unsigned char** result, size_t* result_length);
-static int  salted_password(char* password, char* salt, int salt_length, int iterations, unsigned char** result, int* result_length);
-static int  salted_password_key(unsigned char* salted_password, int salted_password_length, char* key,
-                                unsigned char** result, int* result_length);
-static int  stored_key(unsigned char* client_key, int client_key_length, unsigned char** result, int* result_length);
-static int  generate_salt(char** salt, int* size);
-static int  server_signature(char* password, char* salt, int salt_length, int iterations,
-                             char* server_key, int server_key_length,
-                             char* client_first_message_bare, size_t client_first_message_bare_length,
-                             char* server_first_message, size_t server_first_message_length,
-                             char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
-                             unsigned char** result, size_t* result_length);
+static int salted_password(char* password, char* salt, int salt_length, int iterations, unsigned char** result, int* result_length);
+static int salted_password_key(unsigned char* salted_password, int salted_password_length, char* key,
+                               unsigned char** result, int* result_length);
+static int stored_key(unsigned char* client_key, int client_key_length, unsigned char** result, int* result_length);
+static int generate_salt(char** salt, int* size);
+static int server_signature(char* password, char* salt, int salt_length, int iterations,
+                            char* server_key, int server_key_length,
+                            char* client_first_message_bare, size_t client_first_message_bare_length,
+                            char* server_first_message, size_t server_first_message_length,
+                            char* client_final_message_wo_proof, size_t client_final_message_wo_proof_length,
+                            unsigned char** result, size_t* result_length);
 
-static int  create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
+static int create_ssl_client(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl);
 
 static int create_hash_file(char* filename, char* algorithm, char** hash);
 
@@ -1924,7 +1924,6 @@ pgmoneta_tls_valid(void)
             pgmoneta_log_error("TLS private key file must have at least 0640 permissions when owned by root: %s", config->tls_key_file);
             goto error;
          }
-
       }
       else
       {
@@ -2676,7 +2675,7 @@ int
 pgmoneta_create_ssl_server(SSL_CTX* ctx, char* key, char* cert, char* root, int socket, SSL** ssl)
 {
    SSL* s = NULL;
-   STACK_OF(X509_NAME) * root_cert_list = NULL;
+   STACK_OF(X509_NAME)* root_cert_list = NULL;
 
    if (strlen(cert) == 0)
    {
@@ -3002,8 +3001,7 @@ cpu_supports_sse42(void)
 }
 
 #ifdef __x86_64__
-__attribute__((target("sse4.2")))
-static int
+__attribute__((target("sse4.2"))) static int
 pgmoneta_crc32c_sse42(const void* buffer, size_t size, uint32_t* crc)
 {
    uint32_t crc32 = *crc;
@@ -3106,8 +3104,7 @@ pgmoneta_crc32c_software(const void* buffer, size_t size, uint32_t* crc)
       0xF36E6F75L, 0x0105EC76L, 0x12551F82L, 0xE03E9C81L,
       0x34F4F86AL, 0xC69F7B69L, 0xD5CF889DL, 0x27A40B9EL,
       0x79B737BAL, 0x8BDCB4B9L, 0x988C474DL, 0x6AE7C44EL,
-      0xBE2DA0A5L, 0x4C4623A6L, 0x5F16D052L, 0xAD7D5351L
-   };
+      0xBE2DA0A5L, 0x4C4623A6L, 0x5F16D052L, 0xAD7D5351L};
 
    for (size_t i = 0; i < size; i++)
    {

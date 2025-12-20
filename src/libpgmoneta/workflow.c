@@ -989,7 +989,6 @@ wf_delete_backup(void)
 static int
 get_error_code(int type, int flow, struct art* nodes)
 {
-
    if (pgmoneta_art_contains_key(nodes, NODE_ERROR_CODE))
    {
       return (int)pgmoneta_art_search(nodes, NODE_ERROR_CODE);

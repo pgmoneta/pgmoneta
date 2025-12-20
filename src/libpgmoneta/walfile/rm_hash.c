@@ -105,7 +105,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
    {
       case XLOG_HASH_INIT_META_PAGE:
       {
-         struct xl_hash_init_meta_page* xlrec = (struct xl_hash_init_meta_page*) rec;
+         struct xl_hash_init_meta_page* xlrec = (struct xl_hash_init_meta_page*)rec;
 
          buf = pgmoneta_format_and_append(buf, "num_tuples %g, fillfactor %d",
                                           xlrec->num_tuples, xlrec->ffactor);
@@ -113,21 +113,21 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_INIT_BITMAP_PAGE:
       {
-         struct xl_hash_init_bitmap_page* xlrec = (struct xl_hash_init_bitmap_page*) rec;
+         struct xl_hash_init_bitmap_page* xlrec = (struct xl_hash_init_bitmap_page*)rec;
 
          buf = pgmoneta_format_and_append(buf, "bmsize %d", xlrec->bmsize);
          break;
       }
       case XLOG_HASH_INSERT:
       {
-         struct xl_hash_insert* xlrec = (struct xl_hash_insert*) rec;
+         struct xl_hash_insert* xlrec = (struct xl_hash_insert*)rec;
 
          buf = pgmoneta_format_and_append(buf, "off %u", xlrec->offnum);
          break;
       }
       case XLOG_HASH_ADD_OVFL_PAGE:
       {
-         struct xl_hash_add_ovfl_page* xlrec = (struct xl_hash_add_ovfl_page*) rec;
+         struct xl_hash_add_ovfl_page* xlrec = (struct xl_hash_add_ovfl_page*)rec;
 
          buf = pgmoneta_format_and_append(buf, "bmsize %d, bmpage_found %c",
                                           xlrec->bmsize, (xlrec->bmpage_found) ? 'T' : 'F');
@@ -135,7 +135,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_SPLIT_ALLOCATE_PAGE:
       {
-         struct xl_hash_split_allocate_page* xlrec = (struct xl_hash_split_allocate_page*) rec;
+         struct xl_hash_split_allocate_page* xlrec = (struct xl_hash_split_allocate_page*)rec;
 
          buf = pgmoneta_format_and_append(buf, "new_bucket %u, meta_page_masks_updated %c, issplitpoint_changed %c",
                                           xlrec->new_bucket,
@@ -145,7 +145,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_SPLIT_COMPLETE:
       {
-         struct xl_hash_split_complete* xlrec = (struct xl_hash_split_complete*) rec;
+         struct xl_hash_split_complete* xlrec = (struct xl_hash_split_complete*)rec;
 
          buf = pgmoneta_format_and_append(buf, "old_bucket_flag %u, new_bucket_flag %u",
                                           xlrec->old_bucket_flag, xlrec->new_bucket_flag);
@@ -153,7 +153,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_MOVE_PAGE_CONTENTS:
       {
-         struct xl_hash_move_page_contents* xlrec = (struct xl_hash_move_page_contents*) rec;
+         struct xl_hash_move_page_contents* xlrec = (struct xl_hash_move_page_contents*)rec;
 
          buf = pgmoneta_format_and_append(buf, "ntups %d, is_primary %c",
                                           xlrec->ntups,
@@ -162,7 +162,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_SQUEEZE_PAGE:
       {
-         struct xl_hash_squeeze_page* xlrec = (struct xl_hash_squeeze_page*) rec;
+         struct xl_hash_squeeze_page* xlrec = (struct xl_hash_squeeze_page*)rec;
 
          buf = pgmoneta_format_and_append(buf, "prevblkno %u, nextblkno %u, ntups %d, is_primary %c",
                                           xlrec->prevblkno,
@@ -173,7 +173,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_DELETE:
       {
-         struct xl_hash_delete* xlrec = (struct xl_hash_delete*) rec;
+         struct xl_hash_delete* xlrec = (struct xl_hash_delete*)rec;
 
          buf = pgmoneta_format_and_append(buf, "clear_dead_marking %c, is_primary %c",
                                           xlrec->clear_dead_marking ? 'T' : 'F',
@@ -182,7 +182,7 @@ pgmoneta_wal_hash_desc(char* buf, struct decoded_xlog_record* record)
       }
       case XLOG_HASH_UPDATE_META_PAGE:
       {
-         struct xl_hash_update_meta_page* xlrec = (struct xl_hash_update_meta_page*) rec;
+         struct xl_hash_update_meta_page* xlrec = (struct xl_hash_update_meta_page*)rec;
 
          buf = pgmoneta_format_and_append(buf, "ntuples %g",
                                           xlrec->ntuples);
