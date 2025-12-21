@@ -1723,6 +1723,66 @@ pgmoneta_directory_size(char* directory)
    return total_size;
 }
 
+unsigned long
+pgmoneta_calculate_wal_size(char* directory, char* start)
+{
+   unsigned long total_size = 0;
+   struct deque* wal_files = NULL;
+   struct deque_iterator* iter = NULL;
+   char* basename = NULL;
+   char* path = NULL;
+   char* filename = NULL;
+
+   if (pgmoneta_get_files(directory, &wal_files))
+   {
+      return 0;
+   }
+
+   pgmoneta_deque_iterator_create(wal_files, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      filename = (char*)pgmoneta_value_data(iter->value);
+
+      if (pgmoneta_is_encrypted(filename))
+      {
+         pgmoneta_strip_extension(filename, &basename);
+      }
+      else
+      {
+         basename = strdup(filename);
+      }
+
+      if (pgmoneta_is_compressed(basename))
+      {
+         char* bn = basename;
+         basename = NULL;
+         pgmoneta_strip_extension(bn, &basename);
+         free(bn);
+      }
+
+      if (strcmp(basename, start) >= 0)
+      {
+         path = pgmoneta_append(path, directory);
+         if (!pgmoneta_ends_with(path, "/"))
+         {
+            path = pgmoneta_append(path, "/");
+         }
+         path = pgmoneta_append(path, filename);
+
+         total_size += pgmoneta_get_file_size(path);
+         free(path);
+         path = NULL;
+      }
+      free(basename);
+      basename = NULL;
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   pgmoneta_deque_destroy(wal_files);
+
+   return total_size;
+}
+
 int
 pgmoneta_get_directories(char* base, int* number_of_directories, char*** dirs)
 {
@@ -5144,7 +5204,7 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
 
    if (path_buffer == NULL || buffer_size == 0 || filename == NULL)
    {
-      return 1;
+      goto error;
    }
 
    memset(path_buffer, 0, buffer_size);
@@ -5154,7 +5214,7 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
       temp_path = pgmoneta_append(NULL, directory_path);
       if (temp_path == NULL)
       {
-         return 1;
+         goto error;
       }
 
       if (directory_path[strlen(directory_path) - 1] != '/')
@@ -5162,22 +5222,21 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
          temp_path = pgmoneta_append(temp_path, "/");
          if (temp_path == NULL)
          {
-            return 1;
+            goto error;
          }
       }
 
       temp_path = pgmoneta_append(temp_path, filename);
       if (temp_path == NULL)
       {
-         return 1;
+         goto error;
       }
 
       if (strlen(temp_path) >= buffer_size)
       {
          pgmoneta_log_error("Configuration directory path is too long: %s (maximum %zu characters)",
                             temp_path, buffer_size - 1);
-         free(temp_path);
-         return 1;
+         goto error;
       }
 
       if (access(temp_path, F_OK) == 0)
@@ -5191,6 +5250,7 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
       {
          pgmoneta_log_info("Config file %s not found in directory %s", filename, directory_path);
          free(temp_path);
+         temp_path = NULL;
       }
    }
 
@@ -5202,7 +5262,7 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
          {
             pgmoneta_log_error("Default configuration path is too long: %s (maximum %zu characters)",
                                default_path, buffer_size - 1);
-            return 1;
+            goto error;
          }
          pgmoneta_log_info("Using default config file: %s", default_path);
          strcpy(path_buffer, default_path);
@@ -5216,5 +5276,9 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
    }
 
    pgmoneta_log_warn("No path specified for config file %s", filename);
+
+error:
+
+   free(temp_path);
    return 1;
 }
