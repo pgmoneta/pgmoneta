@@ -359,7 +359,8 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   size = pgmoneta_directory_size(backup_data);
+   char* excludes[] = {"pg_wal", NULL};
+   size = pgmoneta_directory_size_excludes(backup_data, excludes);
    biggest_file_size = pgmoneta_biggest_file(backup_data);
 
    pgmoneta_read_wal(backup_data, &wal);

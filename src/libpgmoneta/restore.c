@@ -2195,6 +2195,16 @@ restore_backup_full(struct art* nodes)
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
 
+   if (pgmoneta_art_contains_key(nodes, NODE_COPY_WAL))
+   {
+      if ((bool)pgmoneta_art_search(nodes, NODE_COPY_WAL))
+      {
+         char* wal_root = pgmoneta_get_server_wal(server);
+         required_space += pgmoneta_calculate_wal_size(wal_root, backup->wal);
+         free(wal_root);
+      }
+   }
+
    if (free_space < required_space)
    {
       char* f = NULL;
@@ -2302,6 +2312,16 @@ restore_backup_incremental(struct art* nodes)
    free_space = pgmoneta_free_space(target_root_combine);
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+
+   if (pgmoneta_art_contains_key(nodes, NODE_COPY_WAL))
+   {
+      if ((bool)pgmoneta_art_search(nodes, NODE_COPY_WAL))
+      {
+         char* wal_root = pgmoneta_get_server_wal(server);
+         required_space += pgmoneta_calculate_wal_size(wal_root, backup->wal);
+         free(wal_root);
+      }
+   }
 
    if (free_space < required_space)
    {

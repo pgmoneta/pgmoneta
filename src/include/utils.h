@@ -673,6 +673,24 @@ unsigned long
 pgmoneta_directory_size(char* directory);
 
 /**
+ * Calculate the directory size excluding specified directories
+ * @param directory The directory
+ * @param excludes The null-terminated list of directories to exclude (only basenames are checked)
+ * @return The size in bytes
+ */
+unsigned long
+pgmoneta_directory_size_excludes(char* directory, char** excludes);
+
+/**
+ * Calculate the size of WAL files starting from a specific WAL segment
+ * @param directory The directory containing WAL files
+ * @param start The starting WAL segment
+ * @return The size in bytes
+ */
+unsigned long
+pgmoneta_calculate_wal_size(char* directory, char* start);
+
+/**
  * Get directories
  * @param base The base directory
  * @param number_of_directories The number of directories

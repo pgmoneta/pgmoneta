@@ -695,6 +695,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    struct token_bucket* bucket = NULL;
    struct token_bucket* network_bucket = NULL;
    struct backup* backup = NULL;
+   char* excludes[] = {"pg_wal", NULL};
 
    config = (struct main_configuration*)shmem;
 
@@ -960,6 +961,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    backup->encryption = config->encryption;
    snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
+   backup->backup_size = pgmoneta_directory_size_excludes(backup_data, excludes);
    backup->biggest_file_size = biggest_file_size;
    backup->major_version = atoi(version);
    backup->minor_version = atoi(minor_version);

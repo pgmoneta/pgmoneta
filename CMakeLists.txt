@@ -204,7 +204,7 @@ find_package(Rst2man)
 if (RST2MAN_FOUND)
   message(STATUS "rst2man found")
 else ()
-  message(FATAL_ERROR "rst2man needed")
+  message(STATUS "rst2man needed but not found (skipping)")
 endif()
 
 find_package(Libssh)

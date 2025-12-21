@@ -1643,6 +1643,12 @@ pgmoneta_remove_suffix(char* orig, char* suffix)
 unsigned long
 pgmoneta_directory_size(char* directory)
 {
+   return pgmoneta_directory_size_excludes(directory, NULL);
+}
+
+unsigned long
+pgmoneta_directory_size_excludes(char* directory, char** excludes)
+{
    unsigned long total_size = 0;
    DIR* dir;
    struct dirent* entry;
@@ -1667,15 +1673,31 @@ pgmoneta_directory_size(char* directory)
       if (entry->d_type == DT_DIR)
       {
          char path[1024];
+         bool excluded = false;
 
          if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
          {
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+         if (excludes != NULL)
+         {
+            for (int i = 0; excludes[i] != NULL; i++)
+            {
+               if (!strcmp(entry->d_name, excludes[i]))
+               {
+                  excluded = true;
+                  break;
+               }
+            }
+         }
 
-         total_size += pgmoneta_directory_size(path);
+         if (!excluded)
+         {
+            snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+
+            total_size += pgmoneta_directory_size_excludes(path, excludes);
+         }
       }
       else if (entry->d_type == DT_REG)
       {
@@ -1719,6 +1741,65 @@ pgmoneta_directory_size(char* directory)
    }
 
    closedir(dir);
+
+   return total_size;
+}
+
+unsigned long
+pgmoneta_calculate_wal_size(char* directory, char* start)
+{
+   unsigned long total_size = 0;
+   int number_of_wal_files = 0;
+   char** wal_files = NULL;
+   char* basename = NULL;
+   char* path = NULL;
+
+   if (pgmoneta_get_files(directory, &number_of_wal_files, &wal_files))
+   {
+      return 0;
+   }
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      if (pgmoneta_is_encrypted(wal_files[i]))
+      {
+         pgmoneta_strip_extension(wal_files[i], &basename);
+      }
+      else
+      {
+         basename = strdup(wal_files[i]);
+      }
+
+      if (pgmoneta_is_compressed(basename))
+      {
+         char* bn = basename;
+         basename = NULL;
+         pgmoneta_strip_extension(bn, &basename);
+         free(bn);
+      }
+
+      if (strcmp(basename, start) >= 0)
+      {
+         path = pgmoneta_append(path, directory);
+         if (!pgmoneta_ends_with(path, "/"))
+         {
+            path = pgmoneta_append(path, "/");
+         }
+         path = pgmoneta_append(path, wal_files[i]);
+
+         total_size += pgmoneta_get_file_size(path);
+         free(path);
+         path = NULL;
+      }
+      free(basename);
+      basename = NULL;
+   }
+
+   for (int i = 0; i < number_of_wal_files; i++)
+   {
+      free(wal_files[i]);
+   }
+   free(wal_files);
 
    return total_size;
 }
