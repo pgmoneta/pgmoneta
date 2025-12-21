@@ -270,12 +270,13 @@ int
 pgmoneta_get_restore_last_files_names(char*** output)
 {
    int number_of_elements = 0;
+
    number_of_elements = sizeof(restore_last_files_names) / sizeof(restore_last_files_names[0]);
 
-   *output = (char**)malloc((number_of_elements + 1) * sizeof(char*));
+   *output = (char**)calloc(number_of_elements + 1, sizeof(char*));
    if (*output == NULL)
    {
-      return 1;
+      goto error;
    }
 
    for (int i = 0; i < number_of_elements; i++)
@@ -283,12 +284,26 @@ pgmoneta_get_restore_last_files_names(char*** output)
       (*output)[i] = strdup(restore_last_files_names[i]);
       if ((*output)[i] == NULL)
       {
-         return 1;
+         goto error;
       }
    }
    (*output)[number_of_elements] = NULL;
 
    return 0;
+
+error:
+
+   if (*output != NULL)
+   {
+      for (int i = 0; i < number_of_elements; i++)
+      {
+         free((*output)[i]);
+      }
+      free(*output);
+      *output = NULL;
+   }
+
+   return 1;
 }
 
 bool
@@ -2142,6 +2157,8 @@ restore_backup_full(struct art* nodes)
    char* target_base = NULL;
    uint64_t free_space = 0;
    uint64_t required_space = 0;
+   char* wal_root = NULL;
+   char* backup_wal_dir = NULL;
    struct main_configuration* config;
 
    struct workflow* workflow = NULL;
@@ -2195,6 +2212,19 @@ restore_backup_full(struct art* nodes)
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
 
+   backup_wal_dir = pgmoneta_get_server_backup_identifier_data_wal(server, backup->label);
+   required_space += pgmoneta_directory_size(backup_wal_dir);
+   free(backup_wal_dir);
+
+   if (pgmoneta_art_contains_key(nodes, NODE_COPY_WAL))
+   {
+      if ((bool)pgmoneta_art_search(nodes, NODE_COPY_WAL))
+      {
+         wal_root = pgmoneta_get_server_wal(server);
+         required_space += pgmoneta_calculate_wal_size(wal_root, backup->wal);
+      }
+   }
+
    if (free_space < required_space)
    {
       char* f = NULL;
@@ -2221,6 +2251,7 @@ restore_backup_full(struct art* nodes)
 
    free(target_root);
    free(target_base);
+   free(wal_root);
 
    pgmoneta_workflow_destroy(workflow);
    return RESTORE_OK;
@@ -2228,6 +2259,7 @@ restore_backup_full(struct art* nodes)
 error:
    free(target_root);
    free(target_base);
+   free(wal_root);
 
    pgmoneta_workflow_destroy(workflow);
    return ret;
@@ -2253,6 +2285,8 @@ restore_backup_incremental(struct art* nodes)
    struct main_configuration* config;
    uint64_t free_space = 0;
    uint64_t required_space = 0;
+   char* wal_root = NULL;
+   char* backup_wal_dir = NULL;
 
    config = (struct main_configuration*)shmem;
 
@@ -2302,6 +2336,19 @@ restore_backup_incremental(struct art* nodes)
    free_space = pgmoneta_free_space(target_root_combine);
    required_space =
       backup->restore_size + (pgmoneta_get_number_of_workers(server) * backup->biggest_file_size);
+
+   backup_wal_dir = pgmoneta_get_server_backup_identifier_data_wal(server, backup->label);
+   required_space += pgmoneta_directory_size(backup_wal_dir);
+   free(backup_wal_dir);
+
+   if (pgmoneta_art_contains_key(nodes, NODE_COPY_WAL))
+   {
+      if ((bool)pgmoneta_art_search(nodes, NODE_COPY_WAL))
+      {
+         wal_root = pgmoneta_get_server_wal(server);
+         required_space += pgmoneta_calculate_wal_size(wal_root, backup->wal);
+      }
+   }
 
    if (free_space < required_space)
    {
@@ -2366,6 +2413,7 @@ restore_backup_incremental(struct art* nodes)
    workflow = NULL;
 
    free(manifest_path);
+   free(wal_root);
    return RESTORE_OK;
 
 error:
@@ -2395,6 +2443,7 @@ error:
    }
 
    free(manifest_path);
+   free(wal_root);
    pgmoneta_workflow_destroy(workflow);
    // set ret error code by default to RESTORE_ERROR if it's not set
    if (ret == RESTORE_OK)
