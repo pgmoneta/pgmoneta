@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <pgmoneta.h>
+#include <art.h>
 #include <json.h>
 #include <info.h>
 
@@ -97,6 +98,17 @@ pgmoneta_is_backup_valid(int server, char* identifier);
  */
 bool
 pgmoneta_is_backup_struct_valid(int server, struct backup* backup);
+
+/**
+ * Get the backup identifier for a restore operation
+ * @param server The server
+ * @param identifier The identifier (e.g., target-time, target-lsn, or label)
+ * @param nodes The art nodes structure to populate with recovery info
+ * @param label The output buffer for the actual backup label
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_get_backup_identifier(int server, char* identifier, struct art* nodes, char* label);
 
 #ifdef __cplusplus
 }
