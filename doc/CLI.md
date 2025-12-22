@@ -136,6 +136,21 @@ Example
 pgmoneta-cli restore primary newest name=MyLabel,primary /tmp
 ```
 
+### Automatic Backup Selection
+
+When using recovery targets (`lsn=X`, `time=X`, or `timeline=X`), pgmoneta automatically selects the appropriate backup:
+
+```sh
+# Restore to a specific LSN (backup auto-selected)
+pgmoneta-cli restore primary newest lsn=0/16B0938 /tmp
+
+# Restore to a specific time (backup auto-selected)
+pgmoneta-cli restore primary newest time=2025-01-15\ 10:30:00 /tmp
+
+# Restore from a specific timeline (backup auto-selected)
+pgmoneta-cli restore primary newest timeline=2 /tmp
+```
+
 ## verify
 
 Verify a backup from a server
