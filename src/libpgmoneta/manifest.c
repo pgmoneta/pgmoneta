@@ -29,12 +29,12 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <art.h>
+#include <utils.h>
 #include <csv.h>
 #include <json.h>
 #include <logging.h>
 #include <manifest.h>
 #include <security.h>
-#include <utils.h>
 
 /* system */
 #include <dirent.h>
@@ -463,8 +463,8 @@ pgmoneta_generate_manifest(int version, uint64_t system_id, char* backup_data, s
    /* put wal ranges */
    pgmoneta_json_create(&wal_ranges);
    pgmoneta_json_create(&range);
-   start_lsn = pgmoneta_lsn_to_string((uint64_t)((uint64_t)bck->start_lsn_hi32 << 32) + (uint64_t)bck->start_lsn_lo32);
-   end_lsn = pgmoneta_lsn_to_string((uint64_t)((uint64_t)bck->end_lsn_hi32 << 32) + (uint64_t)bck->end_lsn_lo32);
+   start_lsn = pgmoneta_lsn_to_string(pgmoneta_get_lsn(bck->start_lsn_hi32, bck->start_lsn_lo32));
+   end_lsn = pgmoneta_lsn_to_string(pgmoneta_get_lsn(bck->end_lsn_hi32, bck->end_lsn_lo32));
 
    pgmoneta_json_put(range, "Timeline", (uintptr_t)bck->start_timeline, ValueInt32);
    pgmoneta_json_put(range, "Start-LSN", (uintptr_t)start_lsn, ValueString);

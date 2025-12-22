@@ -328,6 +328,7 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
 {
    bool active = false;
    bool locked = false;
+   bool explicit_label = false;
    int ret = RESTORE_OK;
    char* identifier = NULL;
    char* position = NULL;
@@ -339,6 +340,9 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    char* output = NULL;
    char* en = NULL;
    int ec = -1;
+   char label[MISC_LENGTH];
+   char* target_identifier = NULL;
+   char* timeline_value = NULL;
    struct backup* backup = NULL;
    struct art* nodes = NULL;
    struct json* req = NULL;
@@ -387,7 +391,186 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   memset(&label[0], 0, sizeof(label));
+
+   /* Check if identifier is an explicit backup label (not oldest/newest) */
+   if (identifier != NULL &&
+       strcmp(identifier, "oldest") != 0 &&
+       strcmp(identifier, "newest") != 0 &&
+       strcmp(identifier, "latest") != 0)
+   {
+      explicit_label = true;
+   }
+
+   /* If lsn=X or time=X is in position, automatically select the
+    * latest backup containing that target. timeline=X is a modifier,
+    * not a primary recovery target. */
+   if (position != NULL && strlen(position) > 0)
+   {
+      char tokens[512];
+      char* ptr = NULL;
+      int target_count = 0;
+      size_t len = 0;
+
+      memset(&tokens[0], 0, sizeof(tokens));
+      len = strlen(position);
+      if (len >= sizeof(tokens))
+      {
+         len = sizeof(tokens) - 1;
+      }
+      memcpy(&tokens[0], position, len);
+
+      ptr = strtok(&tokens[0], ",");
+
+      while (ptr != NULL)
+      {
+         char key[256];
+         char value[256];
+         char* equal = NULL;
+         size_t key_len = 0;
+         size_t val_len = 0;
+
+         memset(&key[0], 0, sizeof(key));
+         memset(&value[0], 0, sizeof(value));
+
+         equal = strchr(ptr, '=');
+
+         if (equal == NULL)
+         {
+            key_len = strlen(ptr);
+            if (key_len >= sizeof(key))
+            {
+               key_len = sizeof(key) - 1;
+            }
+            memcpy(&key[0], ptr, key_len);
+         }
+         else
+         {
+            key_len = strlen(ptr) - strlen(equal);
+            if (key_len >= sizeof(key))
+            {
+               key_len = sizeof(key) - 1;
+            }
+            memcpy(&key[0], ptr, key_len);
+
+            val_len = strlen(equal) - 1;
+            if (val_len >= sizeof(value))
+            {
+               val_len = sizeof(value) - 1;
+            }
+            memcpy(&value[0], equal + 1, val_len);
+         }
+
+         if (!strcmp(&key[0], "lsn"))
+         {
+            if (target_identifier != NULL)
+            {
+               free(target_identifier);
+               target_identifier = NULL;
+            }
+            target_identifier = pgmoneta_append(target_identifier, "target-lsn:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "time"))
+         {
+            if (target_identifier != NULL)
+            {
+               free(target_identifier);
+               target_identifier = NULL;
+            }
+            target_identifier = pgmoneta_append(target_identifier, "target-time:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "current") || !strcmp(&key[0], "immediate"))
+         {
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "name"))
+         {
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "xid"))
+         {
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "timeline"))
+         {
+            /* timeline is a modifier, not a primary target.
+             * Save the value for potential backup selection below. */
+            if (timeline_value != NULL)
+            {
+               free(timeline_value);
+               timeline_value = NULL;
+            }
+            timeline_value = pgmoneta_append(timeline_value, &value[0]);
+         }
+
+         ptr = strtok(NULL, ",");
+      }
+
+      /* Use timeline for backup auto-selection only when no primary
+       * target was specified and the identifier is not explicit. */
+      if (target_count == 0 && !explicit_label && timeline_value != NULL)
+      {
+         target_identifier = pgmoneta_append(target_identifier, "target-tli:");
+         target_identifier = pgmoneta_append(target_identifier, timeline_value);
+      }
+      free(timeline_value);
+      timeline_value = NULL;
+
+      if (target_count > 1)
+      {
+         ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+         pgmoneta_log_error("Restore: Multiple recovery target options specified. Only one primary target (lsn, time, name, xid, current) is allowed.");
+         goto error;
+      }
+
+      if (explicit_label)
+      {
+         /* Explicit backup label takes precedence over position-based selection */
+         if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+            goto error;
+         }
+      }
+      else if (target_identifier != NULL)
+      {
+         /* target-* is an internal identifier used only for backup-label
+          * resolution. Recovery target configuration (recovery_target_lsn,
+          * etc.) is derived from USER_POSITION by wf_restore.c. */
+         if (pgmoneta_get_backup_identifier(server, target_identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s using recovery target '%s'",
+                               config->common.servers[server].name, target_identifier);
+            goto error;
+         }
+      }
+      else
+      {
+         if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+            goto error;
+         }
+      }
+   }
+   else
+   {
+      if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+      {
+         ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+         pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+         goto error;
+      }
+   }
+
+   if (pgmoneta_workflow_nodes(server, label, nodes, &backup))
    {
       ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
       goto error;
@@ -465,6 +648,8 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    free(backup);
    free(elapsed);
    free(output);
+   free(target_identifier);
+   free(timeline_value);
 
    exit(0);
 
@@ -489,6 +674,8 @@ error:
    free(backup);
    free(elapsed);
    free(output);
+   free(target_identifier);
+   free(timeline_value);
 
    exit(1);
 }
