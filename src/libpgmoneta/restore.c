@@ -386,7 +386,125 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   char label[MISC_LENGTH];
+   memset(&label[0], 0, sizeof(label));
+
+   /* If lsn=X, time=X, or timeline=X is in position,
+    * automatically select the latest backup containing that target. */
+   if (position != NULL && strlen(position) > 0)
+   {
+      char tokens[512];
+      char* ptr = NULL;
+      char* target_identifier = NULL;
+      int target_count = 0;
+
+      memset(&tokens[0], 0, sizeof(tokens));
+      memcpy(&tokens[0], position, strlen(position));
+
+      ptr = strtok(&tokens[0], ",");
+
+      while (ptr != NULL)
+      {
+         char key[256];
+         char value[256];
+         char* equal = NULL;
+
+         memset(&key[0], 0, sizeof(key));
+         memset(&value[0], 0, sizeof(value));
+
+         equal = strchr(ptr, '=');
+
+         if (equal == NULL)
+         {
+            memcpy(&key[0], ptr, strlen(ptr));
+         }
+         else
+         {
+            memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
+            memcpy(&value[0], equal + 1, strlen(equal) - 1);
+         }
+
+         if (!strcmp(&key[0], "lsn"))
+         {
+            if (target_identifier != NULL)
+            {
+               free(target_identifier);
+               target_identifier = NULL;
+            }
+            target_identifier = pgmoneta_append(target_identifier, "target-lsn:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "time"))
+         {
+            if (target_identifier != NULL)
+            {
+               free(target_identifier);
+               target_identifier = NULL;
+            }
+            target_identifier = pgmoneta_append(target_identifier, "target-time:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+            target_count++;
+         }
+         else if (!strcmp(&key[0], "timeline"))
+         {
+            if (target_identifier != NULL)
+            {
+               free(target_identifier);
+               target_identifier = NULL;
+            }
+            target_identifier = pgmoneta_append(target_identifier, "target-tli:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+            target_count++;
+         }
+
+         ptr = strtok(NULL, ",");
+      }
+
+      if (target_count > 1)
+      {
+         ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+         pgmoneta_log_error("Restore: Multiple recovery target options specified (lsn, time, timeline). Only one is allowed.");
+         free(target_identifier);
+         target_identifier = NULL;
+         goto error;
+      }
+
+      if (target_identifier != NULL)
+      {
+         if (pgmoneta_get_backup_identifier(server, target_identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s using recovery target '%s'",
+                               config->common.servers[server].name, target_identifier);
+            free(target_identifier);
+            target_identifier = NULL;
+            goto error;
+         }
+         free(target_identifier);
+         target_identifier = NULL;
+      }
+      else
+      {
+         if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+            goto error;
+         }
+      }
+   }
+   else
+   {
+      if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+      {
+         ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+         pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+         goto error;
+      }
+   }
+
+   if (pgmoneta_workflow_nodes(server, label, nodes, &backup))
    {
       ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
       goto error;
