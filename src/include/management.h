@@ -59,37 +59,39 @@ extern "C" {
 /**
  * Management commands
  */
-#define MANAGEMENT_UNKNOWN        0
-#define MANAGEMENT_BACKUP         1
-#define MANAGEMENT_LIST_BACKUP    2
-#define MANAGEMENT_RESTORE        3
-#define MANAGEMENT_ARCHIVE        4
-#define MANAGEMENT_DELETE         5
-#define MANAGEMENT_SHUTDOWN       6
-#define MANAGEMENT_STATUS         7
-#define MANAGEMENT_STATUS_DETAILS 8
-#define MANAGEMENT_PING           9
-#define MANAGEMENT_RESET          10
-#define MANAGEMENT_RELOAD         11
-#define MANAGEMENT_RETAIN         12
-#define MANAGEMENT_EXPUNGE        13
-#define MANAGEMENT_DECRYPT        14
-#define MANAGEMENT_ENCRYPT        15
-#define MANAGEMENT_DECOMPRESS     16
-#define MANAGEMENT_COMPRESS       17
-#define MANAGEMENT_INFO           18
-#define MANAGEMENT_VERIFY         19
-#define MANAGEMENT_ANNOTATE       20
-#define MANAGEMENT_CONF_LS        21
-#define MANAGEMENT_CONF_GET       22
-#define MANAGEMENT_CONF_SET       23
-#define MANAGEMENT_MODE           24
+#define MANAGEMENT_UNKNOWN             0
+#define MANAGEMENT_BACKUP              1
+#define MANAGEMENT_LIST_BACKUP         2
+#define MANAGEMENT_RESTORE             3
+#define MANAGEMENT_ARCHIVE             4
+#define MANAGEMENT_DELETE              5
+#define MANAGEMENT_SHUTDOWN            6
+#define MANAGEMENT_STATUS              7
+#define MANAGEMENT_STATUS_DETAILS      8
+#define MANAGEMENT_PING                9
+#define MANAGEMENT_RESET               10
+#define MANAGEMENT_RELOAD              11
+#define MANAGEMENT_RETAIN              12
+#define MANAGEMENT_EXPUNGE             13
+#define MANAGEMENT_DECRYPT             14
+#define MANAGEMENT_ENCRYPT             15
+#define MANAGEMENT_DECOMPRESS          16
+#define MANAGEMENT_COMPRESS            17
+#define MANAGEMENT_INFO                18
+#define MANAGEMENT_VERIFY              19
+#define MANAGEMENT_ANNOTATE            20
+#define MANAGEMENT_CONF_LS             21
+#define MANAGEMENT_CONF_GET            22
+#define MANAGEMENT_CONF_SET            23
+#define MANAGEMENT_MODE                24
+#define MANAGEMENT_CONF_SET_POSTGRESQL 25
+#define MANAGEMENT_CONF_GET_POSTGRESQL 26
 
-#define MANAGEMENT_MASTER_KEY     24
-#define MANAGEMENT_ADD_USER       25
-#define MANAGEMENT_UPDATE_USER    26
-#define MANAGEMENT_REMOVE_USER    27
-#define MANAGEMENT_LIST_USERS     28
+#define MANAGEMENT_MASTER_KEY          24
+#define MANAGEMENT_ADD_USER            25
+#define MANAGEMENT_UPDATE_USER         26
+#define MANAGEMENT_REMOVE_USER         27
+#define MANAGEMENT_LIST_USERS          28
 
 /**
  * Management categories
@@ -179,6 +181,9 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 #define MANAGEMENT_ARGUMENT_WORKFLOW              "Workflow"
 #define MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE  "WorkspaceFreeSpace"
+#define MANAGEMENT_ARGUMENT_GUC_PARAM             "GucParam"
+#define MANAGEMENT_ARGUMENT_GUC_VALUE             "GucValue"
+#define MANAGEMENT_ARGUMENT_RELOAD                "Reload"
 
 /**
  * Management error
@@ -362,6 +367,23 @@ extern "C" {
 #define MANAGEMENT_ERROR_MODE_NETWORK                       2803
 #define MANAGEMENT_ERROR_MODE_ERROR                         2804
 #define MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION                2805
+
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL                2900
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_NOUSER         2901
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_AUTH           2902
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_QUERY          2903
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_NOSERVER       2904
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_OFFLINE        2905
+#define MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_NOFORK         2906
+
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL                3000
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_NOEXT          3001
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_NOUSER         3002
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_AUTH           3003
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_QUERY          3004
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_NOSERVER       3005
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_OFFLINE        3006
+#define MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_NOFORK         3007
 
 /**
  * Output formats
@@ -600,6 +622,23 @@ int
 pgmoneta_management_request_conf_get(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
+ * Create a conf get request for postgresql query
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The postgresql server
+ * @param guc_param The postgresql GUC parameter
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_conf_get_postgresql(SSL* ssl, int socket,
+                                                char* server, char* guc_param,
+                                                uint8_t compression, uint8_t encryption,
+                                                int32_t output_format);
+
+/**
  * Create a conf get request
  * @param ssl The SSL connection
  * @param socket The socket descriptor
@@ -612,6 +651,22 @@ pgmoneta_management_request_conf_get(SSL* ssl, int socket, uint8_t compression, 
  */
 int
 pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a conf get request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The postgresql server
+ * @param guc_param The postgresql GUC parameter
+ * @param guc_value The postgresql GUC value
+ * @param reload Whether to reload the configuration
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_conf_set_postgresql(SSL* ssl, int socket, char* server, char* guc_param, char* guc_value, bool reload, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a retain request

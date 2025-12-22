@@ -143,11 +143,14 @@ static int annotate(SSL* ssl, int socket, char* server, char* backup, char* comm
 static int mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_get(SSL* ssl, int socket, char* config_key, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int conf_get_postgresql(SSL* ssl, int socket, char* server, char* guc_param, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int conf_set_postgresql(SSL* ssl, int socket, char* server, char* guc_param, char* guc_value, bool reload, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 static int process_result(SSL* ssl, int socket, int32_t output_format);
 static int process_get_result(SSL* ssl, int socket, char* param, int32_t output_format);
 static int process_set_result(SSL* ssl, int socket, char* config_key, int32_t output_format);
+static int process_get_postgresql_result(SSL* ssl, int socket, int32_t output_format, char* guc_param);
 
 static int get_config_key_result(char* config_key, struct json* j, uintptr_t* r, int32_t output_format);
 
@@ -211,12 +214,12 @@ usage(void)
    printf("                           - 'prometheus' to reset the Prometheus statistics\n");
    printf("  compress                 Compress a file using configured method\n");
    printf("  conf <action>            Manage the configuration, with one of subcommands:\n");
-   printf("                           - 'get' to obtain information about a runtime configuration value\n");
-   printf("                             conf get <parameter_name>\n");
-   printf("                           - 'ls' to print the configurations used\n");
    printf("                           - 'reload' to reload the configuration\n");
-   printf("                           - 'set' to modify a configuration value;\n");
-   printf("                             conf set <parameter_name> <parameter_value>;\n");
+   printf("                           - 'ls' to print the configurations used\n");
+   printf("                           - 'get <parameter_name>' to obtain information about a runtime configuration value\n");
+   printf("                           - 'get postgresql <server> <guc_parameter>' to obtain information about a postgresql guc parameter\n");
+   printf("                           - 'set <parameter_name> <parameter_value>' to modify a configuration value\n");
+   printf("                           - 'set postgresql <server> <guc_parameter> <guc_value>' to modify a PostgreSQL GUC parameter\n");
    printf("  decompress               Decompress a file using configured method\n");
    printf("  decrypt                  Decrypt a file using master-key\n");
    printf("  delete                   Delete a backup from a server\n");
@@ -357,13 +360,13 @@ struct pgmoneta_command command_table[] = {
     .log_message = "<conf ls>"},
    {.command = "conf",
     .subcommand = "get",
-    .accepted_argument_count = {0, 1},
+    .accepted_argument_count = {0, 1, 2, 3},
     .action = MANAGEMENT_CONF_GET,
     .deprecated = false,
     .log_message = "<conf get> [%s]"},
    {.command = "conf",
     .subcommand = "set",
-    .accepted_argument_count = {2},
+    .accepted_argument_count = {2, 4, 5},
     .action = MANAGEMENT_CONF_SET,
     .deprecated = false,
     .log_message = "<conf set> [%s]"},
@@ -979,18 +982,61 @@ execute:
    }
    else if (parsed.cmd->action == MANAGEMENT_CONF_GET)
    {
-      if (parsed.args[0])
+      if (!parsed.args[0])
+      {
+         exit_code = conf_get(s_ssl, socket, NULL, compression, encryption, output_format);
+      }
+      else if (strcmp(parsed.args[0], "postgresql"))
       {
          exit_code = conf_get(s_ssl, socket, parsed.args[0], compression, encryption, output_format);
       }
       else
       {
-         exit_code = conf_get(s_ssl, socket, NULL, compression, encryption, output_format);
+         if (!parsed.args[1])
+         {
+            warnx("pgmoneta-cli: Missing required argument for 'conf get postgresql': <server>");
+            exit_code = 1;
+            goto done;
+         }
+         if (parsed.args[2])
+         {
+            exit_code = conf_get_postgresql(s_ssl, socket, parsed.args[1], parsed.args[2], compression, encryption, output_format);
+         }
+         else
+         {
+            exit_code = conf_get_postgresql(s_ssl, socket, parsed.args[1], NULL, compression, encryption, output_format);
+         }
       }
    }
    else if (parsed.cmd->action == MANAGEMENT_CONF_SET)
    {
-      exit_code = conf_set(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+      if (parsed.args[0] && !strcmp(parsed.args[0], "postgresql"))
+      {
+         bool reload = true;
+         // Optional 5th argument controls reload; default true
+         if (parsed.args[4])
+         {
+            if (!strcasecmp(parsed.args[4], "false"))
+            {
+               reload = false;
+            }
+            else if (!strcasecmp(parsed.args[4], "true"))
+            {
+               reload = true;
+            }
+            else
+            {
+               warnx("pgmoneta-cli: Invalid reload flag. Allowed values: true, false.");
+               exit_code = 1;
+               goto done;
+            }
+         }
+         exit_code = conf_set_postgresql(s_ssl, socket, parsed.args[1], parsed.args[2], parsed.args[3], reload, compression, encryption, output_format);
+      }
+      else
+      {
+         exit_code = conf_set(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+      }
    }
 
 done:
@@ -1145,6 +1191,8 @@ help_conf(void)
    printf("  pgmoneta-cli conf [ls]\n");
    printf("  pgmoneta-cli conf [get] <parameter_name>\n");
    printf("  pgmoneta-cli conf [set] <parameter_name> <parameter_value>\n");
+   printf("  pgmoneta-cli conf [get] [postgresql] <server> <guc_parameter>\n");
+   printf("  pgmoneta-cli conf [set] [postgresql] <server> <guc_parameter> <guc_value>\n");
 }
 
 static void
@@ -1930,6 +1978,46 @@ error:
 }
 
 static int
+conf_get_postgresql(SSL* ssl, int socket, char* server, char* guc_param,
+                    uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_conf_get_postgresql(ssl, socket, server, guc_param,
+                                                       compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_get_postgresql_result(ssl, socket, output_format, guc_param))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+static int
+conf_set_postgresql(SSL* ssl, int socket, char* server, char* guc_param, char* guc_value, bool reload, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_conf_set_postgresql(ssl, socket, server, guc_param, guc_value, reload, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_set_result(ssl, socket, guc_param, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+   return 1;
+}
+
+static int
 process_result(SSL* ssl, int socket, int32_t output_format)
 {
    struct json* read = NULL;
@@ -2057,6 +2145,60 @@ error:
       }
    }
 
+   return 1;
+}
+
+static int
+process_get_postgresql_result(SSL* ssl, int socket, int32_t output_format, char* guc_param)
+{
+   struct json* read = NULL;
+   struct json* response = NULL;
+   char* val = NULL;
+
+   if (pgmoneta_management_read_json(ssl, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
+
+   response = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_RESPONSE);
+   if (!response)
+   {
+      goto error;
+   }
+
+   if (guc_param != NULL)
+   {
+      // Single GUC print only the value
+      val = (char*)pgmoneta_json_get(response, guc_param);
+
+      if (val != NULL)
+      {
+         printf("%s\n", val);
+      }
+   }
+   else
+   {
+      // Multiple GUC print full JSON
+      if (MANAGEMENT_OUTPUT_FORMAT_RAW != output_format)
+      {
+         translate_json_object(read);
+      }
+      if (MANAGEMENT_OUTPUT_FORMAT_JSON == output_format)
+      {
+         pgmoneta_json_print(read, FORMAT_JSON);
+      }
+      else
+      {
+         pgmoneta_json_print(read, FORMAT_TEXT);
+      }
+   }
+
+   pgmoneta_json_destroy(read);
+
+   return 0;
+
+error:
+   pgmoneta_json_destroy(read);
    return 1;
 }
 
@@ -2519,6 +2661,16 @@ translate_command(int32_t cmd_code)
          command_output = pgmoneta_append(command_output, COMMAND_CONF);
          command_output = pgmoneta_append_char(command_output, ' ');
          command_output = pgmoneta_append(command_output, "set");
+         break;
+      case MANAGEMENT_CONF_GET_POSTGRESQL:
+         command_output = pgmoneta_append(command_output, COMMAND_CONF);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "get postgresql");
+         break;
+      case MANAGEMENT_CONF_SET_POSTGRESQL:
+         command_output = pgmoneta_append(command_output, COMMAND_CONF);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "set postgresql");
          break;
       default:
          break;

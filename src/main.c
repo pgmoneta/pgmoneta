@@ -1431,6 +1431,27 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          pgmoneta_conf_get(NULL, client_fd, compression, encryption, pyl);
       }
    }
+   else if (id == MANAGEMENT_CONF_GET_POSTGRESQL)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Conf Get PostgreSQL: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_GET_POSTGRESQL_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "conf get-postgresql", NULL);
+         pgmoneta_conf_get_postgresql(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
    else if (id == MANAGEMENT_CONF_SET)
    {
       pid = fork();
@@ -1450,6 +1471,27 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_set_proc_title(1, ai->argv, "conf set", NULL);
          reload_set_configuration(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
+   else if (id == MANAGEMENT_CONF_SET_POSTGRESQL)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Conf Set PostgreSQL: No fork %s (%d)", server, MANAGEMENT_ERROR_CONF_SET_POSTGRESQL_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "conf set-postgresql", NULL);
+         pgmoneta_conf_set_postgresql(NULL, client_fd, compression, encryption, pyl);
       }
    }
    else if (id == MANAGEMENT_STATUS)
