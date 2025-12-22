@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <utils.h>
 #include <extension.h>
 #include <logging.h>
 #include <message.h>
@@ -92,6 +93,15 @@ int
 pgmoneta_ext_promote(SSL* ssl, int socket, struct query_response** qr)
 {
    return query_execute(ssl, socket, "SELECT pgmoneta_ext_promote();", qr);
+}
+
+int
+pgmoneta_ext_set_guc(SSL* ssl, int socket, char* guc_param, char* guc_val, bool reload, struct query_response** qr)
+{
+   char query[MAX_QUERY_LENGTH];
+   const char* reload_str = reload ? "true" : "false";
+   pgmoneta_snprintf(query, MAX_QUERY_LENGTH, "SELECT pgmoneta_ext_set_guc('%s', '%s', %s);", guc_param, guc_val, reload_str);
+   return query_execute(ssl, socket, query, qr);
 }
 
 static int

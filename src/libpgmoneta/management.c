@@ -526,6 +526,42 @@ error:
 }
 
 int
+pgmoneta_management_request_conf_get_postgresql(SSL* ssl, int socket,
+                                                char* server, char* guc_param,
+                                                uint8_t compression, uint8_t encryption,
+                                                int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (pgmoneta_management_create_header(MANAGEMENT_CONF_GET_POSTGRESQL, compression, encryption,
+                                         output_format, &j))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_create_request(j, &request))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_GUC_PARAM, (uintptr_t)guc_param, ValueString);
+
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+   return 0;
+
+error:
+   pgmoneta_json_destroy(j);
+   return 1;
+}
+
+int
 pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
@@ -543,6 +579,43 @@ pgmoneta_management_request_conf_set(SSL* ssl, int socket, char* config_key, cha
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_CONFIG_KEY, (uintptr_t)config_key, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_CONFIG_VALUE, (uintptr_t)config_value, ValueString);
+
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(j);
+
+   return 1;
+}
+
+int
+pgmoneta_management_request_conf_set_postgresql(SSL* ssl, int socket, char* server, char* guc_param, char* guc_value, bool reload, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (pgmoneta_management_create_header(MANAGEMENT_CONF_SET_POSTGRESQL, compression, encryption, output_format, &j))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_create_request(j, &request))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_GUC_PARAM, (uintptr_t)guc_param, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_GUC_VALUE, (uintptr_t)guc_value, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_RELOAD, (uintptr_t)reload, ValueBool);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {

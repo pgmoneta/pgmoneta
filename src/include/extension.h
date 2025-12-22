@@ -127,6 +127,19 @@ int
 pgmoneta_ext_promote(SSL* ssl, int socket, struct query_response** qr);
 
 /**
+ * Set a GUC parameter on the server
+ * @param ssl The SSL structure
+ * @param socket The socket
+ * @param guc_param The GUC parameter name
+ * @param guc_val The GUC parameter value
+ * @param reload Whether to reload the server configuration (optional)
+ * @param qr The query result
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_ext_set_guc(SSL* ssl, int socket, char* guc_param, char* guc_val, bool reload, struct query_response** qr);
+
+/**
  * Parse a semantic version string (e.g., "1.8.2" or "2.1") into version struct
  * @param version_str The version string to parse
  * @param version Output version struct
