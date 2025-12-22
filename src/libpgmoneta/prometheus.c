@@ -2156,7 +2156,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].online);
+      data = pgmoneta_append_int(data, config->common.servers[i].online ? 1 : 0);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -2172,7 +2172,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].primary);
+      data = pgmoneta_append_int(data, config->common.servers[i].primary ? 1 : 0);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -2188,7 +2188,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].valid);
+      data = pgmoneta_append_int(data, config->common.servers[i].valid ? 1 : 0);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -2204,7 +2204,7 @@ general_information(SSL* client_ssl, int client_fd)
       data = pgmoneta_append(data, config->common.servers[i].name);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming > 0);
+      data = pgmoneta_append_int(data, config->common.servers[i].wal_streaming > 0 ? 1 : 0);
 
       data = pgmoneta_append(data, "\n");
    }
