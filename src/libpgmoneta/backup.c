@@ -831,3 +831,153 @@ pgmoneta_is_backup_struct_valid(int server, struct backup* backup)
 
    return result;
 }
+
+static int
+resolve_backup_for_target(int server, uint64_t lsn, time_t time_val, unsigned int timeline, char* label)
+{
+   char* backup_dir = NULL;
+   int number_of_backups = 0;
+   struct backup** backups = NULL;
+   struct backup* bck = NULL;
+   int idx = -1;
+
+   backup_dir = pgmoneta_get_server_backup(server);
+
+   if (pgmoneta_load_infos(backup_dir, &number_of_backups, &backups))
+   {
+      pgmoneta_log_error("Unable to get backups for server %d", server);
+      free(backup_dir);
+      return 1;
+   }
+
+   /* Sort newest first so the first match is the latest backup containing the target */
+   pgmoneta_sort_backups(backups, number_of_backups, true);
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      bck = backups[i];
+
+      if (bck->valid == VALID_TRUE)
+      {
+         if (lsn > 0)
+         {
+            uint64_t start_lsn = ((uint64_t)bck->start_lsn_hi32 << 32) | bck->start_lsn_lo32;
+            if (start_lsn <= lsn)
+            {
+               idx = i;
+               break;
+            }
+         }
+         else if (time_val > 0)
+         {
+            struct tm tm_val;
+            time_t bck_time;
+
+            memset(&tm_val, 0, sizeof(struct tm));
+            if (strptime(bck->label, "%Y%m%d%H%M%S", &tm_val) != NULL)
+            {
+               tm_val.tm_isdst = -1;
+               bck_time = mktime(&tm_val);
+               if (bck_time <= time_val)
+               {
+                  idx = i;
+                  break;
+               }
+            }
+         }
+         else if (timeline > 0)
+         {
+            if (bck->start_timeline == timeline)
+            {
+               idx = i;
+               break;
+            }
+         }
+      }
+   }
+
+   if (idx != -1)
+   {
+      char* l = NULL;
+      l = pgmoneta_append(l, backups[idx]->label);
+      memcpy(label, l, strlen(l) + 1);
+      free(l);
+   }
+   else
+   {
+      pgmoneta_log_error("No backup found for requested target");
+   }
+
+   for (int i = 0; i < number_of_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+   free(backup_dir);
+
+   return idx == -1 ? 1 : 0;
+}
+
+int
+pgmoneta_get_backup_identifier(int server, char* identifier, struct art* nodes, char* label)
+{
+   uint64_t lsn = 0;
+   time_t time_val = 0;
+   unsigned int timeline = 0;
+   char* value = NULL;
+
+   if (identifier == NULL || strlen(identifier) == 0)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_starts_with(identifier, "target-lsn:"))
+   {
+      value = identifier + 11;
+      lsn = pgmoneta_parse_lsn(value);
+
+      if (lsn == 0)
+      {
+         pgmoneta_log_error("Invalid LSN: %s", value);
+         return 1;
+      }
+
+      pgmoneta_art_insert(nodes, "recovery_target_lsn", (uintptr_t)value, ValueString);
+   }
+   else if (pgmoneta_starts_with(identifier, "target-time:"))
+   {
+      value = identifier + 12;
+      time_val = pgmoneta_parse_timestamp(value);
+
+      if (time_val == 0)
+      {
+         pgmoneta_log_error("Invalid timestamp: %s", value);
+         return 1;
+      }
+
+      pgmoneta_art_insert(nodes, "recovery_target_time", (uintptr_t)value, ValueString);
+   }
+   else if (pgmoneta_starts_with(identifier, "target-tli:"))
+   {
+      value = identifier + 11;
+      timeline = atoi(value);
+
+      if (timeline == 0)
+      {
+         pgmoneta_log_error("Invalid timeline: %s", value);
+         return 1;
+      }
+
+      pgmoneta_art_insert(nodes, "recovery_target_timeline", (uintptr_t)value, ValueString);
+   }
+   else
+   {
+      char* l = NULL;
+      l = pgmoneta_append(l, identifier);
+      memcpy(label, l, strlen(l) + 1);
+      free(l);
+      return 0;
+   }
+
+   return resolve_backup_for_target(server, lsn, time_val, timeline, label);
+}

@@ -365,7 +365,101 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   if (pgmoneta_workflow_nodes(server, identifier, nodes, &backup))
+   char label[MISC_LENGTH];
+   memset(&label[0], 0, sizeof(label));
+
+   /* If a recovery target (lsn/time/timeline) is provided via the position argument,
+    * select the latest backup that contains that target. This ties the internal
+    * implementation to the pgmoneta-cli syntax:
+    *
+    *   pgmoneta-cli restore <server> <timestamp|oldest|newest>
+    *                        [[current|name=X|xid=X|lsn=X|time=X|inclusive=X|timeline=X|action=X|primary|replica],*]
+    *                        <directory>
+    */
+   if (position != NULL && strlen(position) > 0)
+   {
+      char tokens[512];
+      char* ptr = NULL;
+      char* target_identifier = NULL;
+
+      memset(&tokens[0], 0, sizeof(tokens));
+      memcpy(&tokens[0], position, strlen(position));
+
+      ptr = strtok(&tokens[0], ",");
+
+      while (ptr != NULL && target_identifier == NULL)
+      {
+         char key[256];
+         char value[256];
+         char* equal = NULL;
+
+         memset(&key[0], 0, sizeof(key));
+         memset(&value[0], 0, sizeof(value));
+
+         equal = strchr(ptr, '=');
+
+         if (equal == NULL)
+         {
+            memcpy(&key[0], ptr, strlen(ptr));
+         }
+         else
+         {
+            memcpy(&key[0], ptr, strlen(ptr) - strlen(equal));
+            memcpy(&value[0], equal + 1, strlen(equal) - 1);
+         }
+
+         if (!strcmp(&key[0], "lsn"))
+         {
+            target_identifier = pgmoneta_append(target_identifier, "target-lsn:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+         }
+         else if (!strcmp(&key[0], "time"))
+         {
+            target_identifier = pgmoneta_append(target_identifier, "target-time:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+         }
+         else if (!strcmp(&key[0], "timeline"))
+         {
+            target_identifier = pgmoneta_append(target_identifier, "target-tli:");
+            target_identifier = pgmoneta_append(target_identifier, &value[0]);
+         }
+
+         ptr = strtok(NULL, ",");
+      }
+
+      if (target_identifier != NULL)
+      {
+         if (pgmoneta_get_backup_identifier(server, target_identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s using recovery target '%s'",
+                               config->common.servers[server].name, target_identifier);
+            free(target_identifier);
+            goto error;
+         }
+         free(target_identifier);
+      }
+      else
+      {
+         if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+         {
+            ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+            pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+            goto error;
+         }
+      }
+   }
+   else
+   {
+      if (pgmoneta_get_backup_identifier(server, identifier, nodes, &label[0]))
+      {
+         ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
+         pgmoneta_log_error("Restore: Unable to find backup for %s/%s", config->common.servers[server].name, identifier);
+         goto error;
+      }
+   }
+
+   if (pgmoneta_workflow_nodes(server, label, nodes, &backup))
    {
       ec = MANAGEMENT_ERROR_RESTORE_NOBACKUP;
       goto error;

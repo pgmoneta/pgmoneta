@@ -5258,3 +5258,57 @@ pgmoneta_normalize_path(char* directory_path, char* filename, char* default_path
    pgmoneta_log_warn("No path specified for config file %s", filename);
    return 1;
 }
+
+uint64_t
+pgmoneta_parse_lsn(char* lsn_str)
+{
+   uint32_t id = 0;
+   uint32_t off = 0;
+   uint64_t lsn = 0;
+
+   if (lsn_str == NULL || strlen(lsn_str) == 0)
+   {
+      return 0;
+   }
+
+   if (sscanf(lsn_str, "%X/%X", &id, &off) != 2)
+   {
+      return 0;
+   }
+
+   lsn = ((uint64_t)id << 32) | off;
+
+   return lsn;
+}
+
+time_t
+pgmoneta_parse_timestamp(char* timestamp_str)
+{
+   struct tm tm_val;
+   time_t time_val;
+
+   if (timestamp_str == NULL || strlen(timestamp_str) == 0)
+   {
+      return 0;
+   }
+
+   memset(&tm_val, 0, sizeof(struct tm));
+
+   if (strptime(timestamp_str, "%Y-%m-%d %H:%M:%S", &tm_val) == NULL)
+   {
+      // Try optional formats if needed, or just fail
+      return 0;
+   }
+
+   // Set DST to -1 to let mktime determine it
+   tm_val.tm_isdst = -1;
+
+   time_val = mktime(&tm_val);
+
+   if (time_val == -1)
+   {
+      return 0;
+   }
+
+   return time_val;
+}

@@ -798,6 +798,22 @@ bool
 pgmoneta_is_file(char* file);
 
 /**
+ * Parse a LSN string
+ * @param lsn_str The LSN string
+ * @return The LSN, or 0 on error
+ */
+uint64_t
+pgmoneta_parse_lsn(char* lsn_str);
+
+/**
+ * Parse a timestamp string
+ * @param timestamp_str The timestamp string (format: YYYY-MM-DD HH:MM:SS)
+ * @return The timestamp, or 0 on error
+ */
+time_t
+pgmoneta_parse_timestamp(char* timestamp_str);
+
+/**
  * Compare files
  * @param f1 The first file path
  * @param f2 The second file path
