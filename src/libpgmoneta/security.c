@@ -2560,6 +2560,15 @@ pgmoneta_create_ssl_ctx(bool client, SSL_CTX** ctx)
       goto error;
    }
 
+   if (client)
+   {
+      if (!SSL_CTX_set_default_verify_paths(c))
+      {
+         pgmoneta_log_warn("Failed to set default SSL verify paths");
+      }
+      SSL_CTX_set_verify(c, SSL_VERIFY_PEER, NULL);
+   }
+
    if (SSL_CTX_set_min_proto_version(c, TLS1_2_VERSION) == 0)
    {
       goto error;

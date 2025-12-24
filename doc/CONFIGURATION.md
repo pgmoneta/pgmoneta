@@ -97,6 +97,15 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | retention | | Array | No | The retention for the server in days, weeks, months, years |
 | wal_shipping | | String | No | The WAL shipping directory |
 | workspace | /tmp/pgmoneta-workspace/ | String | No | The directory for the workspace that incremental backup can use for its work. Can interpolate environment variables (e.g., `$HOME`) |
+| s3_storage_class | | String | No | The S3 storage class. Overrides global setting. |
+| s3_port   | | Int | No | The port number for the S3 endpoint. Overrides global setting. |
+| s3_use_tls | | Bool | No | Use TLS for S3 connections. Overrides global setting. |
+| s3_endpoint | | String | No | S3 endpoint URL. Overrides global setting. |
+| s3_region | | String | No | The AWS region. Overrides global setting. |
+| s3_access_key_id | | String | No | The IAM access key ID. Overrides global setting. |
+| s3_secret_access_key | | String | No | The IAM secret access key. Overrides global setting. |
+| s3_bucket | | String | No | The AWS S3 bucket name. Overrides global setting. |
+| s3_base_dir | | String | No | The base directory for the S3 bucket. Overrides global setting. |
 | hot_standby | | String | No | Hot standby directories. Single directory or comma separated directories up to 8 (e.g., /path/to/hot/standby1,/path/to/hot/standby2) |
 | hot_standby_overrides | | String | No | Files to override in the hot standby directory. If multiple hot standbys are specified then this setting is separated by a \| |
 | hot_standby_tablespaces | | String | No | Tablespace mappings for the hot standby. Syntax is [from -> to,?]+. If multiple hot standbys are specified then this setting is separated by a \| |

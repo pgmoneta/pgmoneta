@@ -45,12 +45,11 @@ static char* s3_storage_name(void);
 static int s3_storage_setup(char*, struct art*);
 static int s3_storage_execute(char*, struct art*);
 static int s3_storage_teardown(char*, struct art*);
-
-static int s3_upload_files(char* local_root, char* s3_root, char* relative_path);
-static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path);
+static int s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server);
+static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server);
 static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class);
 
-static char* s3_get_host(void);
+static char* s3_get_host(int server);
 static char* s3_get_basepath(int server, char* identifier);
 
 struct workflow*
@@ -100,83 +99,6 @@ s3_storage_setup(char* name __attribute__((unused)), struct art* nodes)
 }
 
 static int
-s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
-{
-   int server = -1;
-   char* label = NULL;
-   struct timespec start_t;
-   struct timespec end_t;
-   double remote_s3_elapsed_time;
-   char* local_root = NULL;
-   char* base_dir = NULL;
-   char* s3_root = NULL;
-   struct main_configuration* config;
-   struct backup* temp_backup = NULL;
-#ifdef HAVE_FREEBSD
-   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
-#else
-   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
-#endif
-
-   config = (struct main_configuration*)shmem;
-
-#ifdef DEBUG
-   pgmoneta_dump_art(nodes);
-
-   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
-   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
-#endif
-
-   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
-   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
-
-   pgmoneta_log_debug("S3 storage engine (execute): %s/%s", config->common.servers[server].name, label);
-
-   local_root = pgmoneta_get_server_backup_identifier(server, label);
-   base_dir = pgmoneta_get_server_backup(server);
-   s3_root = s3_get_basepath(server, label);
-
-   if (s3_upload_files(local_root, s3_root, ""))
-   {
-      goto error;
-   }
-
-#ifdef HAVE_FREEBSD
-   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
-#else
-   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
-#endif
-
-   remote_s3_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
-
-   if (pgmoneta_load_info(base_dir, label, &temp_backup))
-   {
-      goto error;
-   }
-   temp_backup->remote_s3_elapsed_time = remote_s3_elapsed_time;
-   if (pgmoneta_save_info(base_dir, temp_backup))
-   {
-      pgmoneta_log_error("Unable to save backup info for directory %s", base_dir);
-      goto error;
-   }
-
-   free(temp_backup);
-   free(local_root);
-   free(base_dir);
-   free(s3_root);
-
-   return 0;
-
-error:
-   free(temp_backup);
-   free(local_root);
-   free(base_dir);
-   free(s3_root);
-
-   return 1;
-}
-
-static int
 s3_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
@@ -208,7 +130,430 @@ s3_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 }
 
 static int
-s3_upload_files(char* local_root, char* s3_root, char* relative_path)
+s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class)
+{
+   if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_http_request_add_header(request, "x-amz-content-sha256", file_sha256))
+   {
+      return 1;
+   }
+
+   if (pgmoneta_http_request_add_header(request, "x-amz-date", long_date))
+   {
+      return 1;
+   }
+
+   if (strlen(storage_class) && pgmoneta_http_request_add_header(request, "x-amz-storage-class", storage_class))
+   {
+      return 1;
+   }
+
+   return 0;
+}
+/*
+ * S3 Configuration Getter Methods
+ * These static methods retrieve the effective S3 configuration for a server,
+ * with server-specific settings overriding global settings.
+ */
+
+/**
+ * Get the effective S3 port for a server
+ * Server-specific port overrides global port if set (non-zero)
+ *
+ * @param server The server index
+ * @return The effective S3 port
+ */
+static int
+s3_get_effective_port(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   // Server port overrides if explicitly set (non-zero)
+   if (srv != NULL && srv->s3.port != 0)
+   {
+      return srv->s3.port;
+   }
+
+   // Fallback to global configuration
+   return config->s3.port;
+}
+
+/**
+ * Get the effective S3 TLS setting for a server
+ * Server-specific TLS setting overrides global if S3 is configured at server level
+ *
+ * @param server The server index
+ * @return The effective S3 TLS setting
+ */
+static bool
+s3_get_effective_use_tls(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   // If server has S3 configuration (port or endpoint), use server TLS setting
+   if (srv != NULL && (srv->s3.port != 0 || strlen(srv->s3.endpoint) > 0))
+   {
+      return srv->s3.use_tls;
+   }
+
+   // Fallback to global configuration
+   return config->s3.use_tls;
+}
+
+/**
+ * Get the effective S3 storage class for a server
+ * Server-specific storage class overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 storage class (do not free)
+ */
+static char*
+s3_get_effective_storage_class(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   // Server storage class overrides if set
+   if (srv != NULL && strlen(srv->s3.storage_class) > 0)
+   {
+      return srv->s3.storage_class;
+   }
+
+   // Fallback to global configuration
+   return config->s3.storage_class;
+}
+
+/**
+ * Get the effective S3 endpoint for a server
+ * Server-specific endpoint overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 endpoint (do not free)
+ */
+static char*
+s3_get_effective_endpoint(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   // Server endpoint overrides if set
+   if (srv != NULL && strlen(srv->s3.endpoint) > 0)
+   {
+      return srv->s3.endpoint;
+   }
+
+   // Fallback to global configuration
+   return config->s3.endpoint;
+}
+
+/**
+ * Get the effective S3 region for a server
+ * Server-specific region overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 region (do not free)
+ */
+static char*
+s3_get_effective_region(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   if (srv != NULL && strlen(srv->s3.region) > 0)
+   {
+      return srv->s3.region;
+   }
+
+   return config->s3.region;
+}
+
+/**
+ * Get the effective S3 access key ID for a server
+ * Server-specific access key overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 access key ID (do not free)
+ */
+static char*
+s3_get_effective_access_key_id(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   if (srv != NULL && strlen(srv->s3.access_key_id) > 0)
+   {
+      return srv->s3.access_key_id;
+   }
+
+   return config->s3.access_key_id;
+}
+
+/**
+ * Get the effective S3 secret access key for a server
+ * Server-specific secret key overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 secret access key (do not free)
+ */
+static char*
+s3_get_effective_secret_access_key(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   if (srv != NULL && strlen(srv->s3.secret_access_key) > 0)
+   {
+      return srv->s3.secret_access_key;
+   }
+
+   return config->s3.secret_access_key;
+}
+
+/**
+ * Get the effective S3 bucket for a server
+ * Server-specific bucket overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 bucket (do not free)
+ */
+static char*
+s3_get_effective_bucket(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   if (srv != NULL && strlen(srv->s3.bucket) > 0)
+   {
+      return srv->s3.bucket;
+   }
+
+   return config->s3.bucket;
+}
+
+/**
+ * Get the effective S3 base directory for a server
+ * Server-specific base dir overrides global if set (non-empty)
+ *
+ * @param server The server index
+ * @return The effective S3 base directory (do not free)
+ */
+static char*
+s3_get_effective_base_dir(int server)
+{
+   struct main_configuration* config;
+   struct server* srv;
+
+   config = (struct main_configuration*)shmem;
+   srv = &config->common.servers[server];
+
+   if (srv != NULL && strlen(srv->s3.base_dir) > 0)
+   {
+      return srv->s3.base_dir;
+   }
+
+   return config->s3.base_dir;
+}
+
+/**
+ * Get the S3 host for a server using effective configuration
+ *
+ * @param server The server index
+ * @return The S3 host (caller must free)
+ */
+static char*
+s3_get_host(int server)
+{
+   char* host = NULL;
+   char* endpoint = NULL;
+   char* effective_endpoint;
+   char* effective_bucket;
+   char* effective_region;
+
+   effective_endpoint = s3_get_effective_endpoint(server);
+   effective_bucket = s3_get_effective_bucket(server);
+   effective_region = s3_get_effective_region(server);
+
+   if (strlen(effective_endpoint) > 0)
+   {
+      endpoint = effective_endpoint;
+      if (!strncmp(endpoint, "http://", 7))
+      {
+         endpoint += 7;
+      }
+      else if (!strncmp(endpoint, "https://", 8))
+      {
+         endpoint += 8;
+      }
+      host = pgmoneta_append(host, endpoint);
+      return host;
+   }
+
+   host = pgmoneta_append(host, effective_bucket);
+   host = pgmoneta_append(host, ".s3.");
+   host = pgmoneta_append(host, effective_region);
+   host = pgmoneta_append(host, ".amazonaws.com");
+
+   return host;
+}
+
+/**
+ * Get the S3 base path for a server using effective configuration
+ *
+ * @param server The server index
+ * @param identifier The backup identifier
+ * @return The S3 base path (caller must free)
+ */
+static char*
+s3_get_basepath(int server, char* identifier)
+{
+   char* d = NULL;
+   struct main_configuration* config;
+   char* effective_endpoint;
+   char* effective_bucket;
+   char* effective_base_dir;
+
+   config = (struct main_configuration*)shmem;
+
+   effective_endpoint = s3_get_effective_endpoint(server);
+   effective_bucket = s3_get_effective_bucket(server);
+   effective_base_dir = s3_get_effective_base_dir(server);
+
+   if (strlen(effective_endpoint) > 0)
+   {
+      d = pgmoneta_append(d, effective_bucket);
+      d = pgmoneta_append(d, "/");
+   }
+
+   d = pgmoneta_append(d, effective_base_dir);
+   if (!pgmoneta_ends_with(effective_base_dir, "/"))
+   {
+      d = pgmoneta_append(d, "/");
+   }
+
+   d = pgmoneta_append(d, config->common.servers[server].name);
+   d = pgmoneta_append(d, "/backup/");
+   d = pgmoneta_append(d, identifier);
+
+   return d;
+}
+
+static int
+s3_storage_execute(char* name __attribute__((unused)), struct art* nodes)
+{
+   int server = -1;
+   char* label = NULL;
+   struct timespec start_t;
+   struct timespec end_t;
+   double remote_s3_elapsed_time;
+   char* local_root = NULL;
+   char* base_dir = NULL;
+   char* s3_root = NULL;
+   struct main_configuration* config;
+   struct backup* temp_backup = NULL;
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef DEBUG
+   pgmoneta_dump_art(nodes);
+
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("S3 storage engine (execute): %s/%s",
+                      config->common.servers[server].name, label);
+   pgmoneta_log_debug("S3 effective config: bucket=%s, region=%s, endpoint=%s",
+                      s3_get_effective_bucket(server),
+                      s3_get_effective_region(server),
+                      s3_get_effective_endpoint(server));
+
+   local_root = pgmoneta_get_server_backup_identifier(server, label);
+   base_dir = pgmoneta_get_server_backup(server);
+   s3_root = s3_get_basepath(server, label);
+
+   if (s3_upload_files(local_root, s3_root, "", server))
+   {
+      goto error;
+   }
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+   remote_s3_elapsed_time = pgmoneta_compute_duration(start_t, end_t);
+
+   if (pgmoneta_load_info(base_dir, label, &temp_backup))
+   {
+      goto error;
+   }
+
+   temp_backup->remote_s3_elapsed_time = remote_s3_elapsed_time;
+
+   if (pgmoneta_save_info(base_dir, temp_backup))
+   {
+      pgmoneta_log_error("Unable to save backup info for directory %s", base_dir);
+      goto error;
+   }
+
+   free(temp_backup);
+   free(local_root);
+   free(base_dir);
+   free(s3_root);
+
+   return 0;
+
+error:
+   free(temp_backup);
+   free(local_root);
+   free(base_dir);
+   free(s3_root);
+
+   return 1;
+}
+
+static int
+s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server)
 {
    char* local_path = NULL;
    char* relative_file;
@@ -243,7 +588,7 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path)
             snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
          }
 
-         s3_upload_files(local_root, s3_root, relative_dir);
+         s3_upload_files(local_root, s3_root, relative_dir, server);
       }
       else
       {
@@ -256,7 +601,7 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path)
          }
          relative_file = pgmoneta_append(relative_file, entry->d_name);
 
-         if (s3_send_upload_request(local_root, s3_root, relative_file))
+         if (s3_send_upload_request(local_root, s3_root, relative_file, server))
          {
             free(relative_file);
             goto error;
@@ -267,22 +612,19 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path)
    }
 
    closedir(dir);
-
    free(local_path);
 
    return 0;
 
 error:
-
    closedir(dir);
-
    free(local_path);
 
    return 1;
 }
 
 static int
-s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
+s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server)
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
@@ -309,12 +651,17 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    struct http* connection = NULL;
    struct http_request* request = NULL;
    struct http_response* response = NULL;
-   struct main_configuration* config;
    bool use_storage_class = false;
 
-   config = (struct main_configuration*)shmem;
+   char* effective_storage_class = s3_get_effective_storage_class(server);
+   char* effective_endpoint = s3_get_effective_endpoint(server);
+   char* effective_region = s3_get_effective_region(server);
+   char* effective_access_key_id = s3_get_effective_access_key_id(server);
+   char* effective_secret_access_key = s3_get_effective_secret_access_key(server);
+   int effective_port = s3_get_effective_port(server);
+   bool effective_use_tls = s3_get_effective_use_tls(server);
 
-   if (strlen(config->s3_storage_class) > 0 && strlen(config->s3_endpoint) == 0)
+   if (strlen(effective_storage_class) > 0 && strlen(effective_endpoint) == 0)
    {
       use_storage_class = true;
    }
@@ -349,7 +696,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    pgmoneta_create_sha256_file(local_path, &file_sha256);
 
-   s3_host = s3_get_host();
+   s3_host = s3_get_host(server);
 
    // Build canonical request
    canonical_request = pgmoneta_append(canonical_request, "PUT\n/");
@@ -363,14 +710,12 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    if (use_storage_class)
    {
-      // Add storage class to canonical request (for AWS)
       canonical_request = pgmoneta_append(canonical_request, "\nx-amz-storage-class:");
-      canonical_request = pgmoneta_append(canonical_request, config->s3_storage_class);
+      canonical_request = pgmoneta_append(canonical_request, effective_storage_class);
       canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-storage-class\n");
    }
    else
    {
-      // No storage class (works for both AWS and Cloudflare)
       canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
    }
 
@@ -383,34 +728,44 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    string_to_sign = pgmoneta_append(string_to_sign, "\n");
    string_to_sign = pgmoneta_append(string_to_sign, short_date);
    string_to_sign = pgmoneta_append(string_to_sign, "/");
-   string_to_sign = pgmoneta_append(string_to_sign, config->s3_region);
+   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
    string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
    string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
 
    key = pgmoneta_append(key, "AWS4");
-   key = pgmoneta_append(key, config->s3_secret_access_key);
+   key = pgmoneta_append(key, effective_secret_access_key);
 
-   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date,
+                                                 SHORT_TIME_LENGTH - 1,
+                                                 &date_key_hmac, &hmac_length))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, config->s3_region, strlen(config->s3_region), &date_region_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length,
+                                                 effective_region, strlen(effective_region),
+                                                 &date_region_key_hmac, &hmac_length))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length,
+                                                 "s3", strlen("s3"),
+                                                 &date_region_service_key_hmac, &hmac_length))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length,
+                                                 "aws4_request", strlen("aws4_request"),
+                                                 &signing_key_hmac, &hmac_length))
    {
       goto error;
    }
 
-   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length,
+                                                 string_to_sign, strlen(string_to_sign),
+                                                 &signature_hmac, &hmac_length))
    {
       goto error;
    }
@@ -419,11 +774,11 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    // Build authorization header with matching signed headers
    auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
-   auth_value = pgmoneta_append(auth_value, config->s3_access_key_id);
+   auth_value = pgmoneta_append(auth_value, effective_access_key_id);
    auth_value = pgmoneta_append(auth_value, "/");
    auth_value = pgmoneta_append(auth_value, short_date);
    auth_value = pgmoneta_append(auth_value, "/");
-   auth_value = pgmoneta_append(auth_value, config->s3_region);
+   auth_value = pgmoneta_append(auth_value, effective_region);
 
    if (use_storage_class)
    {
@@ -463,20 +818,20 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
 
    int s3_port;
 
-   if (config->s3_port != 0)
+   if (effective_port != 0)
    {
-      s3_port = config->s3_port;
+      s3_port = effective_port;
    }
    else
    {
-      s3_port = config->s3_use_tls ? 443 : 80;
+      s3_port = effective_use_tls ? 443 : 80;
    }
-   bool use_tls = config->s3_use_tls;
+
+   bool use_tls = effective_use_tls;
    if (s3_port == 443)
    {
       use_tls = true;
    }
-   // we can check the validity of a flag to another(port with the correct tls or not)
 
    if (pgmoneta_http_create(s3_host, s3_port, use_tls, &connection))
    {
@@ -491,7 +846,7 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
       goto error;
    }
 
-   if (s3_add_request_headers(request, auth_value, file_sha256, long_date, config->s3_storage_class))
+   if (s3_add_request_headers(request, auth_value, file_sha256, long_date, effective_storage_class))
    {
       goto error;
    }
@@ -542,12 +897,10 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path)
    return 0;
 
 error:
-
    free(s3_host);
    free(request_path);
    free(signature_hex);
    free(signature_hmac);
-
    free(signing_key_hmac);
    free(date_region_service_key_hmac);
    free(date_region_key_hmac);
@@ -583,86 +936,4 @@ error:
    }
 
    return 1;
-}
-
-static char*
-s3_get_host(void)
-{
-   char* host = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   char* endpoint = NULL;
-   if (strlen(config->s3_endpoint) > 0)
-   {
-      endpoint = config->s3_endpoint;
-      if (!strncmp(endpoint, "http://", 7))
-      {
-         endpoint += 7;
-      }
-      else if (!strncmp(endpoint, "https://", 8))
-      {
-         endpoint += 8;
-      }
-      host = pgmoneta_append(host, endpoint);
-      return host;
-   }
-   host = pgmoneta_append(host, config->s3_bucket);
-   host = pgmoneta_append(host, ".s3.");
-   host = pgmoneta_append(host, config->s3_region);
-   host = pgmoneta_append(host, ".amazonaws.com");
-
-   return host;
-}
-
-static char*
-s3_get_basepath(int server, char* identifier)
-{
-   char* d = NULL;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   if (strlen(config->s3_endpoint) > 0)
-   {
-      d = pgmoneta_append(d, config->s3_bucket);
-      d = pgmoneta_append(d, "/");
-   }
-   d = pgmoneta_append(d, config->s3_base_dir);
-   if (!pgmoneta_ends_with(config->s3_base_dir, "/"))
-   {
-      d = pgmoneta_append(d, "/");
-   }
-   d = pgmoneta_append(d, config->common.servers[server].name);
-   d = pgmoneta_append(d, "/backup/");
-   d = pgmoneta_append(d, identifier);
-
-   return d;
-}
-
-static int
-s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class)
-{
-   if (pgmoneta_http_request_add_header(request, "Authorization", auth_value))
-   {
-      return 1;
-   }
-
-   if (pgmoneta_http_request_add_header(request, "x-amz-content-sha256", file_sha256))
-   {
-      return 1;
-   }
-
-   if (pgmoneta_http_request_add_header(request, "x-amz-date", long_date))
-   {
-      return 1;
-   }
-
-   if (strlen(storage_class) && pgmoneta_http_request_add_header(request, "x-amz-storage-class", storage_class))
-   {
-      return 1;
-   }
-
-   return 0;
 }
