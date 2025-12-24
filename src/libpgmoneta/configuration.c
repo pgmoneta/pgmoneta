@@ -1,44 +1,46 @@
 /*
  * Copyright (C) 2025 The pgmoneta community
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or other
- * materials provided with the distribution.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
- * 3. Neither the name of the copyright holder nor the names of its contributors may
- * be used to endorse or promote products derived from this software without specific
- * prior written permission.
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
- * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 /* pgmoneta */
-#include <pgmoneta.h>
 #include <aes.h>
 #include <configuration.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>
+#include <pgmoneta.h>
 #include <security.h>
 #include <shmem.h>
 #include <tablespace.h>
+#include <utf8.h>
 #include <utils.h>
 #include <value.h>
-#include <utf8.h>
 
 /* system */
 #include <ctype.h>
@@ -50,9 +52,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 #ifdef HAVE_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
@@ -72,15 +74,19 @@ static int as_compression(char* str);
 static int as_storage_engine(char* str);
 static char* as_ciphers(char* str);
 static int as_encryption_mode(char* str);
-static unsigned int as_update_process_title(char* str, unsigned int default_policy);
+static unsigned int as_update_process_title(char* str,
+                                            unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
 static int as_seconds(char* str, int* age, int default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
-static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
+static int as_retention(char* str, int* days, int* weeks, int* months,
+                        int* years);
 static int as_create_slot(char* str, int* create_slot);
-static char* get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year);
+static char* get_retention_string(int rt_days, int rt_weeks, int rt_months,
+                                  int rt_year);
 
-static bool transfer_configuration(struct main_configuration* config, struct main_configuration* reload);
+static bool transfer_configuration(struct main_configuration* config,
+                                   struct main_configuration* reload);
 static int copy_server(struct server* dst, struct server* src);
 static void copy_user(struct user* dst, struct user* src);
 static int restart_bool(char* name, bool e, bool n);
@@ -90,15 +96,22 @@ static int restart_string(char* name, char* e, char* n);
 static void add_configuration_response(struct json* res);
 static void add_servers_configuration_response(struct json* res);
 
-static int apply_configuration(char* config_key, char* config_value, struct config_key_info* key_info, bool* restart_required);
-static int apply_main_configuration(struct main_configuration* config, struct server* srv, char* section, char* key, char* value);
-static int write_config_value(char* buffer, char* config_key, size_t buffer_size);
-static bool is_valid_config_key(const char* config_key, struct config_key_info* key_info);
+static int apply_configuration(char* config_key, char* config_value,
+                               struct config_key_info* key_info,
+                               bool* restart_required);
+static int apply_main_configuration(struct main_configuration* config,
+                                    struct server* srv, char* section,
+                                    char* key, char* value);
+static int write_config_value(char* buffer, char* config_key,
+                              size_t buffer_size);
+static bool is_valid_config_key(const char* config_key,
+                                struct config_key_info* key_info);
 static bool is_empty_string(char* s);
 static int remove_leading_whitespace_and_comments(char* s, char** trimmed_line);
 static bool pgmoneta_is_binary_file(const char* path);
 
-static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count);
+static void split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH],
+                        int* count);
 
 /**
  *
@@ -259,7 +272,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (idx_server > 0 && idx_server <= NUMBER_OF_SERVERS)
                   {
-                     memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
+                     memcpy(&(config->common.servers[idx_server - 1]), &srv,
+                            sizeof(struct server));
                   }
                   else if (idx_server > NUMBER_OF_SERVERS)
                   {
@@ -295,7 +309,17 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
          }
          else
          {
-            if (pgmoneta_starts_with(trimmed_line, "unix_socket_dir") || pgmoneta_starts_with(trimmed_line, "base_dir") || pgmoneta_starts_with(trimmed_line, "workspace") || pgmoneta_starts_with(trimmed_line, "ssh_base_dir") || pgmoneta_starts_with(trimmed_line, "ssh_private_key_file") || pgmoneta_starts_with(trimmed_line, "ssh_public_key_file") || pgmoneta_starts_with(trimmed_line, "log_path") || pgmoneta_starts_with(trimmed_line, "tls_cert_file") || pgmoneta_starts_with(trimmed_line, "tls_key_file") || pgmoneta_starts_with(trimmed_line, "tls_ca_file") || pgmoneta_starts_with(trimmed_line, "pidfile"))
+            if (pgmoneta_starts_with(trimmed_line, "unix_socket_dir") ||
+                pgmoneta_starts_with(trimmed_line, "base_dir") ||
+                pgmoneta_starts_with(trimmed_line, "workspace") ||
+                pgmoneta_starts_with(trimmed_line, "ssh_base_dir") ||
+                pgmoneta_starts_with(trimmed_line, "ssh_private_key_file") ||
+                pgmoneta_starts_with(trimmed_line, "ssh_public_key_file") ||
+                pgmoneta_starts_with(trimmed_line, "log_path") ||
+                pgmoneta_starts_with(trimmed_line, "tls_cert_file") ||
+                pgmoneta_starts_with(trimmed_line, "tls_key_file") ||
+                pgmoneta_starts_with(trimmed_line, "tls_ca_file") ||
+                pgmoneta_starts_with(trimmed_line, "pidfile"))
             {
                extract_syskey_value(trimmed_line, &key, &value);
             }
@@ -545,7 +569,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      if (token != NULL)
                      {
-                        warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                        warnx("Hot standby configuration for server '%s' contains more "
+                              "than %d directories. Only the first %d will be used.",
+                              section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
                      srv.number_of_hot_standbys = count;
@@ -584,7 +610,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      if (token != NULL)
                      {
-                        warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                        warnx("Hot standby configuration for server '%s' contains more "
+                              "than %d directories. Only the first %d will be used.",
+                              section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
                   }
@@ -622,7 +650,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      }
                      if (token != NULL)
                      {
-                        warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
+                        warnx("Hot standby configuration for server '%s' contains more "
+                              "than %d directories. Only the first %d will be used.",
+                              section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
                   }
@@ -842,7 +872,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->blocking_timeout, DEFAULT_BLOCKING_TIMEOUT))
+                     if (as_seconds(value, &config->blocking_timeout,
+                                    DEFAULT_BLOCKING_TIMEOUT))
                      {
                         unknown = true;
                      }
@@ -872,7 +903,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->update_process_title = as_update_process_title(value, UPDATE_PROCESS_TITLE_VERBOSE);
+                     config->update_process_title =
+                        as_update_process_title(value, UPDATE_PROCESS_TITLE_VERBOSE);
                   }
                   else
                   {
@@ -942,7 +974,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_logging_rotation_size(value, &config->common.log_rotation_size))
+                     if (as_logging_rotation_size(value,
+                                                  &config->common.log_rotation_size))
                      {
                         unknown = true;
                      }
@@ -956,7 +989,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
+                     if (as_seconds(value, &config->common.log_rotation_age,
+                                    PGMONETA_LOGGING_ROTATION_DISABLED))
                      {
                         unknown = true;
                      }
@@ -1228,11 +1262,39 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
+               else if (!strcmp(key, "s3_port"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &(config->s3.port)))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_int(value, &(srv.s3.port)))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
                else if (!strcmp(key, "s3_use_tls"))
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_bool(value, &config->s3_use_tls))
+                     if (as_bool(value, &(config->s3.use_tls)))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_bool(value, &(srv.s3.use_tls)))
                      {
                         unknown = true;
                      }
@@ -1251,21 +1313,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_storage_class, value, max);
+                     memcpy(config->s3.storage_class, value, max);
                   }
-                  else
+                  else if (strlen(section) > 0)
                   {
-                     unknown = true;
-                  }
-               }
-               else if (!strcmp(key, "s3_port"))
-               {
-                  if (!strcmp(section, "pgmoneta"))
-                  {
-                     if (as_int(value, &config->s3_port))
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
                      {
-                        unknown = true;
+                        max = MISC_LENGTH - 1;
                      }
+                     memcpy(srv.s3.storage_class, value, max);
                   }
                   else
                   {
@@ -1281,7 +1338,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_endpoint, value, max);
+                     memcpy(config->s3.endpoint, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.endpoint, value, max);
                   }
                   else
                   {
@@ -1297,7 +1363,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_region, value, max);
+                     memcpy(config->s3.region, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.region, value, max);
                   }
                   else
                   {
@@ -1313,7 +1388,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_access_key_id, value, max);
+                     memcpy(config->s3.access_key_id, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.access_key_id, value, max);
                   }
                   else
                   {
@@ -1329,7 +1413,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_secret_access_key, value, max);
+                     memcpy(config->s3.secret_access_key, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.secret_access_key, value, max);
                   }
                   else
                   {
@@ -1345,7 +1438,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_bucket, value, max);
+                     memcpy(config->s3.bucket, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.bucket, value, max);
                   }
                   else
                   {
@@ -1361,7 +1463,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MAX_PATH - 1;
                      }
-                     memcpy(config->s3_base_dir, value, max);
+                     memcpy(config->s3.base_dir, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(srv.s3.base_dir, value, max);
                   }
                   else
                   {
@@ -1472,10 +1583,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      config->retention_weeks = -1;
                      config->retention_months = -1;
                      config->retention_years = -1;
-                     if (as_retention(value, &config->retention_days,
-                                      &config->retention_weeks,
-                                      &config->retention_months,
-                                      &config->retention_years))
+                     if (as_retention(
+                            value, &config->retention_days, &config->retention_weeks,
+                            &config->retention_months, &config->retention_years))
                      {
                         unknown = true;
                      }
@@ -1486,10 +1596,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      srv.retention_weeks = -1;
                      srv.retention_months = -1;
                      srv.retention_years = -1;
-                     if (as_retention(value, &srv.retention_days,
-                                      &srv.retention_weeks,
-                                      &srv.retention_months,
-                                      &srv.retention_years))
+                     if (as_retention(value, &srv.retention_days, &srv.retention_weeks,
+                                      &srv.retention_months, &srv.retention_years))
                      {
                         unknown = true;
                      }
@@ -1615,7 +1723,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
 
                if (unknown)
                {
-                  warnx("Unknown: Section=%s, Key=%s, Value=%s", strlen(section) > 0 ? section : "<unknown>", key, value);
+                  warnx("Unknown: Section=%s, Key=%s, Value=%s",
+                        strlen(section) > 0 ? section : "<unknown>", key, value);
                }
 
                free(key);
@@ -1625,7 +1734,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
             }
             else
             {
-               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
+               warnx("Unknown: Section=%s, Line=%s",
+                     strlen(section) > 0 ? section : "<unknown>", line);
 
                free(key);
                free(value);
@@ -1640,7 +1750,8 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
 
    if (strlen(srv.name) > 0)
    {
-      memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
+      memcpy(&(config->common.servers[idx_server - 1]), &srv,
+             sizeof(struct server));
    }
 
    config->common.number_of_servers = idx_server;
@@ -1692,7 +1803,8 @@ pgmoneta_validate_main_configuration(void* shm)
    }
    else
    {
-      pgmoneta_log_fatal("unix_socket_dir is not a directory (%s)", config->unix_socket_dir);
+      pgmoneta_log_fatal("unix_socket_dir is not a directory (%s)",
+                         config->unix_socket_dir);
       return 1;
    }
 
@@ -1725,7 +1837,8 @@ pgmoneta_validate_main_configuration(void* shm)
 
    if (config->retention_years != -1 && config->retention_years < 1)
    {
-      pgmoneta_log_fatal("%d is an invalid year configuration", config->retention_years);
+      pgmoneta_log_fatal("%d is an invalid year configuration",
+                         config->retention_years);
       return 1;
    }
    if (config->retention_months != -1)
@@ -1734,13 +1847,15 @@ pgmoneta_validate_main_configuration(void* shm)
       {
          if (config->retention_months < 1 || config->retention_months > 12)
          {
-            pgmoneta_log_fatal("%d is an invalid month configuration", config->retention_months);
+            pgmoneta_log_fatal("%d is an invalid month configuration",
+                               config->retention_months);
             return 1;
          }
       }
       else if (config->retention_months < 1)
       {
-         pgmoneta_log_fatal("%d is an invalid month configuration", config->retention_months);
+         pgmoneta_log_fatal("%d is an invalid month configuration",
+                            config->retention_months);
          return 1;
       }
    }
@@ -1751,13 +1866,15 @@ pgmoneta_validate_main_configuration(void* shm)
       {
          if (config->retention_weeks < 1 || config->retention_weeks > 4)
          {
-            pgmoneta_log_fatal("%d is an invalid week configuration", config->retention_weeks);
+            pgmoneta_log_fatal("%d is an invalid week configuration",
+                               config->retention_weeks);
             return 1;
          }
       }
       else if (config->retention_weeks < 1)
       {
-         pgmoneta_log_fatal("%d is an invalid week configuration", config->retention_weeks);
+         pgmoneta_log_fatal("%d is an invalid week configuration",
+                            config->retention_weeks);
          return 1;
       }
    }
@@ -1783,7 +1900,8 @@ pgmoneta_validate_main_configuration(void* shm)
       return 1;
    }
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP ||
+       config->compression_type == COMPRESSION_SERVER_GZIP)
    {
       if (config->compression_level < 1)
       {
@@ -1794,7 +1912,8 @@ pgmoneta_validate_main_configuration(void* shm)
          config->compression_level = 9;
       }
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD ||
+            config->compression_type == COMPRESSION_SERVER_ZSTD)
    {
       if (config->compression_level < -131072)
       {
@@ -1805,7 +1924,8 @@ pgmoneta_validate_main_configuration(void* shm)
          config->compression_level = 22;
       }
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 ||
+            config->compression_type == COMPRESSION_SERVER_LZ4)
    {
       if (config->compression_level < 1)
       {
@@ -1837,7 +1957,8 @@ pgmoneta_validate_main_configuration(void* shm)
    {
       if (!pgmoneta_exists(config->metrics_cert_file))
       {
-         pgmoneta_log_error("metrics cert file does not exist, falling back to plain HTTP");
+         pgmoneta_log_error(
+            "metrics cert file does not exist, falling back to plain HTTP");
          memset(config->metrics_cert_file, 0, sizeof(config->metrics_cert_file));
          memset(config->metrics_key_file, 0, sizeof(config->metrics_key_file));
          memset(config->metrics_ca_file, 0, sizeof(config->metrics_ca_file));
@@ -1848,7 +1969,8 @@ pgmoneta_validate_main_configuration(void* shm)
    {
       if (!pgmoneta_exists(config->metrics_key_file))
       {
-         pgmoneta_log_error("metrics key file does not exist, falling back to plain HTTP");
+         pgmoneta_log_error(
+            "metrics key file does not exist, falling back to plain HTTP");
          memset(config->metrics_cert_file, 0, sizeof(config->metrics_cert_file));
          memset(config->metrics_key_file, 0, sizeof(config->metrics_key_file));
          memset(config->metrics_ca_file, 0, sizeof(config->metrics_ca_file));
@@ -1859,7 +1981,8 @@ pgmoneta_validate_main_configuration(void* shm)
    {
       if (!pgmoneta_exists(config->metrics_ca_file))
       {
-         pgmoneta_log_error("metrics ca file does not exist, falling back to plain HTTP");
+         pgmoneta_log_error(
+            "metrics ca file does not exist, falling back to plain HTTP");
          memset(config->metrics_cert_file, 0, sizeof(config->metrics_cert_file));
          memset(config->metrics_key_file, 0, sizeof(config->metrics_key_file));
          memset(config->metrics_ca_file, 0, sizeof(config->metrics_ca_file));
@@ -1876,7 +1999,8 @@ pgmoneta_validate_main_configuration(void* shm)
 
       if (!strlen(config->ssh_public_key_file))
       {
-         pgmoneta_log_debug("ssh_public_key_file is not specified, falling back to '${HOME}/.ssh/id_rsa.pub");
+         pgmoneta_log_debug("ssh_public_key_file is not specified, falling back "
+                            "to '${HOME}/.ssh/id_rsa.pub");
          if (pgmoneta_resolve_path("$HOME/.ssh/id_rsa.pub", &buf))
          {
             pgmoneta_log_fatal("Failed to resolve ~/.ssh/id_rsa.pub");
@@ -1892,7 +2016,8 @@ pgmoneta_validate_main_configuration(void* shm)
 
       if (!strlen(config->ssh_private_key_file))
       {
-         pgmoneta_log_debug("ssh_private_key_file is not specified, falling back to '${HOME}/.ssh/id_rsa");
+         pgmoneta_log_debug("ssh_private_key_file is not specified, falling back "
+                            "to '${HOME}/.ssh/id_rsa");
          if (pgmoneta_resolve_path("$HOME/.ssh/id_rsa", &buf))
          {
             pgmoneta_log_fatal("Failed to resolve ~/.ssh/id_rsa");
@@ -1908,12 +2033,14 @@ pgmoneta_validate_main_configuration(void* shm)
 
       if (!pgmoneta_exists(config->ssh_public_key_file))
       {
-         pgmoneta_log_fatal("ssh_public_key_file does not exist: %s", config->ssh_public_key_file);
+         pgmoneta_log_fatal("ssh_public_key_file does not exist: %s",
+                            config->ssh_public_key_file);
          return 1;
       }
       if (!pgmoneta_exists(config->ssh_private_key_file))
       {
-         pgmoneta_log_fatal("ssh_private_key_file does not exist: %s", config->ssh_private_key_file);
+         pgmoneta_log_fatal("ssh_private_key_file does not exist: %s",
+                            config->ssh_private_key_file);
          return 1;
       }
    }
@@ -1934,25 +2061,29 @@ pgmoneta_validate_main_configuration(void* shm)
 
       if (strlen(config->common.servers[i].host) == 0)
       {
-         pgmoneta_log_fatal("No host defined for %s", config->common.servers[i].name);
+         pgmoneta_log_fatal("No host defined for %s",
+                            config->common.servers[i].name);
          return 1;
       }
 
       if (config->common.servers[i].port == 0)
       {
-         pgmoneta_log_fatal("No port defined for %s", config->common.servers[i].name);
+         pgmoneta_log_fatal("No port defined for %s",
+                            config->common.servers[i].name);
          return 1;
       }
 
       if (strlen(config->common.servers[i].username) == 0)
       {
-         pgmoneta_log_fatal("No user defined for %s", config->common.servers[i].name);
+         pgmoneta_log_fatal("No user defined for %s",
+                            config->common.servers[i].name);
          return 1;
       }
 
       if (strlen(config->common.servers[i].wal_slot) == 0)
       {
-         pgmoneta_log_fatal("No WAL slot defined for %s", config->common.servers[i].name);
+         pgmoneta_log_fatal("No WAL slot defined for %s",
+                            config->common.servers[i].name);
          return 1;
       }
 
@@ -1961,7 +2092,8 @@ pgmoneta_validate_main_configuration(void* shm)
          found = false;
          for (int j = 0; !found && j < config->common.number_of_servers; j++)
          {
-            if (!strcmp(config->common.servers[i].follow, config->common.servers[j].name))
+            if (!strcmp(config->common.servers[i].follow,
+                        config->common.servers[j].name))
             {
                found = true;
             }
@@ -1969,7 +2101,8 @@ pgmoneta_validate_main_configuration(void* shm)
 
          if (!found)
          {
-            pgmoneta_log_fatal("Invalid follow value for %s", config->common.servers[i].name);
+            pgmoneta_log_fatal("Invalid follow value for %s",
+                               config->common.servers[i].name);
             return 1;
          }
       }
@@ -2072,7 +2205,8 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
                {
                   if (idx_server == 1)
                   {
-                     memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
+                     memcpy(&(config->common.servers[idx_server - 1]), &srv,
+                            sizeof(struct server));
                   }
                   else if (idx_server > 1)
                   {
@@ -2205,7 +2339,8 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
 
                if (unknown)
                {
-                  warnx("Unknown: Section=%s, Key=%s, Value=%s", strlen(section) > 0 ? section : "<unknown>", key, value);
+                  warnx("Unknown: Section=%s, Key=%s, Value=%s",
+                        strlen(section) > 0 ? section : "<unknown>", key, value);
                }
 
                free(key);
@@ -2215,7 +2350,8 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
             }
             else
             {
-               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
+               warnx("Unknown: Section=%s, Line=%s",
+                     strlen(section) > 0 ? section : "<unknown>", line);
             }
          }
       }
@@ -2225,7 +2361,8 @@ pgmoneta_read_walinfo_configuration(void* shmem, char* filename)
 
    if (strlen(srv.name) > 0)
    {
-      memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
+      memcpy(&(config->common.servers[idx_server - 1]), &srv,
+             sizeof(struct server));
    }
 
    config->common.number_of_servers = idx_server;
@@ -2332,7 +2469,8 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
                {
                   if (idx_server == 1)
                   {
-                     memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
+                     memcpy(&(config->common.servers[idx_server - 1]), &srv,
+                            sizeof(struct server));
                   }
                   else if (idx_server > 1)
                   {
@@ -2465,7 +2603,8 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
 
                if (unknown)
                {
-                  warnx("Unknown: Section=%s, Key=%s, Value=%s", strlen(section) > 0 ? section : "<unknown>", key, value);
+                  warnx("Unknown: Section=%s, Key=%s, Value=%s",
+                        strlen(section) > 0 ? section : "<unknown>", key, value);
                }
 
                free(key);
@@ -2475,7 +2614,8 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
             }
             else
             {
-               warnx("Unknown: Section=%s, Line=%s", strlen(section) > 0 ? section : "<unknown>", line);
+               warnx("Unknown: Section=%s, Line=%s",
+                     strlen(section) > 0 ? section : "<unknown>", line);
             }
          }
       }
@@ -2485,7 +2625,8 @@ pgmoneta_read_walfilter_configuration(void* shmem, char* filename)
 
    if (strlen(srv.name) > 0)
    {
-      memcpy(&(config->common.servers[idx_server - 1]), &srv, sizeof(struct server));
+      memcpy(&(config->common.servers[idx_server - 1]), &srv,
+             sizeof(struct server));
    }
 
    config->common.number_of_servers = idx_server;
@@ -2579,12 +2720,14 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
             goto error;
          }
 
-         if (pgmoneta_base64_decode(ptr, strlen(ptr), (void**)&decoded, &decoded_length))
+         if (pgmoneta_base64_decode(ptr, strlen(ptr), (void**)&decoded,
+                                    &decoded_length))
          {
             goto error;
          }
 
-         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
+         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password,
+                              ENCRYPTION_AES_256_CBC))
          {
             goto error;
          }
@@ -2592,7 +2735,9 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
          // Validate password is valid UTF-8
          if (!pgmoneta_utf8_valid((unsigned char*)password, strlen(password)))
          {
-            printf("pgmoneta: Invalid USER entry: invalid UTF-8 password for user '%s'\n", username);
+            printf("pgmoneta: Invalid USER entry: invalid UTF-8 password for user "
+                   "'%s'\n",
+                   username);
             printf("%s\n", line);
             free(password);
             free(decoded);
@@ -2602,19 +2747,23 @@ pgmoneta_read_users_configuration(void* shm, char* filename)
          }
 
          // Check character length
-         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
+         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password,
+                                                       strlen(password));
          if (strlen(username) < MAX_USERNAME_LENGTH &&
-             strlen(password) < MAX_PASSWORD_LENGTH &&
-             char_count != (size_t)-1 && char_count <= MAX_PASSWORD_CHARS)
+             strlen(password) < MAX_PASSWORD_LENGTH && char_count != (size_t)-1 &&
+             char_count <= MAX_PASSWORD_CHARS)
          {
-            memcpy(&config->common.users[index].username, username, strlen(username));
-            memcpy(&config->common.users[index].password, password, strlen(password));
+            memcpy(&config->common.users[index].username, username,
+                   strlen(username));
+            memcpy(&config->common.users[index].password, password,
+                   strlen(password));
          }
          else
          {
             if (char_count > MAX_PASSWORD_CHARS)
             {
-               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)", username, char_count);
+               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)",
+                                 username, char_count);
             }
             printf("pgmoneta: Invalid USER entry\n");
             printf("%s\n", line);
@@ -2709,7 +2858,8 @@ pgmoneta_validate_users_configuration(void* shm)
 
       for (int j = 0; !found && j < config->common.number_of_users; j++)
       {
-         if (!strcmp(config->common.servers[i].username, config->common.users[j].username))
+         if (!strcmp(config->common.servers[i].username,
+                     config->common.users[j].username))
          {
             found = true;
          }
@@ -2717,7 +2867,9 @@ pgmoneta_validate_users_configuration(void* shm)
 
       if (!found)
       {
-         pgmoneta_log_fatal("Unknown user (\'%s\') defined for %s", config->common.servers[i].username, config->common.servers[i].name);
+         pgmoneta_log_fatal("Unknown user (\'%s\') defined for %s",
+                            config->common.servers[i].username,
+                            config->common.servers[i].name);
          return 1;
       }
    }
@@ -2787,12 +2939,14 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
             goto error;
          }
 
-         if (pgmoneta_base64_decode(ptr, strlen(ptr), (void**)&decoded, &decoded_length))
+         if (pgmoneta_base64_decode(ptr, strlen(ptr), (void**)&decoded,
+                                    &decoded_length))
          {
             goto error;
          }
 
-         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password, ENCRYPTION_AES_256_CBC))
+         if (pgmoneta_decrypt(decoded, decoded_length, master_key, &password,
+                              ENCRYPTION_AES_256_CBC))
          {
             goto error;
          }
@@ -2800,7 +2954,9 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
          // Validate password is valid UTF-8
          if (!pgmoneta_utf8_valid((unsigned char*)password, strlen(password)))
          {
-            printf("pgmoneta: Invalid ADMIN entry: invalid UTF-8 password for user '%s'\n", username);
+            printf("pgmoneta: Invalid ADMIN entry: invalid UTF-8 password for user "
+                   "'%s'\n",
+                   username);
             printf("%s\n", line);
             free(password);
             free(decoded);
@@ -2810,19 +2966,23 @@ pgmoneta_read_admins_configuration(void* shm, char* filename)
          }
 
          // Check character length
-         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password, strlen(password));
+         size_t char_count = pgmoneta_utf8_char_length((unsigned char*)password,
+                                                       strlen(password));
          if (strlen(username) < MAX_USERNAME_LENGTH &&
-             strlen(password) < MAX_PASSWORD_LENGTH &&
-             char_count != (size_t)-1 && char_count <= MAX_PASSWORD_CHARS)
+             strlen(password) < MAX_PASSWORD_LENGTH && char_count != (size_t)-1 &&
+             char_count <= MAX_PASSWORD_CHARS)
          {
-            memcpy(&config->common.admins[index].username, username, strlen(username));
-            memcpy(&config->common.admins[index].password, password, strlen(password));
+            memcpy(&config->common.admins[index].username, username,
+                   strlen(username));
+            memcpy(&config->common.admins[index].password, password,
+                   strlen(password));
          }
          else
          {
             if (char_count > MAX_PASSWORD_CHARS)
             {
-               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)", username, char_count);
+               pgmoneta_log_warn("Password too long for user '%s' (%zu characters)",
+                                 username, char_count);
             }
             printf("pgmoneta: Invalid ADMIN entry\n");
             printf("%s\n", line);
@@ -2934,26 +3094,30 @@ pgmoneta_reload_configuration(bool* restart)
 
    reload_size = sizeof(struct main_configuration);
 
-   if (pgmoneta_create_shared_memory(reload_size, HUGEPAGE_OFF, (void**)&reload))
+   if (pgmoneta_create_shared_memory(reload_size, HUGEPAGE_OFF,
+                                     (void**)&reload))
    {
       goto error;
    }
 
    pgmoneta_init_main_configuration((void*)reload);
 
-   if (pgmoneta_read_main_configuration((void*)reload, config->common.configuration_path))
+   if (pgmoneta_read_main_configuration((void*)reload,
+                                        config->common.configuration_path))
    {
       goto error;
    }
 
-   if (pgmoneta_read_users_configuration((void*)reload, config->common.users_path))
+   if (pgmoneta_read_users_configuration((void*)reload,
+                                         config->common.users_path))
    {
       goto error;
    }
 
    if (strlen(config->common.admins_path) > 0)
    {
-      if (pgmoneta_read_admins_configuration((void*)reload, config->common.admins_path))
+      if (pgmoneta_read_admins_configuration((void*)reload,
+                                             config->common.admins_path))
       {
          goto error;
       }
@@ -3005,72 +3169,138 @@ add_configuration_response(struct json* res)
 
    config = (struct main_configuration*)shmem;
 
-   char* ret = get_retention_string(config->retention_days, config->retention_weeks, config->retention_months, config->retention_years);
+   char* ret =
+      get_retention_string(config->retention_days, config->retention_weeks,
+                           config->retention_months, config->retention_years);
    // JSON of main configuration
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->host, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR, (uintptr_t)config->unix_socket_dir, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BASE_DIR, (uintptr_t)config->base_dir, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS, (uintptr_t)config->metrics, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, (uintptr_t)config->metrics_cache_max_age, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE, (uintptr_t)config->metrics_cache_max_size, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANAGEMENT, (uintptr_t)config->management, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)config->compression_type, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL, (uintptr_t)config->compression_level, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)config->storage_engine, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->encryption, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->create_slot, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_HOSTNAME, (uintptr_t)config->ssh_hostname, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_USERNAME, (uintptr_t)config->ssh_username, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_BASE_DIR, (uintptr_t)config->ssh_base_dir, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_CIPHERS, (uintptr_t)config->ssh_ciphers, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PUBLIC_KEY_FILE, (uintptr_t)config->ssh_public_key_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PRIVATE_KEY_FILE, (uintptr_t)config->ssh_private_key_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_USE_TLS, (uintptr_t)config->s3_use_tls, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_STORAGE_CLASS, (uintptr_t)config->s3_storage_class, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ENDPOINT, (uintptr_t)config->s3_endpoint, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_PORT, (uintptr_t)config->s3_port, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_REGION, (uintptr_t)config->s3_region, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID, (uintptr_t)config->s3_access_key_id, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->s3_secret_access_key, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET, (uintptr_t)config->s3_bucket, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BASE_DIR, (uintptr_t)config->s3_base_dir, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_BASE_DIR, (uintptr_t)config->azure_base_dir, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_STORAGE_ACCOUNT, (uintptr_t)config->azure_storage_account, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_CONTAINER, (uintptr_t)config->azure_container, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY, (uintptr_t)config->azure_shared_key, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->workspace, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)config->common.log_type, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)config->common.log_level, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_PATH, (uintptr_t)config->common.log_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, (uintptr_t)config->common.log_rotation_age, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, (uintptr_t)config->common.log_rotation_size, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX, (uintptr_t)config->common.log_line_prefix, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)config->common.log_mode, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, (uintptr_t)config->blocking_timeout, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS, (uintptr_t)config->tls, ValueBool);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->tls_ca_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->tls_key_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CERT_FILE, (uintptr_t)config->metrics_cert_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_KEY_FILE, (uintptr_t)config->metrics_key_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CA_FILE, (uintptr_t)config->metrics_ca_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LIBEV, (uintptr_t)config->libev, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->backup_max_rate, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->network_max_rate, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_KEEP_ALIVE, (uintptr_t)config->common.keep_alive, ValueBool);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NODELAY, (uintptr_t)config->common.nodelay, ValueBool);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING, (uintptr_t)config->common.non_blocking, ValueBool);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKLOG, (uintptr_t)config->backlog, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HUGEPAGE, (uintptr_t)config->hugepage, ValueChar);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PIDFILE, (uintptr_t)config->pidfile, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UPDATE_PROCESS_TITLE, (uintptr_t)config->update_process_title, ValueUInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->common.configuration_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->common.users_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->common.admins_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_VERIFICATION, (uintptr_t)config->verification, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->host,
+                     ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR,
+                     (uintptr_t)config->unix_socket_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BASE_DIR,
+                     (uintptr_t)config->base_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS,
+                     (uintptr_t)config->metrics, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE,
+                     (uintptr_t)config->metrics_cache_max_age, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE,
+                     (uintptr_t)config->metrics_cache_max_size, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANAGEMENT,
+                     (uintptr_t)config->management, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION,
+                     (uintptr_t)config->compression_type, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL,
+                     (uintptr_t)config->compression_level, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS,
+                     (uintptr_t)config->workers, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE,
+                     (uintptr_t)config->storage_engine, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION,
+                     (uintptr_t)config->encryption, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CREATE_SLOT,
+                     (uintptr_t)config->create_slot, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_HOSTNAME,
+                     (uintptr_t)config->ssh_hostname, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_USERNAME,
+                     (uintptr_t)config->ssh_username, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_BASE_DIR,
+                     (uintptr_t)config->ssh_base_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_CIPHERS,
+                     (uintptr_t)config->ssh_ciphers, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PUBLIC_KEY_FILE,
+                     (uintptr_t)config->ssh_public_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PRIVATE_KEY_FILE,
+                     (uintptr_t)config->ssh_private_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_USE_TLS,
+                     (uintptr_t)config->s3.use_tls, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_STORAGE_CLASS,
+                     (uintptr_t)config->s3.storage_class, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ENDPOINT,
+                     (uintptr_t)config->s3.endpoint, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_PORT,
+                     (uintptr_t)config->s3.port, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_REGION,
+                     (uintptr_t)config->s3.region, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID,
+                     (uintptr_t)config->s3.access_key_id, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY,
+                     (uintptr_t)config->s3.secret_access_key, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET,
+                     (uintptr_t)config->s3.bucket, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BASE_DIR,
+                     (uintptr_t)config->s3.base_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_BASE_DIR,
+                     (uintptr_t)config->azure_base_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_STORAGE_ACCOUNT,
+                     (uintptr_t)config->azure_storage_account, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_CONTAINER,
+                     (uintptr_t)config->azure_container, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_SHARED_KEY,
+                     (uintptr_t)config->azure_shared_key, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKSPACE,
+                     (uintptr_t)config->workspace, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret,
+                     ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE,
+                     (uintptr_t)config->common.log_type, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL,
+                     (uintptr_t)config->common.log_level, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_PATH,
+                     (uintptr_t)config->common.log_path, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE,
+                     (uintptr_t)config->common.log_rotation_age, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE,
+                     (uintptr_t)config->common.log_rotation_size, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX,
+                     (uintptr_t)config->common.log_line_prefix, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_MODE,
+                     (uintptr_t)config->common.log_mode, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT,
+                     (uintptr_t)config->blocking_timeout, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS, (uintptr_t)config->tls,
+                     ValueBool);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE,
+                     (uintptr_t)config->tls_cert_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CA_FILE,
+                     (uintptr_t)config->tls_ca_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_KEY_FILE,
+                     (uintptr_t)config->tls_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CERT_FILE,
+                     (uintptr_t)config->metrics_cert_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_KEY_FILE,
+                     (uintptr_t)config->metrics_key_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CA_FILE,
+                     (uintptr_t)config->metrics_ca_file, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LIBEV, (uintptr_t)config->libev,
+                     ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE,
+                     (uintptr_t)config->backup_max_rate, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE,
+                     (uintptr_t)config->network_max_rate, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512",
+                     ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_KEEP_ALIVE,
+                     (uintptr_t)config->common.keep_alive, ValueBool);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NODELAY,
+                     (uintptr_t)config->common.nodelay, ValueBool);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING,
+                     (uintptr_t)config->common.non_blocking, ValueBool);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKLOG,
+                     (uintptr_t)config->backlog, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HUGEPAGE,
+                     (uintptr_t)config->hugepage, ValueChar);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PIDFILE,
+                     (uintptr_t)config->pidfile, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UPDATE_PROCESS_TITLE,
+                     (uintptr_t)config->update_process_title, ValueUInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH,
+                     (uintptr_t)config->common.configuration_path, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_USER_CONF_PATH,
+                     (uintptr_t)config->common.users_path, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH,
+                     (uintptr_t)config->common.admins_path, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_VERIFICATION,
+                     (uintptr_t)config->verification, ValueInt64);
 
    free(ret);
 }
@@ -3111,16 +3341,31 @@ add_servers_configuration_response(struct json* res)
                                  config->common.servers[i].retention_months,
                                  config->common.servers[i].retention_years);
 
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->common.servers[i].host, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PORT, (uintptr_t)config->common.servers[i].port, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_USER, (uintptr_t)config->common.servers[i].username, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SLOT, (uintptr_t)config->common.servers[i].wal_slot, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->common.servers[i].create_slot, ValueInt32);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_FOLLOW, (uintptr_t)config->common.servers[i].follow, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKSPACE, (uintptr_t)config->common.servers[i].workspace, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_RETENTION, (uintptr_t)ret, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING, (uintptr_t)config->common.servers[i].wal_shipping, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOST,
+                        (uintptr_t)config->common.servers[i].host, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PORT,
+                        (uintptr_t)config->common.servers[i].port, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_USER,
+                        (uintptr_t)config->common.servers[i].username,
+                        ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_ONLINE,
+                        (uintptr_t)config->common.servers[i].online, ValueBool);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SLOT,
+                        (uintptr_t)config->common.servers[i].wal_slot,
+                        ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_CREATE_SLOT,
+                        (uintptr_t)config->common.servers[i].create_slot,
+                        ValueInt32);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_FOLLOW,
+                        (uintptr_t)config->common.servers[i].follow, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKSPACE,
+                        (uintptr_t)config->common.servers[i].workspace,
+                        ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_RETENTION,
+                        (uintptr_t)ret, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WAL_SHIPPING,
+                        (uintptr_t)config->common.servers[i].wal_shipping,
+                        ValueString);
 
       // Compose hot_standby as comma-separated string
       for (j = 0; j < config->common.servers[i].number_of_hot_standbys; j++)
@@ -3129,31 +3374,54 @@ add_servers_configuration_response(struct json* res)
          {
             hot_standby = pgmoneta_append(hot_standby, ",");
          }
-         hot_standby = pgmoneta_append(hot_standby, config->common.servers[i].hot_standby[j]);
+         hot_standby = pgmoneta_append(hot_standby,
+                                       config->common.servers[i].hot_standby[j]);
       }
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)hot_standby, ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY,
+                        (uintptr_t)hot_standby, ValueString);
       free(hot_standby);
 
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES, (uintptr_t)config->common.servers[i].hot_standby_overrides, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->common.servers[i].hot_standby_tablespaces, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->common.servers[i].backup_max_rate, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->common.servers[i].network_max_rate, ValueInt64);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->common.servers[i].tls_cert_file, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->common.servers[i].tls_ca_file, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE, (uintptr_t)config->common.servers[i].tls_key_file, ValueString);
-      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_EXTRA, (uintptr_t)config->common.servers[i].extra, ValueString);
+      pgmoneta_json_put(
+         server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES,
+         (uintptr_t)config->common.servers[i].hot_standby_overrides,
+         ValueString);
+      pgmoneta_json_put(
+         server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES,
+         (uintptr_t)config->common.servers[i].hot_standby_tablespaces,
+         ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS,
+                        (uintptr_t)config->common.servers[i].workers, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE,
+                        (uintptr_t)config->common.servers[i].backup_max_rate,
+                        ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE,
+                        (uintptr_t)config->common.servers[i].network_max_rate,
+                        ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST,
+                        (uintptr_t)"SHA512", ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE,
+                        (uintptr_t)config->common.servers[i].tls_cert_file,
+                        ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE,
+                        (uintptr_t)config->common.servers[i].tls_ca_file,
+                        ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_KEY_FILE,
+                        (uintptr_t)config->common.servers[i].tls_key_file,
+                        ValueString);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_EXTRA,
+                        (uintptr_t)config->common.servers[i].extra, ValueString);
 
       // Add this server to the servers section using server name as key
-      pgmoneta_json_put(servers_section, config->common.servers[i].name, (uintptr_t)server_conf, ValueJSON);
+      pgmoneta_json_put(servers_section, config->common.servers[i].name,
+                        (uintptr_t)server_conf, ValueJSON);
 
       free(ret);
       server_conf = NULL;
    }
 
    // Add the servers section to the main response
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SERVER, (uintptr_t)servers_section, ValueJSON);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SERVER,
+                     (uintptr_t)servers_section, ValueJSON);
    return;
 
 error:
@@ -3181,7 +3449,8 @@ error:
 }
 
 void
-pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression,
+                  uint8_t encryption, struct json* payload)
 {
    char* en = NULL;
    int ec = -1;
@@ -3202,7 +3471,8 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
       ec = MANAGEMENT_ERROR_CONF_GET_ERROR;
-      pgmoneta_log_error("Conf Get: Error creating json object (%d)", MANAGEMENT_ERROR_CONF_GET_ERROR);
+      pgmoneta_log_error("Conf Get: Error creating json object (%d)",
+                         MANAGEMENT_ERROR_CONF_GET_ERROR);
       goto error;
    }
 
@@ -3215,7 +3485,8 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t,
+                                       compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_CONF_GET_NETWORK;
       pgmoneta_log_error("Conf Get: Error sending response");
@@ -3239,8 +3510,9 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
 error:
 
-   pgmoneta_management_response_error(ssl, client_fd, NULL, ec != -1 ? ec : MANAGEMENT_ERROR_CONF_GET_ERROR,
-                                      en != NULL ? en : NAME, compression, encryption, payload);
+   pgmoneta_management_response_error(
+      ssl, client_fd, NULL, ec != -1 ? ec : MANAGEMENT_ERROR_CONF_GET_ERROR,
+      en != NULL ? en : NAME, compression, encryption, payload);
 
    pgmoneta_json_destroy(payload);
 
@@ -3252,7 +3524,9 @@ error:
 }
 
 int
-pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required)
+pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression,
+                  uint8_t encryption, struct json* payload,
+                  bool* restart_required)
 {
    char* en = NULL;
    int ec = -1;
@@ -3279,21 +3553,27 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    *restart_required = false;
 
    // Extract config_key and config_value from request
-   request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   request =
+      (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    if (!request)
    {
       ec = MANAGEMENT_ERROR_CONF_SET_NOREQUEST;
-      pgmoneta_log_error("Conf Set: No request category found in payload (%d)", MANAGEMENT_ERROR_CONF_SET_NOREQUEST);
+      pgmoneta_log_error("Conf Set: No request category found in payload (%d)",
+                         MANAGEMENT_ERROR_CONF_SET_NOREQUEST);
       goto error;
    }
 
-   config_key = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_CONFIG_KEY);
-   config_value = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_CONFIG_VALUE);
+   config_key =
+      (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_CONFIG_KEY);
+   config_value =
+      (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_CONFIG_VALUE);
 
    if (!config_key || !config_value)
    {
       ec = MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE;
-      pgmoneta_log_error("Conf Set: No config key or config value in request (%d)", MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE);
+      pgmoneta_log_error(
+         "Conf Set: No config key or config value in request (%d)",
+         MANAGEMENT_ERROR_CONF_SET_NOCONFIG_KEY_OR_VALUE);
       goto error;
    }
 
@@ -3312,10 +3592,12 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    }
 
    // Apply configuration change
-   if (apply_configuration(config_key, config_value, &key_info, restart_required))
+   if (apply_configuration(config_key, config_value, &key_info,
+                           restart_required))
    {
       ec = MANAGEMENT_ERROR_CONF_SET_ERROR;
-      pgmoneta_log_error("Conf Set: Failed to apply configuration change %s=%s", config_key, config_value);
+      pgmoneta_log_error("Conf Set: Failed to apply configuration change %s=%s",
+                         config_key, config_value);
       goto error;
    }
 
@@ -3323,7 +3605,8 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    if (pgmoneta_management_create_response(payload, -1, &response))
    {
       ec = MANAGEMENT_ERROR_CONF_SET_ERROR;
-      pgmoneta_log_error("Conf Set: Error creating json object (%d)", MANAGEMENT_ERROR_CONF_SET_ERROR);
+      pgmoneta_log_error("Conf Set: Error creating json object (%d)",
+                         MANAGEMENT_ERROR_CONF_SET_ERROR);
       goto error;
    }
 
@@ -3337,26 +3620,42 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    if (*restart_required)
    {
       // Restart required - configuration not applied
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_STATUS, (uintptr_t)CONFIGURATION_STATUS_RESTART_REQUIRED, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_MESSAGE, (uintptr_t)CONFIGURATION_MESSAGE_RESTART_REQUIRED, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CONFIG_KEY, (uintptr_t)config_key, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_REQUESTED_VALUE, (uintptr_t)config_value, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CURRENT_VALUE, (uintptr_t)old_value, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_RESTART_REQUIRED, (uintptr_t)true, ValueBool);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_STATUS,
+                        (uintptr_t)CONFIGURATION_STATUS_RESTART_REQUIRED,
+                        ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_MESSAGE,
+                        (uintptr_t)CONFIGURATION_MESSAGE_RESTART_REQUIRED,
+                        ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CONFIG_KEY,
+                        (uintptr_t)config_key, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_REQUESTED_VALUE,
+                        (uintptr_t)config_value, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CURRENT_VALUE,
+                        (uintptr_t)old_value, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_RESTART_REQUIRED,
+                        (uintptr_t)true, ValueBool);
 
-      pgmoneta_log_info("Conf Set: Restart required for %s=%s. Current value: %s", config_key, config_value, old_value);
+      pgmoneta_log_info("Conf Set: Restart required for %s=%s. Current value: %s",
+                        config_key, config_value, old_value);
    }
    else
    {
       // Success - configuration applied
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_STATUS, (uintptr_t)CONFIGURATION_STATUS_SUCCESS, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_MESSAGE, (uintptr_t)CONFIGURATION_MESSAGE_SUCCESS, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CONFIG_KEY, (uintptr_t)config_key, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_OLD_VALUE, (uintptr_t)old_value, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_NEW_VALUE, (uintptr_t)new_value, ValueString);
-      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_RESTART_REQUIRED, (uintptr_t)false, ValueBool);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_STATUS,
+                        (uintptr_t)CONFIGURATION_STATUS_SUCCESS, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_MESSAGE,
+                        (uintptr_t)CONFIGURATION_MESSAGE_SUCCESS, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CONFIG_KEY,
+                        (uintptr_t)config_key, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_OLD_VALUE,
+                        (uintptr_t)old_value, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_NEW_VALUE,
+                        (uintptr_t)new_value, ValueString);
+      pgmoneta_json_put(response, CONFIGURATION_RESPONSE_RESTART_REQUIRED,
+                        (uintptr_t)false, ValueBool);
 
-      pgmoneta_log_info("Conf Set: Successfully applied %s: %s -> %s", config_key, old_value, new_value);
+      pgmoneta_log_info("Conf Set: Successfully applied %s: %s -> %s", config_key,
+                        old_value, new_value);
    }
 
 #ifdef HAVE_FREEBSD
@@ -3365,7 +3664,8 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
 #endif
 
-   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t,
+                                       compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_CONF_SET_NETWORK;
       pgmoneta_log_error("Conf Set: Error sending response");
@@ -3389,8 +3689,9 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
 error:
 
-   pgmoneta_management_response_error(ssl, client_fd, NULL, ec != -1 ? ec : MANAGEMENT_ERROR_CONF_SET_ERROR,
-                                      en != NULL ? en : NAME, compression, encryption, payload);
+   pgmoneta_management_response_error(
+      ssl, client_fd, NULL, ec != -1 ? ec : MANAGEMENT_ERROR_CONF_SET_ERROR,
+      en != NULL ? en : NAME, compression, encryption, payload);
 
    if (elapsed)
    {
@@ -3402,14 +3703,16 @@ error:
    pgmoneta_stop_logging();
 
    // ADD PROPER ERROR LOGGING HERE
-   pgmoneta_log_error("Configuration set operation failed with error code: %d", ec != -1 ? ec : MANAGEMENT_ERROR_CONF_SET_ERROR);
+   pgmoneta_log_error("Configuration set operation failed with error code: %d",
+                      ec != -1 ? ec : MANAGEMENT_ERROR_CONF_SET_ERROR);
    pgmoneta_log_error("Configuration change failed, not applying changes");
 
    return 1;
 }
 
 static bool
-is_valid_config_key(const char* config_key, struct config_key_info* key_info)
+is_valid_config_key(const char* config_key,
+                    struct config_key_info* key_info)
 {
    struct main_configuration* config;
    int dot_count = 0;
@@ -3429,7 +3732,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
    size_t len = strlen(config_key);
    if (config_key[0] == '.' || config_key[len - 1] == '.')
    {
-      pgmoneta_log_debug("Invalid config key: starts or ends with dot: %s", config_key);
+      pgmoneta_log_debug("Invalid config key: starts or ends with dot: %s",
+                         config_key);
       return false;
    }
 
@@ -3441,7 +3745,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
          dot_count++;
          if (config_key[i + 1] == '.')
          {
-            pgmoneta_log_debug("Invalid config key: consecutive dots: %s", config_key);
+            pgmoneta_log_debug("Invalid config key: consecutive dots: %s",
+                               config_key);
             return false;
          }
       }
@@ -3453,7 +3758,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
 
    if (dot_count > 2)
    {
-      pgmoneta_log_debug("Invalid config key: too many dots (%d): %s", dot_count, config_key);
+      pgmoneta_log_debug("Invalid config key: too many dots (%d): %s", dot_count,
+                         config_key);
       return false;
    }
 
@@ -3503,7 +3809,9 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
       }
       else
       {
-         pgmoneta_log_debug("Invalid section for single dot notation: %s (expected 'pgmoneta')", key_info->section);
+         pgmoneta_log_debug(
+            "Invalid section for single dot notation: %s (expected 'pgmoneta')",
+            key_info->section);
          return false;
       }
    }
@@ -3520,7 +3828,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
       }
       else
       {
-         pgmoneta_log_debug("Unknown section type: %s (expected 'server')", key_info->section);
+         pgmoneta_log_debug("Unknown section type: %s (expected 'server')",
+                            key_info->section);
          return false;
       }
    }
@@ -3537,7 +3846,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
          bool server_found = false;
          for (int i = 0; i < config->common.number_of_servers; i++)
          {
-            if (!strncmp(config->common.servers[i].name, key_info->context, MISC_LENGTH))
+            if (!strncmp(config->common.servers[i].name, key_info->context,
+                         MISC_LENGTH))
             {
                server_found = true;
                break;
@@ -3545,7 +3855,8 @@ is_valid_config_key(const char* config_key, struct config_key_info* key_info)
          }
          if (!server_found)
          {
-            pgmoneta_log_debug("Server '%s' not found in configuration", key_info->context);
+            pgmoneta_log_debug("Server '%s' not found in configuration",
+                               key_info->context);
             return false;
          }
       }
@@ -3576,7 +3887,8 @@ apply_configuration(char* config_key, char* config_value,
 
    // Create temporary configuration
    config_size = sizeof(struct main_configuration);
-   if (pgmoneta_create_shared_memory(config_size, HUGEPAGE_OFF, (void**)&temp_config))
+   if (pgmoneta_create_shared_memory(config_size, HUGEPAGE_OFF,
+                                     (void**)&temp_config))
    {
       goto error;
    }
@@ -3585,13 +3897,16 @@ apply_configuration(char* config_key, char* config_value,
    memcpy(temp_config, current_config, config_size);
 
    // Apply configuration changes using the provided key_info
-   pgmoneta_log_debug("Applying configuration: section='%s', context='%s', key='%s', section_type=%d",
-                      key_info->section, key_info->context, key_info->key, key_info->section_type);
+   pgmoneta_log_debug("Applying configuration: section='%s', context='%s', "
+                      "key='%s', section_type=%d",
+                      key_info->section, key_info->context, key_info->key,
+                      key_info->section_type);
 
    switch (key_info->section_type)
    {
       case 0: // Main configuration
-         if (apply_main_configuration(temp_config, NULL, PGMONETA_MAIN_INI_SECTION, key_info->key, config_value))
+         if (apply_main_configuration(temp_config, NULL, PGMONETA_MAIN_INI_SECTION,
+                                      key_info->key, config_value))
          {
             goto error;
          }
@@ -3601,9 +3916,12 @@ apply_configuration(char* config_key, char* config_value,
       {
          for (int i = 0; i < temp_config->common.number_of_servers; i++)
          {
-            if (!strncmp(temp_config->common.servers[i].name, key_info->context, MISC_LENGTH))
+            if (!strncmp(temp_config->common.servers[i].name, key_info->context,
+                         MISC_LENGTH))
             {
-               if (apply_main_configuration(temp_config, &temp_config->common.servers[i], key_info->context, key_info->key, config_value))
+               if (apply_main_configuration(
+                      temp_config, &temp_config->common.servers[i], key_info->context,
+                      key_info->key, config_value))
                {
                   goto error;
                }
@@ -3621,7 +3939,8 @@ apply_configuration(char* config_key, char* config_value,
    // Validate the temporary configuration
    if (pgmoneta_validate_main_configuration(temp_config))
    {
-      pgmoneta_log_error("Configuration validation failed for %s = %s", config_key, config_value);
+      pgmoneta_log_error("Configuration validation failed for %s = %s",
+                         config_key, config_value);
       goto error;
    }
 
@@ -3630,14 +3949,17 @@ apply_configuration(char* config_key, char* config_value,
 
    if (*restart_required)
    {
-      pgmoneta_log_info("Configuration change %s = %s requires restart - changes not applied", config_key, config_value);
+      pgmoneta_log_info(
+         "Configuration change %s = %s requires restart - changes not applied",
+         config_key, config_value);
       // Don't apply changes if restart is required
    }
    else
    {
       // Apply the changes for real
       transfer_configuration(current_config, temp_config);
-      pgmoneta_log_info("Configuration change %s = %s applied successfully", config_key, config_value);
+      pgmoneta_log_info("Configuration change %s = %s applied successfully",
+                        config_key, config_value);
    }
 
    // Clean up
@@ -3657,7 +3979,10 @@ error:
 }
 
 static int
-apply_main_configuration(struct main_configuration* config, struct server* srv, char* section __attribute__((unused)), char* key, char* value)
+apply_main_configuration(struct main_configuration* config,
+                         struct server* srv,
+                         char* section __attribute__((unused)),
+                         char* key, char* value)
 {
    size_t max;
    bool unknown = false;
@@ -3746,7 +4071,8 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          srv->retention_weeks = -1;
          srv->retention_months = -1;
          srv->retention_years = -1;
-         if (as_retention(value, &srv->retention_days, &srv->retention_weeks, &srv->retention_months, &srv->retention_years))
+         if (as_retention(value, &srv->retention_days, &srv->retention_weeks,
+                          &srv->retention_months, &srv->retention_years))
          {
             unknown = true;
          }
@@ -3825,7 +4151,8 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          config->retention_weeks = -1;
          config->retention_months = -1;
          config->retention_years = -1;
-         if (as_retention(value, &config->retention_days, &config->retention_weeks, &config->retention_months, &config->retention_years))
+         if (as_retention(value, &config->retention_days, &config->retention_weeks,
+                          &config->retention_months, &config->retention_years))
          {
             unknown = true;
          }
@@ -3867,7 +4194,8 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
 }
 
 static int
-write_config_value(char* buffer, char* config_key, size_t buffer_size)
+write_config_value(char* buffer, char* config_key,
+                   size_t buffer_size)
 {
    struct main_configuration* config;
    struct config_key_info key_info;
@@ -3943,7 +4271,9 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          }
          else if (!strcmp(key_info.key, "retention"))
          {
-            char* ret = get_retention_string(config->retention_days, config->retention_weeks, config->retention_months, config->retention_years);
+            char* ret = get_retention_string(
+               config->retention_days, config->retention_weeks,
+               config->retention_months, config->retention_years);
             snprintf(buffer, buffer_size, "%s", ret ? ret : "");
             free(ret);
          }
@@ -3959,7 +4289,8 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          bool server_found = false;
          for (int i = 0; i < config->common.number_of_servers; i++)
          {
-            if (!strncmp(config->common.servers[i].name, key_info.context, MISC_LENGTH))
+            if (!strncmp(config->common.servers[i].name, key_info.context,
+                         MISC_LENGTH))
             {
                struct server* srv = &config->common.servers[i];
                server_found = true;
@@ -4002,13 +4333,16 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                }
                else if (!strcmp(key_info.key, "retention"))
                {
-                  char* ret = get_retention_string(srv->retention_days, srv->retention_weeks, srv->retention_months, srv->retention_years);
+                  char* ret =
+                     get_retention_string(srv->retention_days, srv->retention_weeks,
+                                          srv->retention_months, srv->retention_years);
                   snprintf(buffer, buffer_size, "%s", ret ? ret : "");
                   free(ret);
                }
                else
                {
-                  pgmoneta_log_debug("Unknown server configuration key: %s", key_info.key);
+                  pgmoneta_log_debug("Unknown server configuration key: %s",
+                                     key_info.key);
                   return 1; // Unknown key
                }
                break;
@@ -4124,7 +4458,8 @@ extract_key_value(char* str, char** key, char** value)
 
       for (int i = strlen(left); i >= 0; i--)
       {
-         if (left[i] == '\t' || left[i] == ' ' || left[i] == '\0' || left[i] == '\"' || left[i] == '\'')
+         if (left[i] == '\t' || left[i] == ' ' || left[i] == '\0' ||
+             left[i] == '\"' || left[i] == '\'')
          {
             left[i] = '\0';
          }
@@ -4136,7 +4471,8 @@ extract_key_value(char* str, char** key, char** value)
 
       for (int i = strlen(right); i >= 0; i--)
       {
-         if (right[i] == '\t' || right[i] == ' ' || right[i] == '\0' || right[i] == '\r' || right[i] == '\"' || right[i] == '\'')
+         if (right[i] == '\t' || right[i] == ' ' || right[i] == '\0' ||
+             right[i] == '\r' || right[i] == '\"' || right[i] == '\'')
          {
             right[i] = '\0';
          }
@@ -4232,7 +4568,8 @@ extract_syskey_value(char* str, char** key, char** value)
       k = pgmoneta_append_char(k, str[i]);
    }
 
-   while (c < length && (str[c] == ' ' || str[c] == '\t' || str[c] == '=' || str[c] == '\r' || str[c] == '\n'))
+   while (c < length && (str[c] == ' ' || str[c] == '\t' || str[c] == '=' ||
+                         str[c] == '\r' || str[c] == '\n'))
    {
       c++;
    }
@@ -4248,7 +4585,9 @@ extract_syskey_value(char* str, char** key, char** value)
 
    offset = c;
 
-   while ((str[d] == ' ' || str[d] == '\t' || str[d] == '\r' || str[d] == '\n') && d > c)
+   while (
+      (str[d] == ' ' || str[d] == '\t' || str[d] == '\r' || str[d] == '\n') &&
+      d > c)
    {
       d--;
    }
@@ -4291,7 +4630,8 @@ as_int(char* str, int* i)
    errno = 0;
    val = strtol(str, &endptr, 10);
 
-   if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) || (errno != 0 && val == 0))
+   if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
+       (errno != 0 && val == 0))
    {
       goto error;
    }
@@ -4320,13 +4660,15 @@ error:
 static int
 as_bool(char* str, bool* b)
 {
-   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") || !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
+   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") ||
+       !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
    {
       *b = true;
       return 0;
    }
 
-   if (!strcasecmp(str, "false") || !strcasecmp(str, "off") || !strcasecmp(str, "no") || !strcasecmp(str, "0"))
+   if (!strcasecmp(str, "false") || !strcasecmp(str, "off") ||
+       !strcasecmp(str, "no") || !strcasecmp(str, "0"))
    {
       *b = false;
       return 0;
@@ -4516,7 +4858,8 @@ as_compression(char* str)
 }
 
 static int
-as_retention(char* str, int* days, int* weeks, int* months, int* years)
+as_retention(char* str, int* days, int* weeks, int* months,
+             int* years)
 {
    // make a deep copy because the parsing break the input string
    char* copied_str = (char*)malloc(strlen(str) + 1);
@@ -4825,14 +5168,16 @@ as_ciphers(char* str)
  * @return The policy
  */
 static unsigned int
-as_update_process_title(char* str, unsigned int default_policy)
+as_update_process_title(char* str,
+                        unsigned int default_policy)
 {
    if (is_empty_string(str))
    {
       return default_policy;
    }
 
-   if (!strncmp(str, "never", MISC_LENGTH) || !strncmp(str, "off", MISC_LENGTH))
+   if (!strncmp(str, "never", MISC_LENGTH) ||
+       !strncmp(str, "off", MISC_LENGTH))
    {
       return UPDATE_PROCESS_TITLE_NEVER;
    }
@@ -4844,7 +5189,8 @@ as_update_process_title(char* str, unsigned int default_policy)
    {
       return UPDATE_PROCESS_TITLE_MINIMAL;
    }
-   else if (!strncmp(str, "verbose", MISC_LENGTH) || !strncmp(str, "full", MISC_LENGTH))
+   else if (!strncmp(str, "verbose", MISC_LENGTH) ||
+            !strncmp(str, "full", MISC_LENGTH))
    {
       return UPDATE_PROCESS_TITLE_VERBOSE;
    }
@@ -5083,7 +5429,8 @@ as_encryption_mode(char* str)
       return ENCRYPTION_NONE;
    }
 
-   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes-256") || !strcasecmp(str, "aes-256-cbc"))
+   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes-256") ||
+       !strcasecmp(str, "aes-256-cbc"))
    {
       return ENCRYPTION_AES_256_CBC;
    }
@@ -5121,13 +5468,15 @@ as_encryption_mode(char* str)
 static int
 as_create_slot(char* str, int* create_slot)
 {
-   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") || !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
+   if (!strcasecmp(str, "true") || !strcasecmp(str, "on") ||
+       !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
    {
       *create_slot = CREATE_SLOT_YES;
       return 0;
    }
 
-   if (!strcasecmp(str, "false") || !strcasecmp(str, "off") || !strcasecmp(str, "no") || !strcasecmp(str, "0"))
+   if (!strcasecmp(str, "false") || !strcasecmp(str, "off") ||
+       !strcasecmp(str, "no") || !strcasecmp(str, "0"))
    {
       *create_slot = CREATE_SLOT_NO;
       return 0;
@@ -5139,7 +5488,8 @@ as_create_slot(char* str, int* create_slot)
 }
 
 static char*
-get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year)
+get_retention_string(int rt_days, int rt_weeks, int rt_months,
+                     int rt_year)
 {
    char* retention = NULL;
 
@@ -5183,7 +5533,8 @@ get_retention_string(int rt_days, int rt_weeks, int rt_months, int rt_year)
 }
 
 static bool
-transfer_configuration(struct main_configuration* config, struct main_configuration* reload)
+transfer_configuration(struct main_configuration* config,
+                       struct main_configuration* reload)
 {
    bool changed = false;
 
@@ -5197,7 +5548,8 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    }
    config->metrics = reload->metrics;
    config->metrics_cache_max_age = reload->metrics_cache_max_age;
-   if (restart_int("metrics_cache_max_size", config->metrics_cache_max_size, reload->metrics_cache_max_size))
+   if (restart_int("metrics_cache_max_size", config->metrics_cache_max_size,
+                   reload->metrics_cache_max_size))
    {
       changed = true;
    }
@@ -5217,11 +5569,13 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    config->retention_weeks = reload->retention_weeks;
    config->retention_months = reload->retention_months;
    config->retention_years = reload->retention_years;
-   if (restart_int("retention_interval", config->retention_interval, reload->retention_interval))
+   if (restart_int("retention_interval", config->retention_interval,
+                   reload->retention_interval))
    {
       changed = true;
    }
-   if (restart_int("log_type", config->common.log_type, reload->common.log_type))
+   if (restart_int("log_type", config->common.log_type,
+                   reload->common.log_type))
    {
       changed = true;
    }
@@ -5242,7 +5596,8 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       config->common.log_rotation_size = reload->common.log_rotation_size;
       config->common.log_rotation_age = reload->common.log_rotation_age;
       config->common.log_mode = reload->common.log_mode;
-      memcpy(config->common.log_line_prefix, reload->common.log_line_prefix, MISC_LENGTH);
+      memcpy(config->common.log_line_prefix, reload->common.log_line_prefix,
+             MISC_LENGTH);
       memcpy(config->common.log_path, reload->common.log_path, MISC_LENGTH);
       pgmoneta_start_logging();
    }
@@ -5251,11 +5606,13 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    {
       changed = true;
    }
-   if (restart_string("tls_cert_file", config->tls_cert_file, reload->tls_cert_file))
+   if (restart_string("tls_cert_file", config->tls_cert_file,
+                      reload->tls_cert_file))
    {
       changed = true;
    }
-   if (restart_string("tls_key_file", config->tls_key_file, reload->tls_key_file))
+   if (restart_string("tls_key_file", config->tls_key_file,
+                      reload->tls_key_file))
    {
       changed = true;
    }
@@ -5263,15 +5620,18 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    {
       changed = true;
    }
-   if (restart_string("metrics_cert_file", config->metrics_cert_file, reload->metrics_cert_file))
+   if (restart_string("metrics_cert_file", config->metrics_cert_file,
+                      reload->metrics_cert_file))
    {
       changed = true;
    }
-   if (restart_string("metrics_key_file", config->metrics_key_file, reload->metrics_key_file))
+   if (restart_string("metrics_key_file", config->metrics_key_file,
+                      reload->metrics_key_file))
    {
       changed = true;
    }
-   if (restart_string("metrics_ca_file", config->metrics_ca_file, reload->metrics_ca_file))
+   if (restart_string("metrics_ca_file", config->metrics_ca_file,
+                      reload->metrics_ca_file))
    {
       changed = true;
    }
@@ -5296,11 +5656,13 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    {
       changed = true;
    }
-   if (restart_int("update_process_title", config->update_process_title, reload->update_process_title))
+   if (restart_int("update_process_title", config->update_process_title,
+                   reload->update_process_title))
    {
       changed = true;
    }
-   if (restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir))
+   if (restart_string("unix_socket_dir", config->unix_socket_dir,
+                      reload->unix_socket_dir))
    {
       changed = true;
    }
@@ -5312,7 +5674,8 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
          changed = true;
       }
    }
-   if (restart_int("number_of_servers", config->common.number_of_servers, reload->common.number_of_servers))
+   if (restart_int("number_of_servers", config->common.number_of_servers,
+                   reload->common.number_of_servers))
    {
       changed = true;
    }
@@ -5380,7 +5743,23 @@ copy_server(struct server* dst, struct server* src)
    {
       changed = true;
    }
-   if (restart_string("wal_shipping", &dst->wal_shipping[0], &src->wal_shipping[0]))
+   if (restart_string("wal_shipping", &dst->wal_shipping[0],
+                      &src->wal_shipping[0]))
+   {
+      changed = true;
+   }
+   if (restart_int("s3_port", dst->s3.port, src->s3.port) ||
+       restart_bool("s3_use_tls", dst->s3.use_tls, src->s3.use_tls) ||
+       restart_string("s3_storage_class", dst->s3.storage_class,
+                      src->s3.storage_class) ||
+       restart_string("s3_endpoint", dst->s3.endpoint, src->s3.endpoint) ||
+       restart_string("s3_region", dst->s3.region, src->s3.region) ||
+       restart_string("s3_access_key_id", dst->s3.access_key_id,
+                      src->s3.access_key_id) ||
+       restart_string("s3_secret_access_key", dst->s3.secret_access_key,
+                      src->s3.secret_access_key) ||
+       restart_string("s3_bucket", dst->s3.bucket, src->s3.bucket) ||
+       restart_string("s3_base_dir", dst->s3.base_dir, src->s3.base_dir))
    {
       changed = true;
    }
@@ -5392,11 +5771,13 @@ copy_server(struct server* dst, struct server* src)
    }
    for (int i = 0; i < src->number_of_hot_standbys; i++)
    {
-      memcpy(&dst->hot_standby_overrides[i][0], &src->hot_standby_overrides[i][0], MAX_PATH);
+      memcpy(&dst->hot_standby_overrides[i][0], &src->hot_standby_overrides[i][0],
+             MAX_PATH);
    }
    for (int i = 0; i < src->number_of_hot_standbys; i++)
    {
-      memcpy(&dst->hot_standby_tablespaces[i][0], &src->hot_standby_tablespaces[i][0], MAX_PATH);
+      memcpy(&dst->hot_standby_tablespaces[i][0],
+             &src->hot_standby_tablespaces[i][0], MAX_PATH);
    }
    /* dst->cur_timeline = src->cur_timeline; */
    dst->retention_days = src->retention_days;
@@ -5407,7 +5788,8 @@ copy_server(struct server* dst, struct server* src)
    /* dst->delete = src->delete; */
    /* dst->wal_streaming = src->wal_streaming; */
    /* dst->valid = src->valid; */
-   /* memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH); */
+   /* memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0],
+    * MISC_LENGTH); */
    /* memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH); */
    dst->workers = src->workers;
    dst->backup_max_rate = src->backup_max_rate;
@@ -5452,7 +5834,8 @@ restart_bool(char* name, bool e, bool n)
 {
    if (e != n)
    {
-      pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e ? "true" : "false", n ? "true" : "false");
+      pgmoneta_log_info("Restart required for %s - Existing %s New %s", name,
+                        e ? "true" : "false", n ? "true" : "false");
       return 1;
    }
 
@@ -5464,7 +5847,8 @@ restart_int(char* name, int e, int n)
 {
    if (e != n)
    {
-      pgmoneta_log_info("Restart required for %s - Existing %d New %d", name, e, n);
+      pgmoneta_log_info("Restart required for %s - Existing %d New %d", name, e,
+                        n);
       return 1;
    }
 
@@ -5476,7 +5860,8 @@ restart_string(char* name, char* e, char* n)
 {
    if (strcmp(e, n))
    {
-      pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e, n);
+      pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e,
+                        n);
       return 1;
    }
 
@@ -5512,7 +5897,8 @@ is_empty_string(char* s)
 }
 
 static int
-remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
+remove_leading_whitespace_and_comments(char* s,
+                                       char** trimmed_line)
 {
    char* result = NULL;
    int trimmed_length = 0;
@@ -5552,7 +5938,8 @@ remove_leading_whitespace_and_comments(char* s, char** trimmed_line)
 
    if (result != NULL)
    {
-      while (trimmed_length > 0 && isspace((unsigned char)result[trimmed_length - 1]))
+      while (trimmed_length > 0 &&
+             isspace((unsigned char)result[trimmed_length - 1]))
       {
          trimmed_length--;
       }
@@ -5583,7 +5970,8 @@ error:
 }
 
 static void
-split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH], int* count)
+split_extra(char* extra, char res[MAX_EXTRA][MAX_EXTRA_PATH],
+            int* count)
 {
    int i = 0;
    char temp[DEFAULT_BUFFER_SIZE];
@@ -5613,13 +6001,11 @@ pgmoneta_is_binary_file(const char* path)
    unsigned char buffer[1024];
    size_t bytes;
    int error;
-
    fp = fopen(path, "rb");
    if (fp == NULL)
    {
       goto error;
    }
-
    while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
    {
       for (size_t i = 0; i < bytes; i++)

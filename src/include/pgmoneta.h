@@ -1,29 +1,31 @@
 /*
  * Copyright (C) 2025 The pgmoneta community
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or other
- * materials provided with the distribution.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
- * 3. Neither the name of the copyright holder nor the names of its contributors may
- * be used to endorse or promote products derived from this software without specific
- * prior written permission.
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
- * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef PGMONETA_H
@@ -42,8 +44,8 @@ extern "C" {
 #if HAVE_OPENBSD
 #include <sys/limits.h>
 #endif
-#include <sys/types.h>
 #include <openssl/ssl.h>
+#include <sys/types.h>
 
 #define VERSION                      "0.20.0"
 
@@ -144,15 +146,19 @@ extern "C" {
 
 #define EMPTY_STR(_s)                (_s[0] == 0)
 
-#define MAX(a, b) \
-   ({ __typeof__ (a) _a = (a);  \
-           __typeof__ (b) _b = (b);  \
-           _a > _b ? _a : _b; })
+#define MAX(a, b)             \
+   ({                         \
+      __typeof__(a) _a = (a); \
+      __typeof__(b) _b = (b); \
+      _a > _b ? _a : _b;      \
+   })
 
-#define MIN(a, b) \
-   ({ __typeof__ (a) _a = (a);  \
-           __typeof__ (b) _b = (b);  \
-           _a < _b ? _a : _b; })
+#define MIN(a, b)             \
+   ({                         \
+      __typeof__(a) _a = (a); \
+      __typeof__(b) _b = (b); \
+      _a < _b ? _a : _b;      \
+   })
 
 /*
  * Common piece of code to perform a sleeping.
@@ -232,66 +238,93 @@ struct extension_info
    bool enabled;                     /**< Is extension enabled */
    struct version installed_version; /**< The installed version */
 } __attribute__((aligned(64)));
+/** @struct s3_configuration
+ * Defines the S3 configuration
+ */
+struct s3_configuration
+{
+   int port;                            /**< The S3 port */
+   bool use_tls;                        /**< Use TLS for S3 */
+   char storage_class[MISC_LENGTH];     /**< The S3 storage class */
+   char endpoint[MISC_LENGTH];          /**< The S3 endpoint */
+   char region[MISC_LENGTH];            /**< The AWS region */
+   char access_key_id[MISC_LENGTH];     /**< The IAM Access Key ID */
+   char secret_access_key[MISC_LENGTH]; /**< The IAM Secret Access Key */
+   char bucket[MISC_LENGTH];            /**< The S3 bucket */
+   char base_dir[MAX_PATH];             /**< The S3 base directory */
+} __attribute__((aligned(64)));
 
 /** @struct server
  * Defines a server
  */
 struct server
 {
-   char name[MISC_LENGTH];                                        /**< The name of the server */
-   char host[MISC_LENGTH];                                        /**< The host name of the server */
-   int port;                                                      /**< The port of the server */
-   bool primary;                                                  /**< Is the server a primary ? */
-   char username[MAX_USERNAME_LENGTH];                            /**< The user name */
-   char wal_slot[MISC_LENGTH];                                    /**< The WAL slot name */
-   bool online;                                                   /**< Is the server online ? */
-   char current_wal_filename[MISC_LENGTH];                        /**< The current WAL filename*/
-   char current_wal_lsn[MISC_LENGTH];                             /**< The current WAL log sequence number*/
-   char follow[MISC_LENGTH];                                      /**< Follow a server */
-   char workspace[MAX_PATH];                                      /**< A workspace for combining incremental backups */
-   int retention_days;                                            /**< The retention days for the server */
-   int retention_weeks;                                           /**< The retention weeks for the server */
-   int retention_months;                                          /**< The retention months for the server */
-   int retention_years;                                           /**< The retention years for the server */
-   int create_slot;                                               /**< Create a slot */
-   atomic_bool repository;                                        /**< Repository lock */
-   bool active_backup;                                            /**< Is there an active backup */
-   bool active_restore;                                           /**< Is there an active restore */
-   bool active_archive;                                           /**< Is there an active archive */
-   bool active_delete;                                            /**< Is there an active delete */
-   bool active_retention;                                         /**< Is there an active retention */
-   int wal_size;                                                  /**< The size of the WAL files */
-   size_t block_size;                                             /**< The size of a block in relation files*/
-   size_t segment_size;                                           /**< The max size of a relation file segment*/
-   size_t relseg_size;                                            /**< The max number of blocks in a relation file segment */
-   pid_t wal_streaming;                                           /**< WAL streaming process id */
-   bool checksums;                                                /**< Are checksums enabled */
-   bool summarize_wal;                                            /**< Is summarize_wal enabled */
-   bool valid;                                                    /**< Is the server valid */
-   int version;                                                   /**< The major version of the server*/
-   int minor_version;                                             /**< The minor version of the server*/
-   atomic_ulong operation_count;                                  /**< Operation count of the server */
-   atomic_ulong failed_operation_count;                           /**< Failed operation count of the server */
-   uint32_t cur_timeline;                                         /**< Current timeline the server is on*/
-   atomic_llong last_operation_time;                              /**< Last operation time of the server */
-   atomic_llong last_failed_operation_time;                       /**< Last failed operation time of the server */
-   char wal_shipping[MAX_PATH];                                   /**< The WAL shipping directory */
-   int number_of_hot_standbys;                                    /**< The number of hot standby directories */
-   int number_of_extensions;                                      /**< The number of extensions */
-   char hot_standby[NUMBER_OF_HOT_STANDBY][MAX_PATH];             /**< The hot standby directories */
-   char hot_standby_overrides[NUMBER_OF_HOT_STANDBY][MAX_PATH];   /**< The hot standby overrides directory */
-   char hot_standby_tablespaces[NUMBER_OF_HOT_STANDBY][MAX_PATH]; /**< The hot standby tablespaces mappings */
-   char tls_cert_file[MAX_PATH];                                  /**< TLS certificate path */
-   char tls_key_file[MAX_PATH];                                   /**< TLS key path */
-   char tls_ca_file[MAX_PATH];                                    /**< TLS CA certificate path */
-   int workers;                                                   /**< The number of workers */
-   int backup_max_rate;                                           /**< Number of tokens added to the bucket with each replenishment for backup. */
-   int network_max_rate;                                          /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
-   int number_of_extra;                                           /**< The number of source directory*/
-   char extra[MAX_EXTRA][MAX_EXTRA_PATH];                         /**< Source directory*/
-   bool has_extension;                                            /**< Does this have pgmoneta_ext */
-   char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
-   struct extension_info extensions[NUMBER_OF_EXTENSIONS];        /**< The extensions */
+   char name[MISC_LENGTH];                 /**< The name of the server */
+   char host[MISC_LENGTH];                 /**< The host name of the server */
+   int port;                               /**< The port of the server */
+   bool primary;                           /**< Is the server a primary ? */
+   char username[MAX_USERNAME_LENGTH];     /**< The user name */
+   char wal_slot[MISC_LENGTH];             /**< The WAL slot name */
+   bool online;                            /**< Is the server online ? */
+   char current_wal_filename[MISC_LENGTH]; /**< The current WAL filename*/
+   char current_wal_lsn[MISC_LENGTH];      /**< The current WAL log sequence number*/
+   char follow[MISC_LENGTH];               /**< Follow a server */
+   char
+      workspace[MAX_PATH]; /**< A workspace for combining incremental backups */
+   int retention_days;     /**< The retention days for the server */
+   int retention_weeks;    /**< The retention weeks for the server */
+   int retention_months;   /**< The retention months for the server */
+   int retention_years;    /**< The retention years for the server */
+   int create_slot;        /**< Create a slot */
+   atomic_bool repository; /**< Repository lock */
+   bool active_backup;     /**< Is there an active backup */
+   bool active_restore;    /**< Is there an active restore */
+   bool active_archive;    /**< Is there an active archive */
+   bool active_delete;     /**< Is there an active delete */
+   bool active_retention;  /**< Is there an active retention */
+   int wal_size;           /**< The size of the WAL files */
+   size_t block_size;      /**< The size of a block in relation files*/
+   size_t segment_size;    /**< The max size of a relation file segment*/
+   size_t
+      relseg_size;               /**< The max number of blocks in a relation file segment */
+   pid_t wal_streaming;          /**< WAL streaming process id */
+   bool checksums;               /**< Are checksums enabled */
+   bool summarize_wal;           /**< Is summarize_wal enabled */
+   bool valid;                   /**< Is the server valid */
+   int version;                  /**< The major version of the server*/
+   int minor_version;            /**< The minor version of the server*/
+   atomic_ulong operation_count; /**< Operation count of the server */
+   atomic_ulong
+      failed_operation_count;               /**< Failed operation count of the server */
+   uint32_t cur_timeline;                   /**< Current timeline the server is on*/
+   atomic_llong last_operation_time;        /**< Last operation time of the server */
+   atomic_llong last_failed_operation_time; /**< Last failed operation time of
+                                               the server */
+   char wal_shipping[MAX_PATH];             /**< The WAL shipping directory */
+   int number_of_hot_standbys;              /**< The number of hot standby directories */
+   int number_of_extensions;                /**< The number of extensions */
+   char hot_standby[NUMBER_OF_HOT_STANDBY]
+                   [MAX_PATH]; /**< The hot standby directories */
+   char hot_standby_overrides[NUMBER_OF_HOT_STANDBY]
+                             [MAX_PATH]; /**< The hot standby overrides directory
+                                         */
+   char hot_standby_tablespaces[NUMBER_OF_HOT_STANDBY]
+                               [MAX_PATH];                 /**< The hot standby tablespaces
+                                             mappings */
+   char tls_cert_file[MAX_PATH];                           /**< TLS certificate path */
+   char tls_key_file[MAX_PATH];                            /**< TLS key path */
+   char tls_ca_file[MAX_PATH];                             /**< TLS CA certificate path */
+   int workers;                                            /**< The number of workers */
+   int backup_max_rate;                                    /**< Number of tokens added to the bucket with each
+                           replenishment for backup. */
+   int network_max_rate;                                   /**< Number of bytes of tokens added every one second to
+                            limit the netowrk backup rate */
+   int number_of_extra;                                    /**< The number of source directory*/
+   char extra[MAX_EXTRA][MAX_EXTRA_PATH];                  /**< Source directory*/
+   bool has_extension;                                     /**< Does this have pgmoneta_ext */
+   char ext_version[MISC_LENGTH];                          /**< The major version of the extension*/
+   struct extension_info extensions[NUMBER_OF_EXTENSIONS]; /**< The extensions */
+   struct s3_configuration s3;                             /**< The S3 configuration */
 } __attribute__((aligned(64)));
 
 /** @struct user
@@ -376,14 +409,17 @@ struct common_configuration
  */
 struct main_configuration
 {
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+   struct common_configuration common; /**< Common configurations that are shared
+                                          across multiple tools */
 
    bool running; /**< Is pgmoneta running */
 
    char host[MISC_LENGTH];     /**< The host */
    int metrics;                /**< The metrics port */
-   int metrics_cache_max_age;  /**< Number of seconds to cache the Prometheus response */
-   int metrics_cache_max_size; /**< Number of bytes max to cache the Prometheus response */
+   int metrics_cache_max_age;  /**< Number of seconds to cache the Prometheus
+                                 response */
+   int metrics_cache_max_size; /**< Number of bytes max to cache the Prometheus
+                                  response */
    int management;             /**< The management port */
 
    char base_dir[MAX_PATH]; /**< The base directory */
@@ -404,20 +440,13 @@ struct main_configuration
    char ssh_public_key_file[MAX_PATH];  /**< The SSH public key path */
    char ssh_private_key_file[MAX_PATH]; /**< The SSH private key path */
 
-   int s3_port;                            /**< The S3 port */
-   bool s3_use_tls;                        /**< Use TLS  for S3 */
-   char s3_storage_class[MISC_LENGTH];     /**< The S3 storage class */
-   char s3_endpoint[MISC_LENGTH];          /**< The S3 endpoint */
-   char s3_region[MISC_LENGTH];            /**< The AWS region */
-   char s3_access_key_id[MISC_LENGTH];     /**< The IAM Access Key ID */
-   char s3_secret_access_key[MISC_LENGTH]; /**< The IAM Secret Access Key */
-   char s3_bucket[MISC_LENGTH];            /**< The S3 bucket */
-   char s3_base_dir[MAX_PATH];             /**< The S3 base directory */
+   struct s3_configuration s3; /**< The S3 configuration */
 
-   char azure_storage_account[MISC_LENGTH]; /**< The Azure storage account name */
-   char azure_container[MISC_LENGTH];       /**< The Azure container name */
-   char azure_shared_key[MISC_LENGTH];      /**< The Azure storage account key */
-   char azure_base_dir[MAX_PATH];           /**< The Azure base directory */
+   char
+      azure_storage_account[MISC_LENGTH]; /**< The Azure storage account name */
+   char azure_container[MISC_LENGTH];     /**< The Azure container name */
+   char azure_shared_key[MISC_LENGTH];    /**< The Azure storage account key */
+   char azure_base_dir[MAX_PATH];         /**< The Azure base directory */
 
    int retention_days;     /**< The retention days for the server */
    int retention_weeks;    /**< The retention weeks for the server */
@@ -425,7 +454,8 @@ struct main_configuration
    int retention_years;    /**< The retention years for the server */
    int retention_interval; /**< The retention interval */
 
-   char workspace[MAX_PATH]; /**< A workspace for combining incremental backups */
+   char
+      workspace[MAX_PATH]; /**< A workspace for combining incremental backups */
 
    bool tls;                     /**< Is TLS enabled */
    char tls_cert_file[MAX_PATH]; /**< TLS certificate path */
@@ -442,16 +472,20 @@ struct main_configuration
 
    int workers; /**< The number of workers */
 
-   unsigned int update_process_title; /**< Behaviour for updating the process title */
+   unsigned int
+      update_process_title; /**< Behaviour for updating the process title */
 
    char libev[MISC_LENGTH]; /**< Name of libev mode */
    int backlog;             /**< The backlog for listen */
    unsigned char hugepage;  /**< Huge page support */
 
-   char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain Socket */
+   char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain
+                                         Socket */
 
-   int backup_max_rate;  /**< Number of tokens added to the bucket with each replenishment for backup. */
-   int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
+   int backup_max_rate;  /**< Number of tokens added to the bucket with each
+                           replenishment for backup. */
+   int network_max_rate; /**< Number of bytes of tokens added every one second to
+                            limit the netowrk backup rate */
 
    int verification; /**< The sha512 verification interval */
 
@@ -465,7 +499,8 @@ struct main_configuration
  */
 struct walinfo_configuration
 {
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+   struct common_configuration common; /**< Common configurations that are shared
+                                          across multiple tools */
 } __attribute__((aligned(64)));
 
 /** @struct walfilter_configuration
@@ -473,7 +508,8 @@ struct walinfo_configuration
  */
 struct walfilter_configuration
 {
-   struct common_configuration common; /**< Common configurations that are shared across multiple tools */
+   struct common_configuration common; /**< Common configurations that are shared
+                                          across multiple tools */
 } __attribute__((aligned(64)));
 
 #ifdef __cplusplus
