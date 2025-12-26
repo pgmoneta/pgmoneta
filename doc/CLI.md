@@ -14,7 +14,7 @@ Usage:
   pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 
 Options:
-  -c, --config CONFIG_FILE                        Set the path to the pgmoneta.conf file
+  -c, --config CONFIG_FILE                        Set the path to the pgmoneta_cli.conf file
   -h, --host HOST                                 Set the host name
   -p, --port PORT                                 Set the port number
   -U, --user USERNAME                             Set the user name
@@ -375,6 +375,44 @@ pgmoneta-cli conf ls
 pgmoneta-cli conf get server.primary.host
 pgmoneta-cli conf set encryption aes-256-cbc
 ```
+
+## CLI configuration file
+
+`pgmoneta-cli` can read defaults from a configuration file. The default path is `/etc/pgmoneta/pgmoneta_cli.conf`.
+
+Important rules:
+
+- Format: Key/value pairs are parsed regardless of section markers.
+- Precedence: Command-line flags override values from the CLI config file.
+- Connection selection: If `--host`/`--port` are provided, a TCP connection is used. Otherwise, the CLI attempts a local Unix-domain socket (UDS) connection using `unix_socket_dir` from the CLI config.
+- Validation: For commands that require a server connection, the CLI fails early if neither both `--host` and `--port` nor a valid `unix_socket_dir` are provided.
+
+Accepted keys (all top-level):
+
+- host: Server host (string)
+- port: Server port (integer)
+- unix_socket_dir: Directory where `pgmoneta` exposes its UDS (string)
+- output_format: `text` | `json` | `raw`
+- compression: `none` | `gz` | `zstd` | `lz4` | `bz2` (wire protocol compression)
+- encryption: `none` | `aes` | `aes256` | `aes192` | `aes128` (wire protocol encryption)
+- log_type: Logging type (e.g., `console`, `file`, `syslog`)
+- log_level: Logging level (e.g., `debug5`, `debug4`, `debug3`, `debug2`, `debug1`, `info`, `warning`, `error`)
+- log_mode: Logging mode (`append` or `truncate`)
+- log_path: Path to the log file (used with `log_type = file`)
+
+Examples:
+
+```
+output_format = json
+unix_socket_dir = /tmp/pgmoneta
+compression = zstd
+encryption = none
+```
+
+Notes:
+
+- For local UDS connections, ensure `unix_socket_dir` matches the value configured in `pgmoneta.conf`; otherwise the UDS connect will fail.
+- For remote connections, provide both `--host` and `--port` (or set both in the CLI config). Providing just one will result in a connection error.
 ### conf get
 
 Get the value of a runtime configuration key, or the entire configuration.

@@ -1656,7 +1656,7 @@ general_information(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "#HELP pgmoneta_compression The compression used\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_compression gauge\n");
    data = pgmoneta_append(data, "pgmoneta_compression ");
-   data = pgmoneta_append_int(data, config->compression_type);
+   data = pgmoneta_append_int(data, config->common.compression_type);
    data = pgmoneta_append(data, "\n\n");
 
    d = NULL;

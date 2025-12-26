@@ -249,7 +249,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    tag = pgmoneta_append(tag, label);
 
    pgmoneta_create_base_backup_message(config->common.servers[server].version, false, tag, true,
-                                       config->compression_type, config->compression_level,
+                                       config->common.compression_type, config->common.compression_level,
                                        &basebackup_msg);
 
    status = pgmoneta_write_message(ssl, socket, basebackup_msg);
@@ -368,8 +368,8 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    backup->valid = VALID_TRUE;
    snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
-   backup->compression = config->compression_type;
-   backup->encryption = config->encryption;
+   backup->compression = config->common.compression_type;
+   backup->encryption = config->common.encryption;
    snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;

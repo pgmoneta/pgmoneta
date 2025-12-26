@@ -567,8 +567,8 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    backup->valid = VALID_TRUE;
    snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
-   backup->compression = config->compression_type;
-   backup->encryption = config->encryption;
+   backup->compression = config->common.compression_type;
+   backup->encryption = config->common.encryption;
    snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;
@@ -855,7 +855,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    tag = pgmoneta_append(tag, label);
 
    pgmoneta_create_base_backup_message(config->common.servers[server].version, true, tag, true,
-                                       config->compression_type, config->compression_level,
+                                       config->common.compression_type, config->common.compression_level,
                                        &basebackup_msg);
 
    status = pgmoneta_write_message(ssl, socket, basebackup_msg);
@@ -956,8 +956,8 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
    backup->valid = VALID_TRUE;
    snprintf(backup->label, sizeof(backup->label), "%s", label);
    backup->number_of_tablespaces = 0;
-   backup->compression = config->compression_type;
-   backup->encryption = config->encryption;
+   backup->compression = config->common.compression_type;
+   backup->encryption = config->common.encryption;
    snprintf(backup->wal, sizeof(backup->wal), "%s", wal);
    backup->restore_size = size;
    backup->biggest_file_size = biggest_file_size;

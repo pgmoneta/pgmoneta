@@ -73,7 +73,7 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
       goto error;
    }
 
-   level = config->compression_level;
+   level = config->common.compression_level;
    if (level < 1)
    {
       level = 1;
@@ -234,7 +234,7 @@ pgmoneta_bzip2_wal(char* directory)
       return;
    }
 
-   level = config->compression_level;
+   level = config->common.compression_level;
    if (level < 1)
    {
       level = 1;
@@ -620,7 +620,7 @@ pgmoneta_bzip2_file(char* from, char* to)
 
    config = (struct main_configuration*)shmem;
 
-   level = config->compression_level;
+   level = config->common.compression_level;
    if (level < 1)
    {
       level = 1;

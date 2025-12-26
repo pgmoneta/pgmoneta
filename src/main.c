@@ -150,7 +150,7 @@ shutdown_mgt(void)
    ev_io_stop(main_loop, (struct ev_io*)&io_mgt);
    pgmoneta_disconnect(unix_management_socket);
    errno = 0;
-   pgmoneta_remove_unix_socket(config->unix_socket_dir, MAIN_UDS);
+   pgmoneta_remove_unix_socket(config->common.unix_socket_dir, MAIN_UDS);
    errno = 0;
 }
 
@@ -721,11 +721,11 @@ main(int argc, char** argv)
    }
 
    /* Bind Unix Domain Socket */
-   if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
+   if (pgmoneta_bind_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &unix_management_socket))
    {
-      pgmoneta_log_fatal("Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
+      pgmoneta_log_fatal("Could not bind to %s/%s", config->common.unix_socket_dir, MAIN_UDS);
 #ifdef HAVE_SYSTEMD
-      sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
+      sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->common.unix_socket_dir, MAIN_UDS);
 #endif
       goto error;
    }
@@ -835,8 +835,8 @@ main(int argc, char** argv)
    ev_periodic_start(main_loop, &wal_streaming);
 
    /* Start WAL compression */
-   if (config->compression_type != COMPRESSION_NONE ||
-       config->encryption != ENCRYPTION_NONE)
+   if (config->common.compression_type != COMPRESSION_NONE ||
+       config->common.encryption != ENCRYPTION_NONE)
    {
       ev_periodic_init(&wal, wal_cb, 0., 60, 0);
       ev_periodic_start(main_loop, &wal);
@@ -1010,9 +1010,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          shutdown_mgt();
 
-         if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
+         if (pgmoneta_bind_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &unix_management_socket))
          {
-            pgmoneta_log_fatal("Could not bind to %s", config->unix_socket_dir);
+            pgmoneta_log_fatal("Could not bind to %s", config->common.unix_socket_dir);
             exit(1);
          }
 
@@ -1635,22 +1635,22 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_json_clone(payload, &pyl);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/gzip", NULL);
             pgmoneta_gunzip_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+         else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/zstd", NULL);
             pgmoneta_zstandardd_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/lz4", NULL);
             pgmoneta_lz4d_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
          {
             pgmoneta_set_proc_title(1, ai->argv, "decompress/bz2", NULL);
             pgmoneta_bunzip2_request(NULL, client_fd, compression, encryption, pyl);
@@ -1679,22 +1679,22 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_json_clone(payload, &pyl);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/gzip", NULL);
             pgmoneta_gzip_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+         else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/zstd", NULL);
             pgmoneta_zstandardc_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/lz4", NULL);
             pgmoneta_lz4c_request(NULL, client_fd, compression, encryption, pyl);
          }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
          {
             pgmoneta_set_proc_title(1, ai->argv, "compress/bz2", NULL);
             pgmoneta_bzip2_request(NULL, client_fd, compression, encryption, pyl);
@@ -2256,24 +2256,24 @@ wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute_
             {
                d = pgmoneta_get_server_wal(i);
 
-               if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+               if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
                {
                   pgmoneta_gzip_wal(d);
                }
-               else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+               else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
                {
                   pgmoneta_zstandardc_wal(d);
                }
-               else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+               else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
                {
                   pgmoneta_lz4c_wal(d);
                }
-               else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+               else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
                {
                   pgmoneta_bzip2_wal(d);
                }
 
-               if (config->encryption != ENCRYPTION_NONE)
+               if (config->common.encryption != ENCRYPTION_NONE)
                {
                   pgmoneta_encrypt_wal(d);
                }
@@ -2718,9 +2718,9 @@ init_replication_slot(int server)
             goto server_done;
          }
 
-         if (config->common.servers[server].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
-                                                             config->compression_type == COMPRESSION_SERVER_ZSTD ||
-                                                             config->compression_type == COMPRESSION_SERVER_LZ4))
+         if (config->common.servers[server].version < 15 && (config->common.compression_type == COMPRESSION_SERVER_GZIP ||
+                                                             config->common.compression_type == COMPRESSION_SERVER_ZSTD ||
+                                                             config->common.compression_type == COMPRESSION_SERVER_LZ4))
          {
             pgmoneta_log_error("PostgreSQL 15 or higher is required for server %s for server side compression",
                                config->common.servers[server].name);
@@ -2888,16 +2888,16 @@ create_pidfile(void)
    if (strlen(config->pidfile) == 0)
    {
       // no pidfile set, use a default one
-      if (!pgmoneta_ends_with(config->unix_socket_dir, "/"))
+      if (!pgmoneta_ends_with(config->common.unix_socket_dir, "/"))
       {
          snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
-                  config->unix_socket_dir,
+                  config->common.unix_socket_dir,
                   !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       }
       else
       {
          snprintf(config->pidfile, sizeof(config->pidfile), "%spgmoneta.%s.pid",
-                  config->unix_socket_dir,
+                  config->common.unix_socket_dir,
                   !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       }
       pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);

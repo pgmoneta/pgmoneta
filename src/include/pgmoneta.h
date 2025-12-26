@@ -352,6 +352,11 @@ struct common_configuration
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
 
+   int compression_type;  /**< The compression type */
+   int compression_level; /**< The compression level */
+
+   int encryption; /**< The AES encryption mode */
+
    struct server servers[NUMBER_OF_SERVERS]; /**< The servers */
    struct user users[NUMBER_OF_USERS];       /**< The users */
    struct user admins[NUMBER_OF_ADMINS];     /**< The admins */
@@ -367,6 +372,8 @@ struct common_configuration
    bool keep_alive;   /**< Use keep alive */
    bool nodelay;      /**< Use NODELAY */
    bool non_blocking; /**< Use non blocking */
+
+   char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain Socket */
 
    struct prometheus prometheus; /**< The Prometheus metrics */
 } __attribute__((aligned(64)));
@@ -388,14 +395,9 @@ struct main_configuration
 
    char base_dir[MAX_PATH]; /**< The base directory */
 
-   int compression_type;  /**< The compression type */
-   int compression_level; /**< The compression level */
-
    int create_slot; /**< Create a slot */
 
    int storage_engine; /**< The storage engine */
-
-   int encryption; /**< The AES encryption mode */
 
    char ssh_hostname[MISC_LENGTH];      /**< The SSH hostname */
    char ssh_username[MISC_LENGTH];      /**< The SSH username */
@@ -448,8 +450,6 @@ struct main_configuration
    int backlog;             /**< The backlog for listen */
    unsigned char hugepage;  /**< Huge page support */
 
-   char unix_socket_dir[MISC_LENGTH]; /**< The directory for the Unix Domain Socket */
-
    int backup_max_rate;  /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
@@ -458,6 +458,19 @@ struct main_configuration
 #ifdef DEBUG
    bool link; /**< Do linking */
 #endif
+} __attribute__((aligned(64)));
+
+/** @struct cli_configuration
+ * Defines the CLI configuration list
+ */
+struct cli_configuration
+{
+   struct common_configuration common; /**< Common configurations shared with other tools */
+
+   char host[MISC_LENGTH]; /**< The management host */
+   int port;               /**< The management port */
+
+   int32_t output_format; /**< Default output format for CLI responses */
 } __attribute__((aligned(64)));
 
 /** @struct walinfo_configuration

@@ -173,24 +173,24 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       }
 
       filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
-      if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+      if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
       {
          filename = pgmoneta_append(filename, ".gz");
       }
-      else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+      else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
       {
          filename = pgmoneta_append(filename, ".zstd");
       }
-      else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+      else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
       {
          filename = pgmoneta_append(filename, ".lz4");
       }
-      else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+      else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
       {
          filename = pgmoneta_append(filename, ".bz2");
       }
 
-      if (config->encryption != ENCRYPTION_NONE)
+      if (config->common.encryption != ENCRYPTION_NONE)
       {
          filename = pgmoneta_append(filename, ".aes");
       }
@@ -278,21 +278,21 @@ pgmoneta_extract_tar_file(char* file_path, char* destination)
    a = archive_read_new();
    archive_read_support_format_tar(a);
 
-   if (config->compression_type == COMPRESSION_SERVER_GZIP)
+   if (config->common.compression_type == COMPRESSION_SERVER_GZIP)
    {
       archive_name = pgmoneta_append(archive_name, file_path);
       archive_name = pgmoneta_append(archive_name, ".gz");
       pgmoneta_move_file(file_path, archive_name);
       pgmoneta_gunzip_file(archive_name, file_path);
    }
-   else if (config->compression_type == COMPRESSION_SERVER_ZSTD)
+   else if (config->common.compression_type == COMPRESSION_SERVER_ZSTD)
    {
       archive_name = pgmoneta_append(archive_name, file_path);
       archive_name = pgmoneta_append(archive_name, ".zstd");
       pgmoneta_move_file(file_path, archive_name);
       pgmoneta_zstandardd_file(archive_name, file_path);
    }
-   else if (config->compression_type == COMPRESSION_SERVER_LZ4)
+   else if (config->common.compression_type == COMPRESSION_SERVER_LZ4)
    {
       archive_name = pgmoneta_append(archive_name, file_path);
       archive_name = pgmoneta_append(archive_name, ".lz4");
@@ -969,7 +969,7 @@ is_server_side_compression(void)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
-   return config->compression_type == COMPRESSION_SERVER_GZIP ||
-          config->compression_type == COMPRESSION_SERVER_LZ4 ||
-          config->compression_type == COMPRESSION_SERVER_ZSTD;
+   return config->common.compression_type == COMPRESSION_SERVER_GZIP ||
+          config->common.compression_type == COMPRESSION_SERVER_LZ4 ||
+          config->common.compression_type == COMPRESSION_SERVER_ZSTD;
 }

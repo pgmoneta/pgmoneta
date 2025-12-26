@@ -1968,14 +1968,14 @@ create_info(char* directory, char* label, int status)
    pgmoneta_log_trace("%s=", INFO_COMMENTS);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->compression_type);
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_COMPRESSION, config->common.compression_type);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->compression_type);
+   pgmoneta_log_trace("%s=%d", INFO_COMPRESSION, config->common.compression_type);
 
    memset(&buffer[0], 0, sizeof(buffer));
-   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->encryption);
+   snprintf(&buffer[0], sizeof(buffer), "%s=%d\n", INFO_ENCRYPTION, config->common.encryption);
    fputs(&buffer[0], sfile);
-   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->encryption);
+   pgmoneta_log_trace("%s=%d", INFO_ENCRYPTION, config->common.encryption);
 
    pgmoneta_permission(s, 6, 0, 0);
 
