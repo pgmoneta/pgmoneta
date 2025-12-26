@@ -446,28 +446,28 @@ wf_backup(void)
    current->next = pgmoneta_create_hot_standby();
    current = current->next;
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
    {
       current->next = pgmoneta_create_gzip(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
    {
       current->next = pgmoneta_create_zstd(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
    {
       current->next = pgmoneta_create_lz4(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
    {
       current->next = pgmoneta_create_bzip2(true);
       current = current->next;
    }
 
-   if (config->encryption != ENCRYPTION_NONE)
+   if (config->common.encryption != ENCRYPTION_NONE)
    {
       current->next = pgmoneta_encryption(true);
       current = current->next;
@@ -752,28 +752,28 @@ wf_incremental_backup(void)
    current->next = pgmoneta_create_hot_standby();
    current = current->next;
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
    {
       current->next = pgmoneta_create_gzip(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
    {
       current->next = pgmoneta_create_zstd(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
    {
       current->next = pgmoneta_create_lz4(true);
       current = current->next;
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
    {
       current->next = pgmoneta_create_bzip2(true);
       current = current->next;
    }
 
-   if (config->encryption != ENCRYPTION_NONE)
+   if (config->common.encryption != ENCRYPTION_NONE)
    {
       current->next = pgmoneta_encryption(true);
       current = current->next;

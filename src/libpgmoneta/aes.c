@@ -207,7 +207,7 @@ pgmoneta_encrypt_wal(char* d)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
-   switch (config->compression_type)
+   switch (config->common.compression_type)
    {
       case COMPRESSION_CLIENT_GZIP:
       case COMPRESSION_SERVER_GZIP:
@@ -889,7 +889,7 @@ encrypt_file(char* from, char* to, int enc)
    int f_len = 0;
 
    config = (struct main_configuration*)shmem;
-   cipher_fp = get_cipher(config->encryption);
+   cipher_fp = get_cipher(config->common.encryption);
    cipher_block_size = EVP_CIPHER_block_size(cipher_fp());
    inbuf_size = ENC_BUF_SIZE;
    outbuf_size = inbuf_size + cipher_block_size - 1;
@@ -903,7 +903,7 @@ encrypt_file(char* from, char* to, int enc)
    }
    memset(&key, 0, sizeof(key));
    memset(&iv, 0, sizeof(iv));
-   if (derive_key_iv(master_key, key, iv, config->encryption) != 0)
+   if (derive_key_iv(master_key, key, iv, config->common.encryption) != 0)
    {
       pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
       goto error;

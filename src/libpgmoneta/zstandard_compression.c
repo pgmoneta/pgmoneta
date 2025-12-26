@@ -73,7 +73,7 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
       return;
    }
 
-   level = config->compression_level;
+   level = config->common.compression_level;
    if (level < 1)
    {
       level = 1;
@@ -263,7 +263,7 @@ pgmoneta_zstandardc_wal(char* directory)
       return;
    }
 
-   level = config->compression_level;
+   level = config->common.compression_level;
    if (level < 1)
    {
       level = 1;
@@ -812,7 +812,7 @@ pgmoneta_zstandardc_file(char* from, char* to)
 
    config = (struct main_configuration*)shmem;
 
-   level = config->compression_level;
+   level = config->common.compression_level;
    if (level < 1)
    {
       level = 1;

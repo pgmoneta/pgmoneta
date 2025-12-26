@@ -156,7 +156,7 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    else
    {
-      switch (config->compression_type)
+      switch (config->common.compression_type)
       {
          case COMPRESSION_CLIENT_GZIP:
          case COMPRESSION_SERVER_GZIP:

@@ -69,9 +69,12 @@ static int as_logging_level(char* str);
 static int as_logging_mode(char* str);
 static int as_hugepage(char* str);
 static int as_compression(char* str);
+static int as_management_compression(char* str);
 static int as_storage_engine(char* str);
 static char* as_ciphers(char* str);
 static int as_encryption_mode(char* str);
+static int as_management_encryption(char* str);
+static int as_output_format(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
 static int as_seconds(char* str, int* age, int default_age);
@@ -147,10 +150,10 @@ pgmoneta_init_main_configuration(void* shm)
 
    config->running = true;
 
-   config->compression_type = COMPRESSION_CLIENT_ZSTD;
-   config->compression_level = 3;
+   config->common.compression_type = COMPRESSION_CLIENT_ZSTD;
+   config->common.compression_level = 3;
 
-   config->encryption = ENCRYPTION_NONE;
+   config->common.encryption = ENCRYPTION_NONE;
 
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
@@ -1002,7 +1005,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->unix_socket_dir, value, max);
+                     memcpy(config->common.unix_socket_dir, value, max);
                   }
                   else
                   {
@@ -1096,7 +1099,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->compression_type = as_compression(value);
+                     config->common.compression_type = as_compression(value);
                   }
                   else
                   {
@@ -1107,7 +1110,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_int(value, &config->compression_level))
+                     if (as_int(value, &config->common.compression_level))
                      {
                         unknown = true;
                      }
@@ -1517,7 +1520,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     config->encryption = as_encryption_mode(value);
+                     config->common.encryption = as_encryption_mode(value);
                   }
                   else
                   {
@@ -1680,19 +1683,19 @@ pgmoneta_validate_main_configuration(void* shm)
       return 1;
    }
 
-   if (strlen(config->unix_socket_dir) == 0)
+   if (strlen(config->common.unix_socket_dir) == 0)
    {
       pgmoneta_log_fatal("No unix_socket_dir defined");
       return 1;
    }
 
-   if (stat(config->unix_socket_dir, &st) == 0 && S_ISDIR(st.st_mode))
+   if (stat(config->common.unix_socket_dir, &st) == 0 && S_ISDIR(st.st_mode))
    {
       /* Ok */
    }
    else
    {
-      pgmoneta_log_fatal("unix_socket_dir is not a directory (%s)", config->unix_socket_dir);
+      pgmoneta_log_fatal("unix_socket_dir is not a directory (%s)", config->common.unix_socket_dir);
       return 1;
    }
 
@@ -1783,48 +1786,48 @@ pgmoneta_validate_main_configuration(void* shm)
       return 1;
    }
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   if (config->common.compression_type == COMPRESSION_CLIENT_GZIP || config->common.compression_type == COMPRESSION_SERVER_GZIP)
    {
-      if (config->compression_level < 1)
+      if (config->common.compression_level < 1)
       {
-         config->compression_level = 1;
+         config->common.compression_level = 1;
       }
-      else if (config->compression_level > 9)
+      else if (config->common.compression_level > 9)
       {
-         config->compression_level = 9;
+         config->common.compression_level = 9;
       }
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_ZSTD || config->common.compression_type == COMPRESSION_SERVER_ZSTD)
    {
-      if (config->compression_level < -131072)
+      if (config->common.compression_level < -131072)
       {
-         config->compression_level = -131072;
+         config->common.compression_level = -131072;
       }
-      else if (config->compression_level > 22)
+      else if (config->common.compression_level > 22)
       {
-         config->compression_level = 22;
+         config->common.compression_level = 22;
       }
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_LZ4 || config->common.compression_type == COMPRESSION_SERVER_LZ4)
    {
-      if (config->compression_level < 1)
+      if (config->common.compression_level < 1)
       {
-         config->compression_level = 1;
+         config->common.compression_level = 1;
       }
-      else if (config->compression_level > 12)
+      else if (config->common.compression_level > 12)
       {
-         config->compression_level = 12;
+         config->common.compression_level = 12;
       }
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+   else if (config->common.compression_type == COMPRESSION_CLIENT_BZIP2)
    {
-      if (config->compression_level < 1)
+      if (config->common.compression_level < 1)
       {
-         config->compression_level = 1;
+         config->common.compression_level = 1;
       }
-      else if (config->compression_level > 9)
+      else if (config->common.compression_level > 9)
       {
-         config->compression_level = 9;
+         config->common.compression_level = 9;
       }
    }
 
@@ -1995,6 +1998,237 @@ pgmoneta_validate_main_configuration(void* shm)
       pgmoneta_log_fatal("verification cannot be less than 0");
       return 1;
    }
+   return 0;
+}
+
+int
+pgmoneta_init_cli_configuration(void* shmem)
+{
+   struct cli_configuration* config;
+
+   config = (struct cli_configuration*)shmem;
+
+   config->common.log_type = PGMONETA_LOGGING_TYPE_CONSOLE;
+   config->common.log_level = PGMONETA_LOGGING_LEVEL_INFO;
+   config->common.log_mode = PGMONETA_LOGGING_MODE_APPEND;
+   atomic_init(&config->common.log_lock, STATE_FREE);
+
+   /* For CLI, treat common.compression_type/encryption as management defaults */
+   config->common.compression_type = MANAGEMENT_COMPRESSION_NONE;
+   config->common.compression_level = 0;
+   config->common.encryption = MANAGEMENT_ENCRYPTION_NONE;
+
+   config->output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
+
+   config->port = 0;
+
+   return 0;
+}
+
+int
+pgmoneta_read_cli_configuration(void* shmem, char* filename)
+{
+   FILE* file;
+   char line[LINE_LENGTH];
+   char* trimmed_line = NULL;
+   char* key = NULL;
+   char* value = NULL;
+   size_t max;
+   struct cli_configuration* config;
+
+   file = fopen(filename, "r");
+
+   if (!file)
+   {
+      return 1;
+   }
+
+   config = (struct cli_configuration*)shmem;
+
+   while (fgets(line, sizeof(line), file))
+   {
+      if (!is_empty_string(line))
+      {
+         if (!remove_leading_whitespace_and_comments(line, &trimmed_line))
+         {
+            if (is_empty_string(trimmed_line))
+            {
+               free(trimmed_line);
+               trimmed_line = NULL;
+               continue;
+            }
+         }
+         else
+         {
+            goto error;
+         }
+
+         /* Skip section markers */
+         if (trimmed_line[0] == '[')
+         {
+            free(trimmed_line);
+            trimmed_line = NULL;
+            continue;
+         }
+
+         /* Extract and process all key-value pairs */
+         if (pgmoneta_starts_with(trimmed_line, CONFIGURATION_ARGUMENT_LOG_PATH) ||
+             pgmoneta_starts_with(trimmed_line, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR))
+         {
+            extract_syskey_value(trimmed_line, &key, &value);
+         }
+         else
+         {
+            extract_key_value(trimmed_line, &key, &value);
+         }
+
+         if (key && value)
+         {
+            if (!strcmp(key, CONFIGURATION_ARGUMENT_HOST))
+            {
+               max = strlen(value);
+               if (max > MISC_LENGTH - 1)
+               {
+                  max = MISC_LENGTH - 1;
+               }
+               memcpy(config->host, value, max);
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_PORT))
+            {
+               as_int(value, &config->port); /* leave default if invalid */
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_TYPE))
+            {
+               config->common.log_type = as_logging_type(value);
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_LEVEL))
+            {
+               config->common.log_level = as_logging_level(value);
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_PATH))
+            {
+               max = strlen(value);
+               if (max > MISC_LENGTH - 1)
+               {
+                  max = MISC_LENGTH - 1;
+               }
+               memcpy(config->common.log_path, value, max);
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_LOG_MODE))
+            {
+               config->common.log_mode = as_logging_mode(value);
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR))
+            {
+               max = strlen(value);
+               if (max > MISC_LENGTH - 1)
+               {
+                  max = MISC_LENGTH - 1;
+               }
+               memcpy(config->common.unix_socket_dir, value, max);
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_CLI_OUTPUT_FORMAT))
+            {
+               int out = as_output_format(value);
+               if (out != -1)
+               {
+                  config->output_format = out;
+               }
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_COMPRESSION))
+            {
+               int mc = as_management_compression(value);
+               if (mc != -1)
+               {
+                  config->common.compression_type = mc;
+               }
+            }
+            else if (!strcmp(key, CONFIGURATION_ARGUMENT_ENCRYPTION))
+            {
+               int me = as_management_encryption(value);
+               if (me != -1)
+               {
+                  config->common.encryption = me;
+               }
+            }
+            else
+            {
+               /* Ignore unknown keys in cli.conf */
+            }
+
+
+            free(key);
+            free(value);
+            key = NULL;
+            value = NULL;
+         }
+         else
+         {
+            warnx("Unknown line format: %s", line);
+         }
+      }
+      free(trimmed_line);
+      trimmed_line = NULL;
+   }
+
+   fclose(file);
+
+   return 0;
+
+error:
+
+   free(trimmed_line);
+   trimmed_line = NULL;
+   if (file)
+   {
+      fclose(file);
+   }
+
+   return 1;
+}
+
+int
+pgmoneta_validate_cli_configuration(void* shmem)
+{
+   struct cli_configuration* config;
+
+   config = (struct cli_configuration*)shmem;
+
+   if (config->port < 0)
+   {
+      config->port = 0;
+   }
+
+   if (config->output_format != MANAGEMENT_OUTPUT_FORMAT_TEXT &&
+       config->output_format != MANAGEMENT_OUTPUT_FORMAT_JSON &&
+       config->output_format != MANAGEMENT_OUTPUT_FORMAT_RAW)
+   {
+      config->output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
+   }
+
+   switch (config->common.compression_type)
+   {
+      case MANAGEMENT_COMPRESSION_GZIP:
+      case MANAGEMENT_COMPRESSION_ZSTD:
+      case MANAGEMENT_COMPRESSION_LZ4:
+      case MANAGEMENT_COMPRESSION_BZIP2:
+      case MANAGEMENT_COMPRESSION_NONE:
+         break;
+      default:
+         config->common.compression_type = MANAGEMENT_COMPRESSION_NONE;
+   }
+
+   switch (config->common.encryption)
+   {
+      case MANAGEMENT_ENCRYPTION_NONE:
+      case MANAGEMENT_ENCRYPTION_AES256:
+      case MANAGEMENT_ENCRYPTION_AES192:
+      case MANAGEMENT_ENCRYPTION_AES128:
+         break;
+      default:
+         config->common.encryption = MANAGEMENT_ENCRYPTION_NONE;
+   }
+
    return 0;
 }
 
@@ -3008,17 +3242,17 @@ add_configuration_response(struct json* res)
    char* ret = get_retention_string(config->retention_days, config->retention_weeks, config->retention_months, config->retention_years);
    // JSON of main configuration
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HOST, (uintptr_t)config->host, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR, (uintptr_t)config->unix_socket_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR, (uintptr_t)config->common.unix_socket_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BASE_DIR, (uintptr_t)config->base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS, (uintptr_t)config->metrics, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, (uintptr_t)config->metrics_cache_max_age, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE, (uintptr_t)config->metrics_cache_max_size, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANAGEMENT, (uintptr_t)config->management, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)config->compression_type, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL, (uintptr_t)config->compression_level, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)config->common.compression_type, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL, (uintptr_t)config->common.compression_level, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)config->storage_engine, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->encryption, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->common.encryption, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->create_slot, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_HOSTNAME, (uintptr_t)config->ssh_hostname, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_USERNAME, (uintptr_t)config->ssh_username, ValueString);
@@ -3810,11 +4044,11 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
       }
       else if (!strcmp(key, "compression"))
       {
-         config->compression_type = as_compression(value);
+         config->common.compression_type = as_compression(value);
       }
       else if (!strcmp(key, "compression_level"))
       {
-         if (as_int(value, &config->compression_level))
+         if (as_int(value, &config->common.compression_level))
          {
             unknown = true;
          }
@@ -3919,11 +4153,11 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          }
          else if (!strcmp(key_info.key, "compression"))
          {
-            snprintf(buffer, buffer_size, "%d", config->compression_type);
+            snprintf(buffer, buffer_size, "%d", config->common.compression_type);
          }
          else if (!strcmp(key_info.key, "compression_level"))
          {
-            snprintf(buffer, buffer_size, "%d", config->compression_level);
+            snprintf(buffer, buffer_size, "%d", config->common.compression_level);
          }
          else if (!strcmp(key_info.key, "storage_engine"))
          {
@@ -5119,6 +5353,90 @@ as_encryption_mode(char* str)
 }
 
 static int
+as_management_encryption(char* str)
+{
+   if (!strcasecmp(str, "none"))
+   {
+      return MANAGEMENT_ENCRYPTION_NONE;
+   }
+
+   if (!strcasecmp(str, "aes") || !strcasecmp(str, "aes256"))
+   {
+      return MANAGEMENT_ENCRYPTION_AES256;
+   }
+
+   if (!strcasecmp(str, "aes192"))
+   {
+      return MANAGEMENT_ENCRYPTION_AES192;
+   }
+
+   if (!strcasecmp(str, "aes128"))
+   {
+      return MANAGEMENT_ENCRYPTION_AES128;
+   }
+
+   warnx("Unknown management encryption mode: %s", str);
+
+   return -1;
+}
+
+static int
+as_management_compression(char* str)
+{
+   if (!strcasecmp(str, "gz"))
+   {
+      return MANAGEMENT_COMPRESSION_GZIP;
+   }
+
+   if (!strcasecmp(str, "zstd"))
+   {
+      return MANAGEMENT_COMPRESSION_ZSTD;
+   }
+
+   if (!strcasecmp(str, "lz4"))
+   {
+      return MANAGEMENT_COMPRESSION_LZ4;
+   }
+
+   if (!strcasecmp(str, "bz2"))
+   {
+      return MANAGEMENT_COMPRESSION_BZIP2;
+   }
+
+   if (!strcasecmp(str, "none"))
+   {
+      return MANAGEMENT_COMPRESSION_NONE;
+   }
+
+   warnx("Unknown management compression: %s", str);
+
+   return -1;
+}
+
+static int
+as_output_format(char* str)
+{
+   if (!strcasecmp(str, "text"))
+   {
+      return MANAGEMENT_OUTPUT_FORMAT_TEXT;
+   }
+
+   if (!strcasecmp(str, "json"))
+   {
+      return MANAGEMENT_OUTPUT_FORMAT_JSON;
+   }
+
+   if (!strcasecmp(str, "raw"))
+   {
+      return MANAGEMENT_OUTPUT_FORMAT_RAW;
+   }
+
+   warnx("Unknown output format: %s", str);
+
+   return -1;
+}
+
+static int
 as_create_slot(char* str, int* create_slot)
 {
    if (!strcasecmp(str, "true") || !strcasecmp(str, "on") || !strcasecmp(str, "yes") || !strcasecmp(str, "1"))
@@ -5207,8 +5525,8 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       changed = true;
    }
    config->create_slot = reload->create_slot;
-   config->compression_type = reload->compression_type;
-   config->compression_level = reload->compression_level;
+   config->common.compression_type = reload->common.compression_type;
+   config->common.compression_level = reload->common.compression_level;
    if (restart_string("workspace", config->workspace, reload->workspace))
    {
       changed = true;
@@ -5300,7 +5618,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    {
       changed = true;
    }
-   if (restart_string("unix_socket_dir", config->unix_socket_dir, reload->unix_socket_dir))
+   if (restart_string("unix_socket_dir", config->common.unix_socket_dir, reload->common.unix_socket_dir))
    {
       changed = true;
    }

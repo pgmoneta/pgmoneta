@@ -495,7 +495,7 @@ trim_suffix(char* str)
    if (!pgmoneta_compare_string(str, "backup_label") &&
        !pgmoneta_compare_string(str, "backup_manifest"))
    {
-      switch (config->compression_type)
+      switch (config->common.compression_type)
       {
          case COMPRESSION_CLIENT_GZIP:
          case COMPRESSION_SERVER_GZIP:
@@ -511,7 +511,7 @@ trim_suffix(char* str)
             len -= 4;
             break;
       }
-      if (config->encryption != ENCRYPTION_NONE)
+      if (config->common.encryption != ENCRYPTION_NONE)
       {
          len -= 4;
       }
