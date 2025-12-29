@@ -346,7 +346,12 @@ pgmoneta_restore(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   config->common.servers[server].active_restore = true;
+#ifdef DEBUG
+   pgmoneta_log_debug("Restore: Acquired repository lock")
+#endif
+
+      config->common.servers[server]
+         .active_restore = true;
    locked = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);

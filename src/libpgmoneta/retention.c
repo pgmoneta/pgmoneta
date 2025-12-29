@@ -63,11 +63,16 @@ pgmoneta_retention(char** argv)
 
       if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
       {
-         pgmoneta_log_info("Retention: Server %s is active", config->common.servers[server].name);
+         pgmoneta_log_debug("Retention: Server %s is active", config->common.servers[server].name);
          continue;
       }
 
-      config->common.servers[server].active_retention = true;
+#ifdef DEBUG
+      pgmoneta_log_info("Retention: Acquired repository lock")
+#endif
+
+         config->common.servers[server]
+            .active_retention = true;
 
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, NULL);
 

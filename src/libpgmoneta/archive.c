@@ -95,7 +95,12 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-   config->common.servers[server].active_archive = true;
+#ifdef DEBUG
+   pgmoneta_log_info("Archive: Acquired repository lock")
+#endif
+
+      config->common.servers[server]
+         .active_archive = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
@@ -230,7 +235,11 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    config->common.servers[server].active_archive = false;
    atomic_store(&config->common.servers[server].repository, false);
 
-   pgmoneta_stop_logging();
+#ifdef DEBUG
+   pgmoneta_log_debug("Archive: Released repository lock")
+#endif
+
+      pgmoneta_stop_logging();
 
    free(label);
    free(output);

@@ -2254,7 +2254,11 @@ wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute_
 
             if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
             {
-               d = pgmoneta_get_server_wal(i);
+#ifdef DEBUG
+               pgmoneta_log_debug("WAL: Acquired repository lock")
+#endif
+
+                  d = pgmoneta_get_server_wal(i);
 
                if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
                {
