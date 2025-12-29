@@ -68,7 +68,7 @@ pgmoneta_retention(char** argv)
       }
 
 #ifdef DEBUG
-      pgmoneta_log_info("Retention: Acquired repository lock")
+      pgmoneta_log_info("Retention: Acquired repository lock");
 #endif
 
          config->common.servers[server]

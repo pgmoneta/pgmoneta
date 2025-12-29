@@ -2255,7 +2255,7 @@ wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute_
             if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
             {
 #ifdef DEBUG
-               pgmoneta_log_debug("WAL: Acquired repository lock")
+               pgmoneta_log_debug("WAL: Acquired repository lock");
 #endif
 
                   d = pgmoneta_get_server_wal(i);

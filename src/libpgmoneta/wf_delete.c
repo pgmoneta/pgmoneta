@@ -114,7 +114,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
 #ifdef DEBUG
-   pgmoneta_log_debug("Delete: Acquired repository lock")
+   pgmoneta_log_debug("Delete: Acquired repository lock");
 #endif
 
       config->common.servers[server]

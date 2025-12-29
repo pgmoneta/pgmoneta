@@ -99,11 +99,11 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       goto error;
    }
 
-   config->common.servers[server].active_backup = true;
-
 #ifdef DEBUG
-   pgmoneta_log_debug("Backup: Acquired repository lock")
+   pgmoneta_log_debug("Backup: Acquired repository lock");
 #endif
+
+   config->common.servers[server].active_backup = true;
 
 #ifdef HAVE_FREEBSD
       clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);

@@ -236,7 +236,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    atomic_store(&config->common.servers[server].repository, false);
 
 #ifdef DEBUG
-   pgmoneta_log_debug("Archive: Released repository lock")
+   pgmoneta_log_debug("Archive: Released repository lock");
 #endif
 
       pgmoneta_stop_logging();
