@@ -239,7 +239,7 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    pgmoneta_log_debug("Archive: Released repository lock");
 #endif
 
-      pgmoneta_stop_logging();
+   pgmoneta_stop_logging();
 
    free(label);
    free(output);

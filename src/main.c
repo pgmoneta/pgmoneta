@@ -2258,7 +2258,7 @@ wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute_
                pgmoneta_log_debug("WAL: Acquired repository lock");
 #endif
 
-                  d = pgmoneta_get_server_wal(i);
+               d = pgmoneta_get_server_wal(i);
 
                if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
                {
