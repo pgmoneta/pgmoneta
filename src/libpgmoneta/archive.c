@@ -96,11 +96,10 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
    }
 
 #ifdef DEBUG
-   pgmoneta_log_info("Archive: Acquired repository lock")
+   pgmoneta_log_info("Archive: Acquired repository lock");
 #endif
 
-      config->common.servers[server]
-         .active_archive = true;
+   config->common.servers[server].active_archive = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
