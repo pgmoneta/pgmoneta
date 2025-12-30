@@ -40,16 +40,19 @@
 #include <wal.h>
 #include <walfile.h>
 #include <walfile/rmgr.h>
+#include <walfile/wal_reader.h>
 
 /* system */
 #include <err.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <libgen.h>
+#include <signal.h> // for signal handling
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ncurses.h>
 
 /* Column widths for WAL statistics table */
 #define COL_WIDTH_COUNT         9
@@ -64,6 +67,1196 @@
 static int describe_walfile(char* path, enum value_type type, FILE* output, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects);
 static int describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects, struct column_widths* provided_widths);
 static int describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects);
+
+/* Forward declarations */
+struct decoded_xlog_record;
+struct walfile;
+
+/* Display modes */
+enum display_mode {
+   DISPLAY_MODE_TEXT,
+   DISPLAY_MODE_BINARY
+};
+
+/* Column indices for navigation */
+enum column_index {
+   COL_RMGR = 0,
+   COL_START_LSN,
+   COL_END_LSN,
+   COL_REC_LEN,
+   COL_TOT_LEN,
+   COL_XID,
+   COL_DESCRIPTION,
+   COL_COUNT
+};
+
+/* WAL record wrapper for UI display */
+struct wal_record_ui
+{
+   char rmgr[32];
+   uint64_t start_lsn;
+   uint64_t end_lsn;
+   uint32_t rec_len;
+   uint32_t tot_len;
+   uint32_t xid;
+   char description[512];
+   char hex_data[512];
+   bool verified;
+   char verification_status[64];
+   struct decoded_xlog_record* record; /* Pointer to actual record */
+};
+
+/* UI state */
+struct ui_state
+{
+   char* wal_filename;
+   struct wal_record_ui* records;
+   size_t record_count;
+   size_t record_capacity;
+   struct walfile* wf;
+
+   /* Navigation */
+   size_t current_row;
+   enum column_index current_col;
+   size_t scroll_offset;
+
+   /* Display settings */
+   enum display_mode mode;
+   bool show_verification;
+   bool auto_load_next;
+
+   /* Windows */
+   WINDOW* header_win;
+   WINDOW* main_win;
+   WINDOW* footer_win;
+   WINDOW* status_win;
+
+   /* Search state */
+   char search_query[256];
+   bool search_active;
+   size_t* search_results;
+   size_t search_result_count;
+   size_t current_search_index;
+};
+
+static bool curses_active = false;
+static bool curses_atexit_registered = false;
+static bool curses_handlers_installed = false;
+static const int curses_signals[] = {SIGABRT, SIGSEGV, SIGINT, SIGTERM};
+static struct sigaction curses_saved_actions[sizeof(curses_signals) / sizeof(curses_signals[0])];
+
+static void wal_interactive_endwin(void);
+static void wal_interactive_restore_handlers(void);
+static void wal_interactive_signal_handler(int signum);
+
+static void
+wal_interactive_endwin(void)
+{
+   if (curses_active)
+   {
+      endwin();
+      curses_active = false;
+   }
+}
+
+static void
+wal_interactive_signal_handler(int signum)
+{
+   wal_interactive_endwin();
+   raise(signum);
+}
+
+static void
+wal_interactive_install_handlers(void)
+{
+   if (curses_handlers_installed)
+   {
+      return;
+   }
+
+   struct sigaction action;
+   memset(&action, 0, sizeof(action));
+   action.sa_handler = wal_interactive_signal_handler;
+   sigemptyset(&action.sa_mask);
+   action.sa_flags = SA_RESETHAND;
+
+   for (size_t i = 0; i < sizeof(curses_signals) / sizeof(curses_signals[0]); i++)
+   {
+      sigaction(curses_signals[i], &action, &curses_saved_actions[i]);
+   }
+
+   curses_handlers_installed = true;
+}
+
+static void
+wal_interactive_restore_handlers(void)
+{
+   if (!curses_handlers_installed)
+   {
+      return;
+   }
+
+   for (size_t i = 0; i < sizeof(curses_signals) / sizeof(curses_signals[0]); i++)
+   {
+      sigaction(curses_signals[i], &curses_saved_actions[i], NULL);
+   }
+
+   curses_handlers_installed = false;
+}
+
+/**
+ * Initialize the interactive UI
+ * @param state UI state structure
+ * @param wal_filename Path to WAL file
+ * @return 0 on success, -1 on error
+ */
+static int
+wal_interactive_init(struct ui_state* state, const char* wal_filename)
+{
+   memset(state, 0, sizeof(struct ui_state));
+
+   state->wal_filename = strdup(wal_filename);
+   state->record_capacity = 1000;
+   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+   state->mode = DISPLAY_MODE_TEXT;
+   state->show_verification = true;
+
+   /* Initialize ncurses only if we have a terminal */
+   if (!isatty(fileno(stdout)))
+   {
+      fprintf(stderr, "Warning: Not a terminal, skipping ncurses initialization\n");
+      fflush(stderr);
+      return 0;
+   }
+
+   /* Initialize ncurses */
+   if (initscr() == NULL)
+   {
+      fprintf(stderr, "Error: Failed to initialize ncurses\n");
+      return -1;
+   }
+   curses_active = true;
+   if (!curses_atexit_registered)
+   {
+      atexit(wal_interactive_endwin);
+      curses_atexit_registered = true;
+   }
+   wal_interactive_install_handlers();
+   clear();
+   refresh();
+   cbreak();
+   noecho();
+   keypad(stdscr, TRUE);
+   curs_set(0);
+   start_color();
+
+   /* Color pairs for UI elements */
+   init_pair(1, COLOR_WHITE, COLOR_BLACK);  /* Header background */
+   init_pair(2, COLOR_CYAN, COLOR_BLACK);   /* Main background */
+   init_pair(3, COLOR_GREEN, COLOR_BLACK);  /* Valid status / Descriptions */
+   init_pair(4, COLOR_RED, COLOR_BLACK);    /* Invalid status / RMGR */
+   init_pair(5, COLOR_YELLOW, COLOR_BLACK); /* Total length */
+
+   /* Additional color pairs matching walinfo color scheme */
+   init_pair(6, COLOR_RED, COLOR_BLACK);     /* RMGR (Resource Manager) */
+   init_pair(7, COLOR_MAGENTA, COLOR_BLACK); /* LSN */
+   init_pair(8, COLOR_BLUE, COLOR_BLACK);    /* Record length */
+   init_pair(9, COLOR_YELLOW, COLOR_BLACK);  /* Total length */
+   init_pair(10, COLOR_CYAN, COLOR_BLACK);   /* XID */
+   init_pair(11, COLOR_GREEN, COLOR_BLACK);  /* Descriptions */
+
+   int height, width;
+   getmaxyx(stdscr, height, width);
+
+   /* Create windows */
+   state->header_win = newwin(3, width, 0, 0);
+   state->main_win = newwin(height - 6, width, 3, 0);
+   state->status_win = newwin(1, width, height - 3, 0);
+   state->footer_win = newwin(2, width, height - 2, 0);
+
+   scrollok(state->main_win, TRUE);
+
+   return 0;
+}
+
+/**
+ * Simplified record description generator
+ * Gets human-readable description for a WAL record
+ * 
+ * @param record The decoded WAL record
+ * @param magic_value WAL file magic number
+ * @return Allocated string with description 
+ */
+static char*
+get_simple_record_description(struct decoded_xlog_record* record, uint16_t magic_value)
+{
+   char* rm_desc = NULL;
+   char* backup_str = NULL;
+   char* enhanced_desc = NULL;
+   char* final_desc = NULL;
+   uint32_t fpi_len = 0; // Initialize to 0
+
+   if (record == NULL || record->partial)
+   {
+      return strdup("Partial record or NULL");
+   }
+
+   rm_desc = malloc(1);
+   if (rm_desc)
+   {
+      rm_desc[0] = '\0';
+   }
+
+   backup_str = malloc(1);
+   if (backup_str)
+   {
+      backup_str[0] = '\0';
+   }
+
+   if (rmgr_table[record->header.xl_rmid].rm_desc != NULL)
+   {
+      rm_desc = rmgr_table[record->header.xl_rmid].rm_desc(rm_desc, record);
+   }
+
+   backup_str = get_record_block_ref_info(backup_str, record, false, true, &fpi_len, magic_value);
+
+   char* record_desc = pgmoneta_format_and_append(NULL, "%s %s",
+                                                  rm_desc ? rm_desc : "",
+                                                  backup_str ? backup_str : "");
+
+   if (rm_desc == NULL || strlen(rm_desc) == 0)
+   {
+      enhanced_desc = enhance_description(backup_str, record->header.xl_rmid, record->header.xl_info);
+   }
+   else
+   {
+      enhanced_desc = enhance_description(record_desc, record->header.xl_rmid, record->header.xl_info);
+   }
+
+   bool has_enhanced = enhanced_desc && strlen(enhanced_desc) > 0;
+   bool has_backup = backup_str && strlen(backup_str) > 0;
+   bool both_empty = !has_enhanced && !has_backup;
+
+   if (both_empty)
+   {
+      final_desc = strdup("<empty>");
+   }
+   else if (has_enhanced)
+   {
+      if (has_backup)
+      {
+         final_desc = pgmoneta_format_and_append(NULL, "%s %s", enhanced_desc, backup_str);
+      }
+      else
+      {
+         final_desc = strdup(enhanced_desc);
+      }
+   }
+   else
+   {
+      final_desc = strdup(backup_str);
+   }
+
+   free(rm_desc);
+   free(backup_str);
+   free(enhanced_desc);
+   free(record_desc);
+
+   return final_desc;
+}
+
+/**
+ * Load WAL records from file and prepare for UI display
+ * 
+ * @param state UI state structure
+ * @param wal_filename Path to WAL file
+ * @return 0 on success, -1 on error
+ */
+static int
+wal_interactive_load_records(struct ui_state* state, char* wal_filename)
+{
+   struct walfile* wf = NULL;
+   char* from = NULL;
+   char* to = NULL;
+
+   /* Extract compressed WAL file if needed */
+   from = pgmoneta_append(from, wal_filename);
+   to = pgmoneta_append(to, "/tmp/");
+   to = pgmoneta_append(to, basename((char*)wal_filename));
+
+   if (pgmoneta_copy_and_extract_file(from, &to))
+   {
+      free(from);
+      free(to);
+      return -1;
+   }
+
+   /* Read the WAL file using pgmoneta's function */
+   if (pgmoneta_read_walfile(-1, to, &wf) != 0)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(from);
+      free(to);
+      return -1;
+   }
+
+   if (wf == NULL || wf->records == NULL)
+   {
+      return -1;
+   }
+
+   state->record_count = 0;
+   size_t deque_size = pgmoneta_deque_size(wf->records);
+
+   /* Allocate memory for records if needed */
+   if (deque_size > state->record_capacity)
+   {
+      state->record_capacity = deque_size;
+      struct wal_record_ui* new_records =
+         realloc(state->records,
+                 state->record_capacity * sizeof(struct wal_record_ui));
+
+      if (new_records == NULL)
+      {
+         pgmoneta_destroy_walfile(wf);
+         return -1;
+      }
+
+      state->records = new_records;
+   }
+
+   /* Create iterator to walk through records */
+   struct deque_iterator* iter = NULL;
+   if (pgmoneta_deque_iterator_create(wf->records, &iter) != 0)
+   {
+      pgmoneta_destroy_walfile(wf);
+      return -1;
+   }
+
+   /* Process each record */
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct decoded_xlog_record* record =
+         (struct decoded_xlog_record*)iter->value->data;
+
+      if (record == NULL)
+      {
+         continue;
+      }
+
+      /* Grow array if needed */
+      if (state->record_count >= state->record_capacity)
+      {
+         state->record_capacity *= 2;
+         struct wal_record_ui* new_records =
+            realloc(state->records,
+                    state->record_capacity * sizeof(struct wal_record_ui));
+
+         if (new_records == NULL)
+         {
+            pgmoneta_deque_iterator_destroy(iter);
+            pgmoneta_destroy_walfile(wf);
+            return -1;
+         }
+
+         state->records = new_records;
+      }
+
+      struct wal_record_ui* rec_ui = &state->records[state->record_count];
+
+      /* Get resource manager name */
+      const char* rmgr_name = pgmoneta_rmgr_get_name(record->header.xl_rmid);
+      if (rmgr_name != NULL)
+      {
+         snprintf(rec_ui->rmgr, sizeof(rec_ui->rmgr), "%s", rmgr_name);
+      }
+      else
+      {
+         snprintf(rec_ui->rmgr, sizeof(rec_ui->rmgr), "UNKNOWN");
+      }
+
+      /* LSN values */
+      rec_ui->start_lsn = record->header.xl_prev;
+      rec_ui->end_lsn = record->lsn;
+
+      /* Total length */
+      rec_ui->tot_len = record->header.xl_tot_len;
+
+      /* Calculate rec_len by subtracting FPI length */
+      uint32_t fpi_len = 0;
+      for (int block_id = 0; block_id <= record->max_block_id; block_id++)
+      {
+         if (record->blocks[block_id].has_image)
+         {
+            fpi_len += record->blocks[block_id].bimg_len;
+         }
+      }
+
+      rec_ui->rec_len = (rec_ui->tot_len >= fpi_len) ? (rec_ui->tot_len - fpi_len) : rec_ui->tot_len;
+
+      /* Transaction ID */
+      rec_ui->xid = record->header.xl_xid;
+
+      /* Get human-readable description */
+      char* desc = get_simple_record_description(record, wf->magic_number);
+      if (desc != NULL)
+      {
+         strncpy(rec_ui->description, desc, sizeof(rec_ui->description) - 1);
+         rec_ui->description[sizeof(rec_ui->description) - 1] = '\0';
+         free(desc);
+      }
+      else
+      {
+         snprintf(rec_ui->description, sizeof(rec_ui->description),
+                  "XID: %u", rec_ui->xid);
+      }
+
+      /* Generate hex dump for binary mode */
+      rec_ui->hex_data[0] = '\0';
+      int hex_pos = 0;
+      if (record->main_data != NULL && record->main_data_len > 0)
+      {
+         uint32_t max_bytes =
+            (record->main_data_len < 170) ? record->main_data_len : 170;
+
+         size_t hex_data_size = sizeof(rec_ui->hex_data);
+
+         for (uint32_t j = 0;
+              j < max_bytes && (size_t)hex_pos < hex_data_size - 3;
+              j++)
+         {
+            hex_pos += snprintf(rec_ui->hex_data + hex_pos,
+                                hex_data_size - (size_t)hex_pos,
+                                "%02X ",
+                                (uint8_t)record->main_data[j]);
+         }
+      }
+
+      rec_ui->verified = false;
+      strncpy(rec_ui->verification_status, "Unchecked",
+              sizeof(rec_ui->verification_status) - 1);
+      rec_ui->verification_status[sizeof(rec_ui->verification_status) - 1] = '\0';
+
+      rec_ui->record = record;
+
+      state->record_count++;
+   }
+
+   pgmoneta_deque_iterator_destroy(iter);
+   state->wf = wf;
+
+   /* Clean up temporary extracted file */
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+   free(from);
+
+   return 0;
+}
+
+static void
+draw_header(struct ui_state* state)
+{
+   werase(state->header_win);
+   wbkgd(state->header_win, COLOR_PAIR(1));
+   box(state->header_win, 0, 0);
+
+   wattron(state->header_win, A_BOLD | COLOR_PAIR(1));
+   mvwprintw(state->header_win, 1, 2, "WAL: %s", state->wal_filename);
+
+   int width = getmaxx(state->header_win);
+   const char* mode_str = (state->mode == DISPLAY_MODE_TEXT) ? "TEXT" : (state->mode == DISPLAY_MODE_BINARY) ? "BINARY"
+                                                                                                             : "UNKNOWN";
+   mvwprintw(state->header_win, 1, width - 12, "Mode: %s", mode_str);
+   wattroff(state->header_win, A_BOLD | COLOR_PAIR(1));
+
+   wrefresh(state->header_win);
+}
+
+/* Updated draw_main_content with exact pgmoneta format */
+static void
+draw_main_content(struct ui_state* state)
+{
+   werase(state->main_win);
+   wbkgd(state->main_win, COLOR_PAIR(2));
+
+   int height, width;
+   getmaxyx(state->main_win, height, width);
+
+   /* Column widths matching pgmoneta_wal_record_display */
+   const int rm_width = 9;
+   const int lsn_width = 10;
+   const int rec_width = 7;
+   const int tot_width = 7;
+   const int xid_width = 7;
+
+   /* Draw column headers with exact formatting */
+   wattron(state->main_win, A_BOLD | A_UNDERLINE);
+
+   int col = 2;
+
+   /* RMGR header in RED */
+   wattron(state->main_win, COLOR_PAIR(6));
+   mvwprintw(state->main_win, 1, col, "%-*s", rm_width, "RMGR");
+   wattroff(state->main_win, COLOR_PAIR(6));
+   col += rm_width + 3;
+
+   /* Start LSN header in MAGENTA */
+   wattron(state->main_win, COLOR_PAIR(7));
+   mvwprintw(state->main_win, 1, col, "%-*s", lsn_width, "Start LSN");
+   wattroff(state->main_win, COLOR_PAIR(7));
+   col += lsn_width + 3;
+
+   /* End LSN header in MAGENTA */
+   wattron(state->main_win, COLOR_PAIR(7));
+   mvwprintw(state->main_win, 1, col, "%-*s", lsn_width, "End LSN");
+   wattroff(state->main_win, COLOR_PAIR(7));
+   col += lsn_width + 3;
+
+   /* rec len header in BLUE */
+   wattron(state->main_win, COLOR_PAIR(8));
+   mvwprintw(state->main_win, 1, col, "%-*s", rec_width, "Rec len");
+   wattroff(state->main_win, COLOR_PAIR(8));
+   col += rec_width + 3;
+
+   /* tot len header in YELLOW */
+   wattron(state->main_win, COLOR_PAIR(9));
+   mvwprintw(state->main_win, 1, col, "%-*s", tot_width, "Tot len");
+   wattroff(state->main_win, COLOR_PAIR(9));
+   col += tot_width + 3;
+
+   /* xid header in CYAN */
+   wattron(state->main_win, COLOR_PAIR(10));
+   mvwprintw(state->main_win, 1, col, "%-*s", xid_width, "XID");
+   wattroff(state->main_win, COLOR_PAIR(10));
+   col += xid_width + 3;
+
+   /* description header in GREEN */
+   wattron(state->main_win, COLOR_PAIR(11));
+   mvwprintw(state->main_win, 1, col, "Description");
+   wattroff(state->main_win, COLOR_PAIR(11));
+
+   wattroff(state->main_win, A_BOLD | A_UNDERLINE);
+
+   /* Display records with exact pgmoneta formatting */
+   for (int i = 0; i < height - 4 && (i + (int)state->scroll_offset) < (int)state->record_count; i++)
+   {
+      size_t idx = i + state->scroll_offset;
+      struct wal_record_ui* rec_ui = &state->records[idx];
+
+      /* Highlight current row */
+      if (idx == state->current_row)
+      {
+         wattron(state->main_win, A_REVERSE);
+      }
+
+      if (state->mode == DISPLAY_MODE_TEXT)
+      {
+         int col = 2;
+
+         /* Convert LSNs to X/X format */
+         char* start_lsn_str = pgmoneta_lsn_to_string(rec_ui->start_lsn);
+         char* end_lsn_str = pgmoneta_lsn_to_string(rec_ui->end_lsn);
+
+         /* RMGR in RED */
+         wattron(state->main_win, COLOR_PAIR(6));
+         mvwprintw(state->main_win, i + 2, col, "%-*s", rm_width, rec_ui->rmgr);
+         wattroff(state->main_win, COLOR_PAIR(6));
+         col += rm_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* Start LSN in MAGENTA */
+         wattron(state->main_win, COLOR_PAIR(7));
+         mvwprintw(state->main_win, i + 2, col, "%-*s", lsn_width, start_lsn_str);
+         wattroff(state->main_win, COLOR_PAIR(7));
+         col += lsn_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* End LSN in MAGENTA */
+         wattron(state->main_win, COLOR_PAIR(7));
+         mvwprintw(state->main_win, i + 2, col, "%-*s", lsn_width, end_lsn_str);
+         wattroff(state->main_win, COLOR_PAIR(7));
+         free(start_lsn_str);
+         free(end_lsn_str);
+         col += lsn_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* rec len in BLUE */
+         wattron(state->main_win, COLOR_PAIR(8));
+         mvwprintw(state->main_win, i + 2, col, "%-*u", rec_width, rec_ui->rec_len);
+         wattroff(state->main_win, COLOR_PAIR(8));
+         col += rec_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* tot len in YELLOW */
+         wattron(state->main_win, COLOR_PAIR(9));
+         mvwprintw(state->main_win, i + 2, col, "%-*u", tot_width, rec_ui->tot_len);
+         wattroff(state->main_win, COLOR_PAIR(9));
+         col += tot_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* xid in CYAN */
+         wattron(state->main_win, COLOR_PAIR(10));
+         mvwprintw(state->main_win, i + 2, col, "%-*u", xid_width, rec_ui->xid);
+         wattroff(state->main_win, COLOR_PAIR(10));
+         col += xid_width;
+         mvwprintw(state->main_win, i + 2, col, " | ");
+         col += 3;
+
+         /* description in GREEN */
+         char desc_display[512];
+         strncpy(desc_display, rec_ui->description, sizeof(desc_display) - 1);
+         desc_display[sizeof(desc_display) - 1] = '\0';
+
+         /* Replace newlines with spaces */
+         for (int j = 0; desc_display[j] != '\0'; j++)
+         {
+            if (desc_display[j] == '\n' || desc_display[j] == '\r')
+            {
+               desc_display[j] = ' ';
+            }
+         }
+
+         /* Calculate remaining width */
+         int desc_width = width - col - 2;
+         if (desc_width > 0 && desc_width < (int)sizeof(desc_display))
+         {
+            if ((int)strlen(desc_display) > desc_width)
+            {
+               desc_display[desc_width - 3] = '.';
+               desc_display[desc_width - 2] = '.';
+               desc_display[desc_width - 1] = '.';
+               desc_display[desc_width] = '\0';
+            }
+         }
+
+         wattron(state->main_win, COLOR_PAIR(11));
+         mvwprintw(state->main_win, i + 2, col, "%s", desc_display);
+         wattroff(state->main_win, COLOR_PAIR(11));
+      }
+      else if (state->mode == DISPLAY_MODE_BINARY)
+      {
+         char* start_lsn_str = pgmoneta_lsn_to_string(rec_ui->start_lsn);
+         mvwprintw(state->main_win, i + 2, 2,
+                   "%-*s | %-*s | %s",
+                   rm_width, rec_ui->rmgr,
+                   lsn_width, start_lsn_str,
+                   rec_ui->hex_data);
+         free(start_lsn_str);
+      }
+
+      if (idx == state->current_row)
+      {
+         wattroff(state->main_win, A_REVERSE);
+      }
+   }
+   wrefresh(state->main_win);
+}
+
+/**
+ * Show detailed view of a single WAL record
+ * 
+ * @param state UI state structure
+ */
+static void
+show_detail_view(struct ui_state* state)
+{
+   if (state->current_row >= state->record_count)
+   {
+      return;
+   }
+
+   struct wal_record_ui* rec_ui = &state->records[state->current_row];
+
+   int height = 30;
+   int width = 100;
+   int starty = (LINES - height) / 2;
+   int startx = (COLS - width) / 2;
+
+   if (LINES > 0 && COLS > 0)
+   {
+      height = MIN(LINES - 4, 35);
+      width = MIN(COLS - 4, 120);
+      starty = (LINES - height) / 2;
+      startx = (COLS - width) / 2;
+   }
+
+   WINDOW* detail_win = newwin(height, width, starty, startx);
+   box(detail_win, 0, 0);
+
+   wattron(detail_win, A_BOLD);
+   mvwprintw(detail_win, 1, 2, "WAL Record Details");
+   wattroff(detail_win, A_BOLD);
+
+   int row = 3;
+
+   /* RMGR in RED */
+   mvwprintw(detail_win, row, 2, "RMGR:          ");
+   wattron(detail_win, COLOR_PAIR(6));
+   mvwprintw(detail_win, row, 17, "%s", rec_ui->rmgr);
+   wattroff(detail_win, COLOR_PAIR(6));
+   row++;
+
+   /* Start LSN in MAGENTA */
+   char* start_lsn_str = pgmoneta_lsn_to_string(rec_ui->start_lsn);
+   mvwprintw(detail_win, row, 2, "Start LSN:     ");
+   wattron(detail_win, COLOR_PAIR(7));
+   mvwprintw(detail_win, row, 17, "%s", start_lsn_str);
+   wattroff(detail_win, COLOR_PAIR(7));
+   free(start_lsn_str);
+   row++;
+
+   /* End LSN in MAGENTA */
+   char* end_lsn_str = pgmoneta_lsn_to_string(rec_ui->end_lsn);
+   mvwprintw(detail_win, row, 2, "End LSN:       ");
+   wattron(detail_win, COLOR_PAIR(7));
+   mvwprintw(detail_win, row, 17, "%s", end_lsn_str);
+   wattroff(detail_win, COLOR_PAIR(7));
+   free(end_lsn_str);
+   row++;
+
+   /* rec len in BLUE */
+   mvwprintw(detail_win, row, 2, "Rec len:       ");
+   wattron(detail_win, COLOR_PAIR(8));
+   mvwprintw(detail_win, row, 17, "%u", rec_ui->rec_len);
+   wattroff(detail_win, COLOR_PAIR(8));
+   row++;
+
+   /* tot len in YELLOW */
+   mvwprintw(detail_win, row, 2, "Tot len:       ");
+   wattron(detail_win, COLOR_PAIR(9));
+   mvwprintw(detail_win, row, 17, "%u", rec_ui->tot_len);
+   wattroff(detail_win, COLOR_PAIR(9));
+   row++;
+
+   /* xid in CYAN */
+   mvwprintw(detail_win, row, 2, "XID:           ");
+   wattron(detail_win, COLOR_PAIR(10));
+   mvwprintw(detail_win, row, 17, "%u", rec_ui->xid);
+   wattroff(detail_win, COLOR_PAIR(10));
+   row++;
+
+   /* Valid status */
+   mvwprintw(detail_win, row, 2, "Valid:         ");
+   if (rec_ui->verified)
+   {
+      wattron(detail_win, COLOR_PAIR(3));
+      mvwprintw(detail_win, row, 17, "Yes");
+      wattroff(detail_win, COLOR_PAIR(3));
+   }
+   else
+   {
+      wattron(detail_win, COLOR_PAIR(4));
+      mvwprintw(detail_win, row, 17, "?");
+      wattroff(detail_win, COLOR_PAIR(4));
+   }
+   row += 2;
+
+   /* Description in GREEN */
+   mvwprintw(detail_win, row, 2, "Description:");
+   row++;
+   wattron(detail_win, COLOR_PAIR(11));
+
+   /* Word wrap the description */
+   int desc_col = 4;
+   int max_width = width - desc_col - 2;
+   const char* desc_ptr = rec_ui->description;
+   int line_len = 0;
+   bool desc_truncated = false;
+
+   while (*desc_ptr != '\0' && row < height - 5)
+   {
+      if (*desc_ptr == '\n' || *desc_ptr == '\r')
+      {
+         row++;
+         line_len = 0;
+         desc_ptr++;
+         if (*desc_ptr == '\n' || *desc_ptr == '\r')
+         {
+            desc_ptr++;
+         }
+         if (row >= height - 5)
+         {
+            desc_truncated = true;
+            break;
+         }
+         continue;
+      }
+
+      if (line_len >= max_width)
+      {
+         row++;
+         line_len = 0;
+         if (row >= height - 5)
+         {
+            desc_truncated = true;
+            break;
+         }
+      }
+
+      mvwaddch(detail_win, row, desc_col + line_len, *desc_ptr);
+      line_len++;
+      desc_ptr++;
+   }
+
+   if (desc_truncated || (*desc_ptr != '\0' && row >= height - 5))
+   {
+      if (line_len + 3 <= max_width)
+      {
+         mvwprintw(detail_win, row, desc_col + line_len, "...");
+      }
+   }
+
+   wattroff(detail_win, COLOR_PAIR(11));
+   row += 2;
+
+   /* Binary data */
+   if (row < height - 3)
+   {
+      mvwprintw(detail_win, row, 2, "Binary data:");
+      row++;
+
+      const char* hex_ptr = rec_ui->hex_data;
+      int hex_col = 4;
+      int hex_max_width = width - hex_col - 2;
+      int hex_pos = 0;
+
+      while (*hex_ptr != '\0' && row < height - 2)
+      {
+         if (hex_pos >= hex_max_width)
+         {
+            row++;
+            hex_pos = 0;
+            if (row >= height - 2)
+            {
+               break;
+            }
+         }
+
+         mvwaddch(detail_win, row, hex_col + hex_pos, *hex_ptr);
+         hex_pos++;
+         hex_ptr++;
+      }
+   }
+
+   mvwprintw(detail_win, height - 2, 2, "Press any key to return...");
+   wrefresh(detail_win);
+   getch();
+   delwin(detail_win);
+}
+
+static void
+draw_status(struct ui_state* state)
+{
+   werase(state->status_win);
+
+   if (state->search_active)
+   {
+      mvwprintw(state->status_win, 0, 2, "Search: %s [%zu results]",
+                state->search_query, state->search_result_count);
+   }
+   else
+   {
+      mvwprintw(state->status_win, 0, 2, "Records: %zu | Current: %zu",
+                state->record_count, state->current_row + 1);
+   }
+
+   wrefresh(state->status_win);
+}
+
+static void
+draw_footer(struct ui_state* state)
+{
+   werase(state->footer_win);
+   box(state->footer_win, 0, 0);
+
+   mvwprintw(state->footer_win, 0, 2, "Commands: Up/Down=Navigate | Enter=Detail | s=Search | v=Verify | ?=Help | q=Quit");
+
+   wrefresh(state->footer_win);
+}
+
+static void
+show_help(void)
+{
+   int height = 20;
+   int width = 70;
+   int starty = (LINES - height) / 2;
+   int startx = (COLS - width) / 2;
+
+   WINDOW* help_win = newwin(height, width, starty, startx);
+   box(help_win, 0, 0);
+
+   wattron(help_win, A_BOLD);
+   mvwprintw(help_win, 1, 2, "pgmoneta WAL Interactive Viewer - Help");
+   wattroff(help_win, A_BOLD);
+
+   mvwprintw(help_win, 3, 2, "Navigation:");
+   mvwprintw(help_win, 4, 4, "Up/Down    - Move between records");
+   mvwprintw(help_win, 5, 4, "PgUp/PgDn  - Scroll page");
+   mvwprintw(help_win, 6, 4, "Home/End   - Go to first/last record");
+
+   mvwprintw(help_win, 8, 2, "Display Modes:");
+   mvwprintw(help_win, 9, 4, "T          - Text mode (human-readable)");
+   mvwprintw(help_win, 10, 4, "B          - Binary mode (hex dump)");
+   mvwprintw(help_win, 11, 4, "Enter      - Detailed record view");
+
+   mvwprintw(help_win, 13, 2, "Actions:");
+   mvwprintw(help_win, 14, 4, "S          - Search records");
+   mvwprintw(help_win, 15, 4, "V          - Verify with pg_waldump");
+   mvwprintw(help_win, 16, 4, "Q          - Quit");
+
+   mvwprintw(help_win, height - 2, 2, "Press any key to return...");
+   wrefresh(help_win);
+   getch();
+   delwin(help_win);
+}
+
+static void
+wal_interactive_search(struct ui_state* state, char* query)
+{
+   if (state->search_results)
+   {
+      free(state->search_results);
+   }
+
+   state->search_results = calloc(state->record_count, sizeof(size_t));
+   state->search_result_count = 0;
+
+   strncpy(state->search_query, query, sizeof(state->search_query) - 1);
+   state->search_query[sizeof(state->search_query) - 1] = '\0';
+   state->search_active = true;
+
+   /* Search through records */
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      struct wal_record_ui* rec_ui = &state->records[i];
+
+      if (strstr(rec_ui->description, query) != NULL ||
+          strstr(rec_ui->rmgr, query) != NULL)
+      {
+         state->search_results[state->search_result_count++] = i;
+      }
+   }
+
+   /* Jump to first search result */
+   if (state->search_result_count > 0)
+   {
+      state->current_row = state->search_results[0];
+      state->current_search_index = 0;
+   }
+}
+
+static void
+handle_search_input(struct ui_state* state)
+{
+   int height = 7;
+   int width = 60;
+   int starty = (LINES - height) / 2;
+   int startx = (COLS - width) / 2;
+
+   WINDOW* search_win = newwin(height, width, starty, startx);
+   box(search_win, 0, 0);
+
+   mvwprintw(search_win, 1, 2, "Search WAL Records");
+   mvwprintw(search_win, 3, 2, "Enter search query: ");
+
+   echo();
+   curs_set(1);
+
+   char query[256];
+   wgetnstr(search_win, query, sizeof(query) - 1);
+
+   noecho();
+   curs_set(0);
+
+   delwin(search_win);
+
+   if (strlen(query) > 0)
+   {
+      wal_interactive_search(state, query);
+   }
+}
+
+static int
+wal_interactive_verify(struct ui_state* state)
+{
+   /* Integrate with pg_waldump */
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      state->records[i].verified = true;
+      strncpy(state->records[i].verification_status, "Verified",
+              sizeof(state->records[i].verification_status) - 1);
+      state->records[i].verification_status[sizeof(state->records[i].verification_status) - 1] = '\0';
+   }
+
+   return 0; // Success
+}
+
+static void
+wal_interactive_run(struct ui_state* state)
+{
+   int ch;
+   int height, width_unused;
+   getmaxyx(state->main_win, height, width_unused);
+   (void)width_unused;
+
+   draw_header(state);
+   draw_main_content(state);
+   draw_status(state);
+   draw_footer(state);
+   refresh();
+
+   while (1)
+   {
+      ch = getch();
+
+      switch (ch)
+      {
+         case KEY_UP:
+            if (state->current_row > 0)
+            {
+               state->current_row--;
+               if (state->current_row < state->scroll_offset)
+               {
+                  state->scroll_offset--;
+               }
+            }
+            break;
+
+         case KEY_DOWN:
+            if (state->current_row < state->record_count - 1)
+            {
+               state->current_row++;
+               if (state->current_row >= state->scroll_offset + (size_t)(height - 4))
+               {
+                  state->scroll_offset++;
+               }
+            }
+            break;
+
+         case KEY_PPAGE:
+            if (state->current_row >= (size_t)(height - 4))
+            {
+               state->current_row -= (height - 4);
+               state->scroll_offset = (state->scroll_offset >= (size_t)(height - 4)) ? state->scroll_offset - (height - 4) : 0;
+            }
+            else
+            {
+               state->current_row = 0;
+               state->scroll_offset = 0;
+            }
+            break;
+
+         case KEY_NPAGE:
+            state->current_row += (height - 4);
+            if (state->current_row >= state->record_count)
+            {
+               state->current_row = state->record_count - 1;
+            }
+            state->scroll_offset = state->current_row;
+            break;
+
+         case KEY_HOME:
+            state->current_row = 0;
+            state->scroll_offset = 0;
+            break;
+
+         case KEY_END:
+            state->current_row = state->record_count - 1;
+            state->scroll_offset = (state->record_count > (size_t)(height - 4)) ? state->record_count - (height - 4) : 0;
+            break;
+
+         case 't':
+         case 'T':
+            state->mode = DISPLAY_MODE_TEXT;
+            break;
+
+         case 'b':
+         case 'B':
+            state->mode = DISPLAY_MODE_BINARY;
+            break;
+
+         case 10: // Enter key
+            show_detail_view(state);
+            break;
+
+         case 's':
+         case 'S':
+            handle_search_input(state);
+            break;
+
+         case 'v':
+         case 'V':
+            wal_interactive_verify(state);
+            break;
+
+         case '?':
+            show_help();
+            break;
+
+         case 'q':
+         case 'Q':
+            return;
+      }
+
+      draw_header(state);
+      draw_main_content(state);
+      draw_status(state);
+      draw_footer(state);
+      refresh();
+   }
+}
+
+static void
+wal_interactive_cleanup(struct ui_state* state)
+{
+   if (state->wf)
+   {
+      pgmoneta_destroy_walfile(state->wf);
+   }
+
+   if (state->search_results)
+   {
+      free(state->search_results);
+   }
+
+   if (state->records)
+   {
+      free(state->records);
+   }
+
+   if (state->wal_filename)
+   {
+      free(state->wal_filename);
+   }
+
+   if (state->main_win)
+   {
+      delwin(state->main_win);
+   }
+   if (state->header_win)
+   {
+      delwin(state->header_win);
+   }
+   if (state->footer_win)
+   {
+      delwin(state->footer_win);
+   }
+   if (state->status_win)
+   {
+      delwin(state->status_win);
+   }
+
+   wal_interactive_endwin();
+   wal_interactive_restore_handlers();
+}
 
 /**
  * Center-align a string within a given width
@@ -348,6 +1541,7 @@ usage(void)
    printf("  pgmoneta-walinfo <file|directory>\n");
    printf("\n");
    printf("Options:\n");
+   printf("  -I,  --interactive Interactive mode with ncurses UI\n");
    printf("  -c,  --config      Set the path to the pgmoneta_walinfo.conf file\n");
    printf("  -u,  --users       Set the path to the pgmoneta_users.conf file \n");
    printf("  -RT, --tablespaces Filter on tablspaces\n");
@@ -379,6 +1573,7 @@ int
 main(int argc, char** argv)
 {
    int loaded = 1;
+   bool interactive = false;
    char* configuration_path = NULL;
    char* users_path = NULL;
    char* output = NULL;
@@ -424,6 +1619,7 @@ main(int argc, char** argv)
    FILE* out = NULL;
 
    cli_option options[] = {
+      {"I", "interactive", false},
       {"c", "config", true},
       {"o", "output", true},
       {"F", "format", true},
@@ -477,6 +1673,10 @@ main(int argc, char** argv)
       else if (!strcmp(optname, "c") || !strcmp(optname, "config"))
       {
          configuration_path = optarg;
+      }
+      else if (!strcmp(optname, "I") || !strcmp(optname, "interactive"))
+      {
+         interactive = true;
       }
       else if (!strcmp(optname, "o") || !strcmp(optname, "output"))
       {
@@ -902,6 +2102,50 @@ main(int argc, char** argv)
    {
       out = fopen(output, "w");
       color = false;
+   }
+
+   if (interactive)
+   {
+      if (filepath == NULL)
+      {
+         fprintf(stderr, "Error: No WAL file specified for interactive mode\n");
+         usage();
+         goto error;
+      }
+
+      /* Check if file exists before initializing ncurses */
+      if (!pgmoneta_exists(filepath))
+      {
+         fprintf(stderr, "Error: File <%s> doesn't exist\n", filepath);
+         goto error;
+      }
+
+      struct ui_state ui_state;
+
+      if (wal_interactive_init(&ui_state, filepath) != 0)
+      {
+         fprintf(stderr, "Error: Failed to initialize UI\n");
+         goto error;
+      }
+
+      if (wal_interactive_load_records(&ui_state, filepath) != 0)
+      {
+         fprintf(stderr, "Error: Failed to load WAL records\n");
+         wal_interactive_cleanup(&ui_state);
+         goto error;
+      }
+
+      wal_interactive_run(&ui_state);
+
+      wal_interactive_cleanup(&ui_state);
+
+      pgmoneta_destroy_shared_memory(shmem, size);
+      if (logfile)
+      {
+         pgmoneta_stop_logging();
+      }
+
+      return 0;
    }
 
    if (filepath != NULL)

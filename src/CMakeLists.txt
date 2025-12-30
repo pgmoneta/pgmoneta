@@ -127,6 +127,7 @@ else()
     ${LIBSSH_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
+    ${CURSES_INCLUDE_DIRS}
   )
 
   #
@@ -144,6 +145,7 @@ else()
     ${LIBSSH_LIBRARIES}
     ${LibArchive_LIBRARIES}
     ${THREAD_LIBRARIES}
+    ${CURSES_LIBRARIES}
   )
 
   if (${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")
@@ -353,7 +355,7 @@ endif()
 add_library(pgmoneta SHARED ${SOURCES})
 set_target_properties(pgmoneta PROPERTIES LINKER_LANGUAGE C VERSION ${VERSION_STRING}
                                SOVERSION ${VERSION_MAJOR})
-target_link_libraries(pgmoneta PUBLIC)
+target_link_libraries(pgmoneta PUBLIC ncurses)
 install(TARGETS pgmoneta DESTINATION ${CMAKE_INSTALL_LIBDIR}/)
 
 #
