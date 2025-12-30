@@ -240,7 +240,9 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
          }
          else
          {
-            goto error;
+            free(trimmed_line);
+            trimmed_line = NULL;
+            continue;
          }
 
          if (trimmed_line[0] == '[')
@@ -1648,17 +1650,6 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
    fclose(file);
 
    return 0;
-
-error:
-
-   free(trimmed_line);
-   trimmed_line = NULL;
-   if (file)
-   {
-      fclose(file);
-   }
-
-   return 1;
 }
 
 /**

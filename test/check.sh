@@ -247,6 +247,7 @@ pgmoneta_initialize_configuration() {
    touch $CONFIGURATION_DIRECTORY/pgmoneta.conf $CONFIGURATION_DIRECTORY/pgmoneta_users.conf
    echo "Creating pgmoneta.conf and pgmoneta_users.conf inside $CONFIGURATION_DIRECTORY ... ok"
    cat <<EOF >$CONFIGURATION_DIRECTORY/pgmoneta.conf
+# Main configuration
 [pgmoneta]
 host = localhost
 metrics = 5001
@@ -256,7 +257,7 @@ base_dir = $BACKUP_DIRECTORY
 compression = zstd
 
 retention = 7
-retention_interval = 3600
+retention_interval = 3600 # 1h
 
 log_type = file
 log_level = debug5
@@ -266,6 +267,7 @@ unix_socket_dir = /tmp/
 create_slot = yes
 workspace = $WORKSPACE_DIRECTORY
 
+# primary configuration
 [primary]
 host = localhost
 port = $PORT
