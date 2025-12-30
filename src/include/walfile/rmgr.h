@@ -146,6 +146,14 @@ extern struct rmgr_data rmgr_table[RM_MAX_ID + 1];
 extern struct rmgr_summary rmgr_summary_table[RM_MAX_ID + 1];
 extern struct rmgr_stats rmgr_stats_table[RM_MAX_ID + 1];
 
+/**
+ * Get the name of a resource manager by its ID
+ * @param rmid The resource manager ID
+ * @return The name of the resource manager, or NULL if invalid
+ */
+char*
+pgmoneta_rmgr_get_name(uint8_t rmid);
+
 #ifdef __cplusplus
 }
 #endif
