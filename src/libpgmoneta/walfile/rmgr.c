@@ -102,3 +102,13 @@ struct rmgr_stats rmgr_stats_table[RM_MAX_ID + 1] = {
    PG_RMGR_STATS(RM_GENERIC_ID, "Generic"),
    PG_RMGR_STATS(RM_LOGICALMSG_ID, "LogicalMessage"),
 };
+
+char*
+pgmoneta_rmgr_get_name(uint8_t rmid)
+{
+   if (rmgr_table[rmid].name != NULL)
+   {
+      return rmgr_table[rmid].name;
+   }
+   return NULL;
+}

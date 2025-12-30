@@ -143,6 +143,16 @@ START_TEST(test_pgmoneta_wal_summary)
    pgmoneta_brt_destroy(brt);
    pgmoneta_disconnect(srv_socket);
    pgmoneta_disconnect(custom_user_socket);
+
+   if (srv_ssl != NULL)
+   {
+      SSL_free(srv_ssl);
+   }
+   if (custom_user_ssl != NULL)
+   {
+      SSL_free(custom_user_ssl);
+   }
+
    free(summary_dir);
    free(wal_dir);
 }
