@@ -171,6 +171,14 @@ pgmoneta_socket_has_error(int fd);
 int
 pgmoneta_get_network_max_rate(int server);
 
+/**
+ * Get the host name for an address
+ * @param addr The addr
+ * @return The host name
+ */
+char*
+pgmoneta_get_host(struct sockaddr_in6 addr);
+
 #ifdef __cplusplus
 }
 #endif

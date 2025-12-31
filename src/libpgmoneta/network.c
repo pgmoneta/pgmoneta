@@ -30,6 +30,7 @@
 #include <pgmoneta.h>
 #include <logging.h>
 #include <network.h>
+#include <utils.h>
 
 /* system */
 #include <errno.h>
@@ -703,4 +704,28 @@ pgmoneta_get_network_max_rate(int server)
    }
 
    return config->network_max_rate;
+}
+
+char*
+pgmoneta_get_host(struct sockaddr_in6 addr)
+{
+   char host_str[NI_MAXHOST] = {0};
+   char port_str[NI_MAXSERV] = {0};
+   char* r = NULL;
+
+   if (getnameinfo((struct sockaddr*)&addr, sizeof(struct sockaddr_in6),
+                   host_str, sizeof(host_str),
+                   port_str, sizeof(port_str),
+                   NI_NUMERICHOST | NI_NUMERICSERV) == 0)
+   {
+      r = pgmoneta_append(r, host_str);
+
+      if (strlen(port_str) > 0)
+      {
+         r = pgmoneta_append_char(r, ':');
+         r = pgmoneta_append(r, port_str);
+      }
+   }
+
+   return r;
 }

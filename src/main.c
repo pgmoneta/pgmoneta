@@ -1036,6 +1036,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       goto error;
    }
 
+   if (encryption == MANAGEMENT_ENCRYPTION_NONE)
+   {
+      char* c = pgmoneta_get_host(client_addr);
+      pgmoneta_log_debug("Unencrypted request from %s", c);
+      free(c);
+      c = NULL;
+   }
+
    header = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_HEADER);
    id = (int32_t)pgmoneta_json_get(header, MANAGEMENT_ARGUMENT_COMMAND);
 
