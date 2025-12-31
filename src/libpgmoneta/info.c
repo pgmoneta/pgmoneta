@@ -380,7 +380,7 @@ pgmoneta_load_infos(char* directory, int* number_of_backups, struct backup*** ba
 
          if (pgmoneta_load_info(d, dirs[i], &bcks[i]))
          {
-            pgmoneta_log_error("pgmoneta_load_infos: Unable to load backup for %s", d);
+            pgmoneta_log_error("Unable to load backup for %s", d);
             goto error;
          }
 
@@ -993,7 +993,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    if (number_of_backups == 0)
    {
       ec = MANAGEMENT_ERROR_INFO_NOBACKUP;
-      pgmoneta_log_warn("Info: No backups");
+      pgmoneta_log_info("No backups");
       goto error;
    }
 
@@ -1019,14 +1019,14 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    if (bck == NULL)
    {
       ec = MANAGEMENT_ERROR_INFO_NOBACKUP;
-      pgmoneta_log_warn("Info: No identifier for %s/%s", config->common.servers[server].name, identifier);
+      pgmoneta_log_warn("No identifier for %s/%s", config->common.servers[server].name, identifier);
       goto error;
    }
 
    if (pgmoneta_management_create_response(payload, server, &response))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;
-      pgmoneta_log_error("Info: Allocation error");
+      pgmoneta_log_error("Allocation error");
       goto error;
    }
 
@@ -1047,7 +1047,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    if (pgmoneta_json_create(&tablespaces))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;
-      pgmoneta_log_error("Info: Allocation error");
+      pgmoneta_log_error("Allocation error");
       goto error;
    }
 
@@ -1058,7 +1058,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
       if (pgmoneta_json_create(&tbl))
       {
          ec = MANAGEMENT_ERROR_ALLOCATION;
-         pgmoneta_log_error("Info: Allocation error");
+         pgmoneta_log_error("Allocation error");
          goto error;
       }
 
@@ -1090,7 +1090,7 @@ pgmoneta_info_request(SSL* ssl, int client_fd, int server,
    if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_INFO_NETWORK;
-      pgmoneta_log_error("Info: Error sending response");
+      pgmoneta_log_error("Error sending response");
       goto error;
    }
 
@@ -1180,7 +1180,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    if (number_of_backups == 0)
    {
       ec = MANAGEMENT_ERROR_ANNOTATE_NOBACKUP;
-      pgmoneta_log_warn("Annotate: No backups");
+      pgmoneta_log_warn("No backups");
       goto error;
    }
 
@@ -1212,7 +1212,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    if (bck == NULL)
    {
       ec = MANAGEMENT_ERROR_ANNOTATE_NOBACKUP;
-      pgmoneta_log_warn("Annotate: No backup (%s)", backup);
+      pgmoneta_log_warn("No backup (%s)", backup);
       goto error;
    }
 
@@ -1221,7 +1221,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
        !pgmoneta_compare_string("remove", action))
    {
       ec = MANAGEMENT_ERROR_ANNOTATE_UNKNOWN_ACTION;
-      pgmoneta_log_error("Annotate: unknown action (%s)", action);
+      pgmoneta_log_error("Unknown action (%s)", action);
       goto error;
    }
 
@@ -1256,7 +1256,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    if (pgmoneta_json_create(&tablespaces))
    {
       ec = MANAGEMENT_ERROR_ALLOCATION;
-      pgmoneta_log_error("Annotate: Allocation error");
+      pgmoneta_log_error("Allocation error");
       goto error;
    }
 
@@ -1267,7 +1267,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
       if (pgmoneta_json_create(&tbl))
       {
          ec = MANAGEMENT_ERROR_ALLOCATION;
-         pgmoneta_log_error("Annotate: Allocation error");
+         pgmoneta_log_error("Allocation error");
          goto error;
       }
 
@@ -1299,7 +1299,7 @@ pgmoneta_annotate_request(SSL* ssl, int client_fd, int server, uint8_t compressi
    if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
    {
       ec = MANAGEMENT_ERROR_ANNOTATE_NETWORK;
-      pgmoneta_log_error("Annotate: Error sending response");
+      pgmoneta_log_error("Error sending response");
       goto error;
    }
 
