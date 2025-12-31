@@ -414,8 +414,8 @@ main(int argc, char** argv)
    char un[MAX_USERNAME_LENGTH];
    struct main_configuration* config = NULL;
    int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
-   int32_t compression = MANAGEMENT_COMPRESSION_NONE;
-   int32_t encryption = MANAGEMENT_ENCRYPTION_NONE;
+   int32_t compression = MANAGEMENT_COMPRESSION_UNKNOWN;
+   int32_t encryption = MANAGEMENT_ENCRYPTION_UNKNOWN;
    size_t command_count = sizeof(command_table) / sizeof(struct pgmoneta_command);
    struct pgmoneta_parsed_command parsed = {.cmd = NULL, .args = {0}};
    char* filepath = NULL;
@@ -537,7 +537,7 @@ main(int argc, char** argv)
          }
          else if (!strncmp(optarg, "none", MISC_LENGTH))
          {
-            break;
+            compression = MANAGEMENT_COMPRESSION_NONE;
          }
          else
          {
@@ -565,7 +565,7 @@ main(int argc, char** argv)
          }
          else if (!strncmp(optarg, "none", MISC_LENGTH))
          {
-            break;
+            encryption = MANAGEMENT_ENCRYPTION_NONE;
          }
          else
          {
@@ -594,6 +594,16 @@ main(int argc, char** argv)
          usage();
          exit(0);
       }
+   }
+
+   if (compression == MANAGEMENT_COMPRESSION_UNKNOWN)
+   {
+      compression = MANAGEMENT_COMPRESSION_ZSTD;
+   }
+
+   if (encryption == MANAGEMENT_ENCRYPTION_UNKNOWN)
+   {
+      encryption = MANAGEMENT_ENCRYPTION_AES256;
    }
 
    if (getuid() == 0)
