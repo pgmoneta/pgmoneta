@@ -48,8 +48,8 @@ extern "C" {
  * @param length The resulting length of descriptors
  * @return 0 upon success, otherwise 1
  */
-   int
-   pgmoneta_bind(char* hostname, int port, int** fds, int* length);
+int
+pgmoneta_bind(char* hostname, int port, int** fds, int* length);
 
 /**
  * Bind a Unix Domain Socket
