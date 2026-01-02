@@ -278,6 +278,70 @@ pgmoneta_encrypt_wal(char* d)
    return 0;
 }
 
+int
+pgmoneta_encrypt_wal_file(char* d, char* f)
+{
+   char* from = NULL;
+   char* to = NULL;
+   char* compress_suffix = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+   switch (config->compression_type)
+   {
+      case COMPRESSION_CLIENT_GZIP:
+      case COMPRESSION_SERVER_GZIP:
+         compress_suffix = ".gz";
+         break;
+      case COMPRESSION_CLIENT_ZSTD:
+      case COMPRESSION_SERVER_ZSTD:
+         compress_suffix = ".zstd";
+         break;
+      case COMPRESSION_CLIENT_LZ4:
+      case COMPRESSION_SERVER_LZ4:
+         compress_suffix = ".lz4";
+         break;
+      case COMPRESSION_CLIENT_BZIP2:
+         compress_suffix = ".bz2";
+         break;
+      case COMPRESSION_NONE:
+         compress_suffix = "";
+         break;
+      default:
+         pgmoneta_log_error("encryption_execute: Unknown compression type");
+         break;
+   }
+
+   from = NULL;
+   from = pgmoneta_append(from, d);
+   from = pgmoneta_append(from, "/");
+   from = pgmoneta_append(from, f);
+   from = pgmoneta_append(from, compress_suffix);
+
+   to = NULL;
+   to = pgmoneta_append(to, d);
+   to = pgmoneta_append(to, "/");
+   to = pgmoneta_append(to, f);
+   to = pgmoneta_append(to, compress_suffix);
+   to = pgmoneta_append(to, ".aes");
+
+   if (pgmoneta_exists(from))
+   {
+      encrypt_file(from, to, 1);
+      pgmoneta_delete_file(from, NULL);
+      pgmoneta_permission(to, 6, 0, 0);
+   }
+   else
+   {
+      pgmoneta_log_debug("%s doesn't exists", from);
+   }
+
+   free(from);
+   free(to);
+
+   return 0;
+}
+
 void
 pgmoneta_encrypt_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {

@@ -182,6 +182,10 @@ pgmoneta_lz4c_wal(char* directory)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_label"))
+      {
+         continue;
+      }
       if (entry->d_type == DT_REG)
       {
          if (pgmoneta_is_compressed(entry->d_name) ||
@@ -230,6 +234,40 @@ pgmoneta_lz4c_wal(char* directory)
    }
 
    closedir(dir);
+
+   free(from);
+   free(to);
+}
+
+void
+pgmoneta_lz4c_wal_file(char* directory, char* file)
+{
+   char* from = NULL;
+   char* to = NULL;
+
+   from = NULL;
+   from = pgmoneta_append(from, directory);
+   from = pgmoneta_append(from, "/");
+   from = pgmoneta_append(from, file);
+
+   to = NULL;
+   to = pgmoneta_append(to, directory);
+   to = pgmoneta_append(to, "/");
+   to = pgmoneta_append(to, file);
+   to = pgmoneta_append(to, ".lz4");
+
+   if (lz4_compress(from, to))
+   {
+      pgmoneta_log_error("LZ4: Could not compress %s/%s", directory, file);
+   }
+   else
+   {
+      if (pgmoneta_exists(from))
+      {
+         pgmoneta_delete_file(from, NULL);
+      }
+      pgmoneta_permission(to, 6, 0, 0);
+   }
 
    free(from);
    free(to);

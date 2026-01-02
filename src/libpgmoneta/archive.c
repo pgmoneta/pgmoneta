@@ -95,10 +95,6 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       goto error;
    }
 
-#ifdef DEBUG
-   pgmoneta_log_info("Archive: Acquired repository lock");
-#endif
-
    config->common.servers[server].active_archive = true;
 
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);

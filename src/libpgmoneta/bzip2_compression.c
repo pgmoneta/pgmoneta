@@ -246,6 +246,10 @@ pgmoneta_bzip2_wal(char* directory)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_label"))
+      {
+         continue;
+      }
       if (entry->d_type == DT_REG)
       {
          if (pgmoneta_is_compressed(entry->d_name) ||
@@ -296,6 +300,61 @@ pgmoneta_bzip2_wal(char* directory)
 
    free(from);
    free(to);
+}
+
+void
+pgmoneta_bzip2_wal_file(char* directory, char* file)
+{
+   char* from = NULL;
+   char* to = NULL;
+   int level;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   level = config->compression_level;
+   if (level < 1)
+   {
+      level = 1;
+   }
+   else if (level > 9)
+   {
+      level = 9;
+   }
+
+   from = NULL;
+
+   from = pgmoneta_append(from, directory);
+   from = pgmoneta_append(from, "/");
+   from = pgmoneta_append(from, file);
+
+   to = NULL;
+   to = pgmoneta_append(to, directory);
+   to = pgmoneta_append(to, "/");
+   to = pgmoneta_append(to, file);
+   to = pgmoneta_append(to, ".bz2");
+
+   if (pgmoneta_exists(from))
+   {
+      if (bzip2_compress(from, level, to))
+      {
+         pgmoneta_log_error("Bzip2: Could not compress %s/%s", directory, file);
+      }
+      else
+      {
+         if (pgmoneta_exists(from))
+         {
+            pgmoneta_delete_file(from, NULL);
+         }
+         pgmoneta_permission(to, 6, 0, 0);
+      }
+   }
+
+   free(from);
+   free(to);
+
+   from = NULL;
+   to = NULL;
 }
 
 int

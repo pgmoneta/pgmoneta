@@ -64,6 +64,14 @@ void
 pgmoneta_gzip_wal(char* directory);
 
 /**
+ * GZip a WAL file
+ * @param directory The directory
+ * @param file The file
+ */
+void
+pgmoneta_gzip_wal_file(char* directory, char* file);
+
+/**
  * GZip a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor

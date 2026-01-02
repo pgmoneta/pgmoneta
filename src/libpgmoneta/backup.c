@@ -38,6 +38,7 @@
 #include <network.h>
 #include <security.h>
 #include <utils.h>
+#include <wal.h>
 #include <workflow.h>
 
 #define NAME "backup"
@@ -98,10 +99,6 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
       pgmoneta_log_info("Backup: Server %s is active", config->common.servers[server].name);
       goto error;
    }
-
-#ifdef DEBUG
-   pgmoneta_log_debug("Backup: Acquired repository lock");
-#endif
 
    config->common.servers[server].active_backup = true;
 
@@ -277,6 +274,8 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    }
 
    pgmoneta_log_info("Backup: %s/%s (Elapsed: %s)", config->common.servers[server].name, date, elapsed);
+
+   pgmoneta_wal_server_compress_encrypt(server, NULL, NULL);
 
    config->common.servers[server].active_backup = false;
    atomic_store(&config->common.servers[server].repository, false);

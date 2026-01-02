@@ -345,10 +345,6 @@ pgmoneta_sha512_verification(char** argv)
          continue;
       }
 
-#ifdef DEBUG
-      pgmoneta_log_debug("Verify: Acquired repository lock");
-#endif
-
       pgmoneta_log_debug("Verification: Starting for server %s", config->common.servers[server].name);
 
       locked = true;

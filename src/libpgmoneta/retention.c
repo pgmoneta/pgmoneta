@@ -67,10 +67,6 @@ pgmoneta_retention(char** argv)
          continue;
       }
 
-#ifdef DEBUG
-      pgmoneta_log_info("Retention: Acquired repository lock");
-#endif
-
       config->common.servers[server].active_retention = true;
 
       workflow = pgmoneta_workflow_create(WORKFLOW_TYPE_RETENTION, NULL);

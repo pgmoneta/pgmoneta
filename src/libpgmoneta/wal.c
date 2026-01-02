@@ -28,13 +28,18 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <aes.h>
+#include <bzip2_compression.h>
+#include <gzip_compression.h>
 #include <logging.h>
+#include <lz4_compression.h>
 #include <network.h>
 #include <security.h>
 #include <server.h>
 #include <storage.h>
 #include <utils.h>
 #include <wal.h>
+#include <zstandard_compression.h>
 
 /* system */
 #include <ctype.h>
@@ -285,6 +290,8 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_free_query_response(identify_system_response);
    identify_system_response = NULL;
 
+   pgmoneta_wal_server_compress_encrypt(srv, argv, NULL);
+
    while (config->running && pgmoneta_server_is_online(srv))
    {
       if (wal_fetch_history(d, timeline, ssl, socket))
@@ -456,6 +463,10 @@ pgmoneta_wal(int srv, char** argv)
 
                      if (wal_xlog_offset(xlogptr, segsize) == 0)
                      {
+                        char* wal_filename = NULL;
+
+                        wal_filename = pgmoneta_append(wal_filename, filename);
+
                         // the end of WAL segment
                         fflush(wal_file);
                         wal_close(d, filename, false, wal_file);
@@ -519,6 +530,13 @@ pgmoneta_wal(int srv, char** argv)
                            }
                            bytes_left = 0;
                         }
+
+                        pgmoneta_log_info("wal_filename: %s", wal_filename);
+
+                        pgmoneta_wal_server_compress_encrypt(srv, argv, wal_filename);
+                        free(wal_filename);
+                        wal_filename = NULL;
+
                         break;
                      }
                   }
@@ -602,6 +620,8 @@ pgmoneta_wal(int srv, char** argv)
       // but we opt not to wait for it as the system should no longer be running
       pgmoneta_send_copy_done_message(ssl, socket);
    }
+
+   pgmoneta_wal_server_compress_encrypt(srv, argv, NULL);
 
    config->common.servers[srv].wal_streaming = -1;
    pgmoneta_close_ssl(ssl);
@@ -1684,4 +1704,107 @@ error:
    free(temp_oid);
    temp_oid = NULL;
    return 1;
+}
+
+void
+pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.servers[srv].online)
+   {
+      if (config->compression_type == COMPRESSION_NONE && config->encryption == ENCRYPTION_NONE)
+      {
+         return;
+      }
+
+      if (!fork())
+      {
+         bool active = false;
+         char* d = NULL;
+
+         if (argv != NULL)
+         {
+            pgmoneta_set_proc_title(1, argv, "wal/ce", config->common.servers[srv].name);
+         }
+
+         if (atomic_compare_exchange_strong(&config->common.servers[srv].repository, &active, true))
+         {
+            d = pgmoneta_get_server_wal(srv);
+
+            if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+            {
+               if (wal_file == NULL)
+               {
+                  pgmoneta_gzip_wal(d);
+               }
+               else
+               {
+                  pgmoneta_gzip_wal_file(d, wal_file);
+               }
+            }
+            else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+            {
+               if (wal_file == NULL)
+               {
+                  pgmoneta_zstandardc_wal(d);
+               }
+               else
+               {
+                  pgmoneta_zstandardc_wal_file(d, wal_file);
+               }
+            }
+            else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+            {
+               if (wal_file == NULL)
+               {
+                  pgmoneta_lz4c_wal(d);
+               }
+               else
+               {
+                  pgmoneta_lz4c_wal_file(d, wal_file);
+               }
+            }
+            else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+            {
+               if (wal_file == NULL)
+               {
+                  pgmoneta_bzip2_wal(d);
+               }
+               else
+               {
+                  pgmoneta_bzip2_wal_file(d, wal_file);
+               }
+            }
+
+            if (config->encryption != ENCRYPTION_NONE)
+            {
+               if (wal_file == NULL)
+               {
+                  pgmoneta_encrypt_wal(d);
+               }
+               else
+               {
+                  pgmoneta_encrypt_wal_file(d, wal_file);
+               }
+            }
+
+            free(d);
+
+            atomic_store(&config->common.servers[srv].repository, false);
+         }
+         else
+         {
+            pgmoneta_log_debug("WAL: Did not get repository lock for server %s", config->common.servers[srv].name);
+         }
+
+         exit(0);
+      }
+   }
+   else
+   {
+      pgmoneta_log_debug("WAL: Server %s is offline", config->common.servers[srv].name);
+   }
 }

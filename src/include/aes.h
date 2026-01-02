@@ -90,6 +90,15 @@ int
 pgmoneta_encrypt_wal(char* d);
 
 /**
+ * Encrypt the file under the directory
+ * @param d The wal directory
+ * @param f The wal file
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_encrypt_wal_file(char* d, char* f);
+
+/**
  * Encrypt a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor

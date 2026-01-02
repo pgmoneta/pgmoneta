@@ -91,7 +91,6 @@ static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, in
 static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
-static void wal_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void verification_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
@@ -251,7 +250,6 @@ main(int argc, char** argv)
    bool metrics_started = false;
    pid_t pid, sid;
    struct signal_info signal_watcher[SIGNALS_NUMBER];
-   struct ev_periodic wal;
    struct ev_periodic retention;
    struct ev_periodic valid;
    struct ev_periodic wal_streaming;
@@ -833,14 +831,6 @@ main(int argc, char** argv)
    /* Start to verify WAL streaming */
    ev_periodic_init(&wal_streaming, wal_streaming_cb, 0., 60, 0);
    ev_periodic_start(main_loop, &wal_streaming);
-
-   /* Start WAL compression */
-   if (config->compression_type != COMPRESSION_NONE ||
-       config->encryption != ENCRYPTION_NONE)
-   {
-      ev_periodic_init(&wal, wal_cb, 0., 60, 0);
-      ev_periodic_start(main_loop, &wal);
-   }
 
    /* Start backup retention policy */
    ev_periodic_init(&retention, retention_cb, 0., config->retention_interval, 0);
@@ -2231,78 +2221,6 @@ coredump_cb(struct ev_loop* loop, ev_signal* w, int revents)
    pgmoneta_log_info("core dump requested (%p, %p, %d)", loop, w, revents);
    remove_pidfile();
    abort();
-}
-
-static void
-wal_cb(struct ev_loop* loop __attribute__((unused)), ev_periodic* w __attribute__((unused)), int revents)
-{
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   if (EV_ERROR & revents)
-   {
-      pgmoneta_log_trace("wal_cb: got invalid event: %s", strerror(errno));
-      return;
-   }
-
-   for (int i = 0; i < config->common.number_of_servers; i++)
-   {
-      if (config->common.servers[i].online)
-      {
-         /* Compression is always in a fork() */
-         if (!fork())
-         {
-            bool active = false;
-            char* d = NULL;
-
-            pgmoneta_set_proc_title(1, argv_ptr, "wal", config->common.servers[i].name);
-
-            shutdown_ports();
-
-            if (atomic_compare_exchange_strong(&config->common.servers[i].repository, &active, true))
-            {
-#ifdef DEBUG
-               pgmoneta_log_debug("WAL: Acquired repository lock");
-#endif
-
-               d = pgmoneta_get_server_wal(i);
-
-               if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
-               {
-                  pgmoneta_gzip_wal(d);
-               }
-               else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-               {
-                  pgmoneta_zstandardc_wal(d);
-               }
-               else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-               {
-                  pgmoneta_lz4c_wal(d);
-               }
-               else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-               {
-                  pgmoneta_bzip2_wal(d);
-               }
-
-               if (config->encryption != ENCRYPTION_NONE)
-               {
-                  pgmoneta_encrypt_wal(d);
-               }
-
-               free(d);
-
-               atomic_store(&config->common.servers[i].repository, false);
-            }
-
-            exit(0);
-         }
-      }
-      else
-      {
-         pgmoneta_log_debug("WAL compression: Server %s is offline", config->common.servers[i].name);
-      }
-   }
 }
 
 static void

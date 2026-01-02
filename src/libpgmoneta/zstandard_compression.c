@@ -303,6 +303,10 @@ pgmoneta_zstandardc_wal(char* directory)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (pgmoneta_ends_with(entry->d_name, "backup_label"))
+      {
+         continue;
+      }
       if (entry->d_type == DT_REG)
       {
          if (pgmoneta_is_compressed(entry->d_name) ||
@@ -381,6 +385,119 @@ error:
 
    free(from);
    free(to);
+}
+
+void
+pgmoneta_zstandardc_wal_file(char* directory, char* file)
+{
+   size_t zin_size = 0;
+   void* zin = NULL;
+   size_t zout_size = 0;
+   void* zout = NULL;
+   ZSTD_CCtx* cctx = NULL;
+   char* from = NULL;
+   char* to = NULL;
+   int level;
+   int workers;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   level = config->compression_level;
+   if (level < 1)
+   {
+      level = 1;
+   }
+   else if (level > 19)
+   {
+      level = 19;
+   }
+
+   workers = config->workers != 0 ? config->workers : ZSTD_DEFAULT_NUMBER_OF_WORKERS;
+
+   zin_size = ZSTD_CStreamInSize();
+   zin = malloc(zin_size);
+   if (zin == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (input buffer)");
+      goto error;
+   }
+   zout_size = ZSTD_CStreamOutSize();
+   zout = malloc(zout_size);
+   if (zout == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Allocation failed (output buffer)");
+      goto error;
+   }
+
+   cctx = ZSTD_createCCtx();
+   if (cctx == NULL)
+   {
+      pgmoneta_log_error("ZSTD: Could not create compression context");
+      goto error;
+   }
+
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
+   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
+
+   from = NULL;
+   from = pgmoneta_append(from, directory);
+   from = pgmoneta_append(from, "/");
+   from = pgmoneta_append(from, file);
+
+   to = NULL;
+   to = pgmoneta_append(to, directory);
+   to = pgmoneta_append(to, "/");
+   to = pgmoneta_append(to, file);
+   to = pgmoneta_append(to, ".zstd");
+
+   if (pgmoneta_exists(from))
+   {
+      if (zstd_compress(from, to, cctx, zin_size, zin, zout_size, zout))
+      {
+         pgmoneta_log_error("ZSTD: Could not compress %s/%s", directory, file);
+      }
+      else
+      {
+         if (pgmoneta_exists(from))
+         {
+            pgmoneta_delete_file(from, NULL);
+         }
+         pgmoneta_permission(to, 6, 0, 0);
+
+         memset(zin, 0, zin_size);
+         memset(zout, 0, zout_size);
+      }
+   }
+
+   free(from);
+   free(to);
+
+   ZSTD_freeCCtx(cctx);
+
+   free(zin);
+   free(zout);
+
+   return;
+
+ error:
+   free(from);
+   free(to);
+
+   if (cctx != NULL)
+   {
+      ZSTD_freeCCtx(cctx);
+   }
+
+   if (zin != NULL)
+   {
+      free(zin);
+   }
+   if (zout != NULL)
+   {
+      free(zout);
+   }
 }
 
 void

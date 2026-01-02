@@ -64,6 +64,14 @@ void
 pgmoneta_bzip2_wal(char* directory);
 
 /**
+ * BZip a WAL file
+ * @param directory The directory
+ * @param file The file
+ */
+void
+pgmoneta_bzip2_wal_file(char* directory, char* file);
+
+/**
  * BUNZip a directory
  * @param directory The directory
  * @param workers The optional workers

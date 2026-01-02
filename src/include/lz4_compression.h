@@ -66,6 +66,14 @@ void
 pgmoneta_lz4c_wal(char* directory);
 
 /**
+ * Compress a WAL file with Lz4
+ * @param directory The directory
+ * @param file The file
+ */
+void
+pgmoneta_lz4c_wal_file(char* directory, char* file);
+
+/**
  * Decompress a Lz4 directory
  * @param directory The directory
  * @param workers The optional workers

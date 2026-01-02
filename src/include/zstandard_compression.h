@@ -63,6 +63,14 @@ void
 pgmoneta_zstandardc_wal(char* directory);
 
 /**
+ * Compress a WAL file with Zstandard
+ * @param directory The directory
+ * @param file The file
+ */
+void
+pgmoneta_zstandardc_wal_file(char* directory, char* file);
+
+/**
  * ZSTD decompress a single file, also remove the original file
  * @param ssl The SSL
  * @param client_fd The client descriptor

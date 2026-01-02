@@ -303,6 +303,61 @@ pgmoneta_gzip_wal(char* directory)
 }
 
 void
+pgmoneta_gzip_wal_file(char* directory, char* file)
+{
+   char* from = NULL;
+   char* to = NULL;
+   int level;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   level = config->compression_level;
+   if (level < 1)
+   {
+      level = 1;
+   }
+   else if (level > 9)
+   {
+      level = 9;
+   }
+
+   from = NULL;
+   from = pgmoneta_append(from, directory);
+   from = pgmoneta_append(from, "/");
+   from = pgmoneta_append(from, file);
+
+   to = NULL;
+   to = pgmoneta_append(to, directory);
+   to = pgmoneta_append(to, "/");
+   to = pgmoneta_append(to, file);
+   to = pgmoneta_append(to, ".gz");
+
+   if (pgmoneta_exists(from))
+   {
+      if (gz_compress(from, level, to))
+      {
+         pgmoneta_log_error("Gzip: Could not compress %s/%s", directory, file);
+      }
+      else
+      {
+         if (pgmoneta_exists(from))
+         {
+            pgmoneta_delete_file(from, NULL);
+         }
+         else
+         {
+            pgmoneta_log_debug("%s doesn't exist", from);
+         }
+         pgmoneta_permission(to, 6, 0, 0);
+      }
+   }
+
+   free(from);
+   free(to);
+}
+
+void
 pgmoneta_gzip_request(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
 {
    char* from = NULL;
