@@ -481,7 +481,7 @@ pgmoneta_zstandardc_wal_file(char* directory, char* file)
 
    return;
 
- error:
+error:
    free(from);
    free(to);
 
