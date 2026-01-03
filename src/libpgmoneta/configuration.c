@@ -274,6 +274,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.online = false;
                   srv.primary = false;
                   atomic_init(&srv.repository, false);
+                  atomic_init(&srv.wal_repository, false);
                   srv.active_backup = false;
                   srv.active_restore = false;
                   srv.active_archive = false;
