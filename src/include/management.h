@@ -201,8 +201,8 @@ extern "C" {
 #define MANAGEMENT_ERROR_BACKUP_NETWORK                     109
 #define MANAGEMENT_ERROR_BACKUP_OFFLINE                     110
 #define MANAGEMENT_ERROR_BACKUP_NOSERVER                    111
-#define MANAGEMENT_ERROR_BACKUP_NOFORK                      111
-#define MANAGEMENT_ERROR_BACKUP_ERROR                       112
+#define MANAGEMENT_ERROR_BACKUP_NOFORK                      112
+#define MANAGEMENT_ERROR_BACKUP_ERROR                       113
 
 #define MANAGEMENT_ERROR_INCREMENTAL_BACKUP_SETUP           200
 #define MANAGEMENT_ERROR_INCREMENTAL_BACKUP_EXECUTE         201
