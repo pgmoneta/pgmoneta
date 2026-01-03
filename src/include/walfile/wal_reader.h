@@ -342,6 +342,7 @@ struct decoded_xlog_record
    transaction_id toplevel_xid;                           /**< Top-level transaction ID. */
    char* main_data;                                       /**< Main data portion of the record. */
    uint32_t main_data_len;                                /**< Length of the main data portion. */
+   uint32_t block_size;                                   /**< Block size. */
    int max_block_id;                                      /**< Highest block ID in use (-1 if none). */
    struct decoded_bkp_block blocks[XLR_MAX_BLOCK_ID + 1]; /**< Array of decoded backup blocks. */
    bool partial;                                          /**< Indicates if the record is partial. */

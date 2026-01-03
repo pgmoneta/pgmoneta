@@ -598,6 +598,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
    decoded->toplevel_xid = INVALID_TRANSACTION_ID;
    decoded->main_data = NULL;
    decoded->main_data_len = 0;
+   decoded->block_size = block_size;
    decoded->max_block_id = -1;
 
    //read id
@@ -983,7 +984,7 @@ get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pr
                                                 record->blocks[block_id].apply_image ? "" : " for WAL verification",
                                                 record->blocks[block_id].hole_offset,
                                                 record->blocks[block_id].hole_length,
-                                                8192 -
+                                                record->block_size -
                                                    record->blocks[block_id].hole_length -
                                                    record->blocks[block_id].bimg_len,
                                                 method);

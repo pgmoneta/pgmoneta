@@ -444,7 +444,7 @@ pgmoneta_wal_format_xl_btree_unlink_page_v14(struct xl_btree_unlink_page* wrappe
 }
 
 static char*
-pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint16_t nupdated)
+pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint16_t nupdated, uint32_t block_size)
 {
    offset_number* deletedoffsets;
    offset_number* updatedoffsets;
@@ -471,7 +471,7 @@ pgmoneta_wal_delvacuum_desc(char* buf, char* block_data, uint16_t ndeleted, uint
    {
       offset_number off = updatedoffsets[i];
 
-      assert(OFFSET_NUMBER_IS_VALID(off));
+      assert(OFFSET_NUMBER_IS_VALID(off, block_size));
       assert(updates->ndeletedtids > 0);
 
       /*
@@ -551,7 +551,7 @@ pgmoneta_wal_btree_desc(char* buf, struct decoded_xlog_record* record)
          if (XLogRecHasBlockData(record, 0))
          {
             buf = pgmoneta_wal_delvacuum_desc(buf, pgmoneta_wal_get_record_block_data(record, 0, NULL),
-                                              xlrec->ndeleted, xlrec->nupdated);
+                                              xlrec->ndeleted, xlrec->nupdated, record->block_size);
          }
          break;
       }

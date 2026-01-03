@@ -39,9 +39,10 @@ extern "C" {
 
 #include <stdint.h>
 
-#define INVALID_OFFSET_NUMBER         ((offset_number)0)
-#define FIRST_OFFSET_NUMBER           ((offset_number)1)
-#define MAX_OFFSET_NUMBER             ((offset_number)(8192 / sizeof(struct item_id_data))) // TODO: Replace 8192 with block size from pg_control
+#define INVALID_OFFSET_NUMBER ((offset_number)0)
+#define FIRST_OFFSET_NUMBER   ((offset_number)1)
+#define MAX_OFFSET_NUMBER(block_size) \
+   ((block_size) / sizeof(struct item_id_data))
 
 #define XLOG_BTREE_INSERT_LEAF        0x00 /**< Add index tuple without split */
 #define XLOG_BTREE_INSERT_UPPER       0x10 /**< Same, on a non-leaf page */
@@ -61,10 +62,9 @@ extern "C" {
 
 #define SIZE_OF_BTREE_UPDATE          (offsetof(struct xl_btree_update, ndeletedtids) + sizeof(uint16_t))
 
-#define OFFSET_NUMBER_IS_VALID(offsetNumber)          \
-   ((bool)((offsetNumber != INVALID_OFFSET_NUMBER) && \
-           (offsetNumber <= MAX_OFFSET_NUMBER)))
-
+#define OFFSET_NUMBER_IS_VALID(offset, block_size) \
+   ((bool)(((offset) >= FIRST_OFFSET_NUMBER) &&    \
+           ((offset) <= MAX_OFFSET_NUMBER(block_size))))
 /**
  * @struct item_id_data
  * @brief Describes a line pointer on a page in a B-tree.
