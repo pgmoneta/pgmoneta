@@ -1234,7 +1234,14 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_bool(value, &config->s3_use_tls))
+                     if (as_bool(value, &config->s3.use_tls))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_bool(value, &srv.s3.use_tls))
                      {
                         unknown = true;
                      }
@@ -1253,7 +1260,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_storage_class, value, max);
+                     memcpy(config->s3.storage_class, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.storage_class, value, max);
                   }
                   else
                   {
@@ -1264,7 +1280,14 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_int(value, &config->s3_port))
+                     if (as_int(value, &config->s3.port))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (as_int(value, &srv.s3.port))
                      {
                         unknown = true;
                      }
@@ -1283,7 +1306,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_endpoint, value, max);
+                     memcpy(config->s3.endpoint, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.endpoint, value, max);
                   }
                   else
                   {
@@ -1299,7 +1331,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_region, value, max);
+                     memcpy(config->s3.region, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.region, value, max);
                   }
                   else
                   {
@@ -1315,7 +1356,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_access_key_id, value, max);
+                     memcpy(config->s3.access_key_id, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.access_key_id, value, max);
                   }
                   else
                   {
@@ -1331,7 +1381,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_secret_access_key, value, max);
+                     memcpy(config->s3.secret_access_key, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.secret_access_key, value, max);
                   }
                   else
                   {
@@ -1347,7 +1406,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MISC_LENGTH - 1;
                      }
-                     memcpy(config->s3_bucket, value, max);
+                     memcpy(config->s3.bucket, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MISC_LENGTH - 1)
+                     {
+                        max = MISC_LENGTH - 1;
+                     }
+                     memcpy(srv.s3.bucket, value, max);
                   }
                   else
                   {
@@ -1363,7 +1431,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                      {
                         max = MAX_PATH - 1;
                      }
-                     memcpy(config->s3_base_dir, value, max);
+                     memcpy(config->s3.base_dir, value, max);
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     max = strlen(value);
+                     if (max > MAX_PATH - 1)
+                     {
+                        max = MAX_PATH - 1;
+                     }
+                     memcpy(srv.s3.base_dir, value, max);
                   }
                   else
                   {
@@ -3017,15 +3094,15 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_CIPHERS, (uintptr_t)config->ssh_ciphers, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PUBLIC_KEY_FILE, (uintptr_t)config->ssh_public_key_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_SSH_PRIVATE_KEY_FILE, (uintptr_t)config->ssh_private_key_file, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_USE_TLS, (uintptr_t)config->s3_use_tls, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_STORAGE_CLASS, (uintptr_t)config->s3_storage_class, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ENDPOINT, (uintptr_t)config->s3_endpoint, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_PORT, (uintptr_t)config->s3_port, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_REGION, (uintptr_t)config->s3_region, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID, (uintptr_t)config->s3_access_key_id, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->s3_secret_access_key, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET, (uintptr_t)config->s3_bucket, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BASE_DIR, (uintptr_t)config->s3_base_dir, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_USE_TLS, (uintptr_t)config->s3.use_tls, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_STORAGE_CLASS, (uintptr_t)config->s3.storage_class, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ENDPOINT, (uintptr_t)config->s3.endpoint, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_PORT, (uintptr_t)config->s3.port, ValueInt32);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_REGION, (uintptr_t)config->s3.region, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID, (uintptr_t)config->s3.access_key_id, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->s3.secret_access_key, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET, (uintptr_t)config->s3.bucket, ValueString);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BASE_DIR, (uintptr_t)config->s3.base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_BASE_DIR, (uintptr_t)config->azure_base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_STORAGE_ACCOUNT, (uintptr_t)config->azure_storage_account, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_AZURE_CONTAINER, (uintptr_t)config->azure_container, ValueString);
@@ -3124,7 +3201,15 @@ add_servers_configuration_response(struct json* res)
       }
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY, (uintptr_t)hot_standby, ValueString);
       free(hot_standby);
-
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_USE_TLS, (uintptr_t)config->common.servers[i].s3.use_tls, ValueInt32);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_STORAGE_CLASS, (uintptr_t)config->common.servers[i].s3.storage_class, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ENDPOINT, (uintptr_t)config->common.servers[i].s3.endpoint, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_PORT, (uintptr_t)config->common.servers[i].s3.port, ValueInt32);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_REGION, (uintptr_t)config->common.servers[i].s3.region, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_ACCESS_KEY_ID, (uintptr_t)config->common.servers[i].s3.access_key_id, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_SECRET_ACCESS_KEY, (uintptr_t)config->common.servers[i].s3.secret_access_key, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BUCKET, (uintptr_t)config->common.servers[i].s3.bucket, ValueString);
+      pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_S3_BASE_DIR, (uintptr_t)config->common.servers[i].s3.base_dir, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_OVERRIDES, (uintptr_t)config->common.servers[i].hot_standby_overrides, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_HOT_STANDBY_TABLESPACES, (uintptr_t)config->common.servers[i].hot_standby_tablespaces, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
@@ -3339,14 +3424,13 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    }
    else
    {
-      // Success - configuration applied
+      //Success - configuration applied
       pgmoneta_json_put(response, CONFIGURATION_RESPONSE_STATUS, (uintptr_t)CONFIGURATION_STATUS_SUCCESS, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_RESPONSE_MESSAGE, (uintptr_t)CONFIGURATION_MESSAGE_SUCCESS, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_RESPONSE_CONFIG_KEY, (uintptr_t)config_key, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_RESPONSE_OLD_VALUE, (uintptr_t)old_value, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_RESPONSE_NEW_VALUE, (uintptr_t)new_value, ValueString);
       pgmoneta_json_put(response, CONFIGURATION_RESPONSE_RESTART_REQUIRED, (uintptr_t)false, ValueBool);
-
       pgmoneta_log_info("Conf Set: Successfully applied %s: %s -> %s", config_key, old_value, new_value);
    }
 
@@ -3997,10 +4081,46 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                   snprintf(buffer, buffer_size, "%s", ret ? ret : "");
                   free(ret);
                }
+               else if (!strcmp(key_info.key, "s3_use_tls"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.use_tls ? "true" : "false");
+               }
+               else if (!strcmp(key_info.key, "s3_storage_class"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.storage_class);
+               }
+               else if (!strcmp(key_info.key, "s3_endpoint"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.endpoint);
+               }
+               else if (!strcmp(key_info.key, "s3_port"))
+               {
+                  snprintf(buffer, buffer_size, "%d", srv->s3.port);
+               }
+               else if (!strcmp(key_info.key, "s3_region"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.region);
+               }
+               else if (!strcmp(key_info.key, "s3_access_key_id"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.access_key_id);
+               }
+               else if (!strcmp(key_info.key, "s3_secret_access_key"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.secret_access_key);
+               }
+               else if (!strcmp(key_info.key, "s3_bucket"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.bucket);
+               }
+               else if (!strcmp(key_info.key, "s3_base_dir"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->s3.base_dir);
+               }
                else
                {
                   pgmoneta_log_debug("Unknown server configuration key: %s", key_info.key);
-                  return 1; // Unknown key
+                  return 1;
                }
                break;
             }
@@ -5372,6 +5492,21 @@ copy_server(struct server* dst, struct server* src)
       changed = true;
    }
    if (restart_string("wal_shipping", &dst->wal_shipping[0], &src->wal_shipping[0]))
+   {
+      changed = true;
+   }
+   if (restart_int("s3_port", dst->s3.port, src->s3.port) ||
+       restart_bool("s3_use_tls", dst->s3.use_tls, src->s3.use_tls) ||
+       restart_string("s3_storage_class", dst->s3.storage_class,
+                      src->s3.storage_class) ||
+       restart_string("s3_endpoint", dst->s3.endpoint, src->s3.endpoint) ||
+       restart_string("s3_region", dst->s3.region, src->s3.region) ||
+       restart_string("s3_access_key_id", dst->s3.access_key_id,
+                      src->s3.access_key_id) ||
+       restart_string("s3_secret_access_key", dst->s3.secret_access_key,
+                      src->s3.secret_access_key) ||
+       restart_string("s3_bucket", dst->s3.bucket, src->s3.bucket) ||
+       restart_string("s3_base_dir", dst->s3.base_dir, src->s3.base_dir))
    {
       changed = true;
    }

@@ -233,6 +233,22 @@ struct extension_info
    struct version installed_version; /**< The installed version */
 } __attribute__((aligned(64)));
 
+/** @struct s3_configuration
+ * Defines the S3 configuration
+ */
+struct s3_configuration
+{
+   int port;                            /**< The S3 port */
+   bool use_tls;                        /**< Use TLS for S3 */
+   char storage_class[MISC_LENGTH];     /**< The S3 storage class */
+   char endpoint[MISC_LENGTH];          /**< The S3 endpoint */
+   char region[MISC_LENGTH];            /**< The AWS region */
+   char access_key_id[MISC_LENGTH];     /**< The IAM Access Key ID */
+   char secret_access_key[MISC_LENGTH]; /**< The IAM Secret Access Key */
+   char bucket[MISC_LENGTH];            /**< The S3 bucket */
+   char base_dir[MAX_PATH];             /**< The S3 base directory */
+} __attribute__((aligned(64)));
+
 /** @struct server
  * Defines a server
  */
@@ -292,6 +308,7 @@ struct server
    bool has_extension;                                            /**< Does this have pgmoneta_ext */
    char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
    struct extension_info extensions[NUMBER_OF_EXTENSIONS];        /**< The extensions */
+   struct s3_configuration s3;                                    /**< The S3 configuration */
 } __attribute__((aligned(64)));
 
 /** @struct user
@@ -404,15 +421,7 @@ struct main_configuration
    char ssh_public_key_file[MAX_PATH];  /**< The SSH public key path */
    char ssh_private_key_file[MAX_PATH]; /**< The SSH private key path */
 
-   int s3_port;                            /**< The S3 port */
-   bool s3_use_tls;                        /**< Use TLS  for S3 */
-   char s3_storage_class[MISC_LENGTH];     /**< The S3 storage class */
-   char s3_endpoint[MISC_LENGTH];          /**< The S3 endpoint */
-   char s3_region[MISC_LENGTH];            /**< The AWS region */
-   char s3_access_key_id[MISC_LENGTH];     /**< The IAM Access Key ID */
-   char s3_secret_access_key[MISC_LENGTH]; /**< The IAM Secret Access Key */
-   char s3_bucket[MISC_LENGTH];            /**< The S3 bucket */
-   char s3_base_dir[MAX_PATH];             /**< The S3 base directory */
+   struct s3_configuration s3; /**< The S3 configuration */
 
    char azure_storage_account[MISC_LENGTH]; /**< The Azure storage account name */
    char azure_container[MISC_LENGTH];       /**< The Azure container name */
