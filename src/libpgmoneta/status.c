@@ -140,6 +140,12 @@ pgmoneta_status(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_PRIMARY, (uintptr_t)config->common.servers[i].primary, ValueBool);
 
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_BACKUP, (uintptr_t)config->common.servers[i].active_backup, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_RESTORE, (uintptr_t)config->common.servers[i].active_restore, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_ARCHIVE, (uintptr_t)config->common.servers[i].active_archive, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_DELETE, (uintptr_t)config->common.servers[i].active_delete, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_RETENTION, (uintptr_t)config->common.servers[i].active_retention, ValueBool);
+
       d = pgmoneta_get_server_backup(i);
 
       pgmoneta_load_infos(d, &number_of_backups, &backups);
@@ -354,6 +360,12 @@ pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t en
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_WEEKS, (uintptr_t)retention_weeks, ValueInt32);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_MONTHS, (uintptr_t)retention_months, ValueInt32);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_RETENTION_YEARS, (uintptr_t)retention_years, ValueInt32);
+
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_BACKUP, (uintptr_t)config->common.servers[i].active_backup, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_RESTORE, (uintptr_t)config->common.servers[i].active_restore, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_ARCHIVE, (uintptr_t)config->common.servers[i].active_archive, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_DELETE, (uintptr_t)config->common.servers[i].active_delete, ValueBool);
+      pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ACTIVE_RETENTION, (uintptr_t)config->common.servers[i].active_retention, ValueBool);
 
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_ONLINE, (uintptr_t)config->common.servers[i].online, ValueBool);
       pgmoneta_json_put(js, MANAGEMENT_ARGUMENT_PRIMARY, (uintptr_t)config->common.servers[i].primary, ValueBool);

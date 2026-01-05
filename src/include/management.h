@@ -105,6 +105,11 @@ extern "C" {
  * Management arguments
  */
 #define MANAGEMENT_ARGUMENT_ACTION                "Action"
+#define MANAGEMENT_ARGUMENT_ACTIVE_ARCHIVE        "ActiveArchive"
+#define MANAGEMENT_ARGUMENT_ACTIVE_BACKUP         "ActiveBackup"
+#define MANAGEMENT_ARGUMENT_ACTIVE_DELETE         "ActiveDelete"
+#define MANAGEMENT_ARGUMENT_ACTIVE_RESTORE        "ActiveRestore"
+#define MANAGEMENT_ARGUMENT_ACTIVE_RETENTION      "ActiveRetention"
 #define MANAGEMENT_ARGUMENT_ALL                   "All"
 #define MANAGEMENT_ARGUMENT_BACKUP                "Backup"
 #define MANAGEMENT_ARGUMENT_BACKUPS               "Backups"
