@@ -1877,19 +1877,20 @@ pgmoneta_delete_directory(char* path)
 }
 
 int
-pgmoneta_get_files(char* base, int* number_of_files, char*** files)
+pgmoneta_get_files(char* base, struct deque** files)
 {
-   char* d = NULL;
-   char** array = NULL;
-   int nof = 0;
-   int n;
    DIR* dir = NULL;
    struct dirent* entry;
+   struct deque* array = NULL;
 
-   *number_of_files = 0;
-   *files = NULL;
-
-   nof = 0;
+   if (*files == NULL)
+   {
+      pgmoneta_deque_create(false, &array);
+   }
+   else
+   {
+      array = *files;
+   }
 
    if (base == NULL)
    {
@@ -1905,93 +1906,52 @@ pgmoneta_get_files(char* base, int* number_of_files, char*** files)
    {
       if (entry->d_type == DT_REG)
       {
-         nof++;
-      }
-   }
-
-   closedir(dir);
-   dir = NULL;
-
-   dir = opendir(base);
-
-   if (dir == NULL)
-   {
-      goto error;
-   }
-
-   array = (char**)malloc(sizeof(char*) * nof);
-
-   if (array == NULL)
-   {
-      goto error;
-   }
-
-   n = 0;
-
-   while ((entry = readdir(dir)) != NULL)
-   {
-      if (entry->d_type == DT_REG)
-      {
-         array[n] = (char*)malloc(strlen(entry->d_name) + 1);
-
-         if (array[n] == NULL)
+         if (pgmoneta_deque_add(array, entry->d_name, (uintptr_t)entry->d_name, ValueString))
          {
             goto error;
          }
-
-         memset(array[n], 0, strlen(entry->d_name) + 1);
-         memcpy(array[n], entry->d_name, strlen(entry->d_name));
-         n++;
       }
    }
 
+   // sort the deque
+   pgmoneta_deque_sort(array);
+
+   *files = array;
+
    closedir(dir);
    dir = NULL;
-
-   pgmoneta_sort(nof, array);
-
-   free(d);
-   d = NULL;
-
-   *number_of_files = nof;
-   *files = array;
 
    return 0;
 
 error:
-
    if (dir != NULL)
    {
       closedir(dir);
    }
 
-   for (int i = 0; i < nof; i++)
+   if (*files == NULL)
    {
-      free(array[i]);
+      pgmoneta_deque_destroy(array);
    }
-   free(array);
-
-   free(d);
-
-   *number_of_files = 0;
-   *files = NULL;
 
    return 1;
 }
 
 int
-pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
+pgmoneta_get_wal_files(char* base, struct deque** files)
 {
-   char** array = NULL;
-   int nof = 0;
-   int n;
    DIR* dir;
    struct dirent* entry;
+   struct deque* array = NULL;
 
-   *number_of_files = 0;
-   *files = NULL;
-
-   nof = 0;
+   if (*files == NULL)
+   {
+      pgmoneta_deque_create(false, &array);
+   }
+   else
+   {
+      array = *files;
+   }
 
    if (!(dir = opendir(base)))
    {
@@ -2007,65 +1967,33 @@ pgmoneta_get_wal_files(char* base, int* number_of_files, char*** files)
 
       if (entry->d_type == DT_REG)
       {
-         nof++;
+         if (pgmoneta_deque_add(array, entry->d_name, (uintptr_t)entry->d_name, ValueString))
+         {
+            goto error;
+         }
       }
    }
+
+   // sort the deque
+   pgmoneta_deque_sort(array);
+
+   *files = array;
 
    closedir(dir);
    dir = NULL;
 
-   if (nof > 0)
-   {
-      dir = opendir(base);
-
-      array = (char**)malloc(sizeof(char*) * nof);
-      n = 0;
-
-      while ((entry = readdir(dir)) != NULL)
-      {
-         if (strstr(entry->d_name, ".history") != NULL)
-         {
-            continue;
-         }
-
-         if (entry->d_type == DT_REG)
-         {
-            if (n < nof)
-            {
-               array[n] = (char*)malloc(strlen(entry->d_name) + 1);
-               memset(array[n], 0, strlen(entry->d_name) + 1);
-               memcpy(array[n], entry->d_name, strlen(entry->d_name));
-               n++;
-            }
-         }
-      }
-
-      closedir(dir);
-      dir = NULL;
-
-      pgmoneta_sort(nof, array);
-   }
-
-   *number_of_files = nof;
-   *files = array;
-
    return 0;
 
 error:
-
    if (dir != NULL)
    {
       closedir(dir);
    }
 
-   for (int i = 0; i < nof; i++)
+   if (*files == NULL)
    {
-      free(array[i]);
+      pgmoneta_deque_destroy(array);
    }
-   free(array);
-
-   *number_of_files = 0;
-   *files = NULL;
 
    return 1;
 }
@@ -2793,26 +2721,29 @@ error:
 int
 pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* workers)
 {
-   int number_of_wal_files = 0;
-   char** wal_files = NULL;
+   struct deque* wal_files = NULL;
+   struct deque_iterator* it = NULL;
    char* basename = NULL;
    char* ff = NULL;
    char* tf = NULL;
 
-   pgmoneta_get_files(from, &number_of_wal_files, &wal_files);
+   pgmoneta_get_files(from, &wal_files);
 
-   for (int i = 0; i < number_of_wal_files; i++)
+   pgmoneta_deque_iterator_create(wal_files, &it);
+   while (pgmoneta_deque_iterator_next(it))
    {
-      if (pgmoneta_is_encrypted(wal_files[i]))
+      char* wal_file = (char*)it->value->data;
+
+      if (pgmoneta_is_encrypted(wal_file))
       {
-         if (pgmoneta_strip_extension(wal_files[i], &basename))
+         if (pgmoneta_strip_extension(wal_file, &basename))
          {
             goto error;
          }
       }
       else
       {
-         basename = pgmoneta_append(basename, wal_files[i]);
+         basename = pgmoneta_append(basename, wal_file);
       }
 
       if (pgmoneta_is_compressed(basename))
@@ -2835,7 +2766,7 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
             {
                ff = pgmoneta_append(ff, "/");
             }
-            ff = pgmoneta_append(ff, wal_files[i]);
+            ff = pgmoneta_append(ff, wal_file);
 
             tf = pgmoneta_append(tf, to);
             if (!pgmoneta_ends_with(tf, "/"))
@@ -2851,14 +2782,14 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
             {
                ff = pgmoneta_append(ff, "/");
             }
-            ff = pgmoneta_append(ff, wal_files[i]);
+            ff = pgmoneta_append(ff, wal_file);
 
             tf = pgmoneta_append(tf, to);
             if (!pgmoneta_ends_with(tf, "/"))
             {
                tf = pgmoneta_append(tf, "/");
             }
-            tf = pgmoneta_append(tf, wal_files[i]);
+            tf = pgmoneta_append(tf, wal_file);
          }
 
          pgmoneta_copy_file(ff, tf, workers);
@@ -2872,22 +2803,17 @@ pgmoneta_copy_wal_files(char* from, char* to, char* start, struct workers* worke
       ff = NULL;
       tf = NULL;
    }
+   pgmoneta_deque_iterator_destroy(it);
+   it = NULL;
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_destroy(wal_files);
 
    return 0;
 
 error:
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_iterator_destroy(it);
+   pgmoneta_deque_destroy(wal_files);
 
    return 1;
 }
@@ -2896,26 +2822,29 @@ int
 pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
 {
    int result;
-   int number_of_wal_files = 0;
-   char** wal_files = NULL;
+   struct deque* wal_files = NULL;
+   struct deque_iterator* it = NULL;
    char* basename = NULL;
 
    result = 0;
 
-   pgmoneta_get_files(directory, &number_of_wal_files, &wal_files);
+   pgmoneta_get_files(directory, &wal_files);
 
-   for (int i = 0; i < number_of_wal_files; i++)
+   pgmoneta_deque_iterator_create(wal_files, &it);
+   while (pgmoneta_deque_iterator_next(it))
    {
-      if (pgmoneta_is_encrypted(wal_files[i]))
+      char* wal_file = (char*)it->value->data;
+
+      if (pgmoneta_is_encrypted(wal_file))
       {
-         if (pgmoneta_strip_extension(wal_files[i], &basename))
+         if (pgmoneta_strip_extension(wal_file, &basename))
          {
             goto error;
          }
       }
       else
       {
-         basename = pgmoneta_append(basename, wal_files[i]);
+         basename = pgmoneta_append(basename, wal_file);
       }
 
       if (pgmoneta_is_compressed(basename))
@@ -2940,22 +2869,18 @@ pgmoneta_number_of_wal_files(char* directory, char* from, char* to)
       free(basename);
       basename = NULL;
    }
+   pgmoneta_deque_iterator_destroy(it);
+   it = NULL;
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_destroy(wal_files);
 
    return result;
 
 error:
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_iterator_destroy(it);
+
+   pgmoneta_deque_destroy(wal_files);
 
    return 0;
 }
@@ -3343,55 +3268,51 @@ pgmoneta_read_wal(char* directory, char** wal)
    bool found = false;
    char* result = NULL;
    char* pgwal = NULL;
-   int number_of_wal_files = 0;
-   char** wal_files = NULL;
+
+   struct deque* wal_files = NULL;
+   struct deque_iterator* it = NULL;
 
    *wal = NULL;
 
    pgwal = pgmoneta_append(pgwal, directory);
    pgwal = pgmoneta_append(pgwal, "/pg_wal/");
 
-   number_of_wal_files = 0;
-   wal_files = NULL;
+   pgmoneta_get_files(pgwal, &wal_files);
 
-   pgmoneta_get_files(pgwal, &number_of_wal_files, &wal_files);
-
-   if (number_of_wal_files == 0)
+   if (pgmoneta_deque_size(wal_files) == 0)
    {
       goto error;
    }
 
-   for (int i = 0; !found && i < number_of_wal_files; i++)
+   pgmoneta_deque_iterator_create(wal_files, &it);
+   while (pgmoneta_deque_iterator_next(it) && !found)
    {
-      if (pgmoneta_is_wal_file(wal_files[i]))
+      char* wal_file = (char*)it->value->data;
+
+      if (pgmoneta_is_wal_file(wal_file))
       {
-         result = malloc(strlen(wal_files[i]) + 1);
-         memset(result, 0, strlen(wal_files[i]) + 1);
-         memcpy(result, wal_files[i], strlen(wal_files[i]));
+         result = malloc(strlen(wal_file) + 1);
+         memset(result, 0, strlen(wal_file) + 1);
+         memcpy(result, wal_file, strlen(wal_file));
 
          *wal = result;
 
          found = true;
       }
    }
+   pgmoneta_deque_iterator_destroy(it);
+   it = NULL;
 
    free(pgwal);
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_destroy(wal_files);
 
    return 0;
 
 error:
 
    free(pgwal);
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_iterator_destroy(it);
+   pgmoneta_deque_destroy(wal_files);
 
    return 1;
 }

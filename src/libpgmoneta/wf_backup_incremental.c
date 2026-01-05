@@ -1727,23 +1727,31 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
    }
    pg_wal_dir = pgmoneta_append(pg_wal_dir, "pg_wal/");
 
-   int num_files = 0;
-   char** files = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* it = NULL;
 
-   if (pgmoneta_get_wal_files(wal_dir, &num_files, &files))
+   if (pgmoneta_get_wal_files(wal_dir, &files))
    {
       pgmoneta_log_warn("Unable to get WAL segments under %s", wal_dir);
       goto error;
    }
 
-   for (int i = 0; i < num_files; i++)
+   pgmoneta_deque_iterator_create(files, &it);
+   while (pgmoneta_deque_iterator_next(it))
    {
-      if (strcmp(files[i], start_wal_file) >= 0)
+      char* file_name = (char*)it->value->data;
+      if (strcmp(file_name, start_wal_file) >= 0)
       {
          dst_file = pgmoneta_append(dst_file, pg_wal_dir);
-         dst_file = pgmoneta_append(dst_file, files[i]);
+         dst_file = pgmoneta_append(dst_file, file_name);
          src_file = pgmoneta_append(src_file, wal_dir);
-         src_file = pgmoneta_append(src_file, files[i]);
+         src_file = pgmoneta_append(src_file, file_name);
+
+         if (!pgmoneta_is_file(src_file))
+         {
+            pgmoneta_log_warn("WAL segment %s does not exist in source", file_name);
+            goto error;
+         }
 
          // copy and extract
          if (pgmoneta_copy_and_extract_file(src_file, &dst_file))
@@ -1756,18 +1764,16 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
          dst_file = NULL;
          src_file = NULL;
       }
-      free(files[i]);
    }
+   pgmoneta_deque_iterator_destroy(it);
+   it = NULL;
 
-   free(files);
+   pgmoneta_deque_destroy(files);
    free(pg_wal_dir);
    return 0;
 error:
-   for (int i = 0; i < num_files; i++)
-   {
-      free(files[i]);
-   }
-   free(files);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_deque_iterator_destroy(it);
    free(dst_file);
    free(src_file);
    free(pg_wal_dir);
@@ -1778,36 +1784,37 @@ static int
 wait_for_wal_switch(char* wal_dir, char* wal_file)
 {
    int loop = 1;
-   int num_files = 0;
-   char** files = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* it = NULL;
 
    while (loop)
    {
       files = NULL;
-      if (pgmoneta_get_wal_files(wal_dir, &num_files, &files))
+      if (pgmoneta_get_wal_files(wal_dir, &files))
       {
          pgmoneta_log_warn("Unable to get WAL segments under %s", wal_dir);
          goto error;
       }
-      for (int i = 0; i < num_files; i++)
+      pgmoneta_deque_iterator_create(files, &it);
+      while (pgmoneta_deque_iterator_next(it))
       {
-         if (strcmp(files[i], wal_file) == 0)
+         char* file_name = (char*)it->value->data;
+         if (strcmp(file_name, wal_file) == 0)
          {
             loop = 0;
          }
-         free(files[i]);
       }
-      free(files);
+      pgmoneta_deque_iterator_destroy(it);
+      it = NULL;
+
+      pgmoneta_deque_destroy(files);
       SLEEP(1); // avoid wasting CPU cycles for searching
    }
 
    return 0;
 error:
-   for (int i = 0; i < num_files; i++)
-   {
-      free(files[i]);
-   }
-   free(files);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_deque_iterator_destroy(it);
    return 1;
 }
 

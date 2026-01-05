@@ -503,16 +503,15 @@ pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FI
                                         struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
                                         uint32_t limit, bool summary, char** included_objects)
 {
-   int file_count = 0;
-   int free_counter = 0;
-   char** files = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* file_iterator = NULL;
    char* file_path = malloc(MAX_PATH);
    struct column_widths widths = {0};
    struct walfile* wf = NULL;
    char* from = NULL;
    char* to = NULL;
 
-   if (pgmoneta_get_wal_files(dir_path, &file_count, &files))
+   if (pgmoneta_get_wal_files(dir_path, &files))
    {
       free(file_path);
       return 1;
@@ -520,9 +519,10 @@ pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FI
 
    if (type == ValueString && !summary)
    {
-      for (int i = 0; i < file_count; i++)
+      pgmoneta_deque_iterator_create(files, &file_iterator);
+      while (pgmoneta_deque_iterator_next(file_iterator))
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
 
          if (!pgmoneta_is_file(file_path))
          {
@@ -558,33 +558,34 @@ pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FI
          free(from);
          from = NULL;
       }
+      pgmoneta_deque_iterator_destroy(file_iterator);
+      file_iterator = NULL;
    }
 
-   for (int i = 0; i < file_count; i++)
+   pgmoneta_deque_iterator_create(files, &file_iterator);
+   while (pgmoneta_deque_iterator_next(file_iterator))
    {
-      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
 
       struct column_widths* widths_to_use = (type == ValueString && !summary) ? &widths : NULL;
       if (describe_walfile_internal(file_path, type, output, quiet, color,
                                     rms, start_lsn, end_lsn, xids, limit, summary, included_objects, widths_to_use))
       {
-         free_counter = i;
          goto error;
       }
-      free(files[i]);
    }
+   pgmoneta_deque_iterator_destroy(file_iterator);
+   file_iterator = NULL;
 
+   pgmoneta_deque_destroy(files);
    free(file_path);
-   free(files);
    return 0;
 
 error:
-   for (int i = free_counter; i < file_count; i++)
-   {
-      free(files[i]);
-   }
+   pgmoneta_deque_destroy(files);
+   pgmoneta_deque_iterator_destroy(file_iterator);
+
    free(file_path);
-   free(files);
    free(from);
    if (to != NULL)
    {
@@ -668,45 +669,50 @@ error:
 int
 pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt)
 {
-   int file_count = 0;
-   int free_counter = 0;
-   char** files = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* file_iterator = NULL;
    char* file_path = malloc(MAX_PATH);
 
-   if (pgmoneta_get_wal_files(dir_path, &file_count, &files))
+   if (pgmoneta_get_wal_files(dir_path, &files))
    {
       goto error;
    }
 
-   for (int i = 0; i < file_count; i++)
+   pgmoneta_deque_iterator_create(files, &file_iterator);
+   while (pgmoneta_deque_iterator_next(file_iterator))
    {
+      char* file = (char*)file_iterator->value->data;
+
       if (!pgmoneta_ends_with(dir_path, "/"))
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, files[i]);
+         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, file);
       }
       else
       {
-         snprintf(file_path, MAX_PATH, "%s%s", dir_path, files[i]);
+         snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
+      }
+
+      if (!pgmoneta_is_file(file_path))
+      {
+         pgmoneta_log_error("WAL file at %s does not exist", file_path);
+         goto error;
       }
 
       if (pgmoneta_summarize_walfile(file_path, start_lsn, end_lsn, brt))
       {
-         free_counter = i;
          goto error;
       }
-      free(files[i]);
    }
+   pgmoneta_deque_iterator_destroy(file_iterator);
+   file_iterator = NULL;
 
    free(file_path);
-   free(files);
+   pgmoneta_deque_destroy(files);
    return 0;
 
 error:
-   for (int i = free_counter; i < file_count; i++)
-   {
-      free(files[i]);
-   }
    free(file_path);
-   free(files);
+   pgmoneta_deque_destroy(files);
+   pgmoneta_deque_iterator_destroy(file_iterator);
    return 1;
 }
