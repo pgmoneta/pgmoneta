@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <backup.h>
+#include <deque.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -102,8 +103,7 @@ pgmoneta_delete_wal(int srv)
    struct backup* backup = NULL;
    char* srv_wal = NULL;
    char* wal_shipping = NULL;
-   int number_of_srv_wal_files = 0;
-   char** srv_wal_files = NULL;
+   struct deque* srv_wal_files = NULL;
 
    /* Find the oldest backup */
    d = pgmoneta_get_server_backup(srv);
@@ -120,14 +120,13 @@ pgmoneta_delete_wal(int srv)
    {
       d = pgmoneta_get_server_backup_identifier_data_wal(srv, backup->label);
 
-      number_of_srv_wal_files = 0;
       srv_wal_files = NULL;
 
-      pgmoneta_get_wal_files(d, &number_of_srv_wal_files, &srv_wal_files);
+      pgmoneta_get_wal_files(d, &srv_wal_files);
 
-      if (number_of_srv_wal_files > 0)
+      if (pgmoneta_deque_size(srv_wal_files) > 0)
       {
-         srv_wal = srv_wal_files[0];
+         srv_wal = (char*)pgmoneta_deque_peek(srv_wal_files, NULL);
       }
 
       free(d);
@@ -155,11 +154,7 @@ pgmoneta_delete_wal(int srv)
 
    free(backup);
 
-   for (int i = 0; i < number_of_srv_wal_files; i++)
-   {
-      free(srv_wal_files[i]);
-   }
-   free(srv_wal_files);
+   pgmoneta_deque_destroy(srv_wal_files);
 
    return 0;
 
@@ -170,11 +165,7 @@ error:
 
    free(backup);
 
-   for (int i = 0; i < number_of_srv_wal_files; i++)
-   {
-      free(srv_wal_files[i]);
-   }
-   free(srv_wal_files);
+   pgmoneta_deque_destroy(srv_wal_files);
 
    return 1;
 }
@@ -182,18 +173,21 @@ error:
 static void
 delete_wal_older_than(char* srv_wal, char* base, int backup_index)
 {
-   int number_of_wal_files = 0;
-   char** wal_files = NULL;
+   struct deque* wal_files = NULL;
+   struct deque_iterator* iter = NULL;
    char wal_address[MAX_PATH];
    bool delete;
 
-   if (pgmoneta_get_wal_files(base, &number_of_wal_files, &wal_files))
+   if (pgmoneta_get_wal_files(base, &wal_files))
    {
       pgmoneta_log_warn("Unable to get WAL segments under %s", base);
       goto error;
    }
-   for (int i = 0; i < number_of_wal_files; i++)
+
+   pgmoneta_deque_iterator_create(wal_files, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
    {
+      char* file = (char*)iter->value->data;
       delete = false;
 
       if (backup_index == -1)
@@ -202,7 +196,7 @@ delete_wal_older_than(char* srv_wal, char* base, int backup_index)
       }
       else if (srv_wal != NULL)
       {
-         if (strcmp(wal_files[i], srv_wal) < 0)
+         if (strcmp(file, srv_wal) < 0)
          {
             delete = true;
          }
@@ -213,11 +207,11 @@ delete_wal_older_than(char* srv_wal, char* base, int backup_index)
          memset(wal_address, 0, MAX_PATH);
          if (pgmoneta_ends_with(base, "/"))
          {
-            snprintf(wal_address, MAX_PATH, "%s%s", base, wal_files[i]);
+            snprintf(wal_address, MAX_PATH, "%s%s", base, file);
          }
          else
          {
-            snprintf(wal_address, MAX_PATH, "%s/%s", base, wal_files[i]);
+            snprintf(wal_address, MAX_PATH, "%s/%s", base, file);
          }
 
          pgmoneta_log_trace("WAL: Deleting %s", wal_address);
@@ -235,19 +229,14 @@ delete_wal_older_than(char* srv_wal, char* base, int backup_index)
          break;
       }
    }
+   pgmoneta_deque_iterator_destroy(iter);
+   iter = NULL;
 
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_destroy(wal_files);
 
    return;
 
 error:
-   for (int i = 0; i < number_of_wal_files; i++)
-   {
-      free(wal_files[i]);
-   }
-   free(wal_files);
+   pgmoneta_deque_destroy(wal_files);
+   pgmoneta_deque_iterator_destroy(iter);
 }

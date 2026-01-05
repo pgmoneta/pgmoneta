@@ -31,6 +31,7 @@
 #include <cmd.h>
 #include <compression.h>
 #include <configuration.h>
+#include <deque.h>
 #include <info.h>
 #include <logging.h>
 #include <pgmoneta.h>
@@ -479,9 +480,11 @@ main(int argc, char* argv[])
    struct walfilter_configuration* config = NULL;
    char* logfile = NULL;
    int file_count = 0;
-   char** files = NULL;
+   struct deque_iterator* file_iter = NULL;
+   struct deque* files = NULL;
    char* file_path = NULL;
    char* wal_files_path = NULL;
+   int walfile_index = 0;
    int loaded = 1;
    char* configuration_path = NULL;
    size_t size;
@@ -646,7 +649,7 @@ main(int argc, char* argv[])
 
    pgmoneta_log_debug("WAL files path: %s", wal_files_path);
 
-   if (pgmoneta_get_wal_files(wal_files_path, &file_count, &files))
+   if (pgmoneta_get_wal_files(wal_files_path, &files))
    {
       pgmoneta_log_error("Failed to get WAL files from %s\n", wal_files_path);
       goto error;
@@ -664,6 +667,7 @@ main(int argc, char* argv[])
    partial_record->xlog_record = NULL;
    partial_record->data_buffer = NULL;
 
+   file_count = pgmoneta_deque_size(files);
    walfiles = malloc(file_count * sizeof(struct walfile*));
    if (walfiles == NULL)
    {
@@ -676,10 +680,11 @@ main(int argc, char* argv[])
       walfiles[i] = NULL;
    }
 
-   for (int i = 0; i < file_count; i++)
+   pgmoneta_deque_iterator_create(files, &file_iter);
+   while (pgmoneta_deque_iterator_next(file_iter))
    {
       file_path = malloc(MAX_PATH);
-      snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, files[i]);
+      snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, (char*)file_iter->value->data);
 
       if (!pgmoneta_is_file(file_path))
       {
@@ -757,6 +762,8 @@ main(int argc, char* argv[])
       free(file_path);
       file_path = NULL;
    }
+   pgmoneta_deque_iterator_destroy(file_iter);
+   file_iter = NULL;
 
    if (yaml_config.operation_count > 0)
    {
@@ -807,28 +814,35 @@ main(int argc, char* argv[])
       goto error;
    }
 
-   for (int i = 0; i < walfile_count; i++)
+   walfile_index = 0;
+
+   pgmoneta_deque_iterator_create(files, &file_iter);
+   while (pgmoneta_deque_iterator_next(file_iter))
    {
-      if (pgmoneta_is_compressed(files[i]) || pgmoneta_is_encrypted(files[i]))
+      char* file_name = (char*)file_iter->value->data;
+      if (pgmoneta_is_compressed(file_name) || pgmoneta_is_encrypted(file_name))
       {
          // Remove extension for compressed or encrypted files
-         char* dot = strrchr(files[i], '.');
+         char* dot = strrchr(file_name, '.');
          if (dot != NULL)
          {
             *dot = '\0';
          }
       }
 
-      if (pgmoneta_write_walfile(walfiles[i], -1, files[i]))
+      if (pgmoneta_write_walfile(walfiles[walfile_index], -1, file_name))
       {
-         pgmoneta_log_error("Failed to write WAL file %d", i);
+         pgmoneta_log_error("Failed to write WAL file %d", walfile_index);
          goto error;
       }
       else
       {
-         pgmoneta_log_debug("WAL file %d written successfully: %s", i, files[i]);
+         pgmoneta_log_debug("WAL file %d written successfully: %s", walfile_index, file_name);
       }
+      walfile_index++;
    }
+   pgmoneta_deque_iterator_destroy(file_iter);
+   file_iter = NULL;
 
    pgmoneta_log_info("Filtered WAL files written successfully to %s", target_pg_wal_dir);
 
@@ -881,19 +895,8 @@ main(int argc, char* argv[])
       free(wal_files_path);
       wal_files_path = NULL;
    }
-   if (files)
-   {
-      for (int i = 0; i < file_count; i++)
-      {
-         if (files[i] != NULL)
-         {
-            free(files[i]);
-         }
-      }
-      free(files);
-      files = NULL;
-   }
 
+   pgmoneta_deque_destroy(files);
    cleanup_config(&yaml_config);
 
    if (shmem != NULL)
@@ -953,18 +956,9 @@ error:
       free(wal_files_path);
       wal_files_path = NULL;
    }
-   if (files)
-   {
-      for (int i = 0; i < file_count; i++)
-      {
-         if (files[i] != NULL)
-         {
-            free(files[i]);
-         }
-      }
-      free(files);
-      files = NULL;
-   }
+
+   pgmoneta_deque_destroy(files);
+   pgmoneta_deque_iterator_destroy(file_iter);
 
    cleanup_config(&yaml_config);
    pgmoneta_log_error("An error occurred while processing WAL files. Please check the logs for details.");

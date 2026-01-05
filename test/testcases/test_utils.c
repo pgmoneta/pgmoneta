@@ -589,8 +589,8 @@ START_TEST(test_utils_file_dir)
    char* file1 = "test_dir_extras/file1.txt";
    int n_dirs = 0;
    char** dirs = NULL;
-   int n_files = 0;
-   char** files = NULL;
+   struct deque* files = NULL;
+   struct deque_iterator* it = 0;
 
    strcpy(base, "test_dir_extras");
    strcpy(sub1, "test_dir_extras/sub1");
@@ -622,18 +622,20 @@ START_TEST(test_utils_file_dir)
    ck_assert(found_sub1);
 
    // pgmoneta_get_files
-   ck_assert_int_eq(pgmoneta_get_files(base, &n_files, &files), 0);
-   ck_assert_int_ge(n_files, 1);
+   ck_assert_int_eq(pgmoneta_get_files(base, &files), 0);
+   ck_assert_int_ge(pgmoneta_deque_size(files), 1);
    bool found_file1 = false;
-   for (int i = 0; i < n_files; i++)
+   pgmoneta_deque_iterator_create(files, &it);
+   while (pgmoneta_deque_iterator_next(it))
    {
-      if (pgmoneta_contains(files[i], "file1.txt"))
+      char* file_path = (char*)it->value->data;
+      if (pgmoneta_contains(file_path, "file1.txt"))
       {
          found_file1 = true;
       }
-      free(files[i]);
    }
-   free(files);
+   pgmoneta_deque_iterator_destroy(it);
+   pgmoneta_deque_destroy(files);
    ck_assert(found_file1);
 
    // pgmoneta_directory_size
@@ -1161,8 +1163,7 @@ START_TEST(test_utils_missing_wal)
    char file1[128];
    char file2[128];
    char to_dir[128];
-   int n_files = 0;
-   char** files = NULL;
+   struct deque* files = NULL;
 
    strcpy(dir, "test_wal_dir");
    pgmoneta_mkdir(dir);
@@ -1178,11 +1179,9 @@ START_TEST(test_utils_missing_wal)
    if (f)
       fclose(f);
 
-   ck_assert_int_eq(pgmoneta_get_wal_files(dir, &n_files, &files), 0);
-   ck_assert_int_eq(n_files, 2);
-   for (int i = 0; i < n_files; i++)
-      free(files[i]);
-   free(files);
+   ck_assert_int_eq(pgmoneta_get_wal_files(dir, &files), 0);
+   ck_assert_int_eq(pgmoneta_deque_size(files), 2);
+   pgmoneta_deque_destroy(files);
 
    // number_of_wal_files
    ck_assert_int_eq(pgmoneta_number_of_wal_files(dir, "000000000000000000000000", NULL), 2);
