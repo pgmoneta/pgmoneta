@@ -40,7 +40,7 @@ START_TEST(test_pgmoneta_delete_full)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
-   found = !pgmoneta_tsclient_delete("primary", "oldest");
+   found = !pgmoneta_tsclient_delete("primary", "oldest", 0);
    ck_assert_msg(found, "success status not found");
 }
 END_TEST
@@ -60,7 +60,7 @@ START_TEST(test_pgmoneta_delete_chain_last)
    pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
    ck_assert_int_eq(num_bck_before, 3);
 
-   found = !pgmoneta_tsclient_delete("primary", "newest");
+   found = !pgmoneta_tsclient_delete("primary", "newest", 0);
    ck_assert_msg(found, "success status not found");
 
    pgmoneta_load_infos(d, &num_bck_after, &bcks_after);
@@ -94,7 +94,7 @@ START_TEST(test_pgmoneta_delete_chain_middle)
    pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
    ck_assert_int_eq(num_bck_before, 3);
 
-   found = !pgmoneta_tsclient_delete("primary", bcks_before[1]->label);
+   found = !pgmoneta_tsclient_delete("primary", bcks_before[1]->label, 0);
    ck_assert_msg(found, "success status not found");
 
    pgmoneta_load_infos(d, &num_bck_after, &bcks_after);
@@ -131,7 +131,7 @@ START_TEST(test_pgmoneta_delete_chain_root)
    pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
    ck_assert_int_eq(num_bck_before, 3);
 
-   found = !pgmoneta_tsclient_delete("primary", "oldest");
+   found = !pgmoneta_tsclient_delete("primary", "oldest", 0);
    ck_assert_msg(found, "success status not found");
 
    pgmoneta_load_infos(d, &num_bck_after, &bcks_after);

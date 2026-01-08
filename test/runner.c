@@ -65,6 +65,7 @@ main(int argc, char* argv[])
    json_suite = pgmoneta_test_json_suite();
    server_api_suite = pgmoneta_test_server_api_suite();
    utils_suite = pgmoneta_test_utils_suite();
+   Suite* cli_suite = pgmoneta_test_cli_suite();
 
    sr = srunner_create(backup_suite);
    srunner_add_suite(sr, restore_suite);
@@ -78,6 +79,7 @@ main(int argc, char* argv[])
    srunner_add_suite(sr, json_suite);
    srunner_add_suite(sr, server_api_suite);
    srunner_add_suite(sr, utils_suite);
+   srunner_add_suite(sr, cli_suite);
    srunner_set_log(sr, "-");
    srunner_set_fork_status(sr, CK_NOFORK);
    srunner_run(sr, NULL, NULL, CK_VERBOSE);
