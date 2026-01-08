@@ -649,6 +649,7 @@ main(int argc, char* argv[])
 
    pgmoneta_log_debug("WAL files path: %s", wal_files_path);
 
+   /* TODO: This need a lock if it is the live WAL directory */
    if (pgmoneta_get_wal_files(wal_files_path, &files))
    {
       pgmoneta_log_error("Failed to get WAL files from %s\n", wal_files_path);

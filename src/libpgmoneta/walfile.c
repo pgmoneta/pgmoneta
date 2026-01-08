@@ -672,11 +672,25 @@ pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn
    struct deque* files = NULL;
    struct deque_iterator* file_iterator = NULL;
    char* file_path = malloc(MAX_PATH);
+   /* bool active = false; */
+   /* struct main_configuration* config; */
 
+   /* config = (struct main_configuration*)shmem; */
+
+   /* if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true)) */
+   /* { */
    if (pgmoneta_get_wal_files(dir_path, &files))
    {
+      /* atomic_store(&config->common.servers[srv].wal_repository, false); */
       goto error;
    }
+   /*    atomic_store(&config->common.servers[srv].wal_repository, false); */
+   /* } */
+   /* else */
+   /* { */
+   /*    pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name); */
+   /*    goto error; */
+   /* } */
 
    pgmoneta_deque_iterator_create(files, &file_iterator);
    while (pgmoneta_deque_iterator_next(file_iterator))
@@ -685,11 +699,11 @@ pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn
 
       if (!pgmoneta_ends_with(dir_path, "/"))
       {
-         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, file);
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", dir_path, file);
       }
       else
       {
-         snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
       }
 
       if (!pgmoneta_is_file(file_path))
@@ -703,16 +717,17 @@ pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn
          goto error;
       }
    }
-   pgmoneta_deque_iterator_destroy(file_iterator);
-   file_iterator = NULL;
 
    free(file_path);
+   pgmoneta_deque_iterator_destroy(file_iterator);
    pgmoneta_deque_destroy(files);
+
    return 0;
 
 error:
    free(file_path);
-   pgmoneta_deque_destroy(files);
    pgmoneta_deque_iterator_destroy(file_iterator);
+   pgmoneta_deque_destroy(files);
+
    return 1;
 }

@@ -43,12 +43,12 @@
 /**
  * Delete wal files older than the given srv_wal file under the base directory
  * Base directory could be the wal/ or the wal_shipping directory
+ * @param srv The server
  * @param srv_wal The oldest wal segment file we would like to keep
  * @param base The base directory holding the wal segments
- * @param backup_index The index of the oldest backup
  */
 static void
-delete_wal_older_than(char* srv_wal, char* base, int backup_index);
+delete_wal_older_than(int srv, char* srv_wal, char* base);
 
 int
 pgmoneta_delete(int srv, char* label)
@@ -98,7 +98,6 @@ error:
 int
 pgmoneta_delete_wal(int srv)
 {
-   int backup_index = -1;
    char* d = NULL;
    struct backup* backup = NULL;
    char* srv_wal = NULL;
@@ -137,7 +136,7 @@ pgmoneta_delete_wal(int srv)
    if (backup == NULL)
    {
       d = pgmoneta_get_server_wal(srv);
-      delete_wal_older_than(srv_wal, d, backup_index);
+      delete_wal_older_than(srv, srv_wal, d);
       free(d);
       d = NULL;
 
@@ -145,7 +144,7 @@ pgmoneta_delete_wal(int srv)
       wal_shipping = pgmoneta_get_server_wal_shipping_wal(srv);
       if (wal_shipping != NULL)
       {
-         delete_wal_older_than(srv_wal, wal_shipping, backup_index);
+         delete_wal_older_than(srv, srv_wal, wal_shipping);
       }
 
       free(wal_shipping);
@@ -171,72 +170,87 @@ error:
 }
 
 static void
-delete_wal_older_than(char* srv_wal, char* base, int backup_index)
+delete_wal_older_than(int srv, char* srv_wal, char* base)
 {
    struct deque* wal_files = NULL;
    struct deque_iterator* iter = NULL;
-   char wal_address[MAX_PATH];
-   bool delete;
+   char wal_address[MAX_PATH] = {0};
+   bool delete = false;
+   bool active = false;
+   struct main_configuration* config;
 
-   if (pgmoneta_get_wal_files(base, &wal_files))
+   config = (struct main_configuration*)shmem;
+
+   if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true))
    {
-      pgmoneta_log_warn("Unable to get WAL segments under %s", base);
-      goto error;
-   }
-
-   pgmoneta_deque_iterator_create(wal_files, &iter);
-   while (pgmoneta_deque_iterator_next(iter))
-   {
-      char* file = (char*)iter->value->data;
-      delete = false;
-
-      if (backup_index == -1)
+      if (pgmoneta_get_wal_files(base, &wal_files))
       {
-         delete = true;
+         pgmoneta_log_warn("Unable to get WAL segments under %s", base);
+         atomic_store(&config->common.servers[srv].wal_repository, false);
+         goto error;
       }
-      else if (srv_wal != NULL)
+
+      pgmoneta_deque_iterator_create(wal_files, &iter);
+      while (pgmoneta_deque_iterator_next(iter))
       {
-         if (strcmp(file, srv_wal) < 0)
+         char* file = (char*)iter->value->data;
+         delete = false;
+
+         if (srv_wal != NULL)
+         {
+            if (strcmp(file, srv_wal) < 0)
+            {
+               delete = true;
+            }
+         }
+         else
          {
             delete = true;
          }
-      }
 
-      if (delete)
-      {
-         memset(wal_address, 0, MAX_PATH);
-         if (pgmoneta_ends_with(base, "/"))
+         if (delete)
          {
-            snprintf(wal_address, MAX_PATH, "%s%s", base, file);
+            memset(wal_address, 0, MAX_PATH);
+            if (pgmoneta_ends_with(base, "/"))
+            {
+               pgmoneta_snprintf(wal_address, MAX_PATH, "%s%s", base, file);
+            }
+            else
+            {
+               pgmoneta_snprintf(wal_address, MAX_PATH, "%s/%s", base, file);
+            }
+
+            pgmoneta_log_trace("WAL: Deleting %s", wal_address);
+            if (pgmoneta_exists(wal_address))
+            {
+               pgmoneta_delete_file(wal_address, NULL);
+            }
+            else
+            {
+               pgmoneta_log_debug("%s doesn't exists", wal_address);
+            }
          }
          else
          {
-            snprintf(wal_address, MAX_PATH, "%s/%s", base, file);
+            break;
          }
+      }
 
-         pgmoneta_log_trace("WAL: Deleting %s", wal_address);
-         if (pgmoneta_exists(wal_address))
-         {
-            pgmoneta_delete_file(wal_address, NULL);
-         }
-         else
-         {
-            pgmoneta_log_debug("%s doesn't exists", wal_address);
-         }
-      }
-      else
-      {
-         break;
-      }
+      atomic_store(&config->common.servers[srv].wal_repository, false);
    }
-   pgmoneta_deque_iterator_destroy(iter);
-   iter = NULL;
+   else
+   {
+      pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
+      goto error;
+   }
 
+   pgmoneta_deque_iterator_destroy(iter);
    pgmoneta_deque_destroy(wal_files);
 
    return;
 
 error:
+
    pgmoneta_deque_destroy(wal_files);
    pgmoneta_deque_iterator_destroy(iter);
 }

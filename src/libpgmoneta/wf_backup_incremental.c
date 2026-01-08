@@ -1719,6 +1719,10 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
    char* pg_wal_dir = NULL;
    char* dst_file = NULL;
    char* src_file = NULL;
+   /* bool active = false; */
+   /* struct main_configuration* config; */
+
+   /* config = (struct main_configuration*)shmem; */
 
    pg_wal_dir = pgmoneta_append(pg_wal_dir, backup_data);
    if (!pgmoneta_ends_with(pg_wal_dir, "/"))
@@ -1730,11 +1734,21 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
    struct deque* files = NULL;
    struct deque_iterator* it = NULL;
 
+   /* if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true)) */
+   /* { */
    if (pgmoneta_get_wal_files(wal_dir, &files))
    {
       pgmoneta_log_warn("Unable to get WAL segments under %s", wal_dir);
+      /* atomic_store(&config->common.servers[srv].wal_repository, false); */
       goto error;
    }
+   /*    atomic_store(&config->common.servers[srv].wal_repository, false); */
+   /* } */
+   /* else */
+   /* { */
+   /*    pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name); */
+   /*    goto error; */
+   /* } */
 
    pgmoneta_deque_iterator_create(files, &it);
    while (pgmoneta_deque_iterator_next(it))
@@ -1786,15 +1800,30 @@ wait_for_wal_switch(char* wal_dir, char* wal_file)
    int loop = 1;
    struct deque* files = NULL;
    struct deque_iterator* it = NULL;
+   /* bool active = false; */
+   /* struct main_configuration* config; */
+
+   /* config = (struct main_configuration*)shmem; */
 
    while (loop)
    {
       files = NULL;
+      /* if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true)) */
+      /* { */
       if (pgmoneta_get_wal_files(wal_dir, &files))
       {
          pgmoneta_log_warn("Unable to get WAL segments under %s", wal_dir);
+         /* atomic_store(&config->common.servers[srv].wal_repository, false); */
          goto error;
       }
+      /*    atomic_store(&config->common.servers[srv].wal_repository, false); */
+      /* } */
+      /* else */
+      /* { */
+      /*    pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name); */
+      /*    goto error; */
+      /* } */
+
       pgmoneta_deque_iterator_create(files, &it);
       while (pgmoneta_deque_iterator_next(it))
       {
