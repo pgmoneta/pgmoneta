@@ -27,13 +27,15 @@
  *
  */
 
-#include <info.h>
 #include <server.h>
 #include <tsclient.h>
+#include <tsclient_helpers.h>
 #include <tssuite.h>
 #include <tscommon.h>
 #include <utils.h>
 #include <stdio.h>
+
+#include "logging.h"
 
 // test delete a single full backup
 START_TEST(test_pgmoneta_delete_full)
@@ -48,110 +50,156 @@ END_TEST
 START_TEST(test_pgmoneta_delete_chain_last)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
-   int found = 0;
-   char* d = NULL;
+   int ret = 0;
+   struct json* response_before = NULL;
+   struct json* response_after = NULL;
    int num_bck_before = 0;
    int num_bck_after = 0;
-   struct backup** bcks_before = NULL;
-   struct backup** bcks_after = NULL;
 
-   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
-   ck_assert_msg(d != NULL, "server backup not valid");
-   pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
+   // Query backups BEFORE deletion
+   ret = pgmoneta_tsclient_list_backup("primary", &response_before);
+   ck_assert_msg(ret == 0, "failed to list backups before delete");
+
+   // Verify we have 3 backups
+   num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
    ck_assert_int_eq(num_bck_before, 3);
+   pgmoneta_json_destroy(response_before);
 
-   found = !pgmoneta_tsclient_delete("primary", "newest");
-   ck_assert_msg(found, "success status not found");
+   // Delete newest backup
+   ret = !pgmoneta_tsclient_delete("primary", "newest");
+   ck_assert_msg(ret, "success status not found");
 
-   pgmoneta_load_infos(d, &num_bck_after, &bcks_after);
+   // Query backups AFTER deletion
+   ret = pgmoneta_tsclient_list_backup("primary", &response_after);
+   ck_assert_msg(ret == 0, "failed to list backups after delete");
+
+   // Verify we now have 2 backups
+   num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
    ck_assert_int_eq(num_bck_after, 2);
 
-   free(d);
-   for (int i = 0; i < num_bck_before; i++)
-   {
-      free(bcks_before[i]);
-   }
-   free(bcks_before);
-
-   for (int i = 0; i < num_bck_after; i++)
-   {
-      free(bcks_after[i]);
-   }
-   free(bcks_after);
+   pgmoneta_json_destroy(response_after);
 }
 END_TEST
 // test delete the middle incremental backup in the chain
 START_TEST(test_pgmoneta_delete_chain_middle)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
-   int found = 0;
-   char* d = NULL;
+   int ret = 0;
+   struct json* response_before = NULL;
+   struct json* response_after = NULL;
+   struct json* backup_to_delete = NULL;
+   struct json* backup_before_2 = NULL;
+   struct json* backup_after_0 = NULL;
+   struct json* backup_after_1 = NULL;
+   char* label_to_delete = NULL;
+   char* label_before_2 = NULL;
+   char* label_after_1 = NULL;
    int num_bck_before = 0;
    int num_bck_after = 0;
-   struct backup** bcks_before = NULL;
-   struct backup** bcks_after = NULL;
-   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
-   pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
+
+   // Query backups BEFORE deletion
+   ret = pgmoneta_tsclient_list_backup("primary", &response_before);
+   ck_assert_msg(ret == 0, "failed to list backups before delete");
+
+   // Verify we have 3 backups
+   num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
    ck_assert_int_eq(num_bck_before, 3);
 
-   found = !pgmoneta_tsclient_delete("primary", bcks_before[1]->label);
-   ck_assert_msg(found, "success status not found");
+   // Get label of middle backup (index 1) to delete
+   backup_to_delete = pgmoneta_tsclient_get_backup(response_before, 1);
+   label_to_delete = pgmoneta_tsclient_get_backup_label(backup_to_delete);
+   ck_assert_msg(label_to_delete != NULL, "middle backup label should exist");
 
-   pgmoneta_load_infos(d, &num_bck_after, &bcks_after);
+   // Get label of backup at index 2 (will become index 1 after deletion)
+   backup_before_2 = pgmoneta_tsclient_get_backup(response_before, 2);
+   label_before_2 = pgmoneta_tsclient_get_backup_label(backup_before_2);
+   ck_assert_msg(label_before_2 != NULL, "backup 2 label should exist");
+   label_before_2 = strdup(label_before_2);
+
+   // Delete middle backup
+   ret = !pgmoneta_tsclient_delete("primary", label_to_delete);
+   ck_assert_msg(ret, "success status not found");
+
+   // Query backups AFTER deletion
+   ret = pgmoneta_tsclient_list_backup("primary", &response_after);
+   ck_assert_msg(ret == 0, "failed to list backups after delete");
+
+   // Verify we now have 2 backups
+   num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
    ck_assert_int_eq(num_bck_after, 2);
-   ck_assert_int_eq(bcks_after[0]->type, TYPE_FULL);
-   ck_assert_int_eq(bcks_after[1]->type, TYPE_INCREMENTAL);
-   ck_assert_str_eq(bcks_before[2]->label, bcks_after[1]->label);
 
-   free(d);
-   for (int i = 0; i < num_bck_before; i++)
-   {
-      free(bcks_before[i]);
-   }
-   free(bcks_before);
+   backup_after_0 = pgmoneta_tsclient_get_backup(response_after, 0);
+   backup_after_1 = pgmoneta_tsclient_get_backup(response_after, 1);
 
-   for (int i = 0; i < num_bck_after; i++)
-   {
-      free(bcks_after[i]);
-   }
-   free(bcks_after);
+   // Verify backup types
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup_after_0), "FULL");
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup_after_1), "INCREMENTAL");
+
+   // Verify the backup that was at index 2 is now at index 1
+   label_after_1 = pgmoneta_tsclient_get_backup_label(backup_after_1);
+   ck_assert_str_eq(label_before_2, label_after_1);
+
+   free(label_before_2);
+   pgmoneta_json_destroy(response_before);
+   pgmoneta_json_destroy(response_after);
 }
 END_TEST
 // test delete the root full backup in the chain
 START_TEST(test_pgmoneta_delete_chain_root)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
-   int found = 0;
-   char* d = NULL;
+   int ret = 0;
+   struct json* response_before = NULL;
+   struct json* response_after = NULL;
+   struct json* backup_before_1 = NULL;
+   struct json* backup_after_0 = NULL;
+   struct json* backup_after_1 = NULL;
+   char* label_before_1 = NULL;
+   char* label_after_0 = NULL;
    int num_bck_before = 0;
    int num_bck_after = 0;
-   struct backup** bcks_before = NULL;
-   struct backup** bcks_after = NULL;
-   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
-   pgmoneta_load_infos(d, &num_bck_before, &bcks_before);
+
+   // Query backups BEFORE deletion
+   ret = pgmoneta_tsclient_list_backup("primary", &response_before);
+   ck_assert_msg(ret == 0, "failed to list backups before delete");
+
+   // Verify we have 3 backups
+   num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
    ck_assert_int_eq(num_bck_before, 3);
 
-   found = !pgmoneta_tsclient_delete("primary", "oldest");
-   ck_assert_msg(found, "success status not found");
+   // Get label of backup at index 1
+   backup_before_1 = pgmoneta_tsclient_get_backup(response_before, 1);
+   label_before_1 = pgmoneta_tsclient_get_backup_label(backup_before_1);
+   ck_assert_msg(label_before_1 != NULL, "backup 1 label should exist");
+   label_before_1 = strdup(label_before_1);
 
-   pgmoneta_load_infos(d, &num_bck_after, &bcks_after);
+   // Delete oldest (root) backup
+   ret = !pgmoneta_tsclient_delete("primary", "oldest");
+   ck_assert_msg(ret, "success status not found");
+
+   // Query backups AFTER deletion
+   ret = pgmoneta_tsclient_list_backup("primary", &response_after);
+   ck_assert_msg(ret == 0, "failed to list backups after delete");
+
+   // Verify we now have 2 backups
+   num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
    ck_assert_int_eq(num_bck_after, 2);
-   ck_assert_int_eq(bcks_after[0]->type, TYPE_FULL);
-   ck_assert_int_eq(bcks_after[1]->type, TYPE_INCREMENTAL);
-   ck_assert_str_eq(bcks_before[1]->label, bcks_after[0]->label);
 
-   free(d);
-   for (int i = 0; i < num_bck_before; i++)
-   {
-      free(bcks_before[i]);
-   }
-   free(bcks_before);
+   // Get backups after deletion
+   backup_after_0 = pgmoneta_tsclient_get_backup(response_after, 0);
+   backup_after_1 = pgmoneta_tsclient_get_backup(response_after, 1);
 
-   for (int i = 0; i < num_bck_after; i++)
-   {
-      free(bcks_after[i]);
-   }
-   free(bcks_after);
+   // First backup is now FULL (was INCREMENTAL)
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup_after_0), "FULL");
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup_after_1), "INCREMENTAL");
+
+   // Verify the backup that was at index 1 is now at index 0
+   label_after_0 = pgmoneta_tsclient_get_backup_label(backup_after_0);
+   ck_assert_str_eq(label_before_1, label_after_0);
+
+   free(label_before_1);
+   pgmoneta_json_destroy(response_before);
+   pgmoneta_json_destroy(response_after);
 }
 END_TEST
 
