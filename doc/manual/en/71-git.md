@@ -102,7 +102,7 @@ Use
 ./clang-format.sh
 ```
 
-to format the source code
+to format the source code. Note, that clang-format 21+ is required.
 
 **Repeat**
 
