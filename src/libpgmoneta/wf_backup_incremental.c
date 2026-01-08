@@ -1747,12 +1747,6 @@ copy_wal_from_archive(char* start_wal_file, char* wal_dir, char* backup_data)
          src_file = pgmoneta_append(src_file, wal_dir);
          src_file = pgmoneta_append(src_file, file_name);
 
-         if (!pgmoneta_is_file(src_file))
-         {
-            pgmoneta_log_warn("WAL segment %s does not exist in source", file_name);
-            goto error;
-         }
-
          // copy and extract
          if (pgmoneta_copy_and_extract_file(src_file, &dst_file))
          {

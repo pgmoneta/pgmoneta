@@ -692,12 +692,6 @@ pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn
          snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
       }
 
-      if (!pgmoneta_is_file(file_path))
-      {
-         pgmoneta_log_error("WAL file at %s does not exist", file_path);
-         goto error;
-      }
-
       if (pgmoneta_summarize_walfile(file_path, start_lsn, end_lsn, brt))
       {
          goto error;
