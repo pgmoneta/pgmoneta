@@ -257,6 +257,7 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
    struct deque* files = NULL;
    struct deque_iterator* file_iterator = NULL;
    char* file_path = malloc(MAX_PATH);
+   char* dlog = NULL;
    bool active = false;
    struct main_configuration* config;
 
@@ -277,6 +278,9 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
       goto error;
    }
 
+   dlog = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
+   pgmoneta_log_debug("WAL files: %s", dlog);
+
    pgmoneta_deque_iterator_create(files, &file_iterator);
    while (pgmoneta_deque_iterator_next(file_iterator))
    {
@@ -291,6 +295,8 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
          pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
       }
 
+      pgmoneta_log_debug("WAL file at %s", file_path);
+
       if (!pgmoneta_is_file(file_path))
       {
          pgmoneta_log_error("WAL file at %s does not exist", file_path);
@@ -304,6 +310,7 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
    }
 
    free(file_path);
+   free(dlog);
    pgmoneta_deque_iterator_destroy(file_iterator);
    pgmoneta_deque_destroy(files);
 
@@ -311,6 +318,7 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
 
 error:
    free(file_path);
+   free(dlog);
    pgmoneta_deque_iterator_destroy(file_iterator);
    pgmoneta_deque_destroy(files);
 
