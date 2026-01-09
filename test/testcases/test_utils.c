@@ -1001,15 +1001,19 @@ END_TEST
 
 START_TEST(test_utils_files_advanced)
 {
-   char src[128];
-   char dst[128];
-   char sub[128];
-   char subfile[128];
+   char* src = NULL;
+   char* dst = NULL;
+   char* sub = NULL;
+   char* subfile = NULL;
+   char* file_src = NULL;
+   char* file_dst = NULL;
 
-   strcpy(src, "test_adv_src");
-   strcpy(dst, "test_adv_dst");
-   sprintf(sub, "%s/sub", src);
-   sprintf(subfile, "%s/file.txt", sub);
+   src = pgmoneta_append(NULL, "test_adv_src");
+   dst = pgmoneta_append(NULL, "test_adv_dst");
+   sub = pgmoneta_append(NULL, src);
+   sub = pgmoneta_append(sub, "/sub");
+   subfile = pgmoneta_append(NULL, sub);
+   subfile = pgmoneta_append(subfile, "/file.txt");
 
    // Setup source
    pgmoneta_delete_directory(src);
@@ -1030,10 +1034,10 @@ START_TEST(test_utils_files_advanced)
    ck_assert(!pgmoneta_is_wal_file("000000010000000000000001.partial"));
 
    // Test copy_and_extract basic
-   char file_src[128];
-   char file_dst[128];
-   sprintf(file_src, "%s/plain.txt", src);
-   sprintf(file_dst, "%s/plain.txt", dst);
+   file_src = pgmoneta_append(NULL, src);
+   file_src = pgmoneta_append(file_src, "/plain.txt");
+   file_dst = pgmoneta_append(NULL, dst);
+   file_dst = pgmoneta_append(file_dst, "/plain.txt");
 
    pgmoneta_mkdir(dst);
    f = fopen(file_src, "w");
@@ -1053,6 +1057,13 @@ START_TEST(test_utils_files_advanced)
 
    pgmoneta_delete_directory(src);
    pgmoneta_delete_directory(dst);
+
+   free(src);
+   free(dst);
+   free(sub);
+   free(subfile);
+   free(file_src);
+   free(file_dst);
 }
 END_TEST
 
@@ -1159,18 +1170,21 @@ END_TEST
 
 START_TEST(test_utils_missing_wal)
 {
-   char dir[128];
-   char file1[128];
-   char file2[128];
-   char to_dir[128];
+   char* dir = NULL;
+   char* file1 = NULL;
+   char* file2 = NULL;
+   char* to_dir = NULL;
+   char* check_file = NULL;
    struct deque* files = NULL;
 
-   strcpy(dir, "test_wal_dir");
+   dir = pgmoneta_append(NULL, "test_wal_dir");
    pgmoneta_mkdir(dir);
 
    // Create dummy WAL files (24 chars hex)
-   sprintf(file1, "%s/000000010000000000000001", dir);
-   sprintf(file2, "%s/000000010000000000000002", dir);
+   file1 = pgmoneta_append(NULL, dir);
+   file1 = pgmoneta_append(file1, "/000000010000000000000001");
+   file2 = pgmoneta_append(NULL, dir);
+   file2 = pgmoneta_append(file2, "/000000010000000000000002");
 
    FILE* f = fopen(file1, "w");
    if (f)
@@ -1187,15 +1201,22 @@ START_TEST(test_utils_missing_wal)
    ck_assert_int_eq(pgmoneta_number_of_wal_files(dir, "000000000000000000000000", NULL), 2);
 
    // copy_wal_files
-   strcpy(to_dir, "test_wal_dir_copy");
+   to_dir = pgmoneta_append(NULL, "test_wal_dir_copy");
    pgmoneta_mkdir(to_dir);
 
    ck_assert_int_eq(pgmoneta_copy_wal_files(dir, to_dir, "000000000000000000000000", NULL), 0);
-   char check_file[128];
-   sprintf(check_file, "%s/000000010000000000000001", to_dir);
+   check_file = pgmoneta_append(NULL, to_dir);
+   check_file = pgmoneta_append(check_file, "/000000010000000000000001");
    ck_assert(pgmoneta_exists(check_file));
 
    pgmoneta_delete_directory(to_dir);
+   pgmoneta_delete_directory(dir);
+
+   free(dir);
+   free(file1);
+   free(file2);
+   free(to_dir);
+   free(check_file);
 }
 END_TEST
 
