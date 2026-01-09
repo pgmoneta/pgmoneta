@@ -417,6 +417,33 @@ char*
 pgmoneta_wal_get_record_block_data(struct decoded_xlog_record* record, uint8_t block_id, size_t* len);
 
 /**
+ * Get block reference information for a WAL record
+ * 
+ * @param buf Buffer to append to (can be NULL)
+ * @param record The decoded WAL record
+ * @param pretty Whether to format prettily
+ * @param detailed_format Whether to use detailed format
+ * @param fpi_len Pointer to store FPI length
+ * @param magic_value WAL magic value
+ * @return Updated buffer with block reference info
+ */
+char*
+get_record_block_ref_info(char* buf, struct decoded_xlog_record* record,
+                          bool pretty, bool detailed_format,
+                          uint32_t* fpi_len, uint8_t magic_value);
+
+/**
+ * Enhance WAL record description with operation context
+ * 
+ * @param record_desc Base record description
+ * @param rmid Resource manager ID
+ * @param info xl_info flags
+ * @return Enhanced description string
+ */
+char*
+enhance_description(char* record_desc, uint8_t rmid, uint8_t info);
+
+/**
  * Checks if the backup image is compressed.
  *
  * @param server_info The server structure for context.

@@ -53,7 +53,6 @@ struct server* server_config;
 static int decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlog_record* record, uint32_t block_size, uint16_t magic_value, xlog_rec_ptr lsn);
 static void record_json(struct decoded_xlog_record* record, uint8_t magic_value, struct value** value);
 static bool get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struct rel_file_locator* pLocator, enum fork_number* pNumber, block_number* pInt, buffer* pVoid);
-static char* get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint8_t magic_value);
 static int magic_value_to_postgres_version(uint16_t magic_value);
 
 static bool is_included(char* rm, struct deque* rms, uint64_t s_lsn, uint64_t start_lsn, uint64_t e_lsn, uint64_t end_lsn,
@@ -215,6 +214,21 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    size_t lsn_array_size = 0;
    size_t lsn_array_capacity = 100;
    FILE* file = NULL;
+
+   /* Allocate partial_record if not already allocated */
+   if (partial_record == NULL)
+   {
+      partial_record = malloc(sizeof(struct partial_xlog_record));
+      if (partial_record == NULL)
+      {
+         pgmoneta_log_fatal("Error: Could not allocate memory for partial_record");
+         goto error;
+      }
+      partial_record->data_buffer = NULL;
+      partial_record->xlog_record = NULL;
+      partial_record->data_buffer_bytes_read = 0;
+      partial_record->xlog_record_bytes_read = 0;
+   }
 
    lsn_array = malloc(lsn_array_capacity * sizeof(xlog_rec_ptr));
    if (lsn_array == NULL)
@@ -885,7 +899,7 @@ get_record_length(struct decoded_xlog_record* record, uint32_t* rec_len, uint32_
    *rec_len = record->header.xl_tot_len - *fpi_len;
 }
 
-static char*
+char*
 get_record_block_ref_info(char* buf, struct decoded_xlog_record* record, bool pretty, bool detailed_format, uint32_t* fpi_len, uint8_t magic_value)
 {
    int block_id;
@@ -1111,7 +1125,7 @@ get_record_block_tag_extended(struct decoded_xlog_record* pRecord, int id, struc
    return true;
 }
 
-static char*
+char*
 enhance_description(char* record_desc, uint8_t rmid, uint8_t info)
 {
    if (!record_desc)
