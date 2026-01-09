@@ -165,27 +165,4 @@ int
 pgmoneta_describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output, bool quiet, bool color,
                                         struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
                                         uint32_t limit, bool summary, char** included_objects);
-
-/**
- * Summarize a WAL file
- * @param file_path The path to the WAL file
- * @param start_lsn The start LSN
- * @param end_lsn The end LSN
- * @param brt The block reference table
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_summarize_walfile(char* file_path, uint64_t start_lsn, uint64_t end_lsn, struct block_ref_table* brt);
-
-/**
- * Summarize WAL files in a directory
- * @param dir_path The path to the WAL files directory
- * @param start_lsn The start LSN
- * @param end_lsn The end LSN
- * @param brt The block reference table
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_summarize_walfiles(char* dir_path, uint64_t start_lsn, uint64_t end_lsn, struct block_ref_table* brt);
-
 #endif //PGMONETA_WALFILE_H
