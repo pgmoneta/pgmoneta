@@ -1960,40 +1960,45 @@ pgmoneta_get_wal_files(char* base, struct deque** files)
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (strstr(entry->d_name, ".history") != NULL)
+      if (pgmoneta_ends_with(entry->d_name, ".history"))
       {
+         pgmoneta_log_trace("WAL: Skipping %s", entry->d_name);
          continue;
       }
 
       if (entry->d_type == DT_REG)
       {
+         pgmoneta_log_trace("WAL: Adding %s", entry->d_name);
+
          if (pgmoneta_deque_add(array, entry->d_name, (uintptr_t)entry->d_name, ValueString))
          {
+            pgmoneta_log_error("WAL: Error %s", entry->d_name);
             goto error;
          }
       }
+      else
+      {
+         pgmoneta_log_trace("WAL: Skipping %s", entry->d_name);
+      }
    }
 
-   // sort the deque
    pgmoneta_deque_sort(array);
 
    *files = array;
 
    closedir(dir);
-   dir = NULL;
 
    return 0;
 
 error:
+
    if (dir != NULL)
    {
       closedir(dir);
    }
 
-   if (*files == NULL)
-   {
-      pgmoneta_deque_destroy(array);
-   }
+   pgmoneta_deque_destroy(*files);
+   *files = NULL;
 
    return 1;
 }
