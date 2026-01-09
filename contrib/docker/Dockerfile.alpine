@@ -27,7 +27,8 @@
 
 FROM alpine:latest AS builder
 
-RUN apk add --no-cache \
+RUN apk update && \
+    apk add --no-cache \
     git \
     gcc \
     cmake \
@@ -54,7 +55,8 @@ RUN apk add --no-cache \
     libarchive \
     libarchive-dev \
     libssh \
-    libssh-dev 
+    libssh-dev \
+    ncurses-dev
 
 WORKDIR /src
 
@@ -69,12 +71,10 @@ RUN cd build && \
 
 FROM alpine:latest
 
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
-    echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
-    apk update && \
+RUN apk update && \
     apk add --no-cache \
-    postgresql17 \
-    postgresql17-client \
+    postgresql18 \
+    postgresql18-client \
     bash \
     ca-certificates \
     libev \
@@ -86,7 +86,8 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     zstd \
     lz4-libs \
     libarchive \
-    libssh
+    libssh \
+    ncurses-libs
 
 RUN adduser -D -s /bin/sh pgmoneta
 

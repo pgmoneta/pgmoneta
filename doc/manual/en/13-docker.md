@@ -70,7 +70,7 @@ Once the image is built, run the container using:
 Using Docker
 
 ```sh
-docker run -d --name pgmoneta --network host pgmoneta:latest
+docker run -d --name pgmoneta -p 5001:5001 pgmoneta:latest
 ```
 
 Using Podman
