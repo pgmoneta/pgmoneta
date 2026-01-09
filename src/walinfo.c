@@ -60,6 +60,10 @@
 #define COL_WIDTH_COMBINED_SIZE 14
 #define COL_WIDTH_COMBINED_PCT  10
 
+static int describe_walfile(char* path, enum value_type type, FILE* output, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects);
+static int describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects, struct column_widths* provided_widths);
+static int describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output, bool quiet, bool color, struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids, uint32_t limit, bool summary, char** included_objects);
+
 /**
  * Center-align a string within a given width
  * @param dest Destination buffer
@@ -908,16 +912,16 @@ main(int argc, char** argv)
       partial_record->data_buffer = NULL;
       if (pgmoneta_is_directory(filepath))
       {
-         if (pgmoneta_describe_walfiles_in_directory(filepath, type, out, quiet, color,
-                                                     rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
+         if (describe_walfiles_in_directory(filepath, type, out, quiet, color,
+                                            rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
          {
             fprintf(stderr, "Error while reading/describing WAL directory\n");
             goto error;
          }
       }
 
-      else if (pgmoneta_describe_walfile(filepath, type, out, quiet, color,
-                                         rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
+      else if (describe_walfile(filepath, type, out, quiet, color,
+                                rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
       {
          fprintf(stderr, "Error while reading/describing WAL file\n");
          goto error;
@@ -1047,5 +1051,228 @@ error:
       fclose(out);
    }
 
+   return 1;
+}
+
+static int
+describe_walfile(char* path, enum value_type type, FILE* out, bool quiet, bool color,
+                 struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                 uint32_t limit, bool summary, char** included_objects)
+{
+   return describe_walfile_internal(path, type, out, quiet, color, rms, start_lsn, end_lsn,
+                                    xids, limit, summary, included_objects, NULL);
+}
+
+static int
+describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quiet, bool color,
+                          struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                          uint32_t limit, bool summary, char** included_objects,
+                          struct column_widths* provided_widths)
+{
+   struct walfile* wf = NULL;
+   struct deque_iterator* record_iterator = NULL;
+   struct decoded_xlog_record* record = NULL;
+   char* from = NULL;
+   char* to = NULL;
+   struct column_widths local_widths = {0};
+   struct column_widths* widths = provided_widths ? provided_widths : &local_widths;
+
+   if (!pgmoneta_is_file(path))
+   {
+      pgmoneta_log_error("WAL file at %s does not exist", path);
+      goto error;
+   }
+
+   from = pgmoneta_append(from, path);
+   to = pgmoneta_append(to, "/tmp/");
+   to = pgmoneta_append(to, basename(path));
+
+   if (pgmoneta_copy_and_extract_file(from, &to))
+   {
+      pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);
+      goto error;
+   }
+
+   if (pgmoneta_read_walfile(-1, to, &wf))
+   {
+      pgmoneta_log_error("Failed to read WAL file at %s", path);
+      goto error;
+   }
+
+   if (type == ValueString && !summary && !provided_widths)
+   {
+      pgmoneta_calculate_column_widths(wf, start_lsn, end_lsn, rms, xids, included_objects, widths);
+   }
+
+   if (pgmoneta_deque_iterator_create(wf->records, &record_iterator))
+   {
+      pgmoneta_log_error("Failed to create deque iterator");
+      goto error;
+   }
+
+   if (type == ValueJSON)
+   {
+      if (!quiet && !summary)
+      {
+         fprintf(out, "{ \"WAL\": [\n");
+      }
+
+      while (pgmoneta_deque_iterator_next(record_iterator))
+      {
+         record = (struct decoded_xlog_record*)record_iterator->value->data;
+         if (summary)
+         {
+            pgmoneta_wal_record_collect_stats(record, start_lsn, end_lsn);
+         }
+         else
+         {
+            pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects, widths);
+         }
+      }
+
+      if (!quiet && !summary)
+      {
+         fprintf(out, "\n]}");
+      }
+   }
+   else
+   {
+      while (pgmoneta_deque_iterator_next(record_iterator))
+      {
+         record = (struct decoded_xlog_record*)record_iterator->value->data;
+         if (summary)
+         {
+            pgmoneta_wal_record_collect_stats(record, start_lsn, end_lsn);
+         }
+         else
+         {
+            pgmoneta_wal_record_display(record, wf->long_phd->std.xlp_magic, type, out, quiet, color,
+                                        rms, start_lsn, end_lsn, xids, limit, included_objects, widths);
+         }
+      }
+   }
+
+   free(from);
+   pgmoneta_deque_iterator_destroy(record_iterator);
+   pgmoneta_destroy_walfile(wf);
+
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+
+   return 0;
+
+error:
+   free(from);
+   pgmoneta_destroy_walfile(wf);
+   pgmoneta_deque_iterator_destroy(record_iterator);
+
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+
+   return 1;
+}
+
+static int
+describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* output, bool quiet, bool color,
+                               struct deque* rms, uint64_t start_lsn, uint64_t end_lsn, struct deque* xids,
+                               uint32_t limit, bool summary, char** included_objects)
+{
+   struct deque* files = NULL;
+   struct deque_iterator* file_iterator = NULL;
+   char* file_path = malloc(MAX_PATH);
+   struct column_widths widths = {0};
+   struct walfile* wf = NULL;
+   char* from = NULL;
+   char* to = NULL;
+
+   if (pgmoneta_get_wal_files(dir_path, &files))
+   {
+      free(file_path);
+      return 1;
+   }
+
+   if (type == ValueString && !summary)
+   {
+      pgmoneta_deque_iterator_create(files, &file_iterator);
+      while (pgmoneta_deque_iterator_next(file_iterator))
+      {
+         snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
+
+         if (!pgmoneta_is_file(file_path))
+         {
+            continue;
+         }
+
+         from = pgmoneta_append(from, file_path);
+         to = pgmoneta_append(to, "/tmp/");
+         to = pgmoneta_append(to, basename(file_path));
+
+         if (pgmoneta_copy_and_extract_file(from, &to))
+         {
+            free(from);
+            free(to);
+            from = NULL;
+            to = NULL;
+            continue;
+         }
+
+         if (pgmoneta_read_walfile(-1, to, &wf) == 0)
+         {
+            pgmoneta_calculate_column_widths(wf, start_lsn, end_lsn, rms, xids, included_objects, &widths);
+            pgmoneta_destroy_walfile(wf);
+            wf = NULL;
+         }
+
+         if (to != NULL)
+         {
+            pgmoneta_delete_file(to, NULL);
+            free(to);
+            to = NULL;
+         }
+         free(from);
+         from = NULL;
+      }
+      pgmoneta_deque_iterator_destroy(file_iterator);
+      file_iterator = NULL;
+   }
+
+   pgmoneta_deque_iterator_create(files, &file_iterator);
+   while (pgmoneta_deque_iterator_next(file_iterator))
+   {
+      snprintf(file_path, MAX_PATH, "%s/%s", dir_path, (char*)file_iterator->value->data);
+
+      struct column_widths* widths_to_use = (type == ValueString && !summary) ? &widths : NULL;
+      if (describe_walfile_internal(file_path, type, output, quiet, color,
+                                    rms, start_lsn, end_lsn, xids, limit, summary, included_objects, widths_to_use))
+      {
+         goto error;
+      }
+   }
+   pgmoneta_deque_iterator_destroy(file_iterator);
+   file_iterator = NULL;
+
+   pgmoneta_deque_destroy(files);
+   free(file_path);
+   return 0;
+
+error:
+   pgmoneta_deque_destroy(files);
+   pgmoneta_deque_iterator_destroy(file_iterator);
+
+   free(file_path);
+   free(from);
+   if (to != NULL)
+   {
+      pgmoneta_delete_file(to, NULL);
+      free(to);
+   }
+   pgmoneta_destroy_walfile(wf);
    return 1;
 }
