@@ -65,7 +65,7 @@ pgmoneta_remote_management(int client_fd, char* address)
    auth_status = pgmoneta_remote_management_auth(client_fd, address, &client_ssl);
    if (auth_status == AUTH_SUCCESS)
    {
-      if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &server_fd))
+      if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &server_fd))
       {
          goto done;
       }

@@ -149,7 +149,7 @@ shutdown_mgt(void)
    ev_io_stop(main_loop, (struct ev_io*)&io_mgt);
    pgmoneta_disconnect(unix_management_socket);
    errno = 0;
-   pgmoneta_remove_unix_socket(config->unix_socket_dir, MAIN_UDS);
+   pgmoneta_remove_unix_socket(config->common.unix_socket_dir, MAIN_UDS);
    errno = 0;
 }
 
@@ -719,11 +719,11 @@ main(int argc, char** argv)
    }
 
    /* Bind Unix Domain Socket */
-   if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
+   if (pgmoneta_bind_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &unix_management_socket))
    {
-      pgmoneta_log_fatal("Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
+      pgmoneta_log_fatal("Could not bind to %s/%s", config->common.unix_socket_dir, MAIN_UDS);
 #ifdef HAVE_SYSTEMD
-      sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->unix_socket_dir, MAIN_UDS);
+      sd_notifyf(0, "STATUS=Could not bind to %s/%s", config->common.unix_socket_dir, MAIN_UDS);
 #endif
       goto error;
    }
@@ -1000,9 +1000,9 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          shutdown_mgt();
 
-         if (pgmoneta_bind_unix_socket(config->unix_socket_dir, MAIN_UDS, &unix_management_socket))
+         if (pgmoneta_bind_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &unix_management_socket))
          {
-            pgmoneta_log_fatal("Could not bind to %s", config->unix_socket_dir);
+            pgmoneta_log_fatal("Could not bind to %s", config->common.unix_socket_dir);
             exit(1);
          }
 
@@ -2818,16 +2818,16 @@ create_pidfile(void)
    if (strlen(config->pidfile) == 0)
    {
       // no pidfile set, use a default one
-      if (!pgmoneta_ends_with(config->unix_socket_dir, "/"))
+      if (!pgmoneta_ends_with(config->common.unix_socket_dir, "/"))
       {
          snprintf(config->pidfile, sizeof(config->pidfile), "%s/pgmoneta.%s.pid",
-                  config->unix_socket_dir,
+                  config->common.unix_socket_dir,
                   !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       }
       else
       {
          snprintf(config->pidfile, sizeof(config->pidfile), "%spgmoneta.%s.pid",
-                  config->unix_socket_dir,
+                  config->common.unix_socket_dir,
                   !strncmp(config->host, "*", sizeof(config->host)) ? "all" : config->host);
       }
       pgmoneta_log_debug("PID file automatically set to: [%s]", config->pidfile);

@@ -88,12 +88,17 @@ static char* colors[] =
 /**
  *
  */
+struct any_configuration
+{
+   struct common_configuration common;
+};
+
 int
 pgmoneta_start_logging(void)
 {
-   struct main_configuration* config;
+   struct any_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct any_configuration*)shmem;
 
    if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE && !log_file)
    {
@@ -121,9 +126,9 @@ pgmoneta_start_logging(void)
 int
 pgmoneta_stop_logging(void)
 {
-   struct main_configuration* config;
+   struct any_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct any_configuration*)shmem;
 
    if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
    {
@@ -147,9 +152,9 @@ pgmoneta_stop_logging(void)
 bool
 pgmoneta_log_is_enabled(int level)
 {
-   struct main_configuration* config;
+   struct any_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct any_configuration*)shmem;
 
    if (level >= config->common.log_level)
    {
@@ -164,9 +169,9 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
 {
    FILE* output = NULL;
    signed char isfree;
-   struct main_configuration* config;
+   struct any_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct any_configuration*)shmem;
 
    if (config == NULL)
    {
