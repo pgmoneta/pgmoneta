@@ -40,12 +40,16 @@
 
 /* system */
 #include <assert.h>
+#include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 static char* basebackup_name(void);
 static int basebackup_execute(char*, struct art*);
+static unsigned long directory_size_excludes(char* directory, char** excludes);
 
 struct workflow*
 pgmoneta_create_basebackup(void)
@@ -359,7 +363,8 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Base: %s/%s (Elapsed: %s)", config->common.servers[server].name, label, &elapsed[0]);
 
-   size = pgmoneta_directory_size(backup_data);
+   char* excludes[] = {"pg_wal", NULL};
+   size = directory_size_excludes(backup_data, excludes);
    biggest_file_size = pgmoneta_biggest_file(backup_data);
 
    pgmoneta_read_wal(backup_data, &wal);
@@ -460,4 +465,103 @@ error:
    free(wal);
 
    return 1;
+}
+
+static unsigned long
+directory_size_excludes(char* directory, char** excludes)
+{
+   unsigned long total_size = 0;
+   DIR* dir;
+   struct dirent* entry;
+   char* p;
+   struct stat st;
+   unsigned long l;
+
+   if (directory == NULL || strlen(directory) == 0)
+   {
+      pgmoneta_log_error("Empty directory");
+      return 0;
+   }
+
+   if (!(dir = opendir(directory)))
+   {
+      errno = 0;
+      return total_size;
+   }
+
+   while ((entry = readdir(dir)) != NULL)
+   {
+      if (entry->d_type == DT_DIR)
+      {
+         char path[1024];
+         bool excluded = false;
+
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         {
+            continue;
+         }
+
+         if (excludes != NULL)
+         {
+            for (int i = 0; excludes[i] != NULL; i++)
+            {
+               if (!strcmp(entry->d_name, excludes[i]))
+               {
+                  excluded = true;
+                  break;
+               }
+            }
+         }
+
+         if (!excluded)
+         {
+            snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+
+            total_size += directory_size_excludes(path, excludes);
+         }
+      }
+      else if (entry->d_type == DT_REG)
+      {
+         p = NULL;
+
+         p = pgmoneta_append(p, directory);
+         p = pgmoneta_append(p, "/");
+         p = pgmoneta_append(p, entry->d_name);
+
+         memset(&st, 0, sizeof(struct stat));
+
+         stat(p, &st);
+
+         l = st.st_size / st.st_blksize;
+
+         if (st.st_size % st.st_blksize != 0)
+         {
+            l += 1;
+         }
+
+         total_size += (l * st.st_blksize);
+
+         free(p);
+      }
+      else if (entry->d_type == DT_LNK)
+      {
+         p = NULL;
+
+         p = pgmoneta_append(p, directory);
+         p = pgmoneta_append(p, "/");
+         p = pgmoneta_append(p, entry->d_name);
+
+         memset(&st, 0, sizeof(struct stat));
+
+         stat(p, &st);
+
+         total_size += st.st_blksize;
+
+         free(p);
+      }
+   }
+
+   closedir(dir);
+
+   return total_size;
 }

@@ -58,7 +58,36 @@ START_TEST(test_resolve_path_trailing_env_var)
    ck_assert_str_eq(resolved, expected);
 
    unsetenv(env_key);
+   unsetenv(env_key);
    free(resolved);
+}
+END_TEST
+
+START_TEST(test_calculate_wal_size)
+{
+   char wal_dir[] = "test_wal_size";
+   char w1[] = "test_wal_size/000000010000000000000001";
+   char w2_real[] = "test_wal_size/000000010000000000000002";
+   char w3[] = "test_wal_size/000000010000000000000003";
+
+   pgmoneta_mkdir(wal_dir);
+
+   FILE* f1 = fopen(w1, "w");
+   fprintf(f1, "1234567890");
+   fclose(f1); // 10 bytes
+   FILE* f2 = fopen(w2_real, "w");
+   fprintf(f2, "12345678901234567890");
+   fclose(f2); // 20 bytes
+   FILE* f3 = fopen(w3, "w");
+   fprintf(f3, "123456789012345678901234567890");
+   fclose(f3); // 30 bytes
+
+   unsigned long size = pgmoneta_calculate_wal_size(wal_dir, "000000010000000000000002");
+
+   // Should include w2 and w3. 20 + 30 = 50.
+   ck_assert_int_eq(size, 50);
+
+   pgmoneta_delete_directory(wal_dir);
 }
 END_TEST
 
@@ -1267,6 +1296,7 @@ pgmoneta_test_utils_suite()
    tcase_set_timeout(tc_utils, 60);
    tcase_add_checked_fixture(tc_utils, pgmoneta_test_setup, pgmoneta_test_teardown);
    tcase_add_test(tc_utils, test_resolve_path_trailing_env_var);
+   tcase_add_test(tc_utils, test_calculate_wal_size);
    tcase_add_test(tc_utils, test_utils_starts_with);
    tcase_add_test(tc_utils, test_utils_ends_with);
    tcase_add_test(tc_utils, test_utils_contains);
