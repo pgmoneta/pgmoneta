@@ -97,6 +97,52 @@ pgmoneta_test_teardown(void);
 int
 pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr);
 
+/**
+ * Cleanup SSL connection safely
+ * @param ssl [in/out] Pointer to SSL connection (set to NULL after cleanup)
+ */
+void
+pgmoneta_test_cleanup_ssl(SSL** ssl);
+
+/**
+ * Cleanup socket connection safely
+ * @param socket [in/out] Pointer to socket (set to -1 after cleanup)
+ */
+void
+pgmoneta_test_cleanup_socket(int* socket);
+
+/**
+ * Cleanup both SSL and socket connections
+ * @param ssl [in/out] Pointer to SSL connection
+ * @param socket [in/out] Pointer to socket
+ */
+void
+pgmoneta_test_cleanup_connection(SSL** ssl, int* socket);
+
+/**
+ * Cleanup query response safely
+ * @param qr [in/out] Pointer to query response (set to NULL after cleanup)
+ */
+void
+pgmoneta_test_cleanup_query_response(struct query_response** qr);
+
+/**
+ * Create a backup and return status (for use in tests)
+ * @param server_name The server name
+ * @param backup_name The backup name (or NULL for full backup)
+ * @return 0 on success, 1 on failure
+ */
+int
+pgmoneta_test_backup(const char* server_name, const char* backup_name);
+
+/**
+ * Check if server is valid after calling pgmoneta_server_info
+ * @param srv The server index
+ * @return 0 if valid, 1 if invalid
+ */
+int
+pgmoneta_test_server_info_check(int srv);
+
 #ifdef __cplusplus
 }
 #endif

@@ -26,64 +26,70 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <shmem.h>
+#include <mctf.h>
 #include <tscommon.h>
-#include <tssuite.h>
-#include <configuration.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+#include <unistd.h>
+#include <stdbool.h>
 
-#include "logging.h"
+static void
+usage(const char* progname)
+{
+   printf("Usage: %s [OPTIONS]\n", progname);
+   printf("Options:\n");
+   printf("  -t, --test NAME    Run only tests matching NAME\n");
+   printf("  -h, --help         Show this help message\n");
+   printf("\n");
+}
 
 int
 main(int argc, char* argv[])
 {
    int number_failed = 0;
-   Suite* backup_suite;
-   Suite* restore_suite;
-   Suite* delete_suite;
-   Suite* http_suite;
-   Suite* wal_utils_suite;
-   Suite* brt_io_suite;
-   Suite* wal_summary_suite;
-   Suite* art_suite;
-   Suite* deque_suite;
-   Suite* json_suite;
-   Suite* server_api_suite;
-   Suite* utils_suite;
-   SRunner* sr;
+   const char* test_filter = NULL;
+   int c;
+   bool env_created = false;
 
-   pgmoneta_test_environment_create();
+   static struct option long_options[] = {
+      {"test", required_argument, 0, 't'},
+      {"help", no_argument, 0, 'h'},
+      {0, 0, 0, 0}};
 
-   backup_suite = pgmoneta_test_backup_suite();
-   restore_suite = pgmoneta_test_restore_suite();
-   delete_suite = pgmoneta_test_delete_suite();
-   http_suite = pgmoneta_test_http_suite();
-   wal_utils_suite = pgmoneta_test_wal_utils_suite();
-   brt_io_suite = pgmoneta_test_brt_io_suite();
-   wal_summary_suite = pgmoneta_test_wal_summary_suite();
-   art_suite = pgmoneta_test_art_suite();
-   deque_suite = pgmoneta_test_deque_suite();
-   json_suite = pgmoneta_test_json_suite();
-   server_api_suite = pgmoneta_test_server_api_suite();
-   utils_suite = pgmoneta_test_utils_suite();
+   while ((c = getopt_long(argc, argv, "t:h", long_options, NULL)) != -1)
+   {
+      switch (c)
+      {
+         case 't':
+            test_filter = optarg;
+            break;
+         case 'h':
+            usage(argv[0]);
+            return EXIT_SUCCESS;
+         default:
+            usage(argv[0]);
+            return EXIT_FAILURE;
+      }
+   }
 
-   sr = srunner_create(backup_suite);
-   srunner_add_suite(sr, restore_suite);
-   srunner_add_suite(sr, delete_suite);
-   srunner_add_suite(sr, http_suite);
-   srunner_add_suite(sr, wal_utils_suite);
-   srunner_add_suite(sr, brt_io_suite);
-   srunner_add_suite(sr, wal_summary_suite);
-   srunner_add_suite(sr, art_suite);
-   srunner_add_suite(sr, deque_suite);
-   srunner_add_suite(sr, json_suite);
-   srunner_add_suite(sr, server_api_suite);
-   srunner_add_suite(sr, utils_suite);
-   srunner_set_log(sr, "-");
-   srunner_set_fork_status(sr, CK_NOFORK);
-   srunner_run(sr, NULL, NULL, CK_VERBOSE);
-   number_failed = srunner_ntests_failed(sr);
-   srunner_free(sr);
-   pgmoneta_test_environment_destroy();
+   if (getenv("PGMONETA_TEST_CONF") != NULL)
+   {
+      pgmoneta_test_environment_create();
+      env_created = true;
+   }
+
+   mctf_init();
+
+   number_failed = mctf_run_tests(test_filter);
+   mctf_print_summary();
+   mctf_cleanup();
+
+   if (env_created)
+   {
+      pgmoneta_test_environment_destroy();
+   }
 
    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

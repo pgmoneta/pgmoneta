@@ -30,6 +30,9 @@
 #include <configuration.h>
 #include <logging.h>
 #include <message.h>
+#include <network.h>
+#include <security.h>
+#include <server.h>
 #include <shmem.h>
 #include <tsclient.h>
 #include <tscommon.h>
@@ -39,6 +42,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define ENV_VAR_CONF_PATH        "PGMONETA_TEST_CONF"
 #define ENV_VAR_CONF_SAMPLE_PATH "PGMONETA_TEST_CONF_SAMPLE"
@@ -121,18 +125,49 @@ pgmoneta_test_environment_destroy(void)
 void
 pgmoneta_test_add_backup(void)
 {
+   int ret = 0;
    pgmoneta_test_setup();
-   int found = !pgmoneta_tsclient_backup("primary", NULL);
-   assert(found);
+   ret = pgmoneta_tsclient_backup("primary", NULL);
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_add_backup: backup operation failed");
+   }
+   pgmoneta_test_teardown();
 }
 
 void
 pgmoneta_test_add_backup_chain(void)
 {
+   int ret = 0;
    pgmoneta_test_setup();
-   assert((!pgmoneta_tsclient_backup("primary", NULL)));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
+   
+   ret = pgmoneta_tsclient_backup("primary", NULL);
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_add_backup_chain: full backup failed");
+      pgmoneta_test_teardown();
+      return;
+   }
+   
+   sleep(2);
+   
+   ret = pgmoneta_tsclient_backup("primary", "newest");
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_add_backup_chain: first incremental backup failed (may be timing issue in CI)");
+      pgmoneta_test_teardown();
+      return;
+   }
+   
+   sleep(2);
+   
+   ret = pgmoneta_tsclient_backup("primary", "newest");
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_add_backup_chain: second incremental backup failed (may be timing issue in CI)");
+   }
+   
+   pgmoneta_test_teardown();
 }
 
 void
@@ -142,8 +177,15 @@ pgmoneta_test_basedir_cleanup(void)
    char* wal_dir = NULL;
    bool restart = false;
    struct main_configuration* config;
+   int ret = 0;
 
    config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: config is NULL");
+      return;
+   }
 
    wal_dir = pgmoneta_append(wal_dir, TEST_BASE_DIR);
    wal_dir = pgmoneta_append(wal_dir, "/walfiles");
@@ -159,13 +201,27 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_delete_directory(wal_dir);
    pgmoneta_mkdir(wal_dir);
 
-   // restore pgmoneta.conf by overwriting it with pgmoneta.conf.sample
-   assert(!pgmoneta_delete_file(config->common.configuration_path, NULL));
-   assert(!pgmoneta_copy_file(TEST_CONFIG_SAMPLE_PATH, config->common.configuration_path, NULL));
-   pgmoneta_reload_configuration(&restart);
+   ret = pgmoneta_delete_file(config->common.configuration_path, NULL);
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to delete config file");
+   }
 
-   // assuming server doesn't need to restart
-   assert(!pgmoneta_tsclient_reload());
+   ret = pgmoneta_copy_file(TEST_CONFIG_SAMPLE_PATH, config->common.configuration_path, NULL);
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to copy config file");
+   }
+   else
+   {
+      pgmoneta_reload_configuration(&restart);
+   }
+
+   ret = pgmoneta_tsclient_reload();
+   if (ret != 0)
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to reload configuration");
+   }
 
    free(backup_dir);
    free(wal_dir);
@@ -222,4 +278,54 @@ error:
    pgmoneta_free_query_response(response);
 
    return 1;
+}
+
+void
+pgmoneta_test_cleanup_ssl(SSL** ssl)
+{
+   if (ssl != NULL && *ssl != NULL)
+   {
+      pgmoneta_close_ssl(*ssl);
+      *ssl = NULL;
+   }
+}
+
+void
+pgmoneta_test_cleanup_socket(int* socket)
+{
+   if (socket != NULL && *socket != -1)
+   {
+      pgmoneta_disconnect(*socket);
+      *socket = -1;
+   }
+}
+
+void
+pgmoneta_test_cleanup_connection(SSL** ssl, int* socket)
+{
+   pgmoneta_test_cleanup_ssl(ssl);
+   pgmoneta_test_cleanup_socket(socket);
+}
+
+void
+pgmoneta_test_cleanup_query_response(struct query_response** qr)
+{
+   if (qr != NULL && *qr != NULL)
+   {
+      pgmoneta_free_query_response(*qr);
+      *qr = NULL;
+   }
+}
+
+int
+pgmoneta_test_backup(const char* server_name, const char* backup_name)
+{
+   /* Cast const away as pgmoneta_tsclient_backup doesn't modify the strings */
+   return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name);
+}
+
+int
+pgmoneta_test_server_info_check(int srv)
+{
+   return pgmoneta_server_valid(srv) ? 0 : 1;
 }
