@@ -229,6 +229,43 @@ error:
    return 1;
 }
 
+int
+pgmoneta_tsclient_list_backup(char* server, struct json** response)
+{
+   int socket = -1;
+   struct json* read = NULL;
+
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   // Send LIST_BACKUP request to the main server
+   if (pgmoneta_management_request_list_backup(NULL, socket, server, NULL, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   // Read and parse JSON response from socket
+   if (pgmoneta_management_read_json(NULL, socket, NULL, NULL, &read))
+   {
+      goto error;
+   }
+
+   // Return the parsed JSON response
+   *response = read;
+
+   pgmoneta_disconnect(socket);
+   return 0;
+
+error:
+   pgmoneta_json_destroy(read);
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
 static int
 get_connection()
 {

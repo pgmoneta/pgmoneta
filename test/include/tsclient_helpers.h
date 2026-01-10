@@ -27,64 +27,60 @@
  *
  */
 
-#ifndef PGMONETA_TSCLIENT_H
-#define PGMONETA_TSCLIENT_H
+#ifndef PGMONETA_TSCLIENT_HELPERS_H
+#define PGMONETA_TSCLIENT_HELPERS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <pgmoneta.h>
-#include <brt.h>
 #include <json.h>
-#include <walfile/wal_reader.h>
+#include <stdbool.h>
 
 /**
- * Execute backup command on the server
- * @param server the server to perform backup on
- * @param incremental execute backup in incremental mode
- * @return 0 upon success, otherwise 1
+ * Get backup count from LIST_BACKUP response
+ * @param response The JSON response from list_backup
+ * @return Number of backups, or -1 on error
  */
 int
-pgmoneta_tsclient_backup(char* server, char* incremental);
+pgmoneta_tsclient_get_backup_count(struct json* response);
 
 /**
- * Execute restore command on the server
- * @param server the server to perform restore on
- * @param backup_id the backup_id to perform restore on
- * @param position the position parameters
- * @return 0 upon success, otherwise 1
+ * Get backup at specific index from LIST_BACKUP response
+ * @param response The JSON response from list_backup
+ * @param index The backup index
+ * @return JSON object for backup, or NULL on error
  */
-int
-pgmoneta_tsclient_restore(char* server, char* backup_id, char* position);
+struct json*
+pgmoneta_tsclient_get_backup(struct json* response, int index);
 
 /**
- * Execute delete command on the server
- * @param server the server to perform delete on
- * @param backup_id the backup_id to delete
- * @return 0 upon success, otherwise 1
+ * Get backup label from backup JSON object
+ * @param backup The backup JSON object
+ * @return Label string, or NULL on error
  */
-int
-pgmoneta_tsclient_delete(char* server, char* backup_id);
+char*
+pgmoneta_tsclient_get_backup_label(struct json* backup);
 
 /**
- * List backups for a server
- * @param server the server name
- * @param response [out] the JSON response containing backup list
- * @return 0 upon success, otherwise 1
+ * Get backup type (FULL/INCREMENTAL) from backup JSON object
+ * @param backup The backup JSON object
+ * @return Type string ("FULL" or "INCREMENTAL"), or NULL on error
  */
-int
-pgmoneta_tsclient_list_backup(char* server, struct json** response);
+char*
+pgmoneta_tsclient_get_backup_type(struct json* backup);
 
 /**
- * Execute reload command on the server
- * @return 0 upon success, otherwise 1
+ * Get backup parent label from backup JSON object
+ * @param backup The backup JSON object
+ * @return Parent label string, or NULL if FULL backup or error
  */
-int
-pgmoneta_tsclient_reload();
+char*
+pgmoneta_tsclient_get_backup_parent(struct json* backup);
 
-#ifdef __cplusplus
-}
-#endif
+/**
+ * Verify parent-child relationship between two backups
+ * @param parent The parent backup JSON object
+ * @param child The child backup JSON object
+ * @return true if child's parent matches parent's label
+ */
+bool
+pgmoneta_tsclient_verify_backup_chain(struct json* parent, struct json* child);
 
 #endif
