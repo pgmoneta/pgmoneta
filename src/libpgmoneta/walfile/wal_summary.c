@@ -307,7 +307,8 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
       }
       else
       {
-         pgmoneta_log_debug("WAL file at %s does not exist", file_path);
+         pgmoneta_log_error("WAL file at %s does not exist", file_path);
+         goto error;
       }
    }
 
