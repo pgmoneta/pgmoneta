@@ -1050,6 +1050,7 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
    }
 
    fclose(file);
+   file = NULL;
 
    if (rename(tmp_file_path, file_path) != 0)
    {
@@ -1063,7 +1064,10 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
 
 error:
 
-   fclose(file);
+   if (file != NULL)
+   {
+      fclose(file);
+   }
 
    return 1;
 }
