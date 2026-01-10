@@ -1801,6 +1801,8 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
 
          free(d);
 
+         pgmoneta_log_trace("WAL: Compressed/encrypted %s", wal_file);
+
          atomic_store(&config->common.servers[srv].wal_repository, false);
       }
       else
