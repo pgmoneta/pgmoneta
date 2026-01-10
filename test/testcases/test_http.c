@@ -29,7 +29,7 @@
 #include <http.h>
 #include <tsclient.h>
 #include <tscommon.h>
-#include <tssuite.h>
+#include <mctf.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -55,9 +55,8 @@ static int stop_echo_server(void);
 static void setup_echo_server(void);
 static void teardown_echo_server(void);
 
-START_TEST(test_pgmoneta_http_get)
+MCTF_TEST(test_pgmoneta_http_get)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -67,21 +66,33 @@ START_TEST(test_pgmoneta_http_get)
    int port = 9999;
    bool secure = false;
 
-   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
+   setup_echo_server();
 
-   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/get", &request), "failed to create request");
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/get", &request), "failed to create request", cleanup);
 
    status = pgmoneta_http_invoke(connection, request, &response);
-   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP GET request failed");
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, "HTTP GET request failed", cleanup);
 
-   pgmoneta_http_request_destroy(request);
-   pgmoneta_http_response_destroy(response);
-   pgmoneta_http_destroy(connection);
+cleanup:
+   if (request)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+   if (response)
+   {
+      pgmoneta_http_response_destroy(response);
+   }
+   if (connection)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+   teardown_echo_server();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_pgmoneta_http_post)
+
+MCTF_TEST(test_pgmoneta_http_post)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -91,23 +102,34 @@ START_TEST(test_pgmoneta_http_post)
    bool secure = false;
    const char* test_data = "name=pgmoneta&version=1.0";
 
-   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
+   setup_echo_server();
 
-   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_POST, "/post", &request), "failed to create request");
-
-   ck_assert_msg(!pgmoneta_http_set_data(request, (void*)test_data, strlen(test_data)), "failed to set request data");
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_POST, "/post", &request), "failed to create request", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_set_data(request, (void*)test_data, strlen(test_data)), "failed to set request data", cleanup);
 
    status = pgmoneta_http_invoke(connection, request, &response);
-   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP POST request failed");
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, "HTTP POST request failed", cleanup);
 
-   pgmoneta_http_request_destroy(request);
-   pgmoneta_http_response_destroy(response);
-   pgmoneta_http_destroy(connection);
+cleanup:
+   if (request)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+   if (response)
+   {
+      pgmoneta_http_response_destroy(response);
+   }
+   if (connection)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+   teardown_echo_server();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_pgmoneta_http_put)
+
+MCTF_TEST(test_pgmoneta_http_put)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -117,23 +139,34 @@ START_TEST(test_pgmoneta_http_put)
    bool secure = false;
    const char* test_data = "This is a test file content for PUT request";
 
-   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
+   setup_echo_server();
 
-   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), "failed to create request");
-
-   ck_assert_msg(!pgmoneta_http_set_data(request, (void*)test_data, strlen(test_data)), "failed to set request data");
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), "failed to create request", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_set_data(request, (void*)test_data, strlen(test_data)), "failed to set request data", cleanup);
 
    status = pgmoneta_http_invoke(connection, request, &response);
-   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP PUT request failed");
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, "HTTP PUT request failed", cleanup);
 
-   pgmoneta_http_request_destroy(request);
-   pgmoneta_http_response_destroy(response);
-   pgmoneta_http_destroy(connection);
+cleanup:
+   if (request)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
+   if (response)
+   {
+      pgmoneta_http_response_destroy(response);
+   }
+   if (connection)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+   teardown_echo_server();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_pgmoneta_http_put_file)
+
+MCTF_TEST(test_pgmoneta_http_put_file)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    int status;
    struct http* connection = NULL;
    struct http_request* request = NULL;
@@ -146,95 +179,85 @@ START_TEST(test_pgmoneta_http_put_file)
    const char* test_data = "This is a test file content for PUT file request\nSecond line of test data\nThird line with some numbers: 12345";
    size_t data_len = strlen(test_data);
 
-   temp_file = tmpfile();
-   ck_assert_ptr_nonnull(temp_file);
+   setup_echo_server();
 
-   ck_assert_msg(fwrite(test_data, 1, data_len, temp_file) == data_len, "wrote file incomplete");
+   temp_file = tmpfile();
+   MCTF_ASSERT_PTR_NONNULL(temp_file, "Failed to create temp file", cleanup);
+
+   MCTF_ASSERT(fwrite(test_data, 1, data_len, temp_file) == data_len, "wrote file incomplete", cleanup);
 
    rewind(temp_file);
 
    file_data = malloc(data_len);
-   ck_assert_ptr_nonnull(file_data);
+   MCTF_ASSERT_PTR_NONNULL(file_data, "malloc failed", cleanup);
 
-   ck_assert_msg(fread(file_data, 1, data_len, temp_file) == data_len, "read file incomplete");
+   MCTF_ASSERT(fread(file_data, 1, data_len, temp_file) == data_len, "read file incomplete", cleanup);
 
-   ck_assert_msg(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection");
-
-   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), "failed to create request");
-
-   ck_assert_msg(!pgmoneta_http_request_add_header(request, "Content-Type", "text/plain"), "failed to add content type header");
-
-   ck_assert_msg(!pgmoneta_http_set_data(request, file_data, data_len), "failed to set request data");
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), "failed to establish connection", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), "failed to create request", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_request_add_header(request, "Content-Type", "text/plain"), "failed to add content type header", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_set_data(request, file_data, data_len), "failed to set request data", cleanup);
 
    status = pgmoneta_http_invoke(connection, request, &response);
-   ck_assert_msg(status == PGMONETA_HTTP_STATUS_OK, "HTTP PUT file request failed");
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, "HTTP PUT file request failed", cleanup);
 
+cleanup:
    pgmoneta_http_request_destroy(request);
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
-   free(file_data);
-   fclose(temp_file);
+   if (file_data)
+   {
+      free(file_data);
+   }
+   if (temp_file)
+   {
+      fclose(temp_file);
+   }
+   teardown_echo_server();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_pgmoneta_http_header_operations)
+
+MCTF_TEST(test_pgmoneta_http_header_operations)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct http_request* request = NULL;
    char* header_value = NULL;
 
-   ck_assert_msg(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), "failed to create request");
+   pgmoneta_test_setup(); // No server needed for header ops, just memory init
 
-   ck_assert_msg(!pgmoneta_http_request_add_header(request, "Authorization", "Bearer token123"), "failed to add Authorization header");
-   ck_assert_msg(!pgmoneta_http_request_add_header(request, "Content-Type", "application/json"), "failed to add Content-Type header");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/test", &request), "failed to create request", cleanup);
+
+   MCTF_ASSERT(!pgmoneta_http_request_add_header(request, "Authorization", "Bearer token123"), "failed to add Authorization header", cleanup);
+   MCTF_ASSERT(!pgmoneta_http_request_add_header(request, "Content-Type", "application/json"), "failed to add Content-Type header", cleanup);
 
    header_value = pgmoneta_http_request_get_header(request, "Authorization");
-   ck_assert_ptr_nonnull(header_value);
-   ck_assert_str_eq(header_value, "Bearer token123");
+   MCTF_ASSERT_PTR_NONNULL(header_value, "header Authorization should not be null", cleanup);
+   MCTF_ASSERT_STR_EQ(header_value, "Bearer token123", "header Authorization mismatch", cleanup);
 
    header_value = pgmoneta_http_request_get_header(request, "Content-Type");
-   ck_assert_ptr_nonnull(header_value);
-   ck_assert_str_eq(header_value, "application/json");
+   MCTF_ASSERT_PTR_NONNULL(header_value, "header Content-Type should not be null", cleanup);
+   MCTF_ASSERT_STR_EQ(header_value, "application/json", "header Content-Type mismatch", cleanup);
 
-   ck_assert_ptr_null(pgmoneta_http_request_get_header(request, "NonExistent"));
+   MCTF_ASSERT_PTR_NULL(pgmoneta_http_request_get_header(request, "NonExistent"), "header NonExistent should be null", cleanup);
 
-   ck_assert_msg(!pgmoneta_http_request_update_header(request, "Authorization", "Bearer newtoken456"), "failed to update Authorization header");
+   MCTF_ASSERT(!pgmoneta_http_request_update_header(request, "Authorization", "Bearer newtoken456"), "failed to update Authorization header", cleanup);
 
    header_value = pgmoneta_http_request_get_header(request, "Authorization");
-   ck_assert_ptr_nonnull(header_value);
-   ck_assert_str_eq(header_value, "Bearer newtoken456");
+   MCTF_ASSERT_PTR_NONNULL(header_value, "updated header value is null", cleanup);
+   MCTF_ASSERT_STR_EQ(header_value, "Bearer newtoken456", "updated header value mismatch", cleanup);
 
-   ck_assert_msg(!pgmoneta_http_request_remove_header(request, "Content-Type"), "failed to remove Content-Type header");
+   MCTF_ASSERT(!pgmoneta_http_request_remove_header(request, "Content-Type"), "failed to remove Content-Type header", cleanup);
 
    header_value = pgmoneta_http_request_get_header(request, "Content-Type");
-   ck_assert_ptr_null(header_value);
+   MCTF_ASSERT_PTR_NULL(header_value, "removed header should be null", cleanup);
 
    header_value = pgmoneta_http_request_get_header(request, "Authorization");
-   ck_assert_ptr_nonnull(header_value);
-   ck_assert_str_eq(header_value, "Bearer newtoken456");
+   MCTF_ASSERT_PTR_NONNULL(header_value, "Authorization header should still be present", cleanup);
+   MCTF_ASSERT_STR_EQ(header_value, "Bearer newtoken456", "Authorization header value check", cleanup);
 
+cleanup:
    pgmoneta_http_request_destroy(request);
-}
-END_TEST
-
-Suite*
-pgmoneta_test_http_suite()
-{
-   Suite* s;
-   TCase* tc_http_basic;
-   s = suite_create("pgmoneta_test_http");
-
-   tc_http_basic = tcase_create("http_basic_test");
-   tcase_set_tags(tc_http_basic, "common");
-   tcase_set_timeout(tc_http_basic, 60);
-   tcase_add_checked_fixture(tc_http_basic, setup_echo_server, teardown_echo_server);
-   tcase_add_test(tc_http_basic, test_pgmoneta_http_get);
-   tcase_add_test(tc_http_basic, test_pgmoneta_http_post);
-   tcase_add_test(tc_http_basic, test_pgmoneta_http_put);
-   tcase_add_test(tc_http_basic, test_pgmoneta_http_put_file);
-   tcase_add_test(tc_http_basic, test_pgmoneta_http_header_operations);
-   suite_add_tcase(s, tc_http_basic);
-
-   return s;
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
 
 static void*
