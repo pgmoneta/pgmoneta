@@ -290,7 +290,7 @@ pgmoneta_wal(int srv, char** argv)
    pgmoneta_free_query_response(identify_system_response);
    identify_system_response = NULL;
 
-   pgmoneta_wal_server_compress_encrypt(srv, NULL);
+   pgmoneta_wal_server_compress_encrypt(srv, argv, NULL);
 
    while (config->running && pgmoneta_server_is_online(srv))
    {
@@ -531,7 +531,7 @@ pgmoneta_wal(int srv, char** argv)
                            bytes_left = 0;
                         }
 
-                        pgmoneta_wal_server_compress_encrypt(srv, wal_filename);
+                        pgmoneta_wal_server_compress_encrypt(srv, argv, wal_filename);
                         free(wal_filename);
                         wal_filename = NULL;
 
@@ -619,7 +619,7 @@ pgmoneta_wal(int srv, char** argv)
       pgmoneta_send_copy_done_message(ssl, socket);
    }
 
-   pgmoneta_wal_server_compress_encrypt(srv, NULL);
+   pgmoneta_wal_server_compress_encrypt(srv, argv, NULL);
 
    config->common.servers[srv].wal_streaming = -1;
    pgmoneta_close_ssl(ssl);
@@ -1705,10 +1705,8 @@ error:
 }
 
 void
-pgmoneta_wal_server_compress_encrypt(int srv, char* wal_file)
+pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
 {
-   bool active = false;
-   char* d = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -1718,73 +1716,86 @@ pgmoneta_wal_server_compress_encrypt(int srv, char* wal_file)
       return;
    }
 
-   if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true))
+   if (!fork())
    {
-      d = pgmoneta_get_server_wal(srv);
+      bool active = false;
+      char* d = NULL;
 
-      if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+      if (argv != NULL)
       {
-         if (wal_file == NULL)
-         {
-            pgmoneta_gzip_wal(d);
-         }
-         else
-         {
-            pgmoneta_gzip_wal_file(d, wal_file);
-         }
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-      {
-         if (wal_file == NULL)
-         {
-            pgmoneta_zstandardc_wal(d);
-         }
-         else
-         {
-            pgmoneta_zstandardc_wal_file(d, wal_file);
-         }
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-      {
-         if (wal_file == NULL)
-         {
-            pgmoneta_lz4c_wal(d);
-         }
-         else
-         {
-            pgmoneta_lz4c_wal_file(d, wal_file);
-         }
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-      {
-         if (wal_file == NULL)
-         {
-            pgmoneta_bzip2_wal(d);
-         }
-         else
-         {
-            pgmoneta_bzip2_wal_file(d, wal_file);
-         }
+         pgmoneta_set_proc_title(1, argv, "wal/ce", config->common.servers[srv].name);
       }
 
-      if (config->encryption != ENCRYPTION_NONE)
+      if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true))
       {
-         if (wal_file == NULL)
+         d = pgmoneta_get_server_wal(srv);
+
+         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
          {
-            pgmoneta_encrypt_wal(d);
+            if (wal_file == NULL)
+            {
+               pgmoneta_gzip_wal(d);
+            }
+            else
+            {
+               pgmoneta_gzip_wal_file(d, wal_file);
+            }
          }
-         else
+         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
          {
-            pgmoneta_encrypt_wal_file(d, wal_file);
+            if (wal_file == NULL)
+            {
+               pgmoneta_zstandardc_wal(d);
+            }
+            else
+            {
+               pgmoneta_zstandardc_wal_file(d, wal_file);
+            }
          }
+         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+         {
+            if (wal_file == NULL)
+            {
+               pgmoneta_lz4c_wal(d);
+            }
+            else
+            {
+               pgmoneta_lz4c_wal_file(d, wal_file);
+            }
+         }
+         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+         {
+            if (wal_file == NULL)
+            {
+               pgmoneta_bzip2_wal(d);
+            }
+            else
+            {
+               pgmoneta_bzip2_wal_file(d, wal_file);
+            }
+         }
+
+         if (config->encryption != ENCRYPTION_NONE)
+         {
+            if (wal_file == NULL)
+            {
+               pgmoneta_encrypt_wal(d);
+            }
+            else
+            {
+               pgmoneta_encrypt_wal_file(d, wal_file);
+            }
+         }
+
+         free(d);
+
+         atomic_store(&config->common.servers[srv].wal_repository, false);
+      }
+      else
+      {
+         pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
       }
 
-      free(d);
-
-      atomic_store(&config->common.servers[srv].wal_repository, false);
-   }
-   else
-   {
-      pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
+      exit(0);
    }
 }
