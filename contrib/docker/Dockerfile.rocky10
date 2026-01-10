@@ -25,9 +25,9 @@
 # TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-FROM rockylinux:9 AS builder
+FROM rockylinux/rockylinux:10 AS builder
 
-RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
+RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm && \
     dnf -y upgrade && \
     dnf install -y dnf-plugins-core && \
     dnf config-manager --set-enabled crb && \
@@ -61,7 +61,6 @@ RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.
         libarchive-devel \
         libssh-devel \
         libasan \
-        libasan-static \
         yaml-cpp-devel && \
     dnf clean all
 
@@ -76,9 +75,9 @@ RUN cd build && \
     make && \
     make install
 
-FROM rockylinux:9
+FROM rockylinux/rockylinux:10 
 
-RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm && \
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm && \
     dnf -y update && \
     dnf install -y postgresql17-server \
         postgresql17-contrib \
