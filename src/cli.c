@@ -188,7 +188,7 @@ usage(void)
    printf("  pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]\n");
    printf("\n");
    printf("Options:\n");
-   printf("  -c, --config CONFIG_FILE                       Set the path to the pgmoneta.conf file\n");
+   printf("  -c, --config CONFIG_FILE                       Set the path to the pgmoneta_cli.conf file\n");
    printf("  -h, --host HOST                                Set the host name\n");
    printf("  -p, --port PORT                                Set the port number\n");
    printf("  -U, --user USERNAME                            Set the user name\n");
@@ -412,7 +412,7 @@ main(int argc, char** argv)
    /* Store the result from command parser*/
    size_t size;
    char un[MAX_USERNAME_LENGTH];
-   struct main_configuration* config = NULL;
+   struct cli_configuration* cli_cfg = NULL;
    int32_t output_format = MANAGEMENT_OUTPUT_FORMAT_TEXT;
    int32_t compression = MANAGEMENT_COMPRESSION_UNKNOWN;
    int32_t encryption = MANAGEMENT_ENCRYPTION_UNKNOWN;
@@ -424,6 +424,7 @@ main(int argc, char** argv)
    int num_results = 0;
    bool cascade = false;
    char* sort_option = NULL;
+   char port_buf[16] = {0};
 
    cli_option options[] = {
       {"c", "config", true},
@@ -596,25 +597,9 @@ main(int argc, char** argv)
       }
    }
 
-   if (compression == MANAGEMENT_COMPRESSION_UNKNOWN)
-   {
-      compression = MANAGEMENT_COMPRESSION_ZSTD;
-   }
-
-   if (encryption == MANAGEMENT_ENCRYPTION_UNKNOWN)
-   {
-      encryption = MANAGEMENT_ENCRYPTION_AES256;
-   }
-
    if (getuid() == 0)
    {
       warnx("pgmoneta-cli: Running as root is not allowed for security reasons.");
-      exit(1);
-   }
-
-   if (configuration_path != NULL && (host != NULL || port != NULL))
-   {
-      warnx("pgmoneta-cli: Conflicting options: Use either '-c' for config or '-h/-p' for manual endpoint definition, not both.");
       exit(1);
    }
 
@@ -624,13 +609,13 @@ main(int argc, char** argv)
       exit(1);
    }
 
-   size = sizeof(struct main_configuration);
+   size = sizeof(struct cli_configuration);
    if (pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem))
    {
       warnx("pgmoneta-cli: Failed to allocate shared memory. Check system resources and permissions.");
       exit(1);
    }
-   pgmoneta_init_main_configuration(shmem);
+   pgmoneta_init_cli_configuration(shmem);
 
    if (!parse_command(argc, argv, optind, &parsed, command_table, command_count))
    {
@@ -673,68 +658,126 @@ main(int argc, char** argv)
                errx(1, "Configuration file validation failed: %s", configuration_path);
          }
       }
-
-      ret = pgmoneta_read_main_configuration(shmem, configuration_path);
+      ret = pgmoneta_read_cli_configuration(shmem, configuration_path);
       if (ret)
       {
          errx(1, "pgmoneta-cli: Failed to read configuration file: %s", configuration_path);
       }
 
+      ret = pgmoneta_validate_cli_configuration(shmem);
+      if (ret)
+      {
+         errx(1, "pgmoneta-cli: Invalid configuration after parsing: %s", configuration_path);
+      }
+
       if (logfile)
       {
-         config = (struct main_configuration*)shmem;
+         cli_cfg = (struct cli_configuration*)shmem;
 
-         config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
-         memset(&config->common.log_path[0], 0, MISC_LENGTH);
-         memcpy(&config->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
+         cli_cfg->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
+         memset(&cli_cfg->common.log_path[0], 0, MISC_LENGTH);
+         memcpy(&cli_cfg->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
       }
 
       if (pgmoneta_start_logging())
       {
          exit(1);
       }
-
-      config = (struct main_configuration*)shmem;
+      cli_cfg = (struct cli_configuration*)shmem;
    }
    else
    {
-      char default_conf[] = "/etc/pgmoneta/pgmoneta.conf";
-      ret = pgmoneta_read_main_configuration(shmem, default_conf);
+      char default_conf[] = PGMONETA_CLI_DEFAULT_CONFIG_FILE_PATH;
+      ret = pgmoneta_read_cli_configuration(shmem, default_conf);
       if (ret)
       {
+         /* Default config file not found or can't be read
+          * This is acceptable if all required parameters are provided via flags */
          if (need_server_conn && (host == NULL || port == NULL))
          {
-            warnx("pgmoneta-cli: Missing required arguments: Both '--host' (-h) and '--port' (-p) must be provided.");
+            warnx("pgmoneta-cli: No configuration file found and missing required arguments. Either provide a config file or use '--host' (-h) and '--port' (-p) flags.");
             exit(1);
          }
       }
       else
       {
+         ret = pgmoneta_validate_cli_configuration(shmem);
+         if (ret)
+         {
+            errx(1, "pgmoneta-cli: Invalid configuration after parsing: %s", default_conf);
+         }
+
          configuration_path = default_conf;
 
          if (logfile)
          {
-            config = (struct main_configuration*)shmem;
+            cli_cfg = (struct cli_configuration*)shmem;
 
-            config->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
-            memset(&config->common.log_path[0], 0, MISC_LENGTH);
-            memcpy(&config->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
+            cli_cfg->common.log_type = PGMONETA_LOGGING_TYPE_FILE;
+            memset(&cli_cfg->common.log_path[0], 0, MISC_LENGTH);
+            memcpy(&cli_cfg->common.log_path[0], logfile, MIN((size_t)MISC_LENGTH - 1, strlen(logfile)));
          }
 
          if (pgmoneta_start_logging())
          {
             exit(1);
          }
-
-         config = (struct main_configuration*)shmem;
+         cli_cfg = (struct cli_configuration*)shmem;
       }
    }
 
-   if (configuration_path != NULL)
+   /* Merge config values for host/port, compression, encryption with proper precedence
+    * Precedence: flags > -c config > default config > hard defaults
+    */
+   if (cli_cfg != NULL)
    {
-      /* Local connection */
-      if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
+      if (host == NULL && strlen(cli_cfg->host) > 0)
       {
+         host = &cli_cfg->host[0];
+      }
+      if (port == NULL && cli_cfg->port > 0)
+      {
+         memset(port_buf, 0, sizeof(port_buf));
+         snprintf(port_buf, sizeof(port_buf), "%d", cli_cfg->port);
+         port = &port_buf[0];
+      }
+
+      if (compression == MANAGEMENT_COMPRESSION_UNKNOWN)
+      {
+         compression = cli_cfg->compression;
+      }
+      if (encryption == MANAGEMENT_ENCRYPTION_UNKNOWN)
+      {
+         encryption = cli_cfg->encryption;
+      }
+   }
+
+   if (compression == MANAGEMENT_COMPRESSION_UNKNOWN)
+   {
+      compression = MANAGEMENT_COMPRESSION_ZSTD;
+   }
+   if (encryption == MANAGEMENT_ENCRYPTION_UNKNOWN)
+   {
+      encryption = MANAGEMENT_ENCRYPTION_AES256;
+   }
+
+   bool have_host_port = host != NULL && port != NULL;
+   bool have_uds = cli_cfg != NULL && strlen(cli_cfg->common.unix_socket_dir) > 0;
+
+   if (need_server_conn && !have_host_port && !have_uds)
+   {
+      warnx("pgmoneta-cli: No connection information provided. Supply --host/--port for remote or set unix_socket_dir in pgmoneta_cli.conf for local.");
+      exit_code = 1;
+      goto done;
+   }
+
+   /* Attempt Unix socket first when no host/port was given and a config is loaded */
+   if (!have_host_port && have_uds)
+   {
+      if (pgmoneta_connect_unix_socket(cli_cfg->common.unix_socket_dir, MAIN_UDS, &socket))
+      {
+         warnx("pgmoneta-cli: Failed to connect via Unix socket at '%s/%s'. Check that the daemon is running and that unix_socket_dir in pgmoneta.conf matches the value in your pgmoneta_cli.conf.",
+               cli_cfg->common.unix_socket_dir, MAIN_UDS);
          if (need_server_conn)
          {
             exit_code = 1;
@@ -747,26 +790,14 @@ main(int argc, char** argv)
       }
       is_server_conn = 1;
    }
-   else
+   else if (need_server_conn)
    {
-      /* Local command */
-      if (!need_server_conn)
-      {
-         goto execute;
-      }
-
-      /* Remote connection */
+      /* Remote connection (host/port supplied) */
       if (pgmoneta_connect(host, atoi(port), &socket))
       {
-         if (need_server_conn)
-         {
-            warnx("pgmoneta-cli: Cannot reach the server at '%s:%s'. Check network connection and firewall settings.", host, port);
-            goto done;
-         }
-         else
-         {
-            goto execute;
-         }
+         warnx("pgmoneta-cli: Cannot reach the server at '%s:%s'. Check network connection and firewall settings.", host, port);
+         exit_code = 1;
+         goto done;
       }
 
       /* User name */
@@ -967,7 +998,7 @@ execute:
       }
       else
       {
-         uint8_t local_compression = config ? config->compression_type : COMPRESSION_CLIENT_ZSTD;
+         uint8_t local_compression = COMPRESSION_CLIENT_ZSTD; // Using default compression for client-side
          exit_code = compress_data_client(parsed.args[0], local_compression);
       }
    }

@@ -83,7 +83,7 @@ cleanup() {
    set +e
    echo "Shutdown pgmoneta"
    if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
-     $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown
+     $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf shutdown
      sleep 5
      if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
        echo "Force stop pgmoneta"
@@ -244,8 +244,15 @@ remove_postgresql_container() {
 }
 
 pgmoneta_initialize_configuration() {
-   touch $CONFIGURATION_DIRECTORY/pgmoneta.conf $CONFIGURATION_DIRECTORY/pgmoneta_users.conf
-   echo "Creating pgmoneta.conf and pgmoneta_users.conf inside $CONFIGURATION_DIRECTORY ... ok"
+  touch $CONFIGURATION_DIRECTORY/pgmoneta.conf $CONFIGURATION_DIRECTORY/pgmoneta_users.conf $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf 
+  echo "Creating pgmoneta.conf, pgmoneta_users.conf and pgmoneta_cli.conf inside $CONFIGURATION_DIRECTORY ... ok"
+  cat <<EOF >$CONFIGURATION_DIRECTORY/pgmoneta_cli.conf
+# CLI configuration
+unix_socket_dir = /tmp/
+log_type = file
+log_level = info
+log_path = $LOG_DIR/pgmoneta-cli.log
+EOF
    cat <<EOF >$CONFIGURATION_DIRECTORY/pgmoneta.conf
 # Main configuration
 [pgmoneta]
@@ -329,7 +336,7 @@ execute_testcases() {
    $EXECUTABLE_DIRECTORY/pgmoneta -c $CONFIGURATION_DIRECTORY/pgmoneta.conf -u $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -d
    echo "Wait for pgmoneta to be ready"
    sleep 10
-   $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf status details
+   $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf status details
    if [[ $? -eq 0 ]]; then
       echo "pgmoneta server started ... ok"
    else

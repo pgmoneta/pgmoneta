@@ -40,6 +40,7 @@ extern "C" {
 
 #define PGMONETA_MAIN_INI_SECTION                   "pgmoneta"
 #define PGMONETA_DEFAULT_CONFIG_FILE_PATH           "/etc/pgmoneta/pgmoneta.conf"
+#define PGMONETA_CLI_DEFAULT_CONFIG_FILE_PATH       "/etc/pgmoneta/pgmoneta_cli.conf"
 #define PGMONETA_WALINFO_DEFAULT_CONFIG_FILE_PATH   "/etc/pgmoneta/pgmoneta_walinfo.conf"
 #define PGMONETA_WALFILTER_DEFAULT_CONFIG_FILE_PATH "/etc/pgmoneta/pgmoneta_walfilter.conf"
 #define PGMONETA_DEFAULT_USERS_FILE_PATH            "/etc/pgmoneta/pgmoneta_users.conf"
@@ -191,6 +192,31 @@ pgmoneta_read_main_configuration(void* shmem, char* filename);
  */
 int
 pgmoneta_validate_main_configuration(void* shmem);
+
+/**
+ * Initialize the CLI configuration structure
+ * @param shmem The shared memory segment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_init_cli_configuration(void* shmem);
+
+/**
+ * Read the CLI configuration from a file
+ * @param shmem The shared memory segment
+ * @param filename The file name
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_read_cli_configuration(void* shmem, char* filename);
+
+/**
+ * Validate the CLI configuration
+ * @param shmem The shared memory segment
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_validate_cli_configuration(void* shmem);
 
 /**
  * Initialize the WALINFO configuration structure
