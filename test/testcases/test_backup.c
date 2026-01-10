@@ -42,7 +42,7 @@ START_TEST(test_pgmoneta_backup_full)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
    int ret = 0;
-   ret = !pgmoneta_tsclient_backup("primary", NULL);
+   ret = !pgmoneta_tsclient_backup("primary", NULL, 0);
    ck_assert_msg(ret, "failed to add full backup");
 }
 END_TEST
@@ -53,11 +53,11 @@ START_TEST(test_pgmoneta_backup_incremental_basic)
    char* d = NULL;
    int num_backups = 0;
    struct backup** backups = NULL;
-   ret = !pgmoneta_tsclient_backup("primary", NULL);
+   ret = !pgmoneta_tsclient_backup("primary", NULL, 0);
    ck_assert_msg(ret, "failed to add full backup");
-   ret = !pgmoneta_tsclient_backup("primary", "newest");
+   ret = !pgmoneta_tsclient_backup("primary", "newest", 0);
    ck_assert_msg(ret, "failed to add incremental backup 1");
-   ret = !pgmoneta_tsclient_backup("primary", "newest");
+   ret = !pgmoneta_tsclient_backup("primary", "newest", 0);
    ck_assert_msg(ret, "failed to add incremental backup 2");
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);

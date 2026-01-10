@@ -116,4 +116,11 @@ pgmoneta_test_json_suite();
 Suite*
 pgmoneta_test_utils_suite();
 
+/**
+ * Set up cli test suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_cli_suite();
+
 #endif
