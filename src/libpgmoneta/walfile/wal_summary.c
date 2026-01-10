@@ -341,7 +341,7 @@ static char*
 get_wal_file_name(char* file)
 {
    char* fn = NULL;
-   char* suffix = "";
+   char* suffix = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -370,7 +370,7 @@ get_wal_file_name(char* file)
       suffix = pgmoneta_append(suffix, ".aes");
    }
 
-   if (!pgmoneta_ends_with(file, suffix))
+   if (suffix != NULL && !pgmoneta_ends_with(file, suffix))
    {
       fn = pgmoneta_append(fn, suffix);
    }
