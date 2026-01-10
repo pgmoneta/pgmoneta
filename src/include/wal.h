@@ -201,11 +201,10 @@ pgmoneta_get_relation_oid(char* name, char** oid);
 /**
  * WAL compress/encrypt
  * @param srv The server
- * @param argv The argv
  * @param wal_file The WAL file name (optional)
  */
 void
-pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file);
+pgmoneta_wal_server_compress_encrypt(int srv, char* wal_file);
 
 #ifdef __cplusplus
 }
