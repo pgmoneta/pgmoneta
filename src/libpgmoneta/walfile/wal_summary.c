@@ -259,6 +259,7 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
    struct deque_iterator* file_iterator = NULL;
    char* file_path = malloc(MAX_PATH);
    char* dlog = NULL;
+   int retry_count = 0;
    bool active = false;
    struct main_configuration* config;
 
@@ -317,7 +318,17 @@ retry:
       else
       {
          pgmoneta_log_debug("WAL file at %s does not exist - retrying", file_path);
-         SLEEP_AND_GOTO(500000000L, retry);
+         retry_count++;
+
+         if (retry_count < 10)
+         {
+            SLEEP_AND_GOTO(500000000L, retry);
+         }
+         else
+         {
+            pgmoneta_log_error("WAL file at %s does not exist", file_path);
+            goto error;
+         }
       }
    }
 
