@@ -295,17 +295,19 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
          pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
       }
 
-      pgmoneta_log_debug("WAL file at %s", file_path);
-
-      if (!pgmoneta_is_file(file_path))
+      if (pgmoneta_exists(file_path))
       {
-         pgmoneta_log_error("WAL file at %s does not exist", file_path);
-         goto error;
+         pgmoneta_log_debug("WAL file at %s", file_path);
+
+         if (summarize_walfile(file_path, start_lsn, end_lsn, brt))
+         {
+            pgmoneta_log_error("Summarize WAL error");
+            goto error;
+         }
       }
-
-      if (summarize_walfile(file_path, start_lsn, end_lsn, brt))
+      else
       {
-         goto error;
+         pgmoneta_log_debug("WAL file at %s does not exist", file_path);
       }
    }
 
