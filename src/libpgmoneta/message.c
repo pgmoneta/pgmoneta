@@ -1205,7 +1205,6 @@ error:
    pgmoneta_free_query_response(r);
    pgmoneta_free_message(rmsg);
    pgmoneta_memory_dynamic_destroy(data);
-   pgmoneta_free_query_response(r);
    free(content);
 
    return 1;
