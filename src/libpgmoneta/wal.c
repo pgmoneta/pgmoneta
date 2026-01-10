@@ -1006,6 +1006,8 @@ wal_open(char* root, char* filename, int segsize)
 
    pgmoneta_permission(path, 6, 0, 0);
 
+   pgmoneta_log_trace("WAL: Created %s", path);
+
    free(path);
    return file;
 
@@ -1021,16 +1023,17 @@ error:
 static int
 wal_close(char* root, char* filename, bool partial, FILE* file)
 {
+   char tmp_file_path[MAX_PATH] = {0};
+   char file_path[MAX_PATH] = {0};
+
    if (file == NULL || root == NULL || filename == NULL || strlen(root) == 0 || strlen(filename) == 0)
    {
       return 1;
    }
-   char tmp_file_path[MAX_PATH] = {0};
-   char file_path[MAX_PATH] = {0};
 
    if (partial)
    {
-      pgmoneta_log_info("Not renaming %s.partial, this segment is incomplete", filename);
+      pgmoneta_log_info("Not renaming %s.partial as this segment is incomplete", filename);
       fclose(file);
       return 0;
    }
@@ -1045,18 +1048,23 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
       snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/%s.partial", root, filename);
       snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
    }
+
+   fclose(file);
+
    if (rename(tmp_file_path, file_path) != 0)
    {
-      pgmoneta_log_error("could not rename file %s to %s", tmp_file_path, file_path);
+      pgmoneta_log_error("Could not rename file %s to %s", tmp_file_path, file_path);
       goto error;
    }
 
-   fclose(file);
+   pgmoneta_log_trace("WAL: Renamed %s -> %s", tmp_file_path, file_path);
 
    return 0;
 
 error:
+
    fclose(file);
+
    return 1;
 }
 
