@@ -40,6 +40,7 @@
 static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
 static int summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
 static int summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
+static char* get_wal_file_name(char* file);
 
 /**
  * Handles summarization of arbitary range in a timeline only
@@ -285,16 +286,24 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
    while (pgmoneta_deque_iterator_next(file_iterator))
    {
       char* file = (char*)file_iterator->value->data;
+      char* fn = NULL;
 
+      fn = get_wal_file_name(file);
+
+      memset(file_path, 0, MAX_PATH);
       if (!pgmoneta_ends_with(dir_path, "/"))
       {
-         pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", dir_path, file);
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", dir_path, fn);
       }
       else
       {
-         pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
+         pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", dir_path, fn);
       }
 
+      free(fn);
+      fn = NULL;
+
+retry:
       if (pgmoneta_exists(file_path))
       {
          pgmoneta_log_debug("WAL file at %s", file_path);
@@ -307,8 +316,8 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
       }
       else
       {
-         pgmoneta_log_error("WAL file at %s does not exist", file_path);
-         goto error;
+         pgmoneta_log_debug("WAL file at %s does not exist - retrying", file_path);
+         SLEEP_AND_GOTO(500000000L, retry);
       }
    }
 
@@ -326,4 +335,47 @@ error:
    pgmoneta_deque_destroy(files);
 
    return 1;
+}
+
+static char*
+get_wal_file_name(char* file)
+{
+   char* fn = NULL;
+   char* suffix = "";
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   fn = pgmoneta_append(fn, file);
+
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   {
+      suffix = pgmoneta_append(suffix, ".gz");
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   {
+      suffix = pgmoneta_append(suffix, ".zstd");
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   {
+      suffix = pgmoneta_append(suffix, ".lz4");
+   }
+   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
+   {
+      suffix = pgmoneta_append(suffix, ".bzip2");
+   }
+
+   if (config->encryption != ENCRYPTION_NONE)
+   {
+      suffix = pgmoneta_append(suffix, ".aes");
+   }
+
+   if (!pgmoneta_ends_with(file, suffix))
+   {
+      fn = pgmoneta_append(fn, suffix);
+   }
+
+   free(suffix);
+
+   return fn;
 }
