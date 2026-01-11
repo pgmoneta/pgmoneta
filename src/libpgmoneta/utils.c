@@ -1962,23 +1962,16 @@ pgmoneta_get_wal_files(char* base, struct deque** files)
    {
       if (pgmoneta_ends_with(entry->d_name, ".history"))
       {
-         pgmoneta_log_trace("WAL: Skipping %s", entry->d_name);
          continue;
       }
 
       if (entry->d_type == DT_REG)
       {
-         pgmoneta_log_trace("WAL: Adding %s", entry->d_name);
-
          if (pgmoneta_deque_add(array, entry->d_name, (uintptr_t)entry->d_name, ValueString))
          {
             pgmoneta_log_error("WAL: Error %s", entry->d_name);
             goto error;
          }
-      }
-      else
-      {
-         pgmoneta_log_trace("WAL: Skipping %s", entry->d_name);
       }
    }
 
