@@ -357,7 +357,14 @@ get_wal_file_name(char* file)
 
    config = (struct main_configuration*)shmem;
 
-   fn = pgmoneta_append(fn, file);
+   if (pgmoneta_ends_with(file, ".partial"))
+   {
+      fn = pgmoneta_remove_suffix(file, ".partial");
+   }
+   else
+   {
+      fn = pgmoneta_append(fn, file);
+   }
 
    if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
