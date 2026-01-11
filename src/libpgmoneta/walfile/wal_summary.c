@@ -265,6 +265,7 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
 
    config = (struct main_configuration*)shmem;
 
+retry1:
    if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true))
    {
       if (pgmoneta_get_wal_files(dir_path, &files))
@@ -276,8 +277,19 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
    }
    else
    {
-      pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
-      goto error;
+      pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s - retrying", config->common.servers[srv].name);
+      retry_count++;
+      active = false;
+
+      if (retry_count < 10)
+      {
+         SLEEP_AND_GOTO(500000000L, retry1);
+      }
+      else
+      {
+         pgmoneta_log_error("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
+         goto error;
+      }
    }
 
    dlog = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
@@ -304,7 +316,9 @@ summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn
       free(fn);
       fn = NULL;
 
-retry:
+      retry_count = 0;
+
+retry2:
       if (pgmoneta_exists(file_path))
       {
          pgmoneta_log_debug("WAL file at %s", file_path);
@@ -319,10 +333,11 @@ retry:
       {
          pgmoneta_log_debug("WAL file at %s does not exist - retrying", file_path);
          retry_count++;
+         active = false;
 
          if (retry_count < 10)
          {
-            SLEEP_AND_GOTO(500000000L, retry);
+            SLEEP_AND_GOTO(500000000L, retry2);
          }
          else
          {
