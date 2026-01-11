@@ -1731,6 +1731,8 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
    if (!fork())
    {
       bool active = false;
+      bool scan = false;
+      int retry_count = 0;
       char* d = NULL;
 
       if (argv != NULL)
@@ -1738,13 +1740,20 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
          pgmoneta_set_proc_title(1, argv, "wal/ce", config->common.servers[srv].name);
       }
 
+      if (wal_file == NULL)
+      {
+         scan = true;
+      }
+
+retry:
+
       if (atomic_compare_exchange_strong(&config->common.servers[srv].wal_repository, &active, true))
       {
          d = pgmoneta_get_server_wal(srv);
 
          if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
          {
-            if (wal_file == NULL)
+            if (scan)
             {
                pgmoneta_gzip_wal(d);
             }
@@ -1755,7 +1764,7 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
          }
          else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
          {
-            if (wal_file == NULL)
+            if (scan)
             {
                pgmoneta_zstandardc_wal(d);
             }
@@ -1766,7 +1775,7 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
          }
          else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
          {
-            if (wal_file == NULL)
+            if (scan)
             {
                pgmoneta_lz4c_wal(d);
             }
@@ -1777,7 +1786,7 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
          }
          else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
          {
-            if (wal_file == NULL)
+            if (scan)
             {
                pgmoneta_bzip2_wal(d);
             }
@@ -1789,7 +1798,7 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
 
          if (config->encryption != ENCRYPTION_NONE)
          {
-            if (wal_file == NULL)
+            if (scan)
             {
                pgmoneta_encrypt_wal(d);
             }
@@ -1801,13 +1810,27 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
 
          free(d);
 
-         pgmoneta_log_trace("WAL: Compressed/encrypted %s", wal_file);
+         if (!scan)
+         {
+            pgmoneta_log_trace("WAL: Compressed/encrypted %s", wal_file);
+         }
 
          atomic_store(&config->common.servers[srv].wal_repository, false);
       }
       else
       {
          pgmoneta_log_debug("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
+         retry_count++;
+         scan = true;
+
+         if (retry_count < 10)
+         {
+            SLEEP_AND_GOTO(50000000L, retry);
+         }
+         else
+         {
+            pgmoneta_log_error("WAL: Did not get WAL repository lock for server %s", config->common.servers[srv].name);
+         }
       }
 
       exit(0);
