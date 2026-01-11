@@ -45,6 +45,7 @@
 #include <err.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
