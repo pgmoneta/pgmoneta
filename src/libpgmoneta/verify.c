@@ -100,6 +100,11 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       goto error;
    }
 
+   if (files == NULL || strlen(files) == 0)
+   {
+      files = MANAGEMENT_ARGUMENT_FAILED;
+   }
+
    if (pgmoneta_art_insert(nodes, USER_FILES, (uintptr_t)files, ValueString))
    {
       goto error;
@@ -195,7 +200,7 @@ pgmoneta_verify(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_
       pgmoneta_json_append(failed, (uintptr_t)j, ValueJSON);
    }
 
-   if (!strcasecmp(files, "all"))
+   if (files != NULL && !strcasecmp(files, "all"))
    {
       pgmoneta_json_create(&all);
 

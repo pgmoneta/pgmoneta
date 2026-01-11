@@ -121,7 +121,8 @@ verify_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   if (!strcasecmp((char*)pgmoneta_art_search(nodes, USER_FILES), NODE_ALL))
+   char* user_files = (char*)pgmoneta_art_search(nodes, USER_FILES);
+   if (user_files != NULL && !strcasecmp(user_files, NODE_ALL))
    {
       if (pgmoneta_deque_create(true, &all_deque))
       {
