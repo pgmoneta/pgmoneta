@@ -1459,7 +1459,7 @@ transform_hex_bytea_to_binary(char* hex_bytea, uint8_t** out, int* len)
    /* the requested chunk is not present in the file */
    if (hex_len == 0)
    {
-      pgmoneta_log_warn("the requested chunk is not present or exceeds the boundary of the file");
+      pgmoneta_log_debug("the requested chunk is not present or exceeds the boundary of the file");
       goto done;
    }
 
