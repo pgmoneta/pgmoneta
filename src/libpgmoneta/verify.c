@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include "backup.h"
+#include "info.h"
 #include <pgmoneta.h>
 #include <logging.h>
 #include <management.h>
@@ -346,7 +347,7 @@ pgmoneta_sha512_verification(char** argv)
       active = false;
       if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
       {
-         pgmoneta_log_warn("Verification: Server %s is already active, skipping verification", config->common.servers[server].name);
+         pgmoneta_log_info("Verification: Server %s is already active, skipping verification", config->common.servers[server].name);
          continue;
       }
 
@@ -365,6 +366,8 @@ pgmoneta_sha512_verification(char** argv)
 
       for (int i = 0; i < number_of_backups; i++)
       {
+         bool success = true;
+
 #ifdef HAVE_FREEBSD
          clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
 #else
@@ -374,6 +377,7 @@ pgmoneta_sha512_verification(char** argv)
          if (!pgmoneta_is_backup_struct_valid(server, backups[i]))
          {
             err = 1;
+            success = false;
             continue;
          }
          root = pgmoneta_get_server_backup_identifier(server, backups[i]->label);
@@ -388,10 +392,11 @@ pgmoneta_sha512_verification(char** argv)
          sha512_file = fopen(sha512_path, "r");
          if (sha512_file == NULL)
          {
-            pgmoneta_log_error("Verification: Server %s / Could not open file %s: %s",
+            pgmoneta_log_error("Verification: %s / Could not open file %s: %s",
                                config->common.servers[server].name, sha512_path,
                                strerror(errno));
             err = 1;
+            success = false;
             goto backup_cleanup;
          }
 
@@ -404,28 +409,32 @@ pgmoneta_sha512_verification(char** argv)
             entry = strtok(&buffer[0], " ");
             if (entry == NULL)
             {
-               pgmoneta_log_error("Verification: Server %s / %s: formatting error at line %d",
+               pgmoneta_log_error("Verification: %s / %s: formatting error at line %d",
                                   config->common.servers[server].name, sha512_path, sha512_path,
                                   line);
                err = 1;
+               success = false;
                goto cleanup;
             }
 
             hash = strdup(entry);
             if (hash == NULL)
             {
-               pgmoneta_log_error("Verification: Server %s / Memory allocation error for hash",
+               pgmoneta_log_error("Verification: %s / Memory allocation error for hash",
                                   config->common.servers[server].name);
                err = 1;
+               success = false;
                goto cleanup;
             }
 
             entry = strtok(NULL, "\n");
             if (entry == NULL || strlen(entry) < 3)
             {
-               pgmoneta_log_error("Verification: Server %s / %s: formatting error at line %d",
-                                  config->common.servers[server].name, sha512_path, line);
+               pgmoneta_log_error("Verification: %s/%s %s formatting error at line %d",
+                                  config->common.servers[server].name,
+                                  backups[i]->label, sha512_path, line);
                err = 1;
+               success = false;
                goto cleanup;
             }
 
@@ -442,15 +451,16 @@ pgmoneta_sha512_verification(char** argv)
 
             if (pgmoneta_create_sha512_file(absolute_file_path, &calculated_hash))
             {
-               pgmoneta_log_error("Verification: Server %s / Could not create hash for %s",
+               pgmoneta_log_error("Verification: %s / Could not create hash for %s",
                                   config->common.servers[server].name, absolute_file_path);
                err = 1;
+               success = false;
                goto cleanup;
             }
 
             if (strcmp(hash, calculated_hash) != 0)
             {
-               pgmoneta_log_error("Verification: Server %s / Hash mismatch for %s | Expected: %s | Got: %s",
+               pgmoneta_log_error("Verification: %s / Hash mismatch for %s | Expected: %s | Got: %s",
                                   config->common.servers[server].name,
                                   absolute_file_path, hash, calculated_hash);
                err = 1;
@@ -474,7 +484,24 @@ cleanup:
 #endif
 
          elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
-         pgmoneta_log_info("Verification: %s/%s (Elapsed: %s)", config->common.servers[server].name, backups[i]->label, elapsed);
+         if (success)
+         {
+            pgmoneta_log_info("Verification: %s/%s (Elapsed: %s)", config->common.servers[server].name, backups[i]->label, elapsed);
+         }
+         else
+         {
+            char* bck_dir = NULL;
+
+            pgmoneta_log_info("Update .info");
+
+            backups[i]->valid = VALID_FALSE;
+
+            bck_dir = pgmoneta_get_server_backup(server);
+
+            pgmoneta_save_info(bck_dir, backups[i]);
+
+            free(bck_dir);
+         }
          free(elapsed);
 
 backup_cleanup:
