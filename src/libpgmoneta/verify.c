@@ -379,7 +379,11 @@ pgmoneta_sha512_verification(char** argv)
          root = pgmoneta_get_server_backup_identifier(server, backups[i]->label);
 
          sha512_path = pgmoneta_append(sha512_path, root);
-         sha512_path = pgmoneta_append(sha512_path, "/backup.sha512");
+         if (!pgmoneta_ends_with(sha512_path, "/"))
+         {
+            sha512_path = pgmoneta_append_char(sha512_path, '/');
+         }
+         sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
 
          sha512_file = fopen(sha512_path, "r");
          if (sha512_file == NULL)

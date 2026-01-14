@@ -114,6 +114,10 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
    }
 
    sha512_path = pgmoneta_append(sha512_path, root);
+   if (!pgmoneta_ends_with(sha512_path, "/"))
+   {
+      sha512_path = pgmoneta_append_char(sha512_path, '/');
+   }
    sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
 
    sha512_file = fopen(sha512_path, "w");
@@ -148,6 +152,7 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_save_info(server_backup, backup);
    }
 
+   fsync(fileno(sha512_file));
    fclose(sha512_file);
 
    free(sha512_path);
@@ -227,6 +232,7 @@ write_backup_sha512(char* root, char* relative_path)
          buffer = pgmoneta_append(buffer, "\n");
 
          fputs(buffer, sha512_file);
+         fflush(sha512_file);
 
          free(buffer);
          free(sha512);
@@ -268,10 +274,18 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
    char* new_line = NULL;
 
    sha512_path = pgmoneta_append(sha512_path, root_dir);
-   sha512_path = pgmoneta_append(sha512_path, "/backup.sha512");
+   if (!pgmoneta_ends_with(sha512_path, "/"))
+   {
+      sha512_path = pgmoneta_append_char(sha512_path, '/');
+   }
+   sha512_path = pgmoneta_append(sha512_path, "backup.sha512");
 
    sha512_tmp_path = pgmoneta_append(sha512_tmp_path, root_dir);
-   sha512_tmp_path = pgmoneta_append(sha512_tmp_path, "/backup.sha512.tmp");
+   if (!pgmoneta_ends_with(sha512_tmp_path, "/"))
+   {
+      sha512_tmp_path = pgmoneta_append_char(sha512_tmp_path, '/');
+   }
+   sha512_tmp_path = pgmoneta_append(sha512_tmp_path, "backup.sha512.tmp");
 
    absolute_file_path = pgmoneta_append(absolute_file_path, root_dir);
    absolute_file_path = pgmoneta_append(absolute_file_path, "/");
@@ -336,6 +350,7 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
       {
          fputs(&line[0], dest_file);
       }
+      fflush(dest_file);
    }
 
    if (!found)
@@ -346,6 +361,7 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
       new_line = pgmoneta_append(new_line, "\n");
 
       fputs(new_line, dest_file);
+      fflush(dest_file);
       pgmoneta_log_trace("Added new SHA512 entry for %s", filename);
       free(new_line);
       new_line = NULL;

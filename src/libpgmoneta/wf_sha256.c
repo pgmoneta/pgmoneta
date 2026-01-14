@@ -114,6 +114,7 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_permission(sha256_path, 6, 0, 0);
 
+   fflush(sha256_file);
    fclose(sha256_file);
 
    free(sha256_path);
@@ -193,6 +194,7 @@ write_backup_sha256(char* root, char* relative_path)
          buffer = pgmoneta_append(buffer, "\n");
 
          fputs(buffer, sha256_file);
+         fflush(sha256_file);
 
          free(buffer);
          free(sha256);
