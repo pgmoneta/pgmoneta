@@ -104,19 +104,22 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->common.servers[server].name, label);
 
-   active = false;
-
    if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
    {
       pgmoneta_log_info("Delete: Server %s is active", config->common.servers[server].name);
-
-      goto done;
+      pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
+                         config->common.servers[server].active_backup ? "Yes" : "No",
+                         config->common.servers[server].active_restore ? "Yes" : "No",
+                         config->common.servers[server].active_archive ? "Yes" : "No",
+                         config->common.servers[server].active_delete ? "Yes" : "No",
+                         config->common.servers[server].active_retention ? "Yes" : "No");
+      pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_ACTIVE, ValueInt32);
+      goto error;
    }
 
    config->common.servers[server].active_delete = true;
 
    d = pgmoneta_get_server_backup(server);
-   pgmoneta_log_trace("Delete: %s", d);
    if (pgmoneta_load_infos(d, &number_of_backups, &backups))
    {
       pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_NOBACKUPS, ValueInt32);
@@ -149,7 +152,6 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   pgmoneta_log_trace("Delete trace: %s", d);
    pgmoneta_get_backup_child(server, backups[backup_index], &child);
    if (child != NULL)
    {
@@ -167,8 +169,6 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_log_error("Delete: Full backup error for %s/%s", config->common.servers[server].name, label);
       goto error;
    }
-
-done:
 
    pgmoneta_log_debug("Delete: %s/%s", config->common.servers[server].name, backups[backup_index]->label);
 

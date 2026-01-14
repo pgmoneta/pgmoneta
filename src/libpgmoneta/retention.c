@@ -64,6 +64,12 @@ pgmoneta_retention(char** argv)
       if (!atomic_compare_exchange_strong(&config->common.servers[server].repository, &active, true))
       {
          pgmoneta_log_debug("Retention: Server %s is active", config->common.servers[server].name);
+         pgmoneta_log_debug("Backup=%s, Restore=%s, Archive=%s, Delete=%s, Retention=%s",
+                            config->common.servers[server].active_backup ? "Yes" : "No",
+                            config->common.servers[server].active_restore ? "Yes" : "No",
+                            config->common.servers[server].active_archive ? "Yes" : "No",
+                            config->common.servers[server].active_delete ? "Yes" : "No",
+                            config->common.servers[server].active_retention ? "Yes" : "No");
          continue;
       }
 
