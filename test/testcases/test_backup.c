@@ -27,15 +27,15 @@
  *
  */
 
+#include <pgmoneta.h>
 #include <info.h>
-#include <utils.h>
+#include <logging.h>
 #include <tsclient.h>
 #include <tscommon.h>
 #include <tssuite.h>
+#include <utils.h>
 
 #include <stdio.h>
-
-#include "logging.h"
 
 // test backup
 START_TEST(test_pgmoneta_backup_full)

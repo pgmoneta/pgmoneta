@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
-#include "backup.h"
 #include <pgmoneta.h>
+#include <backup.h>
 #include <link.h>
 #include <logging.h>
 #include <manifest.h>

@@ -27,9 +27,9 @@
  */
 
 /* pgmoneta */
-#include "backup.h"
-#include "info.h"
 #include <pgmoneta.h>
+#include <backup.h>
+#include <info.h>
 #include <logging.h>
 #include <management.h>
 #include <network.h>

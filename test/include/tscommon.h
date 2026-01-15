@@ -33,7 +33,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "pgmoneta.h"
+#include <pgmoneta.h>
 #include <message.h>
 
 #define PRIMARY_SERVER   0
