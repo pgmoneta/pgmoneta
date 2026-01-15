@@ -27,7 +27,8 @@
  */
 
 /* pgmoneta */
-#include "yaml_utils.h"
+#include <pgmoneta.h>
+#include <yaml_utils.h>
 
 /* system */
 #include <stdbool.h>

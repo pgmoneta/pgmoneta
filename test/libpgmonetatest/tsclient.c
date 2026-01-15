@@ -32,6 +32,7 @@
 #include <brt.h>
 #include <configuration.h>
 #include <json.h>
+#include <logging.h>
 #include <management.h>
 #include <network.h>
 #include <tsclient.h>
@@ -49,8 +50,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/types.h>
-
-#include "logging.h"
 
 static int check_output_outcome(int socket);
 static int get_connection();

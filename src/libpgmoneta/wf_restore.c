@@ -27,8 +27,8 @@
  */
 
 /* pgmoneta */
-#include "art.h"
 #include <pgmoneta.h>
+#include <art.h>
 #include <logging.h>
 #include <restore.h>
 #include <utils.h>

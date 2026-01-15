@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#include <pgmoneta.h>
+#include <configuration.h>
+#include <logging.h>
 #include <shmem.h>
 #include <tscommon.h>
 #include <tssuite.h>
-#include <configuration.h>
-
-#include "logging.h"
 
 int
 main(int argc, char* argv[])
