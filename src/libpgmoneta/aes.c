@@ -1040,6 +1040,7 @@ encrypt_file(char* from, char* to, int enc)
    }
    free(master_key);
    fclose(in);
+   fflush(out);
    fclose(out);
    return 0;
 
@@ -1058,6 +1059,7 @@ error:
 
    if (out != NULL)
    {
+      fflush(out);
       fclose(out);
    }
 

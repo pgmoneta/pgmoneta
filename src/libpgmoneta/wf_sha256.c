@@ -127,6 +127,7 @@ error:
 
    if (sha256_file != NULL)
    {
+      fflush(sha256_file);
       fclose(sha256_file);
    }
 

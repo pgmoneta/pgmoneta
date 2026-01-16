@@ -932,6 +932,7 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
    pgmoneta_free_query_response(timeline_history_response);
    if (history_file != NULL)
    {
+      fflush(history_file);
       fclose(history_file);
    }
    return 0;
@@ -1014,6 +1015,7 @@ wal_open(char* root, char* filename, int segsize)
 error:
    if (file != NULL)
    {
+      fflush(file);
       fclose(file);
    }
    free(path);
@@ -1034,6 +1036,7 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
    if (partial)
    {
       pgmoneta_log_info("Not renaming %s.partial as this segment is incomplete", filename);
+      fflush(file);
       fclose(file);
       return 0;
    }
@@ -1049,6 +1052,7 @@ wal_close(char* root, char* filename, bool partial, FILE* file)
       snprintf(file_path, sizeof(file_path), "%s/%s", root, filename);
    }
 
+   fflush(file);
    fclose(file);
    file = NULL;
 
@@ -1066,6 +1070,7 @@ error:
 
    if (file != NULL)
    {
+      fflush(file);
       fclose(file);
    }
 

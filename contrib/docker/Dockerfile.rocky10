@@ -61,7 +61,8 @@ RUN rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch
         libarchive-devel \
         libssh-devel \
         libasan \
-        yaml-cpp-devel && \
+        yaml-cpp-devel \
+        ncurses-devel && \
     dnf clean all
 
 WORKDIR /src
@@ -79,12 +80,13 @@ FROM rockylinux/rockylinux:10
 
 RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm && \
     dnf -y update && \
-    dnf install -y postgresql17-server \
-        postgresql17-contrib \
+    dnf install -y postgresql18-server \
+        postgresql18-contrib \
         libpq5 \
         libev \
         libatomic \
-        libssh && \
+        libssh \
+        ncurses-libs && \
     dnf clean all
 
 RUN useradd --create-home --shell /bin/bash pgmoneta

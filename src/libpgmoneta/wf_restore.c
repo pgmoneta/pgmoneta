@@ -606,6 +606,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
       }
       if (tfile != NULL)
       {
+         fflush(tfile);
          fclose(tfile);
       }
 
@@ -659,6 +660,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          }
          if (tfile != NULL)
          {
+            fflush(tfile);
             fclose(tfile);
          }
 
@@ -698,6 +700,7 @@ error:
    }
    if (tfile != NULL)
    {
+      fflush(tfile);
       fclose(tfile);
    }
 

@@ -55,7 +55,8 @@ RUN apk update && \
     libarchive \
     libarchive-dev \
     libssh \
-    libssh-dev 
+    libssh-dev \
+    ncurses-dev
 
 WORKDIR /src
 
@@ -72,8 +73,8 @@ FROM alpine:latest
 
 RUN apk update && \
     apk add --no-cache \
-    postgresql17 \
-    postgresql17-client \
+    postgresql18 \
+    postgresql18-client \
     bash \
     ca-certificates \
     libev \
@@ -85,7 +86,8 @@ RUN apk update && \
     zstd \
     lz4-libs \
     libarchive \
-    libssh
+    libssh \
+    ncurses-libs
 
 RUN adduser -D -s /bin/sh pgmoneta
 

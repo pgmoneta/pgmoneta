@@ -1426,6 +1426,7 @@ pgmoneta_json_read_file(char* path, struct json** obj)
 
    *obj = j;
 
+   fflush(file);
    fclose(file);
    free(str);
    return 0;
@@ -1436,6 +1437,7 @@ error:
 
    if (file != NULL)
    {
+      fflush(file);
       fclose(file);
    }
 

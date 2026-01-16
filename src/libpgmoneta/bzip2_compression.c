@@ -750,6 +750,7 @@ bzip2_compress(char* from, int level, char* to)
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
 
    fclose(from_ptr);
+   fflush(to_ptr);
    fclose(to_ptr);
 
    return 0;
@@ -765,6 +766,7 @@ error:
 
    if (to_ptr)
    {
+      fflush(to_ptr);
       fclose(to_ptr);
    }
 
@@ -822,6 +824,7 @@ bzip2_decompress(char* from, char* to)
    BZ2_bzReadClose(&bzip2_err, zip_file);
 
    fclose(from_ptr);
+   fflush(to_ptr);
    fclose(to_ptr);
 
    return 0;
@@ -835,6 +838,7 @@ error_unzip:
 error:
    if (to_ptr)
    {
+      fflush(to_ptr);
       fclose(to_ptr);
    }
 
@@ -898,6 +902,7 @@ bzip2_decompress_file(char* from, char* to)
    zip_file = NULL;
 
    fclose(from_ptr);
+   fflush(to_ptr);
    fclose(to_ptr);
 
    return 0;
@@ -911,6 +916,7 @@ error_unzip:
 error:
    if (to_ptr)
    {
+      fflush(to_ptr);
       fclose(to_ptr);
    }
 

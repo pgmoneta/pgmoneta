@@ -1020,6 +1020,7 @@ gz_decompress(char* from, char* to)
       goto error;
    }
 
+   fflush(out);
    fclose(out);
 
    return 0;
@@ -1033,6 +1034,7 @@ error:
 
    if (out != NULL)
    {
+      fflush(out);
       fclose(out);
    }
 

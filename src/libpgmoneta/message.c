@@ -2462,6 +2462,7 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
                         if (file != NULL)
                         {
                            fwrite(decoded_data, 1, decoded_len, file);
+                           fflush(file);
                            fclose(file);
                         }
                         else
