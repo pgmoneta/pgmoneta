@@ -423,7 +423,7 @@ Now that we've attempted our first backup, take a moment to relax. There are a f
 
 ## Testing
 
-See `doc/Test.md` for adding test cases and running test suites. It is recommended that you **ALWAYS** run tests before raising PR.
+See `doc/TEST.md` for adding test cases and running test suites. It is recommended that you **ALWAYS** run tests before raising PR.
 
 ## C programming
 

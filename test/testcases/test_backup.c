@@ -32,73 +32,75 @@
 #include <logging.h>
 #include <tsclient.h>
 #include <tscommon.h>
-#include <tssuite.h>
+#include <mctf.h>
 #include <utils.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-// test backup
-START_TEST(test_pgmoneta_backup_full)
+MCTF_TEST(test_pgmoneta_backup_full)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int ret = 0;
-   ret = !pgmoneta_tsclient_backup("primary", NULL);
-   ck_assert_msg(ret, "failed to add full backup");
+   pgmoneta_test_setup();
+
+   if (pgmoneta_test_add_backup())
+   {
+      fprintf(stderr, "test_pgmoneta_backup_full: backup failed during setup\n");
+      pgmoneta_test_basedir_cleanup();
+      MCTF_SKIP();
+   }
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_pgmoneta_backup_incremental_basic)
+
+MCTF_TEST(test_pgmoneta_backup_incremental_basic)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int ret = 0;
    char* d = NULL;
    int num_backups = 0;
    struct backup** backups = NULL;
-   ret = !pgmoneta_tsclient_backup("primary", NULL);
-   ck_assert_msg(ret, "failed to add full backup");
-   ret = !pgmoneta_tsclient_backup("primary", "newest");
-   ck_assert_msg(ret, "failed to add incremental backup 1");
-   ret = !pgmoneta_tsclient_backup("primary", "newest");
-   ck_assert_msg(ret, "failed to add incremental backup 2");
+
+   pgmoneta_test_setup();
+
+   if (pgmoneta_test_add_backup_chain())
+   {
+      fprintf(stderr, "test_pgmoneta_backup_incremental_basic: backup chain failed during setup\n");
+      pgmoneta_test_basedir_cleanup();
+      MCTF_SKIP();
+   }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup directory is null");
 
-   pgmoneta_load_infos(d, &num_backups, &backups);
-   ck_assert_int_eq(num_backups, 3);
-   ck_assert_msg(backups != NULL, "backups should not be NULL");
+   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos");
+   MCTF_ASSERT_INT_EQ(num_backups, 3, cleanup, "backup count mismatch");
+   MCTF_ASSERT_PTR_NONNULL(backups, cleanup, "backups should not be NULL");
 
    // sort the backups in ascending order
+
    pgmoneta_sort_backups(backups, num_backups, false);
-   ck_assert_int_eq(backups[0]->type, TYPE_FULL);
-   ck_assert_int_eq(backups[1]->type, TYPE_INCREMENTAL);
-   ck_assert_int_eq(backups[2]->type, TYPE_INCREMENTAL);
 
-   ck_assert_str_eq(backups[1]->parent_label, backups[0]->label);
-   ck_assert_str_eq(backups[2]->parent_label, backups[1]->label);
+   MCTF_ASSERT_INT_EQ(backups[0]->type, TYPE_FULL, cleanup, "backup 0 type mismatch");
+   MCTF_ASSERT_INT_EQ(backups[1]->type, TYPE_INCREMENTAL, cleanup, "backup 1 type mismatch");
+   MCTF_ASSERT_INT_EQ(backups[2]->type, TYPE_INCREMENTAL, cleanup, "backup 2 type mismatch");
 
+   MCTF_ASSERT_STR_EQ(backups[1]->parent_label, backups[0]->label, cleanup, "backup 1 parent mismatch");
+   MCTF_ASSERT_STR_EQ(backups[2]->parent_label, backups[1]->label, cleanup, "backup 2 parent mismatch");
+
+cleanup:
    free(d);
-   for (int i = 0; i < num_backups; i++)
+   d = NULL;
+   if (backups != NULL)
    {
-      free(backups[i]);
+      for (int i = 0; i < num_backups; i++)
+      {
+         free(backups[i]);
+         backups[i] = NULL;
+      }
+      free(backups);
+      backups = NULL;
    }
-   free(backups);
-}
-END_TEST
-
-Suite*
-pgmoneta_test_backup_suite()
-{
-   Suite* s;
-   TCase* tc_backup_basic;
-
-   s = suite_create("pgmoneta_test_backup");
-
-   tc_backup_basic = tcase_create("backup_basic_test");
-   tcase_set_tags(tc_backup_basic, "common");
-   tcase_set_timeout(tc_backup_basic, 60);
-   tcase_add_checked_fixture(tc_backup_basic, pgmoneta_test_setup, pgmoneta_test_basedir_cleanup);
-   tcase_add_test(tc_backup_basic, test_pgmoneta_backup_full);
-   tcase_add_test(tc_backup_basic, test_pgmoneta_backup_incremental_basic);
-   suite_add_tcase(s, tc_backup_basic);
-
-   return s;
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
 }

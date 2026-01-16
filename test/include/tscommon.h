@@ -57,14 +57,16 @@ pgmoneta_test_environment_destroy(void);
 
 /**
  * Add a backup for testing purpose
+ * @return 0 on success, 1 on failure
  */
-void
+int
 pgmoneta_test_add_backup(void);
 
 /**
  * Add a chain of 3 backups for testing purpose
+ * @return 0 on success, 1 on failure
  */
-void
+int
 pgmoneta_test_add_backup_chain(void);
 
 /**
@@ -86,16 +88,13 @@ void
 pgmoneta_test_teardown(void);
 
 /**
- * Execute an SQL query on postgres database
- * @param srv The server index
- * @param ssl The SSL
- * @param skt The socket
- * @param query The query to be executed
- * @param qr [out] The query response
- * @return 0 upon success, otherwise 1
+ * Create a backup and return status (for use in tests)
+ * @param server_name The server name
+ * @param backup_name The backup name (or NULL for full backup)
+ * @return 0 on success, 1 on failure
  */
 int
-pgmoneta_test_execute_query(int srv, SSL* ssl, int skt, char* query, struct query_response** qr);
+pgmoneta_test_backup(const char* server_name, const char* backup_name);
 
 #ifdef __cplusplus
 }

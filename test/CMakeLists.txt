@@ -27,11 +27,7 @@
 #
 if (check)
 
-  FILE(GLOB_RECURSE SOURCE_FILES "libpgmonetatest/*.c" "testcases/*.c")
-  FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
 
-  set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
-  set(ENABLE_COVERAGE OFF)
 
   add_compile_options(-O0)
   add_compile_options(-DDEBUG)
@@ -111,15 +107,22 @@ if (check)
       endif()
     endif()
   endif()
+
+  # Build MCTF-based test (replaces Check)
+  FILE(GLOB_RECURSE SOURCE_FILES "libpgmonetatest/*.c" "testcases/*.c")
+  FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
+
+  set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
+
   add_executable(pgmoneta-test runner.c ${SOURCES})
   target_include_directories(pgmoneta-test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
 
   if(EXISTS "/etc/debian_version")
-    target_link_libraries(pgmoneta-test Check::check subunit pthread rt m pgmoneta)
+    target_link_libraries(pgmoneta-test pthread rt m pgmoneta)
   elseif(APPLE)
-    target_link_libraries(pgmoneta-test Check::check m pgmoneta)
+    target_link_libraries(pgmoneta-test m pgmoneta)
   else()
-    target_link_libraries(pgmoneta-test Check::check pthread rt m pgmoneta)
+    target_link_libraries(pgmoneta-test pthread rt m pgmoneta)
   endif()
 
   add_custom_target(custom_clean

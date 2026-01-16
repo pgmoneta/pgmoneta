@@ -24,23 +24,34 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
 #include <pgmoneta.h>
-#include <tscommon.h>
-#include <tssuite.h>
-#include <utils.h>
 #include <configuration.h>
+#include <mctf.h>
 #include <shmem.h>
+#include <tscommon.h>
+#include <utils.h>
+
 #include <netinet/in.h>
-
-#include <stdlib.h>
+#include <arpa/inet.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <deque.h>
+#include <message.h>
+#include <ev.h>
 
-START_TEST(test_resolve_path_trailing_env_var)
+// Forward declaration - will be available in utils.h after rebase
+unsigned long pgmoneta_calculate_wal_size(char* directory, char* start);
+
+MCTF_TEST(test_resolve_path_trailing_env_var)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    char* resolved = NULL;
    char* env_key = "PGMONETA_TEST_PATH_KEY";
    char* env_value = "PGMONETA_TEST_PATH_VALUE";
@@ -50,117 +61,157 @@ START_TEST(test_resolve_path_trailing_env_var)
    setenv(env_key, env_value, 1);
 
    result = pgmoneta_resolve_path("/pgmoneta/$PGMONETA_TEST_PATH_KEY", &resolved);
+   MCTF_ASSERT_INT_EQ(result, 0, cleanup, "resolve_path failed");
+   MCTF_ASSERT_PTR_NONNULL(resolved, cleanup, "resolved path is null");
+   MCTF_ASSERT_STR_EQ(resolved, expected, cleanup, "resolved path mismatch");
 
-   ck_assert_int_eq(result, 0);
-
-   ck_assert_ptr_nonnull(resolved);
-
-   ck_assert_str_eq(resolved, expected);
-
+cleanup:
    unsetenv(env_key);
-   unsetenv(env_key);
-   free(resolved);
+   if (resolved != NULL)
+   {
+      free(resolved);
+      resolved = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_calculate_wal_size)
+MCTF_TEST(test_calculate_wal_size)
 {
-   char wal_dir[] = "test_wal_size";
-   char w1[] = "test_wal_size/000000010000000000000001";
-   char w2_real[] = "test_wal_size/000000010000000000000002";
-   char w3[] = "test_wal_size/000000010000000000000003";
+   char wal_dir[] = "test_wal_size_dir";
+   char w1[] = "test_wal_size_dir/000000010000000000000001";
+   char w2_real[] = "test_wal_size_dir/000000010000000000000002";
+   char w3[] = "test_wal_size_dir/000000010000000000000003";
+   FILE* f1 = NULL;
+   FILE* f2 = NULL;
+   FILE* f3 = NULL;
+   unsigned long size = 0;
 
    pgmoneta_mkdir(wal_dir);
 
-   FILE* f1 = fopen(w1, "w");
+   f1 = fopen(w1, "w");
+   MCTF_ASSERT_PTR_NONNULL(f1, cleanup, "failed to open w1");
    fprintf(f1, "1234567890");
    fflush(f1);
    fclose(f1); // 10 bytes
-   FILE* f2 = fopen(w2_real, "w");
+   f1 = NULL;
+
+   f2 = fopen(w2_real, "w");
+   MCTF_ASSERT_PTR_NONNULL(f2, cleanup, "failed to open w2_real");
    fprintf(f2, "12345678901234567890");
    fflush(f2);
    fclose(f2); // 20 bytes
-   FILE* f3 = fopen(w3, "w");
+   f2 = NULL;
+
+   f3 = fopen(w3, "w");
+   MCTF_ASSERT_PTR_NONNULL(f3, cleanup, "failed to open w3");
    fprintf(f3, "123456789012345678901234567890");
    fflush(f3);
    fclose(f3); // 30 bytes
+   f3 = NULL;
 
-   unsigned long size = pgmoneta_calculate_wal_size(wal_dir, "000000010000000000000002");
-
+   size = pgmoneta_calculate_wal_size(wal_dir, "000000010000000000000002");
    // Should include w2 and w3. 20 + 30 = 50.
-   ck_assert_int_eq(size, 50);
+   MCTF_ASSERT_INT_EQ(size, 50, cleanup, "wal size calculation mismatch");
 
+cleanup:
+   if (f1 != NULL)
+   {
+      fclose(f1);
+      f1 = NULL;
+   }
+   if (f2 != NULL)
+   {
+      fclose(f2);
+      f2 = NULL;
+   }
+   if (f3 != NULL)
+   {
+      fclose(f3);
+      f3 = NULL;
+   }
    pgmoneta_delete_directory(wal_dir);
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_starts_with)
+MCTF_TEST(test_utils_starts_with)
 {
-   ck_assert(pgmoneta_starts_with("hello world", "hello"));
-   ck_assert(pgmoneta_starts_with("hello", "hello"));
-   ck_assert(!pgmoneta_starts_with("hello world", "world"));
-   ck_assert(!pgmoneta_starts_with("hello", "hello world"));
-   ck_assert(!pgmoneta_starts_with(NULL, "hello"));
-   ck_assert(!pgmoneta_starts_with("hello", NULL));
-   ck_assert(!pgmoneta_starts_with(NULL, NULL));
-}
-END_TEST
+   MCTF_ASSERT(pgmoneta_starts_with("hello world", "hello"), cleanup, "starts_with positive case 1 failed");
+   MCTF_ASSERT(pgmoneta_starts_with("hello", "hello"), cleanup, "starts_with positive case 2 failed");
+   MCTF_ASSERT(!pgmoneta_starts_with("hello world", "world"), cleanup, "starts_with negative case 1 failed");
+   MCTF_ASSERT(!pgmoneta_starts_with("hello", "hello world"), cleanup, "starts_with negative case 2 failed");
+   MCTF_ASSERT(!pgmoneta_starts_with(NULL, "hello"), cleanup, "starts_with NULL case 1 failed");
+   MCTF_ASSERT(!pgmoneta_starts_with("hello", NULL), cleanup, "starts_with NULL case 2 failed");
+   MCTF_ASSERT(!pgmoneta_starts_with(NULL, NULL), cleanup, "starts_with NULL case 3 failed");
 
-START_TEST(test_utils_ends_with)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_ends_with)
 {
-   ck_assert(pgmoneta_ends_with("hello world", "world"));
-   ck_assert(pgmoneta_ends_with("world", "world"));
-   ck_assert(!pgmoneta_ends_with("hello world", "hello"));
-   ck_assert(!pgmoneta_ends_with("world", "hello world"));
-   ck_assert(!pgmoneta_ends_with(NULL, "world"));
-   ck_assert(!pgmoneta_ends_with("world", NULL));
-   ck_assert(!pgmoneta_ends_with(NULL, NULL));
-}
-END_TEST
+   MCTF_ASSERT(pgmoneta_ends_with("hello world", "world"), cleanup, "ends_with positive case 1 failed");
+   MCTF_ASSERT(pgmoneta_ends_with("world", "world"), cleanup, "ends_with positive case 2 failed");
+   MCTF_ASSERT(!pgmoneta_ends_with("hello world", "hello"), cleanup, "ends_with negative case 1 failed");
+   MCTF_ASSERT(!pgmoneta_ends_with("world", "hello world"), cleanup, "ends_with negative case 2 failed");
+   MCTF_ASSERT(!pgmoneta_ends_with(NULL, "world"), cleanup, "ends_with NULL case 1 failed");
+   MCTF_ASSERT(!pgmoneta_ends_with("world", NULL), cleanup, "ends_with NULL case 2 failed");
+   MCTF_ASSERT(!pgmoneta_ends_with(NULL, NULL), cleanup, "ends_with NULL case 3 failed");
 
-START_TEST(test_utils_contains)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_contains)
 {
-   ck_assert(pgmoneta_contains("hello world", "lo wo"));
-   ck_assert(pgmoneta_contains("hello", "he"));
-   ck_assert(!pgmoneta_contains("hello world", "z"));
-   ck_assert(!pgmoneta_contains(NULL, "hello"));
-   ck_assert(!pgmoneta_contains("hello", NULL));
-}
-END_TEST
+   MCTF_ASSERT(pgmoneta_contains("hello world", "lo wo"), cleanup, "contains positive case 1 failed");
+   MCTF_ASSERT(pgmoneta_contains("hello", "he"), cleanup, "contains positive case 2 failed");
+   MCTF_ASSERT(!pgmoneta_contains("hello world", "z"), cleanup, "contains negative case 1 failed");
+   MCTF_ASSERT(!pgmoneta_contains(NULL, "hello"), cleanup, "contains NULL case 1 failed");
+   MCTF_ASSERT(!pgmoneta_contains("hello", NULL), cleanup, "contains NULL case 2 failed");
 
-START_TEST(test_utils_compare_string)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_compare_string)
 {
-   ck_assert(pgmoneta_compare_string("abc", "abc"));
-   ck_assert(!pgmoneta_compare_string("abc", "ABC"));
-   ck_assert(!pgmoneta_compare_string("abc", "def"));
-   ck_assert(!pgmoneta_compare_string(NULL, "abc"));
-   ck_assert(!pgmoneta_compare_string("abc", NULL));
-   ck_assert(pgmoneta_compare_string(NULL, NULL));
-}
-END_TEST
+   MCTF_ASSERT(pgmoneta_compare_string("abc", "abc"), cleanup, "compare_string positive case failed");
+   MCTF_ASSERT(!pgmoneta_compare_string("abc", "ABC"), cleanup, "compare_string case sensitive failed");
+   MCTF_ASSERT(!pgmoneta_compare_string("abc", "def"), cleanup, "compare_string negative case failed");
+   MCTF_ASSERT(!pgmoneta_compare_string(NULL, "abc"), cleanup, "compare_string NULL case 1 failed");
+   MCTF_ASSERT(!pgmoneta_compare_string("abc", NULL), cleanup, "compare_string NULL case 2 failed");
+   MCTF_ASSERT(pgmoneta_compare_string(NULL, NULL), cleanup, "compare_string NULL case 3 failed");
 
-START_TEST(test_utils_atoi)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_atoi)
 {
-   ck_assert_int_eq(pgmoneta_atoi("123"), 123);
-   ck_assert_int_eq(pgmoneta_atoi("-123"), -123);
-   ck_assert_int_eq(pgmoneta_atoi("0"), 0);
-   ck_assert_int_eq(pgmoneta_atoi(NULL), 0);
-}
-END_TEST
+   MCTF_ASSERT_INT_EQ(pgmoneta_atoi("123"), 123, cleanup, "atoi positive failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_atoi("-123"), -123, cleanup, "atoi negative failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_atoi("0"), 0, cleanup, "atoi zero failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_atoi(NULL), 0, cleanup, "atoi NULL failed");
 
-START_TEST(test_utils_is_number)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_is_number)
 {
-   ck_assert(pgmoneta_is_number("123", 10));
-   ck_assert(pgmoneta_is_number("-123", 10));
-   ck_assert(!pgmoneta_is_number("12a", 10));
-   ck_assert(!pgmoneta_is_number("abc", 10));
-   ck_assert(pgmoneta_is_number("1A", 16));
-   ck_assert(!pgmoneta_is_number("1Z", 16));
-   ck_assert(!pgmoneta_is_number(NULL, 10));
-}
-END_TEST
+   MCTF_ASSERT(pgmoneta_is_number("123", 10), cleanup, "is_number positive base10 failed");
+   MCTF_ASSERT(pgmoneta_is_number("-123", 10), cleanup, "is_number negative base10 failed");
+   MCTF_ASSERT(!pgmoneta_is_number("12a", 10), cleanup, "is_number invalid base10 failed");
+   MCTF_ASSERT(!pgmoneta_is_number("abc", 10), cleanup, "is_number invalid base10 2 failed");
+   MCTF_ASSERT(pgmoneta_is_number("1A", 16), cleanup, "is_number positive base16 failed");
+   MCTF_ASSERT(!pgmoneta_is_number("1Z", 16), cleanup, "is_number invalid base16 failed");
+   MCTF_ASSERT(!pgmoneta_is_number(NULL, 10), cleanup, "is_number NULL failed");
 
-START_TEST(test_utils_base64)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_base64)
 {
    char* original = "hello world";
    char* encoded = NULL;
@@ -169,58 +220,84 @@ START_TEST(test_utils_base64)
    size_t decoded_length = 0;
    size_t original_length = strlen(original);
 
-   ck_assert_int_eq(pgmoneta_base64_encode(original, original_length, &encoded, &encoded_length), 0);
-   ck_assert_ptr_nonnull(encoded);
-   ck_assert_int_gt(encoded_length, 0);
+   MCTF_ASSERT_INT_EQ(pgmoneta_base64_encode(original, original_length, &encoded, &encoded_length), 0, cleanup, "base64_encode failed");
+   MCTF_ASSERT_PTR_NONNULL(encoded, cleanup, "encoded is null");
+   MCTF_ASSERT(encoded_length > 0, cleanup, "encoded_length should be > 0");
 
-   ck_assert_int_eq(pgmoneta_base64_decode(encoded, encoded_length, (void**)&decoded, &decoded_length), 0);
-   ck_assert_ptr_nonnull(decoded);
-   ck_assert_int_eq(decoded_length, original_length);
-   ck_assert_mem_eq(decoded, original, original_length);
+   MCTF_ASSERT_INT_EQ(pgmoneta_base64_decode(encoded, encoded_length, (void**)&decoded, &decoded_length), 0, cleanup, "base64_decode failed");
+   MCTF_ASSERT_PTR_NONNULL(decoded, cleanup, "decoded is null");
+   MCTF_ASSERT_INT_EQ(decoded_length, original_length, cleanup, "decoded_length mismatch");
+   MCTF_ASSERT(memcmp(decoded, original, original_length) == 0, cleanup, "decoded content mismatch");
 
-   free(encoded);
-   free(decoded);
+cleanup:
+   if (encoded != NULL)
+   {
+      free(encoded);
+      encoded = NULL;
+   }
+   if (decoded != NULL)
+   {
+      free(decoded);
+      decoded = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_is_incremental_path)
+MCTF_TEST(test_utils_is_incremental_path)
 {
-   ck_assert(pgmoneta_is_incremental_path("/path/to/backup/INCREMENTAL.20231026120000-20231026110000"));
-   ck_assert(!pgmoneta_is_incremental_path("/path/to/backup/20231026120000"));
-   ck_assert(!pgmoneta_is_incremental_path("/path/to/backup"));
-   ck_assert(!pgmoneta_is_incremental_path(NULL));
-}
-END_TEST
+   MCTF_ASSERT(pgmoneta_is_incremental_path("/path/to/backup/INCREMENTAL.20231026120000-20231026110000"), cleanup, "is_incremental_path positive failed");
+   MCTF_ASSERT(!pgmoneta_is_incremental_path("/path/to/backup/20231026120000"), cleanup, "is_incremental_path negative 1 failed");
+   MCTF_ASSERT(!pgmoneta_is_incremental_path("/path/to/backup"), cleanup, "is_incremental_path negative 2 failed");
+   MCTF_ASSERT(!pgmoneta_is_incremental_path(NULL), cleanup, "is_incremental_path NULL failed");
 
-START_TEST(test_utils_get_parent_dir)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_get_parent_dir)
 {
    char* parent = NULL;
 
    parent = pgmoneta_get_parent_dir("/a/b/c");
-   ck_assert_str_eq(parent, "/a/b");
+   MCTF_ASSERT_PTR_NONNULL(parent, cleanup, "parent dir is null");
+   MCTF_ASSERT_STR_EQ(parent, "/a/b", cleanup, "parent dir mismatch 1");
    free(parent);
+   parent = NULL;
 
    parent = pgmoneta_get_parent_dir("/a");
-   ck_assert_str_eq(parent, "/");
+   MCTF_ASSERT_PTR_NONNULL(parent, cleanup, "parent dir is null");
+   MCTF_ASSERT_STR_EQ(parent, "/", cleanup, "parent dir mismatch 2");
    free(parent);
+   parent = NULL;
 
    parent = pgmoneta_get_parent_dir("/");
-   ck_assert_str_eq(parent, "/");
+   MCTF_ASSERT_PTR_NONNULL(parent, cleanup, "parent dir is null");
+   MCTF_ASSERT_STR_EQ(parent, "/", cleanup, "parent dir mismatch 3");
    free(parent);
+   parent = NULL;
 
    parent = pgmoneta_get_parent_dir("a");
-   ck_assert_str_eq(parent, ".");
+   MCTF_ASSERT_PTR_NONNULL(parent, cleanup, "parent dir is null");
+   MCTF_ASSERT_STR_EQ(parent, ".", cleanup, "parent dir mismatch 4");
    free(parent);
+   parent = NULL;
 
    parent = pgmoneta_get_parent_dir(NULL);
-   ck_assert_ptr_null(parent);
-}
-END_TEST
+   MCTF_ASSERT_PTR_NULL(parent, cleanup, "parent dir should be null for NULL input");
 
-START_TEST(test_utils_serialization)
+cleanup:
+   if (parent != NULL)
+   {
+      free(parent);
+      parent = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_serialization)
 {
-   void* data = malloc(1024);
-   void* ptr = data;
+   void* data = NULL;
+   void* ptr = NULL;
    signed char b = 'a';
    uint8_t u8 = 10;
    int16_t i16 = -20;
@@ -232,7 +309,10 @@ START_TEST(test_utils_serialization)
    bool bo = true;
    char* s = "hello";
 
+   data = malloc(1024);
+   MCTF_ASSERT_PTR_NONNULL(data, cleanup, "malloc failed");
    memset(data, 0, 1024);
+   ptr = data;
 
    pgmoneta_write_byte(ptr, b);
    ptr += 1;
@@ -255,367 +335,542 @@ START_TEST(test_utils_serialization)
    pgmoneta_write_string(ptr, s);
 
    ptr = data;
-   ck_assert_int_eq(pgmoneta_read_byte(ptr), b);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_byte(ptr), b, cleanup, "read_byte mismatch");
    ptr += 1;
-   ck_assert_int_eq(pgmoneta_read_uint8(ptr), u8);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_uint8(ptr), u8, cleanup, "read_uint8 mismatch");
    ptr += 1;
-   ck_assert_int_eq(pgmoneta_read_int16(ptr), i16);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_int16(ptr), i16, cleanup, "read_int16 mismatch");
    ptr += 2;
-   ck_assert_int_eq(pgmoneta_read_uint16(ptr), u16);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_uint16(ptr), u16, cleanup, "read_uint16 mismatch");
    ptr += 2;
-   ck_assert_int_eq(pgmoneta_read_int32(ptr), i32);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_int32(ptr), i32, cleanup, "read_int32 mismatch");
    ptr += 4;
-   ck_assert_int_eq(pgmoneta_read_uint32(ptr), u32);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_uint32(ptr), u32, cleanup, "read_uint32 mismatch");
    ptr += 4;
-   ck_assert_int_eq(pgmoneta_read_int64(ptr), i64);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_int64(ptr), i64, cleanup, "read_int64 mismatch");
    ptr += 8;
-   ck_assert_int_eq(pgmoneta_read_uint64(ptr), u64);
+   MCTF_ASSERT_INT_EQ(pgmoneta_read_uint64(ptr), u64, cleanup, "read_uint64 mismatch");
    ptr += 8;
-   ck_assert(pgmoneta_read_bool(ptr) == bo);
+   MCTF_ASSERT(pgmoneta_read_bool(ptr) == bo, cleanup, "read_bool mismatch");
    ptr += 1;
-   ck_assert_str_eq(pgmoneta_read_string(ptr), s);
+   MCTF_ASSERT_STR_EQ(pgmoneta_read_string(ptr), s, cleanup, "read_string mismatch");
 
-   free(data);
+cleanup:
+   if (data != NULL)
+   {
+      free(data);
+      data = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_append)
+MCTF_TEST(test_utils_append)
 {
    char* buffer = NULL;
 
    buffer = pgmoneta_append(buffer, "hello");
-   ck_assert_str_eq(buffer, "hello");
+   MCTF_ASSERT_PTR_NONNULL(buffer, cleanup, "append failed");
+   MCTF_ASSERT_STR_EQ(buffer, "hello", cleanup, "append result mismatch 1");
 
    buffer = pgmoneta_append_char(buffer, ' ');
-   ck_assert_str_eq(buffer, "hello ");
+   MCTF_ASSERT_PTR_NONNULL(buffer, cleanup, "append_char failed");
+   MCTF_ASSERT_STR_EQ(buffer, "hello ", cleanup, "append result mismatch 2");
 
    buffer = pgmoneta_append_int(buffer, 123);
-   ck_assert_str_eq(buffer, "hello 123");
+   MCTF_ASSERT_PTR_NONNULL(buffer, cleanup, "append_int failed");
+   MCTF_ASSERT_STR_EQ(buffer, "hello 123", cleanup, "append result mismatch 3");
 
    buffer = pgmoneta_append(buffer, " ");
    buffer = pgmoneta_append_ulong(buffer, 456);
-   ck_assert_str_eq(buffer, "hello 123 456");
+   MCTF_ASSERT_PTR_NONNULL(buffer, cleanup, "append_ulong failed");
+   MCTF_ASSERT_STR_EQ(buffer, "hello 123 456", cleanup, "append result mismatch 4");
 
    buffer = pgmoneta_append(buffer, " ");
    buffer = pgmoneta_append_bool(buffer, true);
-   ck_assert_str_eq(buffer, "hello 123 456 true");
+   MCTF_ASSERT_PTR_NONNULL(buffer, cleanup, "append_bool failed");
+   MCTF_ASSERT_STR_EQ(buffer, "hello 123 456 true", cleanup, "append result mismatch 5");
 
    buffer = pgmoneta_append(buffer, " ");
    buffer = pgmoneta_append_double(buffer, 3.14);
-   ck_assert_str_eq(buffer, "hello 123 456 true 3.140000");
+   MCTF_ASSERT_PTR_NONNULL(buffer, cleanup, "append_double failed");
+   MCTF_ASSERT_STR_EQ(buffer, "hello 123 456 true 3.140000", cleanup, "append result mismatch 6");
 
-   free(buffer);
+cleanup:
+   if (buffer != NULL)
+   {
+      free(buffer);
+      buffer = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_string_manipulation)
+MCTF_TEST(test_utils_string_manipulation)
 {
    char* s = NULL;
    char* res = NULL;
 
    // test remove_whitespace
+
    s = strdup(" a b c ");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
    res = pgmoneta_remove_whitespace(s);
-   ck_assert_str_eq(res, "abc");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_whitespace failed");
+   MCTF_ASSERT_STR_EQ(res, "abc", cleanup, "remove_whitespace result mismatch");
    free(s);
+   s = NULL;
    free(res);
+   res = NULL;
 
    // test remove_prefix
+
    s = strdup("pre_test");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
    res = pgmoneta_remove_prefix(s, "pre_");
-   ck_assert_str_eq(res, "test");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_prefix failed");
+   MCTF_ASSERT_STR_EQ(res, "test", cleanup, "remove_prefix result mismatch");
    free(s);
+   s = NULL;
    free(res);
+   res = NULL;
 
    // test remove_suffix
+
    s = strdup("test.txt");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
    res = pgmoneta_remove_suffix(s, ".txt");
-   ck_assert_str_eq(res, "test");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "remove_suffix failed");
+   MCTF_ASSERT_STR_EQ(res, "test", cleanup, "remove_suffix result mismatch");
    free(s);
+   s = NULL;
    free(res);
+   res = NULL;
 
    // test indent
+
    s = strdup("hello");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
    res = pgmoneta_indent(s, NULL, 2);
-   ck_assert_str_eq(res, "hello  ");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "indent failed");
+   MCTF_ASSERT_STR_EQ(res, "hello  ", cleanup, "indent result mismatch");
+   s = NULL;
    free(res);
+   res = NULL;
 
    // test escape_string
+
    s = strdup("foo'bar");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed");
    res = pgmoneta_escape_string(s);
-   ck_assert_str_eq(res, "foo\\'bar");
+   MCTF_ASSERT_PTR_NONNULL(res, cleanup, "escape_string failed");
+   MCTF_ASSERT_STR_EQ(res, "foo\\'bar", cleanup, "escape_string result mismatch");
    free(s);
+   s = NULL;
    free(res);
+   res = NULL;
+
+cleanup:
+   if (s != NULL)
+   {
+      free(s);
+      s = NULL;
+   }
+   if (res != NULL)
+   {
+      free(res);
+      res = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_math)
+MCTF_TEST(test_utils_math)
 {
-   ck_assert(pgmoneta_get_aligned_size(1) >= 1);
-   ck_assert(pgmoneta_get_aligned_size(100) >= 100);
+   MCTF_ASSERT(pgmoneta_get_aligned_size(1) >= 1, cleanup, "get_aligned_size 1 failed");
+   MCTF_ASSERT(pgmoneta_get_aligned_size(100) >= 100, cleanup, "get_aligned_size 100 failed");
 
-   ck_assert_int_eq(pgmoneta_swap(0x12345678), 0x78563412);
+   MCTF_ASSERT_INT_EQ(pgmoneta_swap(0x12345678), 0x78563412, cleanup, "swap failed");
 
    char* array[] = {"b", "a", "c"};
    pgmoneta_sort(3, array);
-   ck_assert_str_eq(array[0], "a");
-   ck_assert_str_eq(array[1], "b");
-   ck_assert_str_eq(array[2], "c");
-}
-END_TEST
+   MCTF_ASSERT_STR_EQ(array[0], "a", cleanup, "sort result 0 mismatch");
+   MCTF_ASSERT_STR_EQ(array[1], "b", cleanup, "sort result 1 mismatch");
+   MCTF_ASSERT_STR_EQ(array[2], "c", cleanup, "sort result 2 mismatch");
 
-START_TEST(test_utils_version)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_version)
 {
-   ck_assert_int_eq(pgmoneta_version_as_number(1, 2, 3), 10203);
-   ck_assert(pgmoneta_version_ge(0, 0, 0));
-   ck_assert(!pgmoneta_version_ge(99, 99, 99));
-}
-END_TEST
+   MCTF_ASSERT_INT_EQ(pgmoneta_version_as_number(1, 2, 3), 10203, cleanup, "version_as_number failed");
+   MCTF_ASSERT(pgmoneta_version_ge(0, 0, 0), cleanup, "version_ge positive failed");
+   MCTF_ASSERT(!pgmoneta_version_ge(99, 99, 99), cleanup, "version_ge negative failed");
 
-START_TEST(test_utils_bigendian)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_bigendian)
 {
    int n = 1;
    bool is_little = (*(char*)&n == 1);
    if (is_little)
    {
-      ck_assert(!pgmoneta_bigendian());
+      MCTF_ASSERT(!pgmoneta_bigendian(), cleanup, "bigendian should be false on little-endian");
    }
    else
    {
-      ck_assert(pgmoneta_bigendian());
+      MCTF_ASSERT(pgmoneta_bigendian(), cleanup, "bigendian should be true on big-endian");
    }
-}
-END_TEST
 
-START_TEST(test_utils_strip_extension)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_strip_extension)
 {
    char* name = NULL;
 
-   ck_assert_int_eq(pgmoneta_strip_extension("file.txt", &name), 0);
-   ck_assert_str_eq(name, "file");
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("file.txt", &name), 0, cleanup, "strip_extension failed 1");
+   MCTF_ASSERT_PTR_NONNULL(name, cleanup, "name is null 1");
+   MCTF_ASSERT_STR_EQ(name, "file", cleanup, "strip_extension result 1 mismatch");
    free(name);
    name = NULL;
 
-   ck_assert_int_eq(pgmoneta_strip_extension("file", &name), 0);
-   ck_assert_str_eq(name, "file");
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("file", &name), 0, cleanup, "strip_extension failed 2");
+   MCTF_ASSERT_PTR_NONNULL(name, cleanup, "name is null 2");
+   MCTF_ASSERT_STR_EQ(name, "file", cleanup, "strip_extension result 2 mismatch");
    free(name);
    name = NULL;
 
-   ck_assert_int_eq(pgmoneta_strip_extension("file.tar.gz", &name), 0);
-   ck_assert_str_eq(name, "file.tar");
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension("file.tar.gz", &name), 0, cleanup, "strip_extension failed 3");
+   MCTF_ASSERT_PTR_NONNULL(name, cleanup, "name is null 3");
+   MCTF_ASSERT_STR_EQ(name, "file.tar", cleanup, "strip_extension result 3 mismatch");
    free(name);
    name = NULL;
 
    // Hidden file case
-   ck_assert_int_eq(pgmoneta_strip_extension(".bashrc", &name), 0);
-   ck_assert_str_eq(name, "");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_extension(".bashrc", &name), 0, cleanup, "strip_extension failed 4");
+   MCTF_ASSERT_PTR_NONNULL(name, cleanup, "name is null 4");
+   MCTF_ASSERT_STR_EQ(name, "", cleanup, "strip_extension result 4 mismatch");
    free(name);
    name = NULL;
-}
-END_TEST
 
-START_TEST(test_utils_file_size)
+cleanup:
+   if (name != NULL)
+   {
+      free(name);
+      name = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_file_size)
 {
    char* s = NULL;
 
    s = pgmoneta_translate_file_size(100);
-   ck_assert_str_eq(s, "100.00B");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "translate_file_size 100 failed");
+   MCTF_ASSERT_STR_EQ(s, "100.00B", cleanup, "translate_file_size 100 result mismatch");
    free(s);
+   s = NULL;
 
    s = pgmoneta_translate_file_size(1024);
-   ck_assert_str_eq(s, "1.00kB");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "translate_file_size 1024 failed");
+   MCTF_ASSERT_STR_EQ(s, "1.00kB", cleanup, "translate_file_size 1024 result mismatch");
    free(s);
-}
-END_TEST
+   s = NULL;
 
-START_TEST(test_utils_file_ops)
+cleanup:
+   if (s != NULL)
+   {
+      free(s);
+      s = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_file_ops)
 {
    char* path = "test_file_ops.tmp";
    char* dir = "test_dir_ops.tmp";
-   FILE* f = fopen(path, "w");
+   FILE* f = NULL;
+
+   f = fopen(path, "w");
    if (f)
    {
       fprintf(f, "test");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   ck_assert(pgmoneta_exists(path));
-   ck_assert(pgmoneta_is_file(path));
-   ck_assert(!pgmoneta_is_directory(path));
+   MCTF_ASSERT(pgmoneta_exists(path), cleanup, "file should exist");
+   MCTF_ASSERT(pgmoneta_is_file(path), cleanup, "path should be a file");
+   MCTF_ASSERT(!pgmoneta_is_directory(path), cleanup, "path should not be a directory");
 
    pgmoneta_mkdir(dir);
-   ck_assert(pgmoneta_exists(dir));
-   ck_assert(pgmoneta_is_directory(dir));
-   ck_assert(!pgmoneta_is_file(dir));
+   MCTF_ASSERT(pgmoneta_exists(dir), cleanup, "directory should exist");
+   MCTF_ASSERT(pgmoneta_is_directory(dir), cleanup, "dir should be a directory");
+   MCTF_ASSERT(!pgmoneta_is_file(dir), cleanup, "dir should not be a file");
 
    remove(path);
    pgmoneta_delete_directory(dir);
 
-   // ck_assert(!pgmoneta_exists(path)); // remove doesn't check immediate effect usually but here it should be fine.
-   ck_assert(!pgmoneta_exists(dir));
-}
-END_TEST
+   // remove doesn't check immediate effect usually but here it should be fine
 
-START_TEST(test_utils_snprintf)
+   MCTF_ASSERT(!pgmoneta_exists(dir), cleanup, "directory should be deleted");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_snprintf)
 {
    char buf[100];
+
    pgmoneta_snprintf(buf, 100, "Hello %s", "World");
-   ck_assert_str_eq(buf, "Hello World");
+   MCTF_ASSERT_STR_EQ(buf, "Hello World", cleanup, "snprintf result 1 mismatch");
 
    pgmoneta_snprintf(buf, 5, "0123456789");
-   ck_assert_str_eq(buf, "0123");
-}
-END_TEST
+   MCTF_ASSERT_STR_EQ(buf, "0123", cleanup, "snprintf truncation failed");
 
-START_TEST(test_utils_string_extras)
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_string_extras)
 {
    char* s = NULL;
    char** results = NULL;
    int count = 0;
 
    // pgmoneta_remove_first
+
    s = strdup("abc");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed 1");
    s = pgmoneta_remove_first(s);
-   ck_assert_str_eq(s, "bc");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "remove_first returned null");
+   MCTF_ASSERT_STR_EQ(s, "bc", cleanup, "remove_first result 1 mismatch");
    free(s);
+   s = NULL;
 
    s = strdup("a");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed 2");
    s = pgmoneta_remove_first(s);
-   ck_assert_str_eq(s, "");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "remove_first returned null 2");
+   MCTF_ASSERT_STR_EQ(s, "", cleanup, "remove_first result 2 mismatch");
    free(s);
+   s = NULL;
 
-   ck_assert_ptr_null(pgmoneta_remove_first(NULL));
+   MCTF_ASSERT_PTR_NULL(pgmoneta_remove_first(NULL), cleanup, "remove_first should return NULL for NULL input");
 
    // pgmoneta_remove_last
+
    s = strdup("abc");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed 3");
    s = pgmoneta_remove_last(s);
-   ck_assert_str_eq(s, "ab");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "remove_last returned null");
+   MCTF_ASSERT_STR_EQ(s, "ab", cleanup, "remove_last result 1 mismatch");
    free(s);
+   s = NULL;
 
    s = strdup("a");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed 4");
    s = pgmoneta_remove_last(s);
-   ck_assert_str_eq(s, "");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "remove_last returned null 2");
+   MCTF_ASSERT_STR_EQ(s, "", cleanup, "remove_last result 2 mismatch");
    free(s);
+   s = NULL;
 
-   ck_assert_ptr_null(pgmoneta_remove_last(NULL));
+   MCTF_ASSERT_PTR_NULL(pgmoneta_remove_last(NULL), cleanup, "remove_last should return NULL for NULL input");
 
    // pgmoneta_bytes_to_string
+
    s = pgmoneta_bytes_to_string(1024);
-   ck_assert_str_eq(s, "1 KB");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "bytes_to_string 1024 failed");
+   MCTF_ASSERT_STR_EQ(s, "1 KB", cleanup, "bytes_to_string 1024 result mismatch");
    free(s);
+   s = NULL;
 
    s = pgmoneta_bytes_to_string(1024 * 1024);
-   ck_assert_str_eq(s, "1 MB");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "bytes_to_string 1MB failed");
+   MCTF_ASSERT_STR_EQ(s, "1 MB", cleanup, "bytes_to_string 1MB result mismatch");
    free(s);
+   s = NULL;
 
    s = pgmoneta_bytes_to_string(0);
-   ck_assert_str_eq(s, "0");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "bytes_to_string 0 failed");
+   MCTF_ASSERT_STR_EQ(s, "0", cleanup, "bytes_to_string 0 result mismatch");
    free(s);
+   s = NULL;
 
    // pgmoneta_lsn_to_string / pgmoneta_string_to_lsn
+
    uint64_t lsn = 0x123456789ABCDEF0;
    s = pgmoneta_lsn_to_string(lsn);
-   ck_assert_ptr_nonnull(s);
-   ck_assert_int_eq(pgmoneta_string_to_lsn(s), lsn);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "lsn_to_string failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(s), lsn, cleanup, "string_to_lsn round-trip failed");
    free(s);
+   s = NULL;
 
-   ck_assert_int_eq(pgmoneta_string_to_lsn(NULL), 0);
+   MCTF_ASSERT_INT_EQ(pgmoneta_string_to_lsn(NULL), 0, cleanup, "string_to_lsn NULL should return 0");
 
    // pgmoneta_split
-   ck_assert_int_eq(pgmoneta_split("a,b,c", &results, &count, ','), 0);
-   ck_assert_int_eq(count, 3);
-   ck_assert_str_eq(results[0], "a");
-   ck_assert_str_eq(results[1], "b");
-   ck_assert_str_eq(results[2], "c");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_split("a,b,c", &results, &count, ','), 0, cleanup, "split failed");
+   MCTF_ASSERT_INT_EQ(count, 3, cleanup, "split count mismatch");
+   MCTF_ASSERT_PTR_NONNULL(results, cleanup, "split results is null");
+   MCTF_ASSERT_STR_EQ(results[0], "a", cleanup, "split result 0 mismatch");
+   MCTF_ASSERT_STR_EQ(results[1], "b", cleanup, "split result 1 mismatch");
+   MCTF_ASSERT_STR_EQ(results[2], "c", cleanup, "split result 2 mismatch");
    for (int i = 0; i < count; i++)
    {
-      free(results[i]);
+      if (results[i] != NULL)
+      {
+         free(results[i]);
+         results[i] = NULL;
+      }
    }
    free(results);
+   results = NULL;
 
    // pgmoneta_is_substring
-   ck_assert_int_eq(pgmoneta_is_substring("world", "hello world"), 1);
-   ck_assert_int_eq(pgmoneta_is_substring("foo", "bar"), 0);
-   ck_assert_int_eq(pgmoneta_is_substring(NULL, "bar"), 0);
-   ck_assert_int_eq(pgmoneta_is_substring("foo", NULL), 0);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_is_substring("world", "hello world"), 1, cleanup, "is_substring positive failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_is_substring("foo", "bar"), 0, cleanup, "is_substring negative failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_is_substring(NULL, "bar"), 0, cleanup, "is_substring NULL case 1 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_is_substring("foo", NULL), 0, cleanup, "is_substring NULL case 2 failed");
 
    // pgmoneta_format_and_append
-   s = strdup("Hello");
-   s = pgmoneta_format_and_append(s, " %s %d", "World", 2025);
-   ck_assert_str_eq(s, "Hello World 2025");
-   free(s);
-}
-END_TEST
 
-START_TEST(test_utils_merge_string_arrays)
+   s = strdup("Hello");
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "strdup failed 5");
+   s = pgmoneta_format_and_append(s, " %s %d", "World", 2025);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "format_and_append failed");
+   MCTF_ASSERT_STR_EQ(s, "Hello World 2025", cleanup, "format_and_append result mismatch");
+   free(s);
+   s = NULL;
+
+cleanup:
+   if (s != NULL)
+   {
+      free(s);
+      s = NULL;
+   }
+   if (results != NULL)
+   {
+      for (int i = 0; i < count && results[i] != NULL; i++)
+      {
+         free(results[i]);
+         results[i] = NULL;
+      }
+      free(results);
+      results = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_merge_string_arrays)
 {
    char* list1[] = {"a", "b", NULL};
    char* list2[] = {"c", "d", NULL};
    char** lists[] = {list1, list2, NULL};
    char** out_list = NULL;
 
-   ck_assert_int_eq(pgmoneta_merge_string_arrays(lists, &out_list), 0);
-   ck_assert_ptr_nonnull(out_list);
-   ck_assert_str_eq(out_list[0], "a");
-   ck_assert_str_eq(out_list[1], "b");
-   ck_assert_str_eq(out_list[2], "c");
-   ck_assert_str_eq(out_list[3], "d");
-   ck_assert_ptr_null(out_list[4]);
+   MCTF_ASSERT_INT_EQ(pgmoneta_merge_string_arrays(lists, &out_list), 0, cleanup, "merge_string_arrays failed");
+   MCTF_ASSERT_PTR_NONNULL(out_list, cleanup, "out_list is null");
+   MCTF_ASSERT_STR_EQ(out_list[0], "a", cleanup, "merged array[0] mismatch");
+   MCTF_ASSERT_STR_EQ(out_list[1], "b", cleanup, "merged array[1] mismatch");
+   MCTF_ASSERT_STR_EQ(out_list[2], "c", cleanup, "merged array[2] mismatch");
+   MCTF_ASSERT_STR_EQ(out_list[3], "d", cleanup, "merged array[3] mismatch");
+   MCTF_ASSERT_PTR_NULL(out_list[4], cleanup, "merged array[4] should be NULL");
 
    for (int i = 0; i < 4; i++)
    {
-      free(out_list[i]);
+      if (out_list[i] != NULL)
+      {
+         free(out_list[i]);
+         out_list[i] = NULL;
+      }
    }
    free(out_list);
+   out_list = NULL;
 
-   ck_assert_int_eq(pgmoneta_merge_string_arrays(NULL, &out_list), -1);
+   MCTF_ASSERT_INT_EQ(pgmoneta_merge_string_arrays(NULL, &out_list), -1, cleanup, "merge_string_arrays NULL should fail");
+
+cleanup:
+   if (out_list != NULL)
+   {
+      for (int i = 0; out_list[i] != NULL; i++)
+      {
+         free(out_list[i]);
+         out_list[i] = NULL;
+      }
+      free(out_list);
+      out_list = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_time)
+MCTF_TEST(test_utils_time)
 {
    char short_date[SHORT_TIME_LENGTH];
    char long_date[LONG_TIME_LENGTH];
    char utc_date[UTC_TIME_LENGTH];
 
-   ck_assert_int_eq(pgmoneta_get_timestamp_ISO8601_format(short_date, long_date), 0);
-   ck_assert_int_eq(strlen(short_date), 8);
-   ck_assert_int_eq(strlen(long_date), 16);
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_timestamp_ISO8601_format(short_date, long_date), 0, cleanup, "get_timestamp_ISO8601_format failed");
+   MCTF_ASSERT_INT_EQ(strlen(short_date), 8, cleanup, "short_date length mismatch");
+   MCTF_ASSERT_INT_EQ(strlen(long_date), 16, cleanup, "long_date length mismatch");
 
-   ck_assert_int_eq(pgmoneta_get_timestamp_UTC_format(utc_date), 0);
-   ck_assert_int_eq(strlen(utc_date), 29);
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_timestamp_UTC_format(utc_date), 0, cleanup, "get_timestamp_UTC_format failed");
+   MCTF_ASSERT_INT_EQ(strlen(utc_date), 29, cleanup, "utc_date length mismatch");
 
-   ck_assert(pgmoneta_get_current_timestamp() > 0);
-   ck_assert(pgmoneta_get_y2000_timestamp() > 0);
+   MCTF_ASSERT(pgmoneta_get_current_timestamp() > 0, cleanup, "get_current_timestamp should be > 0");
+   MCTF_ASSERT(pgmoneta_get_y2000_timestamp() > 0, cleanup, "get_y2000_timestamp should be > 0");
+
+cleanup:
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_token_bucket)
+MCTF_TEST(test_utils_token_bucket)
 {
    struct token_bucket* tb = NULL;
 
    tb = (struct token_bucket*)malloc(sizeof(struct token_bucket));
+   MCTF_ASSERT_PTR_NONNULL(tb, cleanup, "malloc token_bucket failed");
 
    // Test initialization
-   ck_assert_int_eq(pgmoneta_token_bucket_init(tb, 100), 0);
-   // Initially we should have some tokens or be able to consume if it's not strictly 0.
-   // The implementation usually starts with tokens or adds them.
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_init(tb, 100), 0, cleanup, "token_bucket_init failed");
 
    // Test consume
-   ck_assert_int_eq(pgmoneta_token_bucket_consume(tb, 50), 0);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_consume(tb, 50), 0, cleanup, "token_bucket_consume failed");
 
    // Test once
-   ck_assert_int_eq(pgmoneta_token_bucket_once(tb, 10), 0);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_once(tb, 10), 0, cleanup, "token_bucket_once failed");
 
    // Test add (force update)
-   ck_assert_int_eq(pgmoneta_token_bucket_add(tb), 0);
 
-   pgmoneta_token_bucket_destroy(tb);
+   MCTF_ASSERT_INT_EQ(pgmoneta_token_bucket_add(tb), 0, cleanup, "token_bucket_add failed");
+
+cleanup:
+   if (tb != NULL)
+   {
+      pgmoneta_token_bucket_destroy(tb);
+      tb = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_file_dir)
+MCTF_TEST(test_utils_file_dir)
 {
    char base[MAX_PATH];
    char sub1[MAX_PATH];
@@ -623,7 +878,13 @@ START_TEST(test_utils_file_dir)
    int n_dirs = 0;
    char** dirs = NULL;
    struct deque* files = NULL;
-   struct deque_iterator* it = 0;
+   struct deque_iterator* it = NULL;
+   FILE* f = NULL;
+   bool found_sub1 = false;
+   bool found_file1 = false;
+   char* file2 = "test_dir_extras/file2.txt";
+   char* file3 = "test_dir_extras/file3.txt";
+   char* file4 = "test_dir_extras/file4.txt";
 
    strcpy(base, "test_dir_extras");
    strcpy(sub1, "test_dir_extras/sub1");
@@ -632,196 +893,306 @@ START_TEST(test_utils_file_dir)
    pgmoneta_mkdir(base);
    pgmoneta_mkdir(sub1);
 
-   FILE* f = fopen(file1, "w");
+   f = fopen(file1, "w");
    if (f)
    {
       fprintf(f, "test content");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
    // pgmoneta_get_directories
-   ck_assert_int_eq(pgmoneta_get_directories(base, &n_dirs, &dirs), 0);
-   ck_assert_int_ge(n_dirs, 1);
-   bool found_sub1 = false;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_directories(base, &n_dirs, &dirs), 0, cleanup, "get_directories failed");
+   MCTF_ASSERT(n_dirs >= 1, cleanup, "n_dirs should be >= 1");
    for (int i = 0; i < n_dirs; i++)
    {
-      if (pgmoneta_contains(dirs[i], "sub1"))
+      if (dirs[i] != NULL && pgmoneta_contains(dirs[i], "sub1"))
       {
          found_sub1 = true;
       }
-      free(dirs[i]);
+      if (dirs[i] != NULL)
+      {
+         free(dirs[i]);
+         dirs[i] = NULL;
+      }
    }
    free(dirs);
-   ck_assert(found_sub1);
+   dirs = NULL;
+   MCTF_ASSERT(found_sub1, cleanup, "sub1 directory not found");
 
    // pgmoneta_get_files
-   ck_assert_int_eq(pgmoneta_get_files(base, &files), 0);
-   ck_assert_int_ge(pgmoneta_deque_size(files), 1);
-   bool found_file1 = false;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_files(base, &files), 0, cleanup, "get_files failed");
+   MCTF_ASSERT_PTR_NONNULL(files, cleanup, "files deque is null");
+   MCTF_ASSERT(pgmoneta_deque_size(files) >= 1, cleanup, "files size should be >= 1");
    pgmoneta_deque_iterator_create(files, &it);
+   MCTF_ASSERT_PTR_NONNULL(it, cleanup, "iterator is null");
    while (pgmoneta_deque_iterator_next(it))
    {
-      char* file_path = (char*)it->value->data;
-      if (pgmoneta_contains(file_path, "file1.txt"))
+      if (it->value != NULL && it->value->data != 0)
       {
-         found_file1 = true;
+         char* file_path = (char*)it->value->data;
+         if (file_path != NULL && pgmoneta_contains(file_path, "file1.txt"))
+         {
+            found_file1 = true;
+         }
       }
    }
    pgmoneta_deque_iterator_destroy(it);
+   it = NULL;
    pgmoneta_deque_destroy(files);
-   ck_assert(found_file1);
+   files = NULL;
+   MCTF_ASSERT(found_file1, cleanup, "file1.txt not found");
 
    // pgmoneta_directory_size
-   ck_assert(pgmoneta_directory_size(base) > 0);
+
+   MCTF_ASSERT(pgmoneta_directory_size(base) > 0, cleanup, "directory_size should be > 0");
 
    // pgmoneta_compare_files
-   char* file2 = "test_dir_extras/file2.txt";
+
    f = fopen(file2, "w");
    if (f)
    {
       fprintf(f, "test content");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
-   ck_assert(pgmoneta_compare_files(file1, file2));
+   MCTF_ASSERT(pgmoneta_compare_files(file1, file2), cleanup, "compare_files failed");
 
    // pgmoneta_copy_file
-   char* file3 = "test_dir_extras/file3.txt";
-   ck_assert_int_eq(pgmoneta_copy_file(file1, file3, NULL), 0);
-   ck_assert(pgmoneta_exists(file3));
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_file(file1, file3, NULL), 0, cleanup, "copy_file failed");
+   MCTF_ASSERT(pgmoneta_exists(file3), cleanup, "copied file should exist");
 
    // pgmoneta_move_file
-   char* file4 = "test_dir_extras/file4.txt";
-   ck_assert_int_eq(pgmoneta_move_file(file3, file4), 0);
-   ck_assert(pgmoneta_exists(file4));
-   ck_assert(!pgmoneta_exists(file3));
 
+   MCTF_ASSERT_INT_EQ(pgmoneta_move_file(file3, file4), 0, cleanup, "move_file failed");
+   MCTF_ASSERT(pgmoneta_exists(file4), cleanup, "moved file should exist");
+   MCTF_ASSERT(!pgmoneta_exists(file3), cleanup, "original file should not exist after move");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   if (it != NULL)
+   {
+      pgmoneta_deque_iterator_destroy(it);
+      it = NULL;
+   }
+   if (files != NULL)
+   {
+      pgmoneta_deque_destroy(files);
+      files = NULL;
+   }
+   if (dirs != NULL)
+   {
+      for (int i = 0; i < n_dirs && dirs[i] != NULL; i++)
+      {
+         free(dirs[i]);
+         dirs[i] = NULL;
+      }
+      free(dirs);
+      dirs = NULL;
+   }
    // Clean up
-   pgmoneta_delete_directory(base);
-}
-END_TEST
 
-START_TEST(test_utils_misc)
+   pgmoneta_delete_directory(base);
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_misc)
 {
    char* os = NULL;
    int major, minor, patch;
    char buf[1024];
+   FILE* f = NULL;
 
    // pgmoneta_os_kernel_version
-   ck_assert_int_eq(pgmoneta_os_kernel_version(&os, &major, &minor, &patch), 0);
-   ck_assert_ptr_nonnull(os);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_os_kernel_version(&os, &major, &minor, &patch), 0, cleanup, "os_kernel_version failed");
+   MCTF_ASSERT_PTR_NONNULL(os, cleanup, "os is null");
    // On linux it should be "Linux" or similar
+
    free(os);
+   os = NULL;
 
    // pgmoneta_normalize_path
-   FILE* f = fopen("/tmp/test.txt", "w");
+
+   f = fopen("/tmp/test.txt", "w");
    if (f)
    {
       fflush(f);
       fclose(f);
+      f = NULL;
    }
-   ck_assert_int_eq(pgmoneta_normalize_path("/tmp", "test.txt", "/tmp/default.txt", buf, sizeof(buf)), 0);
-   ck_assert(pgmoneta_contains(buf, "/tmp/test.txt"));
+   MCTF_ASSERT_INT_EQ(pgmoneta_normalize_path("/tmp", "test.txt", "/tmp/default.txt", buf, sizeof(buf)), 0, cleanup, "normalize_path failed 1");
+   MCTF_ASSERT(pgmoneta_contains(buf, "/tmp/test.txt"), cleanup, "normalize_path result 1 mismatch");
    remove("/tmp/test.txt");
 
    // Test with default path
+
    f = fopen("/tmp/default.txt", "w");
    if (f)
    {
       fflush(f);
       fclose(f);
+      f = NULL;
    }
-   ck_assert_int_eq(pgmoneta_normalize_path(NULL, "test.txt", "/tmp/default.txt", buf, sizeof(buf)), 0);
-   ck_assert_str_eq(buf, "/tmp/default.txt");
+   MCTF_ASSERT_INT_EQ(pgmoneta_normalize_path(NULL, "test.txt", "/tmp/default.txt", buf, sizeof(buf)), 0, cleanup, "normalize_path failed 2");
+   MCTF_ASSERT_STR_EQ(buf, "/tmp/default.txt", cleanup, "normalize_path result 2 mismatch");
    remove("/tmp/default.txt");
 
    // pgmoneta_backtrace_string
-   char* bt = NULL;
-   ck_assert_int_eq(pgmoneta_backtrace_string(&bt), 0);
-   ck_assert_ptr_nonnull(bt);
-   free(bt);
-}
-END_TEST
 
-START_TEST(test_utils_symlinks)
+   char* bt = NULL;
+   MCTF_ASSERT_INT_EQ(pgmoneta_backtrace_string(&bt), 0, cleanup, "backtrace_string failed");
+   MCTF_ASSERT_PTR_NONNULL(bt, cleanup, "backtrace is null");
+   free(bt);
+   bt = NULL;
+
+cleanup:
+   if (os != NULL)
+   {
+      free(os);
+      os = NULL;
+   }
+   if (bt != NULL)
+   {
+      free(bt);
+      bt = NULL;
+   }
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_symlinks)
 {
    char base[MAX_PATH];
    char* target = "test_symlinks/target.txt";
    char* slink = "test_symlinks/link.txt";
+   FILE* f = NULL;
+   char* link_target = NULL;
 
    strcpy(base, "test_symlinks");
 
    pgmoneta_delete_directory(base);
    pgmoneta_mkdir(base);
 
-   FILE* f = fopen(target, "w");
+   f = fopen(target, "w");
    if (f)
    {
       fprintf(f, "target content");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   ck_assert_int_eq(pgmoneta_symlink_file(slink, target), 0);
-   ck_assert(pgmoneta_is_symlink(slink));
-   ck_assert(pgmoneta_is_symlink_valid(slink));
+   MCTF_ASSERT_INT_EQ(pgmoneta_symlink_file(slink, target), 0, cleanup, "symlink_file failed");
+   MCTF_ASSERT(pgmoneta_is_symlink(slink), cleanup, "is_symlink failed");
+   MCTF_ASSERT(pgmoneta_is_symlink_valid(slink), cleanup, "is_symlink_valid failed");
 
-   char* link_target = pgmoneta_get_symlink(slink);
-   ck_assert_ptr_nonnull(link_target);
-   ck_assert_str_eq(link_target, target);
+   link_target = pgmoneta_get_symlink(slink);
+   MCTF_ASSERT_PTR_NONNULL(link_target, cleanup, "get_symlink returned null");
+   MCTF_ASSERT_STR_EQ(link_target, target, cleanup, "symlink target mismatch");
    free(link_target);
+   link_target = NULL;
 
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   if (link_target != NULL)
+   {
+      free(link_target);
+      link_target = NULL;
+   }
    pgmoneta_delete_directory(base);
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_server)
+MCTF_TEST(test_utils_server)
 {
    char* s = NULL;
 
-   // server 0 is "primary" in my minimal config
+   pgmoneta_test_setup();
+
+   // server 0 is "primary" in minimal config
+
    s = pgmoneta_get_server(0);
-   ck_assert_ptr_nonnull(s);
-   ck_assert(pgmoneta_contains(s, "primary"));
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server(0) failed");
+   MCTF_ASSERT(pgmoneta_contains(s, "primary"), cleanup, "server should contain 'primary'");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_backup(0);
-   ck_assert_ptr_nonnull(s);
-   ck_assert(pgmoneta_contains(s, "primary/backup"));
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_backup(0) failed");
+   MCTF_ASSERT(pgmoneta_contains(s, "primary/backup"), cleanup, "server backup should contain 'primary/backup'");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_wal(0);
-   ck_assert_ptr_nonnull(s);
-   ck_assert(pgmoneta_contains(s, "primary/wal"));
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_wal(0) failed");
+   MCTF_ASSERT(pgmoneta_contains(s, "primary/wal"), cleanup, "server wal should contain 'primary/wal'");
    free(s);
+   s = NULL;
 
    // Invalid server
-   ck_assert_ptr_null(pgmoneta_get_server(-1));
-   ck_assert_ptr_null(pgmoneta_get_server(100));
-}
-END_TEST
 
-START_TEST(test_utils_libev)
+   MCTF_ASSERT_PTR_NULL(pgmoneta_get_server(-1), cleanup, "get_server(-1) should return NULL");
+   MCTF_ASSERT_PTR_NULL(pgmoneta_get_server(100), cleanup, "get_server(100) should return NULL");
+
+cleanup:
+   if (s != NULL)
+   {
+      free(s);
+      s = NULL;
+   }
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_libev)
 {
    pgmoneta_libev_engines();
    // We cannot check EVBACKEND_* constants easily unless included
+
    // Let's assume constants are available.
 
    // Test string conversion
-   ck_assert_str_eq(pgmoneta_libev_engine(EVBACKEND_SELECT), "select");
-   ck_assert_str_eq(pgmoneta_libev_engine(EVBACKEND_POLL), "poll");
-   ck_assert_str_eq(pgmoneta_libev_engine(0xFFFFFFFF), "Unknown");
-}
-END_TEST
 
-START_TEST(test_utils_extract_error)
+   MCTF_ASSERT_STR_EQ(pgmoneta_libev_engine(EVBACKEND_SELECT), "select", cleanup, "libev_engine SELECT failed");
+   MCTF_ASSERT_STR_EQ(pgmoneta_libev_engine(EVBACKEND_POLL), "poll", cleanup, "libev_engine POLL failed");
+   MCTF_ASSERT_STR_EQ(pgmoneta_libev_engine(0xFFFFFFFF), "Unknown", cleanup, "libev_engine Unknown failed");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_extract_error)
 {
-   struct message* msg = malloc(sizeof(struct message));
+   struct message* msg = NULL;
+   char* p = NULL;
+   char* extracted = NULL;
+
+   msg = (struct message*)malloc(sizeof(struct message));
+   MCTF_ASSERT_PTR_NONNULL(msg, cleanup, "malloc message failed");
    msg->kind = 'E';
    // Data: [Type:1][Length:4] 'S' "ERROR" \0 'C' "12345" \0 \0
+
    msg->data = calloc(1, 100);
-   char* p = (char*)msg->data;
+   MCTF_ASSERT_PTR_NONNULL(msg->data, cleanup, "calloc msg->data failed");
+   p = (char*)msg->data;
 
    pgmoneta_write_byte(p, 'E');
    p += 1;
@@ -838,33 +1209,60 @@ START_TEST(test_utils_extract_error)
 
    msg->length = (char*)p - (char*)msg->data;
 
-   char* extracted = NULL;
-
-   ck_assert_int_eq(pgmoneta_extract_error_fields('S', msg, &extracted), 0);
-   ck_assert_str_eq(extracted, "ERROR");
+   MCTF_ASSERT_INT_EQ(pgmoneta_extract_error_fields('S', msg, &extracted), 0, cleanup, "extract_error_fields 'S' failed");
+   MCTF_ASSERT_PTR_NONNULL(extracted, cleanup, "extracted 'S' is null");
+   MCTF_ASSERT_STR_EQ(extracted, "ERROR", cleanup, "extracted 'S' mismatch");
    free(extracted);
+   extracted = NULL;
 
-   ck_assert_int_eq(pgmoneta_extract_error_fields('C', msg, &extracted), 0);
-   ck_assert_str_eq(extracted, "12345");
+   MCTF_ASSERT_INT_EQ(pgmoneta_extract_error_fields('C', msg, &extracted), 0, cleanup, "extract_error_fields 'C' failed");
+   MCTF_ASSERT_PTR_NONNULL(extracted, cleanup, "extracted 'C' is null");
+   MCTF_ASSERT_STR_EQ(extracted, "12345", cleanup, "extracted 'C' mismatch");
    free(extracted);
+   extracted = NULL;
 
-   ck_assert_int_ne(pgmoneta_extract_error_fields('X', msg, &extracted), 0);
-   ck_assert_ptr_null(extracted);
+   MCTF_ASSERT(pgmoneta_extract_error_fields('X', msg, &extracted) != 0, cleanup, "extract_error_fields 'X' should fail");
+   MCTF_ASSERT_PTR_NULL(extracted, cleanup, "extracted 'X' should be null");
 
-   free(msg->data);
-   free(msg);
+cleanup:
+   if (extracted != NULL)
+   {
+      free(extracted);
+      extracted = NULL;
+   }
+   if (msg != NULL)
+   {
+      if (msg->data != NULL)
+      {
+         free(msg->data);
+         msg->data = NULL;
+      }
+      free(msg);
+      msg = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_wal_unit)
+MCTF_TEST(test_utils_wal_unit)
 {
-   char* s = pgmoneta_wal_file_name(1, 1, 16 * 1024 * 1024);
-   ck_assert_str_eq(s, "000000010000000000000001");
-   free(s);
-}
-END_TEST
+   char* s = NULL;
 
-START_TEST(test_utils_base32)
+   s = pgmoneta_wal_file_name(1, 1, 16 * 1024 * 1024);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "wal_file_name failed");
+   MCTF_ASSERT_STR_EQ(s, "000000010000000000000001", cleanup, "wal_file_name result mismatch");
+   free(s);
+   s = NULL;
+
+cleanup:
+   if (s != NULL)
+   {
+      free(s);
+      s = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_base32)
 {
    unsigned char* hex = NULL;
    // "MZXW6YTBOI======" is base32 for "foobar".
@@ -874,56 +1272,70 @@ START_TEST(test_utils_base32)
    // So if input is "A", hex is "41".
 
    unsigned char input[] = "A";
-   if (pgmoneta_convert_base32_to_hex(input, 1, &hex) == 0)
-   {
-      ck_assert_ptr_nonnull(hex);
-      ck_assert_str_eq((char*)hex, "41"); // 'A' in hex is 41
-      free(hex);
-   }
+   MCTF_ASSERT_INT_EQ(pgmoneta_convert_base32_to_hex(input, 1, &hex), 0, cleanup, "convert_base32_to_hex 1 failed");
+   MCTF_ASSERT_PTR_NONNULL(hex, cleanup, "hex is null 1");
+   MCTF_ASSERT_STR_EQ((char*)hex, "41", cleanup, "hex result 1 mismatch ('A' in hex is 41)");
+   free(hex);
+   hex = NULL;
 
    unsigned char input2[] = "\x01\x02";
-   if (pgmoneta_convert_base32_to_hex(input2, 2, &hex) == 0)
-   {
-      ck_assert_str_eq((char*)hex, "0102");
-      free(hex);
-   }
-}
-END_TEST
+   MCTF_ASSERT_INT_EQ(pgmoneta_convert_base32_to_hex(input2, 2, &hex), 0, cleanup, "convert_base32_to_hex 2 failed");
+   MCTF_ASSERT_PTR_NONNULL(hex, cleanup, "hex is null 2");
+   MCTF_ASSERT_STR_EQ((char*)hex, "0102", cleanup, "hex result 2 mismatch");
+   free(hex);
+   hex = NULL;
 
-START_TEST(test_utils_enc_comp)
+cleanup:
+   if (hex != NULL)
+   {
+      free(hex);
+      hex = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_enc_comp)
 {
    // Is encrypted
-   ck_assert(pgmoneta_is_encrypted("file.aes"));
-   ck_assert(!pgmoneta_is_encrypted("file.txt"));
-   ck_assert(!pgmoneta_is_encrypted(NULL));
+
+   MCTF_ASSERT(pgmoneta_is_encrypted("file.aes"), cleanup, "is_encrypted positive failed");
+   MCTF_ASSERT(!pgmoneta_is_encrypted("file.txt"), cleanup, "is_encrypted negative 1 failed");
+   MCTF_ASSERT(!pgmoneta_is_encrypted(NULL), cleanup, "is_encrypted NULL failed");
 
    // Is compressed
-   ck_assert(pgmoneta_is_compressed("file.zstd"));
-   ck_assert(pgmoneta_is_compressed("file.lz4"));
-   ck_assert(pgmoneta_is_compressed("file.bz2"));
-   ck_assert(pgmoneta_is_compressed("file.gz"));
-   ck_assert(!pgmoneta_is_compressed("file.txt"));
-   ck_assert(!pgmoneta_is_compressed(NULL));
-}
-END_TEST
 
-START_TEST(test_utils_message_parsing)
+   MCTF_ASSERT(pgmoneta_is_compressed("file.zstd"), cleanup, "is_compressed zstd failed");
+   MCTF_ASSERT(pgmoneta_is_compressed("file.lz4"), cleanup, "is_compressed lz4 failed");
+   MCTF_ASSERT(pgmoneta_is_compressed("file.bz2"), cleanup, "is_compressed bz2 failed");
+   MCTF_ASSERT(pgmoneta_is_compressed("file.gz"), cleanup, "is_compressed gz failed");
+   MCTF_ASSERT(!pgmoneta_is_compressed("file.txt"), cleanup, "is_compressed negative failed");
+   MCTF_ASSERT(!pgmoneta_is_compressed(NULL), cleanup, "is_compressed NULL failed");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_message_parsing)
 {
    struct message* msg = NULL;
    struct message* extracted = NULL;
    char* username = NULL;
    char* database = NULL;
    char* appname = NULL;
-   int res;
+   int res = 0;
    void* p = NULL;
 
    msg = (struct message*)malloc(sizeof(struct message));
+   MCTF_ASSERT_PTR_NONNULL(msg, cleanup, "malloc message failed 1");
    msg->kind = 0;
    msg->data = calloc(1, 1024);
+   MCTF_ASSERT_PTR_NONNULL(msg->data, cleanup, "calloc msg->data failed 1");
    p = msg->data;
 
    // The utility expects [Length(4)][Protocol(4)][Key][Val]...
+
    // We write a dummy length first.
+
    pgmoneta_write_int32(p, 0);
    p += 4;
    pgmoneta_write_int32(p, 196608);
@@ -946,26 +1358,34 @@ START_TEST(test_utils_message_parsing)
    msg->length = (char*)p - (char*)msg->data;
 
    res = pgmoneta_extract_username_database(msg, &username, &database, &appname);
-
-   ck_assert_int_eq(res, 0);
-   if (res == 0)
-   {
-      ck_assert_str_eq(username, "myuser");
-      ck_assert_str_eq(database, "mydb");
-      ck_assert_str_eq(appname, "myapp");
-   }
+   MCTF_ASSERT_INT_EQ(res, 0, cleanup, "extract_username_database failed");
+   MCTF_ASSERT_PTR_NONNULL(username, cleanup, "username is null");
+   MCTF_ASSERT_PTR_NONNULL(database, cleanup, "database is null");
+   MCTF_ASSERT_PTR_NONNULL(appname, cleanup, "appname is null");
+   MCTF_ASSERT_STR_EQ(username, "myuser", cleanup, "username mismatch");
+   MCTF_ASSERT_STR_EQ(database, "mydb", cleanup, "database mismatch");
+   MCTF_ASSERT_STR_EQ(appname, "myapp", cleanup, "appname mismatch");
 
    free(username);
+   username = NULL;
    free(database);
+   database = NULL;
    free(appname);
+   appname = NULL;
    free(msg->data);
+   msg->data = NULL;
    free(msg);
+   msg = NULL;
 
    // Test pgmoneta_extract_message (e.g. ErrorResponse 'E')
+
    // extract_message expects [Type][Length]... in msg->data
+
    msg = (struct message*)malloc(sizeof(struct message));
-   msg->kind = 'E'; // This doesn't matter for the function logic much if we pass type but good to set
+   MCTF_ASSERT_PTR_NONNULL(msg, cleanup, "malloc message failed 2");
+   msg->kind = 'E';
    msg->data = calloc(1, 1024);
+   MCTF_ASSERT_PTR_NONNULL(msg->data, cleanup, "calloc msg->data failed 2");
    p = msg->data;
 
    pgmoneta_write_byte(p, 'E');
@@ -975,57 +1395,101 @@ START_TEST(test_utils_message_parsing)
    msg->length = (char*)p - (char*)msg->data;
 
    res = pgmoneta_extract_message('E', msg, &extracted);
-   ck_assert_int_eq(res, 0);
-   ck_assert_ptr_nonnull(extracted);
-   ck_assert_int_eq(extracted->kind, 'E');
+   MCTF_ASSERT_INT_EQ(res, 0, cleanup, "extract_message failed");
+   MCTF_ASSERT_PTR_NONNULL(extracted, cleanup, "extracted message is null");
+   MCTF_ASSERT_INT_EQ(extracted->kind, 'E', cleanup, "extracted message kind mismatch");
 
    pgmoneta_free_message(extracted);
-   free(msg->data);
-   free(msg);
-}
-END_TEST
+   extracted = NULL;
 
-START_TEST(test_utils_permissions)
+cleanup:
+   if (username != NULL)
+   {
+      free(username);
+      username = NULL;
+   }
+   if (database != NULL)
+   {
+      free(database);
+      database = NULL;
+   }
+   if (appname != NULL)
+   {
+      free(appname);
+      appname = NULL;
+   }
+   if (extracted != NULL)
+   {
+      pgmoneta_free_message(extracted);
+      extracted = NULL;
+   }
+   if (msg != NULL)
+   {
+      if (msg->data != NULL)
+      {
+         free(msg->data);
+         msg->data = NULL;
+      }
+      free(msg);
+      msg = NULL;
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_permissions)
 {
    char* dir = "test_perm_dir";
    char* file = "test_perm_dir/file";
-   mode_t mode;
+   mode_t mode = 0;
+   FILE* f = NULL;
 
    pgmoneta_delete_directory(dir);
    pgmoneta_mkdir(dir);
 
-   FILE* f = fopen(file, "w");
+   f = fopen(file, "w");
    if (f)
    {
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   ck_assert_int_eq(pgmoneta_permission_recursive(dir), 0);
+   MCTF_ASSERT_INT_EQ(pgmoneta_permission_recursive(dir), 0, cleanup, "permission_recursive failed");
 
    mode = pgmoneta_get_permission(file);
-   ck_assert(mode > 0);
+   MCTF_ASSERT(mode > 0, cleanup, "get_permission should be > 0");
 
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
    pgmoneta_delete_directory(dir);
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_space)
+MCTF_TEST(test_utils_space)
 {
-   unsigned long total_sp = pgmoneta_total_space(".");
-   ck_assert(total_sp > 0);
-
+   unsigned long total_sp = 0;
    char* dir = "test_space_dir";
    char* file1 = "test_space_dir/small";
    char* file2 = "test_space_dir/big";
+   FILE* f = NULL;
+   unsigned long biggest = 0;
+
+   total_sp = pgmoneta_total_space(".");
+   MCTF_ASSERT(total_sp > 0, cleanup, "total_space should be > 0");
+
    pgmoneta_mkdir(dir);
 
-   FILE* f = fopen(file1, "w");
+   f = fopen(file1, "w");
    if (f)
    {
       fprintf(f, "a");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
    f = fopen(file2, "w");
    if (f)
@@ -1033,16 +1497,23 @@ START_TEST(test_utils_space)
       fprintf(f, "aaaaa");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   unsigned long biggest = pgmoneta_biggest_file(dir);
-   ck_assert(biggest >= 5);
+   biggest = pgmoneta_biggest_file(dir);
+   MCTF_ASSERT(biggest >= 5, cleanup, "biggest_file should be >= 5");
 
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
    pgmoneta_delete_directory(dir);
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_files_advanced)
+MCTF_TEST(test_utils_files_advanced)
 {
    char* src = NULL;
    char* dst = NULL;
@@ -1050,38 +1521,54 @@ START_TEST(test_utils_files_advanced)
    char* subfile = NULL;
    char* file_src = NULL;
    char* file_dst = NULL;
+   FILE* f = NULL;
+   char* to_ptr = NULL;
 
    src = pgmoneta_append(NULL, "test_adv_src");
+   MCTF_ASSERT_PTR_NONNULL(src, cleanup, "append src failed");
    dst = pgmoneta_append(NULL, "test_adv_dst");
+   MCTF_ASSERT_PTR_NONNULL(dst, cleanup, "append dst failed");
    sub = pgmoneta_append(NULL, src);
+   MCTF_ASSERT_PTR_NONNULL(sub, cleanup, "append sub base failed");
    sub = pgmoneta_append(sub, "/sub");
+   MCTF_ASSERT_PTR_NONNULL(sub, cleanup, "append sub failed");
    subfile = pgmoneta_append(NULL, sub);
+   MCTF_ASSERT_PTR_NONNULL(subfile, cleanup, "append subfile base failed");
    subfile = pgmoneta_append(subfile, "/file.txt");
+   MCTF_ASSERT_PTR_NONNULL(subfile, cleanup, "append subfile failed");
 
    // Setup source
+
    pgmoneta_delete_directory(src);
    pgmoneta_delete_directory(dst);
 
    pgmoneta_mkdir(src);
    pgmoneta_mkdir(sub);
-   FILE* f = fopen(subfile, "w");
+   f = fopen(subfile, "w");
    if (f)
    {
       fprintf(f, "data");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
    // Test is_wal_file
-   ck_assert(pgmoneta_is_wal_file("000000010000000000000001"));
-   ck_assert(!pgmoneta_is_wal_file("history"));
-   ck_assert(!pgmoneta_is_wal_file("000000010000000000000001.partial"));
+
+   MCTF_ASSERT(pgmoneta_is_wal_file("000000010000000000000001"), cleanup, "is_wal_file positive failed");
+   MCTF_ASSERT(!pgmoneta_is_wal_file("history"), cleanup, "is_wal_file negative 1 failed");
+   MCTF_ASSERT(!pgmoneta_is_wal_file("000000010000000000000001.partial"), cleanup, "is_wal_file negative 2 failed");
 
    // Test copy_and_extract basic
+
    file_src = pgmoneta_append(NULL, src);
+   MCTF_ASSERT_PTR_NONNULL(file_src, cleanup, "append file_src base failed");
    file_src = pgmoneta_append(file_src, "/plain.txt");
+   MCTF_ASSERT_PTR_NONNULL(file_src, cleanup, "append file_src failed");
    file_dst = pgmoneta_append(NULL, dst);
+   MCTF_ASSERT_PTR_NONNULL(file_dst, cleanup, "append file_dst base failed");
    file_dst = pgmoneta_append(file_dst, "/plain.txt");
+   MCTF_ASSERT_PTR_NONNULL(file_dst, cleanup, "append file_dst failed");
 
    pgmoneta_mkdir(dst);
    f = fopen(file_src, "w");
@@ -1090,131 +1577,239 @@ START_TEST(test_utils_files_advanced)
       fprintf(f, "plain");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   char* to_ptr = strdup(file_dst);
-   ck_assert_int_eq(pgmoneta_copy_and_extract_file(file_src, &to_ptr), 0);
-   ck_assert(pgmoneta_exists(file_dst));
+   to_ptr = strdup(file_dst);
+   MCTF_ASSERT_PTR_NONNULL(to_ptr, cleanup, "strdup failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_and_extract_file(file_src, &to_ptr), 0, cleanup, "copy_and_extract_file failed");
+   MCTF_ASSERT(pgmoneta_exists(file_dst), cleanup, "copied file should exist");
    free(to_ptr);
+   to_ptr = NULL;
 
    // Test list_directory (just ensure it runs)
+
    pgmoneta_list_directory(src);
 
-   pgmoneta_delete_directory(src);
-   pgmoneta_delete_directory(dst);
-
-   free(src);
-   free(dst);
-   free(sub);
-   free(subfile);
-   free(file_src);
-   free(file_dst);
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   if (to_ptr != NULL)
+   {
+      free(to_ptr);
+      to_ptr = NULL;
+   }
+   if (src != NULL)
+   {
+      pgmoneta_delete_directory(src);
+      free(src);
+      src = NULL;
+   }
+   if (dst != NULL)
+   {
+      pgmoneta_delete_directory(dst);
+      free(dst);
+      dst = NULL;
+   }
+   if (sub != NULL)
+   {
+      free(sub);
+      sub = NULL;
+   }
+   if (subfile != NULL)
+   {
+      free(subfile);
+      subfile = NULL;
+   }
+   if (file_src != NULL)
+   {
+      free(file_src);
+      file_src = NULL;
+   }
+   if (file_dst != NULL)
+   {
+      free(file_dst);
+      file_dst = NULL;
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_missing_basic)
+MCTF_TEST(test_utils_missing_basic)
 {
    // Time functions
+
    struct timespec start = {100, 0};
    struct timespec end = {105, 500000000}; // 5.5 seconds later
    double seconds = 0;
+   double duration = 0;
+   char* ts_str = NULL;
+   char* user = NULL;
+   char* home = NULL;
+   char* fpath = "test_del_file.txt";
+   FILE* f = NULL;
+   char* dir = "test_link_at_dir";
 
-   double duration = pgmoneta_compute_duration(start, end);
-   ck_assert(duration > 5.4 && duration < 5.6);
+   duration = pgmoneta_compute_duration(start, end);
+   MCTF_ASSERT(duration > 5.4 && duration < 5.6, cleanup, "compute_duration failed");
 
-   char* ts_str = pgmoneta_get_timestamp_string(start, end, &seconds);
-   ck_assert_ptr_nonnull(ts_str);
-   ck_assert(seconds > 5.4 && seconds < 5.6);
+   ts_str = pgmoneta_get_timestamp_string(start, end, &seconds);
+   MCTF_ASSERT_PTR_NONNULL(ts_str, cleanup, "get_timestamp_string failed");
+   MCTF_ASSERT(seconds > 5.4 && seconds < 5.6, cleanup, "get_timestamp_string seconds mismatch");
    free(ts_str);
+   ts_str = NULL;
 
    // System / User
-   char* user = pgmoneta_get_user_name();
-   ck_assert_ptr_nonnull(user);
-   free(user);
 
-   char* home = pgmoneta_get_home_directory();
-   ck_assert_ptr_nonnull(home);
+   user = pgmoneta_get_user_name();
+   MCTF_ASSERT_PTR_NONNULL(user, cleanup, "get_user_name failed");
+   free(user);
+   user = NULL;
+
+   home = pgmoneta_get_home_directory();
+   MCTF_ASSERT_PTR_NONNULL(home, cleanup, "get_home_directory failed");
    free(home);
+   home = NULL;
 
    // File Extended
-   char* fpath = "test_del_file.txt";
-   FILE* f = fopen(fpath, "w");
+
+   f = fopen(fpath, "w");
    if (f)
    {
       fprintf(f, "12345");
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   ck_assert_int_eq(pgmoneta_get_file_size(fpath), 5);
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_file_size(fpath), 5, cleanup, "get_file_size failed");
 
    // pgmoneta_delete_file(char* file, struct workers* workers)
-   ck_assert_int_eq(pgmoneta_delete_file(fpath, NULL), 0);
-   ck_assert(!pgmoneta_exists(fpath));
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_delete_file(fpath, NULL), 0, cleanup, "delete_file failed");
+   MCTF_ASSERT(!pgmoneta_exists(fpath), cleanup, "file should be deleted");
 
    // Create temp dir for symlink test
-   char* dir = "test_link_at_dir";
+
    pgmoneta_mkdir(dir);
    pgmoneta_delete_directory(dir);
-}
-END_TEST
 
-START_TEST(test_utils_missing_server)
+cleanup:
+   if (ts_str != NULL)
+   {
+      free(ts_str);
+      ts_str = NULL;
+   }
+   if (user != NULL)
+   {
+      free(user);
+      user = NULL;
+   }
+   if (home != NULL)
+   {
+      free(home);
+      home = NULL;
+   }
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   if (pgmoneta_exists(dir))
+   {
+      pgmoneta_delete_directory(dir);
+   }
+   if (pgmoneta_exists(fpath))
+   {
+      pgmoneta_delete_file(fpath, NULL);
+   }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_missing_server)
 {
    char* s = NULL;
    int server = 0;
    char* id = "20231026120000";
+   struct main_configuration* config = NULL;
+
+   pgmoneta_test_setup();
+
+   config = (struct main_configuration*)shmem;
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "configuration is null");
 
    s = pgmoneta_get_server_summary(server);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_summary failed");
    free(s);
+   s = NULL;
 
    // Inject wal_shipping config for testing
-   struct main_configuration* config = (struct main_configuration*)shmem;
+
    strcpy(config->common.servers[server].wal_shipping, "/tmp/wal_ship");
 
    s = pgmoneta_get_server_wal_shipping(server);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_wal_shipping failed");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_wal_shipping_wal(server);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_wal_shipping_wal failed");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_workspace(server);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_workspace failed");
    // Setup workspace for delete test
+
    pgmoneta_mkdir(s);
 
    // Check deletion
-   ck_assert_int_eq(pgmoneta_delete_server_workspace(server, NULL), 0);
-   ck_assert(!pgmoneta_exists(s));
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_delete_server_workspace(server, NULL), 0, cleanup, "delete_server_workspace failed");
+   MCTF_ASSERT(!pgmoneta_exists(s), cleanup, "workspace should be deleted");
    free(s);
+   s = NULL;
 
    // Identifiers
+
    s = pgmoneta_get_server_backup_identifier(server, id);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_backup_identifier failed");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_extra_identifier(server, id);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_extra_identifier failed");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_backup_identifier_data(server, id);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_backup_identifier_data failed");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_backup_identifier_data_wal(server, id);
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_backup_identifier_data_wal failed");
    free(s);
+   s = NULL;
 
    s = pgmoneta_get_server_backup_identifier_tablespace(server, id, "tbs");
-   ck_assert_ptr_nonnull(s);
+   MCTF_ASSERT_PTR_NONNULL(s, cleanup, "get_server_backup_identifier_tablespace failed");
    free(s);
-}
-END_TEST
+   s = NULL;
 
-START_TEST(test_utils_missing_wal)
+cleanup:
+   if (s != NULL)
+   {
+      free(s);
+      s = NULL;
+   }
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_missing_wal)
 {
    char* dir = NULL;
    char* file1 = NULL;
@@ -1222,57 +1817,113 @@ START_TEST(test_utils_missing_wal)
    char* to_dir = NULL;
    char* check_file = NULL;
    struct deque* files = NULL;
+   FILE* f = NULL;
 
    dir = pgmoneta_append(NULL, "test_wal_dir");
+   MCTF_ASSERT_PTR_NONNULL(dir, cleanup, "append dir failed");
    pgmoneta_mkdir(dir);
 
    // Create dummy WAL files (24 chars hex)
-   file1 = pgmoneta_append(NULL, dir);
-   file1 = pgmoneta_append(file1, "/000000010000000000000001");
-   file2 = pgmoneta_append(NULL, dir);
-   file2 = pgmoneta_append(file2, "/000000010000000000000002");
 
-   FILE* f = fopen(file1, "w");
+   file1 = pgmoneta_append(NULL, dir);
+   MCTF_ASSERT_PTR_NONNULL(file1, cleanup, "append file1 base failed");
+   file1 = pgmoneta_append(file1, "/000000010000000000000001");
+   MCTF_ASSERT_PTR_NONNULL(file1, cleanup, "append file1 failed");
+   file2 = pgmoneta_append(NULL, dir);
+   MCTF_ASSERT_PTR_NONNULL(file2, cleanup, "append file2 base failed");
+   file2 = pgmoneta_append(file2, "/000000010000000000000002");
+   MCTF_ASSERT_PTR_NONNULL(file2, cleanup, "append file2 failed");
+
+   f = fopen(file1, "w");
    if (f)
    {
       fflush(f);
       fclose(f);
+      f = NULL;
    }
    f = fopen(file2, "w");
    if (f)
    {
       fflush(f);
       fclose(f);
+      f = NULL;
    }
 
-   ck_assert_int_eq(pgmoneta_get_wal_files(dir, &files), 0);
-   ck_assert_int_eq(pgmoneta_deque_size(files), 2);
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_wal_files(dir, &files), 0, cleanup, "get_wal_files failed");
+   MCTF_ASSERT_PTR_NONNULL(files, cleanup, "files deque is null");
+   MCTF_ASSERT_INT_EQ(pgmoneta_deque_size(files), 2, cleanup, "files size should be 2");
    pgmoneta_deque_destroy(files);
+   files = NULL;
 
    // number_of_wal_files
-   ck_assert_int_eq(pgmoneta_number_of_wal_files(dir, "000000000000000000000000", NULL), 2);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_number_of_wal_files(dir, "000000000000000000000000", NULL), 2, cleanup, "number_of_wal_files failed");
 
    // copy_wal_files
+
    to_dir = pgmoneta_append(NULL, "test_wal_dir_copy");
+   MCTF_ASSERT_PTR_NONNULL(to_dir, cleanup, "append to_dir failed");
    pgmoneta_mkdir(to_dir);
 
-   ck_assert_int_eq(pgmoneta_copy_wal_files(dir, to_dir, "000000000000000000000000", NULL), 0);
+   MCTF_ASSERT_INT_EQ(pgmoneta_copy_wal_files(dir, to_dir, "000000000000000000000000", NULL), 0, cleanup, "copy_wal_files failed");
    check_file = pgmoneta_append(NULL, to_dir);
+   MCTF_ASSERT_PTR_NONNULL(check_file, cleanup, "append check_file base failed");
    check_file = pgmoneta_append(check_file, "/000000010000000000000001");
-   ck_assert(pgmoneta_exists(check_file));
+   MCTF_ASSERT_PTR_NONNULL(check_file, cleanup, "append check_file failed");
+   MCTF_ASSERT(pgmoneta_exists(check_file), cleanup, "copied WAL file should exist");
 
-   pgmoneta_delete_directory(to_dir);
-   pgmoneta_delete_directory(dir);
-
-   free(dir);
-   free(file1);
-   free(file2);
-   free(to_dir);
-   free(check_file);
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   if (files != NULL)
+   {
+      pgmoneta_deque_destroy(files);
+      files = NULL;
+   }
+   if (to_dir != NULL && pgmoneta_exists(to_dir))
+   {
+      pgmoneta_delete_directory(to_dir);
+   }
+   if (dir != NULL)
+   {
+      pgmoneta_delete_directory(dir);
+   }
+   if (dir != NULL)
+   {
+      free(dir);
+      dir = NULL;
+   }
+   if (file1 != NULL)
+   {
+      free(file1);
+      file1 = NULL;
+   }
+   if (file2 != NULL)
+   {
+      free(file2);
+      file2 = NULL;
+   }
+   if (to_dir != NULL)
+   {
+      free(to_dir);
+      to_dir = NULL;
+   }
+   if (check_file != NULL)
+   {
+      free(check_file);
+      check_file = NULL;
+   }
+   if (pgmoneta_exists(dir))
+   {
+      pgmoneta_delete_directory(dir);
+   }
+   MCTF_FINISH();
 }
-END_TEST
 
-START_TEST(test_utils_missing_misc)
+MCTF_TEST(test_utils_missing_misc)
 {
    // pgmoneta_extract_message_from_data
    // Construct a raw message buffer: Type (1 byte) + Length (4 bytes) + Data
@@ -1281,92 +1932,46 @@ START_TEST(test_utils_missing_misc)
    // Usually `data` is the payload.
 
    char buffer[1024];
+   int len = 8; // 4 bytes for length field itself + 4 bytes content
+   int nlen = 0;
+   struct message* extracted = NULL;
+   char arg0[32];
+   char* argv[] = {arg0, NULL};
+   struct main_configuration* config = NULL;
+
    memset(buffer, 0, 1024);
    // Format: Type(1) + Length(4) + Content
    buffer[0] = 'Q';
-   int len = 8; // 4 bytes for length field itself + 4 bytes content
-   int nlen = htonl(len);
+   nlen = htonl(len);
    memcpy(buffer + 1, &nlen, 4);
    memcpy(buffer + 1 + 4, "TEST", 4);
 
-   struct message* extracted = NULL;
-   ck_assert_int_eq(pgmoneta_extract_message_from_data('Q', buffer, 9, &extracted), 0);
-   ck_assert_ptr_nonnull(extracted);
-   ck_assert_int_eq(extracted->kind, 'Q');
-   ck_assert_int_eq(extracted->length, 9);
+   MCTF_ASSERT_INT_EQ(pgmoneta_extract_message_from_data('Q', buffer, 9, &extracted), 0, cleanup, "extract_message_from_data failed");
+   MCTF_ASSERT_PTR_NONNULL(extracted, cleanup, "extracted message is null");
+   MCTF_ASSERT_INT_EQ(extracted->kind, 'Q', cleanup, "extracted message kind mismatch");
+   MCTF_ASSERT_INT_EQ(extracted->length, 9, cleanup, "extracted message length mismatch");
 
    pgmoneta_free_message(extracted);
+   extracted = NULL;
 
-   // pgmoneta_set_proc_title(int argc, char** argv, char* s1, char* s2)
-   // Use mutable argv
-   char arg0[32];
-   strcpy(arg0, "pgmoneta");
-   char* argv[] = {arg0, NULL};
-   pgmoneta_set_proc_title(1, argv, "test", "title");
-}
-END_TEST
+   pgmoneta_test_setup();
+   config = (struct main_configuration*)shmem;
+   if (config != NULL)
+   {
+      unsigned int original_update_process_title = config->update_process_title;
+      config->update_process_title = UPDATE_PROCESS_TITLE_NEVER;
+      strcpy(arg0, "pgmoneta");
+      pgmoneta_set_proc_title(1, argv, "test", "title");
+      config->update_process_title = original_update_process_title;
+      config = NULL;
+   }
+   pgmoneta_test_teardown();
 
-Suite*
-pgmoneta_test_utils_suite()
-{
-   Suite* s;
-   TCase* tc_utils;
-
-   s = suite_create("pgmoneta_test_utils");
-
-   tc_utils = tcase_create("test_utils");
-   tcase_set_tags(tc_utils, "common");
-   tcase_set_timeout(tc_utils, 60);
-   tcase_add_checked_fixture(tc_utils, pgmoneta_test_setup, pgmoneta_test_teardown);
-   tcase_add_test(tc_utils, test_resolve_path_trailing_env_var);
-   tcase_add_test(tc_utils, test_calculate_wal_size);
-   tcase_add_test(tc_utils, test_utils_starts_with);
-   tcase_add_test(tc_utils, test_utils_ends_with);
-   tcase_add_test(tc_utils, test_utils_contains);
-   tcase_add_test(tc_utils, test_utils_compare_string);
-   tcase_add_test(tc_utils, test_utils_atoi);
-   tcase_add_test(tc_utils, test_utils_is_number);
-   tcase_add_test(tc_utils, test_utils_base64);
-   tcase_add_test(tc_utils, test_utils_is_incremental_path);
-   tcase_add_test(tc_utils, test_utils_get_parent_dir);
-   tcase_add_test(tc_utils, test_utils_serialization);
-   tcase_add_test(tc_utils, test_utils_append);
-   tcase_add_test(tc_utils, test_utils_string_manipulation);
-   tcase_add_test(tc_utils, test_utils_math);
-   tcase_add_test(tc_utils, test_utils_version);
-   tcase_add_test(tc_utils, test_utils_bigendian);
-   tcase_add_test(tc_utils, test_utils_strip_extension);
-   tcase_add_test(tc_utils, test_utils_file_size);
-   tcase_add_test(tc_utils, test_utils_file_ops);
-   tcase_add_test(tc_utils, test_utils_snprintf);
-   tcase_add_test(tc_utils, test_utils_string_extras);
-   tcase_add_test(tc_utils, test_utils_merge_string_arrays);
-   tcase_add_test(tc_utils, test_utils_time);
-   tcase_add_test(tc_utils, test_utils_token_bucket);
-   tcase_add_test(tc_utils, test_utils_file_dir);
-   tcase_add_test(tc_utils, test_utils_symlinks);
-   tcase_add_test(tc_utils, test_utils_server);
-   tcase_add_test(tc_utils, test_utils_misc);
-   tcase_add_test(tc_utils, test_utils_message_parsing);
-   tcase_add_test(tc_utils, test_utils_permissions);
-   tcase_add_test(tc_utils, test_utils_space);
-
-   tcase_add_test(tc_utils, test_utils_base32);
-   tcase_add_test(tc_utils, test_utils_enc_comp);
-
-   tcase_add_test(tc_utils, test_utils_missing_server);
-   tcase_add_test(tc_utils, test_utils_missing_wal);
-   tcase_add_test(tc_utils, test_utils_missing_misc);
-
-   tcase_add_test(tc_utils, test_utils_wal_unit);
-
-   tcase_add_test(tc_utils, test_utils_libev);
-   tcase_add_test(tc_utils, test_utils_extract_error);
-
-   tcase_add_test(tc_utils, test_utils_files_advanced);
-
-   tcase_add_test(tc_utils, test_utils_missing_basic);
-
-   suite_add_tcase(s, tc_utils);
-   return s;
+cleanup:
+   if (extracted != NULL)
+   {
+      pgmoneta_free_message(extracted);
+      extracted = NULL;
+   }
+   MCTF_FINISH();
 }
