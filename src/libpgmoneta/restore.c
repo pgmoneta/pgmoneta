@@ -1845,12 +1845,14 @@ write_reconstructed_file_full(char* output_file_path,
    }
    if (wfp != NULL)
    {
+      fflush(wfp);
       fclose(wfp);
    }
    return 0;
 error:
    if (wfp != NULL)
    {
+      fflush(wfp);
       fclose(wfp);
    }
    return 1;
@@ -1947,6 +1949,7 @@ write_reconstructed_file_incremental(char* output_file_path,
    free(header);
    if (wfp != NULL)
    {
+      fflush(wfp);
       fclose(wfp);
    }
    return 0;
@@ -1955,6 +1958,7 @@ error:
    free(header);
    if (wfp != NULL)
    {
+      fflush(wfp);
       fclose(wfp);
    }
    return 1;
@@ -2020,6 +2024,7 @@ write_backup_label(char* from_dir, char* to_dir, char* lsn_entry, char* tli_entr
    }
 
    fclose(from);
+   fflush(to);
    fclose(to);
    return 0;
 error:
@@ -2029,6 +2034,7 @@ error:
    }
    if (to != NULL)
    {
+      fflush(to);
       fclose(to);
    }
    return 1;

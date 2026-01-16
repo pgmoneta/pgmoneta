@@ -1425,6 +1425,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
 
    pgmoneta_permission(bck_info_file, 6, 0, 0);
 
+   fflush(sfile);
    fsync(fileno(sfile));
    fclose(sfile);
 
@@ -1441,6 +1442,7 @@ error:
 
    if (sfile != NULL)
    {
+      fflush(sfile);
       fclose(sfile);
    }
 
@@ -1981,6 +1983,7 @@ create_info(char* directory, char* label, int status)
 
    if (sfile != NULL)
    {
+      fflush(sfile);
       fsync(fileno(sfile));
       fclose(sfile);
    }

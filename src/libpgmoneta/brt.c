@@ -365,6 +365,7 @@ pgmoneta_brt_write(block_ref_table* brt, char* file_path)
    // /* Write out appropriate terminator and flush buffer. */
    brt_file_terminate(file, buffer);
 
+   fflush(file);
    fclose(file);
    free(sdata);
    free(buffer);
@@ -372,6 +373,7 @@ pgmoneta_brt_write(block_ref_table* brt, char* file_path)
 error:
    if (file != NULL)
    {
+      fflush(file);
       fclose(file);
    }
    free(sdata);

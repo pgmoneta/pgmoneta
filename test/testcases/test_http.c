@@ -173,6 +173,7 @@ START_TEST(test_pgmoneta_http_put_file)
    pgmoneta_http_response_destroy(response);
    pgmoneta_http_destroy(connection);
    free(file_data);
+   fflush(temp_file);
    fclose(temp_file);
 }
 END_TEST

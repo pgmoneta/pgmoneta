@@ -62,12 +62,14 @@ validate_wal_file(char* path)
       goto error;
    }
 
+   fflush(file);
    fclose(file);
    return PGMONETA_WAL_SUCCESS;
 
 error:
    if (file)
    {
+      fflush(file);
       fclose(file);
    }
    return error_code;

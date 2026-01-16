@@ -716,6 +716,7 @@ lz4_compress(char* from, char* to)
       buffInIndex = (buffInIndex + 1) % 2;
    }
 
+   fflush(fout);
    fclose(fout);
    fclose(fin);
    LZ4_freeStream(lz4Stream);
@@ -731,6 +732,7 @@ error:
 
    if (fout != NULL)
    {
+      fflush(fout);
       fclose(fout);
    }
 
@@ -807,6 +809,7 @@ lz4_decompress(char* from, char* to)
       buffInIndex = (buffInIndex + 1) % 2;
    }
 
+   fflush(fout);
    fclose(fout);
    fclose(fin);
 
@@ -820,6 +823,7 @@ error:
 
    if (fout != NULL)
    {
+      fflush(fout);
       fclose(fout);
    }
 

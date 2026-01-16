@@ -1132,6 +1132,7 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
       }
    }
 
+   fflush(fout);
    fclose(fout);
    fclose(fin);
 
@@ -1141,6 +1142,7 @@ error:
 
    if (fout != NULL)
    {
+      fflush(fout);
       fclose(fout);
    }
 
@@ -1210,6 +1212,7 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    }
 
    fclose(fin);
+   fflush(fout);
    fclose(fout);
 
    return 0;
@@ -1223,6 +1226,7 @@ error:
 
    if (fout != NULL)
    {
+      fflush(fout);
       fclose(fout);
    }
 

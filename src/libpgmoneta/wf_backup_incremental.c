@@ -1245,12 +1245,14 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
       memset(read_buffer, 0, sizeof(read_buffer));
    }
 
+   fflush(label_file);
    fclose(label_file);
    fclose(prev_label_file);
    return 0;
 error:
    if (label_file)
    {
+      fflush(label_file);
       fclose(label_file);
    }
    if (prev_label_file)
@@ -1526,6 +1528,7 @@ done:
    free(filepath);
    free(file_name);
    free(rel_path);
+   fflush(file);
    fclose(file);
    return 0;
 
@@ -1534,7 +1537,11 @@ error:
    free(filepath);
    free(file_name);
    free(rel_path);
-   fclose(file);
+   if (file != NULL)
+   {
+      fflush(file);
+      fclose(file);
+   }
    return 1;
 }
 
@@ -1593,12 +1600,17 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
    }
 
    free(filepath);
+   fflush(file);
    fclose(file);
    return 0;
 error:
    free(binary_data);
    free(filepath);
-   fclose(file);
+   if (file != NULL)
+   {
+      fflush(file);
+      fclose(file);
+   }
    return 1;
 }
 

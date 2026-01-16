@@ -716,6 +716,7 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* backup_data, ch
          pgmoneta_log_error("Error writing the file backup_label");
          goto error;
       }
+      fflush(file);
       fclose(file);
    }
 
@@ -730,6 +731,7 @@ error:
    pgmoneta_free_query_response(response);
    if (file != NULL)
    {
+      fflush(file);
       fclose(file);
    }
    return 1;

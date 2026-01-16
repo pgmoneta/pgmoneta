@@ -498,6 +498,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       free(password);
    }
 
+   fflush(file);
    fclose(file);
    file = NULL;
 
@@ -517,6 +518,7 @@ error:
 
    if (file)
    {
+      fflush(file);
       fclose(file);
       file = NULL;
    }
@@ -820,6 +822,7 @@ password:
    }
    free(verify);
 
+   fflush(users_file);
    fclose(users_file);
    users_file = NULL;
 
@@ -866,6 +869,7 @@ error:
 
    if (users_file)
    {
+      fflush(users_file);
       fclose(users_file);
       users_file = NULL;
    }
@@ -1151,6 +1155,7 @@ password:
 
    fclose(users_file);
    users_file = NULL;
+   fflush(users_file_tmp);
    fclose(users_file_tmp);
    users_file_tmp = NULL;
 
@@ -1204,6 +1209,7 @@ error:
 
    if (users_file_tmp)
    {
+      fflush(users_file_tmp);
       fclose(users_file_tmp);
       users_file_tmp = NULL;
    }
@@ -1318,6 +1324,7 @@ username:
 
    fclose(users_file);
    users_file = NULL;
+   fflush(users_file_tmp);
    fclose(users_file_tmp);
    users_file_tmp = NULL;
 
@@ -1362,6 +1369,7 @@ error:
 
    if (users_file_tmp)
    {
+      fflush(users_file_tmp);
       fclose(users_file_tmp);
       users_file_tmp = NULL;
    }

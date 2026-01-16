@@ -293,6 +293,7 @@ azure_upload_files(char* local_root, char* azure_root, char* relative_path)
 
       azure_send_upload_request(local_root, azure_root, relative_file);
 
+      fflush(file);
       fclose(file);
 
       remove(new_file);

@@ -132,6 +132,7 @@ pgmoneta_csv_writer_init(char* path, struct csv_writer** writer)
 error:
    if (w->file != NULL)
    {
+      fflush(w->file);
       fclose(w->file);
    }
    free(w);
@@ -176,6 +177,7 @@ pgmoneta_csv_writer_destroy(struct csv_writer* writer)
    }
    if (writer->file != NULL)
    {
+      fflush(writer->file);
       fclose(writer->file);
    }
    free(writer);

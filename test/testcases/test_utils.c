@@ -74,12 +74,15 @@ START_TEST(test_calculate_wal_size)
 
    FILE* f1 = fopen(w1, "w");
    fprintf(f1, "1234567890");
+   fflush(f1);
    fclose(f1); // 10 bytes
    FILE* f2 = fopen(w2_real, "w");
    fprintf(f2, "12345678901234567890");
+   fflush(f2);
    fclose(f2); // 20 bytes
    FILE* f3 = fopen(w3, "w");
    fprintf(f3, "123456789012345678901234567890");
+   fflush(f3);
    fclose(f3); // 30 bytes
 
    unsigned long size = pgmoneta_calculate_wal_size(wal_dir, "000000010000000000000002");
@@ -433,6 +436,7 @@ START_TEST(test_utils_file_ops)
    if (f)
    {
       fprintf(f, "test");
+      fflush(f);
       fclose(f);
    }
 
@@ -632,6 +636,7 @@ START_TEST(test_utils_file_dir)
    if (f)
    {
       fprintf(f, "test content");
+      fflush(f);
       fclose(f);
    }
 
@@ -676,6 +681,7 @@ START_TEST(test_utils_file_dir)
    if (f)
    {
       fprintf(f, "test content");
+      fflush(f);
       fclose(f);
    }
    ck_assert(pgmoneta_compare_files(file1, file2));
@@ -712,6 +718,7 @@ START_TEST(test_utils_misc)
    FILE* f = fopen("/tmp/test.txt", "w");
    if (f)
    {
+      fflush(f);
       fclose(f);
    }
    ck_assert_int_eq(pgmoneta_normalize_path("/tmp", "test.txt", "/tmp/default.txt", buf, sizeof(buf)), 0);
@@ -722,6 +729,7 @@ START_TEST(test_utils_misc)
    f = fopen("/tmp/default.txt", "w");
    if (f)
    {
+      fflush(f);
       fclose(f);
    }
    ck_assert_int_eq(pgmoneta_normalize_path(NULL, "test.txt", "/tmp/default.txt", buf, sizeof(buf)), 0);
@@ -751,6 +759,7 @@ START_TEST(test_utils_symlinks)
    if (f)
    {
       fprintf(f, "target content");
+      fflush(f);
       fclose(f);
    }
 
@@ -987,7 +996,10 @@ START_TEST(test_utils_permissions)
 
    FILE* f = fopen(file, "w");
    if (f)
+   {
+      fflush(f);
       fclose(f);
+   }
 
    ck_assert_int_eq(pgmoneta_permission_recursive(dir), 0);
 
@@ -1012,12 +1024,14 @@ START_TEST(test_utils_space)
    if (f)
    {
       fprintf(f, "a");
+      fflush(f);
       fclose(f);
    }
    f = fopen(file2, "w");
    if (f)
    {
       fprintf(f, "aaaaa");
+      fflush(f);
       fclose(f);
    }
 
@@ -1054,6 +1068,7 @@ START_TEST(test_utils_files_advanced)
    if (f)
    {
       fprintf(f, "data");
+      fflush(f);
       fclose(f);
    }
 
@@ -1073,6 +1088,7 @@ START_TEST(test_utils_files_advanced)
    if (f)
    {
       fprintf(f, "plain");
+      fflush(f);
       fclose(f);
    }
 
@@ -1126,6 +1142,7 @@ START_TEST(test_utils_missing_basic)
    if (f)
    {
       fprintf(f, "12345");
+      fflush(f);
       fclose(f);
    }
 
@@ -1217,10 +1234,16 @@ START_TEST(test_utils_missing_wal)
 
    FILE* f = fopen(file1, "w");
    if (f)
+   {
+      fflush(f);
       fclose(f);
+   }
    f = fopen(file2, "w");
    if (f)
+   {
+      fflush(f);
       fclose(f);
+   }
 
    ck_assert_int_eq(pgmoneta_get_wal_files(dir, &files), 0);
    ck_assert_int_eq(pgmoneta_deque_size(files), 2);

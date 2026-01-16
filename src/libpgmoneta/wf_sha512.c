@@ -152,6 +152,7 @@ sha512_execute(char* name __attribute__((unused)), struct art* nodes)
       pgmoneta_save_info(server_backup, backup);
    }
 
+   fflush(sha512_file);
    fsync(fileno(sha512_file));
    fclose(sha512_file);
 
@@ -165,6 +166,7 @@ error:
 
    if (sha512_file != NULL)
    {
+      fflush(sha512_file);
       fclose(sha512_file);
    }
 
@@ -307,6 +309,7 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
          errno = 0;
          goto error;
       }
+      fflush(source_file);
       fclose(source_file);
       source_file = fopen(sha512_path, "r");
       if (source_file == NULL)
@@ -375,6 +378,7 @@ pgmoneta_update_sha512(char* root_dir, char* filename)
 
    if (dest_file != NULL)
    {
+      fflush(dest_file);
       fsync(fileno(dest_file));
       fclose(dest_file);
    }
@@ -399,6 +403,7 @@ error:
 
    if (dest_file != NULL)
    {
+      fflush(dest_file);
       fclose(dest_file);
    }
 
