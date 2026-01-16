@@ -22,7 +22,7 @@ OPTIONS
 =======
 
 -c, --config CONFIG_FILE
-  Set the path to the pgmoneta.conf file
+  Set the path to the pgmoneta_cli.conf file
 
 -h, --host HOST
   Set the host name
@@ -139,4 +139,4 @@ pgmoneta is licensed under the 3-clause BSD License.
 SEE ALSO
 ========
 
-pgmoneta.conf(5), pgmoneta(1), pgmoneta-admin(1)
+pgmoneta-cli.conf(5), pgmoneta.conf(5), pgmoneta(1), pgmoneta-admin(1)

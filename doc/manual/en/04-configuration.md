@@ -275,6 +275,27 @@ If pgmoneta has both Transport Layer Security (TLS) and `management` enabled the
 connect with TLS using the files `~/.pgmoneta/pgmoneta.key` (must be 0600 permission),
 `~/.pgmoneta/pgmoneta.crt` and `~/.pgmoneta/root.crt`.
 
+## pgmoneta_cli.conf
+
+The `pgmoneta_cli` configuration defines defaults for the `pgmoneta-cli` client. It is loaded from the path passed with `-c` or from `/etc/pgmoneta/pgmoneta_cli.conf` if `-c` is not supplied. Command-line flags override values in this file.
+
+| Property | Default | Unit | Required | Description |
+| :------- | :------ | :--- | :------- | :---------- |
+| host |  | String | No | Management host to connect to. If omitted, `unix_socket_dir` may be used for a local Unix socket connection. |
+| port | 0 | Int | No | Management port to connect to. Required for remote TCP connections unless a Unix socket is used. |
+| unix_socket_dir |  | String | No | Directory containing the pgmoneta Unix Domain Socket. Enables local management without host/port. Can interpolate environment variables (e.g., `$HOME`). |
+| compression | none | String | No | Wire-protocol compression (`none`, `gzip`, `zstd`, `lz4`, `bzip2`). Applies only to CLI<->server traffic. |
+| encryption | none | String | No | Wire-protocol encryption (`none`, `aes256`, `aes192`, `aes128`). Applies only to CLI<->server traffic. |
+| output | text | String | No | Default CLI output format (`text`, `json`, `raw`). |
+| log_type | console | String | No | Logging type for the CLI (`console`, `file`, `syslog`). |
+| log_level | info | String | No | Logging level (`fatal`, `error`, `warn`, `info`, `debug`/`debug1`-`debug5`). |
+| log_path | pgmoneta-cli.log | String | No | Log file path when `log_type = file`. Can interpolate environment variables (e.g., `$HOME`). |
+| log_mode | append | String | No | Log file mode (`append`, `create`). |
+| log_rotation_age | 0 | String | No | Time-based rotation. `0` disables. Supports `S`, `M`, `H`, `D`, `W` suffixes (seconds default). |
+| log_rotation_size | 0 | String | No | Size-based rotation. `0` disables. Supports `B` (default), `K/KB`, `M/MB`, `G/GB`. |
+| log_line_prefix | %Y-%m-%d %H:%M:%S | String | No | strftime(3) format prefix for log lines. |
+
+
 ## Configuration Directory
 
 You can specify a directory for all configuration files using the `-D` flag (or `--directory`).
@@ -312,4 +333,3 @@ pgmoneta -d
 ```
 
 Refer to logs for details about which configuration files were loaded and from which locations.
-

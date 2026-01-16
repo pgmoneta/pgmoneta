@@ -91,23 +91,23 @@ static char* colors[] =
 int
 pgmoneta_start_logging(void)
 {
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE && !log_file)
+   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE && !log_file)
    {
       log_file_open();
 
       if (!log_file)
       {
-         printf("Failed to open log file %s due to %s\n", strlen(config->common.log_path) > 0 ? config->common.log_path : "pgmoneta.log", strerror(errno));
+         printf("Failed to open log file %s due to %s\n", strlen(config->log_path) > 0 ? config->log_path : "pgmoneta.log", strerror(errno));
          errno = 0;
          log_rotation_disable();
          return 1;
       }
    }
-   else if (config->common.log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
+   else if (config->log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
    {
       openlog("pgmoneta", LOG_CONS | LOG_PERROR | LOG_PID, LOG_USER);
    }
@@ -121,11 +121,11 @@ pgmoneta_start_logging(void)
 int
 pgmoneta_stop_logging(void)
 {
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
    {
       if (log_file != NULL)
       {
@@ -136,7 +136,7 @@ pgmoneta_stop_logging(void)
          return 1;
       }
    }
-   else if (config->common.log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
+   else if (config->log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
    {
       closelog();
    }
@@ -147,11 +147,11 @@ pgmoneta_stop_logging(void)
 bool
 pgmoneta_log_is_enabled(int level)
 {
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
-   if (level >= config->common.log_level)
+   if (level >= config->log_level)
    {
       return true;
    }
@@ -164,16 +164,16 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
 {
    FILE* output = NULL;
    signed char isfree;
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
    if (config == NULL)
    {
       return;
    }
 
-   if (level >= config->common.log_level)
+   if (level >= config->log_level)
    {
       switch (level)
       {
@@ -193,11 +193,11 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
             break;
       }
 
-      if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+      if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
       {
          output = stdout;
       }
-      else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+      else if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
       {
          output = log_file;
       }
@@ -205,7 +205,7 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
 retry:
       isfree = STATE_FREE;
 
-      if (atomic_compare_exchange_strong(&config->common.log_lock, &isfree, STATE_IN_USE))
+      if (atomic_compare_exchange_strong(&config->log_lock, &isfree, STATE_IN_USE))
       {
          char buf[1024];
          va_list vl;
@@ -226,9 +226,9 @@ retry:
             filename = file;
          }
 
-         if (strlen(config->common.log_line_prefix) == 0)
+         if (strlen(config->log_line_prefix) == 0)
          {
-            memcpy(config->common.log_line_prefix, PGMONETA_LOGGING_DEFAULT_LOG_LINE_PREFIX, strlen(PGMONETA_LOGGING_DEFAULT_LOG_LINE_PREFIX));
+            memcpy(config->log_line_prefix, PGMONETA_LOGGING_DEFAULT_LOG_LINE_PREFIX, strlen(PGMONETA_LOGGING_DEFAULT_LOG_LINE_PREFIX));
          }
 
          memset(&buf[0], 0, sizeof(buf));
@@ -250,9 +250,9 @@ retry:
 
          va_start(vl, fmt);
 
-         if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+         if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
          {
-            buf[strftime(buf, sizeof(buf), config->common.log_line_prefix, tm)] = '\0';
+            buf[strftime(buf, sizeof(buf), config->log_line_prefix, tm)] = '\0';
             fprintf(output, "%s %s%-5s\x1b[0m \x1b[90m%s:%d\x1b[0m ",
                     buf, colors[level - 1], levels[level - 1],
                     filename, line);
@@ -260,9 +260,9 @@ retry:
             fprintf(output, "\n");
             fflush(output);
          }
-         else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+         else if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
          {
-            buf[strftime(buf, sizeof(buf), config->common.log_line_prefix, tm)] = '\0';
+            buf[strftime(buf, sizeof(buf), config->log_line_prefix, tm)] = '\0';
             fprintf(output, "%s %-5s %s:%d ",
                     buf, levels[level - 1], filename, line);
             vfprintf(output, fmt, vl);
@@ -274,7 +274,7 @@ retry:
                log_file_rotate();
             }
          }
-         else if (config->common.log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
+         else if (config->log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
          {
             switch (level)
             {
@@ -304,7 +304,7 @@ retry:
 
          va_end(vl);
 
-         atomic_store(&config->common.log_lock, STATE_FREE);
+         atomic_store(&config->log_lock, STATE_FREE);
       }
       else
       {
@@ -317,9 +317,9 @@ void
 pgmoneta_log_mem(void* data, size_t size)
 {
    signed char isfree;
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
    if (config == NULL)
    {
@@ -328,13 +328,13 @@ pgmoneta_log_mem(void* data, size_t size)
 
    if (size > 0)
    {
-      if (config->common.log_level == PGMONETA_LOGGING_LEVEL_DEBUG5 &&
-          (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE || config->common.log_type == PGMONETA_LOGGING_TYPE_FILE))
+      if (config->log_level == PGMONETA_LOGGING_LEVEL_DEBUG5 &&
+          (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE || config->log_type == PGMONETA_LOGGING_TYPE_FILE))
       {
 retry:
          isfree = STATE_FREE;
 
-         if (atomic_compare_exchange_strong(&config->common.log_lock, &isfree, STATE_IN_USE))
+         if (atomic_compare_exchange_strong(&config->log_lock, &isfree, STATE_IN_USE))
          {
             if (size > MAX_LENGTH)
             {
@@ -508,7 +508,7 @@ retry:
                }
             }
 
-            atomic_store(&config->common.log_lock, STATE_FREE);
+            atomic_store(&config->log_lock, STATE_FREE);
          }
          else
          {
@@ -521,17 +521,17 @@ retry:
 static void
 output_log_line(char* l)
 {
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
+   if (config->log_type == PGMONETA_LOGGING_TYPE_CONSOLE)
    {
       fprintf(stdout, "%s", l);
       fprintf(stdout, "\n");
       fflush(stdout);
    }
-   else if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+   else if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
    {
       fprintf(log_file, "%s", l);
       fprintf(log_file, "\n");
@@ -557,12 +557,12 @@ pgmoneta_print_bytes_binary(void* ptr, size_t n)
 static bool
 log_rotation_enabled(void)
 {
-   struct main_configuration* config;
-   config = (struct main_configuration*)shmem;
+   struct common_configuration* config;
+   config = (struct common_configuration*)shmem;
 
    // disable log rotation in the case
    // logging is not to a file
-   if (config->common.log_type != PGMONETA_LOGGING_TYPE_FILE)
+   if (config->log_type != PGMONETA_LOGGING_TYPE_FILE)
    {
       log_rotation_disable();
       return false;
@@ -570,17 +570,17 @@ log_rotation_enabled(void)
 
    // log rotation is enabled if either log_rotation_age or
    // log_rotation_size is enabled
-   return config->common.log_rotation_age != PGMONETA_LOGGING_ROTATION_DISABLED || config->common.log_rotation_size != PGMONETA_LOGGING_ROTATION_DISABLED;
+   return config->log_rotation_age != PGMONETA_LOGGING_ROTATION_DISABLED || config->log_rotation_size != PGMONETA_LOGGING_ROTATION_DISABLED;
 }
 
 static void
 log_rotation_disable(void)
 {
-   struct main_configuration* config;
-   config = (struct main_configuration*)shmem;
+   struct common_configuration* config;
+   config = (struct common_configuration*)shmem;
 
-   config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
-   config->common.log_rotation_size = PGMONETA_LOGGING_ROTATION_DISABLED;
+   config->log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+   config->log_rotation_size = PGMONETA_LOGGING_ROTATION_DISABLED;
    next_log_rotation_age = 0;
 }
 
@@ -588,9 +588,9 @@ static bool
 log_rotation_required(void)
 {
    struct stat log_stat;
-   struct main_configuration* config;
+   struct common_configuration* config;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
    if (!log_rotation_enabled())
    {
@@ -602,12 +602,12 @@ log_rotation_required(void)
       return false;
    }
 
-   if (config->common.log_rotation_size > 0 && log_stat.st_size >= config->common.log_rotation_size)
+   if (config->log_rotation_size > 0 && log_stat.st_size >= config->log_rotation_size)
    {
       return true;
    }
 
-   if (config->common.log_rotation_age > 0 && next_log_rotation_age > 0 && next_log_rotation_age <= log_stat.st_ctime)
+   if (config->log_rotation_age > 0 && next_log_rotation_age > 0 && next_log_rotation_age <= log_stat.st_ctime)
    {
       return true;
    }
@@ -618,26 +618,26 @@ log_rotation_required(void)
 static bool
 log_rotation_set_next_rotation_age(void)
 {
-   struct main_configuration* config;
+   struct common_configuration* config;
    time_t now;
 
-   config = (struct main_configuration*)shmem;
+   config = (struct common_configuration*)shmem;
 
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE && config->common.log_rotation_age > 0)
+   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE && config->log_rotation_age > 0)
    {
       now = time(NULL);
       if (!now)
       {
-         config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+         config->log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
          return false;
       }
 
-      next_log_rotation_age = now + config->common.log_rotation_age;
+      next_log_rotation_age = now + config->log_rotation_age;
       return true;
    }
    else
    {
-      config->common.log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+      config->log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
       return false;
    }
 }
@@ -645,13 +645,12 @@ log_rotation_set_next_rotation_age(void)
 static int
 log_file_open(void)
 {
-   struct main_configuration* config;
+   struct common_configuration* config;
    time_t htime;
    struct tm* tm;
 
-   config = (struct main_configuration*)shmem;
-
-   if (config->common.log_type == PGMONETA_LOGGING_TYPE_FILE)
+   config = (struct common_configuration*)shmem;
+   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
    {
       htime = time(NULL);
       if (!htime)
@@ -667,14 +666,14 @@ log_file_open(void)
          return 1;
       }
 
-      if (strftime(current_log_path, sizeof(current_log_path), config->common.log_path, tm) <= 0)
+      if (strftime(current_log_path, sizeof(current_log_path), config->log_path, tm) <= 0)
       {
          // cannot parse the format string, fallback to default logging
          memcpy(current_log_path, "pgmoneta.log", strlen("pgmoneta.log"));
          log_rotation_disable();
       }
 
-      log_file = fopen(current_log_path, config->common.log_mode == PGMONETA_LOGGING_MODE_APPEND ? "a" : "w");
+      log_file = fopen(current_log_path, config->log_mode == PGMONETA_LOGGING_MODE_APPEND ? "a" : "w");
 
       if (!log_file)
       {

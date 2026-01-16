@@ -237,11 +237,11 @@ get_connection()
    config = (struct main_configuration*)shmem;
    if (strlen(config->common.configuration_path))
    {
-      if (pgmoneta_connect_unix_socket(config->unix_socket_dir, MAIN_UDS, &socket))
+      if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &socket))
       {
          return -1;
       }
    }
-   pgmoneta_log_info("%s %s %d", config->common.configuration_path, config->unix_socket_dir, socket);
+   pgmoneta_log_info("%s %s %d", config->common.configuration_path, config->common.unix_socket_dir, socket);
    return socket;
 }
