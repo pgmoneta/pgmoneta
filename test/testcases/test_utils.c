@@ -1283,6 +1283,49 @@ START_TEST(test_utils_missing_misc)
 }
 END_TEST
 
+START_TEST(test_parse_lsn)
+{
+   fprintf(stderr, "TEST START: %s\n", __func__);
+   uint64_t lsn;
+
+   lsn = pgmoneta_lsn_from_string("0/16B0938");
+   ck_assert_uint_eq(lsn, 23791928);
+
+   lsn = pgmoneta_lsn_from_string("1/0");
+   ck_assert_uint_eq(lsn, 4294967296);
+
+   lsn = pgmoneta_lsn_from_string("0/0");
+   ck_assert_uint_eq(lsn, 0);
+
+   lsn = pgmoneta_lsn_from_string("invalid");
+   ck_assert_uint_eq(lsn, 0);
+}
+END_TEST
+
+START_TEST(test_parse_timestamp)
+{
+   fprintf(stderr, "TEST START: %s\n", __func__);
+   time_t ts;
+   struct tm tm_val;
+
+   // 2025-12-23 02:00:00
+   ts = pgmoneta_timestamp_from_string("2025-12-23 02:00:00");
+   ck_assert_int_ne(ts, 0);
+   ck_assert_int_ne(ts, -1);
+
+   localtime_r(&ts, &tm_val);
+   ck_assert_int_eq(tm_val.tm_year + 1900, 2025);
+   ck_assert_int_eq(tm_val.tm_mon + 1, 12);
+   ck_assert_int_eq(tm_val.tm_mday, 23);
+   ck_assert_int_eq(tm_val.tm_hour, 2);
+   ck_assert_int_eq(tm_val.tm_min, 0);
+   ck_assert_int_eq(tm_val.tm_sec, 0);
+
+   ts = pgmoneta_timestamp_from_string("invalid");
+   ck_assert_int_eq(ts, 0);
+}
+END_TEST
+
 Suite*
 pgmoneta_test_utils_suite()
 {
@@ -1343,6 +1386,8 @@ pgmoneta_test_utils_suite()
    tcase_add_test(tc_utils, test_utils_files_advanced);
 
    tcase_add_test(tc_utils, test_utils_missing_basic);
+   tcase_add_test(tc_utils, test_parse_lsn);
+   tcase_add_test(tc_utils, test_parse_timestamp);
 
    suite_add_tcase(s, tc_utils);
    return s;

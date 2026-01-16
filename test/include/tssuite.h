@@ -116,4 +116,11 @@ pgmoneta_test_json_suite();
 Suite*
 pgmoneta_test_utils_suite();
 
+/**
+ * Set up a backup identifier suite for pgmoneta
+ * @return The result
+ */
+Suite*
+pgmoneta_test_backup_identifier_suite();
+
 #endif
