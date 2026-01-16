@@ -39,6 +39,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define ENV_VAR_CONF_PATH        "PGMONETA_TEST_CONF"
 #define ENV_VAR_CONF_SAMPLE_PATH "PGMONETA_TEST_CONF_SAMPLE"
@@ -122,7 +123,12 @@ void
 pgmoneta_test_add_backup(void)
 {
    pgmoneta_test_setup();
-   int found = !pgmoneta_tsclient_backup("primary", NULL);
+   // Wait for server to be fully ready after previous test teardown
+   sleep(5);
+   // Ensure server is set to online mode (may be offline after teardown)
+   int mode_ok = !pgmoneta_tsclient_mode("primary", "online", 0);
+   assert(mode_ok);
+   int found = !pgmoneta_tsclient_backup("primary", NULL, 0);
    assert(found);
 }
 
@@ -130,9 +136,9 @@ void
 pgmoneta_test_add_backup_chain(void)
 {
    pgmoneta_test_setup();
-   assert((!pgmoneta_tsclient_backup("primary", NULL)));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
+   assert((!pgmoneta_tsclient_backup("primary", NULL, 0)));
+   assert(!pgmoneta_tsclient_backup("primary", "newest", 0));
+   assert(!pgmoneta_tsclient_backup("primary", "newest", 0));
 }
 
 void
@@ -165,7 +171,7 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_reload_configuration(&restart);
 
    // assuming server doesn't need to restart
-   assert(!pgmoneta_tsclient_reload());
+   assert(!pgmoneta_tsclient_reload(0));
 
    free(backup_dir);
    free(wal_dir);

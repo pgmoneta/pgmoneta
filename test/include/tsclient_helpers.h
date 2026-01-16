@@ -27,100 +27,60 @@
  *
  */
 
-#ifndef PGMONETA_TEST_SUITE_H
-#define PGMONETA_TEST_SUITE_H
+#ifndef PGMONETA_TSCLIENT_HELPERS_H
+#define PGMONETA_TSCLIENT_HELPERS_H
 
-#include <check.h>
-
-/**
- * Set up a retore test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_restore_suite();
+#include <json.h>
+#include <stdbool.h>
 
 /**
- * Set up a backup test suite for pgmoneta
- * @return The result
+ * Get backup count from LIST_BACKUP response
+ * @param response The JSON response from list_backup
+ * @return Number of backups, or -1 on error
  */
-Suite*
-pgmoneta_test_backup_suite();
+int
+pgmoneta_tsclient_get_backup_count(struct json* response);
 
 /**
- * Set up delete test suite for pgmoneta
- * @return The result
+ * Get backup at specific index from LIST_BACKUP response
+ * @param response The JSON response from list_backup
+ * @param index The backup index
+ * @return JSON object for backup, or NULL on error
  */
-Suite*
-pgmoneta_test_delete_suite();
+struct json*
+pgmoneta_tsclient_get_backup(struct json* response, int index);
 
 /**
- * Set up http test suite for pgmoneta
- * @return The result
+ * Get backup label from backup JSON object
+ * @param backup The backup JSON object
+ * @return Label string, or NULL on error
  */
-Suite*
-pgmoneta_test_http_suite();
+char*
+pgmoneta_tsclient_get_backup_label(struct json* backup);
 
 /**
- * Set up server API test suite for pgmoneta
- * @return The result
+ * Get backup type (FULL/INCREMENTAL) from backup JSON object
+ * @param backup The backup JSON object
+ * @return Type string ("FULL" or "INCREMENTAL"), or NULL on error
  */
-Suite*
-pgmoneta_test_server_api_suite();
+char*
+pgmoneta_tsclient_get_backup_type(struct json* backup);
 
 /**
- * Set up a brt input/output suite for pgmoneta
- * @return The result
+ * Get backup parent label from backup JSON object
+ * @param backup The backup JSON object
+ * @return Parent label string, or NULL if FULL backup or error
  */
-Suite*
-pgmoneta_test_brt_io_suite();
+char*
+pgmoneta_tsclient_get_backup_parent(struct json* backup);
 
 /**
- * Set up a wal utils test suite for pgmoneta
- * @return The result
+ * Verify parent-child relationship between two backups
+ * @param parent The parent backup JSON object
+ * @param child The child backup JSON object
+ * @return true if child's parent matches parent's label
  */
-Suite*
-pgmoneta_test_wal_utils_suite();
-
-/**
- * Set up a wal summary test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_wal_summary_suite();
-
-/**
- * Set up an art suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_art_suite();
-
-/**
- * Set up a deque suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_deque_suite();
-
-/**
- * Set up a json suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_json_suite();
-
-/**
- * Set up a utils suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_utils_suite();
-
-/**
- * Set up cli test suite for pgmoneta
- * @return The result
- */
-Suite*
-pgmoneta_test_cli_suite();
+bool
+pgmoneta_tsclient_verify_backup_chain(struct json* parent, struct json* child);
 
 #endif

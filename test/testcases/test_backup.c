@@ -28,9 +28,9 @@
  */
 
 #include <pgmoneta.h>
-#include <info.h>
 #include <logging.h>
 #include <tsclient.h>
+#include <tsclient_helpers.h>
 #include <tscommon.h>
 #include <tssuite.h>
 #include <utils.h>
@@ -42,45 +42,78 @@ START_TEST(test_pgmoneta_backup_full)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
    int ret = 0;
-   ret = !pgmoneta_tsclient_backup("primary", NULL);
+   struct json* response = NULL;
+   int num_backups_before = 0;
+   int num_backups_after = 0;
+
+   // Query initial backup count via LIST_BACKUP
+   ret = pgmoneta_tsclient_list_backup("primary", NULL, &response, 0);
+   ck_assert_msg(ret == 0, "failed to list backups");
+   num_backups_before = pgmoneta_tsclient_get_backup_count(response);
+   pgmoneta_json_destroy(response);
+   response = NULL;
+
+   // Create full backup
+   ret = !pgmoneta_tsclient_backup("primary", NULL, 0);
    ck_assert_msg(ret, "failed to add full backup");
+
+   // Query backup count after creation
+   ret = pgmoneta_tsclient_list_backup("primary", NULL, &response, 0);
+   ck_assert_msg(ret == 0, "failed to list backups after backup");
+   num_backups_after = pgmoneta_tsclient_get_backup_count(response);
+   pgmoneta_json_destroy(response);
+
+   // Verify one backup was created
+   ck_assert_int_eq(num_backups_after, num_backups_before + 1);
 }
 END_TEST
 START_TEST(test_pgmoneta_backup_incremental_basic)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
    int ret = 0;
-   char* d = NULL;
+   struct json* response = NULL;
    int num_backups = 0;
-   struct backup** backups = NULL;
-   ret = !pgmoneta_tsclient_backup("primary", NULL);
+   struct json* backup0 = NULL;
+   struct json* backup1 = NULL;
+   struct json* backup2 = NULL;
+
+   // Create full backup
+   ret = !pgmoneta_tsclient_backup("primary", NULL, 0);
    ck_assert_msg(ret, "failed to add full backup");
-   ret = !pgmoneta_tsclient_backup("primary", "newest");
+   ret = !pgmoneta_tsclient_backup("primary", "newest", 0);
    ck_assert_msg(ret, "failed to add incremental backup 1");
-   ret = !pgmoneta_tsclient_backup("primary", "newest");
+   ret = !pgmoneta_tsclient_backup("primary", "newest", 0);
    ck_assert_msg(ret, "failed to add incremental backup 2");
 
-   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
+   // Query backups
+   ret = pgmoneta_tsclient_list_backup("primary", NULL, &response, 0);
+   ck_assert_msg(ret == 0, "failed to get backup list from management protocol");
 
-   pgmoneta_load_infos(d, &num_backups, &backups);
+   // Verify we have exactly 3 backups
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
    ck_assert_int_eq(num_backups, 3);
-   ck_assert_msg(backups != NULL, "backups should not be NULL");
 
-   // sort the backups in ascending order
-   pgmoneta_sort_backups(backups, num_backups, false);
-   ck_assert_int_eq(backups[0]->type, TYPE_FULL);
-   ck_assert_int_eq(backups[1]->type, TYPE_INCREMENTAL);
-   ck_assert_int_eq(backups[2]->type, TYPE_INCREMENTAL);
+   // Get each backup from response
+   backup0 = pgmoneta_tsclient_get_backup(response, 0);
+   backup1 = pgmoneta_tsclient_get_backup(response, 1);
+   backup2 = pgmoneta_tsclient_get_backup(response, 2);
 
-   ck_assert_str_eq(backups[1]->parent_label, backups[0]->label);
-   ck_assert_str_eq(backups[2]->parent_label, backups[1]->label);
+   ck_assert_msg(backup0 != NULL, "backup 0 should exist");
+   ck_assert_msg(backup1 != NULL, "backup 1 should exist");
+   ck_assert_msg(backup2 != NULL, "backup 2 should exist");
 
-   free(d);
-   for (int i = 0; i < num_backups; i++)
-   {
-      free(backups[i]);
-   }
-   free(backups);
+   // Verify backup types
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup0), "FULL");
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup1), "INCREMENTAL");
+   ck_assert_str_eq(pgmoneta_tsclient_get_backup_type(backup2), "INCREMENTAL");
+
+   // Verify chain relationships
+   ck_assert_msg(pgmoneta_tsclient_verify_backup_chain(backup0, backup1),
+                 "backup1 should be child of backup0");
+   ck_assert_msg(pgmoneta_tsclient_verify_backup_chain(backup1, backup2),
+                 "backup2 should be child of backup1");
+
+   pgmoneta_json_destroy(response);
 }
 END_TEST
 
