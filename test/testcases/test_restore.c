@@ -37,7 +37,7 @@ START_TEST(test_pgmoneta_restore)
 {
    fprintf(stderr, "TEST START: %s\n", __func__);
    int found = 0;
-   found = !pgmoneta_tsclient_restore("primary", "newest", "current");
+   found = !pgmoneta_tsclient_restore("primary", "newest", "current", 0);
    ck_assert_msg(found, "success status not found");
 }
 END_TEST
