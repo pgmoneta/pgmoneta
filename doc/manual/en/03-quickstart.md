@@ -125,7 +125,7 @@ Usage:
   pgmoneta-cli [ -c CONFIG_FILE ] [ COMMAND ]
 
 Options:
-  -c, --config CONFIG_FILE                       Set the path to the pgmoneta.conf file
+  -c, --config CONFIG_FILE                       Set the path to the pgmoneta_cli.conf file
   -h, --host HOST                                Set the host name
   -p, --port PORT                                Set the port number
   -U, --user USERNAME                            Set the user name
