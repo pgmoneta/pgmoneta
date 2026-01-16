@@ -338,4 +338,4 @@ pgmoneta is licensed under the 3-clause BSD License.
 SEE ALSO
 ========
 
-pgmoneta(1), pgmoneta-cli(1), pgmoneta-admin(1)
+pgmoneta(1), pgmoneta-cli(1), pgmoneta-cli.conf(5), pgmoneta-admin(1)

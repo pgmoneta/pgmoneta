@@ -60,6 +60,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-admin.1 %{buildroot}%{_mandir}/man1/pgmoneta-admin.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-cli.1 %{buildroot}%{_mandir}/man1/pgmoneta-cli.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta.conf.5 %{buildroot}%{_mandir}/man5/pgmoneta.conf.5
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-cli.conf.5 %{buildroot}%{_mandir}/man5/pgmoneta-cli.conf.5
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-walfilter.1 %{buildroot}%{_mandir}/man1/pgmoneta-walfilter.1
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/build/doc/pgmoneta-walinfo.1 %{buildroot}%{_mandir}/man1/pgmoneta-walinfo.1
 
@@ -104,6 +105,7 @@ cd %{buildroot}%{_libdir}/
 %{_mandir}/man1/pgmoneta-admin.1*
 %{_mandir}/man1/pgmoneta-cli.1*
 %{_mandir}/man5/pgmoneta.conf.5*
+%{_mandir}/man5/pgmoneta-cli.conf.5*
 %{_mandir}/man1/pgmoneta-walfilter.1*
 %{_mandir}/man1/pgmoneta-walinfo.1*
 %config %{_sysconfdir}/pgmoneta/pgmoneta.conf
