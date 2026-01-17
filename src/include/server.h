@@ -52,13 +52,13 @@ struct file_stats
  * Store the contents of label file returned from backup stop
  *
  * Format of label file column (returned from pg_backup_stop)
- * - START WAL LOCATION: <start_wal_lsn> (file <wal_segment_name>)
- * - CHECKPOINT LOCATION: <checkpoint_lsn>
- * - BACKUP METHOD: <method>
- * - BACKUP FROM: <server_name>
- * - START TIME: <year>-<month>-<day> <hour>:<minutes>:<seconds> <time_zone>
- * - LABEL: <label>
- * - START TIMELINE: <timeline>
+ * - START WAL LOCATION: start_wal_lsn (file wal_segment_name)
+ * - CHECKPOINT LOCATION: checkpoint_lsn
+ * - BACKUP METHOD: method
+ * - BACKUP FROM: server_name
+ * - START TIME: year-month-day hour:minutes:seconds time_zone
+ * - LABEL: label
+ * - START TIMELINE: timeline
  *
  * Since we have already captured start wal location during pg_bacup_start(), we won't trouble
  * ourselves parsing it here.
