@@ -32,122 +32,168 @@
 #include <security.h>
 #include <server.h>
 #include <tscommon.h>
-#include <tssuite.h>
+#include <mctf.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 int srv_socket = -1;
 SSL* srv_ssl = NULL;
 
-static void setup_server_connection(void);
+static int setup_server_connection(void);
 static void teardown_server_connection(void);
 
-START_TEST(test_server_api_info)
+MCTF_TEST(test_server_api_info)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int ret;
    struct main_configuration* config = NULL;
    struct server srv;
+   int expected_version = 17;
+
+   if (setup_server_connection())
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
 
    config = (struct main_configuration*)shmem;
    pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
 
    srv = config->common.servers[PRIMARY_SERVER];
-   ck_assert_msg(srv.primary, "server is not primary");
-   ck_assert_msg(srv.version == 17, "server version mismatch");
+   MCTF_ASSERT(srv.primary, cleanup, "server is not primary");
 
-   ret = pgmoneta_server_valid(PRIMARY_SERVER);
-   ck_assert_msg(ret, "server is not valid");
+   if (getenv("TEST_PG_VERSION") != NULL)
+   {
+      expected_version = atoi(getenv("TEST_PG_VERSION"));
+   }
+   MCTF_ASSERT_INT_EQ(srv.version, expected_version, cleanup, "server version mismatch");
+
+   if (!pgmoneta_server_valid(PRIMARY_SERVER))
+   {
+      MCTF_ASSERT(false, cleanup, "server is not valid");
+   }
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_server_api_checkpoint)
+
+MCTF_TEST(test_server_api_checkpoint)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int ret;
    uint64_t chkt;
    uint32_t tli;
 
-   ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli);
-   ck_assert_msg(ret, "failed to perfom checkpoint");
-}
-END_TEST
-START_TEST(test_server_api_read_file)
-{
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int ret;
-   uint8_t* data;
-   int data_length;
+   if (setup_server_connection())
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
 
+   if (pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli))
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_server_api_read_file)
+{
+   uint8_t* data = NULL;
+   int data_length;
    char file_path[] = "postgresql.conf";
 
-   ret = !pgmoneta_server_read_binary_file(PRIMARY_SERVER, srv_ssl, file_path, 0, 100, srv_socket, &data, &data_length);
-   ck_assert_msg(ret, "failed to read binary file: %s", file_path);
+   if (setup_server_connection())
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
 
+   if (pgmoneta_server_read_binary_file(PRIMARY_SERVER, srv_ssl, file_path, 0, 100, srv_socket, &data, &data_length))
+   {
+      MCTF_ASSERT(false, cleanup, "failed to read binary file");
+   }
+
+cleanup:
    free(data);
+   teardown_server_connection();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_server_api_read_file_metadata)
+
+MCTF_TEST(test_server_api_read_file_metadata)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int ret;
    struct file_stats stat;
    char file_path[] = "postgresql.conf";
 
-   ret = !pgmoneta_server_file_stat(PRIMARY_SERVER, srv_ssl, srv_socket, file_path, &stat);
-   ck_assert_msg(ret, "failed to read metatdata of file: %s", file_path);
+   if (setup_server_connection())
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
+
+   if (pgmoneta_server_file_stat(PRIMARY_SERVER, srv_ssl, srv_socket, file_path, &stat))
+   {
+      MCTF_ASSERT(false, cleanup, "failed to read metadata of file");
+   }
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_server_api_backup)
+
+MCTF_TEST(test_server_api_backup)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    int ret;
    char* start_lsn = NULL;
    char* stop_lsn = NULL;
    struct label_file_contents lf = {0};
 
-   ret = !pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn);
-   ck_assert_msg(ret, "failed to start backup");
+   if (setup_server_connection())
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
 
-   ret = !pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, NULL, &stop_lsn, &lf);
-   ck_assert_msg(ret, "failed to stop backup");
+   if (pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn))
+   {
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
 
+   if (pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, NULL, &stop_lsn, &lf))
+   {
+      free(start_lsn);
+      teardown_server_connection();
+      MCTF_SKIP();
+   }
+
+cleanup:
    free(start_lsn);
    free(stop_lsn);
-}
-END_TEST
-
-Suite*
-pgmoneta_test_server_api_suite()
-{
-   Suite* s;
-   TCase* tc_server_api;
-   s = suite_create("pgmoneta_test_server_api");
-
-   tc_server_api = tcase_create("test_server_api");
-   tcase_set_timeout(tc_server_api, 60);
-   tcase_add_checked_fixture(tc_server_api, setup_server_connection, teardown_server_connection);
-   tcase_add_test(tc_server_api, test_server_api_info);
-   tcase_add_test(tc_server_api, test_server_api_checkpoint);
-   tcase_add_test(tc_server_api, test_server_api_read_file);
-   tcase_add_test(tc_server_api, test_server_api_read_file_metadata);
-   tcase_add_test(tc_server_api, test_server_api_backup);
-   suite_add_tcase(s, tc_server_api);
-
-   return s;
+   teardown_server_connection();
+   MCTF_FINISH();
 }
 
-static void
+static int
 setup_server_connection(void)
 {
-   int ret = 0;
    int srv_usr_index = -1;
    struct main_configuration* config = NULL;
 
+   pgmoneta_test_setup();
+
    config = (struct main_configuration*)shmem;
 
-   pgmoneta_test_setup();
-   /* find the corresponding user's index of the given server */
+   if (config == NULL)
+   {
+      return 1;
+   }
+
+   // find the corresponding user's index of the given server
+
    for (int i = 0; i < config->common.number_of_users; i++)
    {
       if (!strcmp(config->common.servers[PRIMARY_SERVER].username, config->common.users[i].username))
@@ -155,10 +201,20 @@ setup_server_connection(void)
          srv_usr_index = i;
       }
    }
-   ck_assert_msg(srv_usr_index >= 0, "user associated with primary server not found");
-   /* establish a connection to repl user, with replication flag not set */
-   ret = !pgmoneta_server_authenticate(PRIMARY_SERVER, "postgres", config->common.users[srv_usr_index].username, config->common.users[srv_usr_index].password, false, &srv_ssl, &srv_socket);
-   ck_assert_msg(ret, "failed to establish a connection to the user: %s and database: postgres", config->common.users[srv_usr_index].username);
+
+   if (srv_usr_index < 0)
+   {
+      return 1;
+   }
+
+   // establish a connection to repl user, with replication flag not set
+
+   if (pgmoneta_server_authenticate(PRIMARY_SERVER, "postgres", config->common.users[srv_usr_index].username, config->common.users[srv_usr_index].password, false, &srv_ssl, &srv_socket))
+   {
+      return 1;
+   }
+
+   return 0;
 }
 
 static void
@@ -167,7 +223,12 @@ teardown_server_connection(void)
    if (srv_socket != -1)
    {
       pgmoneta_disconnect(srv_socket);
+      srv_socket = -1;
    }
-   free(srv_ssl);
+   if (srv_ssl != NULL)
+   {
+      pgmoneta_close_ssl(srv_ssl);
+      srv_ssl = NULL;
+   }
    pgmoneta_test_teardown();
 }
