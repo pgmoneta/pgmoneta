@@ -14,7 +14,7 @@ you will get output like
 
 ```
 Header:
-  ClientVersion: 0.20.0
+  ClientVersion: 0.21.0
   Command: list-backup
   Output: text
   Timestamp: 20241018092853
@@ -38,7 +38,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.20.0
+  ServerVersion: 0.21.0
 ```
 
 As you can see backup `20241012091219` has a `Keep` flag of `false`.
@@ -56,7 +56,7 @@ and get output like,
 
 ```
 Header:
-  ClientVersion: 0.20.0
+  ClientVersion: 0.21.0
   Command: retain
   Output: text
   Timestamp: 20241018094129
@@ -77,7 +77,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.20.0
+  ServerVersion: 0.21.0
   Valid: yes
 ```
 
@@ -89,7 +89,7 @@ Now, you may want to add a description to your backup, and as you can see
 
 ```
 Header:
-  ClientVersion: 0.20.0
+  ClientVersion: 0.21.0
   Command: retain
   Output: text
   Timestamp: 20241018094129
@@ -110,7 +110,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.20.0
+  ServerVersion: 0.21.0
   Valid: yes
 ```
 
@@ -126,7 +126,7 @@ which will give
 
 ```
 Header:
-  ClientVersion: 0.20.0
+  ClientVersion: 0.21.0
   Command: annotate
   Output: text
   Timestamp: 20241018095906
@@ -157,7 +157,7 @@ Response:
   NumberOfTablespaces: 0
   RestoreSize: 39.13MB
   Server: primary
-  ServerVersion: 0.20.0
+  ServerVersion: 0.21.0
   StartHiLSN: 0
   StartLoLSN: 33554472
   StartTimeline: 1
@@ -183,7 +183,7 @@ will give,
 
 ```
 Header:
-  ClientVersion: 0.20.0
+  ClientVersion: 0.21.0
   Command: expunge
   Output: text
   Timestamp: 20241018101839
@@ -202,7 +202,7 @@ Response:
   MajorVersion: 17
   MinorVersion: 0
   Server: primary
-  ServerVersion: 0.20.0
+  ServerVersion: 0.21.0
   Valid: yes
 ```
 
@@ -218,7 +218,7 @@ Running `pgmoneta-cli retain --cascade primary 20250625055547` will also retain 
 This will give
 ```
 Header:
-  ClientVersion: 0.20.0
+  ClientVersion: 0.21.0
   Command: retain
   Compression: none
   Encryption: none
@@ -248,7 +248,7 @@ Response:
   MinorVersion: 0
   RestoreSize: 0.00B
   Server: primary
-  ServerVersion: 0.20.0
+  ServerVersion: 0.21.0
   Valid: yes
   WAL: 0.00B
 ```
