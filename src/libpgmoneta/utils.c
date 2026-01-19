@@ -1997,6 +1997,83 @@ error:
    return 1;
 }
 
+/**
+ * Check if a file has a valid WAL file suffix pattern
+ * 
+ * Valid patterns are:
+ * - 24-char hex (uncompressed)
+ * - 24-char hex + .partial
+ * - 24-char hex + compression suffix (.gz, .lz4, .zst, .zstd, .bz2)
+ * - 24-char hex + compression suffix + .aes
+ * 
+ * @param f The filename to check
+ * @return true if the file has a valid WAL suffix pattern, false otherwise
+ */
+static bool
+is_valid_wal_file_suffix(char* f)
+{
+   char* valid_suffixes[] = {
+      "",
+      ".partial",
+      ".gz",
+      ".lz4",
+      ".zstd",
+      ".bz2",
+      ".gz.aes",
+      ".lz4.aes",
+      ".zstd.aes",
+      ".bz2.aes",
+      NULL};
+
+   char path[MAX_PATH];
+
+   memset(path, 0, sizeof(path));
+   size_t len = strlen(f);
+   if (len >= sizeof(path))
+   {
+      len = sizeof(path) - 1;
+   }
+   memcpy(path, f, len);
+
+   char* name = basename(path);
+
+   int name_len = strlen(name);
+
+   for (int i = 0; valid_suffixes[i] != NULL; i++)
+   {
+      int suffix_len = strlen(valid_suffixes[i]);
+
+      if (suffix_len == 0)
+      {
+         if (name_len == 24 && pgmoneta_is_wal_file(name))
+         {
+            return true;
+         }
+      }
+      else
+      {
+         if (pgmoneta_ends_with(name, valid_suffixes[i]))
+         {
+            int prefix_len = name_len - suffix_len;
+            if (prefix_len == 24)
+            {
+               char prefix[25];
+
+               memset(prefix, 0, sizeof(prefix));
+               memcpy(prefix, name, 24);
+
+               if (pgmoneta_is_wal_file(prefix))
+               {
+                  return true;
+               }
+            }
+         }
+      }
+   }
+
+   return false;
+}
+
 int
 pgmoneta_get_wal_files(char* base, struct deque** files)
 {
@@ -2020,16 +2097,21 @@ pgmoneta_get_wal_files(char* base, struct deque** files)
 
    while ((entry = readdir(dir)) != NULL)
    {
+      if (entry->d_type != DT_REG)
+      {
+         continue;
+      }
+
       if (pgmoneta_ends_with(entry->d_name, ".history"))
       {
          continue;
       }
 
-      if (entry->d_type == DT_REG)
+      if (is_valid_wal_file_suffix(entry->d_name))
       {
          if (pgmoneta_deque_add(array, entry->d_name, (uintptr_t)entry->d_name, ValueString))
          {
-            pgmoneta_log_error("WAL: Error %s", entry->d_name);
+            pgmoneta_log_error("WAL: Error adding %s", entry->d_name);
             goto error;
          }
       }
@@ -3291,14 +3373,18 @@ error:
 bool
 pgmoneta_is_wal_file(char* file)
 {
-   if (pgmoneta_ends_with(file, ".history"))
+   if (strlen(file) != 24)
    {
       return false;
    }
 
-   if (strlen(file) != 24)
+   for (int i = 0; i < 24; i++)
    {
-      return false;
+      char c = file[i];
+      if (!isxdigit(c))
+      {
+         return false;
+      }
    }
 
    return true;
