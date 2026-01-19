@@ -32,6 +32,7 @@
 #include <extension.h>
 #include <logging.h>
 #include <manifest.h>
+#include <message.h>
 #include <network.h>
 #include <security.h>
 #include <server.h>
@@ -2182,8 +2183,8 @@ pgmoneta_consume_copy_stream_end(struct stream_buffer* buffer, struct message* m
 int
 pgmoneta_consume_data_row_messages(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, struct query_response** response)
 {
-   int cols;
-   int status;
+   int cols = 0;
+   int status = MESSAGE_STATUS_ERROR;
    char* name = NULL;
    struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct tuple* current = NULL;

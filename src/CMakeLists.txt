@@ -176,6 +176,10 @@ add_compile_options(-Wno-deprecated-declarations)
 add_compile_options(-Wunused)
 add_compile_options(-Wunused-result)
 add_compile_options(-Wsign-compare)
+check_c_compiler_flag(-Wuninitialized HAS_WUNINITIALIZED)
+if (HAS_WUNINITIALIZED)
+  add_compile_options(-Wuninitialized)
+endif()
 
 #
 # version number and string management
