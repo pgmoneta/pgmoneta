@@ -427,7 +427,9 @@ elif [[ $# -eq 1 ]]; then
         libarchive libarchive-devel \
         libasan libasan-static \
         check check-devel check-static \
-        llvm
+        llvm \
+        libyaml-devel \
+        ncurses-devel
    elif [[ "$1" == "clean" ]]; then
       rm -Rf $COVERAGE_DIR
       cleanup
