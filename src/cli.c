@@ -121,7 +121,7 @@ static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uin
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
-static int delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int pgmoneta_shutdown(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int status(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int details(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -423,6 +423,7 @@ main(int argc, char** argv)
    int num_options = 0;
    int num_results = 0;
    bool cascade = false;
+   bool force = false;
    char* sort_option = NULL;
    char port_buf[16] = {0};
 
@@ -440,6 +441,7 @@ main(int argc, char** argv)
       {"E", "encrypt", true},
       {"s", "sort", true},
       {"", "cascade", false},
+      {"", "force", false},
       {"?", "help", false}};
 
    // Disable stdout buffering (i.e. write to stdout immediatelly).
@@ -589,6 +591,10 @@ main(int argc, char** argv)
       else if (!strcmp(optname, "cascade"))
       {
          cascade = true;
+      }
+      else if (!strcmp(optname, "force"))
+      {
+         force = true;
       }
       else if (!strcmp(optname, "?") || !strcmp(optname, "help"))
       {
@@ -923,7 +929,7 @@ execute:
    }
    else if (parsed.cmd->action == MANAGEMENT_DELETE)
    {
-      exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+      exit_code = delete(s_ssl, socket, parsed.args[0], parsed.args[1], force, compression, encryption, output_format);
    }
    else if (parsed.cmd->action == MANAGEMENT_SHUTDOWN)
    {
@@ -1112,7 +1118,7 @@ static void
 help_delete(void)
 {
    printf("Delete a backup for a server\n");
-   printf("  pgmoneta-cli delete <server> <timestamp|oldest|newest>\n");
+   printf("  pgmoneta-cli delete [--force] <server> <timestamp|oldest|newest>\n");
 }
 
 static void
@@ -1406,9 +1412,9 @@ error:
 }
 
 static int
-delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
+delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
-   if (pgmoneta_management_request_delete(ssl, socket, server, backup_id, compression, encryption, output_format))
+   if (pgmoneta_management_request_delete(ssl, socket, server, backup_id, force, compression, encryption, output_format))
    {
       goto error;
    }

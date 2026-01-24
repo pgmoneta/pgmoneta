@@ -55,10 +55,12 @@ under the `[pgmoneta]` configuration.
 ## Delete a backup
 
 ```
-pgmoneta-cli -c pgmoneta.conf delete primary oldest
+pgmoneta-cli -c pgmoneta.conf delete [--force] primary oldest
 ```
 
 will delete the oldest backup on `[primary]`.
+
+When `--force` is used, the backup is deleted immediately, ignoring the configured retention policy.
 
 Note, that if the backup has an incremental backup child that depends on it,
 its data will be rolled up to its child before getting deleted.

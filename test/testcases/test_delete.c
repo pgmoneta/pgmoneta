@@ -44,6 +44,99 @@ START_TEST(test_pgmoneta_delete_full)
    ck_assert_msg(found, "success status not found");
 }
 END_TEST
+// test deletetion without force flage
+START_TEST(test_pgmoneta_delete_retained_backup)
+{
+   fprintf(stderr, "TEST START: %s\n", __func__);
+   char* d = NULL;
+   int num_backups = 0;
+   struct backup** backups = NULL;
+
+   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
+
+   // check added backup or not
+   ck_assert_int_eq(pgmoneta_tsclient_retain("primary", "oldest"), 0);
+
+   // delete without force should fail
+   ck_assert_int_ne(pgmoneta_tsclient_delete("primary", "oldest"), 0);
+
+   // verify the count is still 1
+   pgmoneta_load_infos(d, &num_backups, &backups);
+   ck_assert_int_eq(num_backups, 1);
+   // free these backups
+   for (int i = 0; i < num_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+   backups = NULL;
+
+   // expunge the backup (remove the retained flag)
+   ck_assert_int_eq(pgmoneta_tsclient_expunge("primary", "oldest"), 0);
+
+   // delete will work now without force
+   ck_assert_int_eq(pgmoneta_tsclient_delete("primary", "oldest"), 0);
+
+   // verify the count is 0
+   pgmoneta_load_infos(d, &num_backups, &backups);
+   ck_assert_int_eq(num_backups, 0);
+
+   // free the backups
+   for (int i = 0; i < num_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(d);
+}
+END_TEST
+// test deletetion with force flag for a retained backup
+START_TEST(test_pgmoneta_delete_force_retained_backup)
+{
+   fprintf(stderr, "TEST START: %s\n", __func__);
+   char* d = NULL;
+   int num_backups = 0;
+   struct backup** backups = NULL;
+
+   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
+
+   // check added backup or not
+   ck_assert_int_eq(pgmoneta_tsclient_retain("primary", "oldest"), 0);
+
+   // delete without force should fail
+   ck_assert_int_ne(pgmoneta_tsclient_delete("primary", "oldest"), 0);
+
+   // verify the count is still 1
+   pgmoneta_load_infos(d, &num_backups, &backups);
+   ck_assert_int_eq(num_backups, 1);
+
+   // free the backups
+   for (int i = 0; i < num_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+   backups = NULL;
+
+   // delete will work now with the force flage
+   ck_assert_int_eq(pgmoneta_tsclient_force_delete("primary", "oldest"), 0);
+
+   // verify the count is 0
+   pgmoneta_load_infos(d, &num_backups, &backups);
+   ck_assert_int_eq(num_backups, 0);
+
+   // free the backups
+   for (int i = 0; i < num_backups; i++)
+   {
+      free(backups[i]);
+   }
+   free(backups);
+
+   free(d);
+}
+END_TEST
+
 // test delete the last incremental backup in the chain
 START_TEST(test_pgmoneta_delete_chain_last)
 {
@@ -161,6 +254,8 @@ pgmoneta_test_delete_suite()
    Suite* s;
    TCase* tc_delete_full;
    TCase* tc_delete_chain;
+   TCase* tc_delete_retaied_bakcup;
+   TCase* tc_delete_force_retained_backup;
 
    s = suite_create("pgmoneta_test_delete");
 
@@ -170,6 +265,20 @@ pgmoneta_test_delete_suite()
    tcase_add_checked_fixture(tc_delete_full, pgmoneta_test_add_backup, pgmoneta_test_basedir_cleanup);
    tcase_add_test(tc_delete_full, test_pgmoneta_delete_full);
    suite_add_tcase(s, tc_delete_full);
+
+   tc_delete_retaied_bakcup = tcase_create("delete_retained_backup_test");
+   tcase_set_tags(tc_delete_retaied_bakcup, "common");
+   tcase_set_timeout(tc_delete_retaied_bakcup, 60);
+   tcase_add_checked_fixture(tc_delete_retaied_bakcup, pgmoneta_test_add_backup, pgmoneta_test_basedir_cleanup);
+   tcase_add_test(tc_delete_retaied_bakcup, test_pgmoneta_delete_retained_backup);
+   suite_add_tcase(s, tc_delete_retaied_bakcup);
+
+   tc_delete_force_retained_backup = tcase_create("delete_force_retained_backup_test");
+   tcase_set_tags(tc_delete_force_retained_backup, "common");
+   tcase_set_timeout(tc_delete_force_retained_backup, 60);
+   tcase_add_checked_fixture(tc_delete_force_retained_backup, pgmoneta_test_add_backup, pgmoneta_test_basedir_cleanup);
+   tcase_add_test(tc_delete_force_retained_backup, test_pgmoneta_delete_force_retained_backup);
+   suite_add_tcase(s, tc_delete_force_retained_backup);
 
    tc_delete_chain = tcase_create("delete_chain_test");
    tcase_set_tags(tc_delete_chain, " common");

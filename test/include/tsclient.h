@@ -58,6 +58,23 @@ int
 pgmoneta_tsclient_restore(char* server, char* backup_id, char* position);
 
 /**
+ * Execute retain command on the server 
+ * @param server the server to perform retain on
+ * @param backup_id the backup_id to retain
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_retain(char* server, char* backup_id);
+
+/**
+ * Execute expunge command on the server
+ * @param server the server to perform expunge on
+ * @param backup_id the backup_id to expunge
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_expunge(char* server, char* backup_id);
+/**
  * Execute delete command on the server
  * @param server the server to perform delete on
  * @param backup_id the backup_id to delete
@@ -65,6 +82,14 @@ pgmoneta_tsclient_restore(char* server, char* backup_id, char* position);
  */
 int
 pgmoneta_tsclient_delete(char* server, char* backup_id);
+/**
+ * Execute force delete command on the server 
+ * @param server the server to perform delete on
+ * @param backup_id the backup_id to delete
+ * return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_tsclient_force_delete(char* server, char* backup_id);
 
 /**
  * Execute reload command on the server
