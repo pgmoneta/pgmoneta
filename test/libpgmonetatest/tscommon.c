@@ -142,7 +142,7 @@ pgmoneta_test_validate_configuration(void* shmem)
 int
 pgmoneta_test_add_backup(void)
 {
-   if (pgmoneta_tsclient_backup("primary", NULL))
+   if (pgmoneta_tsclient_backup("primary", NULL, 0))
    {
       return 1;
    }
@@ -152,17 +152,17 @@ pgmoneta_test_add_backup(void)
 int
 pgmoneta_test_add_backup_chain(void)
 {
-   if (pgmoneta_tsclient_backup("primary", NULL))
+   if (pgmoneta_tsclient_backup("primary", NULL, 0))
    {
       return 1;
    }
    
-   if (pgmoneta_tsclient_backup("primary", "newest"))
+   if (pgmoneta_tsclient_backup("primary", "newest", 0))
    {
       return 1;
    }
    
-   if (pgmoneta_tsclient_backup("primary", "newest"))
+   if (pgmoneta_tsclient_backup("primary", "newest", 0))
    {
       return 1;
    }
@@ -214,7 +214,7 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_reload_configuration(&restart);
    }
 
-   if (pgmoneta_tsclient_reload())
+   if (pgmoneta_tsclient_reload(0))
    {
       pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to reload configuration");
    }
@@ -254,7 +254,7 @@ int
 pgmoneta_test_backup(const char* server_name, const char* backup_name)
 {
    /* Cast const away as pgmoneta_tsclient_backup doesn't modify the strings */
-   return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name);
+   return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name, 0);
 }
 
 int

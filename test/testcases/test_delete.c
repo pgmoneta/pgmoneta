@@ -47,7 +47,7 @@ MCTF_TEST(test_pgmoneta_delete_full)
       MCTF_SKIP();
    }
 
-   if (pgmoneta_tsclient_delete("primary", "oldest"))
+   if (pgmoneta_tsclient_delete("primary", "oldest", 0))
    {
       pgmoneta_test_basedir_cleanup();
       MCTF_SKIP();
@@ -76,10 +76,10 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup not valid");
 
    // Retain the backup
-   MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest"), cleanup, "failed to retain backup");
+   MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
 
    // Delete without force should fail
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest") != 0, cleanup, "delete should fail for retained backup");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
 
    // Verify the count is still 1
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos");
@@ -98,10 +98,10 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    }
 
    // Expunge the backup (remove the retained flag)
-   MCTF_ASSERT(!pgmoneta_tsclient_expunge("primary", "oldest"), cleanup, "failed to expunge backup");
+   MCTF_ASSERT(!pgmoneta_tsclient_expunge("primary", "oldest", false, 0), cleanup, "failed to expunge backup");
 
    // Delete will work now without force
-   MCTF_ASSERT(!pgmoneta_tsclient_delete("primary", "oldest"), cleanup, "failed to delete after expunge");
+   MCTF_ASSERT(!pgmoneta_tsclient_delete("primary", "oldest", 0), cleanup, "failed to delete after expunge");
 
    // Verify the count is 0
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos after delete");
@@ -142,10 +142,10 @@ MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
    MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup not valid");
 
    // Retain the backup
-   MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest"), cleanup, "failed to retain backup");
+   MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
 
    // Delete without force should fail
-   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest") != 0, cleanup, "delete should fail for retained backup");
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
 
    // Verify the count is still 1
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos");
@@ -164,7 +164,7 @@ MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
    }
 
    // Delete will work now with the force flag
-   MCTF_ASSERT(!pgmoneta_tsclient_force_delete("primary", "oldest"), cleanup, "failed to force delete retained backup");
+   MCTF_ASSERT(!pgmoneta_tsclient_force_delete("primary", "oldest", 0), cleanup, "failed to force delete retained backup");
 
    // Verify the count is 0
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos after force delete");
@@ -209,7 +209,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_before, &bcks_before), cleanup, "failed to load backup infos");
    MCTF_ASSERT_INT_EQ(num_bck_before, 3, cleanup, "expected 3 backups before deletion");
 
-   if (pgmoneta_tsclient_delete("primary", "newest"))
+   if (pgmoneta_tsclient_delete("primary", "newest", 0))
    {
       // Cleanup resources before skipping
 
@@ -283,7 +283,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
    MCTF_ASSERT_PTR_NONNULL(bcks_before, cleanup, "backups array is null");
    MCTF_ASSERT_PTR_NONNULL(bcks_before[1], cleanup, "backup[1] is null");
 
-   if (pgmoneta_tsclient_delete("primary", bcks_before[1]->label))
+   if (pgmoneta_tsclient_delete("primary", bcks_before[1]->label, 0))
    {
       // Cleanup resources before skipping
 
@@ -364,7 +364,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_root)
    MCTF_ASSERT_PTR_NONNULL(bcks_before, cleanup, "backups array is null");
    MCTF_ASSERT_PTR_NONNULL(bcks_before[1], cleanup, "backup[1] is null");
 
-   if (pgmoneta_tsclient_delete("primary", "oldest"))
+   if (pgmoneta_tsclient_delete("primary", "oldest", 0))
    {
       // Cleanup resources before skipping
 

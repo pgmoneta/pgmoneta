@@ -51,11 +51,12 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-static int check_output_outcome(int socket);
+
+static int check_output_outcome(int socket, int expected_error, struct json** output);
 static int get_connection();
 
 int
-pgmoneta_tsclient_backup(char* server, char* incremental)
+pgmoneta_tsclient_backup(char* server, char* incremental, int expected_error)
 {
    int socket = -1;
 
@@ -71,8 +72,8 @@ pgmoneta_tsclient_backup(char* server, char* incremental)
       goto error;
    }
 
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+   // Check the outcome field of the output
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
@@ -88,71 +89,144 @@ error:
 }
 
 int
-pgmoneta_tsclient_restore(char* server, char* backup_id, char* position)
+pgmoneta_tsclient_list_backup(char* server, char* sort_order, struct json** response, int expected_error)
 {
-   char* restore_path = NULL;
    int socket = -1;
 
    socket = get_connection();
-   // Security Checks
    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
    {
       goto error;
    }
 
-   // Fallbacks
+   if (pgmoneta_management_request_list_backup(NULL, socket, server, sort_order, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, response))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_restore(char* server, char* backup_id, char* position, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
    if (backup_id == NULL)
    {
       backup_id = "newest";
    }
 
-   // Create a restore request to the main server
    if (pgmoneta_management_request_restore(NULL, socket, server, backup_id, position, TEST_RESTORE_DIR, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
 
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
 
-   free(restore_path);
    pgmoneta_disconnect(socket);
    return 0;
 error:
-   free(restore_path);
    pgmoneta_disconnect(socket);
    return 1;
 }
 
 int
-pgmoneta_tsclient_delete(char* server, char* backup_id)
+pgmoneta_tsclient_verify(char* server, char* backup_id, char* directory, char* files, int expected_error)
 {
    int socket = -1;
 
    socket = get_connection();
-   // Security Checks
    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
    {
-      return 1;
+      goto error;
    }
 
-   // Fallbacks
+   if (pgmoneta_management_request_verify(NULL, socket, server, backup_id, directory, files, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_archive(char* server, char* backup_id, char* position, char* directory, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_archive(NULL, socket, server, backup_id, position, directory, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_delete(char* server, char* backup_id, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
    if (!backup_id)
    {
       backup_id = "oldest";
    }
 
-   // Create a delete request to the main server
    if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
 
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
@@ -163,32 +237,29 @@ error:
    pgmoneta_disconnect(socket);
    return 1;
 }
+
 int
-pgmoneta_tsclient_force_delete(char* server, char* backup_id)
+pgmoneta_tsclient_force_delete(char* server, char* backup_id, int expected_error)
 {
    int socket = -1;
 
    socket = get_connection();
-   // Security Checks
    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
    {
-      return 1;
+      goto error;
    }
 
-   // Fallbacks
    if (!backup_id)
    {
       backup_id = "oldest";
    }
 
-   // Create a delete request to the main server
    if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, true, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
 
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
@@ -201,25 +272,26 @@ error:
 }
 
 int
-pgmoneta_tsclient_retain(char* server, char* backup_id)
+pgmoneta_tsclient_retain(char* server, char* backup_id, bool cascade, int expected_error)
 {
    int socket = -1;
+
    socket = get_connection();
-   // Security Checks
    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
    {
-      return 1;
+      goto error;
    }
-   // Create a retain request to the main server
-   if (pgmoneta_management_request_retain(NULL, socket, server, backup_id, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+
+   if (pgmoneta_management_request_retain(NULL, socket, server, backup_id, cascade, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
+
    pgmoneta_disconnect(socket);
    return 0;
 error:
@@ -228,25 +300,26 @@ error:
 }
 
 int
-pgmoneta_tsclient_expunge(char* server, char* backup_id)
+pgmoneta_tsclient_expunge(char* server, char* backup_id, bool cascade, int expected_error)
 {
    int socket = -1;
+
    socket = get_connection();
-   // Security Checks
    if (!pgmoneta_socket_isvalid(socket) || server == NULL)
    {
-      return 1;
+      goto error;
    }
-   // Create a expunge request to the main server
-   if (pgmoneta_management_request_expunge(NULL, socket, server, backup_id, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+
+   if (pgmoneta_management_request_expunge(NULL, socket, server, backup_id, cascade, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
+
    pgmoneta_disconnect(socket);
    return 0;
 error:
@@ -255,25 +328,414 @@ error:
 }
 
 int
-pgmoneta_tsclient_reload()
+pgmoneta_tsclient_decrypt(char* path, int expected_error)
 {
    int socket = -1;
 
    socket = get_connection();
-   // Security Checks
    if (!pgmoneta_socket_isvalid(socket))
    {
-      return 1;
+      goto error;
    }
 
-   // Create a reload request to the main server
+   if (pgmoneta_management_request_decrypt(NULL, socket, path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_encrypt(char* path, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_encrypt(NULL, socket, path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_decompress(char* path, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_decompress(NULL, socket, path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_compress(char* path, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_compress(NULL, socket, path, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_ping(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_ping(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_shutdown(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_shutdown(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_status(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_status(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_status_details(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_status_details(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_reload(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
    if (pgmoneta_management_request_reload(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
 
-   // Check the outcome field of the output, if true success, else failure
-   if (check_output_outcome(socket))
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_conf_ls(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_conf_ls(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_conf_get(char* config_key, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_conf_get(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_conf_set(char* config_key, char* config_value, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_conf_set(NULL, socket, config_key, config_value, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_info(char* server, char* backup_id, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_info(NULL, socket, server, backup_id, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_annotate(char* server, char* backup_id, char* action, char* key, char* comment, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_annotate(NULL, socket, server, backup_id, action, key, comment, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_mode(char* server, char* action, int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_mode(NULL, socket, server, action, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
    {
       goto error;
    }
@@ -286,10 +748,12 @@ error:
 }
 
 static int
-check_output_outcome(int socket)
+check_output_outcome(int socket, int expected_error, struct json** output)
 {
    struct json* read = NULL;
    struct json* outcome = NULL;
+   bool status = false;
+   int error = 0;
 
    if (pgmoneta_management_read_json(NULL, socket, NULL, NULL, &read))
    {
@@ -306,15 +770,55 @@ check_output_outcome(int socket)
    }
 
    outcome = (struct json*)pgmoneta_json_get(read, MANAGEMENT_CATEGORY_OUTCOME);
-   if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_STATUS) || !(bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS))
+
+   if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_STATUS))
    {
       goto error;
    }
 
-   pgmoneta_json_destroy(read);
+   status = (bool)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_STATUS);
+
+   if (expected_error == 0)
+   {
+      if (!status)
+      {
+         goto error;
+      }
+   }
+   else
+   {
+      if (status)
+      {
+         goto error;
+      }
+
+      if (!pgmoneta_json_contains_key(outcome, MANAGEMENT_ARGUMENT_ERROR))
+      {
+          goto error;
+      }
+
+      error = (int)pgmoneta_json_get(outcome, MANAGEMENT_ARGUMENT_ERROR);
+      if (error != expected_error)
+      {
+         pgmoneta_log_error("Expected error %d, got %d", expected_error, error);
+         goto error;
+      }
+   }
+
+   if (output != NULL)
+   {
+      *output = read;
+   }
+   else
+   {
+      pgmoneta_json_destroy(read);
+   }
    return 0;
 error:
-   pgmoneta_json_destroy(read);
+   if (read)
+   {
+       pgmoneta_json_destroy(read);
+   }
    return 1;
 }
 
@@ -325,11 +829,6 @@ get_connection()
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
-
-   if (config == NULL)
-   {
-      return -1;
-   }
    if (strlen(config->common.configuration_path))
    {
       if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &socket))
@@ -339,4 +838,32 @@ get_connection()
    }
    pgmoneta_log_info("%s %s %d", config->common.configuration_path, config->common.unix_socket_dir, socket);
    return socket;
+}
+
+int
+pgmoneta_tsclient_reset(int expected_error)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   if (!pgmoneta_socket_isvalid(socket))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_request_reset(NULL, socket, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   if (check_output_outcome(socket, expected_error, NULL))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
 }

@@ -44,7 +44,7 @@ MCTF_TEST(test_pgmoneta_restore_full)
       MCTF_SKIP();
    }
 
-   if (pgmoneta_tsclient_restore("primary", "newest", "current"))
+   if (pgmoneta_tsclient_restore("primary", "newest", "current", 0))
    {
       pgmoneta_test_basedir_cleanup();
       MCTF_SKIP();
@@ -65,7 +65,7 @@ MCTF_TEST(test_pgmoneta_restore_incremental_chain)
       MCTF_SKIP();
    }
 
-   if (pgmoneta_tsclient_restore("primary", "newest", "current"))
+   if (pgmoneta_tsclient_restore("primary", "newest", "current", 0))
    {
       pgmoneta_test_basedir_cleanup();
       MCTF_SKIP();

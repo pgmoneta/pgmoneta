@@ -1779,6 +1779,12 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
             pgmoneta_annotate_request(NULL, client_fd, srv, compression, encryption, pyl);
          }
       }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Annotate: No server %s (%d)", server, MANAGEMENT_ERROR_ANNOTATE_NOSERVER);
+         goto error;
+      }
    }
    else if (id == MANAGEMENT_MODE)
    {
