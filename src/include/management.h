@@ -141,6 +141,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_FAILED                "Failed"
 #define MANAGEMENT_ARGUMENT_FILENAME              "FileName"
 #define MANAGEMENT_ARGUMENT_FILES                 "Files"
+#define MANAGEMENT_ARGUMENT_FORCE                 "Force"
 #define MANAGEMENT_ARGUMENT_FREE_SPACE            "FreeSpace"
 #define MANAGEMENT_ARGUMENT_HASH_ALGORITHM        "HashAlgorithm"
 #define MANAGEMENT_ARGUMENT_HOT_STANDBY_SIZE      "HotStandbySize"
@@ -503,13 +504,14 @@ pgmoneta_management_request_archive(SSL* ssl, int socket, char* server, char* ba
  * @param socket The socket descriptor
  * @param server The server
  * @param backup_id The backup
+ * @param force Force delete
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param output_format The output format
  * @return 0 upon success, otherwise 1
  */
 int
-pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format);
+pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a shutdown request

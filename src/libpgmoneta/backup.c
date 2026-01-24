@@ -649,6 +649,7 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
 {
    char* identifier = NULL;
    char* elapsed = NULL;
+   bool force = false;
    struct timespec start_t;
    struct timespec end_t;
    double total_seconds;
@@ -677,6 +678,8 @@ pgmoneta_delete_backup(int client_fd, int srv, uint8_t compression, uint8_t encr
    }
    req = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
    identifier = (char*)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_BACKUP);
+   force = (bool)pgmoneta_json_get(req, MANAGEMENT_ARGUMENT_FORCE);
+   pgmoneta_art_insert(nodes, NODE_FORCE, (uintptr_t)force, ValueBool);
    if (pgmoneta_workflow_nodes(srv, identifier, nodes, &backup))
    {
       goto error;

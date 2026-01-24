@@ -235,7 +235,7 @@ error:
 }
 
 int
-pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, uint8_t compression, uint8_t encryption, int32_t output_format)
+pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* backup_id, bool force, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    struct json* j = NULL;
    struct json* request = NULL;
@@ -252,6 +252,7 @@ pgmoneta_management_request_delete(SSL* ssl, int socket, char* server, char* bac
 
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
    pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_BACKUP, (uintptr_t)backup_id, ValueString);
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_FORCE, (uintptr_t)force, ValueBool);
 
    if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
    {

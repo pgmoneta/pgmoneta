@@ -82,6 +82,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
    bool active = false;
+   bool force = false;
    int backup_index = -1;
    char* label = NULL;
    char* d = NULL;
@@ -101,6 +102,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
 
    server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
    label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+   force = (bool)pgmoneta_art_search(nodes, NODE_FORCE);
 
    pgmoneta_log_debug("Delete (execute): %s/%s", config->common.servers[server].name, label);
 
@@ -145,7 +147,7 @@ delete_backup_execute(char* name __attribute__((unused)), struct art* nodes)
       goto error;
    }
 
-   if (backups[backup_index]->keep)
+   if (!force && backups[backup_index]->keep)
    {
       pgmoneta_art_insert(nodes, NODE_ERROR_CODE, (uintptr_t)MANAGEMENT_ERROR_DELETE_BACKUP_RETAINED, ValueInt32);
       pgmoneta_log_warn("Delete: Backup is retained for %s/%s", config->common.servers[server].name, label);

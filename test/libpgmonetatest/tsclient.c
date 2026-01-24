@@ -146,7 +146,7 @@ pgmoneta_tsclient_delete(char* server, char* backup_id)
    }
 
    // Create a delete request to the main server
-   if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
    {
       goto error;
    }
@@ -157,6 +157,96 @@ pgmoneta_tsclient_delete(char* server, char* backup_id)
       goto error;
    }
 
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+int
+pgmoneta_tsclient_force_delete(char* server, char* backup_id)
+{
+   int socket = -1;
+
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      return 1;
+   }
+
+   // Fallbacks
+   if (!backup_id)
+   {
+      backup_id = "oldest";
+   }
+
+   // Create a delete request to the main server
+   if (pgmoneta_management_request_delete(NULL, socket, server, backup_id, true, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+
+   // Check the outcome field of the output, if true success, else failure
+   if (check_output_outcome(socket))
+   {
+      goto error;
+   }
+
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_retain(char* server, char* backup_id)
+{
+   int socket = -1;
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      return 1;
+   }
+   // Create a retain request to the main server
+   if (pgmoneta_management_request_retain(NULL, socket, server, backup_id, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+   // Check the outcome field of the output, if true success, else failure
+   if (check_output_outcome(socket))
+   {
+      goto error;
+   }
+   pgmoneta_disconnect(socket);
+   return 0;
+error:
+   pgmoneta_disconnect(socket);
+   return 1;
+}
+
+int
+pgmoneta_tsclient_expunge(char* server, char* backup_id)
+{
+   int socket = -1;
+   socket = get_connection();
+   // Security Checks
+   if (!pgmoneta_socket_isvalid(socket) || server == NULL)
+   {
+      return 1;
+   }
+   // Create a expunge request to the main server
+   if (pgmoneta_management_request_expunge(NULL, socket, server, backup_id, false, MANAGEMENT_COMPRESSION_NONE, MANAGEMENT_ENCRYPTION_NONE, MANAGEMENT_OUTPUT_FORMAT_JSON))
+   {
+      goto error;
+   }
+   // Check the outcome field of the output, if true success, else failure
+   if (check_output_outcome(socket))
+   {
+      goto error;
+   }
    pgmoneta_disconnect(socket);
    return 0;
 error:

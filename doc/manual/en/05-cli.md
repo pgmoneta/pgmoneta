@@ -29,6 +29,7 @@ Options:
   -E, --encrypt none|aes|aes256|aes192|aes128     Encrypt the wire protocol
   -s, --sort asc|desc                             Sort result (for list-backup)
       --cascade                                   Cascade a retain/expunge backup
+      --force                                     Force delete a backup
   -?, --help                                      Display help
 
 Commands:
@@ -188,7 +189,7 @@ Delete a backup from a server
 Command
 
 ``` sh
-pgmoneta-cli delete <server> [<timestamp>|oldest|newest]
+pgmoneta-cli delete [--force] <server> [<timestamp>|oldest|newest]
 ```
 
 Example

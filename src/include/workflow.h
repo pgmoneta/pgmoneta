@@ -66,6 +66,7 @@ extern "C" {
 #define NODE_BACKUP_DATA                 "backup_data"         /* The data directory of the backup */
 #define NODE_ERROR_CODE                  "error_code"          /* The error code */
 #define NODE_FAILED                      "failed"              /* The failed files in a manifest */
+#define NODE_FORCE                       "force"               /* force deletion of backup */
 #define NODE_INCREMENTAL_BASE            "incremental_base"    /* The base directory of incremental */
 #define NODE_INCREMENTAL_COMBINE         "incremental_combine" /* Whether to combine into one incremental backup */
 #define NODE_INCREMENTAL_LABEL           "incremental_label"   /* The label of the incremental backup */
