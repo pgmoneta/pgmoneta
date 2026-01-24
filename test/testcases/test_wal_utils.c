@@ -27,20 +27,22 @@
  *
  */
 
-/* pgmoneta */
+// pgmoneta
+
 #include <pgmoneta.h>
 #include <configuration.h>
 #include <deque.h>
 #include <logging.h>
 #include <tsclient.h>
 #include <tscommon.h>
-#include <tssuite.h>
 #include <tswalutils.h>
 #include <utils.h>
 #include <value.h>
 #include <walfile.h>
+#include <mctf.h>
 
-/* system */
+// system
+
 #include <err.h>
 #include <getopt.h>
 #include <stdbool.h>
@@ -50,108 +52,128 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-static void test_walfile(struct walfile* (*generate)(void));
-static void compare_walfile(struct walfile* wf1, struct walfile* wf2);
+static int compare_walfile(struct walfile* wf1, struct walfile* wf2);
 static bool compare_long_page_headers(struct xlog_long_page_header_data* h1, struct xlog_long_page_header_data* h2);
-static void compare_deque(struct deque* dq1, struct deque* dq2, void (*compare)(void*, void*));
-static bool compare_xlog_page_header(void* a, void* b);
-static void compare_xlog_record(void* a, void* b);
+static int compare_deque(struct deque* dq1, struct deque* dq2, int (*compare)(void*, void*));
+static int compare_xlog_page_header(void* a, void* b);
+static int compare_xlog_record(void* a, void* b);
 static void destroy_walfile(struct walfile* wf);
 
-START_TEST(test_check_point_shutdown_v17)
-{
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   test_walfile(pgmoneta_test_generate_check_point_shutdown_v17);
-}
-END_TEST
-
-Suite*
-pgmoneta_test_wal_utils_suite()
-{
-   Suite* s;
-   TCase* tc_wal_utils;
-   s = suite_create("pgmoneta_test_wal_utils");
-   tc_wal_utils = tcase_create("test_wal_utils");
-   tcase_add_checked_fixture(tc_wal_utils, pgmoneta_test_setup, pgmoneta_test_basedir_cleanup);
-   tcase_set_timeout(tc_wal_utils, 60);
-   tcase_add_test(tc_wal_utils, test_check_point_shutdown_v17);
-   suite_add_tcase(s, tc_wal_utils);
-
-   return s;
-}
-
-static void
-test_walfile(struct walfile* (*generate)(void))
+MCTF_TEST(test_check_point_shutdown_v17)
 {
    struct walfile* wf = NULL;
    struct walfile* read_wf = NULL;
    char* path = NULL;
-   struct main_configuration* config;
+   struct main_configuration* config = NULL;
+   struct partial_xlog_record* test_partial_record = NULL;
+
+   pgmoneta_test_setup();
 
    config = (struct main_configuration*)shmem;
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "configuration is null");
 
    path = pgmoneta_append(path, TEST_BASE_DIR);
+   MCTF_ASSERT_PTR_NONNULL(path, cleanup, "failed to append TEST_BASE_DIR");
+
    path = pgmoneta_append(path, "/walfiles");
+   MCTF_ASSERT_PTR_NONNULL(path, cleanup, "failed to append /walfiles");
 
    if (access(path, F_OK) != 0)
    {
-      ck_assert_msg(mkdir(path, 0700) == 0, "failed to create walfiles directory");
+      MCTF_ASSERT(mkdir(path, 0700) == 0, cleanup, "failed to create walfiles directory");
    }
 
    path = pgmoneta_append(path, RANDOM_WALFILE_NAME);
-   ck_assert_ptr_nonnull(path);
+   MCTF_ASSERT_PTR_NONNULL(path, cleanup, "failed to append RANDOM_WALFILE_NAME");
 
    // 1. Prepare walfile structure
-   wf = generate();
-   ck_assert_ptr_nonnull(wf);
+
+   wf = pgmoneta_test_generate_check_point_shutdown_v17();
+   MCTF_ASSERT_PTR_NONNULL(wf, cleanup, "failed to generate walfile");
 
    // 2. Write this structure to disk
-   ck_assert_msg(!pgmoneta_write_walfile(wf, 0, path), "failed to write walfile to disk");
 
-   partial_record = malloc(sizeof(struct partial_xlog_record));
-   partial_record->data_buffer_bytes_read = 0;
-   partial_record->xlog_record_bytes_read = 0;
-   partial_record->xlog_record = NULL;
-   partial_record->data_buffer = NULL;
+   MCTF_ASSERT(!pgmoneta_write_walfile(wf, 0, path), cleanup, "failed to write walfile to disk");
+
+   // Initialize partial_record for reading
+
+   test_partial_record = malloc(sizeof(struct partial_xlog_record));
+   MCTF_ASSERT_PTR_NONNULL(test_partial_record, cleanup, "failed to allocate partial_record");
+
+   test_partial_record->data_buffer_bytes_read = 0;
+   test_partial_record->xlog_record_bytes_read = 0;
+   test_partial_record->xlog_record = NULL;
+   test_partial_record->data_buffer = NULL;
+
+   // Set global partial_record for read operation
+
+   partial_record = test_partial_record;
 
    // 3. Read the walfile from disk
-   ck_assert_msg(!pgmoneta_read_walfile(0, path, &read_wf), "failed to read walfile from disk");
+
+   MCTF_ASSERT(!pgmoneta_read_walfile(0, path, &read_wf), cleanup, "failed to read walfile from disk");
+   MCTF_ASSERT_PTR_NONNULL(read_wf, cleanup, "read walfile is null");
 
    // 4. Validate the read data against the original walfile structure
-   compare_walfile(wf, read_wf);
 
+   MCTF_ASSERT(!compare_walfile(wf, read_wf), cleanup, "walfile comparison failed");
+
+cleanup:
    destroy_walfile(wf);
    destroy_walfile(read_wf);
-   if (partial_record != NULL)
+
+   if (test_partial_record != NULL)
    {
-      if (partial_record->xlog_record != NULL)
+      if (test_partial_record->xlog_record != NULL)
       {
-         free(partial_record->xlog_record);
+         free(test_partial_record->xlog_record);
       }
-      if (partial_record->data_buffer != NULL)
+      if (test_partial_record->data_buffer != NULL)
       {
-         free(partial_record->data_buffer);
+         free(test_partial_record->data_buffer);
       }
-      free(partial_record);
-      partial_record = NULL;
+      free(test_partial_record);
+      test_partial_record = NULL;
    }
-   free(path);
+   partial_record = NULL;
+
+   if (path != NULL)
+   {
+      free(path);
+      path = NULL;
+   }
+
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
 
-static void
+static int
 compare_walfile(struct walfile* wf1, struct walfile* wf2)
 {
    if (wf1 == NULL || wf2 == NULL)
    {
-      ck_assert_msg(wf1 == wf2, "one of the walfile is NULL");
+      return 1;
    }
 
-   ck_assert_uint_eq(wf1->long_phd->std.xlp_magic, wf2->long_phd->std.xlp_magic);
+   if (wf1->long_phd == NULL || wf2->long_phd == NULL)
+   {
+      return 1;
+   }
 
-   ck_assert(compare_long_page_headers(wf1->long_phd, wf2->long_phd));
+   if (wf1->long_phd->std.xlp_magic != wf2->long_phd->std.xlp_magic)
+   {
+      return 1;
+   }
 
-   compare_deque(wf1->records, wf2->records, compare_xlog_record);
+   if (!compare_long_page_headers(wf1->long_phd, wf2->long_phd))
+   {
+      return 1;
+   }
+
+   return compare_deque(wf1->records, wf2->records, compare_xlog_record);
 }
 
 static bool
@@ -170,90 +192,184 @@ compare_long_page_headers(struct xlog_long_page_header_data* h1, struct xlog_lon
            h1->xlp_xlog_blcksz == h2->xlp_xlog_blcksz);
 }
 
-static void
-compare_deque(struct deque* dq1, struct deque* dq2, void (*compare)(void*, void*))
+static int
+compare_deque(struct deque* dq1, struct deque* dq2, int (*compare)(void*, void*))
 {
    if (dq1 == NULL || dq2 == NULL)
    {
-      ck_assert_msg(dq1 == dq2, "one of the deque is NULL");
+      return 1;
    }
 
-   ck_assert_uint_eq(pgmoneta_deque_size(dq1), pgmoneta_deque_size(dq2));
+   size_t size1 = pgmoneta_deque_size(dq1);
+   size_t size2 = pgmoneta_deque_size(dq2);
+   if (size1 != size2)
+   {
+      return 1;
+   }
 
    struct deque_iterator* iter1 = NULL;
    struct deque_iterator* iter2 = NULL;
-   bool equal = true;
 
-   ck_assert(pgmoneta_deque_iterator_create(dq1, &iter1) == 0 &&
-             pgmoneta_deque_iterator_create(dq2, &iter2) == 0);
+   if (pgmoneta_deque_iterator_create(dq1, &iter1) != 0)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_deque_iterator_create(dq2, &iter2) != 0)
+   {
+      pgmoneta_deque_iterator_destroy(iter1);
+      return 1;
+   }
 
    while (pgmoneta_deque_iterator_next(iter1) && pgmoneta_deque_iterator_next(iter2))
    {
       uintptr_t data1 = iter1->value->data;
       uintptr_t data2 = iter2->value->data;
 
-      compare((void*)data1, (void*)data2);
+      if (compare((void*)data1, (void*)data2) != 0)
+      {
+         pgmoneta_deque_iterator_destroy(iter1);
+         pgmoneta_deque_iterator_destroy(iter2);
+         return 1;
+      }
    }
 
-   ck_assert((!pgmoneta_deque_iterator_next(iter1)) && (!pgmoneta_deque_iterator_next(iter2)));
-
+   bool has_next1 = pgmoneta_deque_iterator_next(iter1);
+   bool has_next2 = pgmoneta_deque_iterator_next(iter2);
    pgmoneta_deque_iterator_destroy(iter1);
    pgmoneta_deque_iterator_destroy(iter2);
+
+   if (has_next1 || has_next2)
+   {
+      return 1;
+   }
+
+   return 0;
 }
 
-static bool
+static int
 compare_xlog_page_header(void* a, void* b)
 {
    struct xlog_page_header_data* ph1 = (struct xlog_page_header_data*)a;
    struct xlog_page_header_data* ph2 = (struct xlog_page_header_data*)b;
 
+   if (ph1 == NULL || ph2 == NULL)
+   {
+      return 1;
+   }
+
    return (ph1->xlp_magic == ph2->xlp_magic &&
            ph1->xlp_info == ph2->xlp_info &&
            ph1->xlp_tli == ph2->xlp_tli &&
-           ph1->xlp_pageaddr == ph2->xlp_pageaddr);
+           ph1->xlp_pageaddr == ph2->xlp_pageaddr)
+             ? 0
+             : 1;
 }
 
-static void
+static int
 compare_xlog_record(void* a, void* b)
 {
    struct decoded_xlog_record* rec1 = (struct decoded_xlog_record*)a;
    struct decoded_xlog_record* rec2 = (struct decoded_xlog_record*)b;
 
-   ck_assert_int_eq(rec1->oversized, rec2->oversized);
-
-   ck_assert_mem_eq(&rec1->header, &rec2->header, sizeof(struct xlog_record));
-
-   ck_assert_uint_eq(rec1->record_origin, rec2->record_origin);
-
-   ck_assert_uint_eq(rec1->toplevel_xid, rec2->toplevel_xid);
-
-   ck_assert_uint_eq(rec1->main_data_len, rec2->main_data_len);
-
-   ck_assert_msg(rec1->main_data_len == 0 || memcmp(rec1->main_data, rec2->main_data, rec1->main_data_len) == 0, "xlog_record main_data mismatch");
-
-   ck_assert_int_eq(rec1->max_block_id, rec2->max_block_id);
-
-   for (int i = 0; i <= rec1->max_block_id && i < XLR_MAX_BLOCK_ID + 1; i++)
+   if (rec1 == NULL || rec2 == NULL)
    {
-      ck_assert_msg(rec1->blocks[i].in_use == rec2->blocks[i].in_use, "xlog_record blocks[%d] in_use mismatch", i);
+      return 1;
+   }
 
-      if (rec1->blocks[i].in_use)
+   if (rec1->oversized != rec2->oversized)
+   {
+      return 1;
+   }
+
+   if (memcmp(&rec1->header, &rec2->header, sizeof(struct xlog_record)) != 0)
+   {
+      return 1;
+   }
+
+   if (rec1->record_origin != rec2->record_origin)
+   {
+      return 1;
+   }
+
+   if (rec1->toplevel_xid != rec2->toplevel_xid)
+   {
+      return 1;
+   }
+
+   if (rec1->main_data_len != rec2->main_data_len)
+   {
+      return 1;
+   }
+
+   if (rec1->main_data_len > 0)
+   {
+      if (rec1->main_data == NULL || rec2->main_data == NULL)
       {
-         ck_assert_msg(rec1->blocks[i].bimg_len == rec2->blocks[i].bimg_len, "xlog_record blocks[%d] bimg_len mismatch\n", i);
-
-         ck_assert_msg(rec1->blocks[i].bimg_len == 0 ||
-                          memcmp(rec1->blocks[i].bkp_image, rec2->blocks[i].bkp_image, rec1->blocks[i].bimg_len) == 0,
-                       "xlog_record blocks[%d] bkp_image mismatch\n", i);
-
-         ck_assert_msg(rec1->blocks[i].data_len == rec2->blocks[i].data_len, "xlog_record blocks[%d] data_len mismatch", i);
-
-         ck_assert_msg(rec1->blocks[i].data_len == 0 ||
-                          memcmp(rec1->blocks[i].data, rec2->blocks[i].data, rec1->blocks[i].data_len) == 0,
-                       "xlog_record blocks[%d] data mismatch\n", i);
+         return 1;
+      }
+      if (memcmp(rec1->main_data, rec2->main_data, rec1->main_data_len) != 0)
+      {
+         return 1;
       }
    }
 
-   ck_assert_int_eq(rec1->partial, rec2->partial);
+   if (rec1->max_block_id != rec2->max_block_id)
+   {
+      return 1;
+   }
+
+   for (int i = 0; i <= rec1->max_block_id && i < XLR_MAX_BLOCK_ID + 1; i++)
+   {
+      if (rec1->blocks[i].in_use != rec2->blocks[i].in_use)
+      {
+         return 1;
+      }
+
+      if (rec1->blocks[i].in_use)
+      {
+         if (rec1->blocks[i].bimg_len != rec2->blocks[i].bimg_len)
+         {
+            return 1;
+         }
+
+         if (rec1->blocks[i].bimg_len > 0)
+         {
+            if (rec1->blocks[i].bkp_image == NULL || rec2->blocks[i].bkp_image == NULL)
+            {
+               return 1;
+            }
+            if (memcmp(rec1->blocks[i].bkp_image, rec2->blocks[i].bkp_image, rec1->blocks[i].bimg_len) != 0)
+            {
+               return 1;
+            }
+         }
+
+         if (rec1->blocks[i].data_len != rec2->blocks[i].data_len)
+         {
+            return 1;
+         }
+
+         if (rec1->blocks[i].data_len > 0)
+         {
+            if (rec1->blocks[i].data == NULL || rec2->blocks[i].data == NULL)
+            {
+               return 1;
+            }
+            if (memcmp(rec1->blocks[i].data, rec2->blocks[i].data, rec1->blocks[i].data_len) != 0)
+            {
+               return 1;
+            }
+         }
+      }
+   }
+
+   if (rec1->partial != rec2->partial)
+   {
+      return 1;
+   }
+
+   return 0;
 }
 
 static void
@@ -264,7 +380,11 @@ destroy_walfile(struct walfile* wf)
       return;
    }
 
-   free(wf->long_phd);
+   if (wf->long_phd != NULL)
+   {
+      free(wf->long_phd);
+      wf->long_phd = NULL;
+   }
 
    struct deque_iterator* iter = NULL;
    if (wf->page_headers != NULL)
@@ -282,6 +402,7 @@ destroy_walfile(struct walfile* wf)
          pgmoneta_deque_iterator_destroy(iter);
       }
       pgmoneta_deque_destroy(wf->page_headers);
+      wf->page_headers = NULL;
    }
 
    iter = NULL;
@@ -298,6 +419,7 @@ destroy_walfile(struct walfile* wf)
                if (rec->main_data != NULL)
                {
                   free(rec->main_data);
+                  rec->main_data = NULL;
                }
 
                for (int i = 0; i <= rec->max_block_id && i < XLR_MAX_BLOCK_ID + 1; i++)
@@ -307,11 +429,13 @@ destroy_walfile(struct walfile* wf)
                      if (rec->blocks[i].bkp_image != NULL)
                      {
                         free(rec->blocks[i].bkp_image);
+                        rec->blocks[i].bkp_image = NULL;
                      }
 
                      if (rec->blocks[i].data != NULL)
                      {
                         free(rec->blocks[i].data);
+                        rec->blocks[i].data = NULL;
                      }
                   }
                }
@@ -322,6 +446,7 @@ destroy_walfile(struct walfile* wf)
          pgmoneta_deque_iterator_destroy(iter);
       }
       pgmoneta_deque_destroy(wf->records);
+      wf->records = NULL;
    }
 
    free(wf);

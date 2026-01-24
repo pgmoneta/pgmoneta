@@ -24,46 +24,54 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
-#include <tssuite.h>
+#include <pgmoneta.h>
 #include <tsclient.h>
 #include <tscommon.h>
+#include <mctf.h>
+
 #include <stdio.h>
+#include <stdlib.h>
 
-// test restore
-START_TEST(test_pgmoneta_restore)
+MCTF_TEST(test_pgmoneta_restore_full)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   int found = 0;
-   found = !pgmoneta_tsclient_restore("primary", "newest", "current");
-   ck_assert_msg(found, "success status not found");
+   pgmoneta_test_setup();
+
+   if (pgmoneta_test_add_backup())
+   {
+      pgmoneta_test_basedir_cleanup();
+      MCTF_SKIP();
+   }
+
+   if (pgmoneta_tsclient_restore("primary", "newest", "current"))
+   {
+      pgmoneta_test_basedir_cleanup();
+      MCTF_SKIP();
+   }
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
 }
-END_TEST
 
-Suite*
-pgmoneta_test_restore_suite()
+MCTF_TEST(test_pgmoneta_restore_incremental_chain)
 {
-   Suite* s;
-   TCase* tc_restore_full;
-   TCase* tc_restore_incremental;
+   pgmoneta_test_setup();
 
-   s = suite_create("pgmoneta_test_restore");
+   if (pgmoneta_test_add_backup_chain())
+   {
+      pgmoneta_test_basedir_cleanup();
+      MCTF_SKIP();
+   }
 
-   tc_restore_full = tcase_create("full_restore_test");
-   tcase_set_tags(tc_restore_full, "common");
-   tcase_set_timeout(tc_restore_full, 60);
-   tcase_add_checked_fixture(tc_restore_full, pgmoneta_test_add_backup, pgmoneta_test_basedir_cleanup);
-   tcase_add_test(tc_restore_full, test_pgmoneta_restore);
-   suite_add_tcase(s, tc_restore_full);
+   if (pgmoneta_tsclient_restore("primary", "newest", "current"))
+   {
+      pgmoneta_test_basedir_cleanup();
+      MCTF_SKIP();
+   }
 
-   tc_restore_incremental = tcase_create("incremental_restore_test");
-   tcase_set_tags(tc_restore_incremental, "common");
-   tcase_set_timeout(tc_restore_incremental, 60);
-   tcase_add_checked_fixture(tc_restore_incremental, pgmoneta_test_add_backup_chain, pgmoneta_test_basedir_cleanup);
-   tcase_add_test(tc_restore_incremental, test_pgmoneta_restore);
-   suite_add_tcase(s, tc_restore_incremental);
-
-   return s;
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
 }

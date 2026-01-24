@@ -20,16 +20,7 @@ All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta
 the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally.
 So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated. 
 
-To run one particular test case or suite (unfortunately check doesn't support running one single test at the moment), 
-run `CK_RUN_CASE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh` or 
-`CK_RUN_SUITE=<test_case_name> <PATH_TO_PGMONETA>/pgmoneta/test/check.sh`. Alternatively, you can first export the environment variables 
-and then run the script:
-```
-export CK_RUN_CASE=<test_case_name>
-<PATH_TO_PGMONETA>/pgmoneta/test/check.sh
-```
-
-The environment variables will be automatically unset when the test is finished or aborted.
+To run one particular test case or module, use `<PATH_TO_PGMONETA>/build/test/pgmoneta-test -t <test_case_name>` or `<PATH_TO_PGMONETA>/build/test/pgmoneta-test -m <module_name>`. This requires the test environment to already be set up by `check.sh`. The environment variables will be automatically unset when the test is finished or aborted.
 
 It is recommended that you **ALWAYS** run tests before raising PR.
 
@@ -37,7 +28,36 @@ It is recommended that you **ALWAYS** run tests before raising PR.
 
 To add an additional testcase, go to [testcases](https://github.com/pgmoneta/pgmoneta/tree/main/test/testcases) directory inside the `pgmoneta` project.
 
-Create a `.c` file that contains the test suite and define the suite inside `/test/include/tssuite.sh`. Add the above created suite to the test runner in [runner.c](https://github.com/pgmoneta/pgmoneta/tree/main/test/runner.c)
+Create a `.c` file that contains the test and use the `MCTF_TEST()` macro to define your test. Tests are automatically registered and module names are extracted from file names.
+
+Example test structure:
+```c
+#include <mctf.h>
+#include <tscommon.h>
+
+MCTF_TEST(test_my_feature)
+{
+   pgmoneta_test_setup();
+
+   // Your test code here
+   int result = some_function();
+   MCTF_ASSERT(result == 0, cleanup, "function should return 0");
+
+cleanup:
+   pgmoneta_test_basedir_cleanup();
+   MCTF_FINISH();
+}
+```
+
+**MCTF_ASSERT Usage:**
+
+The `MCTF_ASSERT` macro supports optional error messages with printf-style formatting:
+
+- **Without message:** `MCTF_ASSERT(condition, cleanup);` - No error message displayed
+- **With simple message:** `MCTF_ASSERT(condition, cleanup, "error message");`
+- **With formatted message:** `MCTF_ASSERT(condition, cleanup, "got %d, expected 0", value);`
+  - Format arguments (like `value`) are optional and only needed when the message contains format specifiers (`%d`, `%s`, etc.)
+  - Multiple format arguments: `MCTF_ASSERT(a == b, cleanup, "expected %d but got %d", expected, actual);`
 
 **Test Resource**
 
@@ -72,8 +92,6 @@ may also run `PGMONETA_TEST_PORT=<your-port> ./check.sh`.
 
 | Name               | Default | Value           | Description                                         |
 |--------------------|---------|-----------------|-----------------------------------------------------|
-| CK_RUN_CASE        |         | test case name  | Run one single test case                            |
-| CK_RUN_SUITE       |         | test suite name | Run one single test suite                           |
 | PGMONETA_TEST_PORT | 6432    | port number     | The port name pgmoneta use to connect to the db pod |
 
 
@@ -212,15 +230,30 @@ For every record type, we need to add a test case that will generate the wal rec
 1. Implement function `pgmoneta_test_generate_<type>_v<version>` in `test/libpgmonetatest/tswalutils/tswalutils_<version>.c` (add the function prototype in `test/include/tswalutils.h` as well). This function is responsible for generating the wal record of the type you are adding that mimics a real PostgreSQL wal record.
 2. Add this in the body of the testcase 
 ```c
-  START_TEST(test_check_point_shutdown_v17)
-  {
-    test_walfile(pgmoneta_test_generate_check_point_shutdown_v17);
-  }
-  END_TEST
-```
-and replace `pgmoneta_test_generate_check_point_shutdown_v17);` with the function you implemented in step 1.
+MCTF_TEST(test_check_point_shutdown_v17)
+{
+   struct walfile* wf = NULL;
+   struct walfile* read_wf = NULL;
+   char* path = NULL;
 
-`test_walfile` is a function that will take care of the reading, writing and comparing of the wal file generated against the one read from the disk.
+   pgmoneta_test_setup();
+
+   wf = pgmoneta_test_generate_check_point_shutdown_v17();
+   MCTF_ASSERT_PTR_NONNULL(wf, cleanup, "failed to generate walfile");
+
+   MCTF_ASSERT(!pgmoneta_write_walfile(wf, 0, path), cleanup, "failed to write walfile to disk");
+   MCTF_ASSERT(!pgmoneta_read_walfile(0, path, &read_wf), cleanup, "failed to read walfile from disk");
+   MCTF_ASSERT_PTR_NONNULL(read_wf, cleanup, "read walfile is null");
+   MCTF_ASSERT(!compare_walfile(wf, read_wf), cleanup, "walfile comparison failed");
+
+cleanup:
+   destroy_walfile(wf);
+   destroy_walfile(read_wf);
+   free(path);
+   MCTF_FINISH();
+}
+```
+and replace `pgmoneta_test_generate_check_point_shutdown_v17` with the function you implemented in step 1.
 
 If the record type you are adding has differences between versions of PostgreSQL (13-17), you will need to implement a generate function per version (`generate_rec_x` -> `generate_rec_x_v16`, `generate_rec_x_v17`, etc.).
 

@@ -30,6 +30,9 @@
 #include <configuration.h>
 #include <logging.h>
 #include <message.h>
+#include <network.h>
+#include <security.h>
+#include <server.h>
 #include <shmem.h>
 #include <tsclient.h>
 #include <tscommon.h>
@@ -37,8 +40,10 @@
 #include <walfile.h>
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define ENV_VAR_CONF_PATH        "PGMONETA_TEST_CONF"
 #define ENV_VAR_CONF_SAMPLE_PATH "PGMONETA_TEST_CONF_SAMPLE"
@@ -71,10 +76,14 @@ pgmoneta_test_environment_create(void)
    size = sizeof(struct main_configuration);
    assert(!pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem));
 
-   pgmoneta_init_main_configuration(shmem);
+   assert(!pgmoneta_init_main_configuration(shmem));
 
    // Try reading configuration from the configuration path
    assert(!pgmoneta_read_main_configuration(shmem, conf_path));
+   
+   // Validate the configuration is valid
+   assert(!pgmoneta_test_validate_configuration(shmem));
+   
    config = (struct main_configuration*)shmem;
 
    // some validations just to be safe
@@ -118,21 +127,47 @@ pgmoneta_test_environment_destroy(void)
    pgmoneta_destroy_shared_memory(shmem, size);
 }
 
-void
-pgmoneta_test_add_backup(void)
+int
+pgmoneta_test_validate_configuration(void* shmem)
 {
-   pgmoneta_test_setup();
-   int found = !pgmoneta_tsclient_backup("primary", NULL);
-   assert(found);
+   if (shmem == NULL)
+   {
+      return 1;
+   }
+
+   // Use the existing validation function for comprehensive checks
+   return pgmoneta_validate_main_configuration(shmem);
 }
 
-void
+int
+pgmoneta_test_add_backup(void)
+{
+   if (pgmoneta_tsclient_backup("primary", NULL))
+   {
+      return 1;
+   }
+   return 0;
+}
+
+int
 pgmoneta_test_add_backup_chain(void)
 {
-   pgmoneta_test_setup();
-   assert((!pgmoneta_tsclient_backup("primary", NULL)));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
+   if (pgmoneta_tsclient_backup("primary", NULL))
+   {
+      return 1;
+   }
+   
+   if (pgmoneta_tsclient_backup("primary", "newest"))
+   {
+      return 1;
+   }
+   
+   if (pgmoneta_tsclient_backup("primary", "newest"))
+   {
+      return 1;
+   }
+   
+   return 0;
 }
 
 void
@@ -142,8 +177,14 @@ pgmoneta_test_basedir_cleanup(void)
    char* wal_dir = NULL;
    bool restart = false;
    struct main_configuration* config;
+   int ret = 0;
 
    config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      assert(0 && "pgmoneta_test_basedir_cleanup: config is NULL");
+   }
 
    wal_dir = pgmoneta_append(wal_dir, TEST_BASE_DIR);
    wal_dir = pgmoneta_append(wal_dir, "/walfiles");
@@ -159,13 +200,24 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_delete_directory(wal_dir);
    pgmoneta_mkdir(wal_dir);
 
-   // restore pgmoneta.conf by overwriting it with pgmoneta.conf.sample
-   assert(!pgmoneta_delete_file(config->common.configuration_path, NULL));
-   assert(!pgmoneta_copy_file(TEST_CONFIG_SAMPLE_PATH, config->common.configuration_path, NULL));
-   pgmoneta_reload_configuration(&restart);
+   if (pgmoneta_delete_file(config->common.configuration_path, NULL))
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to delete config file");
+   }
 
-   // assuming server doesn't need to restart
-   assert(!pgmoneta_tsclient_reload());
+   if (pgmoneta_copy_file(TEST_CONFIG_SAMPLE_PATH, config->common.configuration_path, NULL))
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to copy config file");
+   }
+   else
+   {
+   pgmoneta_reload_configuration(&restart);
+   }
+
+   if (pgmoneta_tsclient_reload())
+   {
+      pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to reload configuration");
+   }
 
    free(backup_dir);
    free(wal_dir);
@@ -196,6 +248,13 @@ pgmoneta_test_teardown(void)
    }
 
    pgmoneta_memory_destroy();
+}
+
+int
+pgmoneta_test_backup(const char* server_name, const char* backup_name)
+{
+   /* Cast const away as pgmoneta_tsclient_backup doesn't modify the strings */
+   return pgmoneta_tsclient_backup((char*)server_name, (char*)backup_name);
 }
 
 int

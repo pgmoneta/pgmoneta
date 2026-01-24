@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2025 The pgmoneta community
+# Copyright (C) 2026 The pgmoneta community
 #
 # Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
@@ -30,6 +30,7 @@ set -eo pipefail
 
 # Variables
 PG_VERSION="${TEST_PG_VERSION:-17}"
+export TEST_PG_VERSION="${TEST_PG_VERSION:-17}"
 
 IMAGE_NAME="pgmoneta-test-postgresql$PG_VERSION-rocky9"
 CONTAINER_NAME="pgmoneta-test-postgresql$PG_VERSION"
@@ -91,6 +92,9 @@ cleanup() {
        rm -f "/tmp/pgmoneta.localhost.pid"
      fi
    fi
+   
+   echo "Cleaning up shared memory segments"
+   ipcs -m 2>/dev/null | awk '/^0x0/ {print $2}' | xargs -r -I {} ipcrm -m {} 2>/dev/null || true
 
    echo "Clean Test Resources"
    if [[ -d $PGMONETA_ROOT_DIR ]]; then
@@ -99,51 +103,47 @@ cleanup() {
       fi
 
       if ls "$COVERAGE_DIR"/*.profraw >/dev/null 2>&1; then
-       echo "Generating coverage report, expect error when the binary is not covered at all"
-       llvm-profdata merge -sparse $COVERAGE_DIR/*.profraw -o $COVERAGE_DIR/coverage.profdata
+       if command -v llvm-profdata >/dev/null 2>&1 && command -v llvm-cov >/dev/null 2>&1; then
+         echo "Generating coverage report, expect error when the binary is not covered at all"
+         llvm-profdata merge -sparse $COVERAGE_DIR/*.profraw -o $COVERAGE_DIR/coverage.profdata 2>/dev/null || true
 
-       echo "Generating $COVERAGE_DIR/coverage-report-libpgmoneta.txt"
-       llvm-cov report $EXECUTABLE_DIRECTORY/libpgmoneta.so \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-report-libpgmoneta.txt
-       echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta.txt"
-       llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-report-pgmoneta.txt
-      echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt"
-      llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-cli \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt
-      echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt"
-      llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-admin \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt
-      # echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt"
-      # llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
-      #    --instr-profile=$COVERAGE_DIR/coverage.profdata \
-      #    --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-walinfo.txt
+         echo "Generating $COVERAGE_DIR/coverage-report-libpgmoneta.txt"
+         llvm-cov report $EXECUTABLE_DIRECTORY/libpgmoneta.so \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-report-libpgmoneta.txt 2>/dev/null || true
+         echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta.txt"
+         llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-report-pgmoneta.txt 2>/dev/null || true
+        echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt"
+        llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-cli \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-cli.txt 2>/dev/null || true
+        echo "Generating $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt"
+        llvm-cov report $EXECUTABLE_DIRECTORY/pgmoneta-admin \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-report-pgmoneta-admin.txt 2>/dev/null || true
 
-       echo "Generating $COVERAGE_DIR/coverage-libpgmoneta.txt"
-       llvm-cov show $EXECUTABLE_DIRECTORY/libpgmoneta.so \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-libpgmoneta.txt
-       echo "Generating $COVERAGE_DIR/coverage-pgmoneta.txt"
-       llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-pgmoneta.txt
-      echo "Generating $COVERAGE_DIR/coverage-pgmoneta-cli.txt"
-      llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-cli \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-pgmoneta-cli.txt
-      echo "Generating $COVERAGE_DIR/coverage-pgmoneta-admin.txt"
-      llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-admin \
-         --instr-profile=$COVERAGE_DIR/coverage.profdata \
-         --format=text > $COVERAGE_DIR/coverage-pgmoneta-admin.txt
-      # echo "Generating $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt"
-      # llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-walinfo
-      #    --instr-profile=$COVERAGE_DIR/coverage.profdata \
-      #    --format=text > $COVERAGE_DIR/coverage-pgmoneta-walinfo.txt
-       echo "Coverage --> $COVERAGE_DIR"
+         echo "Generating $COVERAGE_DIR/coverage-libpgmoneta.txt"
+         llvm-cov show $EXECUTABLE_DIRECTORY/libpgmoneta.so \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-libpgmoneta.txt 2>/dev/null || true
+         echo "Generating $COVERAGE_DIR/coverage-pgmoneta.txt"
+         llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-pgmoneta.txt 2>/dev/null || true
+        echo "Generating $COVERAGE_DIR/coverage-pgmoneta-cli.txt"
+        llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-cli \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-pgmoneta-cli.txt 2>/dev/null || true
+        echo "Generating $COVERAGE_DIR/coverage-pgmoneta-admin.txt"
+        llvm-cov show $EXECUTABLE_DIRECTORY/pgmoneta-admin \
+           --instr-profile=$COVERAGE_DIR/coverage.profdata \
+           --format=text > $COVERAGE_DIR/coverage-pgmoneta-admin.txt 2>/dev/null || true
+         echo "Coverage --> $COVERAGE_DIR"
+       else
+         echo "Coverage tools (llvm-profdata, llvm-cov) not found, skipping coverage report generation"
+       fi
      fi
      echo "Logs --> $LOG_DIR, $PG_LOG_DIR"
    else
@@ -307,11 +307,6 @@ export_pgmoneta_test_variables() {
 
   echo "export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY"
   export PGMONETA_TEST_RESTORE_DIR=$RESTORE_DIRECTORY
-
-  if [[ $PG_VERSION -lt 17 ]]; then
-    echo "export CK_INCLUDE_TAGS=common"
-    export CK_INCLUDE_TAGS="common"
-  fi
 }
 
 unset_pgmoneta_test_variables() {
@@ -321,32 +316,61 @@ unset_pgmoneta_test_variables() {
   unset PGMONETA_TEST_CONF_SAMPLE
   unset PGMONETA_TEST_RESTORE_DIR
   unset LLVM_PROFILE_FILE
-  if [[ $PG_VERSION -lt 17 ]]; then
-    unset CK_INCLUDE_TAGS
-  fi
-  unset CK_RUN_CASE
-  unset CK_RUN_SUITE
   unset CC
 }
 
 execute_testcases() {
-   echo "Execute Testcases"
+   echo "Execute MCTF Testcases"
    set +e
+   
+   if pgrep -f pgmoneta >/dev/null 2>&1 || [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
+      echo "Clean up any existing pgmoneta processes"
+      if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
+         $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta.conf shutdown 2>/dev/null || true
+         sleep 3
+      fi
+      if pgrep -f pgmoneta >/dev/null 2>&1; then
+         echo "Killing existing pgmoneta processes"
+         pkill -9 -f pgmoneta || true
+         sleep 2
+      fi
+      rm -f "/tmp/pgmoneta.localhost.pid"
+      
+      echo "Cleaning up shared memory segments"
+      ipcs -m 2>/dev/null | awk '/^0x0/ {print $2}' | xargs -r -I {} ipcrm -m {} 2>/dev/null || true
+      sleep 1
+   fi
+   
    echo "Starting pgmoneta server in daemon mode"
    $EXECUTABLE_DIRECTORY/pgmoneta -c $CONFIGURATION_DIRECTORY/pgmoneta.conf -u $CONFIGURATION_DIRECTORY/pgmoneta_users.conf -d
    echo "Wait for pgmoneta to be ready"
    sleep 10
-   $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf status details
-   if [[ $? -eq 0 ]]; then
-      echo "pgmoneta server started ... ok"
-   else
-      echo "pgmoneta server not started ... not ok"
-      exit 1
-   fi
+   
+   for i in {1..5}; do
+      if [[ -f "/tmp/pgmoneta.localhost.pid" ]]; then
+         if $EXECUTABLE_DIRECTORY/pgmoneta-cli -c $CONFIGURATION_DIRECTORY/pgmoneta_cli.conf status details >/dev/null 2>&1; then
+            echo "pgmoneta server started ... ok"
+            break
+         fi
+      fi
+      if [[ $i -eq 5 ]]; then
+         echo "pgmoneta server not started ... not ok"
+         echo "Checking logs:"
+         tail -20 $LOG_DIR/pgmoneta.log 2>/dev/null || echo "Log file not found"
+         exit 1
+      fi
+      sleep 2
+   done
 
-   echo "Start running tests"
-   $TEST_DIRECTORY/pgmoneta-test
-   if [[ $? -ne 0 ]]; then
+   echo "Start running MCTF tests"
+   if [[ -f "$TEST_DIRECTORY/pgmoneta-test" ]]; then
+      $TEST_DIRECTORY/pgmoneta-test
+      if [[ $? -ne 0 ]]; then
+         exit 1
+      fi
+   else
+      echo "Test binary not found: $TEST_DIRECTORY/pgmoneta-test"
+      echo "Please build the project first"
       exit 1
    fi
    set -e
@@ -449,3 +473,4 @@ else
    trap cleanup EXIT SIGINT
    run_tests
 fi
+

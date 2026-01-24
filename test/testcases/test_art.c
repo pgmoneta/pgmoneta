@@ -30,7 +30,7 @@
 #include <pgmoneta.h>
 #include <art.h>
 #include <tscommon.h>
-#include <tssuite.h>
+#include <mctf.h>
 #include <utils.h>
 #include <value.h>
 
@@ -47,343 +47,387 @@ static void test_obj_create(int idx, struct art_test_obj** obj);
 static void test_obj_destroy(struct art_test_obj* obj);
 static void test_obj_destroy_cb(uintptr_t obj);
 
-START_TEST(test_art_create)
+MCTF_TEST(test_art_create)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
+
+   pgmoneta_test_setup();
+
    pgmoneta_art_create(&t);
 
-   ck_assert_ptr_nonnull(t);
-   ck_assert_int_eq(t->size, 0);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
+   MCTF_ASSERT_INT_EQ(t->size, 0, cleanup, "ART size should be 0");
+
+cleanup:
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_insert)
+
+MCTF_TEST(test_art_insert)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    void* mem = NULL;
    struct art_test_obj* obj = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+
+   pgmoneta_test_setup();
 
    pgmoneta_art_create(&t);
    mem = malloc(10);
-   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
 
-   ck_assert_ptr_nonnull(t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
 
-   ck_assert(pgmoneta_art_insert(t, "key_none", 0, ValueNone));
-   ck_assert(pgmoneta_art_insert(t, NULL, 0, ValueInt8));
-   ck_assert(pgmoneta_art_insert(NULL, "key_none", 0, ValueInt8));
+   MCTF_ASSERT(pgmoneta_art_insert(t, "key_none", 0, ValueNone), cleanup, "Insert key_none failed");
+   MCTF_ASSERT(pgmoneta_art_insert(t, NULL, 0, ValueInt8), cleanup, "Insert NULL key failed");
+   MCTF_ASSERT(pgmoneta_art_insert(NULL, "key_none", 0, ValueInt8), cleanup, "Insert into NULL ART failed");
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32));
-   ck_assert(!pgmoneta_art_insert(t, "key_bool", true, ValueBool));
-   ck_assert(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat));
-   ck_assert(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble));
-   ck_assert(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32), cleanup, "Insert key_int failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_bool", true, ValueBool), cleanup, "Insert key_bool failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat), cleanup, "Insert key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble), cleanup, "Insert key_double failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem failed");
 
    test_obj_create(0, &obj);
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config));
-   ck_assert_int_eq(t->size, 7);
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
+   MCTF_ASSERT_INT_EQ(t->size, 7, cleanup, "ART size should be 7");
 
+cleanup:
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_search)
+
+MCTF_TEST(test_art_search)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    struct art_test_obj* obj1 = NULL;
    struct art_test_obj* obj2 = NULL;
    enum value_type type = ValueNone;
    char* value2 = NULL;
    char* key_str = NULL;
-
-   pgmoneta_art_create(&t);
    struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
 
-   ck_assert_ptr_nonnull(t);
+   pgmoneta_test_setup();
 
-   ck_assert(pgmoneta_art_insert(t, "key_none", 0, ValueNone));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_none"));
-   ck_assert_int_eq(pgmoneta_art_search(t, "key_none"), 0);
-   ck_assert_int_eq(pgmoneta_art_search_typed(t, "key_none", &type), 0);
-   ck_assert_int_eq(type, ValueNone);
+   pgmoneta_art_create(&t);
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert_str_eq((char*)pgmoneta_art_search(t, "key_str"), "value1");
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
+
+   MCTF_ASSERT(pgmoneta_art_insert(t, "key_none", 0, ValueNone), cleanup, "Insert key_none failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_none"), cleanup, "Contains key_none should be false");
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_art_search(t, "key_none"), 0, cleanup, "Search key_none should be 0");
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_art_search_typed(t, "key_none", &type), 0, cleanup, "Search typed key_none should be 0");
+   MCTF_ASSERT_INT_EQ(type, ValueNone, cleanup, "Type should be ValueNone");
+
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str should be true");
+   MCTF_ASSERT_STR_EQ((char*)pgmoneta_art_search(t, "key_str"), "value1", cleanup, "Search key_str mismatch");
 
    // inserting string makes a copy
    key_str = pgmoneta_append(key_str, "key_str");
    value2 = pgmoneta_append(value2, "value2");
-   ck_assert(!pgmoneta_art_insert(t, key_str, (uintptr_t)value2, ValueString));
-   ck_assert_str_eq((char*)pgmoneta_art_search(t, "key_str"), "value2");
-   free(value2);
-   free(key_str);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, key_str, (uintptr_t)value2, ValueString), cleanup, "Insert key_str replacement failed");
+   MCTF_ASSERT_STR_EQ((char*)pgmoneta_art_search(t, "key_str"), "value2", cleanup, "Search key_str replacement mismatch");
 
-   ck_assert(!pgmoneta_art_insert(t, "key_int", -1, ValueInt32));
-   ck_assert(pgmoneta_art_contains_key(t, "key_int"));
-   ck_assert_int_eq((int)pgmoneta_art_search(t, "key_int"), -1);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", -1, ValueInt32), cleanup, "Insert key_int failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_int"), cleanup, "Contains key_int should be true");
+   MCTF_ASSERT_INT_EQ((int)pgmoneta_art_search(t, "key_int"), -1, cleanup, "Search key_int mismatch");
 
-   ck_assert(!pgmoneta_art_insert(t, "key_bool", true, ValueBool));
-   ck_assert((bool)pgmoneta_art_search(t, "key_bool"));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_bool", true, ValueBool), cleanup, "Insert key_bool failed");
+   MCTF_ASSERT((bool)pgmoneta_art_search(t, "key_bool"), cleanup, "Search key_bool mismatch");
 
-   ck_assert(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat));
-   ck_assert(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble));
-   ck_assert_float_eq(pgmoneta_value_to_float(pgmoneta_art_search(t, "key_float")), 2.5);
-   ck_assert_double_eq(pgmoneta_value_to_double(pgmoneta_art_search(t, "key_double")), 2.5);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat), cleanup, "Insert key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble), cleanup, "Insert key_double failed");
+
+   float f_val = pgmoneta_value_to_float(pgmoneta_art_search(t, "key_float"));
+   MCTF_ASSERT(f_val == 2.5f, cleanup, "Search key_float mismatch");
+
+   double d_val = pgmoneta_value_to_double(pgmoneta_art_search(t, "key_double"));
+   MCTF_ASSERT(d_val == 2.5, cleanup, "Search key_double mismatch");
 
    test_obj_create(1, &obj1);
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj1, &test_obj_config));
-   ck_assert_int_eq(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->idx, 1);
-   ck_assert_str_eq(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->str, "obj1");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj1, &test_obj_config), cleanup, "Insert key_obj failed");
+   MCTF_ASSERT_INT_EQ(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->idx, 1, cleanup, "Search key_obj idx mismatch");
+   MCTF_ASSERT_STR_EQ(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->str, "obj1", cleanup, "Search key_obj str mismatch");
    pgmoneta_art_search_typed(t, "key_obj", &type);
-   ck_assert_int_eq(type, ValueRef);
+   MCTF_ASSERT_INT_EQ(type, ValueRef, cleanup, "Type should be ValueRef");
 
    // test obj overwrite with memory free up
    test_obj_create(2, &obj2);
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj2, &test_obj_config));
-   ck_assert_int_eq(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->idx, 2);
-   ck_assert_str_eq(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->str, "obj2");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj2, &test_obj_config), cleanup, "Insert key_obj overwrite failed");
+   MCTF_ASSERT_INT_EQ(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->idx, 2, cleanup, "Search key_obj overwrite idx mismatch");
+   MCTF_ASSERT_STR_EQ(((struct art_test_obj*)pgmoneta_art_search(t, "key_obj"))->str, "obj2", cleanup, "Search key_obj overwrite str mismatch");
 
+cleanup:
+   if (key_str)
+   {
+      free(key_str);
+      key_str = NULL;
+   }
+   if (value2)
+   {
+      free(value2);
+      value2 = NULL;
+   }
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_basic_delete)
+
+MCTF_TEST(test_art_basic_delete)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    void* mem = NULL;
    struct art_test_obj* obj = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+
+   pgmoneta_test_setup();
 
    pgmoneta_art_create(&t);
    mem = malloc(10);
-   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
 
-   ck_assert_ptr_nonnull(t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
    test_obj_create(0, &obj);
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32));
-   ck_assert(!pgmoneta_art_insert(t, "key_bool", true, ValueBool));
-   ck_assert(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat));
-   ck_assert(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble));
-   ck_assert(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem));
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32), cleanup, "Insert key_int failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_bool", true, ValueBool), cleanup, "Insert key_bool failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat), cleanup, "Insert key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble), cleanup, "Insert key_double failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem failed");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
 
-   ck_assert(pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_int"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_bool"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_mem"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_float"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_double"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_obj"));
-   ck_assert_int_eq(t->size, 7);
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_int"), cleanup, "Contains key_int failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_bool"), cleanup, "Contains key_bool failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_mem"), cleanup, "Contains key_mem failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_float"), cleanup, "Contains key_float failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_double"), cleanup, "Contains key_double failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_obj"), cleanup, "Contains key_obj failed");
+   MCTF_ASSERT_INT_EQ(t->size, 7, cleanup, "ART size should be 7");
 
-   ck_assert(pgmoneta_art_delete(t, NULL));
-   ck_assert(pgmoneta_art_delete(NULL, "key_str"));
+   MCTF_ASSERT(pgmoneta_art_delete(t, NULL), cleanup, "Delete NULL key should fail");
+   MCTF_ASSERT(pgmoneta_art_delete(NULL, "key_str"), cleanup, "Delete from NULL ART should fail");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_str"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert_int_eq(t->size, 6);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_str"), cleanup, "Delete key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 6, cleanup, "ART size should be 6");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_int"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_int"));
-   ck_assert_int_eq(t->size, 5);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_int"), cleanup, "Delete key_int failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_int"), cleanup, "Contains key_int should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 5, cleanup, "ART size should be 5");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_bool"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_bool"));
-   ck_assert_int_eq(t->size, 4);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_bool"), cleanup, "Delete key_bool failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_bool"), cleanup, "Contains key_bool should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 4, cleanup, "ART size should be 4");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_mem"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_mem"));
-   ck_assert_int_eq(t->size, 3);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_mem"), cleanup, "Delete key_mem failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_mem"), cleanup, "Contains key_mem should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 3, cleanup, "ART size should be 3");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_float"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_float"));
-   ck_assert_int_eq(t->size, 2);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_float"), cleanup, "Delete key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_float"), cleanup, "Contains key_float should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 2, cleanup, "ART size should be 2");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_double"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_double"));
-   ck_assert_int_eq(t->size, 1);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_double"), cleanup, "Delete key_double failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_double"), cleanup, "Contains key_double should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 1, cleanup, "ART size should be 1");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_obj"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_obj"));
-   ck_assert_int_eq(t->size, 0);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_obj"), cleanup, "Delete key_obj failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_obj"), cleanup, "Contains key_obj should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 0, cleanup, "ART size should be 0");
 
+cleanup:
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_double_delete)
+
+MCTF_TEST(test_art_double_delete)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
+
+   pgmoneta_test_setup();
+
    pgmoneta_art_create(&t);
 
-   ck_assert_ptr_nonnull(t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32), cleanup, "Insert key_int failed");
 
-   ck_assert(pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert_int_eq(t->size, 2);
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str failed");
+   MCTF_ASSERT_INT_EQ(t->size, 2, cleanup, "ART size should be 2");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_str"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert_int_eq(t->size, 1);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_str"), cleanup, "Delete key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str should be false");
+   MCTF_ASSERT_INT_EQ(t->size, 1, cleanup, "ART size should be 1");
 
-   ck_assert(!pgmoneta_art_delete(t, "key_str"));
-   ck_assert(!pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert_int_eq(t->size, 1);
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "key_str"), cleanup, "Second delete of key_str should fail gracefully");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str should still be false");
+   MCTF_ASSERT_INT_EQ(t->size, 1, cleanup, "ART size should be 1");
 
+cleanup:
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_clear)
+
+MCTF_TEST(test_art_clear)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    void* mem = NULL;
    struct art_test_obj* obj = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+
+   pgmoneta_test_setup();
 
    pgmoneta_art_create(&t);
    mem = malloc(10);
-   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
 
-   ck_assert_ptr_nonnull(t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
    test_obj_create(0, &obj);
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32));
-   ck_assert(!pgmoneta_art_insert(t, "key_bool", true, ValueBool));
-   ck_assert(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat));
-   ck_assert(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble));
-   ck_assert(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem));
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32), cleanup, "Insert key_int failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_bool", true, ValueBool), cleanup, "Insert key_bool failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat), cleanup, "Insert key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble), cleanup, "Insert key_double failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem failed");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
 
-   ck_assert(pgmoneta_art_contains_key(t, "key_str"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_int"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_bool"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_mem"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_float"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_double"));
-   ck_assert(pgmoneta_art_contains_key(t, "key_obj"));
-   ck_assert_int_eq(t->size, 7);
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_int"), cleanup, "Contains key_int failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_bool"), cleanup, "Contains key_bool failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_mem"), cleanup, "Contains key_mem failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_float"), cleanup, "Contains key_float failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_double"), cleanup, "Contains key_double failed");
+   MCTF_ASSERT(pgmoneta_art_contains_key(t, "key_obj"), cleanup, "Contains key_obj failed");
+   MCTF_ASSERT_INT_EQ(t->size, 7, cleanup, "ART size should be 7");
 
-   ck_assert(!pgmoneta_art_clear(t));
-   ck_assert_int_eq(t->size, 0);
-   ck_assert_ptr_null(t->root);
+   MCTF_ASSERT(!pgmoneta_art_clear(t), cleanup, "Clear failed");
+   MCTF_ASSERT_INT_EQ(t->size, 0, cleanup, "ART size should be 0");
+   MCTF_ASSERT_PTR_NULL(t->root, cleanup, "Root should be NULL");
 
+cleanup:
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_iterator_read)
+
+MCTF_TEST(test_art_iterator_read)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    struct art_iterator* iter = NULL;
    void* mem = NULL;
-   enum value_type type = ValueNone;
    struct art_test_obj* obj = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+
+   pgmoneta_test_setup();
 
    pgmoneta_art_create(&t);
    mem = malloc(10);
-   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
 
-   ck_assert_ptr_nonnull(t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
    test_obj_create(1, &obj);
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32));
-   ck_assert(!pgmoneta_art_insert(t, "key_bool", true, ValueBool));
-   ck_assert(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat));
-   ck_assert(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble));
-   ck_assert(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem));
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32), cleanup, "Insert key_int failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_bool", true, ValueBool), cleanup, "Insert key_bool failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat), cleanup, "Insert key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble), cleanup, "Insert key_double failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem failed");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
 
-   ck_assert(pgmoneta_art_iterator_create(NULL, &iter));
-   ck_assert_ptr_null(iter);
-   ck_assert(!pgmoneta_art_iterator_create(t, &iter));
-   ck_assert_ptr_nonnull(iter);
-   ck_assert(pgmoneta_art_iterator_has_next(iter));
+   MCTF_ASSERT(pgmoneta_art_iterator_create(NULL, &iter), cleanup, "Iterator creation should fail with NULL ART");
+   MCTF_ASSERT_PTR_NULL(iter, cleanup, "Iterator should be NULL");
+   MCTF_ASSERT(!pgmoneta_art_iterator_create(t, &iter), cleanup, "Iterator creation failed");
+   MCTF_ASSERT_PTR_NONNULL(iter, cleanup, "Iterator should not be NULL");
+   MCTF_ASSERT(pgmoneta_art_iterator_has_next(iter), cleanup, "Iterator should have next");
 
    int cnt = 0;
    while (pgmoneta_art_iterator_next(iter))
    {
       if (pgmoneta_compare_string(iter->key, "key_str"))
       {
-         ck_assert_str_eq((char*)pgmoneta_value_data(iter->value), "value1");
+         MCTF_ASSERT_STR_EQ((char*)pgmoneta_value_data(iter->value), "value1", cleanup, "value1 mismatch");
       }
       else if (pgmoneta_compare_string(iter->key, "key_int"))
       {
-         ck_assert_int_eq((int)pgmoneta_value_data(iter->value), 1);
+         MCTF_ASSERT_INT_EQ((int)pgmoneta_value_data(iter->value), 1, cleanup, "value int mismatch");
       }
       else if (pgmoneta_compare_string(iter->key, "key_bool"))
       {
-         ck_assert((bool)pgmoneta_value_data(iter->value));
+         MCTF_ASSERT((bool)pgmoneta_value_data(iter->value), cleanup, "value bool mismatch");
       }
       else if (pgmoneta_compare_string(iter->key, "key_float"))
       {
-         ck_assert_float_eq(pgmoneta_value_to_float(pgmoneta_value_data(iter->value)), 2.5);
+         float f_val = pgmoneta_value_to_float(pgmoneta_value_data(iter->value));
+         MCTF_ASSERT(f_val == 2.5f, cleanup, "value float mismatch");
       }
       else if (pgmoneta_compare_string(iter->key, "key_double"))
       {
-         ck_assert_double_eq(pgmoneta_value_to_double(pgmoneta_value_data(iter->value)), 2.5);
+         double d_val = pgmoneta_value_to_double(pgmoneta_value_data(iter->value));
+         MCTF_ASSERT(d_val == 2.5, cleanup, "value double mismatch");
       }
       else if (pgmoneta_compare_string(iter->key, "key_mem"))
       {
          // as long as it exists...
-         ck_assert(true);
+         MCTF_ASSERT(true, cleanup, "true");
       }
       else if (pgmoneta_compare_string(iter->key, "key_obj"))
       {
-         ck_assert_int_eq(((struct art_test_obj*)pgmoneta_value_data(iter->value))->idx, 1);
-         ck_assert_str_eq(((struct art_test_obj*)pgmoneta_value_data(iter->value))->str, "obj1");
+         MCTF_ASSERT_INT_EQ(((struct art_test_obj*)pgmoneta_value_data(iter->value))->idx, 1, cleanup, "obj idx mismatch");
+         MCTF_ASSERT_STR_EQ(((struct art_test_obj*)pgmoneta_value_data(iter->value))->str, "obj1", cleanup, "obj str mismatch");
       }
       else
       {
-         ck_assert_msg(false, "found key not inserted: %s", iter->key);
+         MCTF_ASSERT(false, cleanup, "found key not inserted");
       }
 
       cnt++;
    }
-   ck_assert_int_eq(cnt, t->size);
-   ck_assert(!pgmoneta_art_iterator_has_next(iter));
+   MCTF_ASSERT_INT_EQ(cnt, t->size, cleanup, "count mismatch");
+   MCTF_ASSERT(!pgmoneta_art_iterator_has_next(iter), cleanup, "iterator should not have next");
 
+cleanup:
    pgmoneta_art_iterator_destroy(iter);
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_iterator_remove)
+
+MCTF_TEST(test_art_iterator_remove)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    struct art_iterator* iter = NULL;
    void* mem = NULL;
-   enum value_type type = ValueNone;
    struct art_test_obj* obj = NULL;
+   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
+
+   pgmoneta_test_setup();
 
    pgmoneta_art_create(&t);
    mem = malloc(10);
-   struct value_config test_obj_config = {.destroy_data = test_obj_destroy_cb, .to_string = NULL};
 
-   ck_assert_ptr_nonnull(t);
+   MCTF_ASSERT_PTR_NONNULL(t, cleanup, "ART creation failed");
    test_obj_create(1, &obj);
 
-   ck_assert(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString));
-   ck_assert(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32));
-   ck_assert(!pgmoneta_art_insert(t, "key_bool", true, ValueBool));
-   ck_assert(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat));
-   ck_assert(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble));
-   ck_assert(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem));
-   ck_assert(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config));
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_str", (uintptr_t)"value1", ValueString), cleanup, "Insert key_str failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_int", 1, ValueInt32), cleanup, "Insert key_int failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_bool", true, ValueBool), cleanup, "Insert key_bool failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_float", pgmoneta_value_from_float(2.5), ValueFloat), cleanup, "Insert key_float failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_double", pgmoneta_value_from_double(2.5), ValueDouble), cleanup, "Insert key_double failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, "key_mem", (uintptr_t)mem, ValueMem), cleanup, "Insert key_mem failed");
+   MCTF_ASSERT(!pgmoneta_art_insert_with_config(t, "key_obj", (uintptr_t)obj, &test_obj_config), cleanup, "Insert key_obj failed");
 
-   ck_assert_int_eq(t->size, 7);
+   MCTF_ASSERT_INT_EQ(t->size, 7, cleanup, "ART size should be 7");
 
-   ck_assert(!pgmoneta_art_iterator_create(t, &iter));
-   ck_assert_ptr_nonnull(iter);
-   ck_assert(pgmoneta_art_iterator_has_next(iter));
+   MCTF_ASSERT(!pgmoneta_art_iterator_create(t, &iter), cleanup, "Iterator creation failed");
+   MCTF_ASSERT_PTR_NONNULL(iter, cleanup, "Iterator should not be NULL");
+   MCTF_ASSERT(pgmoneta_art_iterator_has_next(iter), cleanup, "Iterator should have next");
 
    int cnt = 0;
    while (pgmoneta_art_iterator_next(iter))
@@ -391,88 +435,94 @@ START_TEST(test_art_iterator_remove)
       cnt++;
       if (pgmoneta_compare_string(iter->key, "key_str"))
       {
-         ck_assert_str_eq((char*)pgmoneta_value_data(iter->value), "value1");
+         MCTF_ASSERT_STR_EQ((char*)pgmoneta_value_data(iter->value), "value1", cleanup, "value1 mismatch");
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_str"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_str"), cleanup, "Contains key_str should be false");
       }
       else if (pgmoneta_compare_string(iter->key, "key_int"))
       {
-         ck_assert_int_eq((int)pgmoneta_value_data(iter->value), 1);
+         MCTF_ASSERT_INT_EQ((int)pgmoneta_value_data(iter->value), 1, cleanup, "value int mismatch");
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_int"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_int"), cleanup, "Contains key_int should be false");
       }
       else if (pgmoneta_compare_string(iter->key, "key_bool"))
       {
-         ck_assert((bool)pgmoneta_value_data(iter->value));
+         MCTF_ASSERT((bool)pgmoneta_value_data(iter->value), cleanup, "value bool mismatch");
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_bool"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_bool"), cleanup, "Contains key_bool should be false");
       }
       else if (pgmoneta_compare_string(iter->key, "key_float"))
       {
-         ck_assert_float_eq(pgmoneta_value_to_float(pgmoneta_value_data(iter->value)), 2.5);
+         float f_val = pgmoneta_value_to_float(pgmoneta_value_data(iter->value));
+         MCTF_ASSERT(f_val == 2.5f, cleanup, "value float mismatch");
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_float"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_float"), cleanup, "Contains key_float should be false");
       }
       else if (pgmoneta_compare_string(iter->key, "key_double"))
       {
-         ck_assert_double_eq(pgmoneta_value_to_double(pgmoneta_value_data(iter->value)), 2.5);
+         double d_val = pgmoneta_value_to_double(pgmoneta_value_data(iter->value));
+         MCTF_ASSERT(d_val == 2.5, cleanup, "value double mismatch");
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_double"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_double"), cleanup, "Contains key_double should be false");
       }
       else if (pgmoneta_compare_string(iter->key, "key_mem"))
       {
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_mem"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_mem"), cleanup, "Contains key_mem should be false");
       }
       else if (pgmoneta_compare_string(iter->key, "key_obj"))
       {
-         ck_assert_int_eq(((struct art_test_obj*)pgmoneta_value_data(iter->value))->idx, 1);
-         ck_assert_str_eq(((struct art_test_obj*)pgmoneta_value_data(iter->value))->str, "obj1");
+         MCTF_ASSERT_INT_EQ(((struct art_test_obj*)pgmoneta_value_data(iter->value))->idx, 1, cleanup, "obj idx mismatch");
+         MCTF_ASSERT_STR_EQ(((struct art_test_obj*)pgmoneta_value_data(iter->value))->str, "obj1", cleanup, "obj str mismatch");
          pgmoneta_art_iterator_remove(iter);
-         ck_assert(!pgmoneta_art_contains_key(t, "key_obj"));
+         MCTF_ASSERT(!pgmoneta_art_contains_key(t, "key_obj"), cleanup, "Contains key_obj should be false");
       }
       else
       {
-         ck_assert_msg(false, "found key not inserted: %s", iter->key);
+         MCTF_ASSERT(false, cleanup, "found key not inserted");
       }
 
-      ck_assert_int_eq(t->size, 7 - cnt);
-      ck_assert_ptr_null(iter->key);
-      ck_assert_ptr_null(iter->value);
+      MCTF_ASSERT_INT_EQ(t->size, 7 - cnt, cleanup, "size mismatch");
+      MCTF_ASSERT_PTR_NULL(iter->key, cleanup, "key should be NULL");
+      MCTF_ASSERT_PTR_NULL(iter->value, cleanup, "value should be NULL");
    }
-   ck_assert_int_eq(cnt, 7);
-   ck_assert_int_eq(t->size, 0);
-   ck_assert(!pgmoneta_art_iterator_has_next(iter));
+   MCTF_ASSERT_INT_EQ(cnt, 7, cleanup, "count mismatch");
+   MCTF_ASSERT_INT_EQ(t->size, 0, cleanup, "size should be 0");
+   MCTF_ASSERT(!pgmoneta_art_iterator_has_next(iter), cleanup, "iterator should not have next");
 
+cleanup:
    pgmoneta_art_iterator_destroy(iter);
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_insert_search_extensive)
+
+MCTF_TEST(test_art_insert_search_extensive)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    char buf[512];
    FILE* f = NULL;
    uintptr_t line = 1;
    int len = 0;
    char* path = NULL;
+
+   pgmoneta_test_setup();
+
    path = pgmoneta_append(path, TEST_BASE_DIR);
    path = pgmoneta_append(path, "/resource/art_advanced_test/words.txt");
 
    f = fopen(path, "r");
-   ck_assert_ptr_nonnull(f);
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "File open failed");
 
    pgmoneta_art_create(&t);
    while (fgets(buf, sizeof(buf), f))
    {
       len = strlen(buf);
       buf[len - 1] = '\0';
-      ck_assert(!pgmoneta_art_insert(t, buf, line, ValueInt32));
+      MCTF_ASSERT(!pgmoneta_art_insert(t, buf, line, ValueInt32), cleanup, "Insert failed");
       line++;
    }
 
-   uintptr_t nlines = line - 1;
    // Seek back to the start
    fseek(f, 0, SEEK_SET);
    line = 1;
@@ -481,19 +531,26 @@ START_TEST(test_art_insert_search_extensive)
       len = strlen(buf);
       buf[len - 1] = '\0';
       int val = (int)pgmoneta_art_search(t, buf);
-      ck_assert_msg(val == line, "test_art_insert_search_advanced Line: %d Val: %d Str: %s\n", (int)line, val, buf);
+      MCTF_ASSERT(val == line, cleanup, "Search mismatch");
       line++;
    }
 
-   fclose(f);
+cleanup:
+   if (f)
+   {
+      fclose(f);
+   }
    free(path);
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_insert_very_long)
+
+MCTF_TEST(test_art_insert_very_long)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   struct art* t;
+   struct art* t = NULL;
+   pgmoneta_test_setup();
+
    pgmoneta_art_create(&t);
 
    unsigned char key1[300] = {16, 1, 1, 1, 7, 11, 1, 1, 1, 2, 17, 11, 1, 1, 1, 121, 11, 1, 1, 1, 121, 11, 1,
@@ -533,39 +590,43 @@ START_TEST(test_art_insert_very_long)
                               101, 178, 1, 8, 18, 255, 255, 255, 219, 191, 198, 134, 5, 208, 212, 72,
                               44, 208, 251, 180, 14, 1, 1, 1, 8, '\0'};
 
-   ck_assert(!pgmoneta_art_insert(t, (char*)key1, (uintptr_t)key1, ValueRef));
-   ck_assert(!pgmoneta_art_insert(t, (char*)key2, (uintptr_t)key2, ValueRef));
-   ck_assert(!pgmoneta_art_insert(t, (char*)key2, (uintptr_t)key2, ValueRef));
-   ck_assert_int_eq(t->size, 2);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, (char*)key1, (uintptr_t)key1, ValueRef), cleanup, "Insert key1 failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, (char*)key2, (uintptr_t)key2, ValueRef), cleanup, "Insert key2 failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, (char*)key2, (uintptr_t)key2, ValueRef), cleanup, "Insert key2 copy failed");
+   MCTF_ASSERT_INT_EQ(t->size, 2, cleanup, "Size mismatch");
 
+cleanup:
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_random_delete)
+
+MCTF_TEST(test_art_random_delete)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
    struct art* t = NULL;
    char buf[512];
    FILE* f = NULL;
    uintptr_t line = 1;
    int len = 0;
    char* path = NULL;
+
+   pgmoneta_test_setup();
+
    path = pgmoneta_append(path, TEST_BASE_DIR);
    path = pgmoneta_append(path, "/resource/art_advanced_test/words.txt");
 
    f = fopen(path, "r");
-   ck_assert_ptr_nonnull(f);
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "File open failed");
 
    pgmoneta_art_create(&t);
    while (fgets(buf, sizeof(buf), f))
    {
       len = strlen(buf);
       buf[len - 1] = '\0';
-      ck_assert(!pgmoneta_art_insert(t, buf, line, ValueInt32));
+      MCTF_ASSERT(!pgmoneta_art_insert(t, buf, line, ValueInt32), cleanup, "Insert failed");
       line++;
    }
 
-   uintptr_t nlines = line - 1;
    // Seek back to the start
    fseek(f, 0, SEEK_SET);
    line = 1;
@@ -574,80 +635,54 @@ START_TEST(test_art_random_delete)
       len = strlen(buf);
       buf[len - 1] = '\0';
       int val = (int)pgmoneta_art_search(t, buf);
-      ck_assert_msg(val == line, "test_art_insert_search_advanced Line: %d Val: %d Str: %s\n", (int)line, val, buf);
+      MCTF_ASSERT(val == line, cleanup, "Search mismatch");
       line++;
    }
 
-   ck_assert(!pgmoneta_art_delete(t, "A"));
-   ck_assert(!pgmoneta_art_contains_key(t, "A"));
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "A"), cleanup, "Delete A failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "A"), cleanup, "Contains A should be false");
 
-   ck_assert(!pgmoneta_art_delete(t, "yard"));
-   ck_assert(!pgmoneta_art_contains_key(t, "yard"));
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "yard"), cleanup, "Delete yard failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "yard"), cleanup, "Contains yard should be false");
 
-   ck_assert(!pgmoneta_art_delete(t, "Xenarchi"));
-   ck_assert(!pgmoneta_art_contains_key(t, "Xenarchi"));
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "Xenarchi"), cleanup, "Delete Xenarchi failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "Xenarchi"), cleanup, "Contains Xenarchi should be false");
 
-   ck_assert(!pgmoneta_art_delete(t, "F"));
-   ck_assert(!pgmoneta_art_contains_key(t, "F"));
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "F"), cleanup, "Delete F failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "F"), cleanup, "Contains F should be false");
 
-   ck_assert(!pgmoneta_art_delete(t, "wirespun"));
-   ck_assert(!pgmoneta_art_contains_key(t, "wirespun"));
+   MCTF_ASSERT(!pgmoneta_art_delete(t, "wirespun"), cleanup, "Delete wirespun failed");
+   MCTF_ASSERT(!pgmoneta_art_contains_key(t, "wirespun"), cleanup, "Contains wirespun should be false");
 
-   fclose(f);
+cleanup:
+   if (f)
+   {
+      fclose(f);
+   }
    free(path);
    pgmoneta_art_destroy(t);
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
-END_TEST
-START_TEST(test_art_insert_index_out_of_range)
+
+MCTF_TEST(test_art_insert_index_out_of_range)
 {
-   fprintf(stderr, "TEST START: %s\n", __func__);
-   struct art* t;
-   pgmoneta_art_create(&t);
+   struct art* t = NULL;
    char* s1 = "abcdefghijklmnxyz";
    char* s2 = "abcdefghijklmnopqrstuvw";
    char* s3 = "abcdefghijk";
-   ck_assert(!pgmoneta_art_insert(t, s1, 1, ValueUInt8));
-   ck_assert(!pgmoneta_art_insert(t, s2, 1, ValueUInt8));
-   ck_assert_int_eq(pgmoneta_art_search(t, s3), 0);
+
+   pgmoneta_test_setup();
+
+   pgmoneta_art_create(&t);
+   MCTF_ASSERT(!pgmoneta_art_insert(t, s1, 1, ValueUInt8), cleanup, "Insert s1 failed");
+   MCTF_ASSERT(!pgmoneta_art_insert(t, s2, 1, ValueUInt8), cleanup, "Insert s2 failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_art_search(t, s3), 0, cleanup, "Search s3 should be 0");
+
+cleanup:
    pgmoneta_art_destroy(t);
-}
-END_TEST
-
-Suite*
-pgmoneta_test_art_suite()
-{
-   Suite* s;
-   TCase* tc_art_basic;
-   TCase* tc_art_advanced;
-
-   s = suite_create("pgmoneta_test_art");
-
-   tc_art_basic = tcase_create("art_basic_test");
-   tcase_set_tags(tc_art_basic, "common");
-   tcase_set_timeout(tc_art_basic, 60);
-   tcase_add_checked_fixture(tc_art_basic, pgmoneta_test_setup, pgmoneta_test_teardown);
-   tcase_add_test(tc_art_basic, test_art_create);
-   tcase_add_test(tc_art_basic, test_art_insert);
-   tcase_add_test(tc_art_basic, test_art_search);
-   tcase_add_test(tc_art_basic, test_art_basic_delete);
-   tcase_add_test(tc_art_basic, test_art_double_delete);
-   tcase_add_test(tc_art_basic, test_art_clear);
-   tcase_add_test(tc_art_basic, test_art_iterator_read);
-   tcase_add_test(tc_art_basic, test_art_iterator_remove);
-
-   tc_art_advanced = tcase_create("art_advanced_test");
-   tcase_set_tags(tc_art_advanced, "common");
-   tcase_set_timeout(tc_art_advanced, 60);
-   tcase_add_checked_fixture(tc_art_advanced, pgmoneta_test_setup, pgmoneta_test_teardown);
-   tcase_add_test(tc_art_advanced, test_art_insert_search_extensive);
-   tcase_add_test(tc_art_advanced, test_art_insert_very_long);
-   tcase_add_test(tc_art_advanced, test_art_random_delete);
-   tcase_add_test(tc_art_advanced, test_art_insert_index_out_of_range);
-
-   suite_add_tcase(s, tc_art_basic);
-   suite_add_tcase(s, tc_art_advanced);
-
-   return s;
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
 }
 
 static void

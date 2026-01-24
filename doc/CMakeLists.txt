@@ -143,7 +143,7 @@ if (DOCS)
     set(DOXYGEN_WARN_AS_ERROR FAIL_ON_WARNINGS)
     set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.doxygen)
 
-    doxygen_add_docs(doxygen ${PROJECT_SOURCE_DIR}/src/include/)
+    doxygen_add_docs(doxygen ${PROJECT_SOURCE_DIR}/src/include/ ${PROJECT_SOURCE_DIR}/test/include/)
 
     if (${DOXYGEN_VERSION} STREQUAL "1.10.0" OR
         ${DOXYGEN_VERSION} STREQUAL "1.11.0" OR

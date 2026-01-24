@@ -325,6 +325,11 @@ get_connection()
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      return -1;
+   }
    if (strlen(config->common.configuration_path))
    {
       if (pgmoneta_connect_unix_socket(config->common.unix_socket_dir, MAIN_UDS, &socket))

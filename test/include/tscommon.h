@@ -56,15 +56,25 @@ void
 pgmoneta_test_environment_destroy(void);
 
 /**
- * Add a backup for testing purpose
+ * Validate that main_configuration is valid
+ * @param shmem The shared memory segment containing the configuration
+ * @return 0 if valid, 1 if invalid
  */
-void
+int
+pgmoneta_test_validate_configuration(void* shmem);
+
+/**
+ * Add a backup for testing purpose
+ * @return 0 on success, 1 on failure
+ */
+int
 pgmoneta_test_add_backup(void);
 
 /**
  * Add a chain of 3 backups for testing purpose
+ * @return 0 on success, 1 on failure
  */
-void
+int
 pgmoneta_test_add_backup_chain(void);
 
 /**
