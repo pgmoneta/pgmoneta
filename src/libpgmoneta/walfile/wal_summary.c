@@ -28,6 +28,7 @@
 
 #include <pgmoneta.h>
 #include <brt.h>
+#include <deque.h>
 #include <logging.h>
 #include <utils.h>
 #include <wal.h>
@@ -341,7 +342,10 @@ retry2:
          }
          else
          {
+            char* fs = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
+            pgmoneta_log_debug("%s", fs);
             pgmoneta_log_error("WAL file at %s does not exist", file_path);
+            free(fs);
             goto error;
          }
       }
