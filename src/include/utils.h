@@ -1463,6 +1463,40 @@ pgmoneta_is_number(char* str, int base);
 char*
 pgmoneta_get_parent_dir(const char* path);
 
+/**
+ * Allocate aligned memory for O_DIRECT I/O
+ * @param size The requested size
+ * @param alignment The alignment requirement (typically 512 or 4096)
+ * @return Pointer to aligned memory, or NULL on failure
+ */
+void*
+pgmoneta_allocate_aligned(size_t size, size_t alignment);
+
+/**
+ * Free aligned memory allocated by pgmoneta_allocate_aligned
+ * @param ptr Pointer to free
+ */
+void
+pgmoneta_free_aligned(void* ptr);
+
+/**
+ * Get the filesystem block size for a given path
+ * Uses statvfs to detect the optimal I/O block size
+ * @param path The path to check (directory or file)
+ * @return Block size in bytes, or 4096 as safe default
+ */
+size_t
+pgmoneta_get_block_size(const char* path);
+
+/**
+ * Check if O_DIRECT is supported for a given directory
+ * Creates and tests a temporary file
+ * @param path The directory path to test
+ * @return true if O_DIRECT is supported, false otherwise
+ */
+bool
+pgmoneta_direct_io_supported(const char* path);
+
 #ifdef __cplusplus
 }
 #endif

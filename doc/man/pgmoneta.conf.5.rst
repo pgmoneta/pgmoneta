@@ -241,6 +241,9 @@ backlog
 hugepage
   Huge page support. Default is try
 
+direct_io
+  Direct I/O support for local storage (off, auto, on). When on, bypasses kernel page cache using O_DIRECT. When auto, attempts O_DIRECT and falls back to buffered I/O if unsupported. Linux only. Default is off
+
 pidfile
   Path to the PID file
 

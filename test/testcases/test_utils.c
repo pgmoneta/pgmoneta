@@ -1975,3 +1975,71 @@ cleanup:
    }
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_utils_direct_io)
+{
+   void* ptr = NULL;
+   void* ptr2 = NULL;
+   size_t block_size = 0;
+   bool direct_io_result = false;
+
+   /* Test aligned allocation with 4096 alignment */
+   ptr = pgmoneta_allocate_aligned(8192, 4096);
+   MCTF_ASSERT_PTR_NONNULL(ptr, cleanup, "pgmoneta_allocate_aligned(8192, 4096) failed");
+   MCTF_ASSERT(((uintptr_t)ptr % 4096) == 0, cleanup, "memory not aligned to 4096");
+
+   memset(ptr, 'A', 8192);
+   MCTF_ASSERT(((char*)ptr)[0] == 'A', cleanup, "memory content mismatch at 0");
+   MCTF_ASSERT(((char*)ptr)[8191] == 'A', cleanup, "memory content mismatch at end");
+
+   pgmoneta_free_aligned(ptr);
+   ptr = NULL;
+
+   /* Test aligned allocation with 512 alignment */
+   ptr2 = pgmoneta_allocate_aligned(4096, 512);
+   MCTF_ASSERT_PTR_NONNULL(ptr2, cleanup, "pgmoneta_allocate_aligned(4096, 512) failed");
+   MCTF_ASSERT(((uintptr_t)ptr2 % 512) == 0, cleanup, "memory not aligned to 512");
+
+   pgmoneta_free_aligned(ptr2);
+   ptr2 = NULL;
+
+   /* Test block size detection on root */
+   block_size = pgmoneta_get_block_size("/");
+   MCTF_ASSERT(block_size > 0, cleanup, "block size for / is 0");
+
+   /* Test block size detection on /tmp */
+   block_size = pgmoneta_get_block_size("/tmp");
+   MCTF_ASSERT(block_size > 0, cleanup, "block size for /tmp is 0");
+
+   /* Test block size with NULL path returns default */
+   block_size = pgmoneta_get_block_size(NULL);
+   MCTF_ASSERT(block_size == 4096, cleanup, "block size for NULL should be 4096");
+
+   /* Test block size on non-existent path returns default */
+   block_size = pgmoneta_get_block_size("/nonexistent/path/that/does/not/exist");
+   MCTF_ASSERT(block_size == 4096, cleanup, "block size for non-existent path should be 4096");
+
+   /* Test free_aligned with NULL is safe */
+   pgmoneta_free_aligned(NULL);
+
+#if defined(__linux__)
+   /* Test O_DIRECT support check - result depends on filesystem */
+   direct_io_result = pgmoneta_direct_io_supported("/tmp");
+   /* We don't assert the result since it depends on the filesystem,
+    * but we verify the function runs without crashing */
+   (void)direct_io_result;
+
+   /* Test with NULL path should return false */
+   direct_io_result = pgmoneta_direct_io_supported(NULL);
+   MCTF_ASSERT(direct_io_result == false, cleanup, "direct_io_supported(NULL) should be false");
+
+   /* Test with non-existent path should return false */
+   direct_io_result = pgmoneta_direct_io_supported("/nonexistent/path");
+   MCTF_ASSERT(direct_io_result == false, cleanup, "direct_io_supported on non-existent path should be false");
+#endif
+
+cleanup:
+   pgmoneta_free_aligned(ptr);
+   pgmoneta_free_aligned(ptr2);
+   MCTF_FINISH();
+}

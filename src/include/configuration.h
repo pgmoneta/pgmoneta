@@ -58,6 +58,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_COMPRESSION             "compression"
 #define CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL       "compression_level"
 #define CONFIGURATION_ARGUMENT_CREATE_SLOT             "create_slot"
+#define CONFIGURATION_ARGUMENT_DIRECT_IO               "direct_io"
 #define CONFIGURATION_ARGUMENT_ENCRYPTION              "encryption"
 #define CONFIGURATION_ARGUMENT_EXTRA                   "extra"
 #define CONFIGURATION_ARGUMENT_FOLLOW                  "follow"

@@ -102,6 +102,10 @@ extern "C" {
 #define HUGEPAGE_TRY                 1
 #define HUGEPAGE_ON                  2
 
+#define DIRECT_IO_OFF                0
+#define DIRECT_IO_AUTO               1
+#define DIRECT_IO_ON                 2
+
 #define COMPRESSION_NONE             0
 #define COMPRESSION_CLIENT_GZIP      1
 #define COMPRESSION_CLIENT_ZSTD      2
@@ -459,6 +463,7 @@ struct main_configuration
    char libev[MISC_LENGTH]; /**< Name of libev mode */
    int backlog;             /**< The backlog for listen */
    unsigned char hugepage;  /**< Huge page support */
+   unsigned char direct_io; /**< Direct I/O support (off, auto, on) */
 
    int backup_max_rate;  /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */

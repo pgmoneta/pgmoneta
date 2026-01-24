@@ -128,6 +128,7 @@ The `SIGHUP` signal will trigger a reload of the configuration.
 However, some configuration settings requires a full restart of [**pgmoneta**][pgmoneta] in order to take effect. These are
 
 * `hugepage`
+* `direct_io`
 * `libev`
 * `log_path`
 * `log_type`

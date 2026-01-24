@@ -33,6 +33,7 @@
 #include <logging.h>
 #include <utils.h>
 #include <info.h>
+#include <shmem.h>
 
 /* system */
 #include <assert.h>
@@ -2384,14 +2385,21 @@ static void
 do_copy_file(struct worker_common* wc)
 {
    struct worker_input* fi = (struct worker_input*)wc;
+   struct main_configuration* config = (struct main_configuration*)shmem;
    char* from = NULL;
    int fd_from = -1;
    int fd_to = -1;
-   char buffer[8192];
+   void* buffer = NULL;
+   size_t buffer_size = 8192;
    ssize_t nread = -1;
    int permissions = -1;
    char* dn = NULL;
    char* to = NULL;
+   bool use_direct_io = false;
+   bool aligned_buffer = false;
+   int flags_from = O_RDONLY;
+   int flags_to = O_WRONLY | O_CREAT | O_TRUNC;
+   size_t alignment = 4096;
 
    /* if the file is partial try for complete file */
    if (!pgmoneta_is_file(fi->from) && pgmoneta_ends_with(fi->from, ".partial"))
@@ -2403,7 +2411,89 @@ do_copy_file(struct worker_common* wc)
       from = pgmoneta_append(from, fi->from);
    }
 
-   fd_from = open(from, O_RDONLY);
+   if (config != NULL && config->direct_io != DIRECT_IO_OFF && config->storage_engine == STORAGE_ENGINE_LOCAL)
+   {
+#if defined(__linux__)
+      /* In auto mode, pre-check O_DIRECT support to avoid unnecessary attempts */
+      if (config->direct_io == DIRECT_IO_AUTO)
+      {
+         char* from_copy = strdup(from);
+         if (from_copy != NULL)
+         {
+            char* test_dir = dirname(from_copy);
+            if (!pgmoneta_direct_io_supported(test_dir))
+            {
+               pgmoneta_log_debug("O_DIRECT not supported on %s, using buffered I/O", test_dir);
+               use_direct_io = false;
+            }
+            else
+            {
+               use_direct_io = true;
+            }
+            free(from_copy);
+         }
+         else
+         {
+            use_direct_io = false;
+         }
+      }
+      else
+      {
+         /* DIRECT_IO_ON: attempt O_DIRECT, will fail if unsupported */
+         use_direct_io = true;
+      }
+#else
+      /* Non-Linux platforms: O_DIRECT not supported */
+      use_direct_io = false;
+#endif
+
+      if (use_direct_io)
+      {
+         alignment = pgmoneta_get_block_size(from);
+         if (alignment < 512)
+         {
+            alignment = 512;
+         }
+         buffer_size = alignment > 8192 ? alignment : 8192;
+         /* ensure buffer_size is multiple of alignment */
+         if (buffer_size % alignment != 0)
+         {
+            buffer_size = ((buffer_size / alignment) + 1) * alignment;
+         }
+
+         flags_from |= O_DIRECT;
+         flags_to |= O_DIRECT;
+      }
+   }
+
+   if (use_direct_io)
+   {
+      buffer = pgmoneta_allocate_aligned(buffer_size, alignment);
+      aligned_buffer = true;
+   }
+   else
+   {
+      buffer = malloc(buffer_size);
+   }
+
+   if (buffer == NULL)
+   {
+      goto error;
+   }
+
+   fd_from = open(from, flags_from);
+
+   if (fd_from < 0)
+   {
+      if (errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
+      {
+         pgmoneta_log_debug("O_DIRECT open failed for %s (EINVAL), falling back to buffered I/O", from);
+         use_direct_io = false;
+         flags_from &= ~O_DIRECT;
+         flags_to &= ~O_DIRECT;
+         fd_from = open(from, flags_from);
+      }
+   }
 
    if (fd_from < 0)
    {
@@ -2426,7 +2516,16 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
-   fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
+   fd_to = open(to, flags_to, permissions);
+
+   if (fd_to < 0 && errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
+   {
+      /* Fallback for fd_to */
+      pgmoneta_log_debug("O_DIRECT open failed for %s (EINVAL), falling back to buffered I/O", to);
+      use_direct_io = false;
+      flags_to &= ~O_DIRECT;
+      fd_to = open(to, flags_to, permissions);
+   }
 
    if (fd_to < 0)
    {
@@ -2434,10 +2533,28 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
-   while ((nread = read(fd_from, buffer, sizeof(buffer))) > 0)
+   while ((nread = read(fd_from, buffer, buffer_size)) > 0)
    {
-      char* out = &buffer[0];
+      char* out = (char*)buffer;
       ssize_t nwritten;
+
+#if defined(__linux__)
+      if (use_direct_io && (nread % alignment != 0))
+      {
+         /* Partial block at EOF - O_DIRECT requires aligned I/O.
+          * Close and reopen destination without O_DIRECT for tail write. */
+         pgmoneta_log_debug("Partial block detected (%zu bytes, alignment %zu), switching to buffered I/O for tail", nread, alignment);
+         close(fd_to);
+         flags_to &= ~O_DIRECT;
+         fd_to = open(to, flags_to | O_APPEND, permissions);
+         if (fd_to < 0)
+         {
+            pgmoneta_log_error("Unable to reopen file for partial block write: %s", to);
+            goto error;
+         }
+         use_direct_io = false;
+      }
+#endif
 
       do
       {
@@ -2450,6 +2567,24 @@ do_copy_file(struct worker_common* wc)
          }
          else if (errno != EINTR)
          {
+#if defined(__linux__)
+            /* If write fails with EINVAL and we're using O_DIRECT in auto mode,
+             * it might be due to alignment. Try fallback. */
+            if (errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
+            {
+               pgmoneta_log_debug("O_DIRECT write failed for %s (EINVAL), falling back to buffered I/O", to);
+               close(fd_to);
+               flags_to &= ~O_DIRECT;
+               fd_to = open(to, flags_to | O_APPEND, permissions);
+               if (fd_to < 0)
+               {
+                  goto error;
+               }
+               use_direct_io = false;
+               /* Retry the write */
+               continue;
+            }
+#endif
             goto error;
          }
       }
@@ -2480,6 +2615,14 @@ do_copy_file(struct worker_common* wc)
    free(dn);
    free(from);
    free(to);
+   if (aligned_buffer)
+   {
+      pgmoneta_free_aligned(buffer);
+   }
+   else
+   {
+      free(buffer);
+   }
    free(fi);
 
    return;
@@ -2509,6 +2652,14 @@ error:
    free(dn);
    free(from);
    free(to);
+   if (aligned_buffer)
+   {
+      pgmoneta_free_aligned(buffer);
+   }
+   else
+   {
+      free(buffer);
+   }
    free(fi);
 }
 
@@ -5399,4 +5550,101 @@ error:
 
    free(temp_path);
    return 1;
+}
+
+void*
+pgmoneta_allocate_aligned(size_t size, size_t alignment)
+{
+   void* ptr = NULL;
+#if defined(__linux__)
+   if (posix_memalign(&ptr, alignment, size) != 0)
+   {
+      pgmoneta_log_error("Failed to allocate aligned memory: size=%zu alignment=%zu", size, alignment);
+      return NULL;
+   }
+#else
+   /* On non-Linux platforms, use regular malloc */
+   ptr = malloc(size);
+   if (ptr == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate memory: size=%zu", size);
+   }
+#endif
+   return ptr;
+}
+
+void
+pgmoneta_free_aligned(void* ptr)
+{
+   if (ptr != NULL)
+   {
+      free(ptr);
+   }
+}
+
+size_t
+pgmoneta_get_block_size(const char* path)
+{
+   struct statvfs st;
+
+   if (path == NULL)
+   {
+      return 4096;
+   }
+
+   if (statvfs(path, &st) == 0 && st.f_bsize > 0)
+   {
+      return st.f_bsize;
+   }
+
+   /* Safe default: 4096 bytes */
+   return 4096;
+}
+
+bool
+pgmoneta_direct_io_supported(const char* path)
+{
+#if defined(__linux__)
+   char template[MAX_PATH];
+   int fd = -1;
+
+   /* path must be a writable directory */
+   if (path == NULL)
+   {
+      return false;
+   }
+
+   /* Create a temporary file to test O_DIRECT support */
+   pgmoneta_snprintf(template, sizeof(template), "%s/.direct_io_test_XXXXXX", path);
+   fd = mkstemp(template);
+   if (fd < 0)
+   {
+      pgmoneta_log_debug("Cannot create temp file for O_DIRECT test in %s: %s", path, strerror(errno));
+      return false;
+   }
+   close(fd);
+
+   /* Try to open with O_DIRECT */
+   fd = open(template, O_RDWR | O_DIRECT);
+   unlink(template);
+
+   if (fd >= 0)
+   {
+      close(fd);
+      return true;
+   }
+
+   if (errno == EINVAL || errno == EOPNOTSUPP)
+   {
+      pgmoneta_log_debug("O_DIRECT unsupported on %s", path);
+   }
+   else
+   {
+      pgmoneta_log_debug("O_DIRECT open failed on %s: %s", path, strerror(errno));
+   }
+   return false;
+#else
+   (void)path;
+   return false;
+#endif
 }

@@ -68,6 +68,7 @@ static int as_logging_type(char* str);
 static int as_logging_level(char* str);
 static int as_logging_mode(char* str);
 static int as_hugepage(char* str);
+static int as_direct_io(char* str);
 static int as_compression(char* str);
 static int as_storage_engine(char* str);
 static char* as_ciphers(char* str);
@@ -178,6 +179,7 @@ pgmoneta_init_main_configuration(void* shm)
    config->common.non_blocking = true;
    config->backlog = 16;
    config->hugepage = HUGEPAGE_TRY;
+   config->direct_io = DIRECT_IO_OFF;
 
    config->update_process_title = UPDATE_PROCESS_TITLE_VERBOSE;
 
@@ -1092,6 +1094,17 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      config->hugepage = as_hugepage(value);
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "direct_io"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     config->direct_io = as_direct_io(value);
                   }
                   else
                   {
@@ -3356,6 +3369,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING, (uintptr_t)config->common.non_blocking, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BACKLOG, (uintptr_t)config->backlog, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_HUGEPAGE, (uintptr_t)config->hugepage, ValueChar);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_DIRECT_IO, (uintptr_t)config->direct_io, ValueChar);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PIDFILE, (uintptr_t)config->pidfile, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UPDATE_PROCESS_TITLE, (uintptr_t)config->update_process_title, ValueUInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->common.configuration_path, ValueString);
@@ -4801,6 +4815,27 @@ as_hugepage(char* str)
    }
 
    return HUGEPAGE_OFF;
+}
+
+static int
+as_direct_io(char* str)
+{
+   if (!strcasecmp(str, "off"))
+   {
+      return DIRECT_IO_OFF;
+   }
+
+   if (!strcasecmp(str, "auto") || !strcasecmp(str, "try"))
+   {
+      return DIRECT_IO_AUTO;
+   }
+
+   if (!strcasecmp(str, "on"))
+   {
+      return DIRECT_IO_ON;
+   }
+
+   return DIRECT_IO_OFF;
 }
 
 static int
