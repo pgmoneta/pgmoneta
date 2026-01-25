@@ -53,7 +53,7 @@ MCTF_TEST(test_server_api_info)
    if (setup_server_connection())
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to setup server connection");
    }
 
    config = (struct main_configuration*)shmem;
@@ -86,13 +86,13 @@ MCTF_TEST(test_server_api_checkpoint)
    if (setup_server_connection())
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to setup server connection");
    }
 
    if (pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli))
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to get checkpoint");
    }
 
 cleanup:
@@ -109,7 +109,7 @@ MCTF_TEST(test_server_api_read_file)
    if (setup_server_connection())
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to setup server connection");
    }
 
    if (pgmoneta_server_read_binary_file(PRIMARY_SERVER, srv_ssl, file_path, 0, 100, srv_socket, &data, &data_length))
@@ -131,7 +131,7 @@ MCTF_TEST(test_server_api_read_file_metadata)
    if (setup_server_connection())
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to setup server connection");
    }
 
    if (pgmoneta_server_file_stat(PRIMARY_SERVER, srv_ssl, srv_socket, file_path, &stat))
@@ -154,20 +154,20 @@ MCTF_TEST(test_server_api_backup)
    if (setup_server_connection())
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to setup server connection");
    }
 
    if (pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn))
    {
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to start backup");
    }
 
    if (pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, NULL, &stop_lsn, &lf))
    {
       free(start_lsn);
       teardown_server_connection();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to stop backup");
    }
 
 cleanup:

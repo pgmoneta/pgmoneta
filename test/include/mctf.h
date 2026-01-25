@@ -240,15 +240,55 @@ mctf_get_results(size_t* count);
    MCTF_ASSERT(strcmp((actual), (expected)) == 0, error_label, ##__VA_ARGS__)
 
 /**
- * Skip a test
+ * Internal macro for skip with format
  */
-#define MCTF_SKIP()                   \
-   do                                 \
-   {                                  \
-      mctf_errno = MCTF_CODE_SKIPPED; \
-      return MCTF_CODE_SKIPPED;       \
-   }                                  \
+#define MCTF_SKIP_FMT(format, ...)                                  \
+   do                                                               \
+   {                                                                \
+      mctf_errno = __LINE__;                                        \
+      if (mctf_errmsg)                                              \
+         free(mctf_errmsg);                                         \
+      if (format != NULL)                                           \
+      {                                                             \
+         size_t len = snprintf(NULL, 0, format, ##__VA_ARGS__) + 1; \
+         mctf_errmsg = malloc(len);                                 \
+         if (mctf_errmsg)                                           \
+         {                                                          \
+            snprintf(mctf_errmsg, len, format, ##__VA_ARGS__);      \
+         }                                                          \
+      }                                                             \
+      else                                                          \
+      {                                                             \
+         mctf_errmsg = NULL;                                        \
+      }                                                             \
+      return MCTF_CODE_SKIPPED;                                     \
+   }                                                                \
    while (0)
+
+/**
+ * Helper macros for argument selection - do not use directly
+ */
+#define MCTF_SKIP_GET_HELPER(_1, _2, _3, _4, NAME, ...) NAME
+#define MCTF_SKIP_IMPL_0() \
+   MCTF_SKIP_FMT(NULL)
+#define MCTF_SKIP_IMPL_1(format, ...) \
+   MCTF_SKIP_FMT(format, ##__VA_ARGS__)
+
+/**
+ * Skip a test
+ * @param ... Optional format string and printf-style arguments for skip reason
+ * 
+ * Examples:
+ *   MCTF_SKIP();                                    // Skip without message
+ *   MCTF_SKIP("WAL files not available");           // Skip with simple message
+ *   MCTF_SKIP("Authentication failed for user %s", username);  // Skip with formatted message
+ * 
+ * Implementation: Uses argument counting with sentinel to select between empty and non-empty cases.
+ * When no arguments: selects MCTF_SKIP_IMPL_0 which passes NULL as format.
+ * When arguments provided: selects MCTF_SKIP_IMPL_1 which uses first arg as format.
+ */
+#define MCTF_SKIP(...) \
+   MCTF_SKIP_GET_HELPER(, ##__VA_ARGS__, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_1, MCTF_SKIP_IMPL_0, dummy)(__VA_ARGS__)
 
 /**
  * Finish a test function - returns mctf_errno

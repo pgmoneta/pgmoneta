@@ -297,9 +297,15 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       if (ret == MCTF_CODE_SKIPPED)
       {
          result->skipped = true;
+         result->error_code = mctf_errno;  // Store line number
+         result->error_message = mctf_errmsg ? strdup(mctf_errmsg) : NULL;  // Store skip message
          g_runner.skipped_count++;
-         printf("%s (%02ld:%02ld:%02ld,%03ld) [SKIP]\n",
-                test->name, hours, minutes, seconds, milliseconds);
+         
+         // Format: test_name (time) [SKIP] (file:line) - message only shown in summary
+         printf("  %s (%02ld:%02ld:%02ld,%03ld) [SKIP] (%s:%d)\n",
+                test->name, hours, minutes, seconds, milliseconds,
+                test->file, result->error_code);
+         
          mctf_errno = 0;
          if (mctf_errmsg) { free(mctf_errmsg); mctf_errmsg = NULL; }
       }
@@ -348,7 +354,21 @@ mctf_print_summary(void)
       {
          if (g_runner.results[i].skipped)
          {
-            printf("  - %s\n", g_runner.results[i].test_name);
+            if (g_runner.results[i].error_message)
+            {
+               printf("  - %s (%s:%d) [SKIP] - %s\n",
+                      g_runner.results[i].test_name,
+                      g_runner.results[i].file,
+                      g_runner.results[i].error_code,
+                      g_runner.results[i].error_message);
+            }
+            else
+            {
+               printf("  - %s (%s:%d) [SKIP]\n",
+                      g_runner.results[i].test_name,
+                      g_runner.results[i].file,
+                      g_runner.results[i].error_code);
+            }
          }
       }
    }

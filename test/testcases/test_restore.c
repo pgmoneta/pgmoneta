@@ -41,13 +41,13 @@ MCTF_TEST(test_pgmoneta_restore_full)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    if (pgmoneta_tsclient_restore("primary", "newest", "current", 0))
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("restore failed");
    }
 
 cleanup:
@@ -62,13 +62,13 @@ MCTF_TEST(test_pgmoneta_restore_incremental_chain)
    if (pgmoneta_test_add_backup_chain())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup chain failed during setup");
    }
 
    if (pgmoneta_tsclient_restore("primary", "newest", "current", 0))
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("restore failed");
    }
 
 cleanup:

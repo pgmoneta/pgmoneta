@@ -104,7 +104,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    {
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to authenticate with primary server");
    }
 
    // establish a connection to custom myuser
@@ -113,7 +113,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    {
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to authenticate with custom user");
    }
 
    // Get server info - this returns void, so we check validity after
@@ -123,7 +123,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    {
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("server info check failed");
    }
 
    // get the starting lsn for summary
@@ -132,7 +132,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    {
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to get starting LSN");
    }
 
    // Create a table
@@ -142,7 +142,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       pgmoneta_test_cleanup_query_response(&qr);
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to create table");
    }
    pgmoneta_test_cleanup_query_response(&qr);
 
@@ -153,7 +153,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       pgmoneta_test_cleanup_query_response(&qr);
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to insert data");
    }
    pgmoneta_test_cleanup_query_response(&qr);
 
@@ -163,7 +163,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    {
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to get ending LSN");
    }
 
    // Switch the wal segment so that records won't appear in partial segments
@@ -173,7 +173,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       pgmoneta_test_cleanup_query_response(&qr);
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to switch WAL");
    }
    pgmoneta_test_cleanup_query_response(&qr);
 
@@ -183,7 +183,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    {
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to get checkpoint LSN");
    }
 
    sleep(10);
@@ -198,7 +198,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       summary_dir = NULL;
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to create summary directory");
    }
 
    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);
@@ -213,7 +213,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       wal_dir = NULL;
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to summarize WAL");
    }
 
    // Verify BRT was created and contains data
@@ -237,7 +237,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       wal_dir = NULL;
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to save WAL summary");
    }
 
    // Verify the summary file was actually created on disk
@@ -275,7 +275,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       wal_dir = NULL;
       cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
       pgmoneta_test_teardown();
-      MCTF_SKIP();
+      MCTF_SKIP("failed to read BRT from summary file");
    }
 
    // Verify the read BRT is valid and matches what we wrote

@@ -45,9 +45,8 @@ MCTF_TEST(test_pgmoneta_backup_full)
 
    if (pgmoneta_test_add_backup())
    {
-      fprintf(stderr, "test_pgmoneta_backup_full: backup failed during setup\n");
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
 cleanup:
@@ -65,9 +64,8 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
 
    if (pgmoneta_test_add_backup_chain())
    {
-      fprintf(stderr, "test_pgmoneta_backup_incremental_basic: backup chain failed during setup\n");
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup chain failed during setup");
    }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);

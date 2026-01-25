@@ -44,13 +44,13 @@ MCTF_TEST(test_pgmoneta_delete_full)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    if (pgmoneta_tsclient_delete("primary", "oldest", 0))
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
 cleanup:
@@ -69,7 +69,7 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
@@ -135,7 +135,7 @@ MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
@@ -200,7 +200,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
    if (pgmoneta_test_add_backup_chain())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
@@ -226,7 +226,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
          bcks_before = NULL;
       }
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_after, &bcks_after), cleanup, "failed to load backup infos after deletion");
@@ -272,7 +272,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
    if (pgmoneta_test_add_backup_chain())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
@@ -300,7 +300,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
          bcks_before = NULL;
       }
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_after, &bcks_after), cleanup, "failed to load backup infos after deletion");
@@ -353,7 +353,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_root)
    if (pgmoneta_test_add_backup_chain())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
@@ -381,7 +381,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_root)
          bcks_before = NULL;
       }
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_after, &bcks_after), cleanup, "failed to load backup infos after deletion");

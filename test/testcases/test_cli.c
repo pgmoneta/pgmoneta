@@ -157,7 +157,7 @@ MCTF_TEST(test_cli_list_backup)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, NULL, 0) == 0, cleanup, "List backup primary failed");
@@ -174,7 +174,7 @@ MCTF_TEST(test_cli_info)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_info("primary", "newest", 0) == 0, cleanup, "Info newest failed");
@@ -192,7 +192,7 @@ MCTF_TEST(test_cli_verify)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    snprintf(path, sizeof(path), "%s/verify_test", TEST_BASE_DIR);
@@ -215,7 +215,7 @@ MCTF_TEST(test_cli_archive)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    snprintf(path, sizeof(path), "%s/archive_test", TEST_BASE_DIR);
@@ -237,7 +237,7 @@ MCTF_TEST(test_cli_restore)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
@@ -256,7 +256,7 @@ MCTF_TEST(test_cli_retain)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_retain("primary", "newest", false, 0) == 0, cleanup, "Retain newest failed");
@@ -273,7 +273,7 @@ MCTF_TEST(test_cli_expunge)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_expunge("primary", "newest", false, 0) == 0, cleanup, "Expunge newest failed");
@@ -290,7 +290,7 @@ MCTF_TEST(test_cli_annotate)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_annotate("primary", "newest", "add", "testkey", "testcomment", 0) == 0, cleanup,
@@ -308,7 +308,7 @@ MCTF_TEST(test_cli_delete)
    if (pgmoneta_test_add_backup())
    {
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP();
+      MCTF_SKIP("backup failed during setup");
    }
 
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "Delete oldest failed");
