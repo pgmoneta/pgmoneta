@@ -1991,17 +1991,26 @@ accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          if (pgmoneta_create_ssl_ctx(false, &ctx))
          {
             pgmoneta_log_error("Could not create metrics SSL context");
-            return;
+            goto child_error;
          }
 
          if (pgmoneta_create_ssl_server(ctx, config->metrics_key_file, config->metrics_cert_file, config->metrics_ca_file, client_fd, &client_ssl))
          {
             pgmoneta_log_error("Could not create metrics SSL server");
-            return;
+            goto child_error;
          }
       }
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
       pgmoneta_prometheus(client_ssl, client_fd);
+      exit(0);
+child_error:
+      if (client_ssl == NULL && ctx != NULL)
+      {
+         SSL_CTX_free(ctx);
+      }
+      pgmoneta_close_ssl(client_ssl);
+      pgmoneta_disconnect(client_fd);
+      exit(1);
    }
 
    pgmoneta_close_ssl(client_ssl);
