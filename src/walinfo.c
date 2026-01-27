@@ -53,6 +53,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <ncurses.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <ctype.h>
 
 /* Column widths for WAL statistics table */
 #define COL_WIDTH_COUNT         9
@@ -148,6 +151,8 @@ static struct sigaction curses_saved_actions[sizeof(curses_signals) / sizeof(cur
 static void wal_interactive_endwin(void);
 static void wal_interactive_restore_handlers(void);
 static void wal_interactive_signal_handler(int signum);
+static void wal_interactive_run(struct ui_state* state);
+static void wal_interactive_cleanup(struct ui_state* state);
 
 static void
 wal_interactive_endwin(void)
@@ -977,7 +982,7 @@ draw_footer(struct ui_state* state)
    werase(state->footer_win);
    box(state->footer_win, 0, 0);
 
-   mvwprintw(state->footer_win, 0, 2, "Commands: Up/Down=Navigate | Enter=Detail | s=Search | v=Verify | ?=Help | q=Quit");
+   mvwprintw(state->footer_win, 0, 2, "Commands: Up/Down=Navigate | Enter=Detail | s=Search | v=Verify | l=Load | ?=Help | q=Quit");
 
    wrefresh(state->footer_win);
 }
@@ -1100,6 +1105,583 @@ wal_interactive_verify(struct ui_state* state)
 }
 
 static void
+show_wal_file_selector(struct ui_state* state)
+{
+   int height = 30;
+   int width = 80;
+   int starty = (LINES - height) / 2;
+   int startx = (COLS - width) / 2;
+
+   WINDOW* load_win = newwin(height, width, starty, startx);
+
+   char* temp_path = strdup(state->wal_filename);
+   char current_dir[MAX_PATH * 2];
+   pgmoneta_snprintf(current_dir, sizeof(current_dir), "%s", dirname(temp_path));
+   free(temp_path);
+
+   while (1)
+   {
+      werase(load_win);
+      box(load_win, 0, 0);
+
+      mvwprintw(load_win, 1, 2, "Browse: %s", current_dir);
+      mvwhline(load_win, 2, 1, ACS_HLINE, width - 2);
+
+      DIR* dir = opendir(current_dir);
+      if (dir == NULL)
+      {
+         mvwprintw(load_win, 4, 2, "Error: Cannot open directory");
+         mvwprintw(load_win, height - 2, 2, "Press any key to return...");
+         wrefresh(load_win);
+         getch();
+         delwin(load_win);
+         return;
+      }
+
+      struct
+      {
+         char name[256];
+         bool is_dir;
+      } entries[1000];
+
+      int dir_count = 0;
+      int file_count = 0;
+
+      strcpy(entries[dir_count].name, "..");
+      entries[dir_count].is_dir = true;
+      dir_count++;
+
+      char temp_dirs[999][256];
+      char temp_files[999][256];
+      int temp_dir_idx = 0;
+      int temp_file_idx = 0;
+
+      struct dirent* entry;
+      while ((entry = readdir(dir)) != NULL)
+      {
+         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         {
+            continue;
+         }
+
+         char full_path[MAX_PATH * 2];
+         pgmoneta_snprintf(full_path, sizeof(full_path), "%s/%s", current_dir, entry->d_name);
+
+         struct stat st;
+         if (stat(full_path, &st) == 0)
+         {
+            if (S_ISDIR(st.st_mode))
+            {
+               strcpy(temp_dirs[temp_dir_idx++], entry->d_name);
+            }
+            else if (S_ISREG(st.st_mode))
+            {
+               if (strlen(entry->d_name) >= 24)
+               {
+                  char prefix[25];
+                  strncpy(prefix, entry->d_name, 24);
+                  prefix[24] = '\0';
+
+                  bool is_hex = true;
+                  for (int i = 0; i < 24; i++)
+                  {
+                     if (!isxdigit(prefix[i]))
+                     {
+                        is_hex = false;
+                        break;
+                     }
+                  }
+
+                  if (is_hex)
+                  {
+                     strcpy(temp_files[temp_file_idx++], entry->d_name);
+                  }
+               }
+            }
+         }
+      }
+      closedir(dir);
+
+      for (int i = 0; i < temp_dir_idx - 1; i++)
+      {
+         for (int j = i + 1; j < temp_dir_idx; j++)
+         {
+            if (strcmp(temp_dirs[i], temp_dirs[j]) > 0)
+            {
+               char tmp[256];
+               strcpy(tmp, temp_dirs[i]);
+               strcpy(temp_dirs[i], temp_dirs[j]);
+               strcpy(temp_dirs[j], tmp);
+            }
+         }
+      }
+
+      for (int i = 0; i < temp_file_idx - 1; i++)
+      {
+         for (int j = i + 1; j < temp_file_idx; j++)
+         {
+            if (strcmp(temp_files[i], temp_files[j]) > 0)
+            {
+               char tmp[256];
+               strcpy(tmp, temp_files[i]);
+               strcpy(temp_files[i], temp_files[j]);
+               strcpy(temp_files[j], tmp);
+            }
+         }
+      }
+
+      for (int i = 0; i < temp_dir_idx; i++)
+      {
+         strcpy(entries[dir_count].name, temp_dirs[i]);
+         entries[dir_count].is_dir = true;
+         dir_count++;
+      }
+
+      for (int i = 0; i < temp_file_idx; i++)
+      {
+         strcpy(entries[dir_count + file_count].name, temp_files[i]);
+         entries[dir_count + file_count].is_dir = false;
+         file_count++;
+      }
+
+      int entry_count = dir_count + file_count;
+
+      int selected = 0;
+      int max_display = height - 6;
+      bool navigate_to_dir = false;
+      bool load_file = false;
+
+      while (1)
+      {
+         for (int i = 3; i < height - 2; i++)
+         {
+            wmove(load_win, i, 2);
+            wclrtoeol(load_win);
+         }
+
+         int start_index = (selected / max_display) * max_display;
+
+         for (int i = 0; i < max_display && (start_index + i) < entry_count; i++)
+         {
+            int idx = start_index + i;
+
+            if (idx == selected)
+            {
+               wattron(load_win, A_REVERSE);
+            }
+
+            mvwprintw(load_win, 3 + i, 2, "%s", entries[idx].name);
+
+            if (entries[idx].is_dir)
+            {
+               wprintw(load_win, "/");
+            }
+
+            if (idx == selected)
+            {
+               wattroff(load_win, A_REVERSE);
+            }
+         }
+
+         mvwprintw(load_win, height - 2, 2, "Up/Down=Navigate | Enter=Open/Load | q=Cancel");
+
+         box(load_win, 0, 0);
+         wrefresh(load_win);
+
+         int ch = getch();
+
+         switch (ch)
+         {
+            case KEY_UP:
+               if (selected > 0)
+               {
+                  selected--;
+               }
+               break;
+
+            case KEY_DOWN:
+               if (selected < entry_count - 1)
+               {
+                  selected++;
+               }
+               break;
+
+            case 10: // Enter
+            {
+               if (entries[selected].is_dir)
+               {
+                  if (strcmp(entries[selected].name, "..") == 0)
+                  {
+                     char* last_slash = strrchr(current_dir, '/');
+                     if (last_slash != NULL && last_slash != current_dir)
+                     {
+                        *last_slash = '\0';
+                     }
+                     else if (last_slash == current_dir)
+                     {
+                        strcpy(current_dir, "/");
+                     }
+                  }
+                  else
+                  {
+                     if (strcmp(current_dir, "/") != 0)
+                     {
+                        strcat(current_dir, "/");
+                     }
+                     strcat(current_dir, entries[selected].name);
+                  }
+                  navigate_to_dir = true;
+               }
+               else
+               {
+                  load_file = true;
+               }
+               goto break_inner_loop;
+            }
+            break;
+
+            case 'q':
+            case 'Q':
+               delwin(load_win);
+               return;
+         }
+      }
+
+break_inner_loop:
+      if (navigate_to_dir)
+      {
+         continue;
+      }
+      else if (load_file)
+      {
+         char new_path[MAX_PATH * 2];
+         pgmoneta_snprintf(new_path, sizeof(new_path), "%s/%s", current_dir, entries[selected].name);
+
+         delwin(load_win);
+         clear();
+         refresh();
+
+         if (state->wf != NULL)
+         {
+            pgmoneta_destroy_walfile(state->wf);
+            state->wf = NULL;
+         }
+
+         if (state->records != NULL)
+         {
+            free(state->records);
+            state->records = NULL;
+         }
+
+         if (state->wal_filename != NULL)
+         {
+            free(state->wal_filename);
+            state->wal_filename = NULL;
+         }
+
+         state->record_count = 0;
+         state->record_capacity = 1000;
+         state->current_row = 0;
+         state->scroll_offset = 0;
+
+         state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+         if (state->records == NULL)
+         {
+            return;
+         }
+
+         state->wal_filename = strdup(new_path);
+
+         if (wal_interactive_load_records(state, new_path) != 0)
+         {
+            clear();
+            mvprintw(0, 0, "Error: Failed to load: %s", new_path);
+            refresh();
+            getch();
+         }
+
+         return;
+      }
+   }
+}
+
+static void
+show_previous_wal_file(struct ui_state* state)
+{
+   char* dir_path = strdup(state->wal_filename);
+   char* dir = dirname(dir_path);
+
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+
+   if (pgmoneta_get_wal_files(dir, &files) != 0 || files == NULL || pgmoneta_deque_empty(files))
+   {
+      free(dir_path);
+      return;
+   }
+
+   pgmoneta_deque_sort(files);
+
+   int num_files = pgmoneta_deque_size(files);
+   char** file_list = malloc(num_files * sizeof(char*));
+   if (file_list == NULL)
+   {
+      pgmoneta_deque_destroy(files);
+      free(dir_path);
+      return;
+   }
+
+   int index = 0;
+
+   pgmoneta_deque_iterator_create(files, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct value* val = iter->value;
+      if (val != NULL && val->type == ValueString)
+      {
+         char* full_path = (char*)val->data;
+         char* temp_path = strdup(full_path);
+         char* filename = basename(temp_path);
+         file_list[index++] = strdup(filename);
+         free(temp_path);
+      }
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   num_files = index;
+
+   char* temp_filename = strdup(state->wal_filename);
+   char* current_basename = basename(temp_filename);
+
+   char* previous_file = NULL;
+   int current_index = -1;
+
+   for (int i = 0; i < num_files; i++)
+   {
+      if (strcmp(file_list[i], current_basename) == 0)
+      {
+         current_index = i;
+         break;
+      }
+   }
+
+   free(temp_filename);
+
+   if (current_index > 0)
+   {
+      previous_file = file_list[current_index - 1];
+   }
+   else
+   {
+      for (int i = 0; i < num_files; i++)
+      {
+         free(file_list[i]);
+      }
+      free(file_list);
+      pgmoneta_deque_destroy(files);
+      free(dir_path);
+      return;
+   }
+
+   char new_path[MAX_PATH * 2];
+   pgmoneta_snprintf(new_path, sizeof(new_path), "%s/%s", dir, previous_file);
+
+   for (int i = 0; i < num_files; i++)
+   {
+      free(file_list[i]);
+   }
+   free(file_list);
+   pgmoneta_deque_destroy(files);
+   free(dir_path);
+
+   if (state->wf != NULL)
+   {
+      pgmoneta_destroy_walfile(state->wf);
+      state->wf = NULL;
+   }
+
+   if (state->records != NULL)
+   {
+      free(state->records);
+      state->records = NULL;
+   }
+
+   if (state->wal_filename != NULL)
+   {
+      free(state->wal_filename);
+      state->wal_filename = NULL;
+   }
+
+   state->record_count = 0;
+   state->record_capacity = 1000;
+   state->current_row = 0;
+   state->scroll_offset = 0;
+
+   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+   if (state->records == NULL)
+   {
+      return;
+   }
+
+   state->wal_filename = strdup(new_path);
+
+   if (wal_interactive_load_records(state, new_path) != 0)
+   {
+      clear();
+      mvprintw(0, 0, "Error: Failed to load: %s", new_path);
+      refresh();
+      getch();
+      return;
+   }
+
+   if (state->record_count > 0)
+   {
+      state->current_row = state->record_count - 1;
+
+      if (state->record_count > 20)
+      {
+         state->scroll_offset = state->record_count - 20;
+      }
+      else
+      {
+         state->scroll_offset = 0;
+      }
+   }
+}
+
+static void
+show_next_wal_file(struct ui_state* state)
+{
+   char* dir_path = strdup(state->wal_filename);
+   char* dir = dirname(dir_path);
+
+   struct deque* files = NULL;
+   struct deque_iterator* iter = NULL;
+
+   if (pgmoneta_get_wal_files(dir, &files) != 0 || files == NULL || pgmoneta_deque_empty(files))
+   {
+      free(dir_path);
+      return;
+   }
+
+   pgmoneta_deque_sort(files);
+
+   int num_files = pgmoneta_deque_size(files);
+   char** file_list = malloc(num_files * sizeof(char*));
+   if (file_list == NULL)
+   {
+      pgmoneta_deque_destroy(files);
+      free(dir_path);
+      return;
+   }
+
+   int index = 0;
+
+   pgmoneta_deque_iterator_create(files, &iter);
+   while (pgmoneta_deque_iterator_next(iter))
+   {
+      struct value* val = iter->value;
+      if (val != NULL && val->type == ValueString)
+      {
+         char* full_path = (char*)val->data;
+         char* temp_path = strdup(full_path);
+         char* filename = basename(temp_path);
+         file_list[index++] = strdup(filename);
+         free(temp_path);
+      }
+   }
+   pgmoneta_deque_iterator_destroy(iter);
+
+   num_files = index;
+
+   char* temp_filename = strdup(state->wal_filename);
+   char* current_basename = basename(temp_filename);
+   char* next_file = NULL;
+   int current_index = -1;
+
+   for (int i = 0; i < num_files; i++)
+   {
+      if (strcmp(file_list[i], current_basename) == 0)
+      {
+         current_index = i;
+         break;
+      }
+   }
+
+   free(temp_filename);
+
+   if (current_index >= 0 && current_index < num_files - 1)
+   {
+      next_file = file_list[current_index + 1];
+   }
+   else
+   {
+      for (int i = 0; i < num_files; i++)
+      {
+         free(file_list[i]);
+      }
+      free(file_list);
+      pgmoneta_deque_destroy(files);
+      free(dir_path);
+      return;
+   }
+
+   char new_path[MAX_PATH * 2];
+   pgmoneta_snprintf(new_path, sizeof(new_path), "%s/%s", dir, next_file);
+
+   for (int i = 0; i < num_files; i++)
+   {
+      free(file_list[i]);
+   }
+   free(file_list);
+   pgmoneta_deque_destroy(files);
+   free(dir_path);
+
+   if (state->wf != NULL)
+   {
+      pgmoneta_destroy_walfile(state->wf);
+      state->wf = NULL;
+   }
+
+   if (state->records != NULL)
+   {
+      free(state->records);
+      state->records = NULL;
+   }
+
+   if (state->wal_filename != NULL)
+   {
+      free(state->wal_filename);
+      state->wal_filename = NULL;
+   }
+
+   state->record_count = 0;
+   state->record_capacity = 1000;
+   state->current_row = 0;
+   state->scroll_offset = 0;
+
+   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+   if (state->records == NULL)
+   {
+      return;
+   }
+
+   state->wal_filename = strdup(new_path);
+
+   if (wal_interactive_load_records(state, new_path) != 0)
+   {
+      clear();
+      mvprintw(0, 0, "Error: Failed to load: %s", new_path);
+      refresh();
+      getch();
+      return;
+   }
+
+   state->current_row = 0;
+   state->scroll_offset = 0;
+}
+
+static void
 wal_interactive_run(struct ui_state* state)
 {
    int ch;
@@ -1128,6 +1710,25 @@ wal_interactive_run(struct ui_state* state)
                   state->scroll_offset--;
                }
             }
+            else
+            {
+               size_t old_record_count = state->record_count;
+               show_previous_wal_file(state);
+
+               if (state->record_count != old_record_count && state->record_count > 0)
+               {
+                  state->current_row = state->record_count - 1;
+
+                  if (state->record_count > (size_t)(height - 4))
+                  {
+                     state->scroll_offset = state->record_count - (height - 4);
+                  }
+                  else
+                  {
+                     state->scroll_offset = 0;
+                  }
+               }
+            }
             break;
 
          case KEY_DOWN:
@@ -1137,6 +1738,17 @@ wal_interactive_run(struct ui_state* state)
                if (state->current_row >= state->scroll_offset + (size_t)(height - 4))
                {
                   state->scroll_offset++;
+               }
+            }
+            else
+            {
+               size_t old_record_count = state->record_count;
+               show_next_wal_file(state);
+
+               if (state->record_count != old_record_count && state->record_count > 0)
+               {
+                  state->current_row = 0;
+                  state->scroll_offset = 0;
                }
             }
             break;
@@ -1195,6 +1807,11 @@ wal_interactive_run(struct ui_state* state)
          case 'v':
          case 'V':
             wal_interactive_verify(state);
+            break;
+
+         case 'l':
+         case 'L':
+            show_wal_file_selector(state);
             break;
 
          case '?':
@@ -2106,46 +2723,75 @@ main(int argc, char** argv)
 
    if (interactive)
    {
-      if (filepath == NULL)
-      {
-         fprintf(stderr, "Error: No WAL file specified for interactive mode\n");
-         usage();
-         goto error;
-      }
-
-      /* Check if file exists before initializing ncurses */
-      if (!pgmoneta_exists(filepath))
-      {
-         fprintf(stderr, "Error: File <%s> doesn't exist\n", filepath);
-         goto error;
-      }
-
       struct ui_state ui_state;
 
-      if (wal_interactive_init(&ui_state, filepath) != 0)
+      if (filepath == NULL)
       {
-         fprintf(stderr, "Error: Failed to initialize UI\n");
-         goto error;
-      }
+         char cwd[MAX_PATH];
+         if (getcwd(cwd, sizeof(cwd)) == NULL)
+         {
+            fprintf(stderr, "Error: Unable to get current working directory\n");
+            goto error;
+         }
 
-      if (wal_interactive_load_records(&ui_state, filepath) != 0)
-      {
-         fprintf(stderr, "Error: Failed to load WAL records\n");
+         if (wal_interactive_init(&ui_state, cwd) != 0)
+         {
+            fprintf(stderr, "Error: Failed to initialize UI\n");
+            goto error;
+         }
+
+         ui_state.wal_filename = strdup(cwd);
+
+         show_wal_file_selector(&ui_state);
+
+         if (ui_state.record_count == 0)
+         {
+            wal_interactive_cleanup(&ui_state);
+            pgmoneta_destroy_shared_memory(shmem, size);
+            if (logfile)
+            {
+               pgmoneta_stop_logging();
+            }
+            return 0;
+         }
+
+         wal_interactive_run(&ui_state);
          wal_interactive_cleanup(&ui_state);
-         goto error;
       }
-
-      wal_interactive_run(&ui_state);
-
-      wal_interactive_cleanup(&ui_state);
-
-      pgmoneta_destroy_shared_memory(shmem, size);
-      if (logfile)
+      else
       {
-         pgmoneta_stop_logging();
-      }
+         /* Check if file exists before initializing ncurses */
+         if (!pgmoneta_exists(filepath))
+         {
+            fprintf(stderr, "Error: File <%s> doesn't exist\n", filepath);
+            goto error;
+         }
 
-      return 0;
+         if (wal_interactive_init(&ui_state, filepath) != 0)
+         {
+            fprintf(stderr, "Error: Failed to initialize UI\n");
+            goto error;
+         }
+
+         if (wal_interactive_load_records(&ui_state, filepath) != 0)
+         {
+            fprintf(stderr, "Error: Failed to load WAL records\n");
+            wal_interactive_cleanup(&ui_state);
+            goto error;
+         }
+
+         wal_interactive_run(&ui_state);
+
+         wal_interactive_cleanup(&ui_state);
+
+         pgmoneta_destroy_shared_memory(shmem, size);
+         if (logfile)
+         {
+            pgmoneta_stop_logging();
+         }
+
+         return 0;
+      }
    }
 
    if (filepath != NULL)
