@@ -3681,8 +3681,8 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
    pgmoneta_json_destroy(payload);
    pgmoneta_disconnect(client_fd);
-   pgmoneta_stop_logging();
    pgmoneta_log_info("Configuration set operation completed successfully");
+   pgmoneta_stop_logging();
    return 0;
 
 error:

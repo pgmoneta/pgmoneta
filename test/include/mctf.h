@@ -150,6 +150,22 @@ void
 mctf_print_summary(void);
 
 /**
+ * Open a log file for MCTF output
+ * All subsequent test runner output will be duplicated to this file.
+ *
+ * @param path Filesystem path of the log file
+ * @return 0 on success, non-zero on failure
+ */
+int
+mctf_open_log(const char* path);
+
+/**
+ * Close the MCTF log file if it is open
+ */
+void
+mctf_close_log(void);
+
+/**
  * Get test results
  * @param count [out] Number of results
  * @return Array of test results

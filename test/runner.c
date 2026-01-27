@@ -188,6 +188,45 @@ setup_signal_handlers(void)
    }
 }
 
+static int
+build_mctf_log_path(char* path, size_t size)
+{
+   char base[MAX_PATH];
+   char* slash = NULL;
+   int n;
+
+   if (path == NULL || size == 0)
+   {
+      return 1;
+   }
+
+   memset(base, 0, sizeof(base));
+
+   if (TEST_BASE_DIR[0] == '\0')
+   {
+      return 1;
+   }
+
+   strncpy(base, TEST_BASE_DIR, sizeof(base) - 1);
+   base[sizeof(base) - 1] = '\0';
+
+   slash = strrchr(base, '/');
+   if (slash == NULL)
+   {
+      return 1;
+   }
+
+   *slash = '\0';
+
+   n = snprintf(path, size, "%s/log/pgmoneta-test.log", base);
+   if (n <= 0 || (size_t)n >= size)
+   {
+      return 1;
+   }
+
+   return 0;
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -196,6 +235,7 @@ main(int argc, char* argv[])
    mctf_filter_type_t filter_type = MCTF_FILTER_NONE;
    int c;
    bool env_created = false;
+   char mctf_log_path[MAX_PATH];
 
    static struct option long_options[] = {
       {"test", required_argument, 0, 't'},
@@ -235,9 +275,19 @@ main(int argc, char* argv[])
       env_created = true;
    }
 
+   if (build_mctf_log_path(mctf_log_path, sizeof(mctf_log_path)) == 0)
+   {
+      if (mctf_open_log(mctf_log_path) != 0)
+      {
+         fprintf(stderr, "Warning: Failed to open MCTF log file at '%s'\n", mctf_log_path);
+      }
+   }
+
    number_failed = mctf_run_tests(filter_type, filter);
    mctf_print_summary();
    mctf_cleanup();
+
+   mctf_close_log();
 
    if (env_created)
    {

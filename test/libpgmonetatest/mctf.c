@@ -45,6 +45,87 @@ char* mctf_errmsg = NULL;
 static mctf_runner_t g_runner = {0};
 static bool g_initialized = false;
 
+/* Optional log file for test runner output */
+static FILE* mctf_log_file = NULL;
+
+static void
+mctf_vlogf(FILE* out, const char* fmt, va_list ap)
+{
+   if (out != NULL)
+   {
+      vfprintf(out, fmt, ap);
+      fflush(out);
+   }
+}
+
+static void
+mctf_logf(const char* fmt, ...)
+{
+   va_list ap;
+
+   /* Always log to stdout */
+   va_start(ap, fmt);
+   mctf_vlogf(stdout, fmt, ap);
+   va_end(ap);
+
+   /* Mirror to log file if configured */
+   if (mctf_log_file != NULL)
+   {
+      va_start(ap, fmt);
+      mctf_vlogf(mctf_log_file, fmt, ap);
+      va_end(ap);
+   }
+}
+
+static void
+mctf_log_errorf(const char* fmt, ...)
+{
+   va_list ap;
+
+   /* Always log to stderr */
+   va_start(ap, fmt);
+   mctf_vlogf(stderr, fmt, ap);
+   va_end(ap);
+
+   /* Mirror to log file if configured */
+   if (mctf_log_file != NULL)
+   {
+      va_start(ap, fmt);
+      mctf_vlogf(mctf_log_file, fmt, ap);
+      va_end(ap);
+   }
+}
+
+int
+mctf_open_log(const char* path)
+{
+   FILE* f;
+
+   if (path == NULL || strlen(path) == 0)
+   {
+      return 1;
+   }
+
+   f = fopen(path, "a");
+   if (f == NULL)
+   {
+      return 1;
+   }
+
+   mctf_log_file = f;
+   return 0;
+}
+
+void
+mctf_close_log(void)
+{
+   if (mctf_log_file != NULL)
+   {
+      fclose(mctf_log_file);
+      mctf_log_file = NULL;
+   }
+}
+
 void
 mctf_init(void)
 {
@@ -98,14 +179,14 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
    mctf_test_t* test = calloc(1, sizeof(mctf_test_t));
    if (!test)
    {
-      fprintf(stderr, "MCTF: Failed to allocate memory for test '%s'\n", name);
+      mctf_log_errorf("MCTF: Failed to allocate memory for test '%s'\n", name);
       return;
    }
 
    test->name = strdup(name);
    if (!test->name)
    {
-      fprintf(stderr, "MCTF: Failed to allocate memory for test name '%s'\n", name);
+      mctf_log_errorf("MCTF: Failed to allocate memory for test name '%s'\n", name);
       free(test);
       return;
    }
@@ -113,7 +194,7 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
    test->module = module ? strdup(module) : strdup("unknown");
    if (!test->module)
    {
-      fprintf(stderr, "MCTF: Failed to allocate memory for test module '%s'\n", module);
+      mctf_log_errorf("MCTF: Failed to allocate memory for test module '%s'\n", module ? module : "unknown");
       free((void*)test->name);
       free(test);
       return;
@@ -122,7 +203,7 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
    test->file = file ? strdup(file) : strdup("unknown");
    if (!test->file)
    {
-      fprintf(stderr, "MCTF: Failed to allocate memory for test file '%s'\n", file);
+      mctf_log_errorf("MCTF: Failed to allocate memory for test file '%s'\n", file ? file : "unknown");
       free((void*)test->name);
       free((void*)test->module);
       free(test);
@@ -211,13 +292,13 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       switch (filter_type)
       {
          case MCTF_FILTER_NONE:
-            fprintf(stderr, "MCTF: No tests registered (total registered: %zu)\n", g_runner.test_count);
+            mctf_log_errorf("MCTF: No tests registered (total registered: %zu)\n", g_runner.test_count);
             break;
          case MCTF_FILTER_MODULE:
-            fprintf(stderr, "MCTF: No tests found in module '%s'\n", filter);
+            mctf_log_errorf("MCTF: No tests found in module '%s'\n", filter);
             break;
          case MCTF_FILTER_TEST:
-            fprintf(stderr, "MCTF: No tests found matching filter '%s'\n", filter);
+            mctf_log_errorf("MCTF: No tests found matching filter '%s'\n", filter);
             break;
       }
       return 0;
@@ -227,7 +308,7 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
    g_runner.results = calloc(tests_to_run, sizeof(mctf_result_t));
    if (!g_runner.results)
    {
-      fprintf(stderr, "MCTF: Failed to allocate memory for results\n");
+      mctf_log_errorf("MCTF: Failed to allocate memory for results\n");
       return -1;
    }
 
@@ -236,19 +317,19 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
    g_runner.failed_count = 0;
    g_runner.skipped_count = 0;
 
-   printf("\n=== Running MCTF Tests ===\n");
+   mctf_logf("\n=== Running MCTF Tests ===\n");
    switch (filter_type)
    {
       case MCTF_FILTER_MODULE:
-         printf("Module: %s\n", filter);
+         mctf_logf("Module: %s\n", filter);
          break;
       case MCTF_FILTER_TEST:
-         printf("Test filter: %s\n", filter);
+         mctf_logf("Test filter: %s\n", filter);
          break;
       default:
          break;
    }
-   printf("Total tests to run: %zu\n\n", tests_to_run);
+   mctf_logf("Total tests to run: %zu\n\n", tests_to_run);
 
    const char* current_module = NULL;
    for (test = g_runner.tests; test; test = test->next)
@@ -262,9 +343,9 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       {
          if (current_module)
          {
-            printf("\n");
+            mctf_logf("\n");
          }
-         printf("--- %s ---\n", test->module);
+         mctf_logf("--- %s ---\n", test->module);
          current_module = test->module;
       }
 
@@ -302,9 +383,9 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
          g_runner.skipped_count++;
          
          // Format: test_name (time) [SKIP] (file:line) - message only shown in summary
-         printf("  %s (%02ld:%02ld:%02ld,%03ld) [SKIP] (%s:%d)\n",
-                test->name, hours, minutes, seconds, milliseconds,
-                test->file, result->error_code);
+         mctf_logf("  %s (%02ld:%02ld:%02ld,%03ld) [SKIP] (%s:%d)\n",
+                   test->name, hours, minutes, seconds, milliseconds,
+                   test->file, result->error_code);
          
          mctf_errno = 0;
          if (mctf_errmsg) { free(mctf_errmsg); mctf_errmsg = NULL; }
@@ -313,8 +394,8 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       {
          result->passed = true;
          g_runner.passed_count++;
-         printf("%s (%02ld:%02ld:%02ld,%03ld) [PASS]\n",
-                test->name, hours, minutes, seconds, milliseconds);
+         mctf_logf("%s (%02ld:%02ld:%02ld,%03ld) [PASS]\n",
+                   test->name, hours, minutes, seconds, milliseconds);
       }
       else
       {
@@ -327,9 +408,9 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
             mctf_errmsg = NULL;
          }
          g_runner.failed_count++;
-         printf("  %s (%02ld:%02ld:%02ld,%03ld) [FAIL] (%s:%d)\n",
-                test->name, hours, minutes, seconds, milliseconds,
-                test->file, result->error_code);
+            mctf_logf("  %s (%02ld:%02ld:%02ld,%03ld) [FAIL] (%s:%d)\n",
+                      test->name, hours, minutes, seconds, milliseconds,
+                      test->file, result->error_code);
       }
 
       g_runner.result_count++;
@@ -341,33 +422,33 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
 void
 mctf_print_summary(void)
 {
-   printf("\n=== Test Summary ===\n");
-   printf("Total tests: %zu\n", g_runner.result_count);
-   printf("Passed: %zu\n", g_runner.passed_count);
-   printf("Failed: %zu\n", g_runner.failed_count);
-   printf("Skipped: %zu\n", g_runner.skipped_count);
+   mctf_logf("\n=== Test Summary ===\n");
+   mctf_logf("Total tests: %zu\n", g_runner.result_count);
+   mctf_logf("Passed: %zu\n", g_runner.passed_count);
+   mctf_logf("Failed: %zu\n", g_runner.failed_count);
+   mctf_logf("Skipped: %zu\n", g_runner.skipped_count);
 
    if (g_runner.skipped_count > 0)
    {
-      printf("\nSkipped tests:\n");
+      mctf_logf("\nSkipped tests:\n");
       for (size_t i = 0; i < g_runner.result_count; i++)
       {
          if (g_runner.results[i].skipped)
          {
             if (g_runner.results[i].error_message)
             {
-               printf("  - %s (%s:%d) [SKIP] - %s\n",
-                      g_runner.results[i].test_name,
-                      g_runner.results[i].file,
-                      g_runner.results[i].error_code,
-                      g_runner.results[i].error_message);
+               mctf_logf("  - %s (%s:%d) [SKIP] - %s\n",
+                         g_runner.results[i].test_name,
+                         g_runner.results[i].file,
+                         g_runner.results[i].error_code,
+                         g_runner.results[i].error_message);
             }
             else
             {
-               printf("  - %s (%s:%d) [SKIP]\n",
-                      g_runner.results[i].test_name,
-                      g_runner.results[i].file,
-                      g_runner.results[i].error_code);
+               mctf_logf("  - %s (%s:%d) [SKIP]\n",
+                         g_runner.results[i].test_name,
+                         g_runner.results[i].file,
+                         g_runner.results[i].error_code);
             }
          }
       }
@@ -375,31 +456,31 @@ mctf_print_summary(void)
 
    if (g_runner.failed_count > 0)
    {
-      printf("\nFailed tests:\n");
+      mctf_logf("\nFailed tests:\n");
       for (size_t i = 0; i < g_runner.result_count; i++)
       {
          if (!g_runner.results[i].passed && !g_runner.results[i].skipped)
          {
             if (g_runner.results[i].error_message)
             {
-               printf("  - %s (%s:%d) - %s\n",
-                      g_runner.results[i].test_name,
-                      g_runner.results[i].file,
-                      g_runner.results[i].error_code,
-                      g_runner.results[i].error_message);
+               mctf_logf("  - %s (%s:%d) - %s\n",
+                         g_runner.results[i].test_name,
+                         g_runner.results[i].file,
+                         g_runner.results[i].error_code,
+                         g_runner.results[i].error_message);
             }
             else
             {
-               printf("  - %s (%s:%d)\n",
-                      g_runner.results[i].test_name,
-                      g_runner.results[i].file,
-                      g_runner.results[i].error_code);
+               mctf_logf("  - %s (%s:%d)\n",
+                         g_runner.results[i].test_name,
+                         g_runner.results[i].file,
+                         g_runner.results[i].error_code);
             }
          }
       }
    }
 
-   printf("\n");
+   mctf_logf("\n");
 }
 
 const mctf_result_t*
