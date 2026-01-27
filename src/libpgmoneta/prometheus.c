@@ -88,11 +88,17 @@ pgmoneta_prometheus(SSL* client_ssl, int client_fd)
 
    if (client_ssl)
    {
-      char buffer[5] = {0};
+      unsigned char buffer[5] = {0};
+      ssize_t peeked;
 
-      recv(client_fd, buffer, 5, MSG_PEEK);
+      peeked = recv(client_fd, buffer, sizeof(buffer), MSG_PEEK);
+      if (peeked <= 0)
+      {
+         pgmoneta_log_error("Failed to peek client request");
+         goto error;
+      }
 
-      if ((unsigned char)buffer[0] == 0x16 || (unsigned char)buffer[0] == 0x80) // SSL/TLS request
+      if (buffer[0] == 0x16 || buffer[0] == 0x80) // SSL/TLS request
       {
          if (SSL_accept(client_ssl) <= 0)
          {
@@ -123,7 +129,7 @@ pgmoneta_prometheus(SSL* client_ssl, int client_fd)
             }
          }
 
-         base_url = pgmoneta_format_and_append(base_url, "https://localhost:%d%s", config->metrics, path);
+         base_url = pgmoneta_format_and_append(base_url, "https://%s:%d%s", config->host, config->metrics, path);
 
          if (redirect_page(NULL, client_fd, base_url) != MESSAGE_STATUS_OK)
          {
