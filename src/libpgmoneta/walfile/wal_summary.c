@@ -318,36 +318,45 @@ retry1:
       fn = NULL;
 
       retry_count = 0;
+      long sleep_ns = 500000000L;       /* Start with 500ms */
+      long max_sleep_ns = 30000000000L; /* Cap at 30 seconds */
 
-retry2:
-      if (pgmoneta_exists(file_path))
+      /* Wait for file with exponential backoff (compression/encryption may be in progress) */
+      while (!pgmoneta_exists(file_path) && retry_count < 10)
       {
-         pgmoneta_log_debug("WAL file at %s", file_path);
-
-         if (summarize_walfile(file_path, start_lsn, end_lsn, brt))
-         {
-            pgmoneta_log_error("Summarize WAL error");
-            goto error;
-         }
-      }
-      else
-      {
-         pgmoneta_log_debug("WAL file at %s does not exist - retrying", file_path);
+         pgmoneta_log_debug("WAL file at %s does not exist - retrying (%d/10, wait %ldms)",
+                            file_path, retry_count + 1, sleep_ns / 1000000);
          retry_count++;
          active = false;
+         SLEEP(sleep_ns);
 
-         if (retry_count < 10)
+         /* Exponential backoff: double the sleep time, up to max */
+         if (sleep_ns < max_sleep_ns)
          {
-            SLEEP_AND_GOTO(500000000L, retry2);
+            sleep_ns *= 2;
+            if (sleep_ns > max_sleep_ns)
+            {
+               sleep_ns = max_sleep_ns;
+            }
          }
-         else
-         {
-            char* fs = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
-            pgmoneta_log_debug("%s", fs);
-            pgmoneta_log_error("WAL file at %s does not exist", file_path);
-            free(fs);
-            goto error;
-         }
+      }
+
+      if (!pgmoneta_exists(file_path))
+      {
+         char* fs = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
+         pgmoneta_log_debug("%s", fs);
+         pgmoneta_log_error("WAL file at %s does not exist after retries", file_path);
+         free(fs);
+         goto error;
+      }
+
+      pgmoneta_log_debug("WAL file at %s", file_path);
+
+      if (summarize_walfile(file_path, start_lsn, end_lsn, brt))
+      {
+         pgmoneta_log_error("Summarize WAL error: %s (start: %" PRIX64 ", end: %" PRIX64 ")",
+                            file_path, start_lsn, end_lsn);
+         goto error;
       }
    }
 
