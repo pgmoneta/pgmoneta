@@ -439,7 +439,7 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
       struct decoded_xlog_record* record =
          (struct decoded_xlog_record*)iter->value->data;
 
-      if (record == NULL)
+      if (record == NULL || record->partial)
       {
          continue;
       }
