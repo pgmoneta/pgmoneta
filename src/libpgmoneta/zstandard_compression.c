@@ -49,6 +49,7 @@
 
 static int zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 static int zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
+static int zstd_configure_cctx(ZSTD_CCtx* cctx, int level, int workers);
 
 void
 pgmoneta_zstandardc_data(char* directory, struct workers* workers)
@@ -108,9 +109,10 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
       goto error;
    }
 
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, ws);
+   if (zstd_configure_cctx(cctx, level, ws))
+   {
+      goto error;
+   }
 
    while ((entry = readdir(dir)) != NULL)
    {
@@ -123,8 +125,7 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_zstandardc_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
@@ -231,8 +232,7 @@ pgmoneta_zstandardc_tablespaces(char* root, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
          pgmoneta_zstandardc_data(path, workers);
       }
    }
@@ -297,9 +297,10 @@ pgmoneta_zstandardc_wal(char* directory)
       goto error;
    }
 
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
+   if (zstd_configure_cctx(cctx, level, workers))
+   {
+      goto error;
+   }
 
    while ((entry = readdir(dir)) != NULL)
    {
@@ -437,9 +438,10 @@ pgmoneta_zstandardc_wal_file(char* directory, char* file)
       goto error;
    }
 
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
+   if (zstd_configure_cctx(cctx, level, workers))
+   {
+      goto error;
+   }
 
    from = NULL;
    from = pgmoneta_append(from, directory);
@@ -726,8 +728,7 @@ pgmoneta_zstandardd_directory(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_zstandardd_directory(path, workers);
       }
       else
@@ -963,9 +964,10 @@ pgmoneta_zstandardc_file(char* from, char* to)
       goto error;
    }
 
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
-   ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
+   if (zstd_configure_cctx(cctx, level, workers))
+   {
+      goto error;
+   }
 
    if (zstd_compress(from, to, cctx, zin_size, zin, zout_size, zout))
    {
@@ -1074,6 +1076,35 @@ pgmoneta_zstdd_string(unsigned char* compressed_buffer, size_t compressed_size, 
 }
 
 static int
+zstd_configure_cctx(ZSTD_CCtx* cctx, int level, int workers)
+{
+   size_t ret;
+
+   ret = ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, level);
+   if (ZSTD_isError(ret))
+   {
+      pgmoneta_log_error("ZSTD: Failed to set compression level: %s", ZSTD_getErrorName(ret));
+      return 1;
+   }
+
+   ret = ZSTD_CCtx_setParameter(cctx, ZSTD_c_checksumFlag, 1);
+   if (ZSTD_isError(ret))
+   {
+      pgmoneta_log_error("ZSTD: Failed to enable checksum: %s", ZSTD_getErrorName(ret));
+      return 1;
+   }
+
+   ret = ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, workers);
+   if (ZSTD_isError(ret))
+   {
+      pgmoneta_log_error("ZSTD: Failed to set worker count: %s", ZSTD_getErrorName(ret));
+      return 1;
+   }
+
+   return 0;
+}
+
+static int
 zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout)
 {
    FILE* fin = NULL;
@@ -1100,6 +1131,11 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
    for (;;)
    {
       size_t read = fread(zin, sizeof(char), toRead, fin);
+      if (ferror(fin))
+      {
+         pgmoneta_log_error("ZSTD: Read error while compressing %s: %s", from, strerror(errno));
+         goto error;
+      }
       int lastChunk = (read < toRead);
       ZSTD_EndDirective mode = lastChunk ? ZSTD_e_end : ZSTD_e_continue;
       ZSTD_inBuffer input = {zin, read, 0};
@@ -1144,6 +1180,7 @@ error:
    {
       fflush(fout);
       fclose(fout);
+      pgmoneta_delete_file(to, NULL);
    }
 
    if (fin != NULL)
@@ -1205,6 +1242,12 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       }
    }
 
+   if (ferror(fin))
+   {
+      pgmoneta_log_error("ZSTD: Read error while decompressing %s: %s", from, strerror(errno));
+      goto error;
+   }
+
    if (lastRet != 0)
    {
       pgmoneta_log_error("ZSTD: Incomplete or corrupted frame");
@@ -1228,6 +1271,7 @@ error:
    {
       fflush(fout);
       fclose(fout);
+      pgmoneta_delete_file(to, NULL);
    }
 
    return 1;

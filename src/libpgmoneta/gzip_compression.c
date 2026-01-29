@@ -91,8 +91,7 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_gzip_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
@@ -121,6 +120,10 @@ pgmoneta_gzip_data(char* directory, struct workers* workers)
                   if (workers->outcome)
                   {
                      pgmoneta_workers_add(workers, do_gz_compress, (struct worker_common*)wi);
+                  }
+                  else
+                  {
+                     do_gz_compress((struct worker_common*)wi);
                   }
                }
                else
@@ -172,6 +175,10 @@ do_gz_compress(struct worker_common* wc)
       if (gz_compress(wi->from, wi->level, wi->to))
       {
          pgmoneta_log_error("Gzip: Could not compress %s", wi->from);
+         if (wi->common.workers != NULL)
+         {
+            wi->common.workers->outcome = false;
+         }
       }
       else
       {
@@ -204,8 +211,7 @@ pgmoneta_gzip_tablespaces(char* root, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
          pgmoneta_gzip_data(path, workers);
       }
    }
@@ -639,8 +645,7 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_gunzip_data(path, workers);
       }
       else
@@ -668,6 +673,10 @@ pgmoneta_gunzip_data(char* directory, struct workers* workers)
                   if (workers->outcome)
                   {
                      pgmoneta_workers_add(workers, do_gz_decompress, (struct worker_common*)wi);
+                  }
+                  else
+                  {
+                     do_gz_decompress((struct worker_common*)wi);
                   }
                }
                else
@@ -886,6 +895,10 @@ do_gz_decompress(struct worker_common* wc)
       if (gz_decompress(wi->from, wi->to))
       {
          pgmoneta_log_error("Gzip: Could not decompress %s", wi->from);
+         if (wi->common.workers != NULL)
+         {
+            wi->common.workers->outcome = false;
+         }
       }
       else
       {
@@ -963,6 +976,7 @@ error:
    {
       gzclose(out);
    }
+   pgmoneta_delete_file(to, NULL);
 
    return 1;
 }
@@ -1037,6 +1051,7 @@ error:
       fflush(out);
       fclose(out);
    }
+   pgmoneta_delete_file(to, NULL);
 
    return 1;
 }

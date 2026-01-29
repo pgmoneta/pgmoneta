@@ -267,16 +267,31 @@ pgmoneta_create_worker_input(char* directory, char* from, char* to, int level,
 
    if (directory != NULL && strlen(directory) > 0)
    {
+      if (strlen(directory) >= sizeof(w->directory))
+      {
+         pgmoneta_log_error("Worker input directory too long: %s", directory);
+         goto error;
+      }
       memcpy(w->directory, directory, strlen(directory));
    }
 
    if (from != NULL && strlen(from) > 0)
    {
+      if (strlen(from) >= sizeof(w->from))
+      {
+         pgmoneta_log_error("Worker input source too long: %s", from);
+         goto error;
+      }
       memcpy(w->from, from, strlen(from));
    }
 
    if (to != NULL && strlen(to) > 0)
    {
+      if (strlen(to) >= sizeof(w->to))
+      {
+         pgmoneta_log_error("Worker input destination too long: %s", to);
+         goto error;
+      }
       memcpy(w->to, to, strlen(to));
    }
 
@@ -291,6 +306,8 @@ pgmoneta_create_worker_input(char* directory, char* from, char* to, int level,
    return 0;
 
 error:
+
+   free(w);
 
    return 1;
 }

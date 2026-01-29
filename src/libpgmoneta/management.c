@@ -38,6 +38,7 @@
 #include <zstandard_compression.h>
 
 /* system */
+#include <lz4.h>
 #include <unistd.h>
 
 #include <openssl/err.h>
@@ -1121,8 +1122,35 @@ pgmoneta_management_read_json(SSL* ssl, int socket, uint8_t* compression, uint8_
          case MANAGEMENT_COMPRESSION_LZ4:
             if (pgmoneta_lz4d_string(transfer_buffer, transfer_size, &decompressed))
             {
-               pgmoneta_log_error("pgmoneta_management_read_json: LZ4 decompress failed");
-               goto error;
+               if (transfer_size <= INT_MAX)
+               {
+                  size_t legacy_size = transfer_size * 4;
+                  if (legacy_size == 0 || legacy_size > SIZE_MAX - 1)
+                  {
+                     pgmoneta_log_error("pgmoneta_management_read_json: LZ4 legacy size overflow");
+                     goto error;
+                  }
+                  decompressed = (char*)malloc(legacy_size + 1);
+                  if (decompressed == NULL)
+                  {
+                     pgmoneta_log_error("pgmoneta_management_read_json: LZ4 legacy allocation failed");
+                     goto error;
+                  }
+                  int legacy_decompressed = LZ4_decompress_safe((char*)transfer_buffer, decompressed, (int)transfer_size, (int)legacy_size);
+                  if (legacy_decompressed < 0)
+                  {
+                     pgmoneta_log_error("pgmoneta_management_read_json: LZ4 legacy decompress failed");
+                     free(decompressed);
+                     decompressed = NULL;
+                     goto error;
+                  }
+                  decompressed[legacy_decompressed] = '\0';
+               }
+               else
+               {
+                  pgmoneta_log_error("pgmoneta_management_read_json: LZ4 decompress failed");
+                  goto error;
+               }
             }
             free(transfer_buffer);
             transfer_buffer = NULL;
