@@ -36,6 +36,7 @@
 /* system */
 #include <bzlib.h>
 #include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -94,8 +95,7 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_bzip2_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
@@ -124,6 +124,10 @@ pgmoneta_bzip2_data(char* directory, struct workers* workers)
                   if (workers->outcome)
                   {
                      pgmoneta_workers_add(workers, do_bzip2_compress, (struct worker_common*)wi);
+                  }
+                  else
+                  {
+                     do_bzip2_compress((struct worker_common*)wi);
                   }
                }
                else
@@ -175,6 +179,10 @@ do_bzip2_compress(struct worker_common* wc)
       if (bzip2_compress(wi->from, wi->level, wi->to))
       {
          pgmoneta_log_error("Bzip2: Could not compress %s", wi->from);
+         if (wi->common.workers != NULL)
+         {
+            wi->common.workers->outcome = false;
+         }
       }
       else
       {
@@ -207,8 +215,7 @@ pgmoneta_bzip2_tablespaces(char* root, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
          pgmoneta_bzip2_data(path, workers);
       }
    }
@@ -383,8 +390,7 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_bunzip2_data(path, workers);
       }
       else
@@ -415,7 +421,14 @@ pgmoneta_bunzip2_data(char* directory, struct workers* workers)
             {
                if (workers != NULL)
                {
-                  pgmoneta_workers_add(workers, do_bzip2_decompress, (struct worker_common*)wi);
+                  if (workers->outcome)
+                  {
+                     pgmoneta_workers_add(workers, do_bzip2_decompress, (struct worker_common*)wi);
+                  }
+                  else
+                  {
+                     do_bzip2_decompress((struct worker_common*)wi);
+                  }
                }
                else
                {
@@ -567,6 +580,10 @@ do_bzip2_decompress(struct worker_common* wc)
       if (bzip2_decompress(wi->from, wi->to))
       {
          pgmoneta_log_error("Bzip2: Could not decompress %s", wi->from);
+         if (wi->common.workers != NULL)
+         {
+            wi->common.workers->outcome = false;
+         }
       }
       else
       {
@@ -747,6 +764,12 @@ bzip2_compress(char* from, int level, char* to)
       }
    }
 
+   if (ferror(from_ptr))
+   {
+      pgmoneta_log_error("Bzip2: Read error while compressing %s: %s", from, strerror(errno));
+      goto error_zip;
+   }
+
    BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
 
    fclose(from_ptr);
@@ -756,7 +779,10 @@ bzip2_compress(char* from, int level, char* to)
    return 0;
 
 error_zip:
-   BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
+   if (zip_file != NULL)
+   {
+      BZ2_bzWriteClose(&bzip2_err, zip_file, 0, NULL, NULL);
+   }
 
 error:
    if (from_ptr)
@@ -768,6 +794,7 @@ error:
    {
       fflush(to_ptr);
       fclose(to_ptr);
+      pgmoneta_delete_file(to, NULL);
    }
 
    return 1;
@@ -840,6 +867,7 @@ error:
    {
       fflush(to_ptr);
       fclose(to_ptr);
+      pgmoneta_delete_file(to, NULL);
    }
 
    if (from_ptr)
@@ -918,6 +946,7 @@ error:
    {
       fflush(to_ptr);
       fclose(to_ptr);
+      pgmoneta_delete_file(to, NULL);
    }
 
    if (from_ptr)

@@ -36,6 +36,7 @@
 
 /* system */
 #include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,8 +77,7 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_lz4c_data(path, workers);
       }
       else if (entry->d_type == DT_REG)
@@ -106,6 +106,10 @@ pgmoneta_lz4c_data(char* directory, struct workers* workers)
                   if (workers->outcome)
                   {
                      pgmoneta_workers_add(workers, do_lz4_compress, (struct worker_common*)wi);
+                  }
+                  else
+                  {
+                     do_lz4_compress((struct worker_common*)wi);
                   }
                }
                else
@@ -157,6 +161,10 @@ do_lz4_compress(struct worker_common* wc)
       if (lz4_compress(wi->from, wi->to))
       {
          pgmoneta_log_error("LZ4: Could not compress %s", wi->from);
+         if (wi->common.workers != NULL)
+         {
+            wi->common.workers->outcome = false;
+         }
       }
       else
       {
@@ -295,8 +303,7 @@ pgmoneta_lz4c_tablespaces(char* root, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
          pgmoneta_lz4c_data(path, workers);
       }
    }
@@ -330,8 +337,7 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
          pgmoneta_lz4d_data(path, workers);
       }
       else
@@ -359,6 +365,10 @@ pgmoneta_lz4d_data(char* directory, struct workers* workers)
                   if (workers->outcome)
                   {
                      pgmoneta_workers_add(workers, do_lz4_decompress, (struct worker_common*)wi);
+                  }
+                  else
+                  {
+                     do_lz4_decompress((struct worker_common*)wi);
                   }
                }
                else
@@ -414,6 +424,10 @@ do_lz4_decompress(struct worker_common* wc)
       if (lz4_decompress(wi->from, wi->to))
       {
          pgmoneta_log_error("LZ4: Could not decompress %s", wi->from);
+         if (wi->common.workers != NULL)
+         {
+            wi->common.workers->outcome = false;
+         }
       }
       else
       {
@@ -651,6 +665,7 @@ pgmoneta_lz4c_file(char* from, char* to)
       if (lz4_compress(from, to))
       {
          pgmoneta_log_error("LZ4: Could not compress %s", from);
+         return 1;
       }
       else
       {
@@ -695,6 +710,11 @@ lz4_compress(char* from, char* to)
       size_t read = fread(buffIn[buffInIndex], sizeof(char), BLOCK_BYTES, fin);
       if (read == 0)
       {
+         if (ferror(fin))
+         {
+            pgmoneta_log_error("LZ4: Read error while compressing %s: %s", from, strerror(errno));
+            goto error;
+         }
          break;
       }
 
@@ -734,6 +754,7 @@ error:
    {
       fflush(fout);
       fclose(fout);
+      pgmoneta_delete_file(to, NULL);
    }
 
    if (lz4Stream != NULL)
@@ -780,11 +801,22 @@ lz4_decompress(char* from, char* to)
       read = fread(&compression, 1, sizeof(compression), fin);
       if (read == 0)
       {
+         if (ferror(fin))
+         {
+            pgmoneta_log_error("LZ4: Read error while decompressing %s: %s", from, strerror(errno));
+            goto error;
+         }
          break;
       }
       if (read < sizeof(compression))
       {
          pgmoneta_log_error("lz4_decompression from file compression bytes < sizeof(int)");
+         goto error;
+      }
+
+      if (compression <= 0 || compression > (int)sizeof(buffOut))
+      {
+         pgmoneta_log_error("lz4_decompression invalid compressed block size");
          goto error;
       }
 
@@ -825,6 +857,7 @@ error:
    {
       fflush(fout);
       fclose(fout);
+      pgmoneta_delete_file(to, NULL);
    }
 
    return 1;
@@ -836,18 +869,34 @@ pgmoneta_lz4c_string(char* s, unsigned char** buffer, size_t* buffer_size)
    size_t input_size;
    size_t max_compressed_size;
    int compressed_size;
+   size_t total_size;
 
    input_size = strlen(s);
    max_compressed_size = LZ4_compressBound(input_size);
 
-   *buffer = (unsigned char*)malloc(max_compressed_size);
+   if (max_compressed_size > SIZE_MAX - sizeof(uint32_t))
+   {
+      pgmoneta_log_error("LZ4: Compression size overflow");
+      return 1;
+   }
+
+   total_size = sizeof(uint32_t) + max_compressed_size;
+   *buffer = (unsigned char*)malloc(total_size);
    if (*buffer == NULL)
    {
       pgmoneta_log_error("LZ4: Allocation failed");
       return 1;
    }
 
-   compressed_size = LZ4_compress_default(s, (char*)*buffer, (int)input_size, (int)max_compressed_size);
+   if (input_size > UINT32_MAX)
+   {
+      pgmoneta_log_error("LZ4: Input too large");
+      free(*buffer);
+      return 1;
+   }
+
+   pgmoneta_write_uint32(*buffer, (uint32_t)input_size);
+   compressed_size = LZ4_compress_default(s, (char*)(*buffer + sizeof(uint32_t)), (int)input_size, (int)max_compressed_size);
    if (compressed_size <= 0)
    {
       pgmoneta_log_error("LZ4: Compress failed");
@@ -855,7 +904,7 @@ pgmoneta_lz4c_string(char* s, unsigned char** buffer, size_t* buffer_size)
       return 1;
    }
 
-   *buffer_size = (size_t)compressed_size;
+   *buffer_size = sizeof(uint32_t) + (size_t)compressed_size;
 
    return 0;
 }
@@ -863,20 +912,44 @@ pgmoneta_lz4c_string(char* s, unsigned char** buffer, size_t* buffer_size)
 int
 pgmoneta_lz4d_string(unsigned char* compressed_buffer, size_t compressed_size, char** output_string)
 {
-   size_t max_decompressed_size;
    int decompressed_size;
+   size_t expected_size;
+   size_t payload_size;
 
-   max_decompressed_size = compressed_size * 4;
+   if (compressed_size < sizeof(uint32_t) + 1)
+   {
+      pgmoneta_log_error("LZ4: Compressed buffer too small");
+      return 1;
+   }
 
-   *output_string = (char*)malloc(max_decompressed_size);
+   expected_size = (size_t)pgmoneta_read_uint32(compressed_buffer);
+   payload_size = compressed_size - sizeof(uint32_t);
+   if (payload_size > INT_MAX)
+   {
+      pgmoneta_log_error("LZ4: Compressed payload too large");
+      return 1;
+   }
+   if (expected_size > INT_MAX)
+   {
+      pgmoneta_log_error("LZ4: Decompressed size too large");
+      return 1;
+   }
+
+   if (expected_size > SIZE_MAX - 1)
+   {
+      pgmoneta_log_error("LZ4: Decompressed size overflow");
+      return 1;
+   }
+
+   *output_string = (char*)malloc(expected_size + 1);
    if (*output_string == NULL)
    {
       pgmoneta_log_error("LZ4: Allocation failed");
       return 1;
    }
 
-   decompressed_size = LZ4_decompress_safe((char*)compressed_buffer, *output_string, (int)compressed_size, (int)max_decompressed_size);
-   if (decompressed_size < 0)
+   decompressed_size = LZ4_decompress_safe((char*)(compressed_buffer + sizeof(uint32_t)), *output_string, (int)payload_size, (int)expected_size);
+   if (decompressed_size < 0 || (size_t)decompressed_size != expected_size)
    {
       pgmoneta_log_error("LZ4: Decompress failed");
       free(*output_string);

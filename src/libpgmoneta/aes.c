@@ -36,6 +36,9 @@
 
 /* System */
 #include <dirent.h>
+#include <errno.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #define NAME         "aes"
 #define ENC_BUF_SIZE (1024 * 1024)
@@ -76,8 +79,7 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
          pgmoneta_encrypt_data(path, workers);
       }
       else
@@ -109,11 +111,19 @@ pgmoneta_encrypt_data(char* d, struct workers* workers)
                      {
                         pgmoneta_workers_add(workers, do_encrypt_file, (struct worker_common*)wi);
                      }
+                     else
+                     {
+                        do_encrypt_file((struct worker_common*)wi);
+                     }
                   }
                   else
                   {
                      do_encrypt_file((struct worker_common*)wi);
                   }
+               }
+               else
+               {
+                  pgmoneta_log_error("Could not create a worker instance: %s -> %s", from, to);
                }
             }
 
@@ -159,6 +169,10 @@ do_encrypt_file(struct worker_common* wc)
    else
    {
       pgmoneta_log_warn("do_encrypt_file: %s -> %s", wi->from, wi->to);
+      if (wi->common.workers != NULL)
+      {
+         wi->common.workers->outcome = false;
+      }
    }
 
    free(wi);
@@ -186,8 +200,7 @@ pgmoneta_encrypt_tablespaces(char* root, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", root, entry->d_name);
          pgmoneta_encrypt_data(path, workers);
       }
    }
@@ -260,9 +273,11 @@ pgmoneta_encrypt_wal(char* d)
 
          if (pgmoneta_exists(from))
          {
-            encrypt_file(from, to, 1);
-            pgmoneta_delete_file(from, NULL);
-            pgmoneta_permission(to, 6, 0, 0);
+            if (!encrypt_file(from, to, 1))
+            {
+               pgmoneta_delete_file(from, NULL);
+               pgmoneta_permission(to, 6, 0, 0);
+            }
          }
          else
          {
@@ -327,9 +342,11 @@ pgmoneta_encrypt_wal_file(char* d, char* f)
 
    if (pgmoneta_exists(from))
    {
-      encrypt_file(from, to, 1);
-      pgmoneta_delete_file(from, NULL);
-      pgmoneta_permission(to, 6, 0, 0);
+      if (!encrypt_file(from, to, 1))
+      {
+         pgmoneta_delete_file(from, NULL);
+         pgmoneta_permission(to, 6, 0, 0);
+      }
    }
    else
    {
@@ -532,8 +549,7 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             continue;
          }
 
-         snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
-
+         pgmoneta_snprintf(path, sizeof(path), "%s/%s", d, entry->d_name);
          pgmoneta_decrypt_directory(path, workers);
       }
       else
@@ -568,6 +584,10 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
                   {
                      pgmoneta_workers_add(workers, do_decrypt_file, (struct worker_common*)wi);
                   }
+                  else
+                  {
+                     do_decrypt_file((struct worker_common*)wi);
+                  }
                }
                else
                {
@@ -576,7 +596,7 @@ pgmoneta_decrypt_directory(char* d, struct workers* workers)
             }
             else
             {
-               goto error;
+               pgmoneta_log_error("Could not create a worker instance: %s -> %s", from, to);
             }
 
             free(name);
@@ -622,6 +642,10 @@ do_decrypt_file(struct worker_common* wc)
    else
    {
       pgmoneta_log_warn("do_decrypt_file: %s -> %s", wi->from, wi->to);
+      if (wi->common.workers != NULL)
+      {
+         wi->common.workers->outcome = false;
+      }
    }
 
    free(wi);
@@ -733,8 +757,8 @@ pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* cipher
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
 
-   memset(&key, 0, sizeof(key));
-   memset(&iv, 0, sizeof(iv));
+   OPENSSL_cleanse(key, sizeof(key));
+   OPENSSL_cleanse(iv, sizeof(iv));
 
    if (derive_key_iv(password, key, iv, mode) != 0)
    {
@@ -750,8 +774,8 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
 
-   memset(&key, 0, sizeof(key));
-   memset(&iv, 0, sizeof(iv));
+   OPENSSL_cleanse(key, sizeof(key));
+   OPENSSL_cleanse(iv, sizeof(iv));
 
    if (derive_key_iv(password, key, iv, mode) != 0)
    {
@@ -1174,6 +1198,9 @@ error:
    {
       EVP_CIPHER_CTX_free(ctx);
    }
+
+   free(*res_buffer);
+   *res_buffer = NULL;
 
    free(master_key);
 
