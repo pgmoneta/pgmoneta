@@ -652,6 +652,10 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int
    {
       goto error;
    }
+   if (pgmoneta_http_request_add_header(request, "Content-Type", "application/octet-stream"))
+   {
+      goto error;
+   }
 
    if (pgmoneta_http_set_data(request, file_data, file_info.st_size))
    {
