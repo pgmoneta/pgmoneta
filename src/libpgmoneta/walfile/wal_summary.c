@@ -33,6 +33,7 @@
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
+#include <walfile/wal_reader.h>
 #include <walfile/wal_summary.h>
 
 #include <dirent.h>
@@ -41,7 +42,7 @@
 static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
 static int summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
 static int summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
-static char* get_wal_file_name(char* file);
+static char* get_wal_file_name(char* dir_path, char* file);
 
 /**
  * Handles summarization of arbitary range in a timeline only
@@ -301,8 +302,30 @@ retry1:
    {
       char* file = (char*)file_iterator->value->data;
       char* fn = NULL;
+      xlog_seg_no seg_no = 0;
+      uint64_t seg_start_lsn = 0;
+      int wal_size = config->common.servers[srv].wal_size;
 
-      fn = get_wal_file_name(file);
+      /* Check if file is beyond end_lsn - skip if so */
+      if (pgmoneta_validate_wal_filename(file, NULL, &seg_no, wal_size) == 0)
+      {
+         XLOG_SEG_NO_OFFEST_TO_REC_PTR(seg_no, 0, wal_size, seg_start_lsn);
+         if (seg_start_lsn > end_lsn)
+         {
+            pgmoneta_log_debug("WAL summary: skipping %s (segment starts at %" PRIX64 ", beyond end_lsn %" PRIX64 ")",
+                               file, seg_start_lsn, end_lsn);
+            continue;
+         }
+      }
+
+      fn = get_wal_file_name(dir_path, file);
+
+      /* File needed but not available - error out */
+      if (fn == NULL)
+      {
+         pgmoneta_log_error("WAL summary: %s not available after waiting", file);
+         goto error;
+      }
 
       memset(file_path, 0, MAX_PATH);
       if (!pgmoneta_ends_with(dir_path, "/"))
@@ -316,39 +339,6 @@ retry1:
 
       free(fn);
       fn = NULL;
-
-      retry_count = 0;
-      long sleep_ns = 500000000L;       /* Start with 500ms */
-      long max_sleep_ns = 30000000000L; /* Cap at 30 seconds */
-
-      /* Wait for file with exponential backoff (compression/encryption may be in progress) */
-      while (!pgmoneta_exists(file_path) && retry_count < 10)
-      {
-         pgmoneta_log_debug("WAL file at %s does not exist - retrying (%d/10, wait %ldms)",
-                            file_path, retry_count + 1, sleep_ns / 1000000);
-         retry_count++;
-         active = false;
-         SLEEP(sleep_ns);
-
-         /* Exponential backoff: double the sleep time, up to max */
-         if (sleep_ns < max_sleep_ns)
-         {
-            sleep_ns *= 2;
-            if (sleep_ns > max_sleep_ns)
-            {
-               sleep_ns = max_sleep_ns;
-            }
-         }
-      }
-
-      if (!pgmoneta_exists(file_path))
-      {
-         char* fs = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
-         pgmoneta_log_debug("%s", fs);
-         pgmoneta_log_error("WAL file at %s does not exist after retries", file_path);
-         free(fs);
-         goto error;
-      }
 
       pgmoneta_log_debug("WAL file at %s", file_path);
 
@@ -377,32 +367,49 @@ error:
 }
 
 static char*
-get_wal_file_name(char* file)
+get_wal_file_name(char* dir_path, char* file)
 {
    char* fn = NULL;
+   char* base = NULL;
    char* suffix = NULL;
+   char compressed_path[MAX_PATH];
+   char uncompressed_path[MAX_PATH];
+   char partial_path[MAX_PATH];
+   int retry_count = 0;
+   long sleep_ms = 500;       /* 500ms */
+   long max_sleep_ms = 30000; /* 30s cap */
+   int max_retries = 10;
+   int orig_priority = 0;
+   char* sep = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
+   sep = pgmoneta_ends_with(dir_path, "/") ? "" : "/";
+
+   /* Strip .partial if present to get base name */
    if (pgmoneta_ends_with(file, ".partial"))
    {
-      fn = pgmoneta_remove_suffix(file, ".partial");
+      base = pgmoneta_remove_suffix(file, ".partial");
    }
    else
    {
-      fn = pgmoneta_append(fn, file);
+      base = pgmoneta_append(NULL, file);
    }
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   /* Build expected compression/encryption suffix */
+   if (config->compression_type == COMPRESSION_CLIENT_GZIP ||
+       config->compression_type == COMPRESSION_SERVER_GZIP)
    {
       suffix = pgmoneta_append(suffix, ".gz");
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
+   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD ||
+            config->compression_type == COMPRESSION_SERVER_ZSTD)
    {
       suffix = pgmoneta_append(suffix, ".zstd");
    }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
+   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 ||
+            config->compression_type == COMPRESSION_SERVER_LZ4)
    {
       suffix = pgmoneta_append(suffix, ".lz4");
    }
@@ -416,11 +423,100 @@ get_wal_file_name(char* file)
       suffix = pgmoneta_append(suffix, ".aes");
    }
 
-   if (suffix != NULL && !pgmoneta_ends_with(file, suffix))
+   /* Build paths for all three file forms */
+   memset(compressed_path, 0, MAX_PATH);
+   memset(uncompressed_path, 0, MAX_PATH);
+   memset(partial_path, 0, MAX_PATH);
+
+   pgmoneta_snprintf(uncompressed_path, MAX_PATH, "%s%s%s", dir_path, sep, base);
+
+   if (suffix != NULL)
    {
-      fn = pgmoneta_append(fn, suffix);
+      pgmoneta_snprintf(compressed_path, MAX_PATH, "%s%s%s%s", dir_path, sep, base, suffix);
+   }
+   else
+   {
+      pgmoneta_snprintf(compressed_path, MAX_PATH, "%s%s%s", dir_path, sep, base);
    }
 
+   pgmoneta_snprintf(partial_path, MAX_PATH, "%s%s%s.partial", dir_path, sep, base);
+
+   /* Lower priority while waiting to give compression more CPU (works without root) */
+   orig_priority = pgmoneta_get_priority();
+   if (pgmoneta_set_priority(PRIORITY_LOW) == 0)
+   {
+      pgmoneta_log_debug("WAL: lowered priority to PRIORITY_LOW while waiting for compression");
+   }
+
+   /*
+    * Three-tier file resolution with exponential backoff:
+    * 1. Compressed file (e.g., .zstd) - fully processed
+    * 2. Uncompressed file - renamed but not yet compressed
+    * 3. .partial file - still active segment (may contain needed records)
+    */
+   while (retry_count < max_retries)
+   {
+      /* Tier 1: compressed file */
+      if (pgmoneta_exists(compressed_path))
+      {
+         fn = pgmoneta_append(NULL, base);
+         if (suffix != NULL)
+         {
+            fn = pgmoneta_append(fn, suffix);
+         }
+         break;
+      }
+
+      /* Tier 2: uncompressed file */
+      if (suffix != NULL && pgmoneta_exists(uncompressed_path))
+      {
+         fn = pgmoneta_append(NULL, base);
+         break;
+      }
+
+      /* Tier 3: .partial file */
+      if (pgmoneta_exists(partial_path))
+      {
+         fn = pgmoneta_append(NULL, base);
+         fn = pgmoneta_append(fn, ".partial");
+         pgmoneta_log_debug("WAL: using .partial file %s (active segment)", partial_path);
+         break;
+      }
+
+      struct timespec ts;
+
+      pgmoneta_log_debug("WAL: waiting for %s (retry %d/%d, wait %ldms)",
+                         compressed_path, retry_count + 1, max_retries, sleep_ms);
+
+      ts.tv_sec = sleep_ms / 1000;
+      ts.tv_nsec = (sleep_ms % 1000) * 1000000L;
+      nanosleep(&ts, NULL);
+
+      /* Yield CPU to give compression fork a chance to run */
+      pgmoneta_cpu_yield();
+
+      retry_count++;
+
+      /* Exponential backoff: double the sleep time, up to max */
+      if (sleep_ms < max_sleep_ms)
+      {
+         sleep_ms *= 2;
+         if (sleep_ms > max_sleep_ms)
+         {
+            sleep_ms = max_sleep_ms;
+         }
+      }
+   }
+
+   /* Restore original priority */
+   pgmoneta_set_priority(orig_priority);
+
+   if (fn == NULL)
+   {
+      pgmoneta_log_error("WAL: %s not available after retries", compressed_path);
+   }
+
+   free(base);
    free(suffix);
 
    return fn;

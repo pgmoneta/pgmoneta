@@ -1740,6 +1740,9 @@ pgmoneta_wal_server_compress_encrypt(int srv, char** argv, char* wal_file)
       int retry_count = 0;
       char* d = NULL;
 
+      /* Boost priority for compression to complete faster */
+      pgmoneta_set_priority(PRIORITY_HIGH);
+
       if (argv != NULL)
       {
          pgmoneta_set_proc_title(1, argv, "wal/ce", config->common.servers[srv].name);

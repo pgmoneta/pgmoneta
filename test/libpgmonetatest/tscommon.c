@@ -142,6 +142,12 @@ pgmoneta_test_validate_configuration(void* shmem)
 int
 pgmoneta_test_add_backup(void)
 {
+   /* Ensure server is online before backup */
+   if (pgmoneta_tsclient_mode("primary", "online", 0))
+   {
+      return 1;
+   }
+
    if (pgmoneta_tsclient_backup("primary", NULL, 0))
    {
       return 1;
@@ -152,6 +158,12 @@ pgmoneta_test_add_backup(void)
 int
 pgmoneta_test_add_backup_chain(void)
 {
+   /* Ensure server is online before backup */
+   if (pgmoneta_tsclient_mode("primary", "online", 0))
+   {
+      return 1;
+   }
+
    if (pgmoneta_tsclient_backup("primary", NULL, 0))
    {
       return 1;
@@ -218,6 +230,7 @@ pgmoneta_test_basedir_cleanup(void)
    {
       pgmoneta_log_error("pgmoneta_test_basedir_cleanup: failed to reload configuration");
    }
+
 
    free(backup_dir);
    free(wal_dir);

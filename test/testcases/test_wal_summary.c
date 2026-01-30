@@ -73,7 +73,6 @@ MCTF_TEST(test_pgmoneta_wal_summary)
    int custom_user_socket = -1;
    xlog_rec_ptr s_lsn = 0;
    xlog_rec_ptr e_lsn = 0;
-   xlog_rec_ptr tmp_lsn = 0;
    uint32_t tli = 0;
    char* wal_dir = NULL;
    struct query_response* qr = NULL;
@@ -176,17 +175,6 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       MCTF_SKIP("failed to switch WAL");
    }
    pgmoneta_test_cleanup_query_response(&qr);
-
-   // Append some more tuples just to ensure that a new wal segment is streamed
-
-   if (pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &tmp_lsn, &tli))
-   {
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to get checkpoint LSN");
-   }
-
-   sleep(10);
 
    // Create summary directory in the base_dir of a server if not already present
 
