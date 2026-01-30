@@ -2740,8 +2740,6 @@ main(int argc, char** argv)
             goto error;
          }
 
-         ui_state.wal_filename = strdup(cwd);
-
          show_wal_file_selector(&ui_state);
 
          if (ui_state.record_count == 0)
@@ -2763,8 +2761,43 @@ main(int argc, char** argv)
          /* Check if file exists before initializing ncurses */
          if (!pgmoneta_exists(filepath))
          {
-            fprintf(stderr, "Error: File <%s> doesn't exist\n", filepath);
+            fprintf(stderr, "Error: <%s> doesn't exist\n", filepath);
             goto error;
+         }
+
+         if (pgmoneta_is_directory(filepath))
+         {
+            if (wal_interactive_init(&ui_state, filepath) != 0)
+            {
+               fprintf(stderr, "Error: Failed to initialize UI\n");
+               goto error;
+            }
+
+            show_wal_file_selector(&ui_state);
+
+            if (ui_state.record_count == 0)
+            {
+               wal_interactive_cleanup(&ui_state);
+               pgmoneta_destroy_shared_memory(shmem, size);
+               if (logfile)
+               {
+                  pgmoneta_stop_logging();
+               }
+               return 0;
+            }
+
+            wal_interactive_run(&ui_state);
+            wal_interactive_cleanup(&ui_state);
+
+            return 0;
+         }
+         else
+         {
+            if (pgmoneta_validate_wal_filename(filepath, NULL) != 0)
+            {
+               fprintf(stderr, "Error: %s is not a valid WAL file\n", filepath);
+               goto error;
+            }
          }
 
          if (wal_interactive_init(&ui_state, filepath) != 0)
@@ -2801,6 +2834,13 @@ main(int argc, char** argv)
       partial_record->xlog_record_bytes_read = 0;
       partial_record->xlog_record = NULL;
       partial_record->data_buffer = NULL;
+
+      if (!pgmoneta_exists(filepath))
+      {
+         fprintf(stderr, "Error: <%s> doesn't exist\n", filepath);
+         goto error;
+      }
+
       if (pgmoneta_is_directory(filepath))
       {
          if (describe_walfiles_in_directory(filepath, type, out, quiet, color,
@@ -2810,13 +2850,22 @@ main(int argc, char** argv)
             goto error;
          }
       }
-
-      else if (describe_walfile(filepath, type, out, quiet, color,
-                                rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
+      else
       {
-         fprintf(stderr, "Error while reading/describing WAL file\n");
-         goto error;
+         if (pgmoneta_validate_wal_filename(filepath, NULL) != 0)
+         {
+            fprintf(stderr, "Error: %s is not a valid WAL file\n", filepath);
+            goto error;
+         }
+
+         if (describe_walfile(filepath, type, out, quiet, color,
+                              rms, start_lsn, end_lsn, xids, limit, summary, included_objects))
+         {
+            fprintf(stderr, "Error while reading/describing WAL file\n");
+            goto error;
+         }
       }
+
       if (partial_record->xlog_record != NULL)
       {
          free(partial_record->xlog_record);
@@ -2828,7 +2877,7 @@ main(int argc, char** argv)
       free(partial_record);
       partial_record = NULL;
    }
-   else
+   else if (!interactive)
    {
       fprintf(stderr, "Missing <file> argument\n");
       usage();

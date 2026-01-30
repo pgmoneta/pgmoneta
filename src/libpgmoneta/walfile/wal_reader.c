@@ -185,6 +185,84 @@ error:
 }
 
 int
+pgmoneta_validate_wal_filename(char* path, char** base_filename)
+{
+   char* wal_filename = NULL;
+   char* temp = NULL;
+   timeline_id test_tli = 0;
+   xlog_seg_no test_logSegNo = 0;
+
+   wal_filename = strdup(basename(path));
+   if (wal_filename == NULL)
+   {
+      return 1;
+   }
+
+   if (pgmoneta_ends_with(wal_filename, ".partial"))
+   {
+      temp = pgmoneta_remove_suffix(wal_filename, ".partial");
+      free(wal_filename);
+      wal_filename = temp;
+   }
+
+   if (pgmoneta_is_encrypted(wal_filename))
+   {
+      temp = pgmoneta_remove_suffix(wal_filename, ".aes");
+      free(wal_filename);
+      wal_filename = temp;
+   }
+
+   if (pgmoneta_is_compressed(wal_filename))
+   {
+      if (pgmoneta_ends_with(wal_filename, ".gz"))
+      {
+         temp = pgmoneta_remove_suffix(wal_filename, ".gz");
+         free(wal_filename);
+         wal_filename = temp;
+      }
+      else if (pgmoneta_ends_with(wal_filename, ".zstd"))
+      {
+         temp = pgmoneta_remove_suffix(wal_filename, ".zstd");
+         free(wal_filename);
+         wal_filename = temp;
+      }
+      else if (pgmoneta_ends_with(wal_filename, ".lz4"))
+      {
+         temp = pgmoneta_remove_suffix(wal_filename, ".lz4");
+         free(wal_filename);
+         wal_filename = temp;
+      }
+      else if (pgmoneta_ends_with(wal_filename, ".bz2"))
+      {
+         temp = pgmoneta_remove_suffix(wal_filename, ".bz2");
+         free(wal_filename);
+         wal_filename = temp;
+      }
+   }
+
+   if (xlog_from_file_name(wal_filename, &test_tli, &test_logSegNo, DEFAULT_WAL_SEGZ_BYTES))
+   {
+      pgmoneta_log_trace("Invalid WAL file name: %s", path);
+      free(wal_filename);
+      return 1;
+   }
+
+   pgmoneta_log_trace("Valid WAL file name: %s (timeline: %u, segment: %lu)",
+                      wal_filename, test_tli, test_logSegNo);
+
+   if (base_filename != NULL)
+   {
+      *base_filename = wal_filename;
+   }
+   else
+   {
+      free(wal_filename);
+   }
+
+   return 0;
+}
+
+int
 pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 {
 #define MALLOC(pointer, size)                                                  \
@@ -239,6 +317,12 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    config = (struct walinfo_configuration*)shmem;
 
+   if (pgmoneta_validate_wal_filename(path, NULL))
+   {
+      pgmoneta_log_error("Error: Invalid WAL file name: %s", path);
+      goto error;
+   }
+
    file = fopen(path, "rb");
    if (file == NULL)
    {
@@ -260,11 +344,22 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
       goto error;
    }
 
-   assert(magic_value_to_postgres_version(long_header->std.xlp_magic) != -1);
+   int pg_version = magic_value_to_postgres_version(long_header->std.xlp_magic);
+
+   if (pg_version == -1)
+   {
+      pgmoneta_log_error("Invalid PostgreSQL WAL magic number: 0x%04X in file %s",
+                         long_header->std.xlp_magic, path);
+
+      goto error;
+   }
+
+   pgmoneta_log_trace("Valid PostgreSQL WAL magic number: 0x%04X (PostgreSQL %d) in file %s",
+                      long_header->std.xlp_magic, pg_version, path);
 
    if (server == -1)
    {
-      config->common.servers[0].version = magic_value_to_postgres_version(long_header->std.xlp_magic);
+      config->common.servers[0].version = pg_version;
       server_config = &config->common.servers[0];
    }
    else

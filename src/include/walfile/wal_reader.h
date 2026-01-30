@@ -395,6 +395,15 @@ extern struct server* server_config;
 /* Function definitions */
 
 /**
+ * Validate and extract base WAL filename from path
+ * @param path The full path to the WAL file
+ * @param base_filename Output parameter for the base WAL filename
+ * @return 0 on success, 1 on error
+ */
+int
+pgmoneta_validate_wal_filename(char* path, char** base_filename);
+
+/**
  * Parses a WAL file and populates server information.
  *
  * @param path The file path of the WAL file.
