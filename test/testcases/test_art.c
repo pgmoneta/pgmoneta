@@ -508,7 +508,12 @@ MCTF_TEST(test_art_insert_search_extensive)
 
    pgmoneta_test_setup();
 
+#ifdef TEST_RESOURCE_DIR
+   /* Use compile-time source path directly for resource files */
+   path = pgmoneta_append(path, TEST_RESOURCE_DIR);
+#else
    path = pgmoneta_append(path, TEST_BASE_DIR);
+#endif
    path = pgmoneta_append(path, "/resource/art_advanced_test/words.txt");
 
    f = fopen(path, "r");
@@ -612,7 +617,12 @@ MCTF_TEST(test_art_random_delete)
 
    pgmoneta_test_setup();
 
+#ifdef TEST_RESOURCE_DIR
+   /* Use compile-time source path directly for resource files */
+   path = pgmoneta_append(path, TEST_RESOURCE_DIR);
+#else
    path = pgmoneta_append(path, TEST_BASE_DIR);
+#endif
    path = pgmoneta_append(path, "/resource/art_advanced_test/words.txt");
 
    f = fopen(path, "r");
