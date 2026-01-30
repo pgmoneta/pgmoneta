@@ -2563,6 +2563,20 @@ init_receivewal(int server)
 
    if (strlen(config->common.servers[server].follow) == 0)
    {
+      if (config->common.servers[server].wal_streaming > 0)
+      {
+         int alive = kill(config->common.servers[server].wal_streaming, 0);
+         if (alive == 0)
+         {
+            /* Process already exists and is running */
+            return 0;
+         }
+         else
+         {
+            config->common.servers[server].wal_streaming = -1;
+         }
+      }
+
       if (config->common.servers[server].online)
       {
          pid_t pid;

@@ -186,7 +186,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
       MCTF_SKIP("failed to get checkpoint LSN");
    }
 
-   sleep(10);
+   sleep(30);
 
    // Create summary directory in the base_dir of a server if not already present
 

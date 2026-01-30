@@ -82,7 +82,7 @@ pgmoneta_backup(int client_fd, int server, uint8_t compression, uint8_t encrypti
    if (!config->common.servers[server].valid)
    {
       ec = MANAGEMENT_ERROR_BACKUP_INVALID;
-      pgmoneta_log_error("Backup: Server %s is not in a valid configuration", config->common.servers[server].name);
+      pgmoneta_log_error("Backup: Server %s is not in a valid configuration (valid=false)", config->common.servers[server].name);
       goto error;
    }
 

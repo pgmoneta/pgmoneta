@@ -341,13 +341,31 @@ retry1:
          }
       }
 
+      /* If compressed/encrypted file doesn't exist, check for uncompressed version as fallback */
       if (!pgmoneta_exists(file_path))
       {
-         char* fs = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
-         pgmoneta_log_debug("%s", fs);
-         pgmoneta_log_error("WAL file at %s does not exist after retries", file_path);
-         free(fs);
-         goto error;
+         memset(file_path, 0, MAX_PATH);
+         if (!pgmoneta_ends_with(dir_path, "/"))
+         {
+            pgmoneta_snprintf(file_path, MAX_PATH, "%s/%s", dir_path, file);
+         }
+         else
+         {
+            pgmoneta_snprintf(file_path, MAX_PATH, "%s%s", dir_path, file);
+         }
+
+         if (pgmoneta_exists(file_path))
+         {
+            pgmoneta_log_debug("Compressed/encrypted WAL file not found, using uncompressed version at %s", file_path);
+         }
+         else
+         {
+            char* fs = pgmoneta_deque_to_string(files, FORMAT_TEXT, NULL, 0);
+            pgmoneta_log_debug("%s", fs);
+            pgmoneta_log_error("WAL file at %s does not exist after retries (also checked uncompressed version)", file_path);
+            free(fs);
+            goto error;
+         }
       }
 
       pgmoneta_log_debug("WAL file at %s", file_path);
