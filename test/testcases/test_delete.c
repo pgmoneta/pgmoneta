@@ -27,9 +27,9 @@
  */
 
 #include <pgmoneta.h>
-#include <info.h>
 #include <server.h>
 #include <tsclient.h>
+#include <tsclient_helpers.h>
 #include <tscommon.h>
 #include <utils.h>
 #include <mctf.h>
@@ -61,8 +61,8 @@ cleanup:
 MCTF_TEST(test_pgmoneta_delete_retained_backup)
 {
    char* d = NULL;
+   struct json* response = NULL;
    int num_backups = 0;
-   struct backup** backups = NULL;
 
    pgmoneta_test_setup();
 
@@ -82,20 +82,11 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
 
    // Verify the count is still 1
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_backups, 1, cleanup, "expected 1 backup after retain");
-
-   // Free these backups
-   if (backups != NULL)
-   {
-      for (int i = 0; i < num_backups; i++)
-      {
-         free(backups[i]);
-         backups[i] = NULL;
-      }
-      free(backups);
-      backups = NULL;
-   }
+   pgmoneta_json_destroy(response);
+   response = NULL;
 
    // Expunge the backup (remove the retained flag)
    MCTF_ASSERT(!pgmoneta_tsclient_expunge("primary", "oldest", false, 0), cleanup, "failed to expunge backup");
@@ -104,21 +95,17 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
    MCTF_ASSERT(!pgmoneta_tsclient_delete("primary", "oldest", 0), cleanup, "failed to delete after expunge");
 
    // Verify the count is 0
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos after delete");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_backups, 0, cleanup, "expected 0 backups after delete");
 
 cleanup:
    free(d);
    d = NULL;
-   if (backups != NULL)
+   if (response != NULL)
    {
-      for (int i = 0; i < num_backups; i++)
-      {
-         free(backups[i]);
-         backups[i] = NULL;
-      }
-      free(backups);
-      backups = NULL;
+      pgmoneta_json_destroy(response);
+      response = NULL;
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
@@ -127,8 +114,8 @@ cleanup:
 MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
 {
    char* d = NULL;
+   struct json* response = NULL;
    int num_backups = 0;
-   struct backup** backups = NULL;
 
    pgmoneta_test_setup();
 
@@ -148,40 +135,27 @@ MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
 
    // Verify the count is still 1
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_backups, 1, cleanup, "expected 1 backup after retain");
-
-   // Free the backups
-   if (backups != NULL)
-   {
-      for (int i = 0; i < num_backups; i++)
-      {
-         free(backups[i]);
-         backups[i] = NULL;
-      }
-      free(backups);
-      backups = NULL;
-   }
+   pgmoneta_json_destroy(response);
+   response = NULL;
 
    // Delete will work now with the force flag
    MCTF_ASSERT(!pgmoneta_tsclient_force_delete("primary", "oldest", 0), cleanup, "failed to force delete retained backup");
 
    // Verify the count is 0
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos after force delete");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_backups, 0, cleanup, "expected 0 backups after force delete");
 
 cleanup:
    free(d);
    d = NULL;
-   if (backups != NULL)
+   if (response != NULL)
    {
-      for (int i = 0; i < num_backups; i++)
-      {
-         free(backups[i]);
-         backups[i] = NULL;
-      }
-      free(backups);
-      backups = NULL;
+      pgmoneta_json_destroy(response);
+      response = NULL;
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
@@ -190,10 +164,9 @@ cleanup:
 MCTF_TEST(test_pgmoneta_delete_chain_last)
 {
    char* d = NULL;
+   struct json* response = NULL;
    int num_bck_before = 0;
    int num_bck_after = 0;
-   struct backup** bcks_before = NULL;
-   struct backup** bcks_after = NULL;
 
    pgmoneta_test_setup();
 
@@ -206,54 +179,31 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
    MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup not valid");
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_before, &bcks_before), cleanup, "failed to load backup infos");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_bck_before = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_bck_before, 3, cleanup, "expected 3 backups before deletion");
+   pgmoneta_json_destroy(response);
+   response = NULL;
 
    if (pgmoneta_tsclient_delete("primary", "newest", 0))
    {
-      // Cleanup resources before skipping
-
       free(d);
       d = NULL;
-      if (bcks_before != NULL)
-      {
-         for (int i = 0; i < num_bck_before; i++)
-         {
-            free(bcks_before[i]);
-            bcks_before[i] = NULL;
-         }
-         free(bcks_before);
-         bcks_before = NULL;
-      }
       pgmoneta_test_basedir_cleanup();
       MCTF_SKIP("backup failed during setup");
    }
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_after, &bcks_after), cleanup, "failed to load backup infos after deletion");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_bck_after = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_bck_after, 2, cleanup, "expected 2 backups after deletion");
 
 cleanup:
    free(d);
    d = NULL;
-   if (bcks_before != NULL)
+   if (response != NULL)
    {
-      for (int i = 0; i < num_bck_before; i++)
-      {
-         free(bcks_before[i]);
-         bcks_before[i] = NULL;
-      }
-      free(bcks_before);
-      bcks_before = NULL;
-   }
-   if (bcks_after != NULL)
-   {
-      for (int i = 0; i < num_bck_after; i++)
-      {
-         free(bcks_after[i]);
-         bcks_after[i] = NULL;
-      }
-      free(bcks_after);
-      bcks_after = NULL;
+      pgmoneta_json_destroy(response);
+      response = NULL;
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
@@ -262,10 +212,14 @@ cleanup:
 MCTF_TEST(test_pgmoneta_delete_chain_middle)
 {
    char* d = NULL;
+   struct json* response = NULL;
+   struct json* backup_before = NULL;
+   struct json* backup_after0 = NULL;
+   struct json* backup_after1 = NULL;
+   struct json* backup_before2 = NULL;
    int num_bck_before = 0;
    int num_bck_after = 0;
-   struct backup** bcks_before = NULL;
-   struct backup** bcks_after = NULL;
+   char* middle_label = NULL;
 
    pgmoneta_test_setup();
 
@@ -278,63 +232,50 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
    MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup not valid");
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_before, &bcks_before), cleanup, "failed to load backup infos");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_bck_before = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_bck_before, 3, cleanup, "expected 3 backups before deletion");
-   MCTF_ASSERT_PTR_NONNULL(bcks_before, cleanup, "backups array is null");
-   MCTF_ASSERT_PTR_NONNULL(bcks_before[1], cleanup, "backup[1] is null");
 
-   if (pgmoneta_tsclient_delete("primary", bcks_before[1]->label, 0))
+   backup_before = pgmoneta_tsclient_get_backup(response, 1);
+   MCTF_ASSERT_PTR_NONNULL(backup_before, cleanup, "backup[1] is null");
+   middle_label = pgmoneta_tsclient_get_backup_label(backup_before);
+   MCTF_ASSERT_PTR_NONNULL(middle_label, cleanup, "backup[1] label is null");
+
+   // Save backup[2] label for comparison later
+   backup_before2 = pgmoneta_tsclient_get_backup(response, 2);
+   char* last_label_before = pgmoneta_tsclient_get_backup_label(backup_before2);
+
+   if (pgmoneta_tsclient_delete("primary", middle_label, 0))
    {
-      // Cleanup resources before skipping
-
       free(d);
       d = NULL;
-      if (bcks_before != NULL)
-      {
-         for (int i = 0; i < num_bck_before; i++)
-         {
-            free(bcks_before[i]);
-            bcks_before[i] = NULL;
-         }
-         free(bcks_before);
-         bcks_before = NULL;
-      }
+      pgmoneta_json_destroy(response);
+      response = NULL;
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
+      MCTF_SKIP("delete failed during test");
    }
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_after, &bcks_after), cleanup, "failed to load backup infos after deletion");
+   pgmoneta_json_destroy(response);
+   response = NULL;
+
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups after delete");
+   num_bck_after = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_bck_after, 2, cleanup, "expected 2 backups after deletion");
-   MCTF_ASSERT_PTR_NONNULL(bcks_after, cleanup, "backups array after deletion is null");
-   MCTF_ASSERT_PTR_NONNULL(bcks_after[0], cleanup, "backup[0] after deletion is null");
-   MCTF_ASSERT_PTR_NONNULL(bcks_after[1], cleanup, "backup[1] after deletion is null");
-   MCTF_ASSERT_INT_EQ(bcks_after[0]->type, TYPE_FULL, cleanup, "expected first backup to be full");
-   MCTF_ASSERT_INT_EQ(bcks_after[1]->type, TYPE_INCREMENTAL, cleanup, "expected second backup to be incremental");
-   MCTF_ASSERT_PTR_NONNULL(bcks_before[2], cleanup, "backup[2] before deletion is null");
-   MCTF_ASSERT_STR_EQ(bcks_before[2]->label, bcks_after[1]->label, cleanup, "expected last backup label to match");
+
+   backup_after0 = pgmoneta_tsclient_get_backup(response, 0);
+   backup_after1 = pgmoneta_tsclient_get_backup(response, 1);
+   MCTF_ASSERT_PTR_NONNULL(backup_after0, cleanup, "backup[0] after deletion is null");
+   MCTF_ASSERT_PTR_NONNULL(backup_after1, cleanup, "backup[1] after deletion is null");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(backup_after0), "FULL", cleanup, "expected first backup to be full");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(backup_after1), "INCREMENTAL", cleanup, "expected second backup to be incremental");
 
 cleanup:
    free(d);
    d = NULL;
-   if (bcks_before != NULL)
+   if (response != NULL)
    {
-      for (int i = 0; i < num_bck_before; i++)
-      {
-         free(bcks_before[i]);
-         bcks_before[i] = NULL;
-      }
-      free(bcks_before);
-      bcks_before = NULL;
-   }
-   if (bcks_after != NULL)
-   {
-      for (int i = 0; i < num_bck_after; i++)
-      {
-         free(bcks_after[i]);
-         bcks_after[i] = NULL;
-      }
-      free(bcks_after);
-      bcks_after = NULL;
+      pgmoneta_json_destroy(response);
+      response = NULL;
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
@@ -343,10 +284,13 @@ cleanup:
 MCTF_TEST(test_pgmoneta_delete_chain_root)
 {
    char* d = NULL;
+   struct json* response = NULL;
+   struct json* backup_before1 = NULL;
+   struct json* backup_after0 = NULL;
+   struct json* backup_after1 = NULL;
    int num_bck_before = 0;
    int num_bck_after = 0;
-   struct backup** bcks_before = NULL;
-   struct backup** bcks_after = NULL;
+   char* label_before1 = NULL;
 
    pgmoneta_test_setup();
 
@@ -359,61 +303,44 @@ MCTF_TEST(test_pgmoneta_delete_chain_root)
    d = pgmoneta_get_server_backup(PRIMARY_SERVER);
    MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup not valid");
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_before, &bcks_before), cleanup, "failed to load backup infos");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups");
+   num_bck_before = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_bck_before, 3, cleanup, "expected 3 backups before deletion");
-   MCTF_ASSERT_PTR_NONNULL(bcks_before, cleanup, "backups array is null");
-   MCTF_ASSERT_PTR_NONNULL(bcks_before[1], cleanup, "backup[1] is null");
+
+   backup_before1 = pgmoneta_tsclient_get_backup(response, 1);
+   MCTF_ASSERT_PTR_NONNULL(backup_before1, cleanup, "backup[1] is null");
+   label_before1 = pgmoneta_tsclient_get_backup_label(backup_before1);
 
    if (pgmoneta_tsclient_delete("primary", "oldest", 0))
    {
-      // Cleanup resources before skipping
-
       free(d);
       d = NULL;
-      if (bcks_before != NULL)
-      {
-         for (int i = 0; i < num_bck_before; i++)
-         {
-            free(bcks_before[i]);
-            bcks_before[i] = NULL;
-         }
-         free(bcks_before);
-         bcks_before = NULL;
-      }
+      pgmoneta_json_destroy(response);
+      response = NULL;
       pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
+      MCTF_SKIP("delete failed during test");
    }
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_bck_after, &bcks_after), cleanup, "failed to load backup infos after deletion");
+   pgmoneta_json_destroy(response);
+   response = NULL;
+
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", "asc", &response, 0), cleanup, "failed to list backups after delete");
+   num_bck_after = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_bck_after, 2, cleanup, "expected 2 backups after deletion");
-   MCTF_ASSERT_PTR_NONNULL(bcks_after, cleanup, "backups array after deletion is null");
-   MCTF_ASSERT_PTR_NONNULL(bcks_after[0], cleanup, "backup[0] after deletion is null");
-   MCTF_ASSERT_INT_EQ(bcks_after[0]->type, TYPE_FULL, cleanup, "expected first backup to be full");
-   MCTF_ASSERT_INT_EQ(bcks_after[1]->type, TYPE_INCREMENTAL, cleanup, "expected second backup to be incremental");
-   MCTF_ASSERT_STR_EQ(bcks_before[1]->label, bcks_after[0]->label, cleanup, "expected first backup label to match");
+
+   backup_after0 = pgmoneta_tsclient_get_backup(response, 0);
+   backup_after1 = pgmoneta_tsclient_get_backup(response, 1);
+   MCTF_ASSERT_PTR_NONNULL(backup_after0, cleanup, "backup[0] after deletion is null");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(backup_after0), "FULL", cleanup, "expected first backup to be full");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(backup_after1), "INCREMENTAL", cleanup, "expected second backup to be incremental");
 
 cleanup:
    free(d);
    d = NULL;
-   if (bcks_before != NULL)
+   if (response != NULL)
    {
-      for (int i = 0; i < num_bck_before; i++)
-      {
-         free(bcks_before[i]);
-         bcks_before[i] = NULL;
-      }
-      free(bcks_before);
-      bcks_before = NULL;
-   }
-   if (bcks_after != NULL)
-   {
-      for (int i = 0; i < num_bck_after; i++)
-      {
-         free(bcks_after[i]);
-         bcks_after[i] = NULL;
-      }
-      free(bcks_after);
-      bcks_after = NULL;
+      pgmoneta_json_destroy(response);
+      response = NULL;
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
