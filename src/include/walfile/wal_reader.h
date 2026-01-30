@@ -397,11 +397,13 @@ extern struct server* server_config;
 /**
  * Validate and extract base WAL filename from path
  * @param path The full path to the WAL file
- * @param base_filename Output parameter for the base WAL filename
+ * @param base_filename Output parameter for the base WAL filename (optional, can be NULL)
+ * @param segno Output parameter for segment number (optional, can be NULL)
+ * @param wal_size The WAL segment size in bytes (use 0 for default)
  * @return 0 on success, 1 on error
  */
 int
-pgmoneta_validate_wal_filename(char* path, char** base_filename);
+pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* segno, int wal_size);
 
 /**
  * Parses a WAL file and populates server information.

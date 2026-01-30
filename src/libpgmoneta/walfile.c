@@ -93,7 +93,7 @@ pgmoneta_read_walfile(int server, char* path, struct walfile** wf)
       goto error;
    }
 
-   new_wf = malloc(sizeof(struct walfile));
+   new_wf = calloc(1, sizeof(struct walfile));
    if (!new_wf)
    {
       pgmoneta_log_error("Memory allocation failed for WAL file structure");
@@ -321,47 +321,61 @@ pgmoneta_destroy_walfile(struct walfile* wf)
       return;
    }
 
-   if (pgmoneta_deque_iterator_create(wf->records, &record_iterator) || pgmoneta_deque_iterator_create(wf->page_headers, &page_header_iterator))
+   /* Cleanup records - only if deque was initialized */
+   if (wf->records != NULL)
    {
-      return;
-   }
-
-   while (pgmoneta_deque_iterator_next(record_iterator))
-   {
-      struct decoded_xlog_record* record = (struct decoded_xlog_record*)record_iterator->value->data;
-      if (record->partial)
+      if (pgmoneta_deque_iterator_create(wf->records, &record_iterator) == 0)
       {
-         free(record);
-         continue;
-      }
-      if (record->main_data != NULL)
-      {
-         free(record->main_data);
-      }
-      for (int i = 0; i <= record->max_block_id; i++)
-      {
-         if (record->blocks[i].has_data)
+         while (pgmoneta_deque_iterator_next(record_iterator))
          {
-            free(record->blocks[i].data);
+            struct decoded_xlog_record* record = (struct decoded_xlog_record*)record_iterator->value->data;
+            if (record->partial)
+            {
+               free(record);
+               continue;
+            }
+            if (record->main_data != NULL)
+            {
+               free(record->main_data);
+            }
+            for (int i = 0; i <= record->max_block_id; i++)
+            {
+               if (record->blocks[i].has_data)
+               {
+                  free(record->blocks[i].data);
+               }
+               if (record->blocks[i].has_image)
+               {
+                  free(record->blocks[i].bkp_image);
+               }
+            }
+            free(record);
          }
-         if (record->blocks[i].has_image)
-         {
-            free(record->blocks[i].bkp_image);
-         }
+         pgmoneta_deque_iterator_destroy(record_iterator);
       }
-      free(record);
+      pgmoneta_deque_destroy(wf->records);
    }
-   pgmoneta_deque_iterator_destroy(record_iterator);
-   pgmoneta_deque_destroy(wf->records);
 
-   while (pgmoneta_deque_iterator_next(page_header_iterator))
+   /* Cleanup page headers - only if deque was initialized */
+   if (wf->page_headers != NULL)
    {
-      struct xlog_page_header_data* page_header = (struct xlog_page_header_data*)page_header_iterator->value->data;
-      free(page_header);
+      if (pgmoneta_deque_iterator_create(wf->page_headers, &page_header_iterator) == 0)
+      {
+         while (pgmoneta_deque_iterator_next(page_header_iterator))
+         {
+            struct xlog_page_header_data* page_header = (struct xlog_page_header_data*)page_header_iterator->value->data;
+            free(page_header);
+         }
+         pgmoneta_deque_iterator_destroy(page_header_iterator);
+      }
+      pgmoneta_deque_destroy(wf->page_headers);
    }
-   pgmoneta_deque_iterator_destroy(page_header_iterator);
-   pgmoneta_deque_destroy(wf->page_headers);
 
-   free(wf->long_phd);
+   /* Free long page header if initialized */
+   if (wf->long_phd != NULL)
+   {
+      free(wf->long_phd);
+   }
+
    free(wf);
 }

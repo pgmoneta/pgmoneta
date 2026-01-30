@@ -67,6 +67,8 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <arpa/inet.h>
+#include <sched.h>
+#include <sys/resource.h>
 
 #ifndef EVBACKEND_LINUXAIO
 #define EVBACKEND_LINUXAIO 0x00000040U
@@ -6015,5 +6017,46 @@ pgmoneta_direct_io_supported(const char* path)
 #else
    (void)path;
    return false;
+#endif
+}
+
+void
+pgmoneta_cpu_yield(void)
+{
+#ifdef HAVE_LINUX
+   sched_yield();
+#else
+   /* On non-Linux systems, use a minimal sleep as fallback */
+   struct timespec ts = {0, 1000}; /* 1 microsecond */
+   nanosleep(&ts, NULL);
+#endif
+}
+
+int
+pgmoneta_set_priority(int priority)
+{
+#ifdef HAVE_LINUX
+   return setpriority(PRIO_PROCESS, 0, priority);
+#else
+   (void)priority;
+   return 0; /* No-op on non-Linux systems */
+#endif
+}
+
+int
+pgmoneta_get_priority(void)
+{
+#ifdef HAVE_LINUX
+   int prio;
+
+   errno = 0;
+   prio = getpriority(PRIO_PROCESS, 0);
+   if (prio == -1 && errno != 0)
+   {
+      return -1;
+   }
+   return prio;
+#else
+   return 0; /* Default priority on non-Linux systems */
 #endif
 }

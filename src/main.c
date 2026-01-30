@@ -1852,10 +1852,14 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
                   pgmoneta_server_set_online(srv, false);
                   pgmoneta_log_warn("Replication: Server %s is offline", config->common.servers[srv].name);
                }
-               if (init_receivewal(srv))
+               /* Only start WAL streaming if not already running */
+               if (config->common.servers[srv].wal_streaming <= 0)
                {
-                  pgmoneta_server_set_online(srv, false);
-                  pgmoneta_log_warn("WAL: Server %s is offline", config->common.servers[srv].name);
+                  if (init_receivewal(srv))
+                  {
+                     pgmoneta_server_set_online(srv, false);
+                     pgmoneta_log_warn("WAL: Server %s is offline", config->common.servers[srv].name);
+                  }
                }
             }
             else

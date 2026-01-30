@@ -2884,7 +2884,7 @@ main(int argc, char** argv)
             }
             else
             {
-               if (pgmoneta_validate_wal_filename(filepath, NULL) != 0)
+               if (pgmoneta_validate_wal_filename(filepath, NULL, NULL, 0) != 0)
                {
                   fprintf(stderr, "Error: %s is not a valid WAL file\n", filepath);
                   goto error;
@@ -2959,7 +2959,7 @@ main(int argc, char** argv)
          /* TAR archives bypass WAL filename validation - contents are validated after extraction */
          if (!is_tar_archive_input(filepath))
          {
-            if (pgmoneta_validate_wal_filename(filepath, NULL) != 0)
+            if (pgmoneta_validate_wal_filename(filepath, NULL, NULL, 0) != 0)
             {
                fprintf(stderr, "Error: %s is not a valid WAL file\n", filepath);
                goto error;

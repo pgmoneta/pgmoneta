@@ -142,7 +142,8 @@ MCTF_TEST(test_cli_backup)
 {
    pgmoneta_test_setup();
 
-   /* Use the same pattern as other backup tests - mode is already set by environment */
+   /* Ensure server is online before backup */
+   MCTF_ASSERT(pgmoneta_tsclient_mode("primary", "online", 0) == 0, cleanup, "Mode online failed");
    MCTF_ASSERT(pgmoneta_tsclient_backup("primary", NULL, 0) == 0, cleanup, "Backup primary failed");
 
 cleanup:

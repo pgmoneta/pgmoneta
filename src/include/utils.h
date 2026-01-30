@@ -46,6 +46,11 @@ extern "C" {
 #define LONG_TIME_LENGTH  16 + 1
 #define UTC_TIME_LENGTH   29 + 1
 
+/** Process priority constants for pgmoneta_set_priority() */
+#define PRIORITY_HIGH   -5 /**< Higher priority (requires root) */
+#define PRIORITY_NORMAL 0  /**< Normal priority */
+#define PRIORITY_LOW    5  /**< Lower priority */
+
 /** Define Windows 20 palette colors as constants using ANSI codes **/
 #define COLOR_BLACK        "\033[30m"
 #define COLOR_DARK_RED     "\033[31m"
@@ -1542,6 +1547,28 @@ pgmoneta_get_block_size(const char* path);
  */
 bool
 pgmoneta_direct_io_supported(const char* path);
+
+/**
+ * Yield the CPU to allow other processes to run
+ * This is useful when waiting for another process to complete work
+ */
+void
+pgmoneta_cpu_yield(void);
+
+/**
+ * Set the scheduling priority of the current process
+ * @param priority The priority value (use PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW)
+ * @return 0 on success, -1 on error
+ */
+int
+pgmoneta_set_priority(int priority);
+
+/**
+ * Get the scheduling priority of the current process
+ * @return The priority value, or -1 on error (with errno set)
+ */
+int
+pgmoneta_get_priority(void);
 
 #ifdef __cplusplus
 }

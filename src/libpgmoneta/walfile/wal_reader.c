@@ -185,12 +185,13 @@ error:
 }
 
 int
-pgmoneta_validate_wal_filename(char* path, char** base_filename)
+pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* segno, int wal_size)
 {
    char* wal_filename = NULL;
    char* temp = NULL;
    timeline_id test_tli = 0;
    xlog_seg_no test_logSegNo = 0;
+   int seg_size = (wal_size > 0) ? wal_size : DEFAULT_WAL_SEGZ_BYTES;
 
    wal_filename = strdup(basename(path));
    if (wal_filename == NULL)
@@ -240,7 +241,7 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename)
       }
    }
 
-   if (xlog_from_file_name(wal_filename, &test_tli, &test_logSegNo, DEFAULT_WAL_SEGZ_BYTES))
+   if (xlog_from_file_name(wal_filename, &test_tli, &test_logSegNo, seg_size))
    {
       pgmoneta_log_trace("Invalid WAL file name: %s", path);
       free(wal_filename);
@@ -249,6 +250,11 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename)
 
    pgmoneta_log_trace("Valid WAL file name: %s (timeline: %u, segment: %lu)",
                       wal_filename, test_tli, test_logSegNo);
+
+   if (segno != NULL)
+   {
+      *segno = test_logSegNo;
+   }
 
    if (base_filename != NULL)
    {
@@ -317,7 +323,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
 
    config = (struct walinfo_configuration*)shmem;
 
-   if (pgmoneta_validate_wal_filename(path, NULL))
+   if (pgmoneta_validate_wal_filename(path, NULL, NULL, 0))
    {
       pgmoneta_log_error("Error: Invalid WAL file name: %s", path);
       goto error;
