@@ -456,6 +456,11 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
+   if (pgmoneta_http_request_add_header(request, "Content-Type", "application/octet-stream"))
+   {
+      goto error;
+   }
+
    if (pgmoneta_http_set_data(request, file_data, file_info.st_size))
    {
       goto error;

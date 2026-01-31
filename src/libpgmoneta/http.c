@@ -716,15 +716,6 @@ http_build_request(struct http* connection, struct http_request* request, char**
    headers = pgmoneta_append(headers, content_length);
    headers = pgmoneta_append(headers, "\r\n");
 
-   if (request->method == PGMONETA_HTTP_POST)
-   {
-      headers = pgmoneta_append(headers, "Content-Type: application/x-www-form-urlencoded\r\n");
-   }
-   else if (request->method == PGMONETA_HTTP_PUT)
-   {
-      headers = pgmoneta_append(headers, "Content-Type: application/octet-stream\r\n");
-   }
-
    if (request->payload.headers != NULL && !pgmoneta_deque_empty(request->payload.headers))
    {
       struct deque_iterator* iter = NULL;
