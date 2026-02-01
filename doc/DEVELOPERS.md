@@ -491,7 +491,6 @@ Remember to add your name to the following files,
 ```
 AUTHORS
 doc/manual/en/97-acknowledgement.md
-doc/manual/hi/97-acknowledgement.md
 ```
 
 in your first pull request
