@@ -4253,7 +4253,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
                data = pgmoneta_append(data, backups[i][j]->label);
                data = pgmoneta_append(data, "\"} ");
 
-               data = pgmoneta_append_bool(data, backups[i][j]->keep);
+               data = pgmoneta_append_int(data, backups[i][j]->keep ? 1 : 0);
 
                data = pgmoneta_append(data, "\n");
             }
@@ -4509,7 +4509,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
       data = pgmoneta_append(data, config->common.servers[i].current_wal_filename);
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming > 0);
+      data = pgmoneta_append_int(data, config->common.servers[i].wal_streaming > 0 ? 1 : 0);
 
       data = pgmoneta_append(data, "\n");
    }
@@ -4537,7 +4537,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
       }
       data = pgmoneta_append(data, "\"} ");
 
-      data = pgmoneta_append_bool(data, config->common.servers[i].wal_streaming > 0);
+      data = pgmoneta_append_int(data, config->common.servers[i].wal_streaming > 0 ? 1 : 0);
 
       data = pgmoneta_append(data, "\n");
    }
