@@ -1,0 +1,59 @@
+name: RPM Build
+
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+
+jobs:
+  build-rpm:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    timeout-minutes: 30
+
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf update -y && \
+          dnf install -y rpm-build gcc cmake make python3-docutils \
+          liburing-devel openssl-devel systemd-devel libatomic \
+          zlib-devel libzstd-devel lz4-devel bzip2-devel binutils chrpath \
+          ncurses-devel libarchive-devel libev libev-devel libssh-devel libyaml-devel \
+          lz4 openssl systemd zlib libzstd bzip2 git 
+
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+      - name: Create source tarball
+        run: |
+          VERSION=$(grep "Version:" pgmoneta.spec | awk '{print $2}')
+          NAME=$(grep "Name:" pgmoneta.spec | awk '{print $2}')
+          TARBALL="${NAME}-${VERSION}.tar.gz"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git archive --format=tar.gz --prefix="${NAME}-${VERSION}/" HEAD -o "${TARBALL}"
+          echo "TARBALL=${TARBALL}" >> $GITHUB_ENV
+
+
+      - name: Build RPM package
+        run: |
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS,RPMS,SRPMS}
+          cp ${{ env.TARBALL }} ~/rpmbuild/SOURCES/
+          cp pgmoneta.spec ~/rpmbuild/SPECS/
+          export QA_RPATHS=0x0001
+          rpmbuild -ba ~/rpmbuild/SPECS/pgmoneta.spec
+          cp -r ~/rpmbuild/RPMS/* .
+          cp -r ~/rpmbuild/SRPMS/* .
+
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgmoneta-fedora-rpms
+          path: |
+            x86_64/*.rpm
+            noarch/*.rpm
+            *.src.rpm

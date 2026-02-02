@@ -200,14 +200,14 @@ else ()
   message(FATAL_ERROR "libarchive needed")
 endif()
 
-if (DOCS)
-  find_package(Rst2man)
-  if (RST2MAN_FOUND)
-    message(STATUS "rst2man found")
-  else ()
-    message(FATAL_ERROR "rst2man needed")
-  endif()
+
+find_package(Rst2man)
+if (RST2MAN_FOUND)
+  message(STATUS "rst2man found")
+else ()
+  message(FATAL_ERROR "rst2man needed")
 endif()
+
 
 find_package(Libssh)
 if (LIBSSH_FOUND)
@@ -254,9 +254,7 @@ endif()
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/src/")
 
-if (DOCS)
-  add_subdirectory(doc)
-endif()
+add_subdirectory(doc)
 add_subdirectory(src)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test")
   add_subdirectory(test)

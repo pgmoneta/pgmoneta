@@ -146,3 +146,7 @@ jobs:
           name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ matrix.pg_version }}
           path: /tmp/pgmoneta-test/log
           retention-days: 90
+
+  rpm-build:
+    needs: [format-check]
+    uses: ./.github/workflows/rpm-build.yml
