@@ -2442,10 +2442,6 @@ do_copy_file(struct worker_common* wc)
          /* DIRECT_IO_ON: attempt O_DIRECT, will fail if unsupported */
          use_direct_io = true;
       }
-#else
-      /* Non-Linux platforms: O_DIRECT not supported */
-      use_direct_io = false;
-#endif
 
       if (use_direct_io)
       {
@@ -2464,6 +2460,12 @@ do_copy_file(struct worker_common* wc)
          flags_from |= O_DIRECT;
          flags_to |= O_DIRECT;
       }
+
+#else
+      /* Non-Linux platforms: O_DIRECT not supported */
+      use_direct_io = false;
+#endif
+
    }
 
    if (use_direct_io)
@@ -2483,6 +2485,7 @@ do_copy_file(struct worker_common* wc)
 
    fd_from = open(from, flags_from);
 
+#if defined(__linux__)
    if (fd_from < 0)
    {
       if (errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
@@ -2494,6 +2497,7 @@ do_copy_file(struct worker_common* wc)
          fd_from = open(from, flags_from);
       }
    }
+#endif
 
    if (fd_from < 0)
    {
@@ -2518,6 +2522,7 @@ do_copy_file(struct worker_common* wc)
 
    fd_to = open(to, flags_to, permissions);
 
+#if defined(__linux__)
    if (fd_to < 0 && errno == EINVAL && use_direct_io && config != NULL && config->direct_io == DIRECT_IO_AUTO)
    {
       /* Fallback for fd_to */
@@ -2526,6 +2531,7 @@ do_copy_file(struct worker_common* wc)
       flags_to &= ~O_DIRECT;
       fd_to = open(to, flags_to, permissions);
    }
+#endif
 
    if (fd_to < 0)
    {
