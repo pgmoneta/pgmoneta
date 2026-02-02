@@ -28,9 +28,9 @@
  */
 
 #include <pgmoneta.h>
-#include <info.h>
 #include <logging.h>
 #include <tsclient.h>
+#include <tsclient_helpers.h>
 #include <tscommon.h>
 #include <mctf.h>
 #include <utils.h>
@@ -56,9 +56,11 @@ cleanup:
 
 MCTF_TEST(test_pgmoneta_backup_incremental_basic)
 {
-   char* d = NULL;
+   struct json* response = NULL;
    int num_backups = 0;
-   struct backup** backups = NULL;
+   struct json* b0 = NULL;
+   struct json* b1 = NULL;
+   struct json* b2 = NULL;
 
    pgmoneta_test_setup();
 
@@ -68,36 +70,30 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
       MCTF_SKIP("backup chain failed during setup");
    }
 
-   d = pgmoneta_get_server_backup(PRIMARY_SERVER);
-   MCTF_ASSERT_PTR_NONNULL(d, cleanup, "server backup directory is null");
+   MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
 
-   MCTF_ASSERT(!pgmoneta_load_infos(d, &num_backups, &backups), cleanup, "failed to load backup infos");
+   num_backups = pgmoneta_tsclient_get_backup_count(response);
    MCTF_ASSERT_INT_EQ(num_backups, 3, cleanup, "backup count mismatch");
-   MCTF_ASSERT_PTR_NONNULL(backups, cleanup, "backups should not be NULL");
 
-   // sort the backups in ascending order
+   b0 = pgmoneta_tsclient_get_backup(response, 0);
+   b1 = pgmoneta_tsclient_get_backup(response, 1);
+   b2 = pgmoneta_tsclient_get_backup(response, 2);
 
-   pgmoneta_sort_backups(backups, num_backups, false);
+   MCTF_ASSERT_PTR_NONNULL(b0, cleanup, "backup 0 null");
+   MCTF_ASSERT_PTR_NONNULL(b1, cleanup, "backup 1 null");
+   MCTF_ASSERT_PTR_NONNULL(b2, cleanup, "backup 2 null");
 
-   MCTF_ASSERT_INT_EQ(backups[0]->type, TYPE_FULL, cleanup, "backup 0 type mismatch");
-   MCTF_ASSERT_INT_EQ(backups[1]->type, TYPE_INCREMENTAL, cleanup, "backup 1 type mismatch");
-   MCTF_ASSERT_INT_EQ(backups[2]->type, TYPE_INCREMENTAL, cleanup, "backup 2 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b0), "FULL", cleanup, "backup 0 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b1), "INCREMENTAL", cleanup, "backup 1 type mismatch");
+   MCTF_ASSERT_STR_EQ(pgmoneta_tsclient_get_backup_type(b2), "INCREMENTAL", cleanup, "backup 2 type mismatch");
 
-   MCTF_ASSERT_STR_EQ(backups[1]->parent_label, backups[0]->label, cleanup, "backup 1 parent mismatch");
-   MCTF_ASSERT_STR_EQ(backups[2]->parent_label, backups[1]->label, cleanup, "backup 2 parent mismatch");
+   MCTF_ASSERT(pgmoneta_tsclient_verify_backup_chain(b0, b1), cleanup, "backup 1 parent mismatch (should be b0)");
+   MCTF_ASSERT(pgmoneta_tsclient_verify_backup_chain(b1, b2), cleanup, "backup 2 parent mismatch (should be b1)");
 
 cleanup:
-   free(d);
-   d = NULL;
-   if (backups != NULL)
+   if (response != NULL)
    {
-      for (int i = 0; i < num_backups; i++)
-      {
-         free(backups[i]);
-         backups[i] = NULL;
-      }
-      free(backups);
-      backups = NULL;
+      pgmoneta_json_destroy(response);
    }
    pgmoneta_test_basedir_cleanup();
    MCTF_FINISH();
