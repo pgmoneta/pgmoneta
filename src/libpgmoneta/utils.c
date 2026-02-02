@@ -2465,7 +2465,6 @@ do_copy_file(struct worker_common* wc)
       /* Non-Linux platforms: O_DIRECT not supported */
       use_direct_io = false;
 #endif
-
    }
 
    if (use_direct_io)
