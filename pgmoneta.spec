@@ -56,6 +56,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/PR_GUIDE.md %{buildroot}%{_docdir}/%{name}/PR_GUIDE.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/RPM.md %{buildroot}%{_docdir}/%{name}/RPM.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/S3.md %{buildroot}%{_docdir}/%{name}/S3.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/SPONSORS.md %{buildroot}%{_docdir}/%{name}/SPONSORS.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/SSH.md %{buildroot}%{_docdir}/%{name}/SSH.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/WAL.md %{buildroot}%{_docdir}/%{name}/WAL.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/WALFILTER.md %{buildroot}%{_docdir}/%{name}/WALFILTER.md
@@ -132,6 +133,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/README.md
 %{_docdir}/%{name}/RPM.md
 %{_docdir}/%{name}/S3.md
+%{_docdir}/%{name}/SPONSORS.md
 %{_docdir}/%{name}/SSH.md
 %{_docdir}/%{name}/WAL.md
 %{_docdir}/%{name}/WALFILTER.md
