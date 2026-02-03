@@ -357,6 +357,19 @@ port = 5432
 user = repl
 wal_slot = repl
 ```
+And create the `pgmoneta_cli.conf` configuration file to use when running **pgmoneta-cli**.
+
+``` ini
+cat > pgmoneta_cli.conf
+[pgmoneta-cli]
+compression = zstd
+
+log_type = file
+log_level = info
+log_path = /tmp/pgmoneta-cli.log
+
+unix_socket_dir = /tmp/
+```
 
 In our main section called `[pgmoneta]` we setup [**pgmoneta**](https://github.com/pgmoneta/pgmoneta) to listen on all network addresses. We will enable Prometheus metrics on port 5001 and have the backups live in the `/home/pgmoneta/backup` directory.
 All backups are being compressed with zstd and kept for 7 days. Logging will be performed at `info` level and put in a file called `/tmp/pgmoneta.log`. Last we specify the location of the `unix_socket_dir` used for management operations.
@@ -376,19 +389,19 @@ pgmoneta -c pgmoneta.conf -u pgmoneta_users.conf
 open a new terminal and log in with `pgmoneta`
 
 ``` sh
-pgmoneta-cli -c pgmoneta.conf backup primary
+pgmoneta-cli -c pgmoneta_cli.conf backup primary
 ```
 
 #### View backup
 
 ``` sh
-pgmoneta-cli -c pgmoneta.conf status details
+pgmoneta-cli -c pgmoneta_cli.conf status details
 ```
 
 #### Shutdown pgmoneta
 
 ``` sh
-pgmoneta-cli -c pgmoneta.conf shutdown
+pgmoneta-cli -c pgmoneta_cli.conf shutdown
 ```
 
 ## WAL Tools
