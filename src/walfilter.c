@@ -48,6 +48,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <err.h>
+#include <errno.h>
 #include <libgen.h>
 #include <stdio.h>
 
@@ -588,26 +589,73 @@ main(int argc, char* argv[])
 
       if (access(configuration_path, R_OK) != 0)
       {
-         errx(1, "Can't read configuration file: %s", configuration_path);
+         errx(1, "Can't read configuration file: %s\n"
+                 "Permission denied. Try: chmod +r %s",
+              configuration_path, configuration_path);
       }
 
+      int cfg_ret = pgmoneta_validate_config_file(configuration_path);
+      if (cfg_ret == EINVAL)
       {
-         int cfg_ret = pgmoneta_validate_config_file(configuration_path);
-         if (cfg_ret == 4)
-         {
-            errx(1, "Configuration file contains binary data: %s", configuration_path);
-         }
-         else if (cfg_ret != 0)
-         {
-            goto error;
-         }
+         errx(1, "Configuration file contains binary data or is invalid: %s\n"
+                 "Configuration must be a text file",
+              configuration_path);
+      }
+      else if (cfg_ret == ENOENT)
+      {
+         errx(1, "Configuration file error: %s\n"
+                 "File not found or not accessible",
+              configuration_path);
+      }
+      else if (cfg_ret == EACCES)
+      {
+         errx(1, "Cannot read configuration file: %s\n"
+                 "Permission denied",
+              configuration_path);
+      }
+      else if (cfg_ret != 0)
+      {
+         errx(1, "Configuration file validation failed: %s (error code: %d)",
+              configuration_path, cfg_ret);
       }
 
       loaded = pgmoneta_read_walfilter_configuration(shmem, configuration_path);
 
-      if (loaded)
+      if (loaded == ENOENT)
       {
-         pgmoneta_log_debug("Configuration not found: %s", configuration_path);
+         errx(1, "Configuration file not found: %s\n"
+                 "Please ensure the file exists and is readable",
+              configuration_path);
+      }
+      else if (loaded == EINVAL)
+      {
+         errx(1, "Configuration syntax error in: %s\n"
+                 "\n"
+                 "Valid [pgmoneta-walfilter] section options:\n"
+                 "  - log_type = console|file (default: console)\n"
+                 "  - log_level = (debug5|debug4|debug3|debug2|debug1|info|warn|error|fatal) (default: info)\n"
+                 "  - log_path = /path/to/logfile (optional if log_type = console)\n"
+                 "\n"
+                 "Valid server sections [server_name]:\n"
+                 "  - host = hostname (required)\n"
+                 "  - port = port_number (required)\n"
+                 "  - user = username (required)\n"
+                 "\n"
+                 "Example configuration:\n"
+                 "  [pgmoneta-walfilter]\n"
+                 "  log_type = console\n"
+                 "  log_level = info\n"
+                 "\n"
+                 "  [primary]\n"
+                 "  host = localhost\n"
+                 "  port = 5432\n"
+                 "  user = replication_user",
+              configuration_path);
+      }
+      else if (loaded != 0)
+      {
+         errx(1, "Failed to read configuration: %s (error code: %d)",
+              configuration_path, loaded);
       }
    }
    else
