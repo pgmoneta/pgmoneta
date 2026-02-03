@@ -737,6 +737,66 @@ error:
    return 1;
 }
 
+int
+pgmoneta_server_database_size(int srv, SSL* ssl, int socket, char* database, uint64_t* size)
+{
+   char* user = NULL;
+   char* cell_output = NULL;
+   bool has_privilege = false;
+   char query[MISC_LENGTH];
+   struct query_response* response = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto error;
+   }
+
+   user = config->common.servers[srv].username;
+
+   if (has_execute_privilege(ssl, socket, user, "pg_database_size(name)", &has_privilege))
+   {
+      goto error;
+   }
+
+   if (!has_privilege)
+   {
+      pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_database_size(name)' function", user);
+      goto error;
+   }
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT pg_database_size('%s');", database);
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   if (response == NULL || response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   cell_output = pgmoneta_query_response_get_data(response, 0);
+   if (cell_output == NULL || strcmp(cell_output, "") == 0)
+   {
+      goto error;
+   }
+
+   *size = strtoull(cell_output, NULL, 10);
+
+   pgmoneta_free_query_response(response);
+   return 0;
+
+error:
+   pgmoneta_free_query_response(response);
+   return 1;
+}
+
 static int
 get_wal_size(SSL* ssl, int socket, int* ws)
 {

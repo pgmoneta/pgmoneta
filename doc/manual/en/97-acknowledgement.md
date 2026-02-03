@@ -50,6 +50,7 @@ Shashidhar B M <shashidhar.i.0119@gmail.com>
 Seongjun Shin <shinseongjun@gmail.com>
 Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
 Mazen Kamal <mazenkamal212@gmail.com>
+evangelisilva <silvaevangeli@gmail.com>
 ```
 
 ## Committers
