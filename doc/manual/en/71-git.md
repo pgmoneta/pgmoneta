@@ -108,6 +108,14 @@ to format the source code. Note, that clang-format 21+ is required.
 
 Based on feedback keep making changes, squashing, rebasing and force pushing
 
+**PTAL**
+
+When you are working on a change put it into Draft mode, so we know that you are not
+happy with it yet.
+
+Please, send a PTAL to the Committer that were assigned to you once you think that
+your change is complete. And, of course, take it out of Draft mode.
+
 **Undo**
 
 Normally you can reset to an earlier commit using `git reset <commit hash> --hard`.
