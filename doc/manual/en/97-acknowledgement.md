@@ -48,6 +48,7 @@ Amr Shams <amr.shams2015.a@gmail.com>
 Somye Mahajan <mahajan.somye@gmail.com>
 Shashidhar B M <shashidhar.i.0119@gmail.com>
 Seongjun Shin <shinseongjun@gmail.com>
+Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
 ```
 
 ## Committers
