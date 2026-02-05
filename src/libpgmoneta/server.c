@@ -1746,3 +1746,75 @@ error:
    pgmoneta_free_message(query_msg);
    return 1;
 }
+
+int
+pgmoneta_server_databases_summary(int srv, SSL* ssl, int socket, int* count, char*** names, uint64_t** sizes)
+{
+   char query[MISC_LENGTH];
+   struct query_response* response = NULL;
+   struct tuple* tuple = NULL;
+
+   *count = 0;
+   *names = NULL;
+   *sizes = NULL;
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datistemplate = false;");
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   tuple = response->tuples;
+   while (tuple != NULL)
+   {
+      (*count)++;
+      tuple = tuple->next;
+   }
+
+   if (*count > 0)
+   {
+      *names = (char**)malloc(*count * sizeof(char*));
+      *sizes = (uint64_t*)malloc(*count * sizeof(uint64_t));
+
+      if (*names == NULL || *sizes == NULL)
+      {
+         goto error;
+      }
+
+      tuple = response->tuples;
+      for (int i = 0; i < *count; i++)
+      {
+         (*names)[i] = strdup(tuple->data[0]);
+         (*sizes)[i] = strtoull(tuple->data[1], NULL, 10);
+         tuple = tuple->next;
+      }
+   }
+
+   pgmoneta_free_query_response(response);
+
+   return 0;
+
+error:
+   if (*names != NULL)
+   {
+      for (int i = 0; i < *count; i++)
+      {
+         free((*names)[i]);
+      }
+      free(*names);
+   }
+   if (*sizes != NULL)
+   {
+      free(*sizes);
+   }
+
+   *count = 0;
+   *names = NULL;
+   *sizes = NULL;
+
+   pgmoneta_free_query_response(response);
+
+   return 1;
+}

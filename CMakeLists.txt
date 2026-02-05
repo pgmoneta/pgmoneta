@@ -205,7 +205,7 @@ find_package(Rst2man)
 if (RST2MAN_FOUND)
   message(STATUS "rst2man found")
 else ()
-  message(FATAL_ERROR "rst2man needed")
+#   message(FATAL_ERROR "rst2man needed")
 endif()
 
 

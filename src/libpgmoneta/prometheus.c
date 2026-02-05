@@ -35,6 +35,7 @@
 #include <network.h>
 #include <prometheus.h>
 #include <security.h>
+#include <server.h>
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
@@ -63,6 +64,7 @@ static int redirect_page(SSL* client_ssl, int client_fd, char* path);
 static void general_information(SSL* client_ssl, int client_fd);
 static void backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct backup*** backups);
 static void size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct backup*** backups);
+static void database_size_information(SSL* client_ssl, int client_fd);
 
 static int send_chunk(SSL* client_ssl, int client_fd, char* data);
 
@@ -1437,6 +1439,7 @@ retry_cache_locking:
 
             backup_information(client_ssl, client_fd, num_backups, all_backups);
             size_information(client_ssl, client_fd, num_backups, all_backups);
+            database_size_information(client_ssl, client_fd);
 
             /* Free all backups */
             for (int i = 0; i < config->common.number_of_servers; i++)
@@ -4808,4 +4811,86 @@ metrics_cache_finalize(void)
    now = time(NULL);
    cache->valid_until = now + config->metrics_cache_max_age;
    return cache->valid_until > now;
+}
+
+static char*
+get_user_password(char* username)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   for (int i = 0; i < config->common.number_of_users; i++)
+   {
+      if (!strcmp(config->common.users[i].username, username))
+      {
+         return config->common.users[i].password;
+      }
+   }
+
+   return NULL;
+}
+
+static void
+database_size_information(SSL* client_ssl, int client_fd)
+{
+   char* data = NULL;
+   int fd = -1;
+   SSL* ssl = NULL;
+   int count = 0;
+   char** names = NULL;
+   uint64_t* sizes = NULL;
+   char* password = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   data = pgmoneta_append(data, "#HELP pgmoneta_server_database_size The size of the databases on the server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_server_database_size gauge\n");
+
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      if (config->common.servers[i].valid)
+      {
+         fd = -1;
+         ssl = NULL;
+         password = get_user_password(config->common.servers[i].username);
+
+         if (pgmoneta_server_authenticate(i, "postgres", config->common.servers[i].username, password, false, &ssl, &fd) == AUTH_SUCCESS)
+         {
+            if (pgmoneta_server_databases_summary(i, ssl, fd, &count, &names, &sizes) == 0)
+            {
+               for (int j = 0; j < count; j++)
+               {
+                  data = pgmoneta_append(data, "pgmoneta_server_database_size{");
+
+                  data = pgmoneta_append(data, "name=\"");
+                  data = pgmoneta_append(data, config->common.servers[i].name);
+                  data = pgmoneta_append(data, "\", database=\"");
+                  data = pgmoneta_append(data, names[j]);
+                  data = pgmoneta_append(data, "\"} ");
+
+                  data = pgmoneta_append_ulong(data, sizes[j]);
+                  data = pgmoneta_append(data, "\n");
+               }
+
+               for (int j = 0; j < count; j++)
+               {
+                  free(names[j]);
+               }
+               free(names);
+               free(sizes);
+            }
+            pgmoneta_close_ssl(ssl);
+            pgmoneta_disconnect(fd);
+         }
+      }
+   }
+
+   if (data != NULL)
+   {
+      send_chunk(client_ssl, client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+   }
 }

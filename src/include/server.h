@@ -194,6 +194,19 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* bl_dir, char** 
 int
 pgmoneta_server_database_size(int srv, SSL* ssl, int socket, char* database, uint64_t* size);
 
+/**
+ * Get the size of all databases
+ * @param srv The server index
+ * @param ssl The SSL connection
+ * @param socket The socket
+ * @param count [out] The number of databases
+ * @param names [out] The names of the databases
+ * @param sizes [out] The sizes
+ * @return return 0 if success, otherwise failure
+ */
+int
+pgmoneta_server_databases_summary(int srv, SSL* ssl, int socket, int* count, char*** names, uint64_t** sizes);
+
 #ifdef __cplusplus
 }
 #endif
