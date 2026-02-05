@@ -75,6 +75,7 @@ typedef struct mctf_result
    bool skipped;              /**< True if test was skipped */
    int error_code;            /**< Error code or line number */
    const char* error_message; /**< Error message, if any */
+   long elapsed_ms;           /**< Test execution time in milliseconds */
 } mctf_result_t;
 
 /**

@@ -27,6 +27,7 @@
  *
  */
 #include <mctf.h>
+#include <html_report.h>
 #include <tscommon.h>
 #include <utils.h>
 #include <logging.h>
@@ -236,6 +237,7 @@ main(int argc, char* argv[])
    int c;
    bool env_created = false;
    char mctf_log_path[MAX_PATH];
+   char html_report_path[MAX_PATH];
 
    static struct option long_options[] = {
       {"test", required_argument, 0, 't'},
@@ -288,7 +290,14 @@ main(int argc, char* argv[])
     */
    mctf_log_environment();
 
+   memset(html_report_path, 0, sizeof(html_report_path));
+   bool html_report_available = (html_report_build_path(html_report_path, sizeof(html_report_path)) == 0);
+
    number_failed = mctf_run_tests(filter_type, filter);
+   if (html_report_available)
+   {
+      html_report_generate(html_report_path, filter_type, filter);
+   }
    mctf_print_summary();
    mctf_cleanup();
 

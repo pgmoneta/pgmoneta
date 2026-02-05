@@ -380,6 +380,7 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       result->skipped = false;
       result->error_code = 0;
       result->error_message = NULL;
+      result->elapsed_ms = 0;
 
       struct timespec start_time, end_time;
       clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -392,6 +393,8 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
 
       long elapsed_ms = (end_time.tv_sec - start_time.tv_sec) * 1000 +
                         (end_time.tv_nsec - start_time.tv_nsec) / 1000000;
+
+      result->elapsed_ms = elapsed_ms;
 
       long total_seconds = elapsed_ms / 1000;
       long hours = total_seconds / 3600;
