@@ -150,6 +150,15 @@ void
 mctf_print_summary(void);
 
 /**
+ * Log all available environment variables
+ *
+ * This is typically called by the test runner before the test suite starts,
+ * so that the execution context is captured in the test output and log.
+ */
+void
+mctf_log_environment(void);
+
+/**
  * Open a log file for MCTF output
  * All subsequent test runner output will be duplicated to this file.
  *

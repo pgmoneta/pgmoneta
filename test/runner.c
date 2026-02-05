@@ -283,6 +283,11 @@ main(int argc, char* argv[])
       }
    }
 
+   /* Log all environment variables before starting the test suite so that
+    * the execution context is captured alongside the test output.
+    */
+   mctf_log_environment();
+
    number_failed = mctf_run_tests(filter_type, filter);
    mctf_print_summary();
    mctf_cleanup();

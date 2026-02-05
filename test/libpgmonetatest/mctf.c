@@ -34,6 +34,9 @@
 #include <stdbool.h>
 #include <time.h>
 #include <sys/time.h>
+#include <unistd.h>
+
+extern char** environ;
 
 /* Global error number */
 int mctf_errno = 0;
@@ -94,6 +97,27 @@ mctf_log_errorf(const char* fmt, ...)
       mctf_vlogf(mctf_log_file, fmt, ap);
       va_end(ap);
    }
+}
+
+void
+mctf_log_environment(void)
+{
+   char** env;
+
+   mctf_logf("=== Test Environment Variables ===\n");
+
+   if (environ == NULL)
+   {
+      mctf_logf("  (no environment variables available)\n\n");
+      return;
+   }
+
+   for (env = environ; *env != NULL; env++)
+   {
+      mctf_logf("  %s\n", *env);
+   }
+
+   mctf_logf("=== End Environment Variables ===\n\n");
 }
 
 int
