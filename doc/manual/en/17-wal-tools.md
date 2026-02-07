@@ -11,7 +11,12 @@ pgmoneta provides two powerful command-line utilities for working with PostgreSQ
 
 `pgmoneta-walinfo` is a command-line utility designed to read and display information about PostgreSQL Write-Ahead Log (WAL) files. The tool provides output in either raw or JSON format, making it easy to analyze WAL files for debugging, auditing, or general information purposes.
 
-In addition to standard WAL files, `pgmoneta-walinfo` also supports encrypted (**aes**) and compressed WAL files in the following formats: **zstd**, **gz**, **lz4**, and **bz2**.
+In addition to standard WAL files, `pgmoneta-walinfo` also supports:
+
+- Encrypted WAL files (**.aes**)
+- Compressed WAL files: **.zstd**, **.gz**, **.lz4**, and **.bz2**
+- TAR archives containing WAL files (**.tar**)
+- Directories containing WAL files
 
 ### Usage
 
@@ -20,7 +25,7 @@ pgmoneta-walinfo 0.20.0
   Command line utility to read and display Write-Ahead Log (WAL) files
 
 Usage:
-  pgmoneta-walinfo <file>
+  pgmoneta-walinfo <file|directory|tar_archive>
 
 Options:
   -c,  --config      Set the path to the pgmoneta_walinfo.conf file
@@ -103,6 +108,18 @@ pgmoneta-walinfo -S /path/to/walfile
 
 ```bash
 pgmoneta-walinfo -r Heap -l 10 /path/to/walfile
+```
+
+6. **Analyze a directory containing WAL files:**
+
+```bash
+pgmoneta-walinfo /path/to/wal_directory/
+```
+
+7. **Analyze WAL files from a TAR archive:**
+
+```bash
+pgmoneta-walinfo /path/to/wal_backup.tar.gz
 ```
 
 ### OID Translation

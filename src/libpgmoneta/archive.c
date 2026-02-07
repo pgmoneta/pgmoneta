@@ -29,9 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
-#include <gzip_compression.h>
 #include <logging.h>
-#include <lz4_compression.h>
 #include <management.h>
 #include <manifest.h>
 #include <network.h>
@@ -39,7 +37,6 @@
 #include <security.h>
 #include <utils.h>
 #include <workflow.h>
-#include <zstandard_compression.h>
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -51,6 +48,7 @@
 #define NAME "archive"
 
 static bool is_server_side_compression(void);
+static const char* basebackup_archive_extension(void);
 
 static void write_tar_file(struct archive* a, char* src, char* dst);
 
@@ -276,88 +274,6 @@ error:
 }
 
 int
-pgmoneta_extract_tar_file(char* file_path, char* destination)
-{
-   char* archive_name = NULL;
-   struct archive* a;
-   struct archive_entry* entry;
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-
-   a = archive_read_new();
-   archive_read_support_format_tar(a);
-
-   if (config->compression_type == COMPRESSION_SERVER_GZIP)
-   {
-      archive_name = pgmoneta_append(archive_name, file_path);
-      archive_name = pgmoneta_append(archive_name, ".gz");
-      pgmoneta_move_file(file_path, archive_name);
-      pgmoneta_gunzip_file(archive_name, file_path);
-   }
-   else if (config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      archive_name = pgmoneta_append(archive_name, file_path);
-      archive_name = pgmoneta_append(archive_name, ".zstd");
-      pgmoneta_move_file(file_path, archive_name);
-      pgmoneta_zstandardd_file(archive_name, file_path);
-   }
-   else if (config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      archive_name = pgmoneta_append(archive_name, file_path);
-      archive_name = pgmoneta_append(archive_name, ".lz4");
-      pgmoneta_move_file(file_path, archive_name);
-      pgmoneta_lz4d_file(archive_name, file_path);
-   }
-   else
-   {
-      archive_name = pgmoneta_append(archive_name, file_path);
-   }
-
-   // open tar file in a suitable buffer size, I'm using 10240 here
-   if (archive_read_open_filename(a, file_path, 10240) != ARCHIVE_OK)
-   {
-      pgmoneta_log_error("Failed to open the tar file for reading");
-      goto error;
-   }
-
-   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
-   {
-      char dst_file_path[MAX_PATH];
-      memset(dst_file_path, 0, sizeof(dst_file_path));
-      const char* entry_path = archive_entry_pathname(entry);
-      if (pgmoneta_ends_with(destination, "/"))
-      {
-         snprintf(dst_file_path, sizeof(dst_file_path), "%s%s", destination, entry_path);
-      }
-      else
-      {
-         snprintf(dst_file_path, sizeof(dst_file_path), "%s/%s", destination, entry_path);
-      }
-
-      archive_entry_set_pathname(entry, dst_file_path);
-      if (archive_read_extract(a, entry, 0) != ARCHIVE_OK)
-      {
-         pgmoneta_log_error("Failed to extract entry: %s", archive_error_string(a));
-         goto error;
-      }
-   }
-
-   free(archive_name);
-
-   archive_read_close(a);
-   archive_read_free(a);
-   return 0;
-
-error:
-   free(archive_name);
-
-   archive_read_close(a);
-   archive_read_free(a);
-   return 1;
-}
-
-int
 pgmoneta_tar_directory(char* src, char* dst, char* destination)
 {
    struct archive* a = NULL;
@@ -409,6 +325,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    {
       char file_path[MAX_PATH];
       char directory[MAX_PATH];
+      const char* archive_ext = basebackup_archive_extension();
       memset(file_path, 0, sizeof(file_path));
       memset(directory, 0, sizeof(directory));
       if (tup->data[1] == NULL)
@@ -416,12 +333,12 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          // main data directory
          if (pgmoneta_ends_with(basedir, "/"))
          {
-            snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "base.tar");
+            snprintf(file_path, sizeof(file_path), "%sdata/base%s", basedir, archive_ext);
             snprintf(directory, sizeof(directory), "%sdata/", basedir);
          }
          else
          {
-            snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "base.tar");
+            snprintf(file_path, sizeof(file_path), "%s/data/base%s", basedir, archive_ext);
             snprintf(directory, sizeof(directory), "%s/data/", basedir);
          }
       }
@@ -440,12 +357,12 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          }
          if (pgmoneta_ends_with(basedir, "/"))
          {
-            snprintf(file_path, sizeof(file_path), "%stblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+            snprintf(file_path, sizeof(file_path), "%stblspc_%s/%s%s", basedir, tblspc->name, tblspc->name, archive_ext);
             snprintf(directory, sizeof(directory), "%stblspc_%s/", basedir, tblspc->name);
          }
          else
          {
-            snprintf(file_path, sizeof(file_path), "%s/tblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+            snprintf(file_path, sizeof(file_path), "%s/tblspc_%s/%s%s", basedir, tblspc->name, tblspc->name, archive_ext);
             snprintf(directory, sizeof(directory), "%s/tblspc_%s/", basedir, tblspc->name);
          }
       }
@@ -523,7 +440,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       fclose(file);
 
       // extract the file
-      pgmoneta_extract_tar_file(file_path, directory);
+      pgmoneta_extract_file(file_path, directory);
       remove(file_path);
       pgmoneta_free_message(msg);
 
@@ -667,7 +584,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  pgmoneta_extract_tar_file(file_path, directory);
+                  pgmoneta_extract_file(file_path, directory);
                   remove(file_path);
                }
                // new tablespace or main directory tar file
@@ -676,6 +593,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
 
                memset(file_path, 0, sizeof(file_path));
                memset(directory, 0, sizeof(directory));
+               const char* archive_ext = basebackup_archive_extension();
                // The tablespace order in the second result set is presumably the same as the order in which the server sends tablespaces
                tblspc = tablespaces;
                if (tup == NULL)
@@ -691,12 +609,12 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   // main data directory
                   if (pgmoneta_ends_with(basedir, "/"))
                   {
-                     snprintf(file_path, sizeof(file_path), "%sdata/%s", basedir, "base.tar");
+                     snprintf(file_path, sizeof(file_path), "%sdata/base%s", basedir, archive_ext);
                      snprintf(directory, sizeof(directory), "%sdata/", basedir);
                   }
                   else
                   {
-                     snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "base.tar");
+                     snprintf(file_path, sizeof(file_path), "%s/data/base%s", basedir, archive_ext);
                      snprintf(directory, sizeof(directory), "%s/data/", basedir);
                   }
                }
@@ -715,12 +633,12 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   }
                   if (pgmoneta_ends_with(basedir, "/"))
                   {
-                     snprintf(file_path, sizeof(file_path), "%stblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+                     snprintf(file_path, sizeof(file_path), "%stblspc_%s/%s%s", basedir, tblspc->name, tblspc->name, archive_ext);
                      snprintf(directory, sizeof(directory), "%stblspc_%s/", basedir, tblspc->name);
                   }
                   else
                   {
-                     snprintf(file_path, sizeof(file_path), "%s/tblspc_%s/%s.tar", basedir, tblspc->name, tblspc->name);
+                     snprintf(file_path, sizeof(file_path), "%s/tblspc_%s/%s%s", basedir, tblspc->name, tblspc->name, archive_ext);
                      snprintf(directory, sizeof(directory), "%s/tblspc_%s/", basedir, tblspc->name);
                   }
                }
@@ -749,7 +667,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  pgmoneta_extract_tar_file(file_path, directory);
+                  pgmoneta_extract_file(file_path, directory);
                   remove(file_path);
                }
                if (pgmoneta_ends_with(basedir, "/"))
@@ -982,4 +900,29 @@ is_server_side_compression(void)
    return config->compression_type == COMPRESSION_SERVER_GZIP ||
           config->compression_type == COMPRESSION_SERVER_LZ4 ||
           config->compression_type == COMPRESSION_SERVER_ZSTD;
+}
+
+static const char*
+basebackup_archive_extension(void)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      return ".tar";
+   }
+
+   switch (config->compression_type)
+   {
+      case COMPRESSION_SERVER_GZIP:
+         return ".tar.gz";
+      case COMPRESSION_SERVER_ZSTD:
+         return ".tar.zstd";
+      case COMPRESSION_SERVER_LZ4:
+         return ".tar.lz4";
+      default:
+         return ".tar";
+   }
 }

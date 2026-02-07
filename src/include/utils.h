@@ -69,6 +69,19 @@ extern "C" {
 #define COLOR_WHITE        "\033[97m"
 #define COLOR_RESET        "\033[0m" /* Reset to default color */
 
+/* File type bitmask constants */
+#define PGMONETA_FILE_TYPE_UNKNOWN    0x0000 /* Unknown file type */
+#define PGMONETA_FILE_TYPE_WAL        0x0001 /* WAL file (24-char hex name) */
+#define PGMONETA_FILE_TYPE_COMPRESSED 0x0002 /* Compressed (any type) */
+#define PGMONETA_FILE_TYPE_GZIP       0x0004 /* Compressed with gzip (.gz) */
+#define PGMONETA_FILE_TYPE_LZ4        0x0008 /* Compressed with lz4 (.lz4) */
+#define PGMONETA_FILE_TYPE_ZSTD       0x0010 /* Compressed with zstd (.zstd) */
+#define PGMONETA_FILE_TYPE_BZ2        0x0020 /* Compressed with bzip2 (.bz2) */
+#define PGMONETA_FILE_TYPE_ENCRYPTED  0x0040 /* Encrypted (.aes) */
+#define PGMONETA_FILE_TYPE_TAR        0x0080 /* TAR archive (.tar) */
+#define PGMONETA_FILE_TYPE_PARTIAL    0x0100 /* Partial file (.partial) */
+#define PGMONETA_FILE_TYPE_ALL        0xFFFF /* Match all file types */
+
 /** @struct signal_info
  * Defines the signal structure
  */
@@ -700,13 +713,28 @@ int
 pgmoneta_delete_directory(char* path);
 
 /**
- * Get files
- * @param base The base directory
- * @param files The deque of files
- * @return The result
+ * Get files with type filtering and optional recursion
+ * @param file_type_mask Bitmask of file types to include (e.g., PGMONETA_FILE_TYPE_WAL | PGMONETA_FILE_TYPE_TAR)
+ *                       Use PGMONETA_FILE_TYPE_ALL to match all files
+ * @param base The base directory to scan
+ * @param recursive If true, scan subdirectories recursively
+ * @param files Output deque of matching file paths
+ *              Recursive mode returns full paths; non-recursive mode returns basenames
+ * @return 0 on success, 1 on error
  */
 int
-pgmoneta_get_files(char* base, struct deque** files);
+pgmoneta_get_files(uint32_t file_type_mask, char* base, bool recursive, struct deque** files);
+
+/**
+ * Extract an archive file to a given directory
+ * File type is detected internally via pgmoneta_get_file_type
+ * Handles layered formats (e.g., file.tar.zstd.aes)
+ * @param file_path The archive file path
+ * @param destination The destination to extract to
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_extract_file(char* file_path, char* destination);
 
 /**
  * Get WAL files
@@ -1227,6 +1255,24 @@ pgmoneta_is_encrypted(char* file_path);
  */
 bool
 pgmoneta_is_compressed(char* file_path);
+
+/**
+ * Get the file type bitmask for a given file path
+ * The bitmask can include combinations of:
+ * - PGMONETA_FILE_TYPE_WAL (24-char hex WAL file)
+ * - PGMONETA_FILE_TYPE_COMPRESSED (any compression)
+ * - PGMONETA_FILE_TYPE_GZIP (.gz)
+ * - PGMONETA_FILE_TYPE_LZ4 (.lz4)
+ * - PGMONETA_FILE_TYPE_ZSTD (.zstd)
+ * - PGMONETA_FILE_TYPE_BZ2 (.bz2)
+ * - PGMONETA_FILE_TYPE_ENCRYPTED (.aes)
+ * - PGMONETA_FILE_TYPE_TAR (.tar)
+ * - PGMONETA_FILE_TYPE_PARTIAL (.partial)
+ * @param file_path The file path to check
+ * @return Bitmask of file type flags
+ */
+uint32_t
+pgmoneta_get_file_type(char* file_path);
 
 /**
  * Init a token bucket

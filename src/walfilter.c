@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <aes.h>
+#include <achv.h>
 #include <cmd.h>
 #include <compression.h>
 #include <configuration.h>
@@ -50,6 +51,7 @@
 #include <err.h>
 #include <libgen.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #define OPERATION_DELETE "DELETE"
 
@@ -57,6 +59,7 @@ int pgmoneta_init_crc32c(uint32_t* crc);
 int pgmoneta_create_crc32c_buffer(void* buffer, size_t size, uint32_t* crc);
 int pgmoneta_finalize_crc32c(uint32_t* crc);
 static int pgmoneta_recalculate_record_crc(struct decoded_xlog_record* record, uint16_t magic);
+static char* walfilter_wal_output_name(struct walfile* wf);
 
 static void
 usage(void)
@@ -228,6 +231,21 @@ error:
       encoded_record = NULL;
    }
    return 1;
+}
+
+static char*
+walfilter_wal_output_name(struct walfile* wf)
+{
+   size_t segno = 0;
+
+   if (wf == NULL || wf->long_phd == NULL || wf->long_phd->xlp_seg_size == 0)
+   {
+      return NULL;
+   }
+
+   segno = (size_t)(wf->long_phd->std.xlp_pageaddr / wf->long_phd->xlp_seg_size);
+
+   return pgmoneta_wal_file_name(wf->long_phd->std.xlp_tli, segno, wf->long_phd->xlp_seg_size);
 }
 
 /**
@@ -479,12 +497,11 @@ main(int argc, char* argv[])
    config_t yaml_config;
    struct walfilter_configuration* config = NULL;
    char* logfile = NULL;
-   int file_count = 0;
+   int walfiles_capacity = 0;
    struct deque_iterator* file_iter = NULL;
    struct deque* files = NULL;
    char* file_path = NULL;
    char* wal_files_path = NULL;
-   int walfile_index = 0;
    int loaded = 1;
    char* configuration_path = NULL;
    size_t size;
@@ -649,10 +666,10 @@ main(int argc, char* argv[])
 
    pgmoneta_log_debug("WAL files path: %s", wal_files_path);
 
-   /* TODO: This need a lock if it is the live WAL directory */
-   if (pgmoneta_get_wal_files(wal_files_path, &files))
+   /* Get WAL files and TAR archives using unified API */
+   if (pgmoneta_get_files(PGMONETA_FILE_TYPE_WAL | PGMONETA_FILE_TYPE_TAR, wal_files_path, true, &files))
    {
-      pgmoneta_log_error("Failed to get WAL files from %s\n", wal_files_path);
+      pgmoneta_log_error("Failed to get files from %s\n", wal_files_path);
       goto error;
    }
 
@@ -668,15 +685,20 @@ main(int argc, char* argv[])
    partial_record->xlog_record = NULL;
    partial_record->data_buffer = NULL;
 
-   file_count = pgmoneta_deque_size(files);
-   walfiles = malloc(file_count * sizeof(struct walfile*));
+   walfiles_capacity = pgmoneta_deque_size(files);
+   if (walfiles_capacity <= 0)
+   {
+      walfiles_capacity = 1;
+   }
+
+   walfiles = malloc(walfiles_capacity * sizeof(struct walfile*));
    if (walfiles == NULL)
    {
       pgmoneta_log_error("Failed to allocate memory for walfiles array");
       goto error;
    }
 
-   for (int i = 0; i < file_count; i++)
+   for (int i = 0; i < walfiles_capacity; i++)
    {
       walfiles[i] = NULL;
    }
@@ -684,8 +706,134 @@ main(int argc, char* argv[])
    pgmoneta_deque_iterator_create(files, &file_iter);
    while (pgmoneta_deque_iterator_next(file_iter))
    {
-      file_path = malloc(MAX_PATH);
-      snprintf(file_path, MAX_PATH, "%s/%s", wal_files_path, (char*)file_iter->value->data);
+      char* current_file = (char*)file_iter->value->data;
+      uint32_t file_type = pgmoneta_get_file_type(current_file);
+
+      /* Handle TAR files - extract and process WAL files inside */
+      if (file_type & PGMONETA_FILE_TYPE_TAR)
+      {
+         char tar_temp_template[MAX_PATH];
+         char* tar_temp_dir = NULL;
+         char* tar_archive_copy = NULL;
+         char* current_file_copy = NULL;
+         struct stat archive_stat;
+         unsigned long free_space = 0;
+         struct deque* tar_wal_files = NULL;
+         struct deque_iterator* tar_iter = NULL;
+
+         pgmoneta_snprintf(tar_temp_template, sizeof(tar_temp_template), "/tmp/pgmoneta_walfilter_XXXXXX");
+         tar_temp_dir = mkdtemp(tar_temp_template);
+         if (tar_temp_dir == NULL)
+         {
+            pgmoneta_log_error("Failed to create temp directory for TAR extraction");
+            continue;
+         }
+
+         current_file_copy = pgmoneta_append(current_file_copy, current_file);
+         if (current_file_copy == NULL)
+         {
+            pgmoneta_log_error("Failed to allocate memory for TAR path copy");
+            pgmoneta_delete_directory(tar_temp_dir);
+            continue;
+         }
+
+         tar_archive_copy = pgmoneta_append(tar_archive_copy, tar_temp_dir);
+         tar_archive_copy = pgmoneta_append(tar_archive_copy, "/");
+         tar_archive_copy = pgmoneta_append(tar_archive_copy, basename(current_file_copy));
+         if (tar_archive_copy == NULL)
+         {
+            pgmoneta_log_error("Failed to build TAR staging path");
+            free(current_file_copy);
+            pgmoneta_delete_directory(tar_temp_dir);
+            continue;
+         }
+
+         memset(&archive_stat, 0, sizeof(struct stat));
+         if (stat(current_file, &archive_stat))
+         {
+            pgmoneta_log_error("Failed to stat TAR archive: %s", current_file);
+            free(tar_archive_copy);
+            free(current_file_copy);
+            pgmoneta_delete_directory(tar_temp_dir);
+            continue;
+         }
+
+         free_space = pgmoneta_free_space(tar_temp_dir);
+         if (archive_stat.st_size > 0 && (free_space == 0 || (uint64_t)archive_stat.st_size > (uint64_t)free_space))
+         {
+            pgmoneta_log_error("Not enough temporary space to stage TAR archive: %s", current_file);
+            free(tar_archive_copy);
+            free(current_file_copy);
+            pgmoneta_delete_directory(tar_temp_dir);
+            continue;
+         }
+
+         if (pgmoneta_copy_file(current_file, tar_archive_copy, NULL))
+         {
+            pgmoneta_log_error("Failed to stage TAR archive: %s", current_file);
+            free(tar_archive_copy);
+            free(current_file_copy);
+            pgmoneta_delete_directory(tar_temp_dir);
+            continue;
+         }
+
+         if (pgmoneta_extract_file(tar_archive_copy, tar_temp_dir))
+         {
+            pgmoneta_log_error("Failed to extract TAR archive: %s", current_file);
+            free(tar_archive_copy);
+            free(current_file_copy);
+            pgmoneta_delete_directory(tar_temp_dir);
+            continue;
+         }
+
+         if (pgmoneta_get_files(PGMONETA_FILE_TYPE_WAL, tar_temp_dir, true, &tar_wal_files) == 0 && tar_wal_files != NULL)
+         {
+            pgmoneta_deque_iterator_create(tar_wal_files, &tar_iter);
+            while (pgmoneta_deque_iterator_next(tar_iter))
+            {
+               char* tar_wal_path = (char*)tar_iter->value->data;
+
+               if (pgmoneta_read_walfile(-1, tar_wal_path, &wf))
+               {
+                  pgmoneta_log_error("Failed to read WAL file from TAR: %s", tar_wal_path);
+                  continue;
+               }
+
+               /* tar_iter walks tar_wal_files (fixed); this only grows the destination
+                * walfiles array because one TAR can contribute many WAL entries. */
+               if (walfile_count >= walfiles_capacity)
+               {
+                  walfiles_capacity *= 2;
+                  struct walfile** new_walfiles = realloc(walfiles, walfiles_capacity * sizeof(struct walfile*));
+                  if (new_walfiles == NULL)
+                  {
+                     pgmoneta_destroy_walfile(wf);
+                     wf = NULL;
+                     continue;
+                  }
+                  walfiles = new_walfiles;
+               }
+
+               walfiles[walfile_count] = wf;
+               walfile_count++;
+               wf = NULL;
+            }
+            pgmoneta_deque_iterator_destroy(tar_iter);
+         }
+
+         free(tar_archive_copy);
+         free(current_file_copy);
+         pgmoneta_deque_destroy(tar_wal_files);
+         pgmoneta_delete_directory(tar_temp_dir);
+         continue;
+      }
+
+      /* Regular WAL file handling */
+      file_path = strdup(current_file);
+      if (file_path == NULL)
+      {
+         goto error;
+      }
 
       if (!pgmoneta_is_file(file_path))
       {
@@ -815,35 +963,35 @@ main(int argc, char* argv[])
       goto error;
    }
 
-   walfile_index = 0;
-
-   pgmoneta_deque_iterator_create(files, &file_iter);
-   while (pgmoneta_deque_iterator_next(file_iter))
+   for (int i = 0; i < walfile_count; i++)
    {
-      char* file_name = (char*)file_iter->value->data;
-      if (pgmoneta_is_compressed(file_name) || pgmoneta_is_encrypted(file_name))
-      {
-         // Remove extension for compressed or encrypted files
-         char* dot = strrchr(file_name, '.');
-         if (dot != NULL)
-         {
-            *dot = '\0';
-         }
-      }
+      char* output_file_name = NULL;
 
-      if (pgmoneta_write_walfile(walfiles[walfile_index], -1, file_name))
+      if (walfiles[i] == NULL)
       {
-         pgmoneta_log_error("Failed to write WAL file %d", walfile_index);
+         pgmoneta_log_error("WAL file %d is NULL", i);
          goto error;
       }
-      else
+
+      output_file_name = walfilter_wal_output_name(walfiles[i]);
+      if (output_file_name == NULL)
       {
-         pgmoneta_log_debug("WAL file %d written successfully: %s", walfile_index, file_name);
+         pgmoneta_log_error("Failed to derive output WAL file name for index %d", i);
+         goto error;
       }
-      walfile_index++;
+
+      if (pgmoneta_write_walfile(walfiles[i], -1, output_file_name))
+      {
+         pgmoneta_log_error("Failed to write WAL file %d (%s)", i, output_file_name);
+         free(output_file_name);
+         output_file_name = NULL;
+         goto error;
+      }
+
+      pgmoneta_log_debug("WAL file %d written successfully: %s", i, output_file_name);
+      free(output_file_name);
+      output_file_name = NULL;
    }
-   pgmoneta_deque_iterator_destroy(file_iter);
-   file_iter = NULL;
 
    pgmoneta_log_info("Filtered WAL files written successfully to %s", target_pg_wal_dir);
 

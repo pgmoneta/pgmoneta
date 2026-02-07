@@ -53,15 +53,6 @@ void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* request);
 
 /**
- * Extract from a tar file to a given directory
- * @param file_path The tar file path
- * @param destination The destination to extract to
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_extract_tar_file(char* file_path, char* destination);
-
-/**
  * Create a tar archive of the given directory
  * @param src The source directory
  * @param dst The destination tar file path

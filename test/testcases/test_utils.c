@@ -27,11 +27,14 @@
  */
 
 #include <pgmoneta.h>
+#include <achv.h>
+#include <aes.h>
 #include <configuration.h>
 #include <mctf.h>
 #include <shmem.h>
 #include <tscommon.h>
 #include <utils.h>
+#include <zstandard_compression.h>
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -924,7 +927,7 @@ MCTF_TEST(test_utils_file_dir)
 
    // pgmoneta_get_files
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_get_files(base, &files), 0, cleanup, "get_files failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_get_files(PGMONETA_FILE_TYPE_ALL, base, false, &files), 0, cleanup, "get_files failed");
    MCTF_ASSERT_PTR_NONNULL(files, cleanup, "files deque is null");
    MCTF_ASSERT(pgmoneta_deque_size(files) >= 1, cleanup, "files size should be >= 1");
    pgmoneta_deque_iterator_create(files, &it);
@@ -1312,6 +1315,228 @@ MCTF_TEST(test_utils_enc_comp)
    MCTF_ASSERT(!pgmoneta_is_compressed(NULL), cleanup, "is_compressed NULL failed");
 
 cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_file_type_bitmask)
+{
+   uint32_t type = 0;
+
+   // Test basic WAL file
+   type = pgmoneta_get_file_type("000000010000000000000001");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "WAL file type detection failed");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "WAL file should not be compressed");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_ENCRYPTED), cleanup, "WAL file should not be encrypted");
+
+   // Test compressed WAL file .gz
+   type = pgmoneta_get_file_type("000000010000000000000001.gz");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "Compressed WAL detection failed .gz");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "Compression detection failed .gz");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_GZIP), cleanup, "GZIP detection failed .gz");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "ZSTD must not be set for .gz");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_LZ4), cleanup, "LZ4 must not be set for .gz");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_BZ2), cleanup, "BZ2 must not be set for .gz");
+
+   // Test compressed WAL file .zstd
+   type = pgmoneta_get_file_type("000000010000000000000001.zstd");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "Compressed WAL detection failed .zstd");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "Compression detection failed .zstd");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "ZSTD detection failed .zstd");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_GZIP), cleanup, "GZIP must not be set for .zstd");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_LZ4), cleanup, "LZ4 must not be set for .zstd");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_BZ2), cleanup, "BZ2 must not be set for .zstd");
+
+   // Test compressed WAL file .lz4
+   type = pgmoneta_get_file_type("000000010000000000000001.lz4");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "Compressed WAL detection failed .lz4");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "Compression detection failed .lz4");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_LZ4), cleanup, "LZ4 detection failed .lz4");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_GZIP), cleanup, "GZIP must not be set for .lz4");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "ZSTD must not be set for .lz4");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_BZ2), cleanup, "BZ2 must not be set for .lz4");
+
+   // Test compressed WAL file .bz2
+   type = pgmoneta_get_file_type("000000010000000000000001.bz2");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "Compressed WAL detection failed .bz2");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "Compression detection failed .bz2");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_BZ2), cleanup, "BZ2 detection failed .bz2");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_GZIP), cleanup, "GZIP must not be set for .bz2");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "ZSTD must not be set for .bz2");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_LZ4), cleanup, "LZ4 must not be set for .bz2");
+
+   // Test encrypted compressed WAL file
+   type = pgmoneta_get_file_type("000000010000000000000001.zstd.aes");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "Encrypted WAL detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "Compression in encrypted failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_ENCRYPTED), cleanup, "Encryption detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "ZSTD detection failed in encrypted WAL");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_GZIP), cleanup, "GZIP must not be set in .zstd.aes");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_LZ4), cleanup, "LZ4 must not be set in .zstd.aes");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_BZ2), cleanup, "BZ2 must not be set in .zstd.aes");
+
+   // Test partial file
+   type = pgmoneta_get_file_type("000000010000000000000001.partial");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_WAL), cleanup, "Partial WAL detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_PARTIAL), cleanup, "Partial flag detection failed");
+
+   // Test TAR archive
+   type = pgmoneta_get_file_type("backup.tar");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "TAR detection failed");
+   MCTF_ASSERT(!(type & PGMONETA_FILE_TYPE_WAL), cleanup, "TAR should not be WAL");
+
+   // Test compressed TAR archive - GZIP
+   type = pgmoneta_get_file_type("backup.tar.gz");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "Compressed TAR detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "TAR compression detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_GZIP), cleanup, "TAR GZIP type detection failed");
+
+   // Test compressed TAR archive - LZ4
+   type = pgmoneta_get_file_type("backup.tar.lz4");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "Compressed TAR LZ4 detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_LZ4), cleanup, "TAR LZ4 type detection failed");
+
+   // Test compressed TAR archive - ZSTD
+   type = pgmoneta_get_file_type("backup.tar.zstd");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "Compressed TAR ZSTD detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "TAR ZSTD type detection failed");
+
+   // Test encrypted compressed TAR archive - ZSTD + AES
+   type = pgmoneta_get_file_type("backup.tar.zstd.aes");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "Encrypted compressed TAR detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_ZSTD), cleanup, "Encrypted TAR ZSTD type detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_COMPRESSED), cleanup, "Encrypted TAR compression flag detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_ENCRYPTED), cleanup, "Encrypted TAR encryption flag detection failed");
+
+   // Test compressed TAR archive - BZ2
+   type = pgmoneta_get_file_type("backup.tar.bz2");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "Compressed TAR BZ2 detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_BZ2), cleanup, "TAR BZ2 type detection failed");
+
+   // Test .tgz shorthand
+   type = pgmoneta_get_file_type("backup.tgz");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_TAR), cleanup, "TGZ TAR detection failed");
+   MCTF_ASSERT((type & PGMONETA_FILE_TYPE_GZIP), cleanup, "TGZ GZIP detection failed");
+
+   // Test NULL input
+   type = pgmoneta_get_file_type(NULL);
+   MCTF_ASSERT(type == PGMONETA_FILE_TYPE_UNKNOWN, cleanup, "NULL should return UNKNOWN");
+
+   // Test non-WAL file
+   type = pgmoneta_get_file_type("random_file.txt");
+   MCTF_ASSERT(type == PGMONETA_FILE_TYPE_UNKNOWN, cleanup, "Random file should be UNKNOWN");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_extract_layered_archive)
+{
+   struct main_configuration* config = NULL;
+   FILE* f = NULL;
+   bool own_shmem = false;
+   const char* wal_name = "000000010000000000000001";
+   char root[MAX_PATH];
+   char src_dir[MAX_PATH];
+   char out_dir[MAX_PATH];
+   char home_dir[MAX_PATH];
+   char hidden_dir[MAX_PATH];
+   char master_key_path[MAX_PATH];
+   char wal_src_path[MAX_PATH];
+   char tar_path[MAX_PATH];
+   char zstd_path[MAX_PATH];
+   char encrypted_path[MAX_PATH];
+   char extracted_path[MAX_PATH];
+
+   memset(root, 0, sizeof(root));
+   memset(src_dir, 0, sizeof(src_dir));
+   memset(out_dir, 0, sizeof(out_dir));
+   memset(home_dir, 0, sizeof(home_dir));
+   memset(hidden_dir, 0, sizeof(hidden_dir));
+   memset(master_key_path, 0, sizeof(master_key_path));
+   memset(wal_src_path, 0, sizeof(wal_src_path));
+   memset(tar_path, 0, sizeof(tar_path));
+   memset(zstd_path, 0, sizeof(zstd_path));
+   memset(encrypted_path, 0, sizeof(encrypted_path));
+   memset(extracted_path, 0, sizeof(extracted_path));
+
+   pgmoneta_snprintf(root, sizeof(root), "test_extract_layered_archive");
+   pgmoneta_snprintf(src_dir, sizeof(src_dir), "%s/src", root);
+   pgmoneta_snprintf(out_dir, sizeof(out_dir), "%s/out", root);
+   pgmoneta_snprintf(home_dir, sizeof(home_dir), "%s/home", root);
+   pgmoneta_snprintf(hidden_dir, sizeof(hidden_dir), "%s/.pgmoneta", home_dir);
+   pgmoneta_snprintf(master_key_path, sizeof(master_key_path), "%s/master.key", hidden_dir);
+   pgmoneta_snprintf(wal_src_path, sizeof(wal_src_path), "%s/%s", src_dir, wal_name);
+   pgmoneta_snprintf(tar_path, sizeof(tar_path), "%s/wal.tar", root);
+   pgmoneta_snprintf(zstd_path, sizeof(zstd_path), "%s/wal.tar.zstd", root);
+   pgmoneta_snprintf(encrypted_path, sizeof(encrypted_path), "%s/wal.tar.zstd.aes", root);
+   pgmoneta_snprintf(extracted_path, sizeof(extracted_path), "%s/wal_layer/%s", out_dir, wal_name);
+
+   pgmoneta_delete_directory(root);
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(root), 0, cleanup, "mkdir root failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(src_dir), 0, cleanup, "mkdir src failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(out_dir), 0, cleanup, "mkdir out failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(home_dir), 0, cleanup, "mkdir home failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_mkdir(hidden_dir), 0, cleanup, "mkdir .pgmoneta failed");
+   MCTF_ASSERT_INT_EQ(chmod(hidden_dir, 0700), 0, cleanup, "chmod .pgmoneta failed");
+
+   f = fopen(master_key_path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "fopen master.key failed");
+   fprintf(f, "dGVzdF9tYXN0ZXJfa2V5");
+   fflush(f);
+   fclose(f);
+   f = NULL;
+   MCTF_ASSERT_INT_EQ(chmod(master_key_path, 0600), 0, cleanup, "chmod master.key failed");
+
+   f = fopen(wal_src_path, "w");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "fopen WAL source failed");
+   fprintf(f, "wal test payload");
+   fflush(f);
+   fclose(f);
+   f = NULL;
+
+   if (shmem == NULL)
+   {
+      shmem = calloc(1, sizeof(struct main_configuration));
+      MCTF_ASSERT_PTR_NONNULL(shmem, cleanup, "calloc shmem failed");
+      own_shmem = true;
+   }
+
+   config = (struct main_configuration*)shmem;
+   MCTF_ASSERT_PTR_NONNULL(config, cleanup, "config is null");
+
+   memset(config->common.home_dir, 0, sizeof(config->common.home_dir));
+   pgmoneta_snprintf(config->common.home_dir, sizeof(config->common.home_dir), "%s", home_dir);
+   config->compression_level = 1;
+   config->workers = 1;
+   config->encryption = ENCRYPTION_AES_256_CBC;
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_tar_directory(src_dir, tar_path, "wal_layer"), 0, cleanup, "tar_directory failed");
+   MCTF_ASSERT(pgmoneta_exists(tar_path), cleanup, "tar file missing");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_zstandardc_file(tar_path, zstd_path), 0, cleanup, "zstd compression failed");
+   MCTF_ASSERT(pgmoneta_exists(zstd_path), cleanup, "zstd file missing");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_encrypt_file(zstd_path, encrypted_path), 0, cleanup, "encryption failed");
+   MCTF_ASSERT(pgmoneta_exists(encrypted_path), cleanup, "encrypted file missing");
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(encrypted_path, out_dir), 0, cleanup, "extract_file failed");
+   MCTF_ASSERT(pgmoneta_exists(extracted_path), cleanup, "extracted WAL file missing");
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   if (own_shmem)
+   {
+      free(shmem);
+      shmem = NULL;
+      own_shmem = false;
+   }
+
+   pgmoneta_delete_directory(root);
    MCTF_FINISH();
 }
 
