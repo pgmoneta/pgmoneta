@@ -62,36 +62,37 @@
 
 #include <openssl/ssl.h>
 
-#define HELP                   99
+#define HELP                    99
 
-#define COMMAND_ANNOTATE       "annotate"
-#define COMMAND_ARCHIVE        "archive"
-#define COMMAND_BACKUP         "backup"
-#define COMMAND_CLEAR          "clear"
-#define COMMAND_COMPRESS       "compress"
-#define COMMAND_CONF           "conf"
-#define COMMAND_DECOMPRESS     "decompress"
-#define COMMAND_DECRYPT        "decrypt"
-#define COMMAND_DELETE         "delete"
-#define COMMAND_ENCRYPT        "encrypt"
-#define COMMAND_EXPUNGE        "expunge"
-#define COMMAND_INFO           "info"
-#define COMMAND_LIST_BACKUP    "list-backup"
-#define COMMAND_MODE           "mode"
-#define COMMAND_PING           "ping"
-#define COMMAND_RELOAD         "reload"
-#define COMMAND_RESET          "reset"
-#define COMMAND_RESTORE        "restore"
-#define COMMAND_RETAIN         "retain"
-#define COMMAND_SHUTDOWN       "shutdown"
-#define COMMAND_STATUS         "status"
-#define COMMAND_STATUS_DETAILS "status-details"
-#define COMMAND_VERIFY         "verify"
+#define COMMAND_ANNOTATE        "annotate"
+#define COMMAND_ARCHIVE         "archive"
+#define COMMAND_BACKUP          "backup"
+#define COMMAND_CLEAR           "clear"
+#define COMMAND_COMPRESS        "compress"
+#define COMMAND_CONF            "conf"
+#define COMMAND_DECOMPRESS      "decompress"
+#define COMMAND_DECRYPT         "decrypt"
+#define COMMAND_DELETE          "delete"
+#define COMMAND_ENCRYPT         "encrypt"
+#define COMMAND_EXPUNGE         "expunge"
+#define COMMAND_INFO            "info"
+#define COMMAND_LIST_BACKUP     "list-backup"
+#define COMMAND_LIST_S3_OBJECTS "ls-s3"
+#define COMMAND_MODE            "mode"
+#define COMMAND_PING            "ping"
+#define COMMAND_RELOAD          "reload"
+#define COMMAND_RESET           "reset"
+#define COMMAND_RESTORE         "restore"
+#define COMMAND_RETAIN          "retain"
+#define COMMAND_SHUTDOWN        "shutdown"
+#define COMMAND_STATUS          "status"
+#define COMMAND_STATUS_DETAILS  "status-details"
+#define COMMAND_VERIFY          "verify"
 
-#define OUTPUT_FORMAT_JSON     "json"
-#define OUTPUT_FORMAT_TEXT     "text"
+#define OUTPUT_FORMAT_JSON      "json"
+#define OUTPUT_FORMAT_TEXT      "text"
 
-#define UNSPECIFIED            "Unspecified"
+#define UNSPECIFIED             "Unspecified"
 
 /* Global variables */
 static void help_backup(void);
@@ -118,6 +119,7 @@ static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
 static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -252,6 +254,14 @@ struct pgmoneta_command command_table[] = {
       .action = MANAGEMENT_LIST_BACKUP,
       .deprecated = false,
       .log_message = "<list-backup> [%s]",
+   },
+   {
+      .command = "ls-s3",
+      .subcommand = "",
+      .accepted_argument_count = {1, 2},
+      .action = MANAGEMENT_LIST_S3_OBJECTS,
+      .deprecated = false,
+      .log_message = "<ls-s3> [%s]",
    },
    {
       .command = "restore",
@@ -894,6 +904,10 @@ execute:
    {
       exit_code = list_backup(s_ssl, socket, parsed.args[0], sort_option, compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_LIST_S3_OBJECTS)
+   {
+      exit_code = list_s3_objects(s_ssl, socket, parsed.args[0], sort_option, compression, encryption, output_format);
+   }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
@@ -1092,6 +1106,12 @@ help_list_backup(void)
    printf("List backups for a server\n");
    printf("  pgmoneta-cli list-backup <server> [--sort asc|desc]\n");
 }
+static void
+help_list_s3_objects(void)
+{
+   printf("List objects in s3 bucket\n");
+   printf("  pgmoneta-cli ls-s3 <server> [--sort asc|desc]\n");
+}
 
 static void
 help_restore(void)
@@ -1233,6 +1253,10 @@ display_helper(char* command)
    {
       help_list_backup();
    }
+   else if (!strcmp(command, COMMAND_LIST_S3_OBJECTS))
+   {
+      help_list_s3_objects();
+   }
    else if (!strcmp(command, COMMAND_RESTORE))
    {
       help_restore();
@@ -1350,7 +1374,21 @@ error:
 
    return 1;
 }
-
+static int
+list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_list_s3_objects(ssl, socket, server, sort_order, compression, encryption, output_format))
+   {
+      goto error;
+   }
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+   return 0;
+error:
+   return 1;
+}
 static int
 restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
@@ -2498,6 +2536,9 @@ translate_command(int32_t cmd_code)
       case MANAGEMENT_LIST_BACKUP:
          command_output = pgmoneta_append(command_output, COMMAND_LIST_BACKUP);
          break;
+      case MANAGEMENT_LIST_S3_OBJECTS:
+         command_output = pgmoneta_append(command_output, COMMAND_LIST_S3_OBJECTS);
+         break;
       case MANAGEMENT_RESTORE:
          command_output = pgmoneta_append(command_output, COMMAND_RESTORE);
          break;
@@ -3168,6 +3209,16 @@ translate_json_object(struct json* j)
                   translate_backup_argument(backup);
                }
                pgmoneta_json_iterator_destroy(backup_it);
+               break;
+            case MANAGEMENT_LIST_S3_OBJECTS:
+               translate_response_argument(response);
+               servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+               pgmoneta_json_iterator_create(servers, &server_it);
+               while (pgmoneta_json_iterator_next(server_it))
+               {
+                  translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
+               }
+               pgmoneta_json_iterator_destroy(server_it);
                break;
             case MANAGEMENT_STATUS_DETAILS:
                translate_response_argument(response);

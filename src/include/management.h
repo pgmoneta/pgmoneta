@@ -61,37 +61,38 @@ extern "C" {
 /**
  * Management commands
  */
-#define MANAGEMENT_UNKNOWN        0
-#define MANAGEMENT_BACKUP         1
-#define MANAGEMENT_LIST_BACKUP    2
-#define MANAGEMENT_RESTORE        3
-#define MANAGEMENT_ARCHIVE        4
-#define MANAGEMENT_DELETE         5
-#define MANAGEMENT_SHUTDOWN       6
-#define MANAGEMENT_STATUS         7
-#define MANAGEMENT_STATUS_DETAILS 8
-#define MANAGEMENT_PING           9
-#define MANAGEMENT_RESET          10
-#define MANAGEMENT_RELOAD         11
-#define MANAGEMENT_RETAIN         12
-#define MANAGEMENT_EXPUNGE        13
-#define MANAGEMENT_DECRYPT        14
-#define MANAGEMENT_ENCRYPT        15
-#define MANAGEMENT_DECOMPRESS     16
-#define MANAGEMENT_COMPRESS       17
-#define MANAGEMENT_INFO           18
-#define MANAGEMENT_VERIFY         19
-#define MANAGEMENT_ANNOTATE       20
-#define MANAGEMENT_CONF_LS        21
-#define MANAGEMENT_CONF_GET       22
-#define MANAGEMENT_CONF_SET       23
-#define MANAGEMENT_MODE           24
+#define MANAGEMENT_UNKNOWN         0
+#define MANAGEMENT_BACKUP          1
+#define MANAGEMENT_LIST_BACKUP     2
+#define MANAGEMENT_RESTORE         3
+#define MANAGEMENT_ARCHIVE         4
+#define MANAGEMENT_DELETE          5
+#define MANAGEMENT_SHUTDOWN        6
+#define MANAGEMENT_STATUS          7
+#define MANAGEMENT_STATUS_DETAILS  8
+#define MANAGEMENT_PING            9
+#define MANAGEMENT_RESET           10
+#define MANAGEMENT_RELOAD          11
+#define MANAGEMENT_RETAIN          12
+#define MANAGEMENT_EXPUNGE         13
+#define MANAGEMENT_DECRYPT         14
+#define MANAGEMENT_ENCRYPT         15
+#define MANAGEMENT_DECOMPRESS      16
+#define MANAGEMENT_COMPRESS        17
+#define MANAGEMENT_INFO            18
+#define MANAGEMENT_VERIFY          19
+#define MANAGEMENT_ANNOTATE        20
+#define MANAGEMENT_CONF_LS         21
+#define MANAGEMENT_CONF_GET        22
+#define MANAGEMENT_CONF_SET        23
+#define MANAGEMENT_MODE            24
 
-#define MANAGEMENT_MASTER_KEY     24
-#define MANAGEMENT_ADD_USER       25
-#define MANAGEMENT_UPDATE_USER    26
-#define MANAGEMENT_REMOVE_USER    27
-#define MANAGEMENT_LIST_USERS     28
+#define MANAGEMENT_MASTER_KEY      24
+#define MANAGEMENT_ADD_USER        25
+#define MANAGEMENT_UPDATE_USER     26
+#define MANAGEMENT_REMOVE_USER     27
+#define MANAGEMENT_LIST_USERS      28
+#define MANAGEMENT_LIST_S3_OBJECTS 29
 
 /**
  * Management categories
@@ -165,6 +166,8 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_RETENTION_MONTHS      "RetentionMonths"
 #define MANAGEMENT_ARGUMENT_RETENTION_WEEKS       "RetentionWeeks"
 #define MANAGEMENT_ARGUMENT_RETENTION_YEARS       "RetentionYears"
+#define MANAGEMENT_ARGUMENT_S3_OBJECTS            "S3Objects"
+#define MANAGEMENT_ARGUMENT_S3_KEY                "S3Key"
 #define MANAGEMENT_ARGUMENT_SERVER                "Server"
 #define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
 #define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
@@ -222,6 +225,13 @@ extern "C" {
 #define MANAGEMENT_ERROR_LIST_BACKUP_NOFORK                 305
 #define MANAGEMENT_ERROR_LIST_BACKUP_INVALID_SORT           306
 #define MANAGEMENT_ERROR_LIST_BACKUP_ERROR                  307
+
+#define MANAGEMENT_ERROR_LIST_S3_NOSERVER                   310
+#define MANAGEMENT_ERROR_LIST_S3_NOFORK                     311
+#define MANAGEMENT_ERROR_LIST_S3_WORKFLOW                   312
+#define MANAGEMENT_ERROR_LIST_S3_JSON_VALUE                 313
+#define MANAGEMENT_ERROR_LIST_S3_NETWORK                    314
+#define MANAGEMENT_ERROR_LIST_S3_ERROR                      315
 
 #define MANAGEMENT_ERROR_DELETE_SETUP                       400
 #define MANAGEMENT_ERROR_DELETE_EXECUTE                     401
@@ -449,6 +459,20 @@ pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t c
  */
 int
 pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a list s3 objects request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param sort_order The sort order (asc, desc, or NULL)
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request
