@@ -48,6 +48,7 @@
 #include <remote.h>
 #include <restore.h>
 #include <retention.h>
+#include <s3.h>
 #include <security.h>
 #include <server.h>
 #include <shmem.h>
@@ -1135,6 +1136,48 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          goto error;
       }
    }
+   else if (id == MANAGEMENT_S3_LS)
+   {
+      server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+      srv = -1;
+      for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+      {
+         if (!strcmp(config->common.servers[i].name, server))
+         {
+            srv = i;
+         }
+      }
+
+      if (srv != -1)
+      {
+         pid = fork();
+         if (pid == -1)
+         {
+            pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_S3_NOFORK, NAME, compression, encryption, payload);
+            pgmoneta_log_error("List S3: No fork %s (%d)", server, MANAGEMENT_ERROR_LIST_S3_NOFORK);
+            goto error;
+         }
+         else if (pid == 0)
+         {
+            struct json* pyl = NULL;
+
+            shutdown_ports();
+
+            pgmoneta_json_clone(payload, &pyl);
+
+            pgmoneta_set_proc_title(1, ai->argv, "s3 ls", config->common.servers[srv].name);
+            pgmoneta_list_s3_objects(client_fd, srv, compression, encryption, pyl);
+         }
+      }
+      else
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_LIST_S3_NOSERVER, NAME, compression, encryption, payload);
+         pgmoneta_log_error("List S3: No server %s (%d)", server, MANAGEMENT_ERROR_LIST_S3_NOSERVER);
+         goto error;
+      }
+   }
+
    else if (id == MANAGEMENT_DELETE)
    {
       server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);

@@ -43,6 +43,8 @@ Commands:
                            - 'reload' to reload the configuration
                            - 'set' to modify a configuration value;
                              conf set <parameter_name> <parameter_value>;
+  s3  <action>             Manage S3, with one of subcommands:
+                           - 'ls' to get the list of files in s3
   decompress               Decompress a file using configured method
   decrypt                  Decrypt a file using master-key
   delete                   Delete a backup from a server
@@ -104,7 +106,6 @@ Example
 ```sh
 pgmoneta-cli list-backup primary
 ```
-
 ## restore
 
 Restore a backup from a server
@@ -440,7 +441,37 @@ Configuration change requires manual restart
    Requested value: 192.168.1.100 (cannot be applied to live instance)
    Status: Requires full service restart
 ```
+## s3 
 
+Manage the s3 storage 
+
+Command
+
+```sh
+pgmoneta-cli s3 [ls] <server>
+```
+
+Subcommand
+
+- `ls` : List all the files in s3
+
+Example
+
+```sh
+pgmoneta-cli s3 ls primary --sort=asc
+```
+### s3 ls
+
+Get the list of server files/objects in the remote storage s3
+
+- you can set the server or use the global one in the config
+
+Examples
+
+```sh
+pgmoneta-cli s3 ls primary
+pgmoneta-cli s3 ls 
+```
 ## clear
 
 Clear data/statistics

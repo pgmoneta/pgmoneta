@@ -56,6 +56,7 @@ static struct workflow* wf_archive(struct backup* backup);
 static struct workflow* wf_delete_backup(void);
 static struct workflow* wf_retention(void);
 static struct workflow* wf_post_rollup(struct backup* backup);
+static struct workflow* wf_list_s3_objects(void);
 
 static int get_error_code(int type, int flow, struct art* nodes);
 
@@ -90,6 +91,9 @@ pgmoneta_workflow_create(int workflow_type, struct backup* backup)
          break;
       case WORKFLOW_TYPE_DELETE_BACKUP:
          w = wf_delete_backup();
+         break;
+      case WORKFLOW_TYPE_S3_LIST:
+         w = wf_list_s3_objects();
          break;
       case WORKFLOW_TYPE_RETENTION:
          w = wf_retention();
@@ -498,7 +502,7 @@ wf_backup(void)
 
    if (config->storage_engine & STORAGE_ENGINE_S3)
    {
-      current->next = pgmoneta_storage_create_s3();
+      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
       current = current->next;
    }
 
@@ -701,7 +705,7 @@ wf_post_rollup(struct backup* backup)
 
    if (config->storage_engine & STORAGE_ENGINE_S3)
    {
-      current->next = pgmoneta_storage_create_s3();
+      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
       current = current->next;
    }
 
@@ -796,7 +800,7 @@ wf_incremental_backup(void)
 
    if (config->storage_engine & STORAGE_ENGINE_S3)
    {
-      current->next = pgmoneta_storage_create_s3();
+      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_BACKUP);
       current = current->next;
    }
 
@@ -967,12 +971,50 @@ static struct workflow*
 wf_delete_backup(void)
 {
    struct workflow* head = NULL;
+   struct workflow* current = NULL;
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
 
    head = pgmoneta_create_delete_backup();
+   current = head;
+
+   if (config->storage_engine & STORAGE_ENGINE_S3)
+   {
+      current->next = pgmoneta_storage_create_s3(WORKFLOW_TYPE_DELETE_BACKUP);
+      current = current->next;
+   }
 
 #ifdef DEBUG
-   struct workflow* current = NULL;
    current = head;
+   while (current != NULL)
+   {
+      assert(current->name != NULL);
+      assert(current->setup != NULL);
+      assert(current->execute != NULL);
+      assert(current->teardown != NULL);
+      current = current->next;
+   }
+#endif
+
+   return head;
+}
+
+static struct workflow*
+wf_list_s3_objects(void)
+{
+   struct workflow* head = NULL;
+   struct main_configuration* config = NULL;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->storage_engine & STORAGE_ENGINE_S3)
+   {
+      head = pgmoneta_storage_create_s3(WORKFLOW_TYPE_S3_LIST);
+   }
+
+#ifdef DEBUG
+   struct workflow* current = head;
    while (current != NULL)
    {
       assert(current->name != NULL);

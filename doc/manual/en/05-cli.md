@@ -46,6 +46,9 @@ Commands:
                            - 'reload' to reload the configuration
                            - 'set' to modify a configuration value;
                              conf set <parameter_name> <parameter_value>;
+ s3  <action>              Manage S3, with one of subcommands:
+                           - 'ls' to get the list of files in s3 
+
   decompress               Decompress a file using configured method
   decrypt                  Decrypt a file using master-key
   delete                   Delete a backup from a server
@@ -473,6 +476,39 @@ pgmoneta-cli conf get host
 - Configuration files are **not automatically updated** by the command
 - On restart, pgmoneta always reads from the configuration files on disk
 - Without file updates, restart will revert to the original file-based values
+
+## s3 
+
+Manage the s3 storage 
+
+Command
+
+```sh
+pgmoneta-cli s3 [ls] <server>
+```
+
+Subcommand
+
+- `ls` : List all the files in s3
+
+Example
+
+```sh
+pgmoneta-cli s3 ls primary --sort=asc
+```
+
+### s3 ls
+
+Get the list of server files/objects in the remote storage s3
+
+- you can set the server or use the [pgmoneta] section in the config
+
+Examples
+
+```sh
+pgmoneta-cli s3 ls primary
+pgmoneta-cli s3 ls 
+```
 
 
 ## clear

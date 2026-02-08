@@ -93,6 +93,8 @@ extern "C" {
 #define MANAGEMENT_REMOVE_USER    27
 #define MANAGEMENT_LIST_USERS     28
 
+#define MANAGEMENT_S3_LS          100
+
 /**
  * Management categories
  */
@@ -165,6 +167,8 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_RETENTION_MONTHS      "RetentionMonths"
 #define MANAGEMENT_ARGUMENT_RETENTION_WEEKS       "RetentionWeeks"
 #define MANAGEMENT_ARGUMENT_RETENTION_YEARS       "RetentionYears"
+#define MANAGEMENT_ARGUMENT_S3_OBJECTS            "S3Objects"
+#define MANAGEMENT_ARGUMENT_S3_KEY                "S3Key"
 #define MANAGEMENT_ARGUMENT_SERVER                "Server"
 #define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
 #define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
@@ -372,6 +376,13 @@ extern "C" {
 #define MANAGEMENT_ERROR_MODE_ERROR                         2804
 #define MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION                2805
 
+#define MANAGEMENT_ERROR_LIST_S3_NOSERVER                   2900
+#define MANAGEMENT_ERROR_LIST_S3_NOFORK                     2901
+#define MANAGEMENT_ERROR_LIST_S3_WORKFLOW                   2902
+#define MANAGEMENT_ERROR_LIST_S3_JSON_VALUE                 2903
+#define MANAGEMENT_ERROR_LIST_S3_NETWORK                    2904
+#define MANAGEMENT_ERROR_LIST_S3_ERROR                      2905
+
 /**
  * Output formats
  */
@@ -449,6 +460,20 @@ pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t c
  */
 int
 pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a list s3 objects request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param sort_order The sort order (asc, desc, or NULL)
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request
