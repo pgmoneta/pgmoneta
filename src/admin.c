@@ -43,6 +43,7 @@
 #include <err.h>
 #include <errno.h>
 #include <getopt.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -52,6 +53,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <openssl/rand.h>
 
 #define NAME                    "admin"
 #define DEFAULT_PASSWORD_LENGTH 64
@@ -225,7 +227,16 @@ main(int argc, char** argv)
       }
       else if (!strcmp(optname, "l") || !strcmp(optname, "length"))
       {
-         pwd_length = atoi(optarg);
+         char* endptr = NULL;
+         long val;
+         errno = 0;
+         val = strtol(optarg, &endptr, 10);
+         if (errno != 0 || endptr == optarg || *endptr != '\0' || val <= 0 || val > 1024)
+         {
+            warnx("pgmoneta-admin: Invalid password length: %s", optarg);
+            exit(1);
+         }
+         pwd_length = (int)val;
       }
       else if (!strcmp(optname, "V") || !strcmp(optname, "version"))
       {
@@ -1494,22 +1505,38 @@ error:
 static char*
 generate_password(int pwd_length)
 {
-   char* pwd;
-   size_t s;
-   time_t t;
+   char* pwd = NULL;
+   unsigned char* random_bytes = NULL;
 
-   s = pwd_length + 1;
-
-   pwd = malloc(s);
-   memset(pwd, 0, s);
-
-   srand((unsigned)time(&t));
-
-   for (size_t i = 0; i < s; i++)
+   pwd = malloc(pwd_length + 1);
+   if (pwd == NULL)
    {
-      *((char*)(pwd + i)) = CHARS[rand() % sizeof(CHARS)];
+      return NULL;
    }
-   *((char*)(pwd + pwd_length)) = '\0';
+   memset(pwd, 0, pwd_length + 1);
+
+   random_bytes = malloc(pwd_length);
+   if (random_bytes == NULL)
+   {
+      free(pwd);
+      return NULL;
+   }
+
+   if (RAND_bytes(random_bytes, pwd_length) != 1)
+   {
+      free(pwd);
+      free(random_bytes);
+      return NULL;
+   }
+
+   for (int i = 0; i < pwd_length; i++)
+   {
+      pwd[i] = CHARS[random_bytes[i] % sizeof(CHARS)];
+   }
+   pwd[pwd_length] = '\0';
+
+   memset(random_bytes, 0, pwd_length);
+   free(random_bytes);
 
    return pwd;
 }
