@@ -26,72 +26,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PGMONETA_STORAGE_H
-#define PGMONETA_STORAGE_H
+#ifndef PGMONETA_S3_H
+#define PGMONETA_S3_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* pgmoneta */
 #include <pgmoneta.h>
-#include <workflow.h>
-
-/* system */
-#include <libssh/libssh.h>
-#include <libssh/sftp.h>
+#include <json.h>
+#include <info.h>
 
 /**
- * Create a workflow for the local storage engine
- * @return The workflow
+ * List S3 objects for a server
+ * @param client_fd The client
+ * @param server The server
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param payload The payload
  */
-struct workflow*
-pgmoneta_storage_create_local(void);
-
-/**
- * Create a workflow for the SSH storage engine
- * @param workflow_type The workflow type
- * @return The workflow
- */
-struct workflow*
-pgmoneta_storage_create_ssh(int workflow_type);
-
-/**
- * Create a workflow for the S3 storage engine
- * @param workflow_type The workflow type
- * @return The workflow
- */
-struct workflow*
-pgmoneta_storage_create_s3(int workflow_type);
-
-/**
- * Create a workflow for the Azure storage engine
- * @return The workflow
- */
-struct workflow*
-pgmoneta_storage_create_azure(void);
-
-/**
- * Open WAL shipping file in remote ssh server
- * @param srv The server index
- * @param filename WAL file name
- * @param segsize WAL segment size
- * @param sftp_file WAL streaming file
- * @return 0 on success, otherwise 1
- */
-int
-pgmoneta_sftp_wal_open(int server, char* filename, int segsize, sftp_file* file);
-
-/**
- * Close WAL shipping file in remote ssh server
- * @param srv The server index
- * @param filename WAL file name
- * @param partial Completed segment or not
- * @param sftp_file WAL streaming file
- * @return 0 on success, otherwise 1
- */
-int
-pgmoneta_sftp_wal_close(int server, char* filename, bool partial, sftp_file* file);
+void
+pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
 #ifdef __cplusplus
 }
 #endif
