@@ -123,6 +123,41 @@ error:
 
    return 1;
 }
+int
+pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   struct json* j = NULL;
+   struct json* request = NULL;
+
+   if (pgmoneta_management_create_header(MANAGEMENT_S3_LS, compression, encryption, output_format, &j))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_management_create_request(j, &request))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)server, ValueString);
+
+   pgmoneta_json_put(request, MANAGEMENT_ARGUMENT_SORT, (uintptr_t)(sort_order != NULL ? sort_order : "asc"), ValueString);
+
+   if (pgmoneta_management_write_json(ssl, socket, compression, encryption, j))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_destroy(j);
+
+   return 0;
+
+error:
+
+   pgmoneta_json_destroy(j);
+
+   return 1;
+}
 
 int
 pgmoneta_management_request_restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
