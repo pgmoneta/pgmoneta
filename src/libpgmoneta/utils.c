@@ -4681,12 +4681,22 @@ pgmoneta_format_and_append(char* buf, char* format, ...)
 int
 pgmoneta_atoi(char* input)
 {
+   char* endptr = NULL;
+   long val = 0;
+
    if (input == NULL)
    {
       return 0;
    }
 
-   return atoi(input);
+   errno = 0;
+   val = strtol(input, &endptr, 10);
+   if (errno != 0 || endptr == input || val > INT_MAX || val < INT_MIN)
+   {
+      return 0;
+   }
+
+   return (int)val;
 }
 
 char*
