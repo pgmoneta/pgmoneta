@@ -183,6 +183,8 @@ cleanup_postgresql_image() {
 }
 
 start_postgresql_container() {
+  # Remove existing container so we can reuse the name 
+  remove_postgresql_container
   $CONTAINER_ENGINE run -p $PORT:5432 -v "$PG_LOG_DIR:/pglog:z" -v "$PGCONF_DIRECTORY:/conf:z"\
   --name $CONTAINER_NAME -d \
   -e PG_DATABASE=$PG_DATABASE \
@@ -319,6 +321,71 @@ unset_pgmoneta_test_variables() {
   unset CC
 }
 
+# Returns 0 if setup is already done, 1 if setup is needed.
+need_build() {
+  # Require test runner and server binary 
+  if [[ ! -f "$TEST_DIRECTORY/pgmoneta-test" ]] || [[ ! -f "$EXECUTABLE_DIRECTORY/pgmoneta" ]]; then
+    return 1
+  fi
+  if [[ $MODE != "ci" ]]; then
+    if ! $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+      return 1
+    fi
+  fi
+  if [[ ! -d "$PGMONETA_ROOT_DIR" ]] || [[ ! -f "$CONFIGURATION_DIRECTORY/pgmoneta.conf" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+do_setup() {
+  local always_build="${1:-}"
+  echo "Building PostgreSQL $PG_VERSION image if necessary"
+  if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+    echo "Image $IMAGE_NAME exists, skip building"
+  else
+    if [[ $MODE != "ci" ]]; then
+      build_postgresql_image
+    fi
+  fi
+
+  echo "Preparing the pgmoneta directory"
+  export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p.profraw"
+  rm -Rf "$PGMONETA_ROOT_DIR"
+  mkdir -p "$PGMONETA_ROOT_DIR"
+  mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR"
+  mkdir -p "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY" "$WORKSPACE_DIRECTORY" "$RESOURCE_DIRECTORY" "$PGCONF_DIRECTORY"
+  cp -R "$PROJECT_DIRECTORY/test/resource" $BASE_DIR
+  cp -R $TEST_PG_DIRECTORY/conf/* $PGCONF_DIRECTORY/
+  chmod -R 777 $PG_LOG_DIR
+  chmod -R 777 $PGCONF_DIRECTORY
+
+  if [[ "$always_build" == "force" ]] || [[ ! -f "$TEST_DIRECTORY/pgmoneta-test" ]] || [[ ! -f "$EXECUTABLE_DIRECTORY/pgmoneta" ]]; then
+    echo "Building pgmoneta"
+    mkdir -p "$PROJECT_DIRECTORY/build"
+    cd "$PROJECT_DIRECTORY/build"
+    export CC=$(which clang)
+    cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
+    make -j$(nproc)
+    cd ..
+  else
+    echo "pgmoneta binaries already present, skipping build"
+  fi
+
+  if [[ $MODE == "ci" ]]; then
+    echo "Start PostgreSQL $PG_VERSION locally"
+    start_postgresql
+  else
+    echo "Start PostgreSQL $PG_VERSION container"
+    start_postgresql_container
+  fi
+
+  echo "Initialize pgmoneta"
+  pgmoneta_initialize_configuration
+
+  export_pgmoneta_test_variables
+}
+
 execute_testcases() {
    echo "Execute MCTF Testcases"
    set +e
@@ -331,7 +398,8 @@ execute_testcases() {
       fi
       if pgrep -f pgmoneta >/dev/null 2>&1; then
          echo "Killing existing pgmoneta processes"
-         pkill -9 -f pgmoneta || true
+         pkill -9 -f "${EXECUTABLE_DIRECTORY}/pgmoneta " || true
+         pkill -9 -f "${EXECUTABLE_DIRECTORY}/pgmoneta-cli " || true
          sleep 2
       fi
       rm -f "/tmp/pgmoneta.localhost.pid"
@@ -364,7 +432,13 @@ execute_testcases() {
 
    echo "Start running MCTF tests"
    if [[ -f "$TEST_DIRECTORY/pgmoneta-test" ]]; then
-      $TEST_DIRECTORY/pgmoneta-test
+      TEST_FILTER_ARGS=()
+      if [[ -n "${TEST_FILTER:-}" ]]; then
+         TEST_FILTER_ARGS=(-t "$TEST_FILTER")
+      elif [[ -n "${MODULE_FILTER:-}" ]]; then
+         TEST_FILTER_ARGS=(-m "$MODULE_FILTER")
+      fi
+      $TEST_DIRECTORY/pgmoneta-test "${TEST_FILTER_ARGS[@]}"
       if [[ $? -ne 0 ]]; then
          exit 1
       fi
@@ -377,100 +451,135 @@ execute_testcases() {
 }
 
 usage() {
-   echo "Usage: $0 [sub-command]"
-   echo "Subcommand:"
-   echo " clean       Clean up test suite environment and remove PostgreSQL image"
-   echo " setup       Install dependencies and build PostgreSQL image"
+   echo "Usage: $0 [options] [sub-command]"
+   echo "Subcommands:"
+   echo " build          Set up environment (image, build, PostgreSQL, pgmoneta) without running tests"
+   echo " clean          Clean up test suite environment and remove PostgreSQL image"
+   echo " setup          Install dependencies and build PostgreSQL image"
+   echo " ci             Run full test suite in CI mode (local PostgreSQL)"
+   echo "Options (run tests with optional filter; default is full suite):"
+   echo " -t, --test NAME     Run only tests matching NAME"
+   echo " -m, --module NAME   Run all tests in module NAME"
+   echo "Examples:"
+   echo "  $0                  Run full test suite"
+   echo "  $0 build            Set up environment only; then run e.g. $0 -t backup_full"
+   echo "  $0 -t backup_full   Run test matching 'backup_full' (runs build if needed)"
+   echo "  $0 -m restore       Run all tests in module 'restore'"
    exit 1
 }
 
 run_tests() {
-  echo "Building PostgreSQL $PG_VERSION image if necessary"
-  if $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-    echo "Image $IMAGE_NAME exists, skip building"
+  if need_build; then
+    do_setup
   else
-    if [[ $MODE != "ci" ]]; then
-      build_postgresql_image
+    # Double-check: binaries and config must exist (cleanup removes BASE_DIR/conf, so config can be missing)
+    if [[ ! -f "$EXECUTABLE_DIRECTORY/pgmoneta" ]] || [[ ! -f "$TEST_DIRECTORY/pgmoneta-test" ]] \
+       || [[ ! -f "$CONFIGURATION_DIRECTORY/pgmoneta.conf" ]]; then
+      echo "Environment incomplete (binaries or config missing), running build"
+      do_setup
+    else
+      echo "Environment already ready, skipping build"
     fi
   fi
-
-  echo "Preparing the pgmoneta directory"
-  export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p.profraw"
-  rm -Rf "$PGMONETA_ROOT_DIR"
-  mkdir -p "$PGMONETA_ROOT_DIR"
-  mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR"
-  mkdir -p "$RESTORE_DIRECTORY" "$BACKUP_DIRECTORY" "$CONFIGURATION_DIRECTORY" "$WORKSPACE_DIRECTORY" "$RESOURCE_DIRECTORY" "$PGCONF_DIRECTORY"
-  cp -R "$PROJECT_DIRECTORY/test/resource" $BASE_DIR
-  cp -R $TEST_PG_DIRECTORY/conf/* $PGCONF_DIRECTORY/
-  chmod -R 777 $PG_LOG_DIR
-  chmod -R 777 $PGCONF_DIRECTORY
-
-  echo "Building pgmoneta"
-  mkdir -p "$PROJECT_DIRECTORY/build"
-  cd "$PROJECT_DIRECTORY/build"
-  export CC=$(which clang)
-  cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug -DDOCS=FALSE ..
-  make -j$(nproc)
-  cd ..
-
-  if [[ $MODE == "ci" ]]; then
-    echo "Start PostgreSQL $PG_VERSION locally"
-    start_postgresql
-  else
-    echo "Start PostgreSQL $PG_VERSION container"
-    start_postgresql_container
-  fi
-
-  echo "Initialize pgmoneta"
-  pgmoneta_initialize_configuration
-
-  export_pgmoneta_test_variables
-
   execute_testcases
 }
 
-if [[ $# -gt 1 ]]; then
-   usage # More than one argument, show usage and exit
-elif [[ $# -eq 1 ]]; then
-   if [[ "$1" == "setup" ]]; then
-      build_postgresql_image
-      sudo dnf install -y \
-        clang \
-        clang-analyzer \
-        cmake \
-        make \
-        libev libev-devel \
-        openssl openssl-devel \
-        systemd systemd-devel \
-        zlib zlib-devel \
-        libzstd libzstd-devel \
-        lz4 lz4-devel \
-        libssh libssh-devel \
-        libatomic \
-        bzip2 bzip2-devel \
-        libarchive libarchive-devel \
-        libasan libasan-static \
-        check check-devel check-static \
-        llvm \
-        libyaml-devel \
-        ncurses-devel
-   elif [[ "$1" == "clean" ]]; then
-      rm -Rf $COVERAGE_DIR
-      cleanup
-      cleanup_postgresql_image
-      rm -Rf $PGMONETA_ROOT_DIR
-   elif [[ "$1" == "ci" ]]; then
-      MODE="ci"
-      PORT=5432
-      trap cleanup EXIT
-      run_tests
-   else
-      echo "Invalid parameter: $1"
-      usage # If an invalid parameter is provided, show usage and exit
-   fi
-else
-   # If no arguments are provided, run function_without_param
+TEST_FILTER=""
+MODULE_FILTER=""
+SUBCOMMAND=""
+while [[ $# -gt 0 ]]; do
+   case "$1" in
+      -t|--test)
+         [[ -n "$MODULE_FILTER" ]] && { echo "Error: Cannot specify both -t and -m options"; usage; }
+         shift
+         [[ $# -eq 0 ]] && { echo "Error: -t/--test requires NAME"; usage; }
+         TEST_FILTER="$1"
+         shift
+         ;;
+      -m|--module)
+         [[ -n "$TEST_FILTER" ]] && { echo "Error: Cannot specify both -t and -m options"; usage; }
+         shift
+         [[ $# -eq 0 ]] && { echo "Error: -m/--module requires NAME"; usage; }
+         MODULE_FILTER="$1"
+         shift
+         ;;
+      build)
+         [[ -n "$SUBCOMMAND" ]] && usage
+         SUBCOMMAND="build"
+         shift
+         ;;
+      setup)
+         [[ -n "$SUBCOMMAND" ]] && usage
+         SUBCOMMAND="setup"
+         shift
+         ;;
+      clean)
+         [[ -n "$SUBCOMMAND" ]] && usage
+         SUBCOMMAND="clean"
+         shift
+         ;;
+      ci)
+         [[ -n "$SUBCOMMAND" ]] && usage
+         SUBCOMMAND="ci"
+         shift
+         ;;
+      -h|--help)
+         usage
+         ;;
+      -*)
+         echo "Invalid option: $1"
+         usage
+         ;;
+      *)
+         echo "Invalid parameter: $1"
+         usage
+         ;;
+   esac
+done
+
+if [[ "$SUBCOMMAND" == "build" ]]; then
+   do_setup force
+   exit 0
+fi
+if [[ "$SUBCOMMAND" == "setup" ]]; then
+   build_postgresql_image
+   sudo dnf install -y \
+      clang \
+      clang-analyzer \
+      cmake \
+      make \
+      libev libev-devel \
+      openssl openssl-devel \
+      systemd systemd-devel \
+      zlib zlib-devel \
+      libzstd libzstd-devel \
+      lz4 lz4-devel \
+      libssh libssh-devel \
+      libatomic \
+      bzip2 bzip2-devel \
+      libarchive libarchive-devel \
+      libasan libasan-static \
+      check check-devel check-static \
+      llvm \
+      libyaml-devel \
+      ncurses-devel
+   exit 0
+fi
+if [[ "$SUBCOMMAND" == "clean" ]]; then
+   rm -Rf $COVERAGE_DIR
+   cleanup
+   cleanup_postgresql_image
+   rm -Rf $PGMONETA_ROOT_DIR
+   exit 0
+fi
+if [[ "$SUBCOMMAND" == "ci" ]]; then
+   MODE="ci"
+   PORT=5432
    trap cleanup EXIT SIGINT
    run_tests
+   exit 0
 fi
+# Default: run tests (full suite or with -t/-m filter)
+trap cleanup EXIT SIGINT
+run_tests
 

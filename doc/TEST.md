@@ -3,12 +3,12 @@
 
 **Dependencies**
 
-To install all the required dependencies, simply run `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh setup`. You need to install docker or podman
+To install all the required dependencies, simply run `<PATH_TO_PGMONETA>/test/check.sh setup`. You need to install docker or podman
 separately. The script currently only works on Linux system (we recommend Fedora 39+). 
 
 **Running Tests**
 
-To run the tests, simply run `<PATH_TO_PGMONETA>/pgmoneta/test/check.sh`. The script will build a PostgreSQL 17 image the first time you run it,
+To run the tests, simply run `<PATH_TO_PGMONETA>/test/check.sh`. The script will build a PostgreSQL 17 image the first time you run it,
 and start a docker/podman container using the image (so make sure you at least have one of them installed and have the corresponding container engine started). 
 The containerized postgres server will have a `repl` user with the replication attribute, a normal user `myuser` and a database `mydb`.
 
@@ -16,11 +16,11 @@ The script then starts pgmoneta and runs tests in your local environment. The te
 the testing environment won't run into weird container environment issues, and so that we can reuse the installed dependencies and cmake cache to speed up development
 and debugging.
 
-All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta-test/`, and a cleanup will run whether 
-the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally.
-So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated. 
+All the configuration, logs, coverage reports and data will be in `/tmp/pgmoneta-test/`, and a cleanup will run whether the script exits normally or not. pgmoneta will be force shutdown if it doesn't terminate normally. So don't worry about your local setup being tampered. The container will be stopped and removed when the script exits or is terminated.
 
-To run one particular test case or module, use `<PATH_TO_PGMONETA>/build/test/pgmoneta-test -t <test_case_name>` or `<PATH_TO_PGMONETA>/build/test/pgmoneta-test -m <module_name>`. This requires the test environment to already be set up by `check.sh`. The environment variables will be automatically unset when the test is finished or aborted.
+**Setup only (no tests):** Run `<PATH_TO_PGMONETA>/test/check.sh build` to prepare the test environment (image, pgmoneta build, container, config) without running tests. This always does a full build.
+
+**Single test or module:** Run `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` or `<PATH_TO_PGMONETA>/test/check.sh -m <module_name>` (long form: `--test`, `--module`). The script sets up the environment automatically when needed, so you do not need to run the full suite first. For quick iteration, run `<PATH_TO_PGMONETA>/test/check.sh build` once, then `<PATH_TO_PGMONETA>/test/check.sh -t <test_name>` (or `-m <module_name>`) repeatedly. Environment variables are unset when the test run finishes or is aborted.
 
 It is recommended that you **ALWAYS** run tests before raising PR.
 
@@ -79,14 +79,14 @@ fetched from environment variables.
 
 **Cleanup**
 
-`<PATH_TO_PGMONETA>/pgmoneta/test/check.sh clean` will remove the testing directory and the built image. If you are using docker, chances are it eats your 
+`<PATH_TO_PGMONETA>/test/check.sh clean` will remove the testing directory and the built image. If you are using docker, chances are it eats your 
 disk space secretly, in that case consider cleaning up using `docker system prune --volume`. Use with caution though as it
 nukes all the docker volumes.
 
 **Port**
 
 By default, the pod exposes port 6432 for pgmoneta to connect to. This can be changed by `export PGMONETA_TEST_PORT=<your-port>` before running `check.sh`. Or you
-may also run `PGMONETA_TEST_PORT=<your-port> ./check.sh`.
+may also run `PGMONETA_TEST_PORT=<your-port> <PATH_TO_PGMONETA>/test/check.sh`.
 
 **Configuration**
 
