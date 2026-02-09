@@ -2039,6 +2039,25 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_missing_server_configuration)
+{
+   void* saved_shmem = NULL;
+
+   pgmoneta_test_setup();
+   saved_shmem = shmem;
+   shmem = NULL;
+
+   MCTF_ASSERT_PTR_NULL(pgmoneta_get_server_summary(0), cleanup, "get_server_summary should return NULL without config");
+   MCTF_ASSERT_PTR_NULL(pgmoneta_get_server_wal_shipping(0), cleanup, "get_server_wal_shipping should return NULL without config");
+   MCTF_ASSERT_PTR_NULL(pgmoneta_get_server_wal_shipping_wal(0), cleanup, "get_server_wal_shipping_wal should return NULL without config");
+   MCTF_ASSERT_PTR_NULL(pgmoneta_get_server_workspace(0), cleanup, "get_server_workspace should return NULL without config");
+
+cleanup:
+   shmem = saved_shmem;
+   pgmoneta_test_teardown();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_missing_wal)
 {
    char* dir = NULL;
@@ -2220,6 +2239,14 @@ cleanup:
       pgmoneta_free_message(extracted);
       extracted = NULL;
    }
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_utils_delete_directory_null)
+{
+   MCTF_ASSERT_INT_EQ(pgmoneta_delete_directory(NULL), 1, cleanup, "delete_directory(NULL) should fail safely");
+
+cleanup:
    MCTF_FINISH();
 }
 

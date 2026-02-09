@@ -1969,6 +1969,12 @@ error:
 int
 pgmoneta_delete_directory(char* path)
 {
+   if (path == NULL)
+   {
+      pgmoneta_log_warn("pgmoneta_delete_directory: path is NULL");
+      return 1;
+   }
+
    DIR* d = opendir(path);
    size_t path_len = strlen(path);
    int r = -1;
@@ -3878,7 +3884,14 @@ pgmoneta_get_server_wal_shipping(int server)
 {
    struct main_configuration* config;
    char* ws = NULL;
+
    config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      return NULL;
+   }
+
    if (server < 0 || server >= config->common.number_of_servers)
    {
       return NULL;
@@ -3920,6 +3933,11 @@ pgmoneta_get_server_workspace(int server)
    char* ws = NULL;
 
    config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      goto error;
+   }
 
    if (server < 0 || server >= config->common.number_of_servers)
    {
@@ -4248,6 +4266,11 @@ get_server_basepath(int server)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   if (config == NULL)
+   {
+      return NULL;
+   }
 
    if (server < 0 || server >= config->common.number_of_servers)
    {

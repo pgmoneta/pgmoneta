@@ -223,8 +223,26 @@ bitmask_to_encryption(uint32_t file_type)
    if (file_type & PGMONETA_FILE_TYPE_ENCRYPTED)
    {
       config = (struct main_configuration*)shmem;
-      return config->encryption;
+
+      if (config != NULL)
+      {
+         switch (config->encryption)
+         {
+            case ENCRYPTION_AES_256_CBC:
+            case ENCRYPTION_AES_192_CBC:
+            case ENCRYPTION_AES_128_CBC:
+            case ENCRYPTION_AES_256_CTR:
+            case ENCRYPTION_AES_192_CTR:
+            case ENCRYPTION_AES_128_CTR:
+               return config->encryption;
+            default:
+               break;
+         }
+      }
+
+      return ENCRYPTION_AES_256_CBC;
    }
+
    return ENCRYPTION_NONE;
 }
 
