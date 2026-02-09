@@ -26,6 +26,9 @@ In addition to standard WAL files, pgmoneta-walinfo also supports:
 OPTIONS
 =======
 
+-I, --interactive 
+  Interactive mode for WAL files with ncurses
+
 -c, --config CONFIG_FILE
   Set the path to the pgmoneta.conf file
 
@@ -89,6 +92,10 @@ USAGE
 To display information about a WAL file in raw format:
 
     pgmoneta-walinfo /path/to/walfile
+
+To display information about a WAL file in interactive mode using ncurses
+    
+    pgmoneta-walinfo -I /path/to/walfile
 
 To display information in JSON format:
 
