@@ -139,7 +139,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
    *client_ssl = NULL;
 
    /* Receive client calls - at any point if client exits return AUTH_ERROR */
-   status = pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg);
+   status = pgmoneta_read_timeout_message(NULL, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;
@@ -187,7 +187,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
             goto error;
          }
 
-         status = pgmoneta_read_timeout_message(c_ssl, client_fd, config->authentication_timeout, &msg);
+         status = pgmoneta_read_timeout_message(c_ssl, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg);
          if (status != MESSAGE_STATUS_OK)
          {
             goto error;
@@ -203,7 +203,7 @@ pgmoneta_remote_management_auth(int client_fd, char* address, SSL** client_ssl)
          }
          pgmoneta_clear_message();
 
-         status = pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg);
+         status = pgmoneta_read_timeout_message(NULL, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg);
          if (status != MESSAGE_STATUS_OK)
          {
             goto error;
@@ -866,7 +866,7 @@ retry:
    status = pgmoneta_read_timeout_message(c_ssl, client_fd, 1, &msg);
    if (status != MESSAGE_STATUS_OK)
    {
-      if (difftime(time(NULL), start_time) < config->authentication_timeout)
+      if (difftime(time(NULL), start_time) < pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S))
       {
          if (pgmoneta_socket_isvalid(client_fd))
          {
@@ -928,7 +928,7 @@ retry:
       goto error;
    }
 
-   status = pgmoneta_read_timeout_message(c_ssl, client_fd, config->authentication_timeout, &msg);
+   status = pgmoneta_read_timeout_message(c_ssl, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg);
    if (status != MESSAGE_STATUS_OK)
    {
       goto error;

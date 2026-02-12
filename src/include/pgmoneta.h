@@ -45,108 +45,108 @@ extern "C" {
 #include <sys/types.h>
 #include <openssl/ssl.h>
 
-#define VERSION                      "0.21.0"
+#define VERSION                          "0.21.0"
 
-#define PGMONETA_HOMEPAGE            "https://pgmoneta.github.io/"
-#define PGMONETA_ISSUES              "https://github.com/pgmoneta/pgmoneta/issues"
+#define PGMONETA_HOMEPAGE                "https://pgmoneta.github.io/"
+#define PGMONETA_ISSUES                  "https://github.com/pgmoneta/pgmoneta/issues"
 
-#define POSTGRESQL_MIN_VERSION       13
+#define POSTGRESQL_MIN_VERSION           13
 
-#define MAIN_UDS                     ".s.pgmoneta"
+#define MAIN_UDS                         ".s.pgmoneta"
 
-#define MAX_PROCESS_TITLE_LENGTH     256
+#define MAX_PROCESS_TITLE_LENGTH         256
 
-#define ALIGNMENT_SIZE               512
-#define DEFAULT_BUFFER_SIZE          131072
+#define ALIGNMENT_SIZE                   512
+#define DEFAULT_BUFFER_SIZE              131072
 
-#define DEFAULT_BURST                65536
-#define DEFAULT_EVERY                1
+#define DEFAULT_BURST                    65536
+#define DEFAULT_EVERY                    1
 
-#define MAX_USERNAME_LENGTH          128
-#define MAX_PASSWORD_LENGTH          1024
-#define MAX_PASSWORD_CHARS           256
-#define MIN_MASTER_KEY_CHARS         8
+#define MAX_USERNAME_LENGTH              128
+#define MAX_PASSWORD_LENGTH              1024
+#define MAX_PASSWORD_CHARS               256
+#define MIN_MASTER_KEY_CHARS             8
 
-#define MAX_PATH                     1024
-#define MISC_LENGTH                  128
-#define MAX_COMMENT                  2048
-#define MAX_EXTRA_PATH               8192
+#define MAX_PATH                         1024
+#define MISC_LENGTH                      128
+#define MAX_COMMENT                      2048
+#define MAX_EXTRA_PATH                   8192
 
-#define MAX_EXTRA                    64
-#define NUMBER_OF_SERVERS            64
-#define NUMBER_OF_USERS              64
-#define NUMBER_OF_ADMINS             8
-#define NUMBER_OF_HOT_STANDBY        8
-#define NUMBER_OF_EXTENSIONS         64
+#define MAX_EXTRA                        64
+#define NUMBER_OF_SERVERS                64
+#define NUMBER_OF_USERS                  64
+#define NUMBER_OF_ADMINS                 8
+#define NUMBER_OF_HOT_STANDBY            8
+#define NUMBER_OF_EXTENSIONS             64
 
-#define MAX_NUMBER_OF_COLUMNS        8
-#define MAX_NUMBER_OF_TABLESPACES    64
+#define MAX_NUMBER_OF_COLUMNS            8
+#define MAX_NUMBER_OF_TABLESPACES        64
 
-#define STATE_FREE                   0
-#define STATE_IN_USE                 1
+#define STATE_FREE                       0
+#define STATE_IN_USE                     1
 
-#define AUTH_SUCCESS                 0
-#define AUTH_BAD_PASSWORD            1
-#define AUTH_ERROR                   2
-#define AUTH_TIMEOUT                 3
+#define AUTH_SUCCESS                     0
+#define AUTH_BAD_PASSWORD                1
+#define AUTH_ERROR                       2
+#define AUTH_TIMEOUT                     3
 
-#define ENCRYPTION_NONE              0
-#define ENCRYPTION_AES_256_CBC       1
-#define ENCRYPTION_AES_192_CBC       2
-#define ENCRYPTION_AES_128_CBC       3
-#define ENCRYPTION_AES_256_CTR       4
-#define ENCRYPTION_AES_192_CTR       5
-#define ENCRYPTION_AES_128_CTR       6
+#define ENCRYPTION_NONE                  0
+#define ENCRYPTION_AES_256_CBC           1
+#define ENCRYPTION_AES_192_CBC           2
+#define ENCRYPTION_AES_128_CBC           3
+#define ENCRYPTION_AES_256_CTR           4
+#define ENCRYPTION_AES_192_CTR           5
+#define ENCRYPTION_AES_128_CTR           6
 
-#define HUGEPAGE_OFF                 0
-#define HUGEPAGE_TRY                 1
-#define HUGEPAGE_ON                  2
+#define HUGEPAGE_OFF                     0
+#define HUGEPAGE_TRY                     1
+#define HUGEPAGE_ON                      2
 
-#define DIRECT_IO_OFF                0
-#define DIRECT_IO_AUTO               1
-#define DIRECT_IO_ON                 2
+#define DIRECT_IO_OFF                    0
+#define DIRECT_IO_AUTO                   1
+#define DIRECT_IO_ON                     2
 
-#define COMPRESSION_NONE             0
-#define COMPRESSION_CLIENT_GZIP      1
-#define COMPRESSION_CLIENT_ZSTD      2
-#define COMPRESSION_CLIENT_LZ4       3
-#define COMPRESSION_CLIENT_BZIP2     4
-#define COMPRESSION_SERVER_GZIP      5
-#define COMPRESSION_SERVER_ZSTD      6
-#define COMPRESSION_SERVER_LZ4       7
+#define COMPRESSION_NONE                 0
+#define COMPRESSION_CLIENT_GZIP          1
+#define COMPRESSION_CLIENT_ZSTD          2
+#define COMPRESSION_CLIENT_LZ4           3
+#define COMPRESSION_CLIENT_BZIP2         4
+#define COMPRESSION_SERVER_GZIP          5
+#define COMPRESSION_SERVER_ZSTD          6
+#define COMPRESSION_SERVER_LZ4           7
 
-#define STORAGE_ENGINE_LOCAL         1 << 0
-#define STORAGE_ENGINE_SSH           1 << 1
-#define STORAGE_ENGINE_S3            1 << 2
-#define STORAGE_ENGINE_AZURE         1 << 3
+#define STORAGE_ENGINE_LOCAL             1 << 0
+#define STORAGE_ENGINE_SSH               1 << 1
+#define STORAGE_ENGINE_S3                1 << 2
+#define STORAGE_ENGINE_AZURE             1 << 3
 
-#define DEFAULT_BLOCKING_TIMEOUT     30
+#define DEFAULT_BLOCKING_TIMEOUT_SECONDS 30
 
-#define UPDATE_PROCESS_TITLE_NEVER   0
-#define UPDATE_PROCESS_TITLE_STRICT  1
-#define UPDATE_PROCESS_TITLE_MINIMAL 2
-#define UPDATE_PROCESS_TITLE_VERBOSE 3
+#define UPDATE_PROCESS_TITLE_NEVER       0
+#define UPDATE_PROCESS_TITLE_STRICT      1
+#define UPDATE_PROCESS_TITLE_MINIMAL     2
+#define UPDATE_PROCESS_TITLE_VERBOSE     3
 
-#define CREATE_SLOT_UNDEFINED        0
-#define CREATE_SLOT_YES              1
-#define CREATE_SLOT_NO               2
+#define CREATE_SLOT_UNDEFINED            0
+#define CREATE_SLOT_YES                  1
+#define CREATE_SLOT_NO                   2
 
-#define VALID_SLOT                   0
-#define SLOT_NOT_FOUND               1
-#define INCORRECT_SLOT_TYPE          2
+#define VALID_SLOT                       0
+#define SLOT_NOT_FOUND                   1
+#define INCORRECT_SLOT_TYPE              2
 
-#define INDENT_PER_LEVEL             2
-#define FORMAT_JSON                  0
-#define FORMAT_TEXT                  1
-#define FORMAT_JSON_COMPACT          2
-#define BULLET_POINT                 "- "
+#define INDENT_PER_LEVEL                 2
+#define FORMAT_JSON                      0
+#define FORMAT_TEXT                      1
+#define FORMAT_JSON_COMPACT              2
+#define BULLET_POINT                     "- "
 
-#define INCREMENTAL_PREFIX           "INCREMENTAL."
+#define INCREMENTAL_PREFIX               "INCREMENTAL."
 
-#define likely(x)                    __builtin_expect(!!(x), 1)
-#define unlikely(x)                  __builtin_expect(!!(x), 0)
+#define likely(x)                        __builtin_expect(!!(x), 1)
+#define unlikely(x)                      __builtin_expect(!!(x), 0)
 
-#define EMPTY_STR(_s)                (_s[0] == 0)
+#define EMPTY_STR(_s)                    (_s[0] == 0)
 
 #define MAX(a, b) \
    ({ __typeof__ (a) _a = (a);  \
@@ -157,6 +157,23 @@ extern "C" {
    ({ __typeof__ (a) _a = (a);  \
            __typeof__ (b) _b = (b);  \
            _a < _b ? _a : _b; })
+
+/**
+ * Duration type stored internally as milliseconds.
+ */
+typedef struct pgmoneta_time
+{
+   int64_t ms; /**< Internal storage in milliseconds */
+} pgmoneta_time_t;
+
+#define PGMONETA_TIME_MS(v)    ((pgmoneta_time_t){.ms = (int64_t)(v)})
+#define PGMONETA_TIME_SEC(v)   ((pgmoneta_time_t){.ms = (int64_t)(v) * 1000LL})
+#define PGMONETA_TIME_MIN(v)   ((pgmoneta_time_t){.ms = (int64_t)(v) * 60000LL})
+#define PGMONETA_TIME_HOUR(v)  ((pgmoneta_time_t){.ms = (int64_t)(v) * 3600000LL})
+#define PGMONETA_TIME_DAY(v)   ((pgmoneta_time_t){.ms = (int64_t)(v) * 86400000LL})
+
+#define PGMONETA_TIME_DISABLED ((pgmoneta_time_t){.ms = 0})
+#define PGMONETA_TIME_INFINITE ((pgmoneta_time_t){.ms = -1})
 
 /*
  * Common piece of code to perform a sleeping.
@@ -370,7 +387,7 @@ struct common_configuration
    char log_path[MISC_LENGTH];        /**< The logging path */
    int log_mode;                      /**< The logging mode */
    int log_rotation_size;             /**< bytes to force log rotation */
-   int log_rotation_age;              /**< minutes for log rotation */
+   pgmoneta_time_t log_rotation_age;  /**< Log rotation interval */
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
 
@@ -404,11 +421,11 @@ struct main_configuration
 
    bool running; /**< Is pgmoneta running */
 
-   char host[MISC_LENGTH];     /**< The host */
-   int metrics;                /**< The metrics port */
-   int metrics_cache_max_age;  /**< Number of seconds to cache the Prometheus response */
-   int metrics_cache_max_size; /**< Number of bytes max to cache the Prometheus response */
-   int management;             /**< The management port */
+   char host[MISC_LENGTH];                /**< The host */
+   int metrics;                           /**< The metrics port */
+   pgmoneta_time_t metrics_cache_max_age; /**< Cache duration for Prometheus response */
+   int metrics_cache_max_size;            /**< Number of bytes max to cache the Prometheus response */
+   int management;                        /**< The management port */
 
    char base_dir[MAX_PATH]; /**< The base directory */
 
@@ -452,9 +469,9 @@ struct main_configuration
    char metrics_key_file[MAX_PATH];  /**< Metrics TLS key path */
    char metrics_ca_file[MAX_PATH];   /**< Metrics TLS CA certificate path */
 
-   int blocking_timeout;       /**< The blocking timeout in seconds */
-   int authentication_timeout; /**< The authentication timeout in seconds */
-   char pidfile[MAX_PATH];     /**< File containing the PID */
+   pgmoneta_time_t blocking_timeout;       /**< The blocking timeout */
+   pgmoneta_time_t authentication_timeout; /**< The authentication timeout */
+   char pidfile[MAX_PATH];                 /**< File containing the PID */
 
    int workers; /**< The number of workers */
 
@@ -468,7 +485,7 @@ struct main_configuration
    int backup_max_rate;  /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
-   int verification; /**< The sha512 verification interval */
+   pgmoneta_time_t verification; /**< The sha512 verification interval */
 
 #ifdef DEBUG
    bool link; /**< Do linking */
