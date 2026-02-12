@@ -837,7 +837,7 @@ main(int argc, char** argv)
    ev_periodic_start(main_loop, &retention);
 
    /* Start SHA512 verification job */
-   ev_periodic_init(&verification, verification_cb, 0., config->verification, 0);
+   ev_periodic_init(&verification, verification_cb, 0., pgmoneta_time_convert(config->verification, FORMAT_TIME_S), 0);
    ev_periodic_start(main_loop, &verification);
 
    pgmoneta_log_info("Started on %s", config->host);

@@ -575,7 +575,7 @@ log_rotation_enabled(void)
 
    // log rotation is enabled if either log_rotation_age or
    // log_rotation_size is enabled
-   return config->log_rotation_age != PGMONETA_LOGGING_ROTATION_DISABLED || config->log_rotation_size != PGMONETA_LOGGING_ROTATION_DISABLED;
+   return pgmoneta_time_is_valid(config->log_rotation_age) || config->log_rotation_size != PGMONETA_LOGGING_ROTATION_DISABLED;
 }
 
 static void
@@ -584,7 +584,7 @@ log_rotation_disable(void)
    struct common_configuration* config;
    config = (struct common_configuration*)shmem;
 
-   config->log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+   config->log_rotation_age = PGMONETA_TIME_DISABLED;
    config->log_rotation_size = PGMONETA_LOGGING_ROTATION_DISABLED;
    next_log_rotation_age = 0;
 }
@@ -612,7 +612,7 @@ log_rotation_required(void)
       return true;
    }
 
-   if (config->log_rotation_age > 0 && next_log_rotation_age > 0 && next_log_rotation_age <= log_stat.st_ctime)
+   if (pgmoneta_time_is_valid(config->log_rotation_age) && next_log_rotation_age > 0 && next_log_rotation_age <= log_stat.st_ctime)
    {
       return true;
    }
@@ -628,21 +628,21 @@ log_rotation_set_next_rotation_age(void)
 
    config = (struct common_configuration*)shmem;
 
-   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE && config->log_rotation_age > 0)
+   if (config->log_type == PGMONETA_LOGGING_TYPE_FILE && pgmoneta_time_is_valid(config->log_rotation_age))
    {
       now = time(NULL);
       if (!now)
       {
-         config->log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+         config->log_rotation_age = PGMONETA_TIME_DISABLED;
          return false;
       }
 
-      next_log_rotation_age = now + config->log_rotation_age;
+      next_log_rotation_age = now + pgmoneta_time_convert(config->log_rotation_age, FORMAT_TIME_S);
       return true;
    }
    else
    {
-      config->log_rotation_age = PGMONETA_LOGGING_ROTATION_DISABLED;
+      config->log_rotation_age = PGMONETA_TIME_DISABLED;
       return false;
    }
 }

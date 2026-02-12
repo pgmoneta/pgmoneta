@@ -158,6 +158,22 @@ extern "C" {
            __typeof__ (b) _b = (b);  \
            _a < _b ? _a : _b; })
 
+/**
+ * Duration type stored internally as seconds.
+ */
+typedef struct pgmoneta_time
+{
+   int64_t s; /**< Internal storage in seconds */
+} pgmoneta_time_t;
+
+#define PGMONETA_TIME_SEC(v)   ((pgmoneta_time_t){.s = (int64_t)(v)})
+#define PGMONETA_TIME_MIN(v)   ((pgmoneta_time_t){.s = (int64_t)(v) * 60LL})
+#define PGMONETA_TIME_HOUR(v)  ((pgmoneta_time_t){.s = (int64_t)(v) * 3600LL})
+#define PGMONETA_TIME_DAY(v)   ((pgmoneta_time_t){.s = (int64_t)(v) * 86400LL})
+
+#define PGMONETA_TIME_DISABLED ((pgmoneta_time_t){.s = 0})
+#define PGMONETA_TIME_INFINITE ((pgmoneta_time_t){.s = -1})
+
 /*
  * Common piece of code to perform a sleeping.
  *
@@ -370,7 +386,7 @@ struct common_configuration
    char log_path[MISC_LENGTH];        /**< The logging path */
    int log_mode;                      /**< The logging mode */
    int log_rotation_size;             /**< bytes to force log rotation */
-   int log_rotation_age;              /**< minutes for log rotation */
+   pgmoneta_time_t log_rotation_age;  /**< Log rotation interval */
    char log_line_prefix[MISC_LENGTH]; /**< The logging prefix */
    atomic_schar log_lock;             /**< The logging lock */
 
@@ -404,11 +420,11 @@ struct main_configuration
 
    bool running; /**< Is pgmoneta running */
 
-   char host[MISC_LENGTH];     /**< The host */
-   int metrics;                /**< The metrics port */
-   int metrics_cache_max_age;  /**< Number of seconds to cache the Prometheus response */
-   int metrics_cache_max_size; /**< Number of bytes max to cache the Prometheus response */
-   int management;             /**< The management port */
+   char host[MISC_LENGTH];                /**< The host */
+   int metrics;                           /**< The metrics port */
+   pgmoneta_time_t metrics_cache_max_age; /**< Cache duration for Prometheus response */
+   int metrics_cache_max_size;            /**< Number of bytes max to cache the Prometheus response */
+   int management;                        /**< The management port */
 
    char base_dir[MAX_PATH]; /**< The base directory */
 
@@ -452,9 +468,9 @@ struct main_configuration
    char metrics_key_file[MAX_PATH];  /**< Metrics TLS key path */
    char metrics_ca_file[MAX_PATH];   /**< Metrics TLS CA certificate path */
 
-   int blocking_timeout;       /**< The blocking timeout in seconds */
-   int authentication_timeout; /**< The authentication timeout in seconds */
-   char pidfile[MAX_PATH];     /**< File containing the PID */
+   pgmoneta_time_t blocking_timeout;       /**< The blocking timeout */
+   pgmoneta_time_t authentication_timeout; /**< The authentication timeout */
+   char pidfile[MAX_PATH];                 /**< File containing the PID */
 
    int workers; /**< The number of workers */
 
@@ -468,7 +484,7 @@ struct main_configuration
    int backup_max_rate;  /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
-   int verification; /**< The sha512 verification interval */
+   pgmoneta_time_t verification; /**< The sha512 verification interval */
 
 #ifdef DEBUG
    bool link; /**< Do linking */

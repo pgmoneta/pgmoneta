@@ -78,7 +78,7 @@ static int as_management_compression(char* str);
 static int as_output_format(char* str);
 static unsigned int as_update_process_title(char* str, unsigned int default_policy);
 static int as_logging_rotation_size(char* str, int* size);
-static int as_seconds(char* str, int* age, int default_age);
+static int as_seconds(char* str, pgmoneta_time_t* time, pgmoneta_time_t default_age);
 static int as_bytes(char* str, int* bytes, int default_bytes);
 static int as_retention(char* str, int* days, int* weeks, int* months, int* years);
 static int as_create_slot(char* str, int* create_slot);
@@ -168,8 +168,8 @@ pgmoneta_init_main_configuration(void* shm)
 
    config->tls = false;
 
-   config->blocking_timeout = DEFAULT_BLOCKING_TIMEOUT;
-   config->authentication_timeout = 5;
+   config->blocking_timeout = PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT);
+   config->authentication_timeout = PGMONETA_TIME_SEC(5);
 
    home_dir = pgmoneta_get_home_directory();
    memcpy(&config->common.home_dir, home_dir, strlen(home_dir));
@@ -191,7 +191,7 @@ pgmoneta_init_main_configuration(void* shm)
    config->backup_max_rate = 0;
    config->network_max_rate = 0;
 
-   config->verification = 0;
+   config->verification = PGMONETA_TIME_DISABLED;
 
 #ifdef DEBUG
    config->link = true;
@@ -667,7 +667,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->metrics_cache_max_age, 0))
+                     if (as_seconds(value, &config->metrics_cache_max_age, PGMONETA_TIME_DISABLED))
                      {
                         unknown = true;
                      }
@@ -850,7 +850,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->blocking_timeout, DEFAULT_BLOCKING_TIMEOUT))
+                     if (as_seconds(value, &config->blocking_timeout, PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT)))
                      {
                         unknown = true;
                      }
@@ -964,7 +964,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_LOGGING_ROTATION_DISABLED))
+                     if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_TIME_DISABLED))
                      {
                         unknown = true;
                      }
@@ -1678,7 +1678,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                {
                   if (!strcmp(section, "pgmoneta"))
                   {
-                     if (as_seconds(value, &config->verification, 0))
+                     if (as_seconds(value, &config->verification, PGMONETA_TIME_DISABLED))
                      {
                         unknown = true;
                      }
@@ -2075,7 +2075,7 @@ pgmoneta_validate_main_configuration(void* shm)
       }
    }
 
-   if (config->verification < 0)
+   if (pgmoneta_time_convert(config->verification, FORMAT_TIME_S) < 0)
    {
       pgmoneta_log_fatal("verification cannot be less than 0");
       return 1;
@@ -3315,7 +3315,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR, (uintptr_t)config->common.unix_socket_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BASE_DIR, (uintptr_t)config->base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS, (uintptr_t)config->metrics, ValueInt64);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, (uintptr_t)config->metrics_cache_max_age, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, (uintptr_t)pgmoneta_time_convert(config->metrics_cache_max_age, FORMAT_TIME_S), ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE, (uintptr_t)config->metrics_cache_max_size, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANAGEMENT, (uintptr_t)config->management, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)config->compression_type, ValueInt32);
@@ -3348,11 +3348,11 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_TYPE, (uintptr_t)config->common.log_type, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LEVEL, (uintptr_t)config->common.log_level, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_PATH, (uintptr_t)config->common.log_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, (uintptr_t)config->common.log_rotation_age, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_AGE, (uintptr_t)pgmoneta_time_convert(config->common.log_rotation_age, FORMAT_TIME_S), ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_ROTATION_SIZE, (uintptr_t)config->common.log_rotation_size, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX, (uintptr_t)config->common.log_line_prefix, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_LOG_MODE, (uintptr_t)config->common.log_mode, ValueInt32);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, (uintptr_t)config->blocking_timeout, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT, (uintptr_t)pgmoneta_time_convert(config->blocking_timeout, FORMAT_TIME_S), ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS, (uintptr_t)config->tls, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->tls_cert_file, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->tls_ca_file, ValueString);
@@ -3375,7 +3375,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MAIN_CONF_PATH, (uintptr_t)config->common.configuration_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_USER_CONF_PATH, (uintptr_t)config->common.users_path, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ADMIN_CONF_PATH, (uintptr_t)config->common.admins_path, ValueString);
-   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_VERIFICATION, (uintptr_t)config->verification, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_VERIFICATION, (uintptr_t)pgmoneta_time_convert(config->verification, FORMAT_TIME_S), ValueInt64);
 
    free(ret);
 }
@@ -4158,7 +4158,28 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
       }
       else if (!strcmp(key, "verification"))
       {
-         if (as_seconds(value, &config->verification, 0))
+         if (as_seconds(value, &config->verification, PGMONETA_TIME_DISABLED))
+         {
+            unknown = true;
+         }
+      }
+      else if (!strcmp(key, "blocking_timeout"))
+      {
+         if (as_seconds(value, &config->blocking_timeout, PGMONETA_TIME_SEC(DEFAULT_BLOCKING_TIMEOUT)))
+         {
+            unknown = true;
+         }
+      }
+      else if (!strcmp(key, "metrics_cache_max_age"))
+      {
+         if (as_seconds(value, &config->metrics_cache_max_age, PGMONETA_TIME_DISABLED))
+         {
+            unknown = true;
+         }
+      }
+      else if (!strcmp(key, "log_rotation_age"))
+      {
+         if (as_seconds(value, &config->common.log_rotation_age, PGMONETA_TIME_DISABLED))
          {
             unknown = true;
          }
@@ -4251,7 +4272,7 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          }
          else if (!strcmp(key_info.key, "verification"))
          {
-            snprintf(buffer, buffer_size, "%d", config->verification);
+            snprintf(buffer, buffer_size, "%" PRId64, pgmoneta_time_convert(config->verification, FORMAT_TIME_S));
          }
          else if (!strcmp(key_info.key, "retention"))
          {
@@ -5249,17 +5270,17 @@ as_logging_rotation_size(char* str, int* size)
  * @param str the value to parse as retrieved from the configuration
  * @param age a pointer to the value that is going to store
  *        the resulting number of seconds
- * @param default_age a value to set when the parsing is unsuccesful
-
+ * @param default_age a value to set when the parsing is unsuccessful
+ *
  */
 static int
-as_seconds(char* str, int* age, int default_age)
+as_seconds(char* str, pgmoneta_time_t* age, pgmoneta_time_t default_age)
 {
    int multiplier = 1;
    int index;
    char value[MISC_LENGTH];
    bool multiplier_set = false;
-   int i_value = default_age;
+   int i_value = 0;
 
    if (is_empty_string(str))
    {
@@ -5303,8 +5324,13 @@ as_seconds(char* str, int* age, int default_age)
          }
          else if (str[i] == 'w' || str[i] == 'W')
          {
-            multiplier = 24 * 3600 * 7;
+            multiplier = 7 * 24 * 3600;
             multiplier_set = true;
+         }
+         else
+         {
+            // unrecognized suffix
+            goto error;
          }
       }
       else
@@ -5321,7 +5347,7 @@ as_seconds(char* str, int* age, int default_age)
       // must be a positive number!
       if (i_value >= 0)
       {
-         *age = i_value * multiplier;
+         *age = PGMONETA_TIME_SEC(i_value * multiplier);
       }
       else
       {
@@ -5680,14 +5706,14 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    }
    config->common.log_level = reload->common.log_level;
 
-   if (restart_int("verification", config->verification, reload->verification))
+   if (pgmoneta_time_convert(config->verification, FORMAT_TIME_S) != pgmoneta_time_convert(reload->verification, FORMAT_TIME_S))
    {
       changed = true;
    }
 
    if (strncmp(config->common.log_path, reload->common.log_path, MISC_LENGTH) ||
        config->common.log_rotation_size != reload->common.log_rotation_size ||
-       config->common.log_rotation_age != reload->common.log_rotation_age ||
+       pgmoneta_time_convert(config->common.log_rotation_age, FORMAT_TIME_S) != pgmoneta_time_convert(reload->common.log_rotation_age, FORMAT_TIME_S) ||
        config->common.log_mode != reload->common.log_mode)
    {
       pgmoneta_log_debug("Log restart triggered!");

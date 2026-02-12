@@ -1570,6 +1570,44 @@ pgmoneta_set_priority(int priority);
 int
 pgmoneta_get_priority(void);
 
+/**
+ * Time format specifiers for pgmoneta_time_format()
+ */
+enum pgmoneta_time_format_t {
+   FORMAT_TIME_S,         /**< Seconds */
+   FORMAT_TIME_MIN,       /**< Minutes */
+   FORMAT_TIME_HOUR,      /**< Hours */
+   FORMAT_TIME_DAY,       /**< Days */
+   FORMAT_TIME_TIMESTAMP, /**< Timestamp */
+};
+
+/**
+ * Convert a time value to a raw integer in the specified unit
+ * @param t The time value
+ * @param fmt The output format
+ * @return The time in the requested unit
+ */
+int64_t
+pgmoneta_time_convert(pgmoneta_time_t t, enum pgmoneta_time_format_t fmt);
+
+/**
+ * Check if a time value is valid (non-zero, non-disabled)
+ * @param t The time value
+ * @return true if enabled, otherwise false
+ */
+bool
+pgmoneta_time_is_valid(pgmoneta_time_t t);
+
+/**
+ * Format a time value into a string
+ * @param t The time value
+ * @param fmt The output format
+ * @param output The output string
+ * @return 0 on success, otherwise 1
+ */
+int
+pgmoneta_time_format(pgmoneta_time_t t, enum pgmoneta_time_format_t fmt, char** output);
+
 #ifdef __cplusplus
 }
 #endif

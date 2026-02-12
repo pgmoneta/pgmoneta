@@ -26,7 +26,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | unix_socket_dir | | String | Yes | The Unix Domain Socket location. Can interpolate environment variables (e.g., `$HOME`) |
 | base_dir | | String | Yes | The base directory for the backup. Can interpolate environment variables (e.g., `$HOME`) |
 | metrics | 0 | Int | No | The metrics port (disable = 0) |
-| metrics_cache_max_age | 0 | String | No | The time to keep a Prometheus (metrics) response in cache. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables caching. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
+| metrics_cache_max_age | 0 | String | No | The duration to keep a Prometheus (metrics) response in cache. If set to zero, the caching will be disabled. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
 | metrics_cache_max_size | 256k | String | No | The maximum amount of data to keep in cache when serving Prometheus responses. Changes require restart. This parameter determines the size of memory allocated for the cache even if `metrics_cache_max_age` or `metrics` are disabled. Its value, however, is taken into account only if `metrics_cache_max_age` is set to a non-zero value. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes).|
 | management | 0 | Int | No | The remote management port (disable = 0) |
 | compression | zstd | String | No | The compression type (none, gzip, client-gzip, server-gzip, zstd, client-zstd, server-zstd, lz4, client-lz4, server-lz4, bzip2, client-bzip2) |
@@ -60,11 +60,12 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | log_type | console | String | No | The logging type (console, file, syslog) |
 | log_level | info | String | No | The logging level, any of the (case insensitive) strings `FATAL`, `ERROR`, `WARN`, `INFO` and `DEBUG` (that can be more specific as `DEBUG1` thru `DEBUG5`). Debug level greater than 5 will be set to `DEBUG5`. Not recognized values will make the log_level be `INFO` |
 | log_path | pgmoneta.log | String | No | The log file location. Can be a strftime(3) compatible string. Can interpolate environment variables (e.g., `$HOME`) |
-| log_rotation_age | 0 | String | No | The time after which log file rotation is triggered. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables log rotation based on time. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
+| log_rotation_age | 0 | String | No | The age that will trigger a log file rotation. If expressed as a positive number, is managed as seconds. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). A value of `0` disables. |
 | log_rotation_size | 0 | String | No | The size of the log file that will trigger a log rotation. Supports suffixes: 'B' (bytes), the default if omitted, 'K' or 'KB' (kilobytes), 'M' or 'MB' (megabytes), 'G' or 'GB' (gigabytes). A value of `0` (with or without suffix) disables. |
 | log_line_prefix | %Y-%m-%d %H:%M:%S | String | No | A strftime(3) compatible string to use as prefix for every log line. Must be quoted if contains spaces. |
 | log_mode | append | String | No | Append to or create the log file (append, create) |
-| blocking_timeout | 30 | String | No | The number of seconds the process will be blocking for a connection. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables it. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
+| blocking_timeout | 30s | String | No | The duration the process will be blocking for a connection (disable = 0). Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
+| authentication_timeout | 5s | String | No | The duration allowed for authentication. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
 | tls | `off` | Bool | No | Enable Transport Layer Security (TLS) |
 | tls_cert_file | | String | No | Certificate file for TLS. This file must be owned by either the user running pgmoneta or root. Can interpolate environment variables (e.g., `$HOME`) |
 | tls_key_file | | String | No | Private key file for TLS. This file must be owned by either the user running pgmoneta or root. Additionally permissions must be at least `0640` when owned by root or `0600` otherwise. Can interpolate environment variables (e.g., `$HOME`) |
@@ -75,7 +76,7 @@ See a [sample](./etc/pgmoneta.conf) configuration for running `pgmoneta` on `loc
 | libev | `auto` | String | No | Select the [libev](http://software.schmorp.de/pkg/libev.html) backend to use. Valid options: `auto`, `select`, `poll`, `epoll`, `iouring`, `devpoll` and `port` |
 | backup_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the backup rate|
 | network_max_rate | 0 | Int | No | The number of bytes of tokens added every one second to limit the netowrk backup rate|
-| verification | 0 | Int | No | The time between verification of a backup. If this value is specified without units, it is taken as seconds. Setting this parameter to 0 disables verification. It supports the following units as suffixes: 'S' for seconds (default), 'M' for minutes, 'H' for hours, 'D' for days, and 'W' for weeks. |
+| verification | 0 | String | No | The time between verification of a backup. Setting this parameter to 0 disables verification. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
 | keep_alive | on | Bool | No | Have `SO_KEEPALIVE` on sockets |
 | nodelay | on | Bool | No | Have `TCP_NODELAY` on sockets |
 | non_blocking | on | Bool | No | Have `O_NONBLOCK` on sockets |
@@ -173,7 +174,7 @@ The `pgmoneta_cli` configuration defines defaults for the `pgmoneta-cli` client.
 | log_level | info | String | No | Logging level (`fatal`, `error`, `warn`, `info`, `debug`/`debug1`-`debug5`). |
 | log_path | pgmoneta-cli.log | String | No | Log file path when `log_type = file`. Can interpolate environment variables (e.g., `$HOME`). |
 | log_mode | append | String | No | Log file mode (`append`, `create`). |
-| log_rotation_age | 0 | String | No | Time-based rotation. `0` disables. Supports `S`, `M`, `H`, `D`, `W` suffixes (seconds default). |
+| log_rotation_age | 0 | String | No | Time-based rotation. `0` disables. Supports suffixes: 's' (seconds, default), 'm' (minutes), 'h' (hours), 'd' (days), 'w' (weeks). |
 | log_rotation_size | 0 | String | No | Size-based rotation. `0` disables. Supports `B` (default), `K/KB`, `M/MB`, `G/GB`. |
 | log_line_prefix | %Y-%m-%d %H:%M:%S | String | No | strftime(3) format prefix for log lines. |
 

@@ -51,6 +51,7 @@ Seongjun Shin <shinsj4653@gmail.com>
 Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
 Mazen Kamal <mazenkamal212@gmail.com>
 Trevor Jacob Mathews <trevorjacobmathews@gmail.com>
+Abdelrhman Sersawy <abdelrhmansersawy@gmail.com>
 ```
 
 ## Committers
