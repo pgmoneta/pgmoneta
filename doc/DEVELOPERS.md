@@ -415,6 +415,16 @@ For detailed user documentation about these tools, please refer to the [WAL Tool
 
 For developer information about the internal APIs and implementation details, see the [WAL developer guide](./manual/en/78-wal.md).
 
+## XID64
+
+pgmoneta is compatible with external PostgreSQL patches that introduce 64-bit Transaction IDs (FullTransactionId).
+
+Support includes:
+
+- **Backup/Restore:** Correct handling of 64-bit XIDs during backup and restore operations.
+
+**Note:** WAL tools are not supported with XID64.
+
 ## Logging levels
 
 | Level | Description |
