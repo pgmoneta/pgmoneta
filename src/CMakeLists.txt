@@ -6,6 +6,46 @@ FILE(GLOB_RECURSE HEADER_FILES "include/*.h")
 
 set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
 
+function(pgmoneta_require_shared_libs)
+  foreach(lib_var IN LISTS ARGN)
+    if (NOT DEFINED ${lib_var})
+      continue()
+    endif()
+
+    set(updated_libs "")
+    foreach(lib IN LISTS ${lib_var})
+      if (IS_ABSOLUTE "${lib}" AND lib MATCHES "\\.a$")
+        get_filename_component(lib_dir "${lib}" DIRECTORY)
+        get_filename_component(lib_name "${lib}" NAME_WE)
+        string(REGEX REPLACE "^lib" "" lib_base "${lib_name}")
+        set(shared_lib "")
+        if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+          file(GLOB shared_candidates
+            "${lib_dir}/${lib_name}.dylib*"
+            "${lib_dir}/${lib_base}.dylib*")
+        else()
+          file(GLOB shared_candidates
+            "${lib_dir}/${lib_name}.so*"
+            "${lib_dir}/${lib_base}.so*")
+        endif()
+
+        if (shared_candidates)
+          list(GET shared_candidates 0 shared_lib)
+        endif()
+
+        if (shared_lib)
+          list(APPEND updated_libs "${shared_lib}")
+        else()
+          message(FATAL_ERROR "Static library detected: ${lib}. Shared libraries are required.")
+        endif()
+      else()
+        list(APPEND updated_libs "${lib}")
+      endif()
+    endforeach()
+    set(${lib_var} "${updated_libs}" PARENT_SCOPE)
+  endforeach()
+endfunction()
+
 #
 # OS
 #
@@ -33,6 +73,21 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${LIBSSH_INCLUDE_DIRS}
     ${LibArchive_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
+  )
+
+  pgmoneta_require_shared_libs(
+    ZLIB_LIBRARIES
+    BZIP2_LIBRARIES
+    ZSTD_LIBRARIES
+    LZ4_LIBRARIES
+    LIBEV_LIBRARIES
+    OPENSSL_CRYPTO_LIBRARY
+    OPENSSL_SSL_LIBRARY
+    LIBYAML_LIBRARIES
+    LIBSSH_LIBRARIES
+    LIBATOMIC_LIBRARY
+    LibArchive_LIBRARY
+    THREAD_LIBRARY
   )
 
   #
@@ -87,6 +142,21 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     ${THREAD_INCLUDE_DIRS}
   )
 
+  pgmoneta_require_shared_libs(
+    ZLIB_LIBRARIES
+    BZIP2_LIBRARIES
+    ZSTD_LIBRARIES
+    LZ4_LIBRARIES
+    LIBEV_LIBRARIES
+    OPENSSL_CRYPTO_LIBRARY
+    OPENSSL_SSL_LIBRARY
+    LIBYAML_LIBRARIES
+    LIBSSH_LIBRARIES
+    LIBATOMIC_LIBRARY
+    LibArchive_LIBRARY
+    THREAD_LIBRARY
+  )
+
   #
   # Library directories
   #
@@ -130,19 +200,35 @@ else()
     ${CURSES_INCLUDE_DIRS}
   )
 
+  pgmoneta_require_shared_libs(
+    ZLIB_LIBRARIES
+    BZIP2_LIBRARIES
+    ZSTD_LIBRARIES
+    LZ4_LIBRARIES
+    LIBEV_LIBRARIES
+    OPENSSL_CRYPTO_LIBRARY
+    OPENSSL_SSL_LIBRARY
+    LIBYAML_LIBRARIES
+    LIBSSH_LIBRARIES
+    LIBATOMIC_LIBRARY
+    LibArchive_LIBRARY
+    THREAD_LIBRARY
+    CURSES_LIBRARIES
+  )
   #
   # Library directories
   #
   link_libraries(
     ${ZLIB_LIBRARIES}
-    ${ZSTD_LIBRARIES}
     ${BZIP2_LIBRARIES}
+    ${ZSTD_LIBRARIES}
     ${LZ4_LIBRARIES}
     ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
     ${LIBYAML_LIBRARIES}
     ${LIBSSH_LIBRARIES}
+    ${LIBATOMIC_LIBRARY}
     ${LibArchive_LIBRARIES}
     ${THREAD_LIBRARIES}
     ${CURSES_LIBRARIES}
