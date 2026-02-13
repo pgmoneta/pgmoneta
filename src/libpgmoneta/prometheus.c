@@ -111,7 +111,7 @@ pgmoneta_prometheus(SSL* client_ssl, int client_fd)
          char* path = "/";
          char* base_url = NULL;
 
-         if (pgmoneta_read_timeout_message(NULL, client_fd, config->authentication_timeout, &msg) != MESSAGE_STATUS_OK)
+         if (pgmoneta_read_timeout_message(NULL, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg) != MESSAGE_STATUS_OK)
          {
             pgmoneta_log_error("Failed to read message");
             goto error;
@@ -149,7 +149,7 @@ pgmoneta_prometheus(SSL* client_ssl, int client_fd)
          exit(0);
       }
    }
-   status = pgmoneta_read_timeout_message(client_ssl, client_fd, config->authentication_timeout, &msg);
+   status = pgmoneta_read_timeout_message(client_ssl, client_fd, pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S), &msg);
 
    if (status != MESSAGE_STATUS_OK)
    {
@@ -4611,7 +4611,7 @@ is_metrics_cache_configured(void)
       return false;
    }
 
-   return config->metrics_cache_max_age != PGMONETA_PROMETHEUS_CACHE_DISABLED;
+   return pgmoneta_time_is_valid(config->metrics_cache_max_age);
 }
 
 /**
@@ -4671,7 +4671,8 @@ pgmoneta_init_prometheus_cache(size_t* p_size, void** p_shmem)
 
 error:
    // disable caching
-   config->metrics_cache_max_age = config->metrics_cache_max_size = PGMONETA_PROMETHEUS_CACHE_DISABLED;
+   config->metrics_cache_max_age = PGMONETA_TIME_DISABLED;
+   config->metrics_cache_max_size = PGMONETA_PROMETHEUS_CACHE_DISABLED;
    pgmoneta_log_error("Cannot allocate shared memory for the Prometheus cache!");
    *p_size = 0;
    *p_shmem = NULL;
@@ -4806,6 +4807,6 @@ metrics_cache_finalize(void)
    }
 
    now = time(NULL);
-   cache->valid_until = now + config->metrics_cache_max_age;
+   cache->valid_until = now + pgmoneta_time_convert(config->metrics_cache_max_age, FORMAT_TIME_S);
    return cache->valid_until > now;
 }
