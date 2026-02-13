@@ -417,12 +417,13 @@ For developer information about the internal APIs and implementation details, se
 
 ## XID64
 
-pgmoneta is compatible with PostgreSQL versions using 64-bit Transaction IDs (FullTransactionId), such as PostgreSQL 19devel.
+pgmoneta is compatible with external PostgreSQL patches that introduce 64-bit Transaction IDs (FullTransactionId).
 
 Support includes:
-- **Base Backups:** Correctly handling 64-bit XIDs in backup manifests.
-- **WAL Parsing:** The `wal_reader` module supports parsing WAL records with 64-bit XIDs.
-- **Epoch Management:** Correctly handling XID wraparound (Epoch > 0) during streaming and restoration.
+
+- **Backup/Restore:** Correct handling of 64-bit XIDs during backup and restore operations.
+
+**Note:** WAL tools are not supported with XID64.
 
 ## Logging levels
 
