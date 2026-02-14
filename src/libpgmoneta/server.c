@@ -737,6 +737,66 @@ error:
    return 1;
 }
 
+int
+pgmoneta_server_database_size(int srv, SSL* ssl, int socket, char* database, uint64_t* size)
+{
+   char* user = NULL;
+   char* cell_output = NULL;
+   bool has_privilege = false;
+   char query[MISC_LENGTH];
+   struct query_response* response = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (ssl == NULL && socket < 0)
+   {
+      pgmoneta_log_error("Unable to connect to server %s", config->common.servers[srv].name);
+      goto error;
+   }
+
+   user = config->common.servers[srv].username;
+
+   if (has_execute_privilege(ssl, socket, user, "pg_database_size(name)", &has_privilege))
+   {
+      goto error;
+   }
+
+   if (!has_privilege)
+   {
+      pgmoneta_log_warn("Connection user: %s does not have EXECUTE privilege on 'pg_database_size(name)' function", user);
+      goto error;
+   }
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT pg_database_size('%s');", database);
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   if (response == NULL || response->number_of_columns != 1)
+   {
+      goto error;
+   }
+
+   cell_output = pgmoneta_query_response_get_data(response, 0);
+   if (cell_output == NULL || strcmp(cell_output, "") == 0)
+   {
+      goto error;
+   }
+
+   *size = strtoull(cell_output, NULL, 10);
+
+   pgmoneta_free_query_response(response);
+   return 0;
+
+error:
+   pgmoneta_free_query_response(response);
+   return 1;
+}
+
 static int
 get_wal_size(SSL* ssl, int socket, int* ws)
 {
@@ -1684,5 +1744,77 @@ error:
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(query_msg);
+   return 1;
+}
+
+int
+pgmoneta_server_databases_summary(int srv, SSL* ssl, int socket, int* count, char*** names, uint64_t** sizes)
+{
+   char query[MISC_LENGTH];
+   struct query_response* response = NULL;
+   struct tuple* tuple = NULL;
+
+   *count = 0;
+   *names = NULL;
+   *sizes = NULL;
+
+   memset(query, 0, sizeof(query));
+   snprintf(query, sizeof(query), "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datistemplate = false;");
+
+   if (query_execute(ssl, socket, query, &response))
+   {
+      goto error;
+   }
+
+   tuple = response->tuples;
+   while (tuple != NULL)
+   {
+      (*count)++;
+      tuple = tuple->next;
+   }
+
+   if (*count > 0)
+   {
+      *names = (char**)malloc(*count * sizeof(char*));
+      *sizes = (uint64_t*)malloc(*count * sizeof(uint64_t));
+
+      if (*names == NULL || *sizes == NULL)
+      {
+         goto error;
+      }
+
+      tuple = response->tuples;
+      for (int i = 0; i < *count; i++)
+      {
+         (*names)[i] = strdup(tuple->data[0]);
+         (*sizes)[i] = strtoull(tuple->data[1], NULL, 10);
+         tuple = tuple->next;
+      }
+   }
+
+   pgmoneta_free_query_response(response);
+
+   return 0;
+
+error:
+   if (*names != NULL)
+   {
+      for (int i = 0; i < *count; i++)
+      {
+         free((*names)[i]);
+      }
+      free(*names);
+   }
+   if (*sizes != NULL)
+   {
+      free(*sizes);
+   }
+
+   *count = 0;
+   *names = NULL;
+   *sizes = NULL;
+
+   pgmoneta_free_query_response(response);
+
    return 1;
 }
