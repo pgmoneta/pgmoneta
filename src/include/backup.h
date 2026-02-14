@@ -62,6 +62,17 @@ void
 pgmoneta_list_backup(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
 
 /**
+ * List S3 objects for a server
+ * @param client_fd The client
+ * @param server The server
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param payload The payload
+ */
+void
+pgmoneta_list_s3_objects(int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload);
+
+/**
  * Delete a backup for a server
  * @param client_fd The client
  * @param server The server

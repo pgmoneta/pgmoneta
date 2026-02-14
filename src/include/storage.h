@@ -58,10 +58,11 @@ pgmoneta_storage_create_ssh(int workflow_type);
 
 /**
  * Create a workflow for the S3 storage engine
+ * @param workflow_type The workflow type
  * @return The workflow
  */
 struct workflow*
-pgmoneta_storage_create_s3(void);
+pgmoneta_storage_create_s3(int workflow_type);
 
 /**
  * Create a workflow for the Azure storage engine

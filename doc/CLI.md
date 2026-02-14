@@ -105,6 +105,17 @@ Example
 pgmoneta-cli list-backup primary
 ```
 
+## ls-s3 
+list the objects in the s3 bucket 
+command
+```sh 
+pgmoneta-cli ls-s3 <server> 
+```
+Example
+```sh 
+pgmoneta-cli ls-s3 primary
+```
+
 ## restore
 
 Restore a backup from a server
