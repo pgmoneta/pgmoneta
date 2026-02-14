@@ -2268,3 +2268,47 @@ cleanup:
    pgmoneta_free_aligned(ptr2);
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_parse_lsn)
+{
+   uint64_t lsn = 0;
+
+   lsn = pgmoneta_lsn_from_string("0/16B0938");
+   MCTF_ASSERT_INT_EQ(lsn, 23791928, cleanup, "lsn mismatch 1");
+
+   lsn = pgmoneta_lsn_from_string("1/0");
+   MCTF_ASSERT_INT_EQ(lsn, 4294967296, cleanup, "lsn mismatch 2");
+
+   lsn = pgmoneta_lsn_from_string("0/0");
+   MCTF_ASSERT_INT_EQ(lsn, 0, cleanup, "lsn mismatch 3");
+
+   lsn = pgmoneta_lsn_from_string("invalid");
+   MCTF_ASSERT_INT_EQ(lsn, 0, cleanup, "lsn mismatch 4");
+
+cleanup:
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_parse_timestamp)
+{
+   time_t ts = 0;
+   struct tm tm_val;
+
+   ts = pgmoneta_timestamp_from_string("2025-12-23 02:00:00");
+   MCTF_ASSERT(ts != 0, cleanup, "timestamp parsing failed");
+   MCTF_ASSERT(ts != -1, cleanup, "timestamp parsing error");
+
+   localtime_r(&ts, &tm_val);
+   MCTF_ASSERT_INT_EQ(tm_val.tm_year + 1900, 2025, cleanup, "year mismatch");
+   MCTF_ASSERT_INT_EQ(tm_val.tm_mon + 1, 12, cleanup, "month mismatch");
+   MCTF_ASSERT_INT_EQ(tm_val.tm_mday, 23, cleanup, "day mismatch");
+   MCTF_ASSERT_INT_EQ(tm_val.tm_hour, 2, cleanup, "hour mismatch");
+   MCTF_ASSERT_INT_EQ(tm_val.tm_min, 0, cleanup, "minute mismatch");
+   MCTF_ASSERT_INT_EQ(tm_val.tm_sec, 0, cleanup, "second mismatch");
+
+   ts = pgmoneta_timestamp_from_string("invalid");
+   MCTF_ASSERT_INT_EQ(ts, 0, cleanup, "invalid timestamp should return 0");
+
+cleanup:
+   MCTF_FINISH();
+}

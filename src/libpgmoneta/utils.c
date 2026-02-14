@@ -6017,3 +6017,69 @@ pgmoneta_direct_io_supported(const char* path)
    return false;
 #endif
 }
+
+uint64_t
+pgmoneta_lsn_from_string(char* lsn)
+{
+   uint32_t id = 0;
+   uint32_t off = 0;
+   uint64_t v = 0;
+
+   if (lsn == NULL || strlen(lsn) == 0)
+   {
+      goto error;
+   }
+
+   if (sscanf(lsn, "%X/%X", &id, &off) != 2)
+   {
+      goto error;
+   }
+
+   v = ((uint64_t)id << 32) | off;
+
+   return v;
+
+error:
+
+   return 0;
+}
+
+time_t
+pgmoneta_timestamp_from_string(char* ts)
+{
+   struct tm tm_val;
+   time_t time_val;
+
+   if (ts == NULL || strlen(ts) == 0)
+   {
+      goto error;
+   }
+
+   memset(&tm_val, 0, sizeof(struct tm));
+
+   if (strptime(ts, "%Y-%m-%d %H:%M:%S", &tm_val) == NULL)
+   {
+      goto error;
+   }
+
+   tm_val.tm_isdst = -1;
+
+   time_val = mktime(&tm_val);
+
+   if (time_val == -1)
+   {
+      goto error;
+   }
+
+   return time_val;
+
+error:
+
+   return 0;
+}
+
+uint64_t
+pgmoneta_get_lsn(uint32_t hi, uint32_t lo)
+{
+   return ((uint64_t)hi << 32) | lo;
+}

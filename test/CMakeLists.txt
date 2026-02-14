@@ -117,6 +117,9 @@ if (check)
   add_executable(pgmoneta-test runner.c ${SOURCES})
   target_include_directories(pgmoneta-test PRIVATE ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/test/include)
 
+  # Define the source resource directory as a fallback for tests
+  target_compile_definitions(pgmoneta-test PRIVATE TEST_RESOURCE_DIR="${CMAKE_SOURCE_DIR}/test")
+
   if(EXISTS "/etc/debian_version")
     target_link_libraries(pgmoneta-test pthread rt m pgmoneta)
   elseif(APPLE)

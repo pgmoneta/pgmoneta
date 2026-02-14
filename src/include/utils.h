@@ -833,6 +833,31 @@ bool
 pgmoneta_is_file(char* file);
 
 /**
+ * Parse an LSN string
+ * @param lsn The LSN string (e.g., "0/16B0938")
+ * @return The LSN, or 0 on error
+ */
+uint64_t
+pgmoneta_lsn_from_string(char* lsn);
+
+/**
+ * Parse a timestamp string
+ * @param ts The timestamp string (e.g., "2025-12-23 15:30:00")
+ * @return The timestamp, or 0 on error
+ */
+time_t
+pgmoneta_timestamp_from_string(char* ts);
+
+/**
+ * Get LSN from high and low 32-bit values
+ * @param hi The high 32 bits
+ * @param lo The low 32 bits
+ * @return The 64-bit LSN
+ */
+uint64_t
+pgmoneta_get_lsn(uint32_t hi, uint32_t lo);
+
+/**
  * Compare files
  * @param f1 The first file path
  * @param f2 The second file path
