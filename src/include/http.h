@@ -52,6 +52,8 @@ extern "C" {
 #define PGMONETA_HTTP_STATUS_OK    0
 #define PGMONETA_HTTP_STATUS_ERROR 1
 
+#define MAX_HEADER_SIZE            (16 * 1024)
+
 /** @struct http_payload
  * Defines shared HTTP message content
  */
