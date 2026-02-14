@@ -30,6 +30,7 @@
 #include <tsclient.h>
 #include <tscommon.h>
 #include <mctf.h>
+#include <deque.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -45,14 +46,15 @@ struct echo_server
    int port;
    pthread_t thread;
    bool running;
+   char* response;
 };
 
 static struct echo_server* test_server = NULL;
 
 static void* echo_server_thread(void* arg);
-static int start_echo_server(int port);
+static int start_echo_server(int port, char* response);
 static int stop_echo_server(void);
-static void setup_echo_server(void);
+static void setup_echo_server(char* response);
 static void teardown_echo_server(void);
 
 MCTF_TEST(test_pgmoneta_http_get)
@@ -65,14 +67,90 @@ MCTF_TEST(test_pgmoneta_http_get)
    const char* hostname = "localhost";
    int port = 9999;
    bool secure = false;
-
-   setup_echo_server();
+   setup_echo_server(NULL);
 
    MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
    MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/get", &request), cleanup, "failed to create request");
 
    status = pgmoneta_http_invoke(connection, request, &response);
    MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP GET request failed");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+MCTF_TEST(test_pgmoneta_http_get_content_length)
+{
+   int status;
+   char* content_length;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+
+   char* response_text =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: application/json\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 16\r\n"
+      "\r\n"
+      "{\"status\":\"ok\"}\n";
+
+   setup_echo_server(response_text);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/get", &request), cleanup, "failed to create request");
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP GET request failed");
+   MCTF_ASSERT(response->payload.headers, cleanup, "headers is null");
+   content_length = (char*)pgmoneta_deque_get(response->payload.headers, "Content-Length");
+   MCTF_ASSERT_STR_EQ(content_length, "16", cleanup, "Content-Length header mismatch");
+
+cleanup:
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_response_destroy(response);
+   pgmoneta_http_destroy(connection);
+   teardown_echo_server();
+   MCTF_FINISH();
+}
+MCTF_TEST(test_pgmoneta_http_get_truncated_chunk)
+{
+   int status;
+   char* truncated;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+   struct http_response* response = NULL;
+
+   const char* hostname = "localhost";
+   int port = 9999;
+   bool secure = false;
+   char* response_text = "HTTP/1.1 200 OK\r\n"
+                         "Content-Type: application/json\r\n"
+                         "Transfer-Encoding: chunked\r\n"
+                         "Connection: close\r\n"
+                         "\r\n"
+                         "10\r\n"
+                         "{\"status\":\"ok\"}\n"
+                         "\r\n"
+                         "0\r\n"
+                         "\r\n";
+   setup_echo_server(response_text);
+
+   MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
+   MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_GET, "/get", &request), cleanup, "failed to create request");
+
+   status = pgmoneta_http_invoke(connection, request, &response);
+   MCTF_ASSERT_INT_EQ(status, PGMONETA_HTTP_STATUS_OK, cleanup, "HTTP GET request failed");
+
+   MCTF_ASSERT(response->payload.headers, cleanup, "headers is null");
+   truncated = (char*)pgmoneta_deque_get(response->payload.headers, "Transfer-Encoding");
+   MCTF_ASSERT(truncated, cleanup, "Truncated-Chunk is null");
 
 cleanup:
    pgmoneta_http_request_destroy(request);
@@ -93,7 +171,7 @@ MCTF_TEST(test_pgmoneta_http_post)
    bool secure = false;
    const char* test_data = "name=pgmoneta&version=1.0";
 
-   setup_echo_server();
+   setup_echo_server(NULL);
 
    MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
    MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_POST, "/post", &request), cleanup, "failed to create request");
@@ -121,7 +199,7 @@ MCTF_TEST(test_pgmoneta_http_put)
    bool secure = false;
    const char* test_data = "This is a test file content for PUT request";
 
-   setup_echo_server();
+   setup_echo_server(NULL);
 
    MCTF_ASSERT(!pgmoneta_http_create((char*)hostname, port, secure, &connection), cleanup, "failed to establish connection");
    MCTF_ASSERT(!pgmoneta_http_request_create(PGMONETA_HTTP_PUT, "/put", &request), cleanup, "failed to create request");
@@ -152,7 +230,7 @@ MCTF_TEST(test_pgmoneta_http_put_file)
    const char* test_data = "This is a test file content for PUT file request\nSecond line of test data\nThird line with some numbers: 12345";
    size_t data_len = strlen(test_data);
 
-   setup_echo_server();
+   setup_echo_server(NULL);
 
    temp_file = tmpfile();
    MCTF_ASSERT_PTR_NONNULL(temp_file, cleanup, "Failed to create temp file");
@@ -284,14 +362,7 @@ echo_server_thread(void* arg)
          if (bytes_read > 0)
          {
             buffer[bytes_read] = '\0';
-
-            char response[] = "HTTP/1.1 200 OK\r\n"
-                              "Content-Type: application/json\r\n"
-                              "Connection: close\r\n"
-                              "\r\n"
-                              "{\"status\":\"ok\"}\n";
-
-            send(client_fd, response, strlen(response), 0);
+            send(client_fd, server->response, strlen(server->response), 0);
          }
 
          close(client_fd);
@@ -302,7 +373,7 @@ echo_server_thread(void* arg)
 }
 
 static int
-start_echo_server(int port)
+start_echo_server(int port, char* response)
 {
    if (test_server != NULL)
    {
@@ -317,6 +388,13 @@ start_echo_server(int port)
 
    test_server->port = port;
    test_server->running = false;
+   if (response == NULL)
+      response = "HTTP/1.1 200 OK\r\n"
+                 "Content-Type: application/json\r\n"
+                 "Connection: close\r\n"
+                 "\r\n"
+                 "{\"status\":\"ok\"}\n";
+   test_server->response = response;
 
    test_server->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
    if (test_server->socket_fd < 0)
@@ -394,10 +472,10 @@ stop_echo_server(void)
 }
 
 static void
-setup_echo_server(void)
+setup_echo_server(char* response)
 {
    pgmoneta_test_setup();
-   start_echo_server(9999);
+   start_echo_server(9999, response);
 }
 
 static void
