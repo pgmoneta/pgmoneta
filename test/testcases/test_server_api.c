@@ -50,11 +50,7 @@ MCTF_TEST(test_server_api_info)
    struct server srv;
    int expected_version = 17;
 
-   if (setup_server_connection())
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to setup server connection");
-   }
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection - check authentication and server configuration");
 
    config = (struct main_configuration*)shmem;
    pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
@@ -83,17 +79,9 @@ MCTF_TEST(test_server_api_checkpoint)
    uint64_t chkt;
    uint32_t tli;
 
-   if (setup_server_connection())
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to setup server connection");
-   }
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection - check authentication and server configuration");
 
-   if (pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli))
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to get checkpoint");
-   }
+   MCTF_ASSERT(pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &chkt, &tli) == 0, cleanup, "failed to get checkpoint - checkpoint operation failed");
 
 cleanup:
    teardown_server_connection();
@@ -106,11 +94,7 @@ MCTF_TEST(test_server_api_read_file)
    int data_length;
    char file_path[] = "postgresql.conf";
 
-   if (setup_server_connection())
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to setup server connection");
-   }
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection - check authentication and server configuration");
 
    if (pgmoneta_server_read_binary_file(PRIMARY_SERVER, srv_ssl, file_path, 0, 100, srv_socket, &data, &data_length))
    {
@@ -128,11 +112,7 @@ MCTF_TEST(test_server_api_read_file_metadata)
    struct file_stats stat;
    char file_path[] = "postgresql.conf";
 
-   if (setup_server_connection())
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to setup server connection");
-   }
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection - check authentication and server configuration");
 
    if (pgmoneta_server_file_stat(PRIMARY_SERVER, srv_ssl, srv_socket, file_path, &stat))
    {
@@ -151,24 +131,11 @@ MCTF_TEST(test_server_api_backup)
    char* stop_lsn = NULL;
    struct label_file_contents lf = {0};
 
-   if (setup_server_connection())
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to setup server connection");
-   }
+   MCTF_ASSERT(setup_server_connection() == 0, cleanup, "failed to setup server connection - check authentication and server configuration");
 
-   if (pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn))
-   {
-      teardown_server_connection();
-      MCTF_SKIP("failed to start backup");
-   }
+   MCTF_ASSERT(pgmoneta_server_start_backup(PRIMARY_SERVER, srv_ssl, srv_socket, "test_backup", &start_lsn) == 0, cleanup, "failed to start backup - backup initialization failed");
 
-   if (pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, NULL, &stop_lsn, &lf))
-   {
-      free(start_lsn);
-      teardown_server_connection();
-      MCTF_SKIP("failed to stop backup");
-   }
+   MCTF_ASSERT(pgmoneta_server_stop_backup(PRIMARY_SERVER, srv_ssl, srv_socket, NULL, &stop_lsn, &lf) == 0, cleanup, "failed to stop backup - backup completion failed");
 
 cleanup:
    free(start_lsn);

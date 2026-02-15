@@ -155,11 +155,7 @@ MCTF_TEST(test_cli_list_backup)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_list_backup("primary", NULL, NULL, 0) == 0, cleanup, "List backup primary failed");
 
@@ -172,11 +168,7 @@ MCTF_TEST(test_cli_info)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_info("primary", "newest", 0) == 0, cleanup, "Info newest failed");
 
@@ -190,11 +182,7 @@ MCTF_TEST(test_cli_verify)
    char path[MAX_PATH];
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    snprintf(path, sizeof(path), "%s/verify_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
@@ -213,11 +201,7 @@ MCTF_TEST(test_cli_archive)
    char path[MAX_PATH];
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    snprintf(path, sizeof(path), "%s/archive_test", TEST_BASE_DIR);
    pgmoneta_mkdir(path);
@@ -235,11 +219,7 @@ MCTF_TEST(test_cli_restore)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_restore("primary", "newest", "current", 0) == 0, cleanup, "Restore newest failed");
 
@@ -254,11 +234,7 @@ MCTF_TEST(test_cli_retain)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_retain("primary", "newest", false, 0) == 0, cleanup, "Retain newest failed");
 
@@ -271,11 +247,7 @@ MCTF_TEST(test_cli_expunge)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_expunge("primary", "newest", false, 0) == 0, cleanup, "Expunge newest failed");
 
@@ -288,11 +260,7 @@ MCTF_TEST(test_cli_annotate)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_annotate("primary", "newest", "add", "testkey", "testcomment", 0) == 0, cleanup,
                "Annotate add failed");
@@ -306,11 +274,7 @@ MCTF_TEST(test_cli_delete)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "Delete oldest failed");
 

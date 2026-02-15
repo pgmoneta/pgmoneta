@@ -41,11 +41,7 @@ MCTF_TEST(test_pgmoneta_delete_full)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "delete failed");
 
@@ -61,11 +57,7 @@ MCTF_TEST(test_pgmoneta_delete_retained_backup)
 
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
@@ -101,11 +93,7 @@ MCTF_TEST(test_pgmoneta_delete_force_retained_backup)
 
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_retain("primary", "oldest", false, 0), cleanup, "failed to retain backup");
    MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) != 0, cleanup, "delete should fail for retained backup");
@@ -142,11 +130,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
 
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup_chain())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup chain failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_before, 0), cleanup, "list backup before failed");
    num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
@@ -154,11 +138,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_last)
    pgmoneta_json_destroy(response_before);
    response_before = NULL;
 
-   if (pgmoneta_tsclient_delete("primary", "newest", 0))
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("delete failed");
-   }
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "newest", 0) == 0, cleanup, "delete operation failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_after, 0), cleanup, "list backup after failed");
    num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
@@ -193,11 +173,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
 
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup_chain())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup chain failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_before, 0), cleanup, "list backup before failed");
    num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
@@ -208,12 +184,7 @@ MCTF_TEST(test_pgmoneta_delete_chain_middle)
    label_to_delete = pgmoneta_tsclient_get_backup_label(backup_target);
    MCTF_ASSERT_PTR_NONNULL(label_to_delete, cleanup, "label is null");
 
-   if (pgmoneta_tsclient_delete("primary", label_to_delete, 0))
-   {
-      pgmoneta_json_destroy(response_before);
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("delete failed");
-   }
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", label_to_delete, 0) == 0, cleanup, "delete operation failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_after, 0), cleanup, "list backup after failed");
    num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);
@@ -256,22 +227,13 @@ MCTF_TEST(test_pgmoneta_delete_chain_root)
 
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup_chain())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup chain failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_before, 0), cleanup, "list backup before failed");
    num_bck_before = pgmoneta_tsclient_get_backup_count(response_before);
    MCTF_ASSERT_INT_EQ(num_bck_before, 3, cleanup, "expected 3 backups before deletion");
 
-   if (pgmoneta_tsclient_delete("primary", "oldest", 0))
-   {
-      pgmoneta_json_destroy(response_before);
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("delete failed");
-   }
+   MCTF_ASSERT(pgmoneta_tsclient_delete("primary", "oldest", 0) == 0, cleanup, "delete operation failed");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response_after, 0), cleanup, "list backup after failed");
    num_bck_after = pgmoneta_tsclient_get_backup_count(response_after);

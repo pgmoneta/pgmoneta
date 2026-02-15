@@ -43,11 +43,7 @@ MCTF_TEST(test_pgmoneta_backup_full)
 {
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup() == 0, cleanup, "backup failed during setup - check server is online and backup configuration");
 
 cleanup:
    pgmoneta_test_basedir_cleanup();
@@ -64,11 +60,7 @@ MCTF_TEST(test_pgmoneta_backup_incremental_basic)
 
    pgmoneta_test_setup();
 
-   if (pgmoneta_test_add_backup_chain())
-   {
-      pgmoneta_test_basedir_cleanup();
-      MCTF_SKIP("backup chain failed during setup");
-   }
+   MCTF_ASSERT(pgmoneta_test_add_backup_chain() == 0, cleanup, "backup chain failed during setup - check server is online and backup configuration");
 
    MCTF_ASSERT(!pgmoneta_tsclient_list_backup("primary", NULL, &response, 0), cleanup, "list backup failed");
 

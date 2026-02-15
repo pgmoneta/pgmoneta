@@ -40,6 +40,10 @@ GRANT EXECUTE ON FUNCTION pgmoneta_ext_get_files(text) TO PG_REPL_USER_NAME;
 -- GRANT REPL_USER priviledge to fetch file from server
 GRANT pg_read_server_files TO PG_REPL_USER_NAME;
 
+-- GRANT REPL_USER privilege to perform CHECKPOINT and pg_switch_wal
+GRANT pg_checkpoint TO PG_REPL_USER_NAME;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_switch_wal() TO PG_REPL_USER_NAME;
+
 GRANT EXECUTE ON FUNCTION pg_read_binary_file(text, bigint, bigint, boolean) TO PG_REPL_USER_NAME;
 GRANT EXECUTE ON FUNCTION pg_stat_file(text, boolean) TO PG_REPL_USER_NAME;
 -- GRANT REPL_USER execute privileges on backup admin functions

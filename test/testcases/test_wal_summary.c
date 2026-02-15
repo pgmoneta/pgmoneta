@@ -99,110 +99,56 @@ MCTF_TEST(test_pgmoneta_wal_summary)
 
    // establish a connection to repl user, with replication flag not set
 
-   if (pgmoneta_server_authenticate(PRIMARY_SERVER, "postgres", config->common.users[srv_usr_index].username, config->common.users[srv_usr_index].password, false, &srv_ssl, &srv_socket))
-   {
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to authenticate with primary server");
-   }
+   MCTF_ASSERT(pgmoneta_server_authenticate(PRIMARY_SERVER, "postgres", config->common.users[srv_usr_index].username, config->common.users[srv_usr_index].password, false, &srv_ssl, &srv_socket) == 0, cleanup, "failed to authenticate with primary server - check connection and credentials");
 
    // establish a connection to custom myuser
+   // Note: Password is "mypass" as set in test/check.sh (PG_USER_PASSWORD=mypass)
+   // pg_hba.conf uses "trust" for PG_USER_NAME, so password shouldn't matter, but we use correct one
 
-   if (pgmoneta_server_authenticate(PRIMARY_SERVER, "mydb", "myuser", "password", false, &custom_user_ssl, &custom_user_socket))
-   {
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to authenticate with custom user");
-   }
+   MCTF_ASSERT(pgmoneta_server_authenticate(PRIMARY_SERVER, "mydb", "myuser", "mypass", false, &custom_user_ssl, &custom_user_socket) == 0, cleanup, "failed to authenticate with custom user - check user configuration");
 
    // Get server info - this returns void, so we check validity after
 
    pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
-   if (pgmoneta_test_server_info_check(PRIMARY_SERVER))
-   {
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("server info check failed");
-   }
+   MCTF_ASSERT(pgmoneta_test_server_info_check(PRIMARY_SERVER) == 0, cleanup, "server info check failed - server may not be properly initialized");
 
    // get the starting lsn for summary
 
-   if (pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &s_lsn, &tli))
-   {
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to get starting LSN");
-   }
+   MCTF_ASSERT(pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &s_lsn, &tli) == 0, cleanup, "failed to get starting LSN - checkpoint operation failed");
 
-   // Create a table
+   // Create a table (drop if exists to ensure clean state)
 
-   if (pgmoneta_test_execute_query(PRIMARY_SERVER, custom_user_ssl, custom_user_socket, "CREATE TABLE t1 (id int);", &qr))
-   {
-      pgmoneta_test_cleanup_query_response(&qr);
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to create table");
-   }
+   MCTF_ASSERT(pgmoneta_test_execute_query(PRIMARY_SERVER, custom_user_ssl, custom_user_socket, "DROP TABLE IF EXISTS t1;", &qr) == 0, cleanup, "failed to drop existing table - database query execution failed");
+   pgmoneta_test_cleanup_query_response(&qr);
+
+   MCTF_ASSERT(pgmoneta_test_execute_query(PRIMARY_SERVER, custom_user_ssl, custom_user_socket, "CREATE TABLE t1 (id int);", &qr) == 0, cleanup, "failed to create table - database query execution failed");
    pgmoneta_test_cleanup_query_response(&qr);
 
    // Insert some tuples
 
-   if (pgmoneta_test_execute_query(PRIMARY_SERVER, custom_user_ssl, custom_user_socket, "INSERT INTO t1 SELECT GENERATE_SERIES(1, 800);", &qr))
-   {
-      pgmoneta_test_cleanup_query_response(&qr);
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to insert data");
-   }
+   MCTF_ASSERT(pgmoneta_test_execute_query(PRIMARY_SERVER, custom_user_ssl, custom_user_socket, "INSERT INTO t1 SELECT GENERATE_SERIES(1, 800);", &qr) == 0, cleanup, "failed to insert data - database query execution failed");
    pgmoneta_test_cleanup_query_response(&qr);
 
    // get the ending lsn for summary
 
-   if (pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &e_lsn, &tli))
-   {
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to get ending LSN");
-   }
+   MCTF_ASSERT(pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &e_lsn, &tli) == 0, cleanup, "failed to get ending LSN - checkpoint operation failed");
 
    // Switch the wal segment so that records won't appear in partial segments
 
-   if (pgmoneta_test_execute_query(PRIMARY_SERVER, srv_ssl, srv_socket, "SELECT pg_switch_wal();", &qr))
-   {
-      pgmoneta_test_cleanup_query_response(&qr);
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to switch WAL");
-   }
+   MCTF_ASSERT(pgmoneta_test_execute_query(PRIMARY_SERVER, srv_ssl, srv_socket, "SELECT pg_switch_wal();", &qr) == 0, cleanup, "failed to switch WAL - WAL operation failed");
    pgmoneta_test_cleanup_query_response(&qr);
 
    // Create summary directory in the base_dir of a server if not already present
 
    summary_dir = pgmoneta_get_server_summary(PRIMARY_SERVER);
    MCTF_ASSERT_PTR_NONNULL(summary_dir, cleanup, "summary directory path is null");
-   if (pgmoneta_mkdir(summary_dir))
-   {
-      free(summary_dir);
-      summary_dir = NULL;
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to create summary directory");
-   }
+   MCTF_ASSERT(pgmoneta_mkdir(summary_dir) == 0, cleanup, "failed to create summary directory - filesystem operation failed");
 
    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);
    MCTF_ASSERT_PTR_NONNULL(wal_dir, cleanup, "wal directory path is null");
 
    MCTF_ASSERT(e_lsn >= s_lsn, cleanup, "ending LSN must be >= starting LSN");
-   if (pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn, &brt))
-   {
-      free(summary_dir);
-      summary_dir = NULL;
-      free(wal_dir);
-      wal_dir = NULL;
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to summarize WAL");
-   }
+   MCTF_ASSERT(pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn, &brt) == 0, cleanup, "failed to summarize WAL - WAL summarization operation failed");
 
    // Verify BRT was created and contains data
 
@@ -212,21 +158,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
 
    MCTF_ASSERT(brt->table->size > 0, cleanup, "BRT should contain entries after WAL summarization");
 
-   if (pgmoneta_wal_summary_save(PRIMARY_SERVER, s_lsn, e_lsn, brt))
-   {
-      if (brt != NULL)
-      {
-         pgmoneta_brt_destroy(brt);
-         brt = NULL;
-      }
-      free(summary_dir);
-      summary_dir = NULL;
-      free(wal_dir);
-      wal_dir = NULL;
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to save WAL summary");
-   }
+   MCTF_ASSERT(pgmoneta_wal_summary_save(PRIMARY_SERVER, s_lsn, e_lsn, brt) == 0, cleanup, "failed to save WAL summary - file I/O operation failed");
 
    // Verify the summary file was actually created on disk
 
@@ -246,25 +178,7 @@ MCTF_TEST(test_pgmoneta_wal_summary)
 
    // Verify we can read the summary file back and it matches what we wrote
 
-   if (pgmoneta_brt_read(summary_file_path, &verify_brt))
-   {
-      // If read fails, we skip the verification but still report the file exists
-
-      free(summary_file_path);
-      summary_file_path = NULL;
-      if (brt != NULL)
-      {
-         pgmoneta_brt_destroy(brt);
-         brt = NULL;
-      }
-      free(summary_dir);
-      summary_dir = NULL;
-      free(wal_dir);
-      wal_dir = NULL;
-      cleanup_connections(&srv_ssl, &srv_socket, &custom_user_ssl, &custom_user_socket);
-      pgmoneta_test_teardown();
-      MCTF_SKIP("failed to read BRT from summary file");
-   }
+   MCTF_ASSERT(pgmoneta_brt_read(summary_file_path, &verify_brt) == 0, cleanup, "failed to read BRT from summary file - file I/O operation failed");
 
    // Verify the read BRT is valid and matches what we wrote
 
