@@ -40,6 +40,16 @@
 #include <signal.h>
 #include <errno.h>
 
+/* Previous signal handlers for chaining (e.g., ASan handlers) */
+static struct sigaction old_sa_abrt;
+static struct sigaction old_sa_segv;
+
+/* Saved signal context for proper chaining with full siginfo_t and ucontext_t */
+static siginfo_t saved_siginfo_abrt;
+static siginfo_t saved_siginfo_segv;
+static ucontext_t saved_ucontext_abrt;
+static ucontext_t saved_ucontext_segv;
+
 static void
 usage(const char* progname)
 {
@@ -57,18 +67,30 @@ usage(const char* progname)
 }
 
 /**
- * Signal handler for SIGABRT (assertion failures)
+ * Signal handler for SIGABRT (assertion failures) with full context preservation
  * - pgmoneta_backtrace_string(): Gets backtrace as string for immediate display
  * - pgmoneta_backtrace(): Logs backtrace to debug log (if logging is initialized)
  * - pgmoneta_os_kernel_version(): Provides system information (OS, kernel version)
+ * 
+ * Uses SA_SIGINFO to preserve full signal context (siginfo_t and ucontext_t)
+ * for proper chaining to previous handlers (e.g., ASan).
  */
 static void
-sigabrt_handler(int sig)
+sigabrt_handler_siginfo(int sig, siginfo_t* info, void* context)
 {
+   /* Save the original signal context for proper chaining */
+   if (info != NULL)
+   {
+      saved_siginfo_abrt = *info;
+   }
+   if (context != NULL)
+   {
+      saved_ucontext_abrt = *(ucontext_t*)context;
+   }
+
    char* bt = NULL;
    char* os = NULL;
    int kernel_major = 0, kernel_minor = 0, kernel_patch = 0;
-   (void)sig;
 
    fprintf(stderr, "\n========================================\n");
    fprintf(stderr, "FATAL: Received SIGABRT (assertion failure)\n");
@@ -105,23 +127,63 @@ sigabrt_handler(int sig)
    fprintf(stderr, "\n========================================\n");
    fflush(stderr);
 
-   signal(SIGABRT, SIG_DFL);
-   abort();
+   /* Chain to previous SIGABRT handler with saved context */
+   if (old_sa_abrt.sa_flags & SA_SIGINFO)
+   {
+      /* Old handler uses SA_SIGINFO - call with saved siginfo_t and ucontext_t */
+      if (getenv("PGMONETA_TEST_DEBUG_SIGNALS") != NULL)
+      {
+         fprintf(stderr, "DEBUG: Chaining to previous SIGABRT handler (SA_SIGINFO) at %p\n", (void*)old_sa_abrt.sa_sigaction);
+      }
+      old_sa_abrt.sa_sigaction(sig, &saved_siginfo_abrt, &saved_ucontext_abrt);
+   }
+   else if (old_sa_abrt.sa_handler == SIG_IGN)
+   {
+      /* Ignore if previously ignored */
+      return;
+   }
+   else if (old_sa_abrt.sa_handler == SIG_DFL)
+   {
+      signal(SIGABRT, SIG_DFL);
+      abort();
+   }
+   else
+   {
+      /* Old handler is simple - call with just signal number */
+      if (getenv("PGMONETA_TEST_DEBUG_SIGNALS") != NULL)
+      {
+         fprintf(stderr, "DEBUG: Chaining to previous SIGABRT handler (simple) at %p\n", (void*)old_sa_abrt.sa_handler);
+      }
+      old_sa_abrt.sa_handler(sig);
+   }
 }
 
 /**
- * Signal handler for SIGSEGV (segmentation faults)
+ * Signal handler for SIGSEGV (segmentation faults) with full context preservation
  * - pgmoneta_backtrace_string(): Gets backtrace as string for immediate display
  * - pgmoneta_backtrace(): Logs backtrace to debug log (if logging is initialized)
  * - pgmoneta_os_kernel_version(): Provides system information (OS, kernel version)
+ * 
+ * Uses SA_SIGINFO to preserve full signal context (siginfo_t and ucontext_t)
+ * for proper chaining to previous handlers (e.g., ASan). This ensures ASan's
+ * handler receives the original fault context and can generate its full report.
  */
 static void
-sigsegv_handler(int sig)
+sigsegv_handler_siginfo(int sig, siginfo_t* info, void* context)
 {
+   /* Save the original signal context for proper chaining */
+   if (info != NULL)
+   {
+      saved_siginfo_segv = *info;
+   }
+   if (context != NULL)
+   {
+      saved_ucontext_segv = *(ucontext_t*)context;
+   }
+
    char* bt = NULL;
    char* os = NULL;
    int kernel_major = 0, kernel_minor = 0, kernel_patch = 0;
-   (void)sig;
 
    fprintf(stderr, "\n========================================\n");
    fprintf(stderr, "FATAL: Received SIGSEGV (segmentation fault)\n");
@@ -158,8 +220,45 @@ sigsegv_handler(int sig)
    fprintf(stderr, "\n========================================\n");
    fflush(stderr);
 
-   signal(SIGSEGV, SIG_DFL);
-   raise(SIGSEGV);
+   /* Chain to previous SIGSEGV handler with saved context.
+    *
+    * This is important for tools like AddressSanitizer which install their own
+    * SIGSEGV handler to print detailed diagnostics. By calling the previous
+    * handler with the saved siginfo_t and ucontext_t, we preserve the original
+    * fault context (fault address, read/write info, etc.) so ASan can generate
+    * its full diagnostic report.
+    */
+   if (old_sa_segv.sa_flags & SA_SIGINFO)
+   {
+      /* Old handler uses SA_SIGINFO - call with saved siginfo_t and ucontext_t */
+      if (getenv("PGMONETA_TEST_DEBUG_SIGNALS") != NULL)
+      {
+         fprintf(stderr, "DEBUG: Chaining to previous SIGSEGV handler (SA_SIGINFO) at %p\n", (void*)old_sa_segv.sa_sigaction);
+         fprintf(stderr, "DEBUG: Fault address: %p\n", (void*)saved_siginfo_segv.si_addr);
+         fflush(stderr); /* Ensure debug output is visible before calling old handler */
+      }
+      old_sa_segv.sa_sigaction(sig, &saved_siginfo_segv, &saved_ucontext_segv);
+   }
+   else if (old_sa_segv.sa_handler == SIG_IGN)
+   {
+      /* Previously ignored: do nothing further */
+      return;
+   }
+   else if (old_sa_segv.sa_handler == SIG_DFL)
+   {
+      /* Restore default handler and re-raise */
+      signal(SIGSEGV, SIG_DFL);
+      raise(SIGSEGV);
+   }
+   else
+   {
+      /* Old handler is simple - call with just signal number */
+      if (getenv("PGMONETA_TEST_DEBUG_SIGNALS") != NULL)
+      {
+         fprintf(stderr, "DEBUG: Chaining to previous SIGSEGV handler (simple) at %p\n", (void*)old_sa_segv.sa_handler);
+      }
+      old_sa_segv.sa_handler(sig);
+   }
 }
 
 /**
@@ -170,22 +269,39 @@ setup_signal_handlers(void)
 {
    struct sigaction sa_abrt, sa_segv;
 
+   /* Setup SIGABRT handler with SA_SIGINFO to preserve full context */
    memset(&sa_abrt, 0, sizeof(sa_abrt));
-   sa_abrt.sa_handler = sigabrt_handler;
+   sa_abrt.sa_sigaction = sigabrt_handler_siginfo;
    sigemptyset(&sa_abrt.sa_mask);
-   sa_abrt.sa_flags = 0;
-   if (sigaction(SIGABRT, &sa_abrt, NULL) != 0)
+   sa_abrt.sa_flags = SA_SIGINFO;
+   if (sigaction(SIGABRT, &sa_abrt, &old_sa_abrt) != 0)
    {
       fprintf(stderr, "Warning: Failed to setup SIGABRT handler: %s\n", strerror(errno));
    }
 
+   /* Setup SIGSEGV handler with SA_SIGINFO to preserve full context */
    memset(&sa_segv, 0, sizeof(sa_segv));
-   sa_segv.sa_handler = sigsegv_handler;
+   sa_segv.sa_sigaction = sigsegv_handler_siginfo;
    sigemptyset(&sa_segv.sa_mask);
-   sa_segv.sa_flags = 0;
-   if (sigaction(SIGSEGV, &sa_segv, NULL) != 0)
+   sa_segv.sa_flags = SA_SIGINFO;
+   if (sigaction(SIGSEGV, &sa_segv, &old_sa_segv) != 0)
    {
       fprintf(stderr, "Warning: Failed to setup SIGSEGV handler: %s\n", strerror(errno));
+   }
+   else
+   {
+      /* Debug: Log what handler we saved (only in verbose mode) */
+      if (getenv("PGMONETA_TEST_DEBUG_SIGNALS") != NULL)
+      {
+         if (old_sa_segv.sa_handler == SIG_DFL)
+            fprintf(stderr, "DEBUG: Previous SIGSEGV handler was SIG_DFL\n");
+         else if (old_sa_segv.sa_handler == SIG_IGN)
+            fprintf(stderr, "DEBUG: Previous SIGSEGV handler was SIG_IGN\n");
+         else if (old_sa_segv.sa_flags & SA_SIGINFO)
+            fprintf(stderr, "DEBUG: Previous SIGSEGV handler was custom (SA_SIGINFO): %p\n", (void*)old_sa_segv.sa_sigaction);
+         else
+            fprintf(stderr, "DEBUG: Previous SIGSEGV handler was custom: %p\n", (void*)old_sa_segv.sa_handler);
+      }
    }
 }
 
