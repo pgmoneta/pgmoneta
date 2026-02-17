@@ -124,6 +124,29 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_server_api_database_size)
+{
+   uint64_t size = 0;
+   char* database = "postgres";
+
+   if (setup_server_connection())
+   {
+      teardown_server_connection();
+      MCTF_SKIP("failed to setup server connection");
+   }
+
+   if (pgmoneta_server_database_size(PRIMARY_SERVER, srv_ssl, srv_socket, database, &size))
+   {
+      MCTF_ASSERT(false, cleanup, "failed to get database size");
+   }
+
+   MCTF_ASSERT(size > 0, cleanup, "database size should be > 0");
+
+cleanup:
+   teardown_server_connection();
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_server_api_backup)
 {
    int ret;
