@@ -27,9 +27,9 @@ Joan Jeremiah J <joanjeremiah04@gmail.com>
 Iury Santos <iuryroberto@gmail.com>
 Palak Chaturvedi <palakchaturvedi2843@gmail.com>
 Jakub Jirutka <jakub@jirutka.cz>
+Ashutosh Sharma <ash2003sharma@gmail.com>
 Mario Rodas
 Annupamaa <annu242005@gmail.com>
-Ashutosh Sharma <ash2003sharma@gmail.com>
 Mohab Yaser <mohabyaserofficial2003@gmail.com>
 Georg Pfuetzenreuter <mail@georg-pfuetzenreuter.net>
 Ahmed Ashour <a8087027@gmail.com>
@@ -44,10 +44,10 @@ Bassam Adnan <mailbassam@gmail.com>
 Sara Nabih <nabihsara8@gmail.com>
 Shashank Singh <shashanksgh3@gmail.com>
 Mahmoud Hamdy (TutTrue) <mahmoud.hamdy5113@gmail.com>
-Amr Shams <amr.shams2015.a@gmail.com>
+Amr Shams (NightBird) <amr.shams2015.a@gmail.com>
 Somye Mahajan <mahajan.somye@gmail.com>
 Shashidhar B M <shashidhar.i.0119@gmail.com>
-Seongjun Shin <shinseongjun@gmail.com>
+Seongjun Shin <shinsj4653@gmail.com>
 Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
 Mazen Kamal <mazenkamal212@gmail.com>
 Trevor Jacob Mathews <trevorjacobmathews@gmail.com>
