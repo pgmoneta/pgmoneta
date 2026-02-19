@@ -104,6 +104,35 @@ Example
 ```sh
 pgmoneta-cli list-backup primary
 ```
+## s3 
+
+Manage the s3 storage 
+
+Command
+
+```sh
+pgmoneta-cli s3 [ls] <server>
+```
+
+Subcommand
+
+- `ls` : to ls all the files in s3
+
+Example
+
+```sh
+pgmoneta-cli conf ls primary --sort=asc
+```
+### s3 ls
+
+Get the list of server files/objects in the remote storage s3
+- you can set the server or use the global one in the config
+Examples
+
+```sh
+pgmoneta-cli s3 ls primary
+pgmoneta-cli s3 ls 
+```
 
 ## restore
 

@@ -92,6 +92,7 @@ extern "C" {
 #define MANAGEMENT_UPDATE_USER    26
 #define MANAGEMENT_REMOVE_USER    27
 #define MANAGEMENT_LIST_USERS     28
+#define MANAGEMENT_S3_LS          29
 
 /**
  * Management categories
@@ -165,6 +166,8 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_RETENTION_MONTHS      "RetentionMonths"
 #define MANAGEMENT_ARGUMENT_RETENTION_WEEKS       "RetentionWeeks"
 #define MANAGEMENT_ARGUMENT_RETENTION_YEARS       "RetentionYears"
+#define MANAGEMENT_ARGUMENT_S3_OBJECTS            "S3Objects"
+#define MANAGEMENT_ARGUMENT_S3_KEY                "S3Key"
 #define MANAGEMENT_ARGUMENT_SERVER                "Server"
 #define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
 #define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
@@ -222,6 +225,13 @@ extern "C" {
 #define MANAGEMENT_ERROR_LIST_BACKUP_NOFORK                 305
 #define MANAGEMENT_ERROR_LIST_BACKUP_INVALID_SORT           306
 #define MANAGEMENT_ERROR_LIST_BACKUP_ERROR                  307
+
+#define MANAGEMENT_ERROR_LIST_S3_NOSERVER                   310
+#define MANAGEMENT_ERROR_LIST_S3_NOFORK                     311
+#define MANAGEMENT_ERROR_LIST_S3_WORKFLOW                   312
+#define MANAGEMENT_ERROR_LIST_S3_JSON_VALUE                 313
+#define MANAGEMENT_ERROR_LIST_S3_NETWORK                    314
+#define MANAGEMENT_ERROR_LIST_S3_ERROR                      315
 
 #define MANAGEMENT_ERROR_DELETE_SETUP                       400
 #define MANAGEMENT_ERROR_DELETE_EXECUTE                     401
@@ -449,6 +459,20 @@ pgmoneta_management_request_backup(SSL* ssl, int socket, char* server, uint8_t c
  */
 int
 pgmoneta_management_request_list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a list s3 objects request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param sort_order The sort order (asc, desc, or NULL)
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create a restore request
