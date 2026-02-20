@@ -136,15 +136,14 @@ git push -f origin mywork
 
 as all pull requests should be squashed and rebased.
 
-In your first pull request you need to add yourself to the
+In your first pull request you need to add yourself to the following files:
 
 ```
 AUTHORS
-doc/manual/97-acknowledgement.md
-doc/manual/advanced/97-acknowledgement.md
+doc/manual/en/97-acknowledgement.md
 ```
 
-files.
+New contributors are encouraged to begin with issues marked with the "community" label, which functions similarly to "good first issue".
 
 ## Policy and guidelines for using AI
 
