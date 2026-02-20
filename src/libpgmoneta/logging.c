@@ -46,7 +46,7 @@
 #define LINE_LENGTH 32
 #define MAX_LENGTH  4096
 
-FILE* log_file;
+FILE* log_file = NULL;
 
 time_t next_log_rotation_age; /* number of seconds at which the next location will happen */
 
@@ -197,6 +197,13 @@ pgmoneta_log_line(int level, char* file, int line, char* fmt, ...)
       }
       else if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
       {
+         if (log_file == NULL)
+         {
+            if (pgmoneta_start_logging())
+            {
+               return;
+            }
+         }
          output = log_file;
       }
 
