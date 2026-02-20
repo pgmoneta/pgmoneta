@@ -75,6 +75,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <openssl/crypto.h>
 #ifdef HAVE_SYSTEMD
@@ -83,7 +84,7 @@
 
 #define NAME           "main"
 #define MAX_FDS        64
-#define SIGNALS_NUMBER 6
+#define SIGNALS_NUMBER 7
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
@@ -91,6 +92,7 @@ static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, in
 static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
+static void sigchld_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void retention_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void verification_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
@@ -746,8 +748,9 @@ main(int argc, char** argv)
    ev_signal_init((struct ev_signal*)&signal_watcher[3], coredump_cb, SIGABRT);
    ev_signal_init((struct ev_signal*)&signal_watcher[4], shutdown_cb, SIGALRM);
    ev_signal_init((struct ev_signal*)&signal_watcher[5], service_reload_cb, SIGUSR1);
+   ev_signal_init((struct ev_signal*)&signal_watcher[6], sigchld_cb, SIGCHLD);
 
-   for (int i = 0; i < 6; i++)
+   for (int i = 0; i < SIGNALS_NUMBER; i++)
    {
       signal_watcher[i].slot = -1;
       ev_signal_start(main_loop, (struct ev_signal*)&signal_watcher[i]);
@@ -895,7 +898,7 @@ main(int argc, char** argv)
    shutdown_metrics();
    shutdown_mgt();
 
-   for (int i = 0; i < 5; i++)
+   for (int i = 0; i < SIGNALS_NUMBER; i++)
    {
       ev_signal_stop(main_loop, (struct ev_signal*)&signal_watcher[i]);
    }
@@ -2103,6 +2106,15 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
    }
 
    pgmoneta_disconnect(client_fd);
+}
+
+static void
+sigchld_cb(struct ev_loop* loop __attribute__((unused)), ev_signal* w __attribute__((unused)), int revents __attribute__((unused)))
+{
+   while (waitpid(-1, NULL, WNOHANG) > 0)
+   {
+      ;
+   }
 }
 
 static void
