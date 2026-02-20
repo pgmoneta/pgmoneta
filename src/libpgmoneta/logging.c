@@ -129,7 +129,9 @@ pgmoneta_stop_logging(void)
    {
       if (log_file != NULL)
       {
-         return fclose(log_file);
+         int rc = fclose(log_file);
+         log_file = NULL;
+         return rc;
       }
       else
       {
