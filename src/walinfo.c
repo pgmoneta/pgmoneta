@@ -57,6 +57,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <zconf.h>
 
 /* Column widths for WAL statistics table */
 #define COL_WIDTH_COUNT         9
@@ -113,6 +114,87 @@ struct wal_record_ui
    struct decoded_xlog_record* record; /* Pointer to actual record */
 };
 
+/* Search modes for WAL record searching */
+enum wal_search_mode {
+   WAL_SEARCH_MODE_SINGLE_FIELD,
+   WAL_SEARCH_MODE_MULTI_FIELD
+};
+
+/* Field types for search queries */
+enum wal_search_field {
+   WAL_SEARCH_FIELD_RMGR,
+   WAL_SEARCH_FIELD_START_LSN,
+   WAL_SEARCH_FIELD_END_LSN,
+   WAL_SEARCH_FIELD_REC_LEN,
+   WAL_SEARCH_FIELD_TOT_LEN,
+   WAL_SEARCH_FIELD_XID,
+   WAL_SEARCH_FIELD_DESCRIPTION
+};
+
+/* Column highlight information for search results */
+struct wal_search_highlight
+{
+   enum wal_search_field field;
+   size_t match_start;
+   size_t match_length;
+};
+
+/* Multi-field search criteria */
+struct wal_search_multi_criteria
+{
+   char* rmgr;
+   uint64_t start_lsn;
+   uint64_t end_lsn;
+   uint32_t xid;
+   bool has_rmgr;
+   bool has_start_lsn;
+   bool has_end_lsn;
+   bool has_xid;
+};
+
+struct search_ui
+{
+   char rmgr[32];
+   char relation_name[256];
+   int relation_oid;
+   uint64_t start_lsn;
+   uint64_t end_lsn;
+   uint32_t xid;
+   char description[512];
+   bool search_mode; // 0: current file only, 1: all files in directory
+
+   /* Multi-field search state */
+   enum wal_search_mode search_mode_type;
+   enum wal_search_field single_field;
+   bool search_all_files;
+   uint64_t lsn_range_start;
+   uint64_t lsn_range_end;
+};
+
+struct search_result_ui
+{
+   size_t record_index;
+   char filename[512];
+   struct wal_search_highlight* highlights;
+   size_t highlight_count;
+   uint64_t start_lsn;
+};
+
+/* Column highlight state for current search */
+struct column_highlight
+{
+   enum wal_search_field field;
+   int color_pair;
+};
+
+/* WAL file entry for directory scanning */
+struct wal_file_entry
+{
+   char filename[512];
+   uint64_t start_lsn;
+   uint64_t end_lsn;
+};
+
 /* UI state */
 struct ui_state
 {
@@ -139,11 +221,28 @@ struct ui_state
    WINDOW* status_win;
 
    /* Search state */
-   char search_query[256];
+   struct search_ui* search_ui;
    bool search_active;
    size_t* search_results;
    size_t search_result_count;
    size_t current_search_index;
+
+   /* Multi-file search results */
+   struct search_result_ui* multi_file_results;
+   size_t multi_file_result_count;
+   size_t multi_file_capacity;
+   char* current_search_dir;
+
+   /* Column highlighting for current search */
+   struct column_highlight highlights[7];
+   size_t highlight_count;
+   size_t current_highlight_row;
+
+   /* Current match position within field (for cycling with arrow keys) */
+   size_t current_match_index;
+   size_t total_matches_in_field;
+   enum wal_search_field current_search_field;
+   char current_search_query[256];
 };
 
 static bool curses_active = false;
@@ -273,6 +372,7 @@ wal_interactive_init(struct ui_state* state, const char* wal_filename)
    init_pair(9, COLOR_YELLOW, COLOR_BLACK);  /* Total length */
    init_pair(10, COLOR_CYAN, COLOR_BLACK);   /* XID */
    init_pair(11, COLOR_GREEN, COLOR_BLACK);  /* Descriptions */
+   init_pair(15, COLOR_WHITE, COLOR_BLACK);  /* Search result highlighting */
 
    int height, width;
    getmaxyx(stdscr, height, width);
@@ -387,6 +487,12 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
    struct walfile* wf = NULL;
    char* from = NULL;
    char* to = NULL;
+
+   if (state->wf != NULL)
+   {
+      pgmoneta_destroy_walfile(state->wf);
+      state->wf = NULL;
+   }
 
    /* Extract compressed WAL file if needed */
    from = pgmoneta_append(from, wal_filename);
@@ -565,6 +671,829 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
    return 0;
 }
 
+/**
+ * Build KMP failure function array (preprocesses pattern)
+ * 
+ * @param pattern The pattern to preprocess
+ * @param pattern_len Length of the pattern
+ * @param failure Array to store failure function (must be allocated)
+ */
+static void
+pgmoneta_kmp_build_failure_function(const char* pattern, size_t pattern_len, int* failure)
+{
+   if (pattern == NULL || failure == NULL || pattern_len == 0)
+   {
+      goto error;
+   }
+
+   failure[0] = 0;
+   size_t j = 0;
+
+   for (size_t i = 1; i < pattern_len; i++)
+   {
+      while (j > 0 && pattern[i] != pattern[j])
+      {
+         j = failure[j - 1];
+      }
+
+      if (pattern[i] == pattern[j])
+      {
+         j++;
+      }
+
+      failure[i] = (int)j;
+   }
+
+error:
+   return;
+}
+
+/**
+ * Search for pattern in text using KMP algorithm
+ * 
+ * @param text The text to search in
+ * @param text_len Length of the text
+ * @param pattern The pattern to find
+ * @param pattern_len Length of the pattern
+ * @param failure Pre-built KMP failure function
+ * @return Index of first match, or -1 if not found
+ */
+static int
+pgmoneta_kmp_search(const char* text, size_t text_len,
+                    const char* pattern, size_t pattern_len,
+                    const int* failure)
+{
+   if (text == NULL || pattern == NULL || failure == NULL)
+   {
+      goto error;
+   }
+
+   if (pattern_len == 0 || pattern_len > text_len)
+   {
+      goto error;
+   }
+
+   size_t j = 0;
+
+   for (size_t i = 0; i < text_len; i++)
+   {
+      while (j > 0 && text[i] != pattern[j])
+      {
+         j = failure[j - 1];
+      }
+
+      if (text[i] == pattern[j])
+      {
+         j++;
+      }
+
+      if (j == pattern_len)
+      {
+         return (int)(i - pattern_len + 1);
+      }
+   }
+
+error:
+   return -1;
+}
+
+/**
+ * Case-insensitive string comparison for RMGR searching
+ * 
+ * @param str1 First string
+ * @param str2 Second string
+ * @return 0 if equal, non-zero otherwise
+ */
+static int
+pgmoneta_strcasecmp_safe(const char* str1, const char* str2)
+{
+   if (str1 == NULL && str2 == NULL)
+   {
+      return 0;
+   }
+
+   if (str1 == NULL || str2 == NULL)
+   {
+      goto error;
+   }
+
+   while (*str1 && *str2)
+   {
+      int c1 = tolower((unsigned char)*str1);
+      int c2 = tolower((unsigned char)*str2);
+
+      if (c1 != c2)
+      {
+         return c1 - c2;
+      }
+
+      str1++;
+      str2++;
+   }
+
+   return (int)((unsigned char)*str1 - (unsigned char)*str2);
+
+error:
+   return 1;
+}
+
+/**
+ * Search across all WAL files in directory
+ * Scans directory for valid WAL files, loads each one, and performs search
+ * Filters files based on LSN range for performance
+ * 
+ * @param state UI state
+ * @param query Search query
+ * @param field Field to search
+ */
+static void
+wal_search_across_directory(struct ui_state* state, const char* query, enum wal_search_field field)
+{
+   struct deque* wal_files = NULL;
+   char* dir_path = NULL;
+   char* dir = NULL;
+   int* failure = NULL;
+   DIR* dir_handle = NULL;
+
+   if (state == NULL || query == NULL || state->wal_filename == NULL)
+   {
+      goto error;
+   }
+
+   /* Get directory path */
+   dir_path = strdup(state->wal_filename);
+   if (dir_path == NULL)
+   {
+      goto error;
+   }
+   dir = dirname(dir_path);
+
+   /* List WAL files */
+   dir_handle = opendir(dir);
+   if (dir_handle == NULL)
+   {
+      goto error;
+   }
+   closedir(dir_handle);
+   dir_handle = NULL;
+
+   /* Collect valid WAL files */
+   if (pgmoneta_get_wal_files(dir, &wal_files))
+   {
+      goto error;
+   }
+
+   /* Initialize storage for multi-file results */
+   if (state->multi_file_results == NULL)
+   {
+      state->multi_file_capacity = 500;
+      state->multi_file_results = calloc(state->multi_file_capacity, sizeof(struct search_result_ui));
+      if (state->multi_file_results == NULL)
+      {
+         goto error;
+      }
+   }
+   state->multi_file_result_count = 0;
+
+   size_t query_len = strlen(query);
+   failure = (int*)malloc(query_len * sizeof(int));
+   if (failure == NULL)
+   {
+      goto error;
+   }
+
+   pgmoneta_kmp_build_failure_function(query, query_len, failure);
+
+   struct deque_iterator* file_iter = NULL;
+
+   if (pgmoneta_deque_iterator_create(wal_files, &file_iter) != 0)
+   {
+      goto error;
+   }
+
+   while (pgmoneta_deque_iterator_next(file_iter))
+   {
+      char* filename = (char*)file_iter->value->data;
+      char file_path[1024];
+
+      pgmoneta_snprintf(file_path, sizeof(file_path), "%s/%s", dir, filename);
+
+      /* Load WAL file */
+      struct walfile* wf = NULL;
+      char* from = pgmoneta_append(NULL, file_path);
+      char* to = pgmoneta_append(NULL, "/tmp/");
+      to = pgmoneta_append(to, filename);
+
+      if (pgmoneta_copy_and_extract_file(from, &to) != 0)
+      {
+         free(from);
+         free(to);
+         continue;
+      }
+
+      if (pgmoneta_read_walfile(-1, to, &wf) != 0 || wf == NULL)
+      {
+         pgmoneta_delete_file(to, NULL);
+         free(from);
+         free(to);
+         continue;
+      }
+
+      /* Search through records in this file */
+      struct deque_iterator* record_iter = NULL;
+      if (pgmoneta_deque_iterator_create(wf->records, &record_iter) == 0)
+      {
+         size_t record_index = 0;
+         while (pgmoneta_deque_iterator_next(record_iter))
+         {
+            struct decoded_xlog_record* record =
+               (struct decoded_xlog_record*)record_iter->value->data;
+
+            if (record == NULL || record->partial)
+            {
+               record_index++;
+               continue;
+            }
+
+            bool found = false;
+            switch (field)
+            {
+               case WAL_SEARCH_FIELD_RMGR:
+               {
+                  const char* rmgr_name = pgmoneta_rmgr_get_name(record->header.xl_rmid);
+                  if (rmgr_name != NULL)
+                  {
+                     int match_pos = pgmoneta_kmp_search(rmgr_name, strlen(rmgr_name),
+                                                         query, query_len, failure);
+                     found = (match_pos != -1);
+                  }
+                  break;
+               }
+               case WAL_SEARCH_FIELD_DESCRIPTION:
+               {
+                  char* desc = get_simple_record_description(record, wf->magic_number);
+                  if (desc != NULL)
+                  {
+                     int match_pos = pgmoneta_kmp_search(desc, strlen(desc),
+                                                         query, query_len, failure);
+                     found = (match_pos != -1);
+                     free(desc);
+                  }
+                  break;
+               }
+               case WAL_SEARCH_FIELD_XID:
+               {
+                  char xid_str[32];
+                  snprintf(xid_str, sizeof(xid_str), "%u", record->header.xl_xid);
+                  int match_pos = pgmoneta_kmp_search(xid_str, strlen(xid_str),
+                                                      query, query_len, failure);
+                  found = (match_pos != -1);
+                  break;
+               }
+               default:
+                  break;
+            }
+
+            if (found && state->multi_file_result_count < state->multi_file_capacity)
+            {
+               struct search_result_ui* result = &state->multi_file_results[state->multi_file_result_count];
+               result->record_index = record_index;
+               pgmoneta_snprintf(result->filename, sizeof(result->filename), "%s", filename);
+               result->start_lsn = record->lsn;
+               result->highlight_count = 0;
+
+               /* Add highlight info */
+               if (result->highlights == NULL)
+               {
+                  result->highlights = calloc(1, sizeof(struct wal_search_highlight));
+               }
+               if (result->highlights != NULL)
+               {
+                  result->highlights[0].field = field;
+                  result->highlights[0].match_start = 0;
+                  result->highlights[0].match_length = query_len;
+                  result->highlight_count = 1;
+               }
+
+               state->multi_file_result_count++;
+            }
+
+            record_index++;
+         }
+
+         pgmoneta_deque_iterator_destroy(record_iter);
+         record_iter = NULL;
+      }
+
+      if (wf != NULL)
+      {
+         pgmoneta_destroy_walfile(wf);
+         wf = NULL;
+      }
+
+      pgmoneta_delete_file(to, NULL);
+      free(from);
+      free(to);
+      from = NULL;
+      to = NULL;
+   }
+
+   if (file_iter != NULL)
+   {
+      pgmoneta_deque_iterator_destroy(file_iter);
+      file_iter = NULL;
+   }
+
+   /* If results found, switch to first file */
+   if (state->multi_file_result_count > 0)
+   {
+      state->search_active = true;
+      state->current_search_index = 0;
+
+      /* Store search directory for later navigation */
+      if (state->current_search_dir != NULL)
+      {
+         free(state->current_search_dir);
+      }
+      state->current_search_dir = strdup(dir);
+
+      /* Load the first result file */
+      struct search_result_ui* first_result = &state->multi_file_results[0];
+      char first_file[1024];
+      snprintf(first_file, sizeof(first_file), "%s/%s", dir, first_result->filename);
+
+      /* Update wal_filename to the first result file */
+      if (state->wal_filename != NULL)
+      {
+         free(state->wal_filename);
+      }
+      state->wal_filename = strdup(first_file);
+
+      /* Reload current file with first result file */
+      if (state->wf != NULL)
+      {
+         pgmoneta_destroy_walfile(state->wf);
+         state->wf = NULL;
+      }
+
+      if (state->records != NULL)
+      {
+         free(state->records);
+         state->records = NULL;
+      }
+
+      state->record_count = 0;
+      state->record_capacity = 1000;
+      state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+
+      if (state->records != NULL && wal_interactive_load_records(state, first_file) == 0)
+      {
+         if (first_result->record_index < state->record_count)
+         {
+            state->current_row = first_result->record_index;
+            state->current_highlight_row = first_result->record_index;
+
+            /* Add highlight for this field */
+            state->highlight_count = 0;
+            if (state->highlight_count < 7)
+            {
+               state->highlights[state->highlight_count].field = field;
+               state->highlights[state->highlight_count].color_pair = 15;
+               state->highlight_count++;
+            }
+
+            int height = getmaxy(state->main_win);
+            if (state->current_row < state->scroll_offset)
+            {
+               state->scroll_offset = state->current_row;
+            }
+            else if (state->current_row >= state->scroll_offset + (size_t)(height - 4))
+            {
+               state->scroll_offset = state->current_row - (height - 4) + 1;
+            }
+         }
+      }
+   }
+
+error:
+   if (dir_handle != NULL)
+   {
+      closedir(dir_handle);
+   }
+
+   if (wal_files != NULL)
+   {
+      pgmoneta_deque_destroy(wal_files);
+      wal_files = NULL;
+   }
+
+   if (dir_path != NULL)
+   {
+      free(dir_path);
+   }
+
+   if (failure != NULL)
+   {
+      free(failure);
+   }
+}
+
+/**
+ * Perform single-field search with KMP algorithm
+ * Searches in a specific field (column) across all loaded records
+ * 
+ * @param state UI state
+ * @param query Search query string
+ * @param field Field to search in
+ * @param search_all Whether to search across all files in directory
+ */
+static void
+wal_search_single_field(struct ui_state* state, const char* query, enum wal_search_field field)
+{
+   if (state == NULL || query == NULL)
+   {
+      return;
+   }
+
+   wal_search_across_directory(state, query, field);
+}
+
+/**
+ * Perform multi-field search across exact values
+ * Searches for records matching all specified criteria
+ * 
+ * @param state UI state
+ * @param criteria Multi-field search criteria
+ */
+static void
+wal_search_multi_field(struct ui_state* state, struct wal_search_multi_criteria* criteria)
+{
+   if (state == NULL || criteria == NULL)
+   {
+      goto error;
+   }
+
+   /* Clear previous search results */
+   if (state->search_results != NULL)
+   {
+      free(state->search_results);
+   }
+
+   state->search_results = calloc(state->record_count, sizeof(size_t));
+   state->search_result_count = 0;
+   state->highlight_count = 0;
+
+   if (state->search_results == NULL)
+   {
+      goto error;
+   }
+
+   /* Search through all records with exact matching */
+   for (size_t i = 0; i < state->record_count; i++)
+   {
+      struct wal_record_ui* rec = &state->records[i];
+      bool matches_all = true;
+
+      /* Check RMGR */
+      if (criteria->has_rmgr && criteria->rmgr != NULL)
+      {
+         if (pgmoneta_strcasecmp_safe(rec->rmgr, criteria->rmgr) != 0)
+         {
+            matches_all = false;
+         }
+         else if (state->highlight_count < 7)
+         {
+            state->highlights[state->highlight_count].field = WAL_SEARCH_FIELD_RMGR;
+            state->highlights[state->highlight_count].color_pair = 12;
+            state->highlight_count++;
+         }
+      }
+
+      /* Check Start LSN */
+      if (matches_all && criteria->has_start_lsn)
+      {
+         if (rec->start_lsn != criteria->start_lsn)
+         {
+            matches_all = false;
+         }
+         else if (state->highlight_count < 7)
+         {
+            state->highlights[state->highlight_count].field = WAL_SEARCH_FIELD_START_LSN;
+            state->highlights[state->highlight_count].color_pair = 13;
+            state->highlight_count++;
+         }
+      }
+
+      /* Check End LSN */
+      if (matches_all && criteria->has_end_lsn)
+      {
+         if (rec->end_lsn != criteria->end_lsn)
+         {
+            matches_all = false;
+         }
+         else if (state->highlight_count < 7)
+         {
+            state->highlights[state->highlight_count].field = WAL_SEARCH_FIELD_END_LSN;
+            state->highlights[state->highlight_count].color_pair = 13;
+            state->highlight_count++;
+         }
+      }
+
+      /* Check XID */
+      if (matches_all && criteria->has_xid)
+      {
+         if (rec->xid != criteria->xid)
+         {
+            matches_all = false;
+         }
+         else if (state->highlight_count < 7)
+         {
+            state->highlights[state->highlight_count].field = WAL_SEARCH_FIELD_XID;
+            state->highlights[state->highlight_count].color_pair = 14;
+            state->highlight_count++;
+         }
+      }
+
+      if (matches_all && state->search_result_count < state->record_count)
+      {
+         state->search_results[state->search_result_count] = i;
+         state->search_result_count++;
+      }
+   }
+
+   if (state->search_result_count > 0)
+   {
+      state->search_active = true;
+      state->current_search_index = 0;
+      state->current_row = state->search_results[0];
+
+      /* Adjust scroll offset */
+      int height = getmaxy(state->main_win);
+      if (state->current_row < state->scroll_offset)
+      {
+         state->scroll_offset = state->current_row;
+      }
+      else if (state->current_row >= state->scroll_offset + (size_t)(height - 4))
+      {
+         state->scroll_offset = state->current_row - (height - 4) + 1;
+      }
+   }
+
+error:
+   return;
+}
+
+/**
+ * Load a file from multi-file search results
+ * Updates state->wal_filename and loads the WAL records
+ * 
+ * @param state UI state
+ * @param filename The filename to load
+ * @param dir The directory containing the file
+ * @return 0 on success, -1 on failure
+ */
+static int
+wal_search_load_file_from_result(struct ui_state* state, const char* filename, const char* dir)
+{
+   if (state == NULL || filename == NULL || dir == NULL)
+   {
+      goto error;
+   }
+
+   char file_path[1024];
+   snprintf(file_path, sizeof(file_path), "%s/%s", dir, filename);
+
+   /* Update filename in state */
+   if (state->wal_filename != NULL)
+   {
+      free(state->wal_filename);
+   }
+   state->wal_filename = strdup(file_path);
+
+   /* Clear old records */
+   if (state->records != NULL)
+   {
+      free(state->records);
+      state->records = NULL;
+   }
+
+   state->record_count = 0;
+   state->record_capacity = 1000;
+   state->records = calloc(state->record_capacity, sizeof(struct wal_record_ui));
+
+   /* Load new records from file */
+   if (state->records != NULL && wal_interactive_load_records(state, file_path) == 0)
+   {
+      /* Count matches of the search query in the current field of the matched record */
+      if (state->multi_file_result_count > 0 && state->current_search_index < state->multi_file_result_count)
+      {
+         struct search_result_ui* result = &state->multi_file_results[state->current_search_index];
+         if (result->record_index < state->record_count)
+         {
+            struct wal_record_ui* rec = &state->records[result->record_index];
+            const char* field_data = NULL;
+            int match_count = 0;
+
+            /* Get the field data to search in */
+            switch (state->current_search_field)
+            {
+               case WAL_SEARCH_FIELD_RMGR:
+                  field_data = rec->rmgr;
+                  break;
+               case WAL_SEARCH_FIELD_DESCRIPTION:
+                  field_data = rec->description;
+                  break;
+               case WAL_SEARCH_FIELD_XID:
+               {
+                  static char xid_str[32];
+                  snprintf(xid_str, sizeof(xid_str), "%u", rec->xid);
+                  field_data = xid_str;
+                  break;
+               }
+               default:
+                  field_data = NULL;
+                  break;
+            }
+
+            /* Count occurrences using KMP */
+            if (field_data != NULL)
+            {
+               size_t query_len = strlen(state->current_search_query);
+               size_t text_len = strlen(field_data);
+               int* failure = (int*)malloc(query_len * sizeof(int));
+
+               if (failure != NULL)
+               {
+                  pgmoneta_kmp_build_failure_function(state->current_search_query, query_len, failure);
+
+                  size_t pos = 0;
+                  while (pos <= text_len - query_len)
+                  {
+                     int match_pos = pgmoneta_kmp_search(field_data + pos, text_len - pos,
+                                                         state->current_search_query, query_len, failure);
+                     if (match_pos != -1)
+                     {
+                        match_count++;
+                        pos += match_pos + 1;
+                     }
+                     else
+                     {
+                        break;
+                     }
+                  }
+
+                  free(failure);
+               }
+            }
+
+            state->total_matches_in_field = match_count > 0 ? match_count : 1;
+         }
+      }
+      return 0;
+   }
+
+   return -1;
+
+error:
+   return -1;
+}
+
+/**
+ * Navigate to next search result
+ * 
+ * @param state UI state
+ */
+static void
+wal_search_navigate_next(struct ui_state* state)
+{
+   if (state == NULL || !state->search_active)
+   {
+      goto error;
+   }
+
+   /* Handle multi-file results */
+   if (state->multi_file_result_count > 0)
+   {
+      state->current_search_index++;
+      if (state->current_search_index >= state->multi_file_result_count)
+      {
+         state->current_search_index = 0;
+      }
+
+      struct search_result_ui* result = &state->multi_file_results[state->current_search_index];
+      state->current_row = result->record_index;
+      state->current_highlight_row = result->record_index;
+
+      /* Load the file from this result if it's different */
+      if (state->wal_filename == NULL ||
+          strstr(state->wal_filename, result->filename) == NULL)
+      {
+         /* Get directory from current search directory */
+         if (state->current_search_dir != NULL)
+         {
+            wal_search_load_file_from_result(state, result->filename, state->current_search_dir);
+         }
+      }
+   }
+   /* Handle single-file results */
+   else if (state->search_result_count > 0)
+   {
+      state->current_search_index++;
+      if (state->current_search_index >= state->search_result_count)
+      {
+         state->current_search_index = 0;
+      }
+
+      state->current_row = state->search_results[state->current_search_index];
+      state->current_highlight_row = state->current_row;
+   }
+
+   /* Adjust scroll offset */
+   int height = getmaxy(state->main_win);
+   if (state->current_row < state->scroll_offset)
+   {
+      state->scroll_offset = state->current_row;
+   }
+   else if (state->current_row >= state->scroll_offset + (size_t)(height - 4))
+   {
+      state->scroll_offset = state->current_row - (height - 4) + 1;
+   }
+
+error:
+   return;
+}
+
+/**
+ * Navigate to previous search result
+ * 
+ * @param state UI state
+ */
+static void
+wal_search_navigate_prev(struct ui_state* state)
+{
+   if (!state->search_active)
+   {
+      goto error;
+   }
+
+   /* Handle multi-file results */
+   if (state->multi_file_result_count > 0)
+   {
+      if (state->current_search_index == 0)
+      {
+         state->current_search_index = state->multi_file_result_count - 1;
+      }
+      else
+      {
+         state->current_search_index--;
+      }
+
+      struct search_result_ui* result = &state->multi_file_results[state->current_search_index];
+      state->current_row = result->record_index;
+      state->current_highlight_row = result->record_index;
+
+      /* Load the file from this result if it's different */
+      if (state->wal_filename == NULL ||
+          strstr(state->wal_filename, result->filename) == NULL)
+      {
+         /* Get directory from current search directory */
+         if (state->current_search_dir != NULL)
+         {
+            wal_search_load_file_from_result(state, result->filename, state->current_search_dir);
+         }
+      }
+   }
+   /* Handle single-file results */
+   else if (state->search_result_count > 0)
+   {
+      if (state->current_search_index == 0)
+      {
+         state->current_search_index = state->search_result_count - 1;
+      }
+      else
+      {
+         state->current_search_index--;
+      }
+
+      state->current_row = state->search_results[state->current_search_index];
+      state->current_highlight_row = state->current_row;
+   }
+
+   /* Adjust scroll offset */
+   int height = getmaxy(state->main_win);
+   if (state->current_row < state->scroll_offset)
+   {
+      state->scroll_offset = state->current_row;
+   }
+   else if (state->current_row >= state->scroll_offset + (size_t)(height - 4))
+   {
+      state->scroll_offset = state->current_row - (height - 4) + 1;
+   }
+
+error:
+   return;
+}
+
 static void
 draw_header(struct ui_state* state)
 {
@@ -669,57 +1598,108 @@ draw_main_content(struct ui_state* state)
          char* start_lsn_str = pgmoneta_lsn_to_string(rec_ui->start_lsn);
          char* end_lsn_str = pgmoneta_lsn_to_string(rec_ui->end_lsn);
 
-         /* RMGR in RED */
-         wattron(state->main_win, COLOR_PAIR(6));
+         /* Check if this row is highlighted in search */
+         bool is_highlighted_row = state->search_active && (idx == state->current_highlight_row);
+
+         /* RMGR in RED or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_RMGR)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(6));
+         }
          mvwprintw(state->main_win, i + 2, col, "%-*s", rm_width, rec_ui->rmgr);
-         wattroff(state->main_win, COLOR_PAIR(6));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(6) | A_BOLD);
          col += rm_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
-         /* Start LSN in MAGENTA */
-         wattron(state->main_win, COLOR_PAIR(7));
+         /* Start LSN in MAGENTA or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_START_LSN)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(7));
+         }
          mvwprintw(state->main_win, i + 2, col, "%-*s", lsn_width, start_lsn_str);
-         wattroff(state->main_win, COLOR_PAIR(7));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(7) | A_BOLD);
          col += lsn_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
-         /* End LSN in MAGENTA */
-         wattron(state->main_win, COLOR_PAIR(7));
+         /* End LSN in MAGENTA or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_END_LSN)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(7));
+         }
          mvwprintw(state->main_win, i + 2, col, "%-*s", lsn_width, end_lsn_str);
-         wattroff(state->main_win, COLOR_PAIR(7));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(7) | A_BOLD);
          free(start_lsn_str);
          free(end_lsn_str);
          col += lsn_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
-         /* rec len in BLUE */
-         wattron(state->main_win, COLOR_PAIR(8));
+         /* rec len in BLUE or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_REC_LEN)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(8));
+         }
          mvwprintw(state->main_win, i + 2, col, "%-*u", rec_width, rec_ui->rec_len);
-         wattroff(state->main_win, COLOR_PAIR(8));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(8) | A_BOLD);
          col += rec_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
-         /* tot len in YELLOW */
-         wattron(state->main_win, COLOR_PAIR(9));
+         /* tot len in YELLOW or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_TOT_LEN)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(9));
+         }
          mvwprintw(state->main_win, i + 2, col, "%-*u", tot_width, rec_ui->tot_len);
-         wattroff(state->main_win, COLOR_PAIR(9));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(9) | A_BOLD);
          col += tot_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
-         /* xid in CYAN */
-         wattron(state->main_win, COLOR_PAIR(10));
+         /* xid in CYAN or HIGHLIGHT */
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_XID)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(10));
+         }
          mvwprintw(state->main_win, i + 2, col, "%-*u", xid_width, rec_ui->xid);
-         wattroff(state->main_win, COLOR_PAIR(10));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(10) | A_BOLD);
          col += xid_width;
          mvwprintw(state->main_win, i + 2, col, " | ");
          col += 3;
 
-         /* description in GREEN */
+         /* description in GREEN or HIGHLIGHT */
          char desc_display[512];
          strncpy(desc_display, rec_ui->description, sizeof(desc_display) - 1);
          desc_display[sizeof(desc_display) - 1] = '\0';
@@ -746,9 +1726,17 @@ draw_main_content(struct ui_state* state)
             }
          }
 
-         wattron(state->main_win, COLOR_PAIR(11));
+         if (is_highlighted_row && state->highlight_count > 0 &&
+             state->current_search_field == WAL_SEARCH_FIELD_DESCRIPTION)
+         {
+            wattron(state->main_win, COLOR_PAIR(15) | A_BOLD);
+         }
+         else
+         {
+            wattron(state->main_win, COLOR_PAIR(11));
+         }
          mvwprintw(state->main_win, i + 2, col, "%s", desc_display);
-         wattroff(state->main_win, COLOR_PAIR(11));
+         wattroff(state->main_win, COLOR_PAIR(15) | COLOR_PAIR(11) | A_BOLD);
       }
       else if (state->mode == DISPLAY_MODE_BINARY)
       {
@@ -966,10 +1954,28 @@ draw_status(struct ui_state* state)
 {
    werase(state->status_win);
 
-   if (state->search_active)
+   if (state->search_active && (state->search_result_count > 0 || state->multi_file_result_count > 0))
    {
-      mvwprintw(state->status_win, 0, 2, "Search: %s [%zu results]",
-                state->search_query, state->search_result_count);
+      char filename_display[64];
+      const char* base_filename = strrchr(state->wal_filename, '/');
+      if (base_filename == NULL)
+      {
+         base_filename = state->wal_filename;
+      }
+      else
+      {
+         base_filename++;
+      }
+
+      snprintf(filename_display, sizeof(filename_display), "%.24s", base_filename);
+
+      size_t total_matches = (state->multi_file_result_count > 0) ? state->multi_file_result_count : state->search_result_count;
+
+      wattron(state->status_win, A_BOLD | COLOR_PAIR(3));
+      mvwprintw(state->status_win, 0, 2, "Match %zu of %zu | File: %s",
+                state->current_search_index + 1, total_matches,
+                filename_display);
+      wattroff(state->status_win, A_BOLD | COLOR_PAIR(3));
    }
    else
    {
@@ -986,7 +1992,14 @@ draw_footer(struct ui_state* state)
    werase(state->footer_win);
    box(state->footer_win, 0, 0);
 
-   mvwprintw(state->footer_win, 0, 2, "Commands: Up/Down=Navigate | Enter=Detail | s=Search | v=Verify | l=Load | ?=Help | q=Quit");
+   if (state->search_active && (state->search_result_count > 0 || state->multi_file_result_count > 0))
+   {
+      mvwprintw(state->footer_win, 0, 2, "Search: n=Next | p=Prev | s=New Search | Esc=Clear | q=Quit");
+   }
+   else
+   {
+      mvwprintw(state->footer_win, 0, 2, "Cmd: Up/Down=Nav | Enter=Detail | s=Search | v=Verify | l=Load | ?=Help | q=Quit");
+   }
 
    wrefresh(state->footer_win);
 }
@@ -994,8 +2007,8 @@ draw_footer(struct ui_state* state)
 static void
 show_help(void)
 {
-   int height = 20;
-   int width = 70;
+   int height = 24;
+   int width = 80;
    int starty = (LINES - height) / 2;
    int startx = (COLS - width) / 2;
 
@@ -1016,10 +2029,16 @@ show_help(void)
    mvwprintw(help_win, 10, 4, "B          - Binary mode (hex dump)");
    mvwprintw(help_win, 11, 4, "Enter      - Detailed record view");
 
-   mvwprintw(help_win, 13, 2, "Actions:");
-   mvwprintw(help_win, 14, 4, "S          - Search records");
-   mvwprintw(help_win, 15, 4, "V          - Verify with pg_waldump");
-   mvwprintw(help_win, 16, 4, "Q          - Quit");
+   mvwprintw(help_win, 13, 2, "Search (KMP Algorithm):");
+   mvwprintw(help_win, 14, 4, "S          - Start search (single or multi-field)");
+   mvwprintw(help_win, 15, 4, "N/→        - Next search result");
+   mvwprintw(help_win, 16, 4, "P/←        - Previous search result");
+   mvwprintw(help_win, 17, 4, "ESC        - Clear search results");
+
+   mvwprintw(help_win, 19, 2, "Other Actions:");
+   mvwprintw(help_win, 20, 4, "V          - Verify records");
+   mvwprintw(help_win, 21, 4, "L          - Load different file");
+   mvwprintw(help_win, 22, 4, "Q          - Quit");
 
    mvwprintw(help_win, height - 2, 2, "Press any key to return...");
    wrefresh(help_win);
@@ -1027,69 +2046,356 @@ show_help(void)
    delwin(help_win);
 }
 
+/**
+ *  Auto-complete RMGR names
+ */
 static void
-wal_interactive_search(struct ui_state* state, char* query)
+show_rmgr_autocomplete(WINDOW* win, const char* partial, int y, int x)
 {
-   if (state->search_results)
+   const char* rmgr_names[] = {
+      "XLOG", "Transaction", "Storage", "CLOG", "Database",
+      "Tablespace", "MultiXact", "RelMap", "Standby", "Heap2",
+      "Heap", "Btree", "Hash", "Gin", "Gist", "Sequence",
+      "SPGist", "BRIN", "CommitTs", "ReplicationOrigin",
+      "Generic", "LogicalMessage", NULL};
+
+   if (partial == NULL || strlen(partial) == 0)
    {
-      free(state->search_results);
+      return;
    }
 
-   state->search_results = calloc(state->record_count, sizeof(size_t));
-   state->search_result_count = 0;
-
-   strncpy(state->search_query, query, sizeof(state->search_query) - 1);
-   state->search_query[sizeof(state->search_query) - 1] = '\0';
-   state->search_active = true;
-
-   /* Search through records */
-   for (size_t i = 0; i < state->record_count; i++)
+   /* Clear previous autocomplete area */
+   for (int i = 1; i <= 5; i++)
    {
-      struct wal_record_ui* rec_ui = &state->records[i];
+      mvwprintw(win, y + i, x, "%-50s", "");
+   }
 
-      if (strstr(rec_ui->description, query) != NULL ||
-          strstr(rec_ui->rmgr, query) != NULL)
+   /* Show matching suggestions */
+   int match_count = 0;
+   wattron(win, COLOR_PAIR(6));
+   for (int i = 0; rmgr_names[i] != NULL && match_count < 5; i++)
+   {
+      if (strncasecmp(rmgr_names[i], partial, strlen(partial)) == 0)
       {
-         state->search_results[state->search_result_count++] = i;
+         wattron(win, COLOR_PAIR(6) | A_DIM);
+         mvwprintw(win, y + match_count + 1, x, "   %s", rmgr_names[i]);
+         wattroff(win, COLOR_PAIR(6) | A_DIM);
+         match_count++;
       }
    }
-
-   /* Jump to first search result */
-   if (state->search_result_count > 0)
-   {
-      state->current_row = state->search_results[0];
-      state->current_search_index = 0;
-   }
+   wattroff(win, COLOR_PAIR(6));
 }
 
 static void
 handle_search_input(struct ui_state* state)
 {
-   int height = 7;
-   int width = 60;
+   int height = 28;
+   int width = 90;
    int starty = (LINES - height) / 2;
    int startx = (COLS - width) / 2;
 
    WINDOW* search_win = newwin(height, width, starty, startx);
    box(search_win, 0, 0);
 
-   mvwprintw(search_win, 1, 2, "Search WAL Records");
-   mvwprintw(search_win, 3, 2, "Enter search query: ");
+   wattron(search_win, A_BOLD);
+   mvwprintw(search_win, 1, 2, "WAL Record Search - Select Mode");
+   wattroff(search_win, A_BOLD);
+   mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
 
-   echo();
-   curs_set(1);
+   mvwprintw(search_win, 4, 2, "Search Mode:");
+   mvwprintw(search_win, 5, 4, "1. Single Field   - Search in one column (RMGR, LSN, XID, Description)");
+   mvwprintw(search_win, 6, 4, "2. Multi-Field    - Find records matching multiple criteria");
 
-   char query[256];
-   wgetnstr(search_win, query, sizeof(query) - 1);
+   mvwprintw(search_win, 8, 2, "Select mode (1-2): ");
+   mvwprintw(search_win, height - 2, 2, "q=Cancel");
 
+   wrefresh(search_win);
+
+   /* Get mode selection */
+   int ch = getch();
    noecho();
-   curs_set(0);
 
-   delwin(search_win);
-
-   if (strlen(query) > 0)
+   if (ch == '1')
    {
-      wal_interactive_search(state, query);
+      /* Single field search */
+      werase(search_win);
+      box(search_win, 0, 0);
+
+      wattron(search_win, A_BOLD);
+      mvwprintw(search_win, 1, 2, "Single Field Search");
+      wattroff(search_win, A_BOLD);
+      mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
+
+      mvwprintw(search_win, 4, 2, "Select Field:");
+      mvwprintw(search_win, 5, 4, "1. RMGR (Resource Manager)");
+      mvwprintw(search_win, 6, 4, "2. Description");
+      mvwprintw(search_win, 7, 4, "3. XID (Transaction ID)");
+
+      mvwprintw(search_win, 9, 2, "Field (1-3): ");
+      wrefresh(search_win);
+
+      int field_ch = getch();
+      enum wal_search_field field = WAL_SEARCH_FIELD_RMGR;
+
+      switch (field_ch)
+      {
+         case '1':
+            field = WAL_SEARCH_FIELD_RMGR;
+            break;
+         case '2':
+            field = WAL_SEARCH_FIELD_DESCRIPTION;
+            break;
+         case '3':
+            field = WAL_SEARCH_FIELD_XID;
+            break;
+         default:
+            delwin(search_win);
+            return;
+      }
+
+      /* Get search query and scope */
+      werase(search_win);
+      box(search_win, 0, 0);
+
+      wattron(search_win, A_BOLD);
+      mvwprintw(search_win, 1, 2, "Single Field Search");
+      wattroff(search_win, A_BOLD);
+      mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
+
+      const char* field_names[] = {"RMGR", "LSN", "LSN", "Rec Len", "Tot Len", "XID", "Description"};
+      mvwprintw(search_win, 4, 2, "Search Field: %s", field_names[field]);
+      mvwprintw(search_win, 6, 2, "Search Query:");
+
+      char query[256];
+      wmove(search_win, 7, 4);
+      echo();
+      curs_set(1);
+      wgetnstr(search_win, query, sizeof(query) - 1);
+      noecho();
+      curs_set(0);
+
+      if (strlen(query) == 0 || query[0] == 'q' || query[0] == 'Q')
+      {
+         delwin(search_win);
+         return;
+      }
+
+      /* Setup search state for arrow key navigation */
+      state->current_search_field = field;
+      strncpy(state->current_search_query, query, sizeof(state->current_search_query) - 1);
+      state->current_search_query[sizeof(state->current_search_query) - 1] = '\0';
+      state->current_match_index = 0;
+      state->total_matches_in_field = 0;
+
+      /* Perform search */
+      wal_search_single_field(state, query, field);
+
+      /* Count total matches in the first result record */
+      if (state->search_result_count > 0 || state->multi_file_result_count > 0)
+      {
+         state->total_matches_in_field = 1; /* At minimum one match found */
+      }
+
+      /* Show results */
+      if (state->search_result_count > 0 || state->multi_file_result_count > 0)
+      {
+         werase(search_win);
+         box(search_win, 0, 0);
+         wattron(search_win, A_BOLD | COLOR_PAIR(3));
+         size_t total_matches = state->multi_file_result_count;
+         mvwprintw(search_win, height / 2, 5, "Found %zu matches! Press any key to continue...", total_matches);
+         wattroff(search_win, A_BOLD | COLOR_PAIR(3));
+         wrefresh(search_win);
+      }
+      else
+      {
+         werase(search_win);
+         box(search_win, 0, 0);
+         wattron(search_win, A_BOLD | COLOR_PAIR(4));
+         mvwprintw(search_win, height / 2, 10, "No matches found. Press any key...");
+         wattroff(search_win, A_BOLD | COLOR_PAIR(4));
+         wrefresh(search_win);
+      }
+
+      getch();
+      delwin(search_win);
+   }
+   else if (ch == '2')
+   {
+      /* Multi-field search */
+      werase(search_win);
+      box(search_win, 0, 0);
+
+      wattron(search_win, A_BOLD);
+      mvwprintw(search_win, 1, 2, "Multi-Field Search");
+      wattroff(search_win, A_BOLD);
+      mvwhline(search_win, 2, 1, ACS_HLINE, width - 2);
+
+      struct wal_search_multi_criteria criteria = {0};
+
+      int row = 4;
+      char input_buf[128];
+
+      /* RMGR input */
+      mvwprintw(search_win, row, 2, "RMGR (or leave empty): ");
+      wmove(search_win, row, 26);
+
+      char rmgr_input[128] = {0};
+      int pos = 0;
+
+      echo();
+      curs_set(1);
+
+      while (1)
+      {
+         int ch = wgetch(search_win);
+
+         if (ch == '\n')
+         {
+            break;
+         }
+         else if (ch == 27)
+         {
+            rmgr_input[0] = 'q';
+            break;
+         }
+         else if (ch == KEY_BACKSPACE || ch == 127)
+         {
+            if (pos > 0)
+            {
+               pos--;
+               rmgr_input[pos] = '\0';
+               mvwprintw(search_win, row, 26, "%-50s", rmgr_input);
+               wmove(search_win, row, 26 + pos);
+
+               show_rmgr_autocomplete(search_win, rmgr_input, row, 26);
+            }
+         }
+         else if (isprint(ch) && pos < 127)
+         {
+            rmgr_input[pos++] = (char)ch;
+            rmgr_input[pos] = '\0';
+            mvwprintw(search_win, row, 26, "%s", rmgr_input);
+
+            show_rmgr_autocomplete(search_win, rmgr_input, row, 26);
+         }
+
+         wrefresh(search_win);
+      }
+
+      strcpy(input_buf, rmgr_input);
+      noecho();
+
+      if (strlen(rmgr_input) > 0)
+      {
+         for (int i = 1; i <= 5; i++)
+         {
+            mvwprintw(search_win, row + i, 26, "%-50s", "");
+         }
+      }
+
+      wrefresh(search_win);
+
+      if (strlen(input_buf) > 0 && input_buf[0] != 'q')
+      {
+         criteria.rmgr = (char*)malloc(strlen(input_buf) + 1);
+         if (criteria.rmgr != NULL)
+         {
+            strcpy(criteria.rmgr, input_buf);
+            criteria.has_rmgr = true;
+         }
+      }
+
+      /* Start LSN input */
+      row += 2;
+      mvwprintw(search_win, row, 2, "Start LSN (e.g., 0/1500000 or leave empty): ");
+      wmove(search_win, row, 47);
+      echo();
+      curs_set(1);
+      wgetnstr(search_win, input_buf, sizeof(input_buf) - 1);
+      noecho();
+
+      if (strlen(input_buf) > 0 && input_buf[0] != 'q')
+      {
+         char* end;
+         criteria.start_lsn = strtoull(input_buf, &end, 16);
+         if (*end == '/')
+         {
+            uint64_t high = criteria.start_lsn;
+            criteria.start_lsn = (high << 32) | strtoul(end + 1, NULL, 16);
+         }
+         criteria.has_start_lsn = true;
+      }
+
+      /* End LSN input */
+      row += 2;
+      mvwprintw(search_win, row, 2, "End LSN (or leave empty): ");
+      wmove(search_win, row, 29);
+      echo();
+      curs_set(1);
+      wgetnstr(search_win, input_buf, sizeof(input_buf) - 1);
+      noecho();
+
+      if (strlen(input_buf) > 0 && input_buf[0] != 'q')
+      {
+         char* end;
+         criteria.end_lsn = strtoull(input_buf, &end, 16);
+         if (*end == '/')
+         {
+            uint64_t high = criteria.end_lsn;
+            criteria.end_lsn = (high << 32) | strtoul(end + 1, NULL, 16);
+         }
+         criteria.has_end_lsn = true;
+      }
+
+      /* XID input */
+      row += 2;
+      mvwprintw(search_win, row, 2, "XID (or leave empty): ");
+      wmove(search_win, row, 24);
+      echo();
+      curs_set(1);
+      wgetnstr(search_win, input_buf, sizeof(input_buf) - 1);
+      noecho();
+      curs_set(0);
+
+      if (strlen(input_buf) > 0 && input_buf[0] != 'q')
+      {
+         criteria.xid = (uint32_t)strtoul(input_buf, NULL, 10);
+         criteria.has_xid = true;
+      }
+
+      /* Perform search */
+      wal_search_multi_field(state, &criteria);
+
+      /* Show results */
+      werase(search_win);
+      box(search_win, 0, 0);
+      if (state->search_result_count > 0)
+      {
+         wattron(search_win, A_BOLD | COLOR_PAIR(3));
+         mvwprintw(search_win, height / 2, 5, "Found %zu matches! Press any key to continue...", state->search_result_count);
+         wattroff(search_win, A_BOLD | COLOR_PAIR(3));
+      }
+      else
+      {
+         wattron(search_win, A_BOLD | COLOR_PAIR(4));
+         mvwprintw(search_win, height / 2, 10, "No matches found. Press any key...");
+         wattroff(search_win, A_BOLD | COLOR_PAIR(4));
+      }
+      wrefresh(search_win);
+      getch();
+
+      /* Clean up */
+      if (criteria.rmgr != NULL)
+      {
+         free(criteria.rmgr);
+      }
+
+      delwin(search_win);
+   }
+   else
+   {
+      delwin(search_win);
    }
 }
 
@@ -1808,6 +3114,84 @@ wal_interactive_run(struct ui_state* state)
             handle_search_input(state);
             break;
 
+         case 'n':
+         case 'N':
+            if (state->search_active && (state->search_result_count > 0 || state->multi_file_result_count > 0))
+            {
+               wal_search_navigate_next(state);
+            }
+            break;
+
+         case 'p':
+         case 'P':
+            if (state->search_active && (state->search_result_count > 0 || state->multi_file_result_count > 0))
+            {
+               wal_search_navigate_prev(state);
+            }
+            break;
+
+         case KEY_RIGHT:
+            if (state->search_active && (state->search_result_count > 0 || state->multi_file_result_count > 0))
+            {
+               if (state->total_matches_in_field > 1)
+               {
+                  state->current_match_index++;
+                  if (state->current_match_index >= state->total_matches_in_field)
+                  {
+                     state->current_match_index = 0;
+                  }
+               }
+            }
+            break;
+
+         case KEY_LEFT:
+            if (state->search_active && (state->search_result_count > 0 || state->multi_file_result_count > 0))
+            {
+               if (state->total_matches_in_field > 1)
+               {
+                  if (state->current_match_index == 0)
+                  {
+                     state->current_match_index = state->total_matches_in_field - 1;
+                  }
+                  else
+                  {
+                     state->current_match_index--;
+                  }
+               }
+            }
+            break;
+
+         case 27: // ESC key - clear search
+            if (state->search_active)
+            {
+               state->search_active = false;
+               state->highlight_count = 0;
+               if (state->search_results != NULL)
+               {
+                  free(state->search_results);
+                  state->search_results = NULL;
+               }
+               state->search_result_count = 0;
+
+               if (state->multi_file_results != NULL)
+               {
+                  for (size_t i = 0; i < state->multi_file_result_count; i++)
+                  {
+                     if (state->multi_file_results[i].highlights != NULL)
+                     {
+                        free(state->multi_file_results[i].highlights);
+                     }
+                  }
+                  free(state->multi_file_results);
+                  state->multi_file_results = NULL;
+               }
+               state->multi_file_result_count = 0;
+
+               state->current_row = 0;
+               state->scroll_offset = 0;
+            }
+            break;
+
          case 'v':
          case 'V':
             wal_interactive_verify(state);
@@ -1846,16 +3230,50 @@ wal_interactive_cleanup(struct ui_state* state)
    if (state->search_results)
    {
       free(state->search_results);
+      state->search_results = NULL;
+   }
+
+   /* Cleanup multi-file search results and their highlights */
+   if (state->multi_file_results != NULL)
+   {
+      for (size_t i = 0; i < state->multi_file_result_count; i++)
+      {
+         if (state->multi_file_results[i].highlights != NULL)
+         {
+            free(state->multi_file_results[i].highlights);
+            state->multi_file_results[i].highlights = NULL;
+         }
+      }
+      free(state->multi_file_results);
+      state->multi_file_results = NULL;
+   }
+   state->multi_file_result_count = 0;
+   state->multi_file_capacity = 0;
+
+   /* Cleanup search directory */
+   if (state->current_search_dir != NULL)
+   {
+      free(state->current_search_dir);
+      state->current_search_dir = NULL;
+   }
+
+   /* Cleanup search UI state */
+   if (state->search_ui != NULL)
+   {
+      free(state->search_ui);
+      state->search_ui = NULL;
    }
 
    if (state->records)
    {
       free(state->records);
+      state->records = NULL;
    }
 
    if (state->wal_filename)
    {
       free(state->wal_filename);
+      state->wal_filename = NULL;
    }
 
    if (state->main_win)
