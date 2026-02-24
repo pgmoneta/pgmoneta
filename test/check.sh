@@ -350,7 +350,7 @@ do_setup() {
   fi
 
   echo "Preparing the pgmoneta directory"
-  export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p.profraw"
+  export LLVM_PROFILE_FILE="$COVERAGE_DIR/coverage-%p-%m.profraw"
   rm -Rf "$PGMONETA_ROOT_DIR"
   mkdir -p "$PGMONETA_ROOT_DIR"
   mkdir -p "$LOG_DIR" "$PG_LOG_DIR" "$COVERAGE_DIR" "$BASE_DIR"
