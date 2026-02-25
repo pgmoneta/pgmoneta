@@ -300,18 +300,6 @@ int
 pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_dir, char* base_file_name, int encryption, int compression, struct rfile** rfile);
 
 /**
- * Extract a file from a backup
- * @param server The server
- * @param label The label
- * @param relative_file_path The file path relative to the backup data directory
- * @param target_directory The target root directory
- * @param target_file The target file
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file);
-
-/**
  * Get an approximate size of a backup repository
  * The goal is to iterate over all file entries in the manifest. If an entry represents an incremental
  * file, retrieve its block_length using the file's truncated_block_length (which indicates the total

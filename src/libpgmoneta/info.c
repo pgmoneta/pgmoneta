@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <pgmoneta.h>
 #include <backup.h>
+#include <extraction.h>
 #include <info.h>
 #include <logging.h>
 #include <management.h>
@@ -1470,7 +1471,7 @@ pgmoneta_rfile_create(int server, char* label, char* relative_dir, char* base_fi
       snprintf(base_relative_path, MAX_PATH, "%s/%s", relative_dir, base_file_name);
    }
 
-   // try both base and final relative path
+   /* try both base and final relative path */
    if (pgmoneta_extract_backup_file(server, label, base_relative_path, NULL, &extracted_file_path))
    {
       free(extracted_file_path);
@@ -1621,65 +1622,6 @@ pgmoneta_incremental_rfile_initialize(int server, char* label, char* relative_di
 error:
    // contains fp closing logic
    pgmoneta_rfile_destroy(rf);
-   return 1;
-}
-
-int
-pgmoneta_extract_backup_file(int server, char* label, char* relative_file_path, char* target_directory, char** target_file)
-{
-   char* from = NULL;
-   char* to = NULL;
-
-   *target_file = NULL;
-
-   from = pgmoneta_get_server_backup_identifier_data(server, label);
-
-   if (!pgmoneta_ends_with(from, "/"))
-   {
-      from = pgmoneta_append_char(from, '/');
-   }
-   from = pgmoneta_append(from, relative_file_path);
-
-   if (!pgmoneta_exists(from))
-   {
-      goto error;
-   }
-
-   if (target_directory == NULL || strlen(target_directory) == 0)
-   {
-      to = pgmoneta_get_server_workspace(server);
-      to = pgmoneta_append(to, label);
-      to = pgmoneta_append(to, "/");
-   }
-   else
-   {
-      to = pgmoneta_append(to, target_directory);
-   }
-
-   if (!pgmoneta_ends_with(to, "/"))
-   {
-      to = pgmoneta_append_char(to, '/');
-   }
-   to = pgmoneta_append(to, relative_file_path);
-
-   if (pgmoneta_copy_and_extract_file(from, &to))
-   {
-      goto error;
-   }
-
-   pgmoneta_log_trace("Extract: %s -> %s", from, to);
-
-   *target_file = to;
-
-   free(from);
-
-   return 0;
-
-error:
-
-   free(from);
-   free(to);
-
    return 1;
 }
 
@@ -1836,26 +1778,17 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
    }
 
    final = pgmoneta_append(final, file);
-   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
    {
-      final = pgmoneta_append(final, ".gz");
-   }
-   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
-   {
-      final = pgmoneta_append(final, ".zstd");
-   }
-   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
-   {
-      final = pgmoneta_append(final, ".lz4");
-   }
-   else if (compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      final = pgmoneta_append(final, ".bz2");
-   }
-
-   if (encryption != ENCRYPTION_NONE)
-   {
-      final = pgmoneta_append(final, ".aes");
+      char* suffix = NULL;
+      if (pgmoneta_extraction_get_suffix(compression, encryption, &suffix))
+      {
+         goto error;
+      }
+      if (suffix != NULL)
+      {
+         final = pgmoneta_append(final, suffix);
+         free(suffix);
+      }
    }
 
    *finalname = final;

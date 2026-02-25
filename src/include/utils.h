@@ -86,6 +86,10 @@ extern "C" {
 #define PGMONETA_FILE_TYPE_TAR        0x0080 /* TAR archive (.tar) */
 #define PGMONETA_FILE_TYPE_PARTIAL    0x0100 /* Partial file (.partial) */
 #define PGMONETA_FILE_TYPE_ALL        0xFFFF /* Match all file types */
+#define PGMONETA_FILE_TYPE_COMPRESSION_MASK \
+   (PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_GZIP | PGMONETA_FILE_TYPE_LZ4 | PGMONETA_FILE_TYPE_ZSTD | PGMONETA_FILE_TYPE_BZ2)
+#define PGMONETA_FILE_TYPE_EXTRACTION_MASK \
+   (PGMONETA_FILE_TYPE_ENCRYPTED | PGMONETA_FILE_TYPE_TAR | PGMONETA_FILE_TYPE_COMPRESSION_MASK)
 
 /** @struct signal_info
  * Defines the signal structure
@@ -739,17 +743,6 @@ int
 pgmoneta_get_files(uint32_t file_type_mask, char* base, bool recursive, struct deque** files);
 
 /**
- * Extract an archive file to a given directory
- * File type is detected internally via pgmoneta_get_file_type
- * Handles layered formats (e.g., file.tar.zstd.aes)
- * @param file_path The archive file path
- * @param destination The destination to extract to
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_extract_file(char* file_path, char* destination);
-
-/**
  * Get WAL files
  * @param base The base directory
  * @param files The deque of files
@@ -1245,15 +1238,6 @@ size_t
 pgmoneta_get_file_size(char* file_path);
 
 /**
- * Copy and extract a file
- * @param from The source file
- * @param to The destination file
- * @return 0 if success, otherwise 1
- */
-int
-pgmoneta_copy_and_extract_file(char* from, char** to);
-
-/**
  * Is the file encrypted
  * @param file_path The file path
  * @return True if encrypted, otherwise false
@@ -1286,6 +1270,27 @@ pgmoneta_is_compressed(char* file_path);
  */
 uint32_t
 pgmoneta_get_file_type(char* file_path);
+
+/**
+ * Normalize a file type bitmask.
+ * This ensures specific compression bits imply PGMONETA_FILE_TYPE_COMPRESSED.
+ *
+ * @param type The file type bitmask
+ * @return Normalized file type bitmask
+ */
+uint32_t
+pgmoneta_normalize_file_type(uint32_t type);
+
+/**
+ * Build the compound suffix string for a file type bitmask.
+ * For example, TAR | ZSTD | ENCRYPTED produces ".tar.zstd.aes".
+ *
+ * @param type The file type bitmask (PGMONETA_FILE_TYPE_*)
+ * @param suffix The resulting suffix string (caller must free)
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_get_type_suffix(uint32_t type, char** suffix);
 
 /**
  * Init a token bucket

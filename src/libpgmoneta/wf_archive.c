@@ -28,7 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <achv.h>
+#include <tar.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -88,7 +88,6 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
    char* base = NULL;
    char* src = NULL;
    char* dst = NULL;
-   char* d_name = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
@@ -122,16 +121,12 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
    dst = pgmoneta_append(dst, label);
    dst = pgmoneta_append(dst, ".tar");
 
-   d_name = pgmoneta_append(d_name, config->common.servers[server].name);
-   d_name = pgmoneta_append(d_name, "-");
-   d_name = pgmoneta_append(d_name, label);
-
    if (pgmoneta_exists(dst))
    {
       pgmoneta_delete_file(dst, NULL);
    }
 
-   if (pgmoneta_tar_directory(src, dst, d_name))
+   if (pgmoneta_tar(src, dst))
    {
       goto error;
    }
@@ -143,7 +138,6 @@ archive_execute(char* name __attribute__((unused)), struct art* nodes)
 
    free(src);
    free(dst);
-   free(d_name);
 
    return 0;
 
@@ -151,7 +145,6 @@ error:
 
    free(src);
    free(dst);
-   free(d_name);
 
    return 1;
 }
