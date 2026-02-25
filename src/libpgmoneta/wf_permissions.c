@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <extraction.h>
 #include <logging.h>
 #include <utils.h>
 #include <workflow.h>
@@ -187,21 +188,18 @@ permissions_execute_archive(char* name __attribute__((unused)), struct art* node
    path = pgmoneta_append(path, label);
    path = pgmoneta_append(path, ".tar");
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
    {
-      path = pgmoneta_append(path, ".gz");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      path = pgmoneta_append(path, ".zstd");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      path = pgmoneta_append(path, ".lz4");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      path = pgmoneta_append(path, ".bz2");
+      char* suffix = NULL;
+      if (pgmoneta_get_suffix(config->compression_type, config->encryption, &suffix))
+      {
+         free(path);
+         return 1;
+      }
+      if (suffix != NULL)
+      {
+         path = pgmoneta_append(path, suffix);
+         free(suffix);
+      }
    }
 
    pgmoneta_permission(path, 6, 0, 0);

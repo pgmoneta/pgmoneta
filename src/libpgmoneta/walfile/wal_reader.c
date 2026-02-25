@@ -31,6 +31,7 @@
 #include <brt.h>
 #include <json.h>
 #include <logging.h>
+#include <extraction.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
@@ -206,39 +207,17 @@ pgmoneta_validate_wal_filename(char* path, char** base_filename, xlog_seg_no* se
       wal_filename = temp;
    }
 
-   if (pgmoneta_is_encrypted(wal_filename))
+   if (pgmoneta_is_encrypted(wal_filename) || pgmoneta_is_compressed(wal_filename))
    {
-      temp = pgmoneta_remove_suffix(wal_filename, ".aes");
+      if (pgmoneta_strip_suffix(wal_filename, pgmoneta_get_file_type(wal_filename), &temp))
+      {
+         free(wal_filename);
+         return 1;
+      }
+
       free(wal_filename);
       wal_filename = temp;
-   }
-
-   if (pgmoneta_is_compressed(wal_filename))
-   {
-      if (pgmoneta_ends_with(wal_filename, ".gz"))
-      {
-         temp = pgmoneta_remove_suffix(wal_filename, ".gz");
-         free(wal_filename);
-         wal_filename = temp;
-      }
-      else if (pgmoneta_ends_with(wal_filename, ".zstd"))
-      {
-         temp = pgmoneta_remove_suffix(wal_filename, ".zstd");
-         free(wal_filename);
-         wal_filename = temp;
-      }
-      else if (pgmoneta_ends_with(wal_filename, ".lz4"))
-      {
-         temp = pgmoneta_remove_suffix(wal_filename, ".lz4");
-         free(wal_filename);
-         wal_filename = temp;
-      }
-      else if (pgmoneta_ends_with(wal_filename, ".bz2"))
-      {
-         temp = pgmoneta_remove_suffix(wal_filename, ".bz2");
-         free(wal_filename);
-         wal_filename = temp;
-      }
+      temp = NULL;
    }
 
    if (xlog_from_file_name(wal_filename, &test_tli, &test_logSegNo, seg_size))

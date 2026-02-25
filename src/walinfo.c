@@ -37,6 +37,7 @@
 #include <security.h>
 #include <shmem.h>
 #include <stddef.h>
+#include <extraction.h>
 #include <utils.h>
 #include <wal.h>
 #include <walfile.h>
@@ -393,7 +394,7 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
    to = pgmoneta_append(to, "/tmp/");
    to = pgmoneta_append(to, basename((char*)wal_filename));
 
-   if (pgmoneta_copy_and_extract_file(from, &to))
+   if (pgmoneta_extract_file(from, &to, 0, true))
    {
       free(from);
       free(to);
@@ -3143,7 +3144,7 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
    to = pgmoneta_append(to, "/tmp/");
    to = pgmoneta_append(to, basename(path));
 
-   if (pgmoneta_copy_and_extract_file(from, &to))
+   if (pgmoneta_extract_file(from, &to, 0, true))
    {
       pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);
       goto error;
@@ -3270,7 +3271,7 @@ describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* outpu
          to = pgmoneta_append(to, "/tmp/");
          to = pgmoneta_append(to, basename(file_path));
 
-         if (pgmoneta_copy_and_extract_file(from, &to))
+         if (pgmoneta_extract_file(from, &to, 0, true))
          {
             free(from);
             free(to);
@@ -3399,7 +3400,7 @@ prepare_wal_files_from_tar_archive(char* path, char** temp_dir, struct deque** w
       goto error;
    }
 
-   if (pgmoneta_extract_file(archive_copy_path, local_temp_dir))
+   if (pgmoneta_extract_file(archive_copy_path, &local_temp_dir, 0, false))
    {
       pgmoneta_log_error("Failed to extract TAR archive: %s", path);
       goto error;

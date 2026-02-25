@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <art.h>
+#include <extraction.h>
 #include <logging.h>
 #include <restore.h>
 #include <utils.h>
@@ -833,53 +834,9 @@ restore_excluded_files_execute(char* name __attribute__((unused)), struct art* n
 
    backup = (struct backup*)pgmoneta_art_search(nodes, NODE_BACKUP);
 
-   switch (backup->compression)
+   if (pgmoneta_get_suffix(backup->compression, backup->encryption, &suffix))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
-         suffix = pgmoneta_append(suffix, ".gz");
-         break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
-         suffix = pgmoneta_append(suffix, ".zstd");
-         break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
-         suffix = pgmoneta_append(suffix, ".lz4");
-         break;
-      case COMPRESSION_CLIENT_BZIP2:
-         suffix = pgmoneta_append(suffix, ".bz2");
-         break;
-      case COMPRESSION_NONE:
-         break;
-      default:
-         break;
-   }
-
-   switch (backup->encryption)
-   {
-      case ENCRYPTION_AES_256_CBC:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_192_CBC:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_128_CBC:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_256_CTR:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_192_CTR:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_128_CTR:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_NONE:
-         break;
-      default:
-         break;
+      goto error;
    }
 
    from = pgmoneta_append(from, (char*)pgmoneta_art_search(nodes, NODE_BACKUP_DATA));
@@ -985,53 +942,9 @@ restore_excluded_files_teardown(char* name __attribute__((unused)), struct art* 
 
    to = pgmoneta_append(to, (char*)pgmoneta_art_search(nodes, NODE_TARGET_BASE));
 
-   switch (backup->compression)
+   if (pgmoneta_get_suffix(backup->compression, backup->encryption, &suffix))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
-         suffix = pgmoneta_append(suffix, ".gz");
-         break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
-         suffix = pgmoneta_append(suffix, ".zstd");
-         break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
-         suffix = pgmoneta_append(suffix, ".lz4");
-         break;
-      case COMPRESSION_CLIENT_BZIP2:
-         suffix = pgmoneta_append(suffix, ".bz2");
-         break;
-      case COMPRESSION_NONE:
-         break;
-      default:
-         break;
-   }
-
-   switch (backup->encryption)
-   {
-      case ENCRYPTION_AES_256_CBC:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_192_CBC:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_128_CBC:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_256_CTR:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_192_CTR:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_AES_128_CTR:
-         suffix = pgmoneta_append(suffix, ".aes");
-         break;
-      case ENCRYPTION_NONE:
-         break;
-      default:
-         break;
+      goto error;
    }
 
    if (pgmoneta_get_restore_last_files_names(&restore_last_files_names))

@@ -32,6 +32,7 @@
 #include <management.h>
 #include <manifest.h>
 #include <network.h>
+#include <extraction.h>
 #include <restore.h>
 #include <security.h>
 #include <utils.h>
@@ -2755,47 +2756,7 @@ create_copy_backup_file_input(
 static int
 file_base_name(char* file, char** basename)
 {
-   char* b = NULL;
-
-   *basename = NULL;
-   if (file == NULL)
-   {
-      goto error;
-   }
-
-   b = pgmoneta_append(b, file);
-   if (pgmoneta_is_encrypted(b))
-   {
-      char* new_b = NULL;
-
-      if (pgmoneta_strip_extension(b, &new_b))
-      {
-         goto error;
-      }
-
-      free(b);
-      b = new_b;
-   }
-
-   if (pgmoneta_is_compressed(b))
-   {
-      char* new_b = NULL;
-
-      if (pgmoneta_strip_extension(b, &new_b))
-      {
-         goto error;
-      }
-
-      free(b);
-      b = new_b;
-   }
-
-   *basename = b;
-   return 0;
-
-error:
-   free(b);
-   return 1;
+   return pgmoneta_strip_suffix(file, pgmoneta_get_file_type(file), basename);
 }
 
 static int

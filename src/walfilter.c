@@ -37,6 +37,7 @@
 #include <logging.h>
 #include <pgmoneta.h>
 #include <shmem.h>
+#include <extraction.h>
 #include <utils.h>
 #include <walfile.h>
 #include <walfile/pg_control.h>
@@ -507,10 +508,7 @@ main(int argc, char* argv[])
    size_t size;
    char* tmp_wal = NULL;
    struct walfile* wf = NULL;
-   char* decompressed_file_name = NULL;
-   char* decrypted_file_name = NULL;
    char* wal_path = NULL;
-   bool copy = true;
    struct walfile** walfiles = NULL;
    int walfile_count = 0;
    char* target_pg_wal_dir = NULL;
@@ -777,7 +775,7 @@ main(int argc, char* argv[])
             continue;
          }
 
-         if (pgmoneta_extract_file(tar_archive_copy, tar_temp_dir))
+         if (pgmoneta_extract_file(tar_archive_copy, &tar_temp_dir, 0, false))
          {
             pgmoneta_log_error("Failed to extract TAR archive: %s", current_file);
             free(tar_archive_copy);
@@ -845,57 +843,21 @@ main(int argc, char* argv[])
       wal_path = NULL;
       wal_path = pgmoneta_append(wal_path, file_path);
 
-      if (pgmoneta_is_encrypted(wal_path))
+      if (pgmoneta_is_encrypted(wal_path) || pgmoneta_is_compressed(wal_path))
       {
          free(tmp_wal);
          tmp_wal = NULL;
          tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
 
-         pgmoneta_copy_file(wal_path, tmp_wal, NULL);
-         copy = false;
-
-         pgmoneta_strip_extension(basename(wal_path), &decrypted_file_name);
+         if (pgmoneta_extract_file(wal_path, &tmp_wal, 0, true))
+         {
+            pgmoneta_log_fatal("Failed to extract WAL file at %s", file_path);
+            goto error;
+         }
 
          free(wal_path);
          wal_path = NULL;
-
-         wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decrypted_file_name);
-         free(decrypted_file_name);
-         decrypted_file_name = NULL;
-
-         if (pgmoneta_decrypt_file(tmp_wal, wal_path))
-         {
-            pgmoneta_log_fatal("Failed to decrypt WAL file at %s", file_path);
-            goto error;
-         }
-      }
-
-      if (pgmoneta_is_compressed(wal_path))
-      {
-         free(tmp_wal);
-         tmp_wal = NULL;
-
-         tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
-
-         if (copy)
-         {
-            pgmoneta_copy_file(wal_path, tmp_wal, NULL);
-         }
-
-         pgmoneta_strip_extension(basename(wal_path), &decompressed_file_name);
-
-         free(wal_path);
-         wal_path = NULL;
-
-         wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decompressed_file_name);
-         free(decompressed_file_name);
-         decompressed_file_name = NULL;
-
-         if (pgmoneta_decompress(tmp_wal, wal_path))
-         {
-            pgmoneta_log_fatal("Failed to decompress WAL file at %s", file_path);
-            goto error;
-         }
+         wal_path = pgmoneta_append(wal_path, tmp_wal);
       }
 
       if (pgmoneta_read_walfile(-1, wal_path, &wf))

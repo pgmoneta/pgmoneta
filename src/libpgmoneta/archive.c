@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
+#include <extraction.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
@@ -49,8 +50,6 @@
 
 static bool is_server_side_compression(void);
 static const char* basebackup_archive_extension(void);
-
-static void write_tar_file(struct archive* a, char* src, char* dst);
 
 void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* payload)
@@ -177,26 +176,17 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       }
 
       filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
-      if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
       {
-         filename = pgmoneta_append(filename, ".gz");
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-      {
-         filename = pgmoneta_append(filename, ".zstd");
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-      {
-         filename = pgmoneta_append(filename, ".lz4");
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-      {
-         filename = pgmoneta_append(filename, ".bz2");
-      }
-
-      if (config->encryption != ENCRYPTION_NONE)
-      {
-         filename = pgmoneta_append(filename, ".aes");
+         char* suffix = NULL;
+         if (pgmoneta_get_suffix(config->compression_type, config->encryption, &suffix))
+         {
+            goto error;
+         }
+         if (suffix != NULL)
+         {
+            filename = pgmoneta_append(filename, suffix);
+            free(suffix);
+         }
       }
 
       pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[server].name, ValueString);
@@ -271,35 +261,6 @@ error:
    free(real_directory);
 
    exit(1);
-}
-
-int
-pgmoneta_tar_directory(char* src, char* dst, char* destination)
-{
-   struct archive* a = NULL;
-   int status;
-
-   a = archive_write_new();
-   archive_write_set_format_ustar(a); // Set tar format
-   status = archive_write_open_filename(a, dst);
-
-   if (status != ARCHIVE_OK)
-   {
-      pgmoneta_log_error("Could not create tar file %s", dst);
-      goto error;
-   }
-   write_tar_file(a, src, destination);
-
-   archive_write_close(a);
-   archive_write_free(a);
-
-   return 0;
-
-error:
-   archive_write_close(a);
-   archive_write_free(a);
-
-   return 1;
 }
 
 int
@@ -440,7 +401,14 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       fclose(file);
 
       // extract the file
-      pgmoneta_extract_file(file_path, directory);
+      {
+         char* dest = directory;
+         if (pgmoneta_extract_file(file_path, &dest, 0, false))
+         {
+            pgmoneta_log_error("Could not extract archive file %s", file_path);
+            goto error;
+         }
+      }
       remove(file_path);
       pgmoneta_free_message(msg);
 
@@ -584,7 +552,14 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  pgmoneta_extract_file(file_path, directory);
+                  {
+                     char* dest = directory;
+                     if (pgmoneta_extract_file(file_path, &dest, 0, false))
+                     {
+                        pgmoneta_log_error("Could not extract archive file %s", file_path);
+                        goto error;
+                     }
+                  }
                   remove(file_path);
                }
                // new tablespace or main directory tar file
@@ -667,7 +642,14 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  pgmoneta_extract_file(file_path, directory);
+                  {
+                     char* dest = directory;
+                     if (pgmoneta_extract_file(file_path, &dest, 0, false))
+                     {
+                        pgmoneta_log_error("Could not extract archive file %s", file_path);
+                        goto error;
+                     }
+                  }
                   remove(file_path);
                }
                if (pgmoneta_ends_with(basedir, "/"))
@@ -798,97 +780,6 @@ error:
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(msg);
    return 1;
-}
-
-static void
-write_tar_file(struct archive* a, char* src, char* dst)
-{
-   char real_path[MAX_PATH];
-   char save_path[MAX_PATH];
-   ssize_t size;
-   struct archive_entry* entry;
-   struct stat s;
-   struct dirent* dent;
-
-   DIR* dir = opendir(src);
-   if (!dir)
-   {
-      pgmoneta_log_error("Could not open directory: %s", src);
-      return;
-   }
-   while ((dent = readdir(dir)) != NULL)
-   {
-      char* entry_name = dent->d_name;
-
-      if (pgmoneta_compare_string(entry_name, ".") || pgmoneta_compare_string(entry_name, ".."))
-      {
-         continue;
-      }
-
-      snprintf(real_path, sizeof(real_path), "%s/%s", src, entry_name);
-      snprintf(save_path, sizeof(save_path), "%s/%s", dst, entry_name);
-
-      entry = archive_entry_new();
-      archive_entry_copy_pathname(entry, save_path);
-
-      lstat(real_path, &s);
-      if (S_ISDIR(s.st_mode))
-      {
-         archive_entry_set_filetype(entry, AE_IFDIR);
-         archive_entry_set_perm(entry, s.st_mode);
-         archive_write_header(a, entry);
-         write_tar_file(a, real_path, save_path);
-      }
-      else if (S_ISLNK(s.st_mode))
-      {
-         char target[MAX_PATH];
-         memset(target, 0, sizeof(target));
-         size = readlink(real_path, target, sizeof(target));
-         if (size == -1)
-         {
-            return;
-         }
-
-         archive_entry_set_filetype(entry, AE_IFLNK);
-         archive_entry_set_perm(entry, s.st_mode);
-         archive_entry_set_symlink(entry, target);
-         archive_write_header(a, entry);
-      }
-      else if (S_ISREG(s.st_mode))
-      {
-         FILE* file = NULL;
-
-         archive_entry_set_filetype(entry, AE_IFREG);
-         archive_entry_set_perm(entry, s.st_mode);
-         archive_entry_set_size(entry, s.st_size);
-         int status = archive_write_header(a, entry);
-         if (status != ARCHIVE_OK)
-         {
-            pgmoneta_log_error("Could not write header: %s", archive_error_string(a));
-            return;
-         }
-
-         file = fopen(real_path, "rb");
-
-         if (file != NULL)
-         {
-            char buf[DEFAULT_BUFFER_SIZE];
-            size_t bytes_read = 0;
-
-            memset(buf, 0, sizeof(buf));
-            while ((bytes_read = fread(buf, 1, sizeof(buf), file)) > 0)
-            {
-               archive_write_data(a, buf, bytes_read);
-               memset(buf, 0, sizeof(buf));
-            }
-            fclose(file);
-         }
-      }
-
-      archive_entry_free(entry);
-   }
-
-   closedir(dir);
 }
 
 static bool

@@ -29,6 +29,7 @@
 #include <pgmoneta.h>
 #include <brt.h>
 #include <deque.h>
+#include <extraction.h>
 #include <logging.h>
 #include <utils.h>
 #include <wal.h>
@@ -198,7 +199,7 @@ summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_ta
    to = pgmoneta_append(to, "/tmp/");
    to = pgmoneta_append(to, basename(path));
 
-   if (pgmoneta_copy_and_extract_file(from, &to))
+   if (pgmoneta_extract_file(from, &to, 0, true))
    {
       pgmoneta_log_error("Failed to extract WAL file from %s to %s", from, to);
       goto error;
@@ -398,29 +399,11 @@ get_wal_file_name(char* dir_path, char* file)
    }
 
    /* Build expected compression/encryption suffix */
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP ||
-       config->compression_type == COMPRESSION_SERVER_GZIP)
+   if (pgmoneta_get_suffix(config->compression_type, config->encryption, &suffix))
    {
-      suffix = pgmoneta_append(suffix, ".gz");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD ||
-            config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      suffix = pgmoneta_append(suffix, ".zstd");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 ||
-            config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      suffix = pgmoneta_append(suffix, ".lz4");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      suffix = pgmoneta_append(suffix, ".bzip2");
-   }
-
-   if (config->encryption != ENCRYPTION_NONE)
-   {
-      suffix = pgmoneta_append(suffix, ".aes");
+      pgmoneta_log_error("WAL: failed to build suffix for %s", file);
+      free(base);
+      return NULL;
    }
 
    /* Build paths for all three file forms */
