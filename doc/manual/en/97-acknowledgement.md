@@ -52,6 +52,7 @@ Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
 Mazen Kamal <mazenkamal212@gmail.com>
 Trevor Jacob Mathews <trevorjacobmathews@gmail.com>
 Abdelrhman Sersawy <abdelrhmansersawy@gmail.com>
+Zeyad Daowd <zeyaddaowd@yahoo.com>
 ```
 
 ## Committers
