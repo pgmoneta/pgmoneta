@@ -47,7 +47,11 @@ Mahmoud Hamdy (TutTrue) <mahmoud.hamdy5113@gmail.com>
 Amr Shams <amr.shams2015.a@gmail.com>
 Somye Mahajan <mahajan.somye@gmail.com>
 Shashidhar B M <shashidhar.i.0119@gmail.com>
-Seongjun Shin <shinseongjun@gmail.com>
+Bishoy Wadea Fathy <bishoyw.fathy@gmail.com>
+Mazen Kamal <mazenkamal212@gmail.com>
+Trevor Jacob Mathews <trevorjacobmathews@gmail.com>
+Abdelrhman Sersawy <abdelrhmansersawy@gmail.com>
+Zeyad Daowd <zeyaddaowd@yahoo.com>
 ```
 
 ## Committers
