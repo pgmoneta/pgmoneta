@@ -135,6 +135,10 @@ extern "C" {
 #define SLOT_NOT_FOUND               1
 #define INCORRECT_SLOT_TYPE          2
 
+#define BACKUP_PROGRESS_NONE         0
+#define BACKUP_PROGRESS_RUNNING      1
+#define BACKUP_PROGRESS_DONE         2
+
 #define INDENT_PER_LEVEL             2
 #define FORMAT_JSON                  0
 #define FORMAT_TEXT                  1
@@ -269,6 +273,18 @@ struct s3_configuration
    char base_dir[MAX_PATH];             /**< The S3 base directory */
 } __attribute__((aligned(64)));
 
+/** @struct backup_progress
+ * The backup_progress of a server
+ */
+struct backup_progress
+{
+   atomic_int state;         /**< The progress state */
+   atomic_llong bytes_done;  /**< The bytes transferred so far */
+   atomic_llong bytes_total; /**< The total bytes to transfer */
+   atomic_llong start_time;  /**< The start time */
+   atomic_llong elapsed;     /**< The elapsed time */
+};
+
 /** @struct server
  * Defines a server
  */
@@ -297,6 +313,7 @@ struct server
    bool active_archive;                                           /**< Is there an active archive */
    bool active_delete;                                            /**< Is there an active delete */
    bool active_retention;                                         /**< Is there an active retention */
+   struct backup_progress backup_progress;                        /**< The backup progress */
    int wal_size;                                                  /**< The size of the WAL files */
    size_t block_size;                                             /**< The size of a block in relation files*/
    size_t segment_size;                                           /**< The max size of a relation file segment*/
@@ -325,6 +342,7 @@ struct server
    int backup_max_rate;                                           /**< Number of tokens added to the bucket with each replenishment for backup. */
    int network_max_rate;                                          /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
    int number_of_extra;                                           /**< The number of source directory*/
+   int progress;                                                  /**< The Backup progress status (-1 = not configured, 0 = off, 1 = on) */
    char extra[MAX_EXTRA][MAX_EXTRA_PATH];                         /**< Source directory*/
    bool has_extension;                                            /**< Does this have pgmoneta_ext */
    char ext_version[MISC_LENGTH];                                 /**< The major version of the extension*/
@@ -485,6 +503,8 @@ struct main_configuration
    int network_max_rate; /**< Number of bytes of tokens added every one second to limit the netowrk backup rate */
 
    pgmoneta_time_t verification; /**< The sha512 verification interval */
+
+   bool progress; /**< Enable backup progress tracking */
 
 #ifdef DEBUG
    bool link; /**< Do linking */

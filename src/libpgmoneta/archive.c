@@ -29,6 +29,7 @@
 /* pgmoneta */
 #include <pgmoneta.h>
 #include <achv.h>
+#include <backup.h>
 #include <logging.h>
 #include <management.h>
 #include <manifest.h>
@@ -511,6 +512,7 @@ error:
 int
 pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buffer* buffer, char* basedir, struct tablespace* tablespaces, struct token_bucket* bucket, struct token_bucket* network_bucket)
 {
+   struct main_configuration* config = (struct main_configuration*)shmem;
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct tuple* tup = NULL;
@@ -541,6 +543,23 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    if (pgmoneta_consume_data_row_messages(srv, ssl, socket, buffer, &response))
    {
       goto error;
+   }
+
+   // Extract total backup size from tablespace listing
+   if (pgmoneta_is_progress_enabled(srv))
+   {
+      int64_t total_size = 0;
+      struct tuple* t = response->tuples;
+      while (t != NULL)
+      {
+         if (t->data[2] != NULL)
+         {
+            total_size += strtoll(t->data[2], NULL, 10) * 1024;
+         }
+         t = t->next;
+      }
+      atomic_store(&config->common.servers[srv].backup_progress.bytes_total, total_size);
+      pgmoneta_log_debug("Backup progress: total size %" PRId64 " bytes", total_size);
    }
    while (msg == NULL || msg->kind != 'H')
    {
@@ -715,7 +734,46 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
             }
             case 'p':
             {
-               // progress report, ignore this for now
+               // progress report
+               int64_t bytes_done = pgmoneta_read_int64(msg->data + 1);
+               int64_t bytes_total = atomic_load(&config->common.servers[srv].backup_progress.bytes_total);
+
+               // The total size is only approximate and might not increase monotonically
+               // so we need to update it if it's greater than the current value
+               if (bytes_done > bytes_total)
+               {
+                  bytes_total = bytes_done;
+                  atomic_store(&config->common.servers[srv].backup_progress.bytes_total, bytes_total);
+               }
+
+               int64_t bytes_remaining = bytes_total - bytes_done;
+
+               atomic_store(&config->common.servers[srv].backup_progress.bytes_done, bytes_done);
+               if (atomic_load(&config->common.servers[srv].backup_progress.start_time) > 0)
+               {
+                  time_t now = time(NULL);
+                  time_t start = atomic_load(&config->common.servers[srv].backup_progress.start_time);
+                  time_t elapsed = now - start;
+                  atomic_store(&config->common.servers[srv].backup_progress.elapsed, elapsed);
+
+                  double pct = (bytes_total > 0) ? ((double)bytes_done / (double)bytes_total) * 100.0 : 0.0;
+                  time_t remaining = (bytes_done > 0 && bytes_total > 0)
+                                        ? (time_t)((double)elapsed * ((double)bytes_remaining / (double)bytes_done))
+                                        : 0;
+
+                  int e_hours = (int)(elapsed / 3600);
+                  int e_minutes = (int)((elapsed % 3600) / 60);
+                  int e_seconds = (int)(elapsed % 60);
+                  int r_hours = (int)(remaining / 3600);
+                  int r_minutes = (int)((remaining % 3600) / 60);
+                  int r_seconds = (int)(remaining % 60);
+
+                  pgmoneta_log_debug("Backup progress (Elapsed: %02d:%02d:%d, Remaining: %02d:%02d:%d) "
+                                     "%" PRId64 "/%" PRId64 " bytes (%.1f%%), %" PRId64 " bytes remaining",
+                                     e_hours, e_minutes, e_seconds,
+                                     r_hours, r_minutes, r_seconds,
+                                     bytes_done, bytes_total, pct, bytes_remaining);
+               }
                break;
             }
             default:

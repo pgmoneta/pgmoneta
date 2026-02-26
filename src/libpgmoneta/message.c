@@ -797,7 +797,7 @@ pgmoneta_create_standby_status_update_message(int64_t received, int64_t flushed,
 
 int
 pgmoneta_create_base_backup_message(int server_version, bool incremental, char* label, bool include_wal,
-                                    int compression, int compression_level,
+                                    int compression, int compression_level, bool progress,
                                     struct message** msg)
 {
    bool use_new_format = server_version >= 15;
@@ -851,6 +851,11 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
          options = pgmoneta_append(options, "', ");
       }
 
+      if (progress)
+      {
+         options = pgmoneta_append(options, "PROGRESS true, ");
+      }
+
       options = pgmoneta_append(options, "CHECKPOINT 'fast', ");
 
       options = pgmoneta_append(options, "MANIFEST 'yes', ");
@@ -864,6 +869,11 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
       options = pgmoneta_append(options, "LABEL '");
       options = pgmoneta_append(options, label);
       options = pgmoneta_append(options, "' ");
+
+      if (progress)
+      {
+         options = pgmoneta_append(options, "PROGRESS ");
+      }
 
       options = pgmoneta_append(options, "FAST ");
 

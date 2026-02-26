@@ -86,6 +86,7 @@ extern "C" {
 #define MANAGEMENT_CONF_GET       22
 #define MANAGEMENT_CONF_SET       23
 #define MANAGEMENT_MODE           24
+#define MANAGEMENT_PROGRESS       29
 
 #define MANAGEMENT_MASTER_KEY     24
 #define MANAGEMENT_ADD_USER       25
@@ -187,6 +188,10 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_WORKERS               "Workers"
 #define MANAGEMENT_ARGUMENT_WORKFLOW              "Workflow"
 #define MANAGEMENT_ARGUMENT_WORKSPACE_FREE_SPACE  "WorkspaceFreeSpace"
+#define MANAGEMENT_ARGUMENT_BYTES_DONE            "BytesDone"
+#define MANAGEMENT_ARGUMENT_BYTES_TOTAL           "BytesTotal"
+#define MANAGEMENT_ARGUMENT_START_TIME            "StartTime"
+#define MANAGEMENT_ARGUMENT_PROGRESS_STATE        "BackupProgressState"
 
 /**
  * Management error
@@ -371,6 +376,11 @@ extern "C" {
 #define MANAGEMENT_ERROR_MODE_NETWORK                       2803
 #define MANAGEMENT_ERROR_MODE_ERROR                         2804
 #define MANAGEMENT_ERROR_MODE_UNKNOWN_ACTION                2805
+
+#define MANAGEMENT_ERROR_PROGRESS_NOSERVER                  2900
+#define MANAGEMENT_ERROR_PROGRESS_NOFORK                    2901
+#define MANAGEMENT_ERROR_PROGRESS_NETWORK                   2902
+#define MANAGEMENT_ERROR_PROGRESS_ERROR                     2903
 
 /**
  * Output formats
@@ -748,6 +758,19 @@ pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* b
  * @return 0 upon success, otherwise 1
  */
 int pgmoneta_management_request_mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a backup progress request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_progress(SSL* ssl, int socket, char* server, char* command, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an ok response

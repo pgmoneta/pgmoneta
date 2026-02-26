@@ -1913,6 +1913,27 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
          goto error;
       }
    }
+   else if (id == MANAGEMENT_PROGRESS)
+   {
+      pid = fork();
+      if (pid == -1)
+      {
+         pgmoneta_management_response_error(NULL, client_fd, server, MANAGEMENT_ERROR_PROGRESS_NOFORK, NAME, compression, encryption, payload);
+         pgmoneta_log_error("Backup progress: No fork (%d)", MANAGEMENT_ERROR_PROGRESS_NOFORK);
+         goto error;
+      }
+      else if (pid == 0)
+      {
+         struct json* pyl = NULL;
+
+         shutdown_ports();
+
+         pgmoneta_json_clone(payload, &pyl);
+
+         pgmoneta_set_proc_title(1, ai->argv, "progress", NULL);
+         pgmoneta_progress(NULL, client_fd, compression, encryption, pyl);
+      }
+   }
    else
    {
       pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_UNKNOWN_COMMAND, NAME, compression, encryption, payload);
