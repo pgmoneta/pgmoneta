@@ -856,7 +856,7 @@ incr_backup_execute_17_plus(char* name __attribute__((unused)), struct art* node
 
    pgmoneta_create_base_backup_message(config->common.servers[server].version, true, tag, true,
                                        config->compression_type, config->compression_level,
-                                       &basebackup_msg);
+                                       pgmoneta_is_progress_enabled(server), &basebackup_msg);
 
    status = pgmoneta_write_message(ssl, socket, basebackup_msg);
    if (status != MESSAGE_STATUS_OK)

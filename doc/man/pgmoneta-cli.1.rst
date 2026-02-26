@@ -111,6 +111,9 @@ mode
 ping
   Check if pgmoneta is alive
 
+progress
+  Get progress for a command
+
 restore
   Restore a backup from a server
 

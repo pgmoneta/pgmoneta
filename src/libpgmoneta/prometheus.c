@@ -2659,6 +2659,45 @@ general_information(prometheus_metrics_container_t* container)
    add_metric_to_art(container->general_metrics, "pgmoneta_extension_pgmoneta_ext", data, NULL, NULL, 0);
    free(data);
    data = NULL;
+   data = pgmoneta_append(data, "#HELP pgmoneta_backup_progress The backup progress for a server\n");
+   data = pgmoneta_append(data, "#TYPE pgmoneta_backup_progress gauge\n");
+   for (int i = 0; i < config->common.number_of_servers; i++)
+   {
+      int64_t state = atomic_load(&config->common.servers[i].backup_progress.state);
+      int64_t bytes_done = atomic_load(&config->common.servers[i].backup_progress.bytes_done);
+      int64_t bytes_total = atomic_load(&config->common.servers[i].backup_progress.bytes_total);
+      int64_t elapsed = atomic_load(&config->common.servers[i].backup_progress.elapsed);
+      int64_t percentage = (bytes_total > 0) ? (bytes_done * 100 / bytes_total) : 0;
+      int64_t remaining = (bytes_done > 0 && bytes_total > 0)
+                             ? (int64_t)((double)elapsed * ((double)(bytes_total - bytes_done) / (double)bytes_done))
+                             : 0;
+
+      data = pgmoneta_append(data, "pgmoneta_backup_progress{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\", type=\"state\"} ");
+      data = pgmoneta_append_int(data, (int)state);
+      data = pgmoneta_append(data, "\n");
+
+      data = pgmoneta_append(data, "pgmoneta_backup_progress{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\", type=\"percentage\"} ");
+      data = pgmoneta_append_int(data, (int)percentage);
+      data = pgmoneta_append(data, "\n");
+
+      data = pgmoneta_append(data, "pgmoneta_backup_progress{");
+      data = pgmoneta_append(data, "name=\"");
+      data = pgmoneta_append(data, config->common.servers[i].name);
+      data = pgmoneta_append(data, "\", type=\"remaining\"} ");
+      data = pgmoneta_append_int(data, (int)remaining);
+      data = pgmoneta_append(data, "\n");
+   }
+   data = pgmoneta_append(data, "\n");
+
+   add_metric_to_art(container->general_metrics, "pgmoneta_backup_progress", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
 }
 
 static void

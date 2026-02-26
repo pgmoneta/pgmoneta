@@ -60,6 +60,17 @@ pgmoneta_status(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption
 void
 pgmoneta_status_details(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 
+/**
+ * Get progress information
+ * @param ssl The SSL connection
+ * @param client_fd The client
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param payload The payload
+ */
+void
+pgmoneta_progress(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+
 #ifdef __cplusplus
 }
 #endif

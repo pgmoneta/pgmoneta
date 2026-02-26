@@ -92,6 +92,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_ONLINE                  "online"
 #define CONFIGURATION_ARGUMENT_PIDFILE                 "pidfile"
 #define CONFIGURATION_ARGUMENT_PORT                    "port"
+#define CONFIGURATION_ARGUMENT_PROGRESS                "progress"
 #define CONFIGURATION_ARGUMENT_RETENTION               "retention"
 #define CONFIGURATION_ARGUMENT_S3_USE_TLS              "s3_use_tls"
 #define CONFIGURATION_ARGUMENT_S3_ENDPOINT             "s3_endpoint"

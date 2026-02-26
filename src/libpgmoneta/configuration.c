@@ -299,6 +299,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.workers = -1;
                   srv.backup_max_rate = -1;
                   srv.network_max_rate = -1;
+                  srv.progress = -1;
 
                   idx_server++;
                }
@@ -636,6 +637,31 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
+                  }
+               }
+               else if (!strcmp(key, "progress"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     {
+                        config->progress = true;
+                     }
+                  }
+                  else if (strlen(section) > 0)
+                  {
+                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     {
+                        srv.progress = 1;
+                     }
+                     else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+                     {
+                        srv.progress = 0;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
                   }
                }
                else if (!strcmp(key, "metrics"))
@@ -3339,6 +3365,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION, (uintptr_t)config->compression_type, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_COMPRESSION_LEVEL, (uintptr_t)config->compression_level, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->workers, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_PROGRESS, (uintptr_t)config->progress, ValueBool);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_STORAGE_ENGINE, (uintptr_t)config->storage_engine, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_ENCRYPTION, (uintptr_t)config->encryption, ValueInt32);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CREATE_SLOT, (uintptr_t)config->create_slot, ValueInt32);
@@ -3470,6 +3497,7 @@ add_servers_configuration_response(struct json* res)
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_WORKERS, (uintptr_t)config->common.servers[i].workers, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_BACKUP_MAX_RATE, (uintptr_t)config->common.servers[i].backup_max_rate, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_NETWORK_MAX_RATE, (uintptr_t)config->common.servers[i].network_max_rate, ValueInt64);
+      pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_PROGRESS, (uintptr_t)config->common.servers[i].progress, ValueInt64);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_MANIFEST, (uintptr_t)"SHA512", ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CERT_FILE, (uintptr_t)config->common.servers[i].tls_cert_file, ValueString);
       pgmoneta_json_put(server_conf, CONFIGURATION_ARGUMENT_TLS_CA_FILE, (uintptr_t)config->common.servers[i].tls_ca_file, ValueString);
@@ -4087,6 +4115,17 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             unknown = true;
          }
       }
+      else if (!strcmp(key, "progress"))
+      {
+         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         {
+            srv->progress = 1;
+         }
+         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         {
+            srv->progress = 0;
+         }
+      }
       else
       {
          unknown = true;
@@ -4215,6 +4254,17 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             unknown = true;
          }
       }
+      else if (!strcmp(key, "progress"))
+      {
+         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         {
+            config->progress = true;
+         }
+         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         {
+            config->progress = false;
+         }
+      }
       else
       {
          unknown = true;
@@ -4315,6 +4365,10 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
             snprintf(buffer, buffer_size, "%s", ret ? ret : "");
             free(ret);
          }
+         else if (!strcmp(key_info.key, "progress"))
+         {
+            snprintf(buffer, buffer_size, "%s", config->progress ? "on" : "off");
+         }
          else
          {
             pgmoneta_log_debug("Unknown main configuration key: %s", key_info.key);
@@ -4409,6 +4463,10 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
                else if (!strcmp(key_info.key, "s3_base_dir"))
                {
                   snprintf(buffer, buffer_size, "%s", srv->s3.base_dir);
+               }
+               else if (!strcmp(key_info.key, "progress"))
+               {
+                  snprintf(buffer, buffer_size, "%s", srv->progress == 1 ? "on" : (srv->progress == 0 ? "off" : "inherit"));
                }
                else
                {
@@ -5862,6 +5920,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    config->common.number_of_admins = reload->common.number_of_admins;
 
    config->workers = reload->workers;
+   config->progress = reload->progress;
    config->backup_max_rate = reload->backup_max_rate;
    config->network_max_rate = reload->network_max_rate;
 
@@ -5957,6 +6016,7 @@ copy_server(struct server* dst, struct server* src)
    /* memcpy(&dst->current_wal_filename[0], &src->current_wal_filename[0], MISC_LENGTH); */
    /* memcpy(&dst->current_wal_lsn[0], &src->current_wal_lsn[0], MISC_LENGTH); */
    dst->workers = src->workers;
+   dst->progress = src->progress;
    dst->backup_max_rate = src->backup_max_rate;
    dst->network_max_rate = src->network_max_rate;
 

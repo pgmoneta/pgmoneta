@@ -58,6 +58,7 @@ Commands:
   list-backup              List the backups for a server
   mode                     Switch the mode for a server
   ping                     Check if pgmoneta is alive
+  progress                 Get progress for a command
   restore                  Restore a backup from a server
   retain                   Retain a backup from a server
   shutdown                 Shutdown pgmoneta
@@ -298,6 +299,23 @@ Example
 ``` sh
 pgmoneta-cli ping
 ```
+
+## progress
+
+Get progress for a command.
+
+Command
+
+``` sh
+pgmoneta-cli progress <server> backup
+```
+
+Example
+
+``` sh
+pgmoneta-cli progress primary backup
+```
+
 ## mode
 
 [**pgmoneta**][pgmoneta] detects when a server is down. You can bring a server online or offline

@@ -86,6 +86,7 @@ extern "C" {
 #define MANAGEMENT_CONF_GET       22
 #define MANAGEMENT_CONF_SET       23
 #define MANAGEMENT_MODE           24
+#define MANAGEMENT_PROGRESS       25
 
 #define MANAGEMENT_MASTER_KEY     100
 #define MANAGEMENT_ADD_USER       101
@@ -117,6 +118,8 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_BACKUPS               "Backups"
 #define MANAGEMENT_ARGUMENT_BACKUP_SIZE           "BackupSize"
 #define MANAGEMENT_ARGUMENT_BIGGEST_FILE_SIZE     "BiggestFileSize"
+#define MANAGEMENT_ARGUMENT_BYTES_DONE            "BytesDone"
+#define MANAGEMENT_ARGUMENT_BYTES_TOTAL           "BytesTotal"
 #define MANAGEMENT_ARGUMENT_CALCULATED            "Calculated"
 #define MANAGEMENT_ARGUMENT_CASCADE               "Cascade"
 #define MANAGEMENT_ARGUMENT_CHECKPOINT_HILSN      "CheckpointHiLSN"
@@ -127,14 +130,12 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_COMMENT               "Comment"
 #define MANAGEMENT_ARGUMENT_COMMENTS              "Comments"
 #define MANAGEMENT_ARGUMENT_COMPRESSION           "Compression"
-#define MANAGEMENT_ARGUMENT_COMPRESSION           "Compression"
 #define MANAGEMENT_ARGUMENT_CONFIG_KEY            "ConfigKey"
 #define MANAGEMENT_ARGUMENT_CONFIG_VALUE          "ConfigValue"
 #define MANAGEMENT_ARGUMENT_DELTA                 "Delta"
 #define MANAGEMENT_ARGUMENT_DESTINATION_FILE      "DestinationFile"
 #define MANAGEMENT_ARGUMENT_DIRECTORY             "Directory"
 #define MANAGEMENT_ARGUMENT_ELAPSED               "Elapsed"
-#define MANAGEMENT_ARGUMENT_ENCRYPTION            "Encryption"
 #define MANAGEMENT_ARGUMENT_ENCRYPTION            "Encryption"
 #define MANAGEMENT_ARGUMENT_END_HILSN             "EndHiLSN"
 #define MANAGEMENT_ARGUMENT_END_LOLSN             "EndLoLSN"
@@ -161,14 +162,15 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_OUTPUT                "Output"
 #define MANAGEMENT_ARGUMENT_POSITION              "Position"
 #define MANAGEMENT_ARGUMENT_PRIMARY               "Primary"
+#define MANAGEMENT_ARGUMENT_PROGRESS_STATE        "BackupProgressState"
 #define MANAGEMENT_ARGUMENT_RESTART               "Restart"
 #define MANAGEMENT_ARGUMENT_RESTORE_SIZE          "RestoreSize"
 #define MANAGEMENT_ARGUMENT_RETENTION_DAYS        "RetentionDays"
 #define MANAGEMENT_ARGUMENT_RETENTION_MONTHS      "RetentionMonths"
 #define MANAGEMENT_ARGUMENT_RETENTION_WEEKS       "RetentionWeeks"
 #define MANAGEMENT_ARGUMENT_RETENTION_YEARS       "RetentionYears"
-#define MANAGEMENT_ARGUMENT_S3_OBJECTS            "S3Objects"
 #define MANAGEMENT_ARGUMENT_S3_KEY                "S3Key"
+#define MANAGEMENT_ARGUMENT_S3_OBJECTS            "S3Objects"
 #define MANAGEMENT_ARGUMENT_SERVER                "Server"
 #define MANAGEMENT_ARGUMENT_SERVERS               "Servers"
 #define MANAGEMENT_ARGUMENT_SERVER_SIZE           "ServerSize"
@@ -177,6 +179,7 @@ extern "C" {
 #define MANAGEMENT_ARGUMENT_SOURCE_FILE           "SourceFile"
 #define MANAGEMENT_ARGUMENT_START_HILSN           "StartHiLSN"
 #define MANAGEMENT_ARGUMENT_START_LOLSN           "StartLoLSN"
+#define MANAGEMENT_ARGUMENT_START_TIME            "StartTime"
 #define MANAGEMENT_ARGUMENT_START_TIMELINE        "StartTimeline"
 #define MANAGEMENT_ARGUMENT_STATUS                "Status"
 #define MANAGEMENT_ARGUMENT_TABLESPACE            "Tablespace"
@@ -382,6 +385,11 @@ extern "C" {
 #define MANAGEMENT_ERROR_LIST_S3_JSON_VALUE                 2903
 #define MANAGEMENT_ERROR_LIST_S3_NETWORK                    2904
 #define MANAGEMENT_ERROR_LIST_S3_ERROR                      2905
+
+#define MANAGEMENT_ERROR_PROGRESS_NOSERVER                  3000
+#define MANAGEMENT_ERROR_PROGRESS_NOFORK                    3001
+#define MANAGEMENT_ERROR_PROGRESS_NETWORK                   3002
+#define MANAGEMENT_ERROR_PROGRESS_ERROR                     3003
 
 /**
  * Output formats
@@ -772,6 +780,19 @@ pgmoneta_management_request_annotate(SSL* ssl, int socket, char* server, char* b
  * @return 0 upon success, otherwise 1
  */
 int pgmoneta_management_request_mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
+
+/**
+ * Create a backup progress request
+ * @param ssl The SSL connection
+ * @param socket The socket descriptor
+ * @param server The server
+ * @param compression The compress method for wire protocol
+ * @param encryption The encrypt method for wire protocol
+ * @param output_format The output format
+ * @return 0 upon success, otherwise 1
+ */
+int
+pgmoneta_management_request_progress(SSL* ssl, int socket, char* server, char* command, uint8_t compression, uint8_t encryption, int32_t output_format);
 
 /**
  * Create an ok response

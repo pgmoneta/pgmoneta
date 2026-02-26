@@ -111,6 +111,7 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    char old_label_path[MAX_PATH];
    int backup_max_rate;
    int network_max_rate;
+   bool progress_enabled = false;
    uint64_t biggest_file_size;
    struct main_configuration* config;
    struct message* basebackup_msg = NULL;
@@ -252,9 +253,20 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    tag = pgmoneta_append(tag, "pgmoneta_");
    tag = pgmoneta_append(tag, label);
 
+   progress_enabled = pgmoneta_is_progress_enabled(server);
+
    pgmoneta_create_base_backup_message(config->common.servers[server].version, false, tag, true,
                                        config->compression_type, config->compression_level,
-                                       &basebackup_msg);
+                                       progress_enabled, &basebackup_msg);
+
+   if (progress_enabled)
+   {
+      atomic_store(&config->common.servers[server].backup_progress.state, BACKUP_PROGRESS_RUNNING);
+      atomic_store(&config->common.servers[server].backup_progress.bytes_done, 0);
+      atomic_store(&config->common.servers[server].backup_progress.bytes_total, 0);
+      atomic_store(&config->common.servers[server].backup_progress.elapsed, 0);
+      atomic_store(&config->common.servers[server].backup_progress.start_time, (long long)time(NULL));
+   }
 
    status = pgmoneta_write_message(ssl, socket, basebackup_msg);
    if (status != MESSAGE_STATUS_OK)
@@ -432,6 +444,11 @@ basebackup_execute(char* name __attribute__((unused)), struct art* nodes)
    free(tag);
    free(wal);
 
+   if (progress_enabled)
+   {
+      atomic_store(&config->common.servers[server].backup_progress.state, BACKUP_PROGRESS_NONE);
+   }
+
    return 0;
 
 error:
@@ -463,6 +480,11 @@ error:
    free(chkptpos);
    free(tag);
    free(wal);
+
+   if (progress_enabled)
+   {
+      atomic_store(&config->common.servers[server].backup_progress.state, BACKUP_PROGRESS_NONE);
+   }
 
    return 1;
 }
