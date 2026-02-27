@@ -1829,21 +1829,20 @@ file_final_name(char* file, int encryption, int compression, char** finalname)
    }
 
    final = pgmoneta_append(final, file);
-   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(compression))
    {
-      final = pgmoneta_append(final, ".gz");
-   }
-   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
-   {
-      final = pgmoneta_append(final, ".zstd");
-   }
-   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
-   {
-      final = pgmoneta_append(final, ".lz4");
-   }
-   else if (compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      final = pgmoneta_append(final, ".bz2");
+      case COMPRESSION_ALG_GZIP:
+         final = pgmoneta_append(final, ".gz");
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         final = pgmoneta_append(final, ".zstd");
+         break;
+      case COMPRESSION_ALG_LZ4:
+         final = pgmoneta_append(final, ".lz4");
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         final = pgmoneta_append(final, ".bz2");
+         break;
    }
 
    if (encryption != ENCRYPTION_NONE)

@@ -398,24 +398,20 @@ get_wal_file_name(char* dir_path, char* file)
    }
 
    /* Build expected compression/encryption suffix */
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP ||
-       config->compression_type == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(config->compression_type))
    {
-      suffix = pgmoneta_append(suffix, ".gz");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD ||
-            config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      suffix = pgmoneta_append(suffix, ".zstd");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 ||
-            config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      suffix = pgmoneta_append(suffix, ".lz4");
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      suffix = pgmoneta_append(suffix, ".bzip2");
+      case COMPRESSION_ALG_GZIP:
+         suffix = pgmoneta_append(suffix, ".gz");
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         suffix = pgmoneta_append(suffix, ".zstd");
+         break;
+      case COMPRESSION_ALG_LZ4:
+         suffix = pgmoneta_append(suffix, ".lz4");
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         suffix = pgmoneta_append(suffix, ".bzip2");
+         break;
    }
 
    if (config->encryption != ENCRYPTION_NONE)

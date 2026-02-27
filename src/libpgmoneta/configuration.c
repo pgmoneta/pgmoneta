@@ -1868,49 +1868,48 @@ pgmoneta_validate_main_configuration(void* shm)
       return 1;
    }
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(config->compression_type))
    {
-      if (config->compression_level < 1)
-      {
-         config->compression_level = 1;
-      }
-      else if (config->compression_level > 9)
-      {
-         config->compression_level = 9;
-      }
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      if (config->compression_level < -131072)
-      {
-         config->compression_level = -131072;
-      }
-      else if (config->compression_level > 22)
-      {
-         config->compression_level = 22;
-      }
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      if (config->compression_level < 1)
-      {
-         config->compression_level = 1;
-      }
-      else if (config->compression_level > 12)
-      {
-         config->compression_level = 12;
-      }
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      if (config->compression_level < 1)
-      {
-         config->compression_level = 1;
-      }
-      else if (config->compression_level > 9)
-      {
-         config->compression_level = 9;
-      }
+      case COMPRESSION_ALG_GZIP:
+         if (config->compression_level < 1)
+         {
+            config->compression_level = 1;
+         }
+         else if (config->compression_level > 9)
+         {
+            config->compression_level = 9;
+         }
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         if (config->compression_level < -131072)
+         {
+            config->compression_level = -131072;
+         }
+         else if (config->compression_level > 22)
+         {
+            config->compression_level = 22;
+         }
+         break;
+      case COMPRESSION_ALG_LZ4:
+         if (config->compression_level < 1)
+         {
+            config->compression_level = 1;
+         }
+         else if (config->compression_level > 12)
+         {
+            config->compression_level = 12;
+         }
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         if (config->compression_level < 1)
+         {
+            config->compression_level = 1;
+         }
+         else if (config->compression_level > 9)
+         {
+            config->compression_level = 9;
+         }
+         break;
    }
 
    if (config->workers < 0)

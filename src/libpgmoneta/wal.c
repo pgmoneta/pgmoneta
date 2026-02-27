@@ -1759,49 +1759,47 @@ retry:
       {
          d = pgmoneta_get_server_wal(srv);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         switch (COMPRESSION_ALGORITHM(config->compression_type))
          {
-            if (scan)
-            {
-               pgmoneta_gzip_wal(d);
-            }
-            else
-            {
-               pgmoneta_gzip_wal_file(d, wal_file);
-            }
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-         {
-            if (scan)
-            {
-               pgmoneta_zstandardc_wal(d);
-            }
-            else
-            {
-               pgmoneta_zstandardc_wal_file(d, wal_file);
-            }
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-         {
-            if (scan)
-            {
-               pgmoneta_lz4c_wal(d);
-            }
-            else
-            {
-               pgmoneta_lz4c_wal_file(d, wal_file);
-            }
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-         {
-            if (scan)
-            {
-               pgmoneta_bzip2_wal(d);
-            }
-            else
-            {
-               pgmoneta_bzip2_wal_file(d, wal_file);
-            }
+            case COMPRESSION_ALG_GZIP:
+               if (scan)
+               {
+                  pgmoneta_gzip_wal(d);
+               }
+               else
+               {
+                  pgmoneta_gzip_wal_file(d, wal_file);
+               }
+               break;
+            case COMPRESSION_ALG_ZSTD:
+               if (scan)
+               {
+                  pgmoneta_zstandardc_wal(d);
+               }
+               else
+               {
+                  pgmoneta_zstandardc_wal_file(d, wal_file);
+               }
+               break;
+            case COMPRESSION_ALG_LZ4:
+               if (scan)
+               {
+                  pgmoneta_lz4c_wal(d);
+               }
+               else
+               {
+                  pgmoneta_lz4c_wal_file(d, wal_file);
+               }
+               break;
+            case COMPRESSION_ALG_BZIP2:
+               if (scan)
+               {
+                  pgmoneta_bzip2_wal(d);
+               }
+               else
+               {
+                  pgmoneta_bzip2_wal_file(d, wal_file);
+               }
          }
 
          if (config->encryption != ENCRYPTION_NONE)

@@ -1636,30 +1636,28 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_json_clone(payload, &pyl);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         switch (COMPRESSION_ALGORITHM(config->compression_type))
          {
-            pgmoneta_set_proc_title(1, ai->argv, "decompress/gzip", NULL);
-            pgmoneta_gunzip_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-         {
-            pgmoneta_set_proc_title(1, ai->argv, "decompress/zstd", NULL);
-            pgmoneta_zstandardd_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-         {
-            pgmoneta_set_proc_title(1, ai->argv, "decompress/lz4", NULL);
-            pgmoneta_lz4d_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-         {
-            pgmoneta_set_proc_title(1, ai->argv, "decompress/bz2", NULL);
-            pgmoneta_bunzip2_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else
-         {
-            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, NAME, compression, encryption, payload);
-            pgmoneta_log_error("Decompress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+            case COMPRESSION_ALG_GZIP:
+               pgmoneta_set_proc_title(1, ai->argv, "decompress/gzip", NULL);
+               pgmoneta_gunzip_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            case COMPRESSION_ALG_ZSTD:
+               pgmoneta_set_proc_title(1, ai->argv, "decompress/zstd", NULL);
+               pgmoneta_zstandardd_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            case COMPRESSION_ALG_LZ4:
+               pgmoneta_set_proc_title(1, ai->argv, "decompress/lz4", NULL);
+               pgmoneta_lz4d_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            case COMPRESSION_ALG_BZIP2:
+               pgmoneta_set_proc_title(1, ai->argv, "decompress/bz2", NULL);
+               pgmoneta_bunzip2_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            default:
+               pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_DECOMPRESS_UNKNOWN, NAME, compression, encryption, payload);
+               pgmoneta_log_error("Decompress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+               break;
          }
       }
    }
@@ -1680,30 +1678,28 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_json_clone(payload, &pyl);
 
-         if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+         switch (COMPRESSION_ALGORITHM(config->compression_type))
          {
-            pgmoneta_set_proc_title(1, ai->argv, "compress/gzip", NULL);
-            pgmoneta_gzip_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-         {
-            pgmoneta_set_proc_title(1, ai->argv, "compress/zstd", NULL);
-            pgmoneta_zstandardc_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-         {
-            pgmoneta_set_proc_title(1, ai->argv, "compress/lz4", NULL);
-            pgmoneta_lz4c_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-         {
-            pgmoneta_set_proc_title(1, ai->argv, "compress/bz2", NULL);
-            pgmoneta_bzip2_request(NULL, client_fd, compression, encryption, pyl);
-         }
-         else
-         {
-            pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, NAME, compression, encryption, payload);
-            pgmoneta_log_error("Compress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+            case COMPRESSION_ALG_GZIP:
+               pgmoneta_set_proc_title(1, ai->argv, "compress/gzip", NULL);
+               pgmoneta_gzip_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            case COMPRESSION_ALG_ZSTD:
+               pgmoneta_set_proc_title(1, ai->argv, "compress/zstd", NULL);
+               pgmoneta_zstandardc_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            case COMPRESSION_ALG_LZ4:
+               pgmoneta_set_proc_title(1, ai->argv, "compress/lz4", NULL);
+               pgmoneta_lz4c_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            case COMPRESSION_ALG_BZIP2:
+               pgmoneta_set_proc_title(1, ai->argv, "compress/bz2", NULL);
+               pgmoneta_bzip2_request(NULL, client_fd, compression, encryption, pyl);
+               break;
+            default:
+               pgmoneta_management_response_error(NULL, client_fd, NULL, MANAGEMENT_ERROR_COMPRESS_UNKNOWN, NAME, compression, encryption, payload);
+               pgmoneta_log_error("Compress: Unknown compression (%d)", MANAGEMENT_ERROR_DECOMPRESS_NOFORK);
+               break;
          }
       }
    }
@@ -2679,9 +2675,7 @@ init_replication_slot(int server)
             goto server_done;
          }
 
-         if (config->common.servers[server].version < 15 && (config->compression_type == COMPRESSION_SERVER_GZIP ||
-                                                             config->compression_type == COMPRESSION_SERVER_ZSTD ||
-                                                             config->compression_type == COMPRESSION_SERVER_LZ4))
+         if (config->common.servers[server].version < 15 && COMPRESSION_IS_SERVER(config->compression_type))
          {
             pgmoneta_log_error("PostgreSQL 15 or higher is required for server %s for server side compression",
                                config->common.servers[server].name);

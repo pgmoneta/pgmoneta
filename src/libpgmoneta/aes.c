@@ -220,24 +220,21 @@ pgmoneta_encrypt_wal(char* d)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
-   switch (config->compression_type)
+   switch (COMPRESSION_ALGORITHM(config->compression_type))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
+      case COMPRESSION_ALG_GZIP:
          compress_suffix = ".gz";
          break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
+      case COMPRESSION_ALG_ZSTD:
          compress_suffix = ".zstd";
          break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
+      case COMPRESSION_ALG_LZ4:
          compress_suffix = ".lz4";
          break;
-      case COMPRESSION_CLIENT_BZIP2:
+      case COMPRESSION_ALG_BZIP2:
          compress_suffix = ".bz2";
          break;
-      case COMPRESSION_NONE:
+      case COMPRESSION_ALG_NONE:
          compress_suffix = "";
          break;
       default:
@@ -302,24 +299,21 @@ pgmoneta_encrypt_wal_file(char* d, char* f)
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
-   switch (config->compression_type)
+   switch (COMPRESSION_ALGORITHM(config->compression_type))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
+      case COMPRESSION_ALG_GZIP:
          compress_suffix = ".gz";
          break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
+      case COMPRESSION_ALG_ZSTD:
          compress_suffix = ".zstd";
          break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
+      case COMPRESSION_ALG_LZ4:
          compress_suffix = ".lz4";
          break;
-      case COMPRESSION_CLIENT_BZIP2:
+      case COMPRESSION_ALG_BZIP2:
          compress_suffix = ".bz2";
          break;
-      case COMPRESSION_NONE:
+      case COMPRESSION_ALG_NONE:
          compress_suffix = "";
          break;
       default:

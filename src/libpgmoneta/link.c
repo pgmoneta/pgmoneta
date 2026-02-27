@@ -495,19 +495,16 @@ trim_suffix(char* str)
    if (!pgmoneta_compare_string(str, "backup_label") &&
        !pgmoneta_compare_string(str, "backup_manifest"))
    {
-      switch (config->compression_type)
+      switch (COMPRESSION_ALGORITHM(config->compression_type))
       {
-         case COMPRESSION_CLIENT_GZIP:
-         case COMPRESSION_SERVER_GZIP:
+         case COMPRESSION_ALG_GZIP:
             len -= 3;
             break;
-         case COMPRESSION_CLIENT_ZSTD:
-         case COMPRESSION_SERVER_ZSTD:
+         case COMPRESSION_ALG_ZSTD:
             len -= 5;
             break;
-         case COMPRESSION_CLIENT_LZ4:
-         case COMPRESSION_SERVER_LZ4:
-         case COMPRESSION_CLIENT_BZIP2:
+         case COMPRESSION_ALG_LZ4:
+         case COMPRESSION_ALG_BZIP2:
             len -= 4;
             break;
       }

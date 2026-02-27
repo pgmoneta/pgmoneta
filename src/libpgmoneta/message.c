@@ -829,26 +829,26 @@ pgmoneta_create_base_backup_message(int server_version, bool incremental, char* 
          options = pgmoneta_append(options, "WAL false, ");
       }
 
-      if (compression == COMPRESSION_SERVER_GZIP)
+      switch (compression)
       {
-         options = pgmoneta_append(options, "COMPRESSION 'gzip', ");
-         options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
-         options = pgmoneta_append_int(options, compression_level);
-         options = pgmoneta_append(options, "', ");
-      }
-      else if (compression == COMPRESSION_SERVER_ZSTD)
-      {
-         options = pgmoneta_append(options, "COMPRESSION 'zstd', ");
-         options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
-         options = pgmoneta_append_int(options, compression_level);
-         options = pgmoneta_append(options, ",workers=4', ");
-      }
-      else if (compression == COMPRESSION_SERVER_LZ4)
-      {
-         options = pgmoneta_append(options, "COMPRESSION 'lz4', ");
-         options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
-         options = pgmoneta_append_int(options, compression_level);
-         options = pgmoneta_append(options, "', ");
+         case COMPRESSION_SERVER_GZIP:
+            options = pgmoneta_append(options, "COMPRESSION 'gzip', ");
+            options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
+            options = pgmoneta_append_int(options, compression_level);
+            options = pgmoneta_append(options, "', ");
+            break;
+         case COMPRESSION_SERVER_ZSTD:
+            options = pgmoneta_append(options, "COMPRESSION 'zstd', ");
+            options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
+            options = pgmoneta_append_int(options, compression_level);
+            options = pgmoneta_append(options, ",workers=4', ");
+            break;
+         case COMPRESSION_SERVER_LZ4:
+            options = pgmoneta_append(options, "COMPRESSION 'lz4', ");
+            options = pgmoneta_append(options, "COMPRESSION_DETAIL 'level=");
+            options = pgmoneta_append_int(options, compression_level);
+            options = pgmoneta_append(options, "', ");
+            break;
       }
 
       options = pgmoneta_append(options, "CHECKPOINT 'fast', ");
