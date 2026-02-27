@@ -52,6 +52,9 @@ extern char* mctf_errmsg;
 /* Test function type */
 typedef int (*mctf_test_func_t)(void);
 
+/* Hook function type (setup / teardown) */
+typedef void (*mctf_hook_func_t)(void);
+
 /**
  * Test registration structure
  */
@@ -63,6 +66,32 @@ typedef struct mctf_test
    mctf_test_func_t func;  /**< Test function pointer */
    struct mctf_test* next; /**< Next test in linked list */
 } mctf_test_t;
+
+/**
+ * Per-test hook registration for a module.
+ * setup   is called before EACH test in the module.
+ * teardown is called after  EACH test in the module.
+ */
+typedef struct mctf_test_hooks
+{
+   const char* module;           /**< Module these hooks apply to */
+   mctf_hook_func_t setup;       /**< Called before each test in module */
+   mctf_hook_func_t teardown;    /**< Called after  each test in module */
+   struct mctf_test_hooks* next; /**< Next per-test hook registration in linked list */
+} mctf_test_hooks_t;
+
+/**
+ * Per-module hook registration.
+ * setup   is called ONCE before the first test in the module.
+ * teardown is called ONCE after  the last  test in the module.
+ */
+typedef struct mctf_module_hooks
+{
+   const char* module;             /**< Module these hooks apply to */
+   mctf_hook_func_t setup;         /**< Called once before module's first test */
+   mctf_hook_func_t teardown;      /**< Called once after  module's last  test */
+   struct mctf_module_hooks* next; /**< Next per-module hook registration in linked list */
+} mctf_module_hooks_t;
 
 /**
  * Test result structure
@@ -83,13 +112,15 @@ typedef struct mctf_result
  */
 typedef struct mctf_runner
 {
-   mctf_test_t* tests;     /**< Linked list of registered tests */
-   mctf_result_t* results; /**< Array of test results */
-   size_t test_count;      /**< Total number of tests */
-   size_t result_count;    /**< Total number of results */
-   size_t passed_count;    /**< Number of passed tests */
-   size_t failed_count;    /**< Number of failed tests */
-   size_t skipped_count;   /**< Number of skipped tests */
+   mctf_test_t* tests;                /**< Linked list of registered tests */
+   mctf_result_t* results;            /**< Array of test results */
+   mctf_test_hooks_t* test_hooks;     /**< Per-test hook registrations (by module) */
+   mctf_module_hooks_t* module_hooks; /**< Per-module hook registrations */
+   size_t test_count;                 /**< Total number of tests */
+   size_t result_count;               /**< Total number of results */
+   size_t passed_count;               /**< Number of passed tests */
+   size_t failed_count;               /**< Number of failed tests */
+   size_t skipped_count;              /**< Number of skipped tests */
 } mctf_runner_t;
 
 /**
@@ -113,6 +144,42 @@ mctf_cleanup(void);
  */
 void
 mctf_register_test(const char* name, const char* module, const char* file, mctf_test_func_t func);
+
+/**
+ * Register a per-test setup hook for a module.
+ * Called automatically before each test in @p module.
+ * @param module The module name
+ * @param func   The setup function
+ */
+void
+mctf_register_test_setup(const char* module, mctf_hook_func_t func);
+
+/**
+ * Register a per-test teardown hook for a module.
+ * Called automatically after each test in @p module.
+ * @param module The module name
+ * @param func   The teardown function
+ */
+void
+mctf_register_test_teardown(const char* module, mctf_hook_func_t func);
+
+/**
+ * Register a per-module setup hook.
+ * Called automatically once before the first test in @p module.
+ * @param module The module name
+ * @param func   The setup function
+ */
+void
+mctf_register_module_setup(const char* module, mctf_hook_func_t func);
+
+/**
+ * Register a per-module teardown hook.
+ * Called automatically once after the last test in @p module.
+ * @param module The module name
+ * @param func   The teardown function
+ */
+void
+mctf_register_module_teardown(const char* module, mctf_hook_func_t func);
 
 /**
  * Extract module name from file path (internal use)
@@ -336,6 +403,65 @@ mctf_get_results(size_t* count);
       mctf_register_test(#name, mctf_extract_module_name(file_path), filename, name); \
    }                                                                                  \
    static int name(void)
+
+/**
+ * Register a per-test setup hook for this file's module.
+ * The function body follows the macro, e.g.:
+ *
+ *   MCTF_TEST_SETUP(cache) { pgmoneta_memory_init(); }
+ *
+ * The module name is inferred from the source file name the same way
+ * MCTF_TEST() does it.
+ */
+#define MCTF_TEST_SETUP(module_name)                                                 \
+   static void mctf_test_setup_fn_##module_name(void);                               \
+   static void __attribute__((constructor)) mctf_ctor_test_setup_##module_name(void) \
+   {                                                                                 \
+      mctf_register_test_setup(#module_name, mctf_test_setup_fn_##module_name);      \
+   }                                                                                 \
+   static void mctf_test_setup_fn_##module_name(void)
+
+/**
+ * Register a per-test teardown hook for this file's module.
+ * The function body follows the macro, e.g.:
+ *
+ *   MCTF_TEST_TEARDOWN(cache) { pgmoneta_memory_destroy(); }
+ */
+#define MCTF_TEST_TEARDOWN(module_name)                                                 \
+   static void mctf_test_teardown_fn_##module_name(void);                               \
+   static void __attribute__((constructor)) mctf_ctor_test_teardown_##module_name(void) \
+   {                                                                                    \
+      mctf_register_test_teardown(#module_name, mctf_test_teardown_fn_##module_name);   \
+   }                                                                                    \
+   static void mctf_test_teardown_fn_##module_name(void)
+
+/**
+ * Register a once-per-module setup hook.
+ * Called once before the first test in the module.
+ *
+ *   MCTF_MODULE_SETUP(cache) { ... }
+ */
+#define MCTF_MODULE_SETUP(module_name)                                                 \
+   static void mctf_module_setup_fn_##module_name(void);                               \
+   static void __attribute__((constructor)) mctf_ctor_module_setup_##module_name(void) \
+   {                                                                                   \
+      mctf_register_module_setup(#module_name, mctf_module_setup_fn_##module_name);    \
+   }                                                                                   \
+   static void mctf_module_setup_fn_##module_name(void)
+
+/**
+ * Register a once-per-module teardown hook.
+ * Called once after the last test in the module.
+ *
+ *   MCTF_MODULE_TEARDOWN(cache) { ... }
+ */
+#define MCTF_MODULE_TEARDOWN(module_name)                                                 \
+   static void mctf_module_teardown_fn_##module_name(void);                               \
+   static void __attribute__((constructor)) mctf_ctor_module_teardown_##module_name(void) \
+   {                                                                                      \
+      mctf_register_module_teardown(#module_name, mctf_module_teardown_fn_##module_name); \
+   }                                                                                      \
+   static void mctf_module_teardown_fn_##module_name(void)
 
 #ifdef __cplusplus
 }

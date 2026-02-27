@@ -54,6 +54,9 @@ char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 char TEST_RESTORE_DIR[MAX_PATH];
 char TEST_BASE_DIR[MAX_PATH];
 
+/* In-process snapshot of the configuration used for save/restore */
+static struct main_configuration config_snapshot;
+
 void
 pgmoneta_test_environment_create(void)
 {
@@ -261,6 +264,28 @@ pgmoneta_test_teardown(void)
    }
 
    pgmoneta_memory_destroy();
+}
+
+void
+pgmoneta_test_config_save(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (config != NULL)
+   {
+      memcpy(&config_snapshot, config, sizeof(struct main_configuration));
+   }
+}
+
+void
+pgmoneta_test_config_restore(void)
+{
+   struct main_configuration* config = (struct main_configuration*)shmem;
+
+   if (config != NULL)
+   {
+      memcpy(config, &config_snapshot, sizeof(struct main_configuration));
+   }
 }
 
 int

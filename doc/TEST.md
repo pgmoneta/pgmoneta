@@ -30,7 +30,40 @@ To add an additional testcase, go to [testcases](https://github.com/pgmoneta/pgm
 
 Create a `.c` file that contains the test and use the `MCTF_TEST()` macro to define your test. Tests are automatically registered and module names are extracted from file names.
 
-Example test structure:
+**Lifecycle Hooks**
+
+MCTF provides four self-registering lifecycle hook macros (same `__attribute__((constructor))` pattern as `MCTF_TEST`):
+
+| Macro | When it runs | Use case |
+|---|---|---|
+| `MCTF_TEST_SETUP(module)` | Before **each** test | Allocate per-test resources |
+| `MCTF_TEST_TEARDOWN(module)` | After **each** test (always) | Free per-test resources |
+| `MCTF_MODULE_SETUP(module)` | Once before the first test | Start a daemon / open a connection |
+| `MCTF_MODULE_TEARDOWN(module)` | Once after the last test | Stop a daemon / close a connection |
+
+`module` must match the name derived from the filename (e.g. `test_cache.c` -> `cache`).
+
+Use `MCTF_TEST_SETUP/TEARDOWN` when each test needs a clean, isolated environment (e.g. private `shmem`). Use `MCTF_MODULE_SETUP/TEARDOWN` when setup is expensive and safe to share across all tests in the module. They can be combined.
+
+**Config snapshot/restore**
+
+Because all tests share the same process and `shmem`, config mutations in one test leak into the next. Use `pgmoneta_test_config_save()` and `pgmoneta_test_config_restore()` (declared in `tscommon.h`) inside `MCTF_TEST_SETUP/TEARDOWN` to snapshot and roll back `struct main_configuration` around each test:
+
+```c
+MCTF_TEST_SETUP(mymodule)
+{
+   pgmoneta_test_config_save();
+   pgmoneta_memory_init();
+}
+
+MCTF_TEST_TEARDOWN(mymodule)
+{
+   pgmoneta_memory_destroy();
+   pgmoneta_test_config_restore();
+}
+```
+
+**Example test structure:**
 ```c
 #include <mctf.h>
 #include <tscommon.h>

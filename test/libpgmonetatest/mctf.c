@@ -170,6 +170,30 @@ mctf_cleanup(void)
       test = next;
    }
 
+   /* Free per-test hook records */
+   {
+      mctf_test_hooks_t* h = g_runner.test_hooks;
+      while (h)
+      {
+         mctf_test_hooks_t* next = h->next;
+         free((void*)h->module);
+         free(h);
+         h = next;
+      }
+   }
+
+   /* Free per-module hook records */
+   {
+      mctf_module_hooks_t* h = g_runner.module_hooks;
+      while (h)
+      {
+         mctf_module_hooks_t* next = h->next;
+         free((void*)h->module);
+         free(h);
+         h = next;
+      }
+   }
+
    if (g_runner.results)
    {
       for (size_t i = 0; i < g_runner.result_count; i++)
@@ -238,6 +262,117 @@ mctf_register_test(const char* name, const char* module, const char* file, mctf_
    test->next = g_runner.tests;
    g_runner.tests = test;
    g_runner.test_count++;
+}
+
+
+/** Find or create a mctf_test_hooks_t record for @p module in the runner. */
+static mctf_test_hooks_t*
+get_or_create_test_hooks(const char* module)
+{
+   mctf_test_hooks_t* h;
+
+   for (h = g_runner.test_hooks; h; h = h->next)
+   {
+      if (strcmp(h->module, module) == 0)
+         return h;
+   }
+
+   h = calloc(1, sizeof(mctf_test_hooks_t));
+   if (!h)
+   {
+      mctf_log_errorf("MCTF: Failed to allocate test hooks for module '%s'\n", module);
+      return NULL;
+   }
+   h->module = strdup(module);
+   if (!h->module)
+   {
+      free(h);
+      return NULL;
+   }
+   h->next = g_runner.test_hooks;
+   g_runner.test_hooks = h;
+   return h;
+}
+
+/** Find or create a mctf_module_hooks_t record for @p module in the runner. */
+static mctf_module_hooks_t*
+get_or_create_module_hooks(const char* module)
+{
+   mctf_module_hooks_t* h;
+
+   for (h = g_runner.module_hooks; h; h = h->next)
+   {
+      if (strcmp(h->module, module) == 0)
+         return h;
+   }
+
+   h = calloc(1, sizeof(mctf_module_hooks_t));
+   if (!h)
+   {
+      mctf_log_errorf("MCTF: Failed to allocate module hooks for module '%s'\n", module);
+      return NULL;
+   }
+   h->module = strdup(module);
+   if (!h->module)
+   {
+      free(h);
+      return NULL;
+   }
+   h->next = g_runner.module_hooks;
+   g_runner.module_hooks = h;
+   return h;
+}
+
+void
+mctf_register_test_setup(const char* module, mctf_hook_func_t func)
+{
+   mctf_test_hooks_t* h;
+
+   if (!g_initialized)
+      mctf_init();
+
+   h = get_or_create_test_hooks(module);
+   if (h)
+      h->setup = func;
+}
+
+void
+mctf_register_test_teardown(const char* module, mctf_hook_func_t func)
+{
+   mctf_test_hooks_t* h;
+
+   if (!g_initialized)
+      mctf_init();
+
+   h = get_or_create_test_hooks(module);
+   if (h)
+      h->teardown = func;
+}
+
+void
+mctf_register_module_setup(const char* module, mctf_hook_func_t func)
+{
+   mctf_module_hooks_t* h;
+
+   if (!g_initialized)
+      mctf_init();
+
+   h = get_or_create_module_hooks(module);
+   if (h)
+      h->setup = func;
+}
+
+void
+mctf_register_module_teardown(const char* module, mctf_hook_func_t func)
+{
+   mctf_module_hooks_t* h;
+
+   if (!g_initialized)
+      mctf_init();
+
+   h = get_or_create_module_hooks(module);
+   if (h)
+      h->teardown = func;
 }
 
 const char*
@@ -355,7 +490,11 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
    }
    mctf_logf("Total tests to run: %zu\n\n", tests_to_run);
 
+   /* Helper lambdas replaced by explicit lookups below */
    const char* current_module = NULL;
+   mctf_test_hooks_t* cur_test_hooks = NULL;
+   mctf_module_hooks_t* cur_module_hooks = NULL;
+
    for (test = g_runner.tests; test; test = test->next)
    {
       if (!matches_filter(filter_type, test->name, test->module, filter))
@@ -363,15 +502,50 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
          continue;
       }
 
+      /* ---- module transition ---- */
       if (!current_module || strcmp(current_module, test->module) != 0)
       {
+         /* Tear down the previous module (if any) */
+         if (current_module && cur_module_hooks && cur_module_hooks->teardown)
+         {
+            cur_module_hooks->teardown();
+         }
+
          if (current_module)
          {
             mctf_logf("\n");
          }
          mctf_logf("--- %s ---\n", test->module);
          current_module = test->module;
+
+         /* Find hook registrations for the new module */
+         cur_test_hooks = NULL;
+         for (mctf_test_hooks_t* h = g_runner.test_hooks; h; h = h->next)
+         {
+            if (strcmp(h->module, test->module) == 0)
+            {
+               cur_test_hooks = h;
+               break;
+            }
+         }
+
+         cur_module_hooks = NULL;
+         for (mctf_module_hooks_t* h = g_runner.module_hooks; h; h = h->next)
+         {
+            if (strcmp(h->module, test->module) == 0)
+            {
+               cur_module_hooks = h;
+               break;
+            }
+         }
+
+         /* Set up the new module */
+         if (cur_module_hooks && cur_module_hooks->setup)
+         {
+            cur_module_hooks->setup();
+         }
       }
+      /* ---- end module transition ---- */
 
       mctf_result_t* result = &g_runner.results[g_runner.result_count];
       result->test_name = test->name;
@@ -387,7 +561,20 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
 
       mctf_errno = 0;
       if (mctf_errmsg) { free(mctf_errmsg); mctf_errmsg = NULL; }
+
+      /* Per-test setup */
+      if (cur_test_hooks && cur_test_hooks->setup)
+      {
+         cur_test_hooks->setup();
+      }
+
       int ret = test->func();
+
+      /* Per-test teardown (always, regardless of test outcome) */
+      if (cur_test_hooks && cur_test_hooks->teardown)
+      {
+         cur_test_hooks->teardown();
+      }
 
       clock_gettime(CLOCK_MONOTONIC, &end_time);
 
@@ -441,6 +628,12 @@ mctf_run_tests(mctf_filter_type_t filter_type, const char* filter)
       }
 
       g_runner.result_count++;
+   }
+
+   /* Tear down the last module */
+   if (current_module && cur_module_hooks && cur_module_hooks->teardown)
+   {
+      cur_module_hooks->teardown();
    }
 
    return (int)g_runner.failed_count;
