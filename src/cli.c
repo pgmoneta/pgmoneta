@@ -50,6 +50,7 @@
 
 /* system */
 #include <err.h>
+#include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -644,30 +645,67 @@ main(int argc, char** argv)
    {
       ret = pgmoneta_validate_config_file(configuration_path);
 
-      if (ret)
+      if (ret == EINVAL)
       {
-         switch (ret)
-         {
-            case ENOENT:
-               errx(1, "Configuration file not found or not a regular file: %s", configuration_path);
-               break;
-
-            case EACCES:
-               errx(1, "Can't read configuration file: %s", configuration_path);
-               break;
-
-            case EINVAL:
-               errx(1, "Configuration file contains binary data or invalid path: %s", configuration_path);
-               break;
-
-            default:
-               errx(1, "Configuration file validation failed: %s", configuration_path);
-         }
+         errx(1, "Configuration file contains binary data or is invalid: %s\n"
+                 "Configuration must be a text file",
+              configuration_path);
       }
-      ret = pgmoneta_read_cli_configuration(shmem, configuration_path);
-      if (ret)
+      else if (ret == ENOENT)
       {
-         errx(1, "pgmoneta-cli: Failed to read configuration file: %s", configuration_path);
+         errx(1, "Configuration file error: %s\n"
+                 "File not found or not accessible",
+              configuration_path);
+      }
+      else if (ret == EACCES)
+      {
+         errx(1, "Cannot read configuration file: %s\n"
+                 "Permission denied",
+              configuration_path);
+      }
+      else if (ret != 0)
+      {
+         errx(1, "Configuration file validation failed: %s (error code: %d)",
+              configuration_path, ret);
+      }
+
+      ret = pgmoneta_read_cli_configuration(shmem, configuration_path);
+      if (ret == ENOENT)
+      {
+         errx(1, "Configuration file not found: %s\n"
+                 "Please ensure the file exists and is readable",
+              configuration_path);
+      }
+      else if (ret == EINVAL)
+      {
+         errx(1, "Configuration syntax error in: %s\n"
+                 "\n"
+                 "Connection settings (choose one):\n"
+                 "  1. TCP: hose = <hostname> AND port = <port>\n"
+                 "  2. Unix: unix_socket_dir = <path>\n"
+                 "\n"
+                 "Optinal settings:\n"
+                 "  - log_type = console|file (default: console)\n"
+                 "  - log_level = (debug5|debug4|debug3|debug2|debug1|info|warn|error|fatal) (default: info)\n"
+                 "  - log_path = /path/to/logfile (optional if log_type = console)\n"
+                 "  - log_mode = create|append (default: append)\n"
+                 "\n"
+                 "Example1 (TCP connection):\n"
+                 "  host = localhost\n"
+                 "  port = 5432\n"
+                 "  log_type = console\n"
+                 "  log_level = info"
+                 "\n"
+                 "Example2 (Unix socket connection):\n"
+                 "  unix_socket_dir = /tmp\n"
+                 "  log_type = file\n"
+                 "  log_path = /var/log/pgmoneta-cli.log",
+              configuration_path);
+      }
+      else if (ret != 0)
+      {
+         errx(1, "Failed to read configuration: %s (error code: %d)",
+              configuration_path, ret);
       }
 
       ret = pgmoneta_validate_cli_configuration(shmem);
