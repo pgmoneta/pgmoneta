@@ -52,6 +52,35 @@ static int lz4_decompress(char* from, char* to);
 static void do_lz4_compress(struct worker_common* wc);
 static void do_lz4_decompress(struct worker_common* wc);
 
+static int lz4_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static int lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static void lz4_compressor_close(struct compressor* compressor);
+
+enum lz4_compressor_state {
+   LZ4_NEED_DATA,
+   LZ4_FLUSH,
+   LZ4_NEW_CHUNK,
+   LZ4_PROCESS,
+};
+
+struct lz4_compressor
+{
+   struct compressor super;
+   LZ4_stream_t* compress_strm;
+   LZ4_streamDecode_t* decompress_strm;
+   char in_buf[2][LZ4_COMPRESSBOUND(BLOCK_BYTES) + 4];
+   size_t in_capacity;
+   size_t in_size;
+   char out_buf[2][LZ4_COMPRESSBOUND(BLOCK_BYTES)];
+   size_t out_capacity;
+   size_t out_size;
+   size_t out_pos;
+   uint32_t compressed_bytes;
+   int in_buf_idx;
+   int out_buf_idx;
+   enum lz4_compressor_state state;
+};
+
 int
 pgmoneta_lz4c_data(char* directory, struct workers* workers)
 {
@@ -959,4 +988,216 @@ pgmoneta_lz4d_string(unsigned char* compressed_buffer, size_t compressed_size, c
    (*output_string)[decompressed_size] = '\0';
 
    return 0;
+}
+
+int
+pgmoneta_lz4_compressor_create(struct compressor** compressor)
+{
+   struct lz4_compressor* lcompressor = NULL;
+   lcompressor = malloc(sizeof(struct lz4_compressor));
+   memset(lcompressor, 0, sizeof(struct lz4_compressor));
+   lcompressor->super.close = lz4_compressor_close;
+   lcompressor->super.compress = lz4_compressor_compress;
+   lcompressor->super.decompress = lz4_compressor_decompress;
+   lcompressor->in_capacity = BLOCK_BYTES;
+   lcompressor->out_capacity = LZ4_COMPRESSBOUND(BLOCK_BYTES);
+   *compressor = (struct compressor*)lcompressor;
+   return 0;
+}
+
+static int
+lz4_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct lz4_compressor* this = NULL;
+   size_t bytes_to_read = 0;
+   uint32_t compression_size = 0;
+   size_t bytes_to_write = 0;
+   int csize = 0;
+   int buf_offset = 0;
+   this = (struct lz4_compressor*)compressor;
+   *out_size = 0;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *finished = true;
+      goto error;
+   }
+
+   if (this->compress_strm == NULL)
+   {
+      this->compress_strm = LZ4_createStream();
+      if (this->compress_strm == NULL)
+      {
+         pgmoneta_log_error("lz4 compressor: failed to create compression stream");
+         goto error;
+      }
+      LZ4_resetStream_fast(this->compress_strm);
+      this->state = LZ4_NEED_DATA;
+   }
+
+   if (this->state == LZ4_NEED_DATA)
+   {
+      bytes_to_read = MIN(this->in_capacity - this->in_size, this->super.in_size - this->super.in_pos);
+      memcpy(this->in_buf[this->in_buf_idx] + this->in_size, this->super.in_buf + this->super.in_pos, bytes_to_read);
+      this->in_size += bytes_to_read;
+      this->super.in_pos += bytes_to_read;
+      if (this->in_capacity == this->in_size || this->super.last_chunk)
+      {
+         csize = LZ4_compress_fast_continue(this->compress_strm, this->in_buf[this->in_buf_idx], this->out_buf[this->out_buf_idx], this->in_size, this->out_capacity, 1);
+         if (csize <= 0)
+         {
+            pgmoneta_log_error("lz4_compressor: failed to compress data");
+            goto error;
+         }
+         this->out_size = csize;
+         this->out_pos = 0;
+         compression_size = (uint32_t)csize;
+         memcpy(out_buf, &compression_size, 4);
+         buf_offset = 4;
+         this->state = LZ4_FLUSH;
+         this->in_size = 0;
+      }
+   }
+
+   if (this->state == LZ4_FLUSH)
+   {
+      bytes_to_write = MIN(out_capacity - buf_offset, this->out_size - this->out_pos);
+      memcpy(out_buf + buf_offset, this->out_buf[this->out_buf_idx] + this->out_pos, bytes_to_write);
+      this->out_pos += bytes_to_write;
+      *out_size = bytes_to_write + buf_offset;
+      if (this->out_pos >= this->out_size)
+      {
+         this->state = LZ4_NEED_DATA;
+         this->in_buf_idx = (this->in_buf_idx + 1) % 2;
+      }
+   }
+   *finished = this->super.in_size == this->super.in_pos && this->out_size == this->out_pos;
+
+   return 0;
+error:
+   return 1;
+}
+
+static int
+lz4_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct lz4_compressor* this = NULL;
+   size_t bytes_to_read = 0;
+   size_t bytes_to_write = 0;
+   int dsize = 0;
+   *out_size = 0;
+
+   this = (struct lz4_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *finished = true;
+      goto error;
+   }
+
+   if (this->decompress_strm == NULL)
+   {
+      this->decompress_strm = LZ4_createStreamDecode();
+      if (this->decompress_strm == NULL)
+      {
+         goto error;
+      }
+      this->state = LZ4_NEW_CHUNK;
+      LZ4_setStreamDecode(this->decompress_strm, NULL, 0);
+   }
+
+   if (this->state == LZ4_NEW_CHUNK)
+   {
+      // try reading more data here, our buffer is actually slightly larger than the claimed capacity because
+      // compressed data could be larger, thus using sizeof instead of in_capacity
+      bytes_to_read = MIN(sizeof(this->in_buf[this->in_buf_idx]) - this->in_size, this->super.in_size - this->super.in_pos);
+      memcpy(this->in_buf[this->in_buf_idx] + this->in_size, this->super.in_buf + this->super.in_pos, bytes_to_read);
+      this->in_size += bytes_to_read;
+      this->super.in_pos += bytes_to_read;
+      if (this->in_size < 4)
+      {
+         if (this->super.last_chunk)
+         {
+            goto error;
+         }
+      }
+      else
+      {
+         memcpy(&this->compressed_bytes, this->in_buf[this->in_buf_idx], 4);
+         if (this->compressed_bytes > sizeof(this->in_buf[this->in_buf_idx]))
+         {
+            pgmoneta_log_error("lz4 compressor: chunk is too big, compressed size %d", this->compressed_bytes);
+            goto error;
+         }
+         if (this->in_size - 4 >= this->compressed_bytes)
+         {
+            this->state = LZ4_PROCESS;
+         }
+         else
+         {
+            this->state = LZ4_NEED_DATA;
+         }
+         memmove(this->in_buf[this->in_buf_idx], this->in_buf[this->in_buf_idx] + 4, this->in_size - 4);
+         this->in_size -= 4;
+      }
+   }
+   else if (this->state == LZ4_NEED_DATA)
+   {
+      // read new data from buffer, our buffer is actually slightly larger than the claimed capacity because
+      // compressed data could be larger
+      bytes_to_read = MIN(sizeof(this->in_buf[this->in_buf_idx]) - this->in_size, this->super.in_size - this->super.in_pos);
+      memcpy(this->in_buf[this->in_buf_idx] + this->in_size, this->super.in_buf + this->super.in_pos, bytes_to_read);
+      this->in_size += bytes_to_read;
+      this->super.in_pos += bytes_to_read;
+      if (this->in_size >= this->compressed_bytes)
+      {
+         this->state = LZ4_PROCESS;
+      }
+   }
+
+   if (this->state == LZ4_PROCESS)
+   {
+      dsize = LZ4_decompress_safe_continue(this->decompress_strm, this->in_buf[this->in_buf_idx], this->out_buf[this->out_buf_idx], this->compressed_bytes, this->out_capacity);
+
+      if (dsize < 0)
+      {
+         pgmoneta_log_error("lz4 compressor: failed to decompress");
+         goto error;
+      }
+      memmove(this->in_buf[this->in_buf_idx], this->in_buf[this->in_buf_idx] + this->compressed_bytes, this->in_size - this->compressed_bytes);
+      this->in_size -= this->compressed_bytes;
+      this->compressed_bytes = 0;
+      this->out_size = dsize;
+      this->out_pos = 0;
+      this->state = LZ4_FLUSH;
+   }
+
+   if (this->state == LZ4_FLUSH)
+   {
+      bytes_to_write = MIN(out_capacity, this->out_size - this->out_pos);
+      memcpy(out_buf, this->out_buf[this->out_buf_idx] + this->out_pos, bytes_to_write);
+      this->out_pos += bytes_to_write;
+      *out_size = bytes_to_write;
+      if (this->out_pos >= this->out_size)
+      {
+         this->state = LZ4_NEW_CHUNK;
+         this->out_buf_idx = (this->out_buf_idx + 1) % 2;
+      }
+   }
+
+   *finished = this->super.in_size == this->super.in_pos && this->out_size == this->out_pos;
+   return 0;
+error:
+   return 1;
+}
+
+static void
+lz4_compressor_close(struct compressor* compressor)
+{
+   if (compressor == NULL)
+   {
+      return;
+   }
+
+   struct lz4_compressor* this = (struct lz4_compressor*)compressor;
+   LZ4_freeStream(this->compress_strm);
+   LZ4_freeStreamDecode(this->decompress_strm);
 }

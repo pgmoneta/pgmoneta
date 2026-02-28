@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <compression.h>
 #include <logging.h>
 #include <management.h>
 #include <utils.h>
@@ -50,6 +51,17 @@
 static int zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 static int zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zin, size_t zout_size, void* zout);
 static int zstd_configure_cctx(ZSTD_CCtx* cctx, int level, int workers);
+
+static int zstd_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static int zstd_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static void zstd_compressor_close(struct compressor* compressor);
+
+struct zstd_compressor
+{
+   struct compressor super;
+   ZSTD_DCtx* dctx;
+   ZSTD_CCtx* cctx;
+};
 
 void
 pgmoneta_zstandardc_data(char* directory, struct workers* workers)
@@ -1075,6 +1087,19 @@ pgmoneta_zstdd_string(unsigned char* compressed_buffer, size_t compressed_size, 
    return 0;
 }
 
+int
+pgmoneta_zstd_compressor_create(struct compressor** compressor)
+{
+   struct zstd_compressor* zcompressor = NULL;
+   zcompressor = malloc(sizeof(struct zstd_compressor));
+   memset(zcompressor, 0, sizeof(struct zstd_compressor));
+   zcompressor->super.close = zstd_compressor_close;
+   zcompressor->super.compress = zstd_compressor_compress;
+   zcompressor->super.decompress = zstd_compressor_decompress;
+   *compressor = (struct compressor*)zcompressor;
+   return 0;
+}
+
 static int
 zstd_configure_cctx(ZSTD_CCtx* cctx, int level, int workers)
 {
@@ -1275,4 +1300,114 @@ error:
    }
 
    return 1;
+}
+
+static int
+zstd_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct main_configuration* config;
+   struct zstd_compressor* this = NULL;
+
+   config = (struct main_configuration*)shmem;
+   this = (struct zstd_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *out_size = 0;
+      *finished = true;
+      goto error;
+   }
+
+   if (this->super.in_pos > this->super.in_size)
+   {
+      return 0;
+   }
+
+   ZSTD_EndDirective mode = this->super.last_chunk ? ZSTD_e_end : ZSTD_e_continue;
+
+   if (this->cctx == NULL)
+   {
+      int level = config->compression_level;
+      int workers = config->workers != 0 ? config->workers : ZSTD_DEFAULT_NUMBER_OF_WORKERS;
+
+      level = MIN(19, MAX(1, level));
+      this->cctx = ZSTD_createCCtx();
+      if (this->cctx == NULL)
+      {
+         goto error;
+      }
+
+      ZSTD_CCtx_setParameter(this->cctx, ZSTD_c_compressionLevel, level);
+      ZSTD_CCtx_setParameter(this->cctx, ZSTD_c_checksumFlag, 1);
+      ZSTD_CCtx_setParameter(this->cctx, ZSTD_c_nbWorkers, workers);
+   }
+
+   ZSTD_inBuffer input = {.src = this->super.in_buf, .size = this->super.in_size, .pos = this->super.in_pos};
+   ZSTD_outBuffer output = {.dst = out_buf, .size = out_capacity, .pos = 0};
+   size_t remaining = ZSTD_compressStream2(this->cctx, &output, &input, mode);
+   if (ZSTD_isError(remaining))
+   {
+      pgmoneta_log_error("ZSTD: Compression error: %s", ZSTD_getErrorName(remaining));
+      goto error;
+   }
+
+   this->super.in_pos = input.pos;
+   *finished = this->super.last_chunk ? (remaining == 0) : (input.pos == input.size);
+   *out_size = output.pos;
+   return 0;
+error:
+   return 1;
+}
+
+static int
+zstd_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct zstd_compressor* this = NULL;
+   this = (struct zstd_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *out_size = 0;
+      *finished = true;
+      goto error;
+   }
+   if (this->super.in_pos > this->super.in_size)
+   {
+      return 0;
+   }
+   if (this->dctx == NULL)
+   {
+      this->dctx = ZSTD_createDCtx();
+      if (this->dctx == NULL)
+      {
+         pgmoneta_log_error("ZSTD: Could not create decompression context");
+         goto error;
+      }
+   }
+
+   ZSTD_inBuffer input = {.src = this->super.in_buf, .size = this->super.in_size, .pos = this->super.in_pos};
+   ZSTD_outBuffer output = {.dst = out_buf, .size = out_capacity, .pos = 0};
+   size_t remaining = ZSTD_decompressStream(this->dctx, &output, &input);
+   if (ZSTD_isError(remaining))
+   {
+      pgmoneta_log_error("ZSTD: Decompression error: %s", ZSTD_getErrorName(remaining));
+      goto error;
+   }
+   this->super.in_pos = input.pos;
+   *out_size = output.pos;
+   *finished = this->super.last_chunk ? (remaining == 0) : (input.pos == input.size);
+
+   return 0;
+error:
+   return 1;
+}
+
+static void
+zstd_compressor_close(struct compressor* compressor)
+{
+   if (compressor == NULL)
+   {
+      return;
+   }
+   struct zstd_compressor* this = (struct zstd_compressor*)compressor;
+   ZSTD_freeDCtx(this->dctx);
+   ZSTD_freeCCtx(this->cctx);
 }

@@ -52,6 +52,17 @@ static int gz_decompress(char* from, char* to);
 static void do_gz_compress(struct worker_common* wc);
 static void do_gz_decompress(struct worker_common* wc);
 
+static int gzip_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static int gzip_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished);
+static void gzip_compressor_close(struct compressor* compressor);
+
+struct gzip_compressor
+{
+   struct compressor super;
+   z_stream* deflate_strm;
+   z_stream* inflate_strm;
+};
+
 int
 pgmoneta_gzip_data(char* directory, struct workers* workers)
 {
@@ -1054,4 +1065,153 @@ error:
    pgmoneta_delete_file(to, NULL);
 
    return 1;
+}
+
+int
+pgmoneta_gzip_compressor_create(struct compressor** compressor)
+{
+   struct gzip_compressor* gcompressor = NULL;
+   gcompressor = malloc(sizeof(struct gzip_compressor));
+   memset(gcompressor, 0, sizeof(struct gzip_compressor));
+   gcompressor->super.close = gzip_compressor_close;
+   gcompressor->super.compress = gzip_compressor_compress;
+   gcompressor->super.decompress = gzip_compressor_decompress;
+   *compressor = (struct compressor*)gcompressor;
+   return 0;
+}
+
+static int
+gzip_compressor_compress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct gzip_compressor* this = NULL;
+   int ret = Z_OK;
+   int flush;
+
+   this = (struct gzip_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *out_size = 0;
+      *finished = true;
+      goto error;
+   }
+
+   if (this->deflate_strm == NULL)
+   {
+      // init the stream only the first time
+      this->deflate_strm = malloc(sizeof(z_stream));
+      memset(this->deflate_strm, 0, sizeof(z_stream));
+      ret = deflateInit2(this->deflate_strm, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 9, Z_DEFAULT_STRATEGY);
+      if (ret != Z_OK)
+      {
+         pgmoneta_log_error("gzip compressor: failed to initialize deflate stream for the compressor");
+         goto error;
+      }
+      this->deflate_strm->avail_out = out_capacity;
+      this->deflate_strm->next_out = out_buf;
+   }
+   if (this->deflate_strm->avail_in == 0 && this->deflate_strm->avail_out > 0)
+   {
+      this->deflate_strm->avail_in = this->super.in_size;
+      this->deflate_strm->next_in = this->super.in_buf;
+   }
+   // It is guaranteed by streamer that the out_buf is drained each time after the compression callback
+   this->deflate_strm->avail_out = out_capacity;
+   this->deflate_strm->next_out = out_buf;
+   flush = this->super.last_chunk ? Z_FINISH : Z_NO_FLUSH;
+   ret = deflate(this->deflate_strm, flush);
+   if (ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR)
+   {
+      pgmoneta_log_error("gzip compressor: failed to deflate");
+      goto error;
+   }
+
+   *out_size = out_capacity - this->deflate_strm->avail_out;
+   *finished = ret == Z_STREAM_END ||
+               (this->deflate_strm->avail_in == 0 && this->deflate_strm->avail_out > 0);
+   this->super.in_pos = this->super.in_size - this->deflate_strm->avail_in;
+
+   return 0;
+error:
+   return 1;
+}
+
+static int
+gzip_compressor_decompress(struct compressor* compressor, void* out_buf, size_t out_capacity, size_t* out_size, bool* finished)
+{
+   struct gzip_compressor* this = NULL;
+   int ret = Z_OK;
+
+   this = (struct gzip_compressor*)compressor;
+   if (this == NULL || this->super.in_buf == NULL)
+   {
+      *out_size = 0;
+      *finished = true;
+      goto error;
+   }
+
+   if (this->inflate_strm == NULL)
+   {
+      // init the stream only the first time
+      this->inflate_strm = malloc(sizeof(z_stream));
+      memset(this->inflate_strm, 0, sizeof(z_stream));
+      ret = inflateInit2(this->inflate_strm, MAX_WBITS + 32);
+      if (ret != Z_OK)
+      {
+         pgmoneta_log_error("gzip compressor: failed to initialize inflate stream for the compressor");
+         goto error;
+      }
+      this->inflate_strm->avail_out = out_capacity;
+      this->inflate_strm->next_out = out_buf;
+   }
+   if (this->inflate_strm->avail_in == 0 && this->inflate_strm->avail_out > 0)
+   {
+      this->inflate_strm->avail_in = this->super.in_size;
+      this->inflate_strm->next_in = this->super.in_buf;
+   }
+   this->inflate_strm->avail_out = out_capacity;
+   this->inflate_strm->next_out = out_buf;
+   ret = inflate(this->inflate_strm, Z_NO_FLUSH);
+   if (ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR)
+   {
+      pgmoneta_log_error("gzip compressor: failed to inflate");
+      goto error;
+   }
+
+   if (ret == Z_STREAM_END && this->inflate_strm->avail_in > 0)
+   {
+      pgmoneta_log_warn("gzip compressor: stream reached end while having %d uncompressed bytes", this->inflate_strm->avail_in);
+   }
+
+   *out_size = out_capacity - this->inflate_strm->avail_out;
+   *finished = ret == Z_STREAM_END ||
+               (this->inflate_strm->avail_in == 0 && this->inflate_strm->avail_out > 0);
+   this->super.in_pos = this->super.in_size - this->inflate_strm->avail_in;
+
+   return 0;
+error:
+   return 1;
+}
+
+static void
+gzip_compressor_close(struct compressor* compressor)
+{
+   if (compressor == NULL)
+   {
+      return;
+   }
+
+   struct gzip_compressor* this = (struct gzip_compressor*)compressor;
+   if (this->deflate_strm != NULL)
+   {
+      deflateEnd(this->deflate_strm);
+      free(this->deflate_strm);
+      this->deflate_strm = NULL;
+   }
+
+   if (this->inflate_strm != NULL)
+   {
+      inflateEnd(this->inflate_strm);
+      free(this->inflate_strm);
+      this->inflate_strm = NULL;
+   }
 }

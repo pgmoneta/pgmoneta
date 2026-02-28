@@ -66,10 +66,12 @@ struct manifest_chunk
 /**
  * Verify checksum of the manifest and the checksum
  * @param root The root directory holding the manifest
+ * @param file_checksums The ART map from relatvie file path to file checksums
+ * @param file_sizes The ART map from relative file path to file sizes
  * @return 0 if verification turns out ok, 1 otherwise
  */
 int
-pgmoneta_manifest_checksum_verify(char* root);
+pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct art* file_sizes);
 
 /**
  * Compare manifests

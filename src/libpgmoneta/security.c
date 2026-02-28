@@ -3316,3 +3316,108 @@ pgmoneta_finalize_crc32c(uint32_t* crc)
 
    return 0;
 }
+
+int
+pgmoneta_hasher_create(char* algorithm, struct hasher** hasher)
+{
+   struct hasher* h = NULL;
+   unsigned int hash_len = 0;
+
+   h = malloc(sizeof(struct hasher));
+   memset(h, 0, sizeof(struct hasher));
+
+   h->md = EVP_get_digestbyname(algorithm);
+   if (h->md == NULL)
+   {
+      pgmoneta_log_error("Invalid message digest: %s", algorithm);
+      goto error;
+   }
+
+   h->md_ctx = EVP_MD_CTX_new();
+   if (h->md_ctx == NULL)
+   {
+      goto error;
+   }
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+   if (!EVP_DigestInit_ex2(h->md_ctx, h->md, NULL))
+#else
+   if (!EVP_DigestInit_ex(h->md_ctx, h->md, NULL))
+#endif
+   {
+      pgmoneta_log_error("Message digest initialization failed");
+      goto error;
+   }
+
+   if (strcmp("SHA224", algorithm) == 0)
+   {
+      hash_len = 57;
+   }
+   else if (strcmp("SHA256", algorithm) == 0)
+   {
+      hash_len = 65;
+   }
+   else if (strcmp("SHA384", algorithm) == 0)
+   {
+      hash_len = 97;
+   }
+   else
+   {
+      hash_len = 129;
+   }
+   h->hash = malloc(hash_len);
+   h->hash_len = hash_len;
+   memset(h->hash, 0, hash_len);
+   *hasher = (struct hasher*)h;
+   return 0;
+error:
+   pgmoneta_hasher_destroy(h);
+   return 1;
+}
+
+int
+pgmoneta_hasher_update(struct hasher* hasher, void* buffer, size_t size, bool last_chunk)
+{
+   unsigned int md_len = 0;
+   if (hasher == NULL || buffer == NULL || hasher->md_ctx == NULL)
+   {
+      goto error;
+   }
+   if (!EVP_DigestUpdate(hasher->md_ctx, buffer, size))
+   {
+      pgmoneta_log_error("Message digest update failed");
+      goto error;
+   }
+
+   if (last_chunk)
+   {
+      if (!EVP_DigestFinal_ex(hasher->md_ctx, hasher->md_value, &md_len))
+      {
+         pgmoneta_log_error("Message digest finalization failed");
+         goto error;
+      }
+      for (size_t i = 0; i < md_len; i++)
+      {
+         sprintf(&hasher->hash[i * 2], "%02x", hasher->md_value[i]);
+      }
+      hasher->hash[hasher->hash_len - 1] = 0;
+   }
+   return 0;
+error:
+   return 1;
+}
+
+void
+pgmoneta_hasher_destroy(struct hasher* hasher)
+{
+   if (hasher == NULL)
+   {
+      return;
+   }
+   if (hasher->md_ctx != NULL)
+   {
+      EVP_MD_CTX_free(hasher->md_ctx);
+   }
+   free(hasher->hash);
+   free(hasher);
+}

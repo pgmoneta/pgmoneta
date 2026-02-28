@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <art.h>
 #include <csv.h>
 #include <json.h>
 #include <logging.h>
@@ -61,12 +62,17 @@ static void
 build_tree(struct art* tree, struct csv_reader* reader, char** f);
 
 int
-pgmoneta_manifest_checksum_verify(char* root)
+pgmoneta_manifest_checksum_verify(char* root, struct art* file_checksums, struct art* file_sizes)
 {
    char manifest_path[MAX_PATH];
    char* key_path[1] = {"Files"};
    struct json_reader* reader = NULL;
    struct json* file = NULL;
+
+   if (file_sizes == NULL || file_checksums == NULL)
+   {
+      goto error;
+   }
 
    memset(manifest_path, 0, MAX_PATH);
    if (pgmoneta_ends_with(root, "/"))
@@ -88,41 +94,26 @@ pgmoneta_manifest_checksum_verify(char* root)
    }
    while (pgmoneta_json_next_array_item(reader, &file))
    {
-      char file_path[MAX_PATH];
+      char* file_path = NULL;
       size_t file_size = 0;
       size_t file_size_manifest = 0;
       char* hash = NULL;
       char* checksum = NULL;
 
-      memset(file_path, 0, MAX_PATH);
-      if (pgmoneta_ends_with(root, "/"))
-      {
-         snprintf(file_path, MAX_PATH, "%s%s", root, (char*)pgmoneta_json_get(file, "Path"));
-      }
-      else
-      {
-         snprintf(file_path, MAX_PATH, "%s/%s", root, (char*)pgmoneta_json_get(file, "Path"));
-      }
+      file_path = (char*)pgmoneta_json_get(file, "Path");
 
-      file_size = pgmoneta_get_file_size(file_path);
+      file_size = (size_t)pgmoneta_art_search(file_sizes, file_path);
       file_size_manifest = (int64_t)pgmoneta_json_get(file, "Size");
       if (file_size != file_size_manifest)
       {
          pgmoneta_log_error("File size mismatch: %s, getting %lu, should be %lu", file_size, file_size_manifest);
       }
-
-      if (pgmoneta_create_sha512_file(file_path, &hash))
-      {
-         pgmoneta_log_error("Unable to generate hash for file %s with algorithm SHA512", file_path);
-         goto error;
-      }
-
+      hash = (char*)pgmoneta_art_search(file_checksums, file_path);
       checksum = (char*)pgmoneta_json_get(file, "Checksum");
       if (!pgmoneta_compare_string(hash, checksum))
       {
          pgmoneta_log_error("File checksum mismatch, path: %s. Getting %s, should be %s", file_path, hash, checksum);
       }
-      free(hash);
       pgmoneta_json_destroy(file);
       file = NULL;
    }

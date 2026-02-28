@@ -42,6 +42,7 @@ extern "C" {
 extern char TEST_CONFIG_SAMPLE_PATH[MAX_PATH];
 extern char TEST_RESTORE_DIR[MAX_PATH];
 extern char TEST_BASE_DIR[MAX_PATH];
+extern char TEST_RETROSPECT_DIR[MAX_PATH];
 
 /**
  * Create the testing environment

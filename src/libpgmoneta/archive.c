@@ -35,12 +35,15 @@
 #include <network.h>
 #include <restore.h>
 #include <security.h>
+#include <stream.h>
 #include <utils.h>
+#include <vfile.h>
 #include <workflow.h>
 
 #include <archive.h>
 #include <archive_entry.h>
 #include <dirent.h>
+#include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -312,6 +315,11 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
    struct query_response* response = NULL;
    struct message* msg = (struct message*)malloc(sizeof(struct message));
    struct tuple* tup = NULL;
+   struct art* file_sizes = NULL;
+   struct art* file_checksums = NULL;
+
+   pgmoneta_art_create(&file_sizes);
+   pgmoneta_art_create(&file_checksums);
 
    memset(msg, 0, sizeof(struct message));
 
@@ -440,7 +448,10 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       fclose(file);
 
       // extract the file
-      pgmoneta_extract_file(file_path, directory);
+      if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes))
+      {
+         goto error;
+      }
       remove(file_path);
       pgmoneta_free_message(msg);
 
@@ -487,17 +498,20 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
       snprintf(directory, sizeof(directory), "%s/data", basedir);
    }
 
-   if (pgmoneta_manifest_checksum_verify(directory))
+   if (pgmoneta_manifest_checksum_verify(directory, file_checksums, file_sizes))
    {
       pgmoneta_log_error("Manifest verification failed");
       goto error;
    }
-
+   pgmoneta_art_destroy(file_sizes);
+   pgmoneta_art_destroy(file_checksums);
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(msg);
    return 0;
 
 error:
+   pgmoneta_art_destroy(file_sizes);
+   pgmoneta_art_destroy(file_checksums);
    pgmoneta_close_ssl(ssl);
    if (socket != -1)
    {
@@ -521,6 +535,9 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    char link_path[MAX_PATH];
    char tmp_manifest_file_path[MAX_PATH];
    char manifest_file_path[MAX_PATH];
+   struct art* file_sizes = NULL;
+   struct art* file_checksums = NULL;
+
    memset(file_path, 0, sizeof(file_path));
    memset(directory, 0, sizeof(directory));
    memset(link_path, 0, sizeof(link_path));
@@ -529,6 +546,9 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    memset(null_buffer, 0, 2 * 512);
    char type;
    FILE* file = NULL;
+
+   pgmoneta_art_create(&file_sizes);
+   pgmoneta_art_create(&file_checksums);
 
    if (msg == NULL)
    {
@@ -584,7 +604,10 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  pgmoneta_extract_file(file_path, directory);
+                  if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes))
+                  {
+                     goto error;
+                  }
                   remove(file_path);
                }
                // new tablespace or main directory tar file
@@ -667,7 +690,10 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   fflush(file);
                   fclose(file);
                   file = NULL;
-                  pgmoneta_extract_file(file_path, directory);
+                  if (pgmoneta_extract_backup_tar_file(file_path, directory, file_checksums, file_sizes))
+                  {
+                     goto error;
+                  }
                   remove(file_path);
                }
                if (pgmoneta_ends_with(basedir, "/"))
@@ -774,7 +800,8 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
    {
       snprintf(dir, sizeof(dir), "%s/data", basedir);
    }
-   if (pgmoneta_manifest_checksum_verify(dir))
+
+   if (pgmoneta_manifest_checksum_verify(dir, file_checksums, file_sizes))
    {
       pgmoneta_log_error("Manifest verification failed");
       goto error;
@@ -782,6 +809,8 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
 
    pgmoneta_free_query_response(response);
    pgmoneta_free_message(msg);
+   pgmoneta_art_destroy(file_sizes);
+   pgmoneta_art_destroy(file_checksums);
    return 0;
 
 error:
@@ -796,7 +825,255 @@ error:
       fclose(file);
    }
    pgmoneta_free_query_response(response);
+   msg->data = NULL;
    pgmoneta_free_message(msg);
+   pgmoneta_art_destroy(file_sizes);
+   pgmoneta_art_destroy(file_checksums);
+   return 1;
+}
+
+int
+pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art* file_checksums, struct art* file_sizes)
+{
+   char* archive_name = NULL;
+   struct archive* a;
+   struct archive_entry* entry;
+   struct main_configuration* config;
+   struct streamer* restore_strm = NULL;
+   struct streamer* backup_strm = NULL;
+   struct streamer* noop_strm = NULL;
+   struct streamer* strm = NULL;
+   struct vfile* reader = NULL;
+   struct vfile* writer = NULL;
+   struct hasher* hasher = NULL;
+   char* entry_path_cpy = NULL;
+   char buf[10240];
+   size_t size = 0;
+   la_ssize_t asize = 0;
+   bool last_chunk = false;
+   char* dest = NULL;
+   config = (struct main_configuration*)shmem;
+
+   a = archive_read_new();
+   archive_read_support_format_tar(a);
+
+   if (is_server_side_compression())
+   {
+      if (pgmoneta_vfile_create_local(file_path, "r", &reader))
+      {
+         pgmoneta_log_error("Failed to create reader at %s", file_path);
+         goto error;
+      }
+
+      if (pgmoneta_streamer_create(STREAMER_MODE_RESTORE, ENCRYPTION_NONE, config->compression_type, &restore_strm))
+      {
+         pgmoneta_log_error("Failed to create streamer");
+         goto error;
+      }
+
+      if (restore_strm->get_dest_file_name(restore_strm, file_path, &archive_name))
+      {
+         pgmoneta_log_error("Failed to get destination file name for %s", file_path);
+         goto error;
+      }
+
+      if (pgmoneta_vfile_create_local(archive_name, "wb", &writer))
+      {
+         pgmoneta_log_error("Failed to create writer at %s", archive_name);
+         goto error;
+      }
+
+      pgmoneta_streamer_add_destination(restore_strm, writer);
+      do
+      {
+         if (reader->read(reader, buf, sizeof(buf), &size, &last_chunk))
+         {
+            pgmoneta_log_error("Failed to read from reader");
+            goto error;
+         }
+         if (pgmoneta_streamer_write(restore_strm, buf, size, last_chunk))
+         {
+            pgmoneta_log_error("Failed to stream");
+            goto error;
+         }
+      }
+      while (!last_chunk);
+
+      // close reader and stream to flush the data
+      pgmoneta_vfile_destroy(reader);
+      pgmoneta_streamer_destroy(restore_strm);
+      reader = NULL;
+      restore_strm = NULL;
+      writer = NULL;
+   }
+   else
+   {
+      archive_name = pgmoneta_append(archive_name, file_path);
+   }
+
+   pgmoneta_streamer_create(STREAMER_MODE_NONE, ENCRYPTION_NONE, COMPRESSION_NONE, &noop_strm);
+   pgmoneta_streamer_create(STREAMER_MODE_BACKUP, config->encryption, config->compression_type, &backup_strm);
+
+   // open tar file in a suitable buffer size, I'm using 10240 here
+   if (archive_read_open_filename(a, archive_name, 10240) != ARCHIVE_OK)
+   {
+      pgmoneta_log_error("Failed to open the tar file for reading");
+      goto error;
+   }
+
+   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+   {
+      char dst_path[MAX_PATH];
+      memset(dst_path, 0, sizeof(dst_path));
+      const char* entry_path = archive_entry_pathname(entry);
+      mode_t type = (mode_t)archive_entry_filetype(entry);
+
+      if (!entry_path)
+      {
+         pgmoneta_log_error("untar: getting empty entry name");
+         goto error;
+      }
+
+      if (pgmoneta_ends_with(destination, "/"))
+      {
+         snprintf(dst_path, sizeof(dst_path), "%s%s", destination, entry_path);
+      }
+      else
+      {
+         snprintf(dst_path, sizeof(dst_path), "%s/%s", destination, entry_path);
+      }
+
+      if (type == AE_IFDIR)
+      {
+         if (pgmoneta_mkdir(dst_path))
+         {
+            pgmoneta_log_error("Failed to create directory for %s", dest);
+            goto error;
+         }
+         continue;
+      }
+
+      dest = pgmoneta_append(dest, dst_path);
+      if (pgmoneta_mkdir(dirname(dest)))
+      {
+         pgmoneta_log_error("Failed to create directory for %s", dest);
+         goto error;
+      }
+      free(dest);
+      dest = NULL;
+
+      if (type == AE_IFLNK)
+      {
+         const char* target = archive_entry_symlink(entry);
+         if (target == NULL)
+         {
+            pgmoneta_log_error("untar: getting empty target");
+            goto error;
+         }
+         if (pgmoneta_symlink_file(dst_path, target))
+         {
+            pgmoneta_log_error("Failed to create symlink from %s to %s", dst_path, target);
+            goto error;
+         }
+      }
+      else if (type == AE_IFREG)
+      {
+         if (pgmoneta_ends_with(dst_path, "backup_label") || pgmoneta_ends_with(dst_path, "backup_manifest"))
+         {
+            strm = noop_strm;
+         }
+         else
+         {
+            strm = backup_strm;
+         }
+
+         if (strm->get_dest_file_name(strm, dst_path, &dest))
+         {
+            goto error;
+         }
+         if (pgmoneta_vfile_create_local(dest, "wb", &writer))
+         {
+            pgmoneta_log_error("Failed to create writer at %s", dst_path);
+            goto error;
+         }
+
+         if (pgmoneta_hasher_create("SHA512", &hasher))
+         {
+            pgmoneta_log_error("Failed to create SHA512 hasher at %s", entry_path);
+            goto error;
+         }
+         pgmoneta_streamer_add_destination(strm, writer);
+
+         do
+         {
+            asize = archive_read_data(a, buf, sizeof(buf));
+            if (asize < 0)
+            {
+               pgmoneta_log_error("Failed to untar data: %s", archive_error_string(a));
+               goto error;
+            }
+            if (pgmoneta_hasher_update(hasher, buf, (size_t)asize, asize == 0))
+            {
+               pgmoneta_log_error("Failed to hash data at entry %s", entry_path);
+               goto error;
+            }
+            if (pgmoneta_streamer_write(strm, buf, (size_t)asize, asize == 0))
+            {
+               pgmoneta_log_error("Failed to stream data at entry %s", entry_path);
+               goto error;
+            }
+         }
+         while (asize > 0);
+
+         entry_path_cpy = pgmoneta_append(entry_path_cpy, entry_path);
+         pgmoneta_art_insert(file_sizes, entry_path_cpy, (uintptr_t)strm->written, ValueUInt64);
+         pgmoneta_art_insert(file_checksums, entry_path_cpy, (uintptr_t)hasher->hash, ValueString);
+
+         free(dest);
+         dest = NULL;
+         pgmoneta_streamer_reset(strm);
+         strm = NULL;
+         writer = NULL;
+         pgmoneta_hasher_destroy(hasher);
+         hasher = NULL;
+         free(entry_path_cpy);
+         entry_path_cpy = NULL;
+      }
+      else
+      {
+         pgmoneta_log_warn("Unrecognized entry type: %d, path %s", type, dst_path);
+         archive_read_data_skip(a);
+         continue;
+      }
+   }
+
+   free(dest);
+
+   archive_read_close(a);
+   remove(archive_name);
+   free(archive_name);
+
+   archive_read_free(a);
+   pgmoneta_streamer_destroy(restore_strm);
+   pgmoneta_streamer_destroy(backup_strm);
+   pgmoneta_streamer_destroy(noop_strm);
+   pgmoneta_vfile_destroy(reader);
+   pgmoneta_hasher_destroy(hasher);
+   free(entry_path_cpy);
+   return 0;
+
+error:
+   free(archive_name);
+   free(dest);
+
+   archive_read_close(a);
+   archive_read_free(a);
+   pgmoneta_streamer_destroy(restore_strm);
+   pgmoneta_streamer_destroy(backup_strm);
+   pgmoneta_streamer_destroy(noop_strm);
+   pgmoneta_vfile_destroy(reader);
+   pgmoneta_hasher_destroy(hasher);
+   free(entry_path_cpy);
    return 1;
 }
 
