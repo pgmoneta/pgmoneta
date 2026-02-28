@@ -594,7 +594,7 @@ error:
 int
 pgmoneta_gunzip_file(char* from, char* to)
 {
-   if (pgmoneta_ends_with(from, ".gz"))
+   if (pgmoneta_ends_with(from, ".gz") || pgmoneta_ends_with(from, ".tgz"))
    {
       if (gz_decompress(from, to))
       {

@@ -28,18 +28,13 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
-#include <aes.h>
-#include <compression.h>
 #include <deque.h>
-#include <gzip_compression.h>
 #include <info.h>
 #include <logging.h>
 #include <shmem.h>
 #include <utils.h>
 
 /* system */
-#include <archive.h>
-#include <archive_entry.h>
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -2093,208 +2088,6 @@ error:
       pgmoneta_deque_destroy(array);
    }
 
-   return 1;
-}
-
-int
-pgmoneta_extract_file(char* file_path, char* destination)
-{
-   uint32_t file_type = 0;
-   char* archive_path = NULL;
-   char* extracted_path = NULL;
-   char* previous_archive = NULL;
-   struct archive* a = NULL;
-   struct archive_entry* entry = NULL;
-   bool is_generated_archive = false;
-   la_int64_t entry_size = 0;
-   uint64_t extracted_size = 0;
-   unsigned long free_space = 0;
-
-   if (file_path == NULL || destination == NULL)
-   {
-      goto error;
-   }
-
-   file_type = pgmoneta_get_file_type(file_path);
-   archive_path = pgmoneta_append(archive_path, file_path);
-
-   if (archive_path == NULL)
-   {
-      goto error;
-   }
-
-   /* Layer 1: Handle encryption (.aes) */
-   if (file_type & PGMONETA_FILE_TYPE_ENCRYPTED)
-   {
-      if (pgmoneta_strip_extension(archive_path, &extracted_path))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_decrypt_file(archive_path, extracted_path))
-      {
-         goto error;
-      }
-
-      previous_archive = archive_path;
-      archive_path = extracted_path;
-      extracted_path = NULL;
-
-      if (is_generated_archive)
-      {
-         remove(previous_archive);
-      }
-      free(previous_archive);
-      previous_archive = NULL;
-
-      is_generated_archive = true;
-   }
-
-   /* Layer 2: Handle compression (.gz, .zstd, .lz4, .bz2, .tgz) */
-   if (file_type & PGMONETA_FILE_TYPE_COMPRESSED)
-   {
-      if (pgmoneta_ends_with(archive_path, ".tgz"))
-      {
-         if (pgmoneta_strip_extension(archive_path, &extracted_path))
-         {
-            goto error;
-         }
-
-         extracted_path = pgmoneta_append(extracted_path, ".tar");
-      }
-      else if (pgmoneta_strip_extension(archive_path, &extracted_path))
-      {
-         goto error;
-      }
-
-      if (extracted_path == NULL)
-      {
-         goto error;
-      }
-
-      if (pgmoneta_ends_with(archive_path, ".tgz"))
-      {
-         if (pgmoneta_gunzip_file(archive_path, extracted_path))
-         {
-            goto error;
-         }
-      }
-      else if (pgmoneta_decompress(archive_path, extracted_path))
-      {
-         goto error;
-      }
-
-      previous_archive = archive_path;
-      archive_path = extracted_path;
-      extracted_path = NULL;
-
-      if (is_generated_archive)
-      {
-         remove(previous_archive);
-      }
-      free(previous_archive);
-      previous_archive = NULL;
-
-      is_generated_archive = true;
-   }
-
-   /* Verify it's a TAR archive after processing layers */
-   if (!(pgmoneta_get_file_type(archive_path) & PGMONETA_FILE_TYPE_TAR))
-   {
-      pgmoneta_log_error("pgmoneta_extract_file: file is not a TAR archive: %s", file_path);
-      goto error;
-   }
-
-   /* Layer 3a: Estimate extraction size from TAR headers */
-   a = archive_read_new();
-   archive_read_support_format_tar(a);
-
-   if (archive_read_open_filename(a, archive_path, 10240) != ARCHIVE_OK)
-   {
-      pgmoneta_log_error("Failed to open the tar file for reading");
-      goto error;
-   }
-
-   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
-   {
-      entry_size = archive_entry_size(entry);
-      if (entry_size > 0)
-      {
-         if (extracted_size > UINT64_MAX - (uint64_t)entry_size)
-         {
-            pgmoneta_log_error("Extracted TAR size overflow for file: %s", file_path);
-            goto error;
-         }
-         extracted_size += (uint64_t)entry_size;
-      }
-   }
-
-   archive_read_close(a);
-   archive_read_free(a);
-   a = NULL;
-
-   free_space = pgmoneta_free_space(destination);
-   if (extracted_size > 0 && (free_space == 0 || extracted_size > (uint64_t)free_space))
-   {
-      pgmoneta_log_error("Not enough space to extract TAR archive: %s", file_path);
-      goto error;
-   }
-
-   /* Layer 3b: Extract TAR archive */
-   a = archive_read_new();
-   archive_read_support_format_tar(a);
-
-   if (archive_read_open_filename(a, archive_path, 10240) != ARCHIVE_OK)
-   {
-      pgmoneta_log_error("Failed to open the tar file for reading");
-      goto error;
-   }
-
-   while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
-   {
-      char dst_file_path[MAX_PATH];
-      memset(dst_file_path, 0, sizeof(dst_file_path));
-      const char* entry_path = archive_entry_pathname(entry);
-      if (pgmoneta_ends_with(destination, "/"))
-      {
-         pgmoneta_snprintf(dst_file_path, sizeof(dst_file_path), "%s%s", destination, entry_path);
-      }
-      else
-      {
-         pgmoneta_snprintf(dst_file_path, sizeof(dst_file_path), "%s/%s", destination, entry_path);
-      }
-
-      archive_entry_set_pathname(entry, dst_file_path);
-      if (archive_read_extract(a, entry, 0) != ARCHIVE_OK)
-      {
-         pgmoneta_log_error("Failed to extract entry: %s", archive_error_string(a));
-         goto error;
-      }
-   }
-
-   if (is_generated_archive)
-   {
-      remove(archive_path);
-   }
-   free(archive_path);
-
-   archive_read_close(a);
-   archive_read_free(a);
-   return 0;
-
-error:
-   if (is_generated_archive && archive_path)
-   {
-      remove(archive_path);
-   }
-   free(archive_path);
-   free(extracted_path);
-
-   if (a != NULL)
-   {
-      archive_read_close(a);
-      archive_read_free(a);
-   }
    return 1;
 }
 
@@ -4588,61 +4381,6 @@ pgmoneta_get_file_size(char* file_path)
    return file_stat.st_size;
 }
 
-int
-pgmoneta_copy_and_extract_file(char* from, char** to)
-{
-   char* new_to = NULL;
-   char* old_to = NULL;
-
-   old_to = *to;
-
-   if (pgmoneta_copy_file(from, old_to, NULL))
-   {
-      goto error;
-   }
-
-   if (pgmoneta_is_encrypted(old_to))
-   {
-      if (pgmoneta_strip_extension(old_to, &new_to))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_decrypt_file(old_to, new_to))
-      {
-         free(new_to);
-         goto error;
-      }
-
-      free(old_to);
-      old_to = new_to;
-      new_to = NULL;
-   }
-
-   if (pgmoneta_is_compressed(old_to))
-   {
-      if (pgmoneta_strip_extension(old_to, &new_to))
-      {
-         goto error;
-      }
-
-      if (pgmoneta_decompress(old_to, new_to))
-      {
-         free(new_to);
-         goto error;
-      }
-
-      free(old_to);
-      old_to = new_to;
-   }
-
-   *to = old_to;
-
-   return 0;
-error:
-   return 1;
-}
-
 bool
 pgmoneta_is_encrypted(char* file_path)
 {
@@ -4774,6 +4512,140 @@ pgmoneta_get_file_type(char* file_path)
    free(basename_copy);
 
    return type;
+}
+
+int
+pgmoneta_strip_suffix(char* file_path, uint32_t type, char** base_name)
+{
+   char* current = NULL;
+   char* next = NULL;
+   uint32_t effective_type = type;
+
+   if (base_name == NULL)
+   {
+      goto error;
+   }
+
+   *base_name = NULL;
+
+   if (file_path == NULL)
+   {
+      goto error;
+   }
+
+   current = pgmoneta_append(current, file_path);
+   if (current == NULL)
+   {
+      goto error;
+   }
+
+   if (effective_type == PGMONETA_FILE_TYPE_UNKNOWN)
+   {
+      effective_type = pgmoneta_get_file_type(current);
+   }
+
+   if (effective_type & PGMONETA_FILE_TYPE_ENCRYPTED)
+   {
+      if (pgmoneta_strip_extension(current, &next))
+      {
+         goto error;
+      }
+
+      free(current);
+      current = next;
+      next = NULL;
+   }
+
+   if (effective_type & PGMONETA_FILE_TYPE_COMPRESSED)
+   {
+      if (pgmoneta_strip_extension(current, &next))
+      {
+         goto error;
+      }
+
+      free(current);
+      current = next;
+      next = NULL;
+   }
+
+   if (effective_type & PGMONETA_FILE_TYPE_TAR)
+   {
+      if (pgmoneta_strip_extension(current, &next))
+      {
+         goto error;
+      }
+
+      free(current);
+      current = next;
+      next = NULL;
+   }
+
+   *base_name = current;
+   return 0;
+
+error:
+   free(current);
+   free(next);
+   return 1;
+}
+
+int
+pgmoneta_get_suffix(int compression, int encryption, char** suffix)
+{
+   char* s = NULL;
+
+   if (suffix == NULL)
+   {
+      goto error;
+   }
+
+   *suffix = NULL;
+
+   switch (compression)
+   {
+      case COMPRESSION_CLIENT_GZIP:
+      case COMPRESSION_SERVER_GZIP:
+         s = pgmoneta_append(s, ".gz");
+         break;
+      case COMPRESSION_CLIENT_ZSTD:
+      case COMPRESSION_SERVER_ZSTD:
+         s = pgmoneta_append(s, ".zstd");
+         break;
+      case COMPRESSION_CLIENT_LZ4:
+      case COMPRESSION_SERVER_LZ4:
+         s = pgmoneta_append(s, ".lz4");
+         break;
+      case COMPRESSION_CLIENT_BZIP2:
+         s = pgmoneta_append(s, ".bz2");
+         break;
+      case COMPRESSION_NONE:
+         break;
+      default:
+         break;
+   }
+
+   switch (encryption)
+   {
+      case ENCRYPTION_AES_256_CBC:
+      case ENCRYPTION_AES_192_CBC:
+      case ENCRYPTION_AES_128_CBC:
+      case ENCRYPTION_AES_256_CTR:
+      case ENCRYPTION_AES_192_CTR:
+      case ENCRYPTION_AES_128_CTR:
+         s = pgmoneta_append(s, ".aes");
+         break;
+      case ENCRYPTION_NONE:
+         break;
+      default:
+         break;
+   }
+
+   *suffix = s;
+   return 0;
+
+error:
+   free(s);
+   return 1;
 }
 
 /* Parser for pgmoneta-cli amd pgmoneta-admin commands */

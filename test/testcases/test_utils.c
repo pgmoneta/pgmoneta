@@ -27,9 +27,10 @@
  */
 
 #include <pgmoneta.h>
-#include <achv.h>
+#include <tar.h>
 #include <aes.h>
 #include <configuration.h>
+#include <extraction.h>
 #include <mctf.h>
 #include <shmem.h>
 #include <tscommon.h>
@@ -1299,6 +1300,8 @@ cleanup:
 
 MCTF_TEST(test_utils_enc_comp)
 {
+   char* base = NULL;
+
    // Is encrypted
 
    MCTF_ASSERT(pgmoneta_is_encrypted("file.aes"), cleanup, "is_encrypted positive failed");
@@ -1314,7 +1317,24 @@ MCTF_TEST(test_utils_enc_comp)
    MCTF_ASSERT(!pgmoneta_is_compressed("file.txt"), cleanup, "is_compressed negative failed");
    MCTF_ASSERT(!pgmoneta_is_compressed(NULL), cleanup, "is_compressed NULL failed");
 
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_suffix("file.zstd.aes",
+                                            PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_ZSTD | PGMONETA_FILE_TYPE_ENCRYPTED,
+                                            &base),
+                      0, cleanup, "strip_suffix failed");
+   MCTF_ASSERT_STR_EQ(base, "file", cleanup, "strip_suffix mismatch");
+   free(base);
+   base = NULL;
+
+   // Strip suffix with TAR bit — "001.tar.zstd.aes" should become "001"
+
+   MCTF_ASSERT_INT_EQ(pgmoneta_strip_suffix("001.tar.zstd.aes",
+                                            PGMONETA_FILE_TYPE_TAR | PGMONETA_FILE_TYPE_COMPRESSED | PGMONETA_FILE_TYPE_ZSTD | PGMONETA_FILE_TYPE_ENCRYPTED,
+                                            &base),
+                      0, cleanup, "strip_suffix tar failed");
+   MCTF_ASSERT_STR_EQ(base, "001", cleanup, "strip_suffix tar mismatch");
+
 cleanup:
+   free(base);
    MCTF_FINISH();
 }
 
@@ -1435,6 +1455,7 @@ MCTF_TEST(test_utils_extract_layered_archive)
    FILE* f = NULL;
    bool own_shmem = false;
    const char* wal_name = "000000010000000000000001";
+   uint32_t file_type = 0;
    char root[MAX_PATH];
    char src_dir[MAX_PATH];
    char out_dir[MAX_PATH];
@@ -1469,7 +1490,7 @@ MCTF_TEST(test_utils_extract_layered_archive)
    pgmoneta_snprintf(tar_path, sizeof(tar_path), "%s/wal.tar", root);
    pgmoneta_snprintf(zstd_path, sizeof(zstd_path), "%s/wal.tar.zstd", root);
    pgmoneta_snprintf(encrypted_path, sizeof(encrypted_path), "%s/wal.tar.zstd.aes", root);
-   pgmoneta_snprintf(extracted_path, sizeof(extracted_path), "%s/wal_layer/%s", out_dir, wal_name);
+   pgmoneta_snprintf(extracted_path, sizeof(extracted_path), "%s/src/%s", out_dir, wal_name);
 
    pgmoneta_delete_directory(root);
 
@@ -1511,7 +1532,7 @@ MCTF_TEST(test_utils_extract_layered_archive)
    config->workers = 1;
    config->encryption = ENCRYPTION_AES_256_CBC;
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_tar_directory(src_dir, tar_path, "wal_layer"), 0, cleanup, "tar_directory failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_tar(src_dir, tar_path), 0, cleanup, "tar failed");
    MCTF_ASSERT(pgmoneta_exists(tar_path), cleanup, "tar file missing");
 
    MCTF_ASSERT_INT_EQ(pgmoneta_zstandardc_file(tar_path, zstd_path), 0, cleanup, "zstd compression failed");
@@ -1520,7 +1541,11 @@ MCTF_TEST(test_utils_extract_layered_archive)
    MCTF_ASSERT_INT_EQ(pgmoneta_encrypt_file(zstd_path, encrypted_path), 0, cleanup, "encryption failed");
    MCTF_ASSERT(pgmoneta_exists(encrypted_path), cleanup, "encrypted file missing");
 
-   MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(encrypted_path, out_dir), 0, cleanup, "extract_file failed");
+   file_type = pgmoneta_get_file_type(encrypted_path);
+   {
+      char* dest = out_dir;
+      MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(encrypted_path, &dest, file_type, false), 0, cleanup, "extract_file failed");
+   }
    MCTF_ASSERT(pgmoneta_exists(extracted_path), cleanup, "extracted WAL file missing");
 
 cleanup:
@@ -1807,7 +1832,7 @@ MCTF_TEST(test_utils_files_advanced)
 
    to_ptr = strdup(file_dst);
    MCTF_ASSERT_PTR_NONNULL(to_ptr, cleanup, "strdup failed");
-   MCTF_ASSERT_INT_EQ(pgmoneta_copy_and_extract_file(file_src, &to_ptr), 0, cleanup, "copy_and_extract_file failed");
+   MCTF_ASSERT_INT_EQ(pgmoneta_extract_file(file_src, &to_ptr, 0, true), 0, cleanup, "extract_file copy failed");
    MCTF_ASSERT(pgmoneta_exists(file_dst), cleanup, "copied file should exist");
    free(to_ptr);
    to_ptr = NULL;

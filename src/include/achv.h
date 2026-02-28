@@ -53,16 +53,6 @@ void
 pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8_t encryption, struct json* request);
 
 /**
- * Create a tar archive of the given directory
- * @param src The source directory
- * @param dst The destination tar file path
- * @param destination The destination name
- * @return 0 upon success, otherwise 1
- */
-int
-pgmoneta_tar_directory(char* src, char* dst, char* destination);
-
-/**
  * Receive backup tar files from the copy stream and write to disk
  * This functionality is for server version < 15
  * @param srv The server
