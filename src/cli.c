@@ -1726,46 +1726,43 @@ compress_data_client(char* from, uint8_t compression)
 
    to = pgmoneta_append(to, from);
 
-   if (compression == COMPRESSION_CLIENT_GZIP || compression == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(compression))
    {
-      to = pgmoneta_append(to, ".gz");
-      if (pgmoneta_gzip_file(from, to))
-      {
-         pgmoneta_log_error("Compress: GZIP compression failed");
+      case COMPRESSION_ALG_GZIP:
+         to = pgmoneta_append(to, ".gz");
+         if (pgmoneta_gzip_file(from, to))
+         {
+            pgmoneta_log_error("Compress: GZIP compression failed");
+            goto error;
+         }
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         to = pgmoneta_append(to, ".zstd");
+         if (pgmoneta_zstandardc_file(from, to))
+         {
+            pgmoneta_log_error("Compress: ZSTD compression failed");
+            goto error;
+         }
+         break;
+      case COMPRESSION_ALG_LZ4:
+         to = pgmoneta_append(to, ".lz4");
+         if (pgmoneta_lz4c_file(from, to))
+         {
+            pgmoneta_log_error("Compress: LZ4 compression failed");
+            goto error;
+         }
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         to = pgmoneta_append(to, ".bz2");
+         if (pgmoneta_bzip2_file(from, to))
+         {
+            pgmoneta_log_error("Compress: BZIP2 compression failed");
+            goto error;
+         }
+         break;
+      default:
+         pgmoneta_log_error("Compress: Unknown compression type: %d", compression);
          goto error;
-      }
-   }
-   else if (compression == COMPRESSION_CLIENT_ZSTD || compression == COMPRESSION_SERVER_ZSTD)
-   {
-      to = pgmoneta_append(to, ".zstd");
-      if (pgmoneta_zstandardc_file(from, to))
-      {
-         pgmoneta_log_error("Compress: ZSTD compression failed");
-         goto error;
-      }
-   }
-   else if (compression == COMPRESSION_CLIENT_LZ4 || compression == COMPRESSION_SERVER_LZ4)
-   {
-      to = pgmoneta_append(to, ".lz4");
-      if (pgmoneta_lz4c_file(from, to))
-      {
-         pgmoneta_log_error("Compress: LZ4 compression failed");
-         goto error;
-      }
-   }
-   else if (compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      to = pgmoneta_append(to, ".bz2");
-      if (pgmoneta_bzip2_file(from, to))
-      {
-         pgmoneta_log_error("Compress: BZIP2 compression failed");
-         goto error;
-      }
-   }
-   else
-   {
-      pgmoneta_log_error("Compress: Unknown compression type: %d", compression);
-      goto error;
    }
 
    free(to);
@@ -2614,24 +2611,21 @@ static char*
 translate_compression(int32_t compression_code)
 {
    char* compression_output = NULL;
-   switch (compression_code)
+   switch (COMPRESSION_ALGORITHM(compression_code))
    {
-      case COMPRESSION_CLIENT_GZIP:
-      case COMPRESSION_SERVER_GZIP:
+      case COMPRESSION_ALG_GZIP:
          compression_output = pgmoneta_append(compression_output, "gzip");
          break;
-      case COMPRESSION_CLIENT_ZSTD:
-      case COMPRESSION_SERVER_ZSTD:
+      case COMPRESSION_ALG_ZSTD:
          compression_output = pgmoneta_append(compression_output, "zstd");
          break;
-      case COMPRESSION_CLIENT_LZ4:
-      case COMPRESSION_SERVER_LZ4:
+      case COMPRESSION_ALG_LZ4:
          compression_output = pgmoneta_append(compression_output, "lz4");
          break;
-      case COMPRESSION_CLIENT_BZIP2:
+      case COMPRESSION_ALG_BZIP2:
          compression_output = pgmoneta_append(compression_output, "bzip2");
          break;
-      case COMPRESSION_NONE:
+      case COMPRESSION_ALG_NONE:
          compression_output = pgmoneta_append(compression_output, "none");
          break;
       default:

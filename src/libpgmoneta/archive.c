@@ -47,7 +47,6 @@
 
 #define NAME "archive"
 
-static bool is_server_side_compression(void);
 static const char* basebackup_archive_extension(void);
 
 static void write_tar_file(struct archive* a, char* src, char* dst);
@@ -177,21 +176,20 @@ pgmoneta_archive(SSL* ssl, int client_fd, int server, uint8_t compression, uint8
       }
 
       filename = pgmoneta_append(filename, (char*)pgmoneta_art_search(nodes, NODE_TARGET_FILE));
-      if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+      switch (COMPRESSION_ALGORITHM(config->compression_type))
       {
-         filename = pgmoneta_append(filename, ".gz");
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-      {
-         filename = pgmoneta_append(filename, ".zstd");
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-      {
-         filename = pgmoneta_append(filename, ".lz4");
-      }
-      else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-      {
-         filename = pgmoneta_append(filename, ".bz2");
+         case COMPRESSION_ALG_GZIP:
+            filename = pgmoneta_append(filename, ".gz");
+            break;
+         case COMPRESSION_ALG_ZSTD:
+            filename = pgmoneta_append(filename, ".zstd");
+            break;
+         case COMPRESSION_ALG_LZ4:
+            filename = pgmoneta_append(filename, ".lz4");
+            break;
+         case COMPRESSION_ALG_BZIP2:
+            filename = pgmoneta_append(filename, ".bz2");
+            break;
       }
 
       if (config->encryption != ENCRYPTION_NONE)
@@ -573,7 +571,8 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                // append two blocks of null buffer and extract the tar file
                if (file != NULL)
                {
-                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  struct main_configuration* config = (struct main_configuration*)shmem;
+                  if (!COMPRESSION_IS_SERVER(config->compression_type) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
                      fflush(file);
@@ -656,7 +655,8 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                // start of manifest, finish off previous data archive receiving
                if (file != NULL)
                {
-                  if ((!is_server_side_compression()) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
+                  struct main_configuration* config = (struct main_configuration*)shmem;
+                  if (!COMPRESSION_IS_SERVER(config->compression_type) && fwrite(null_buffer, 2 * 512, 1, file) != 1)
                   {
                      pgmoneta_log_error("could not write to file %s", file_path);
                      fflush(file);
@@ -889,17 +889,6 @@ write_tar_file(struct archive* a, char* src, char* dst)
    }
 
    closedir(dir);
-}
-
-static bool
-is_server_side_compression(void)
-{
-   struct main_configuration* config;
-
-   config = (struct main_configuration*)shmem;
-   return config->compression_type == COMPRESSION_SERVER_GZIP ||
-          config->compression_type == COMPRESSION_SERVER_LZ4 ||
-          config->compression_type == COMPRESSION_SERVER_ZSTD;
 }
 
 static const char*

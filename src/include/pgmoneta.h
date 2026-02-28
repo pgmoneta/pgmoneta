@@ -106,14 +106,26 @@ extern "C" {
 #define DIRECT_IO_AUTO               1
 #define DIRECT_IO_ON                 2
 
-#define COMPRESSION_NONE             0
-#define COMPRESSION_CLIENT_GZIP      1
-#define COMPRESSION_CLIENT_ZSTD      2
-#define COMPRESSION_CLIENT_LZ4       3
-#define COMPRESSION_CLIENT_BZIP2     4
-#define COMPRESSION_SERVER_GZIP      5
-#define COMPRESSION_SERVER_ZSTD      6
-#define COMPRESSION_SERVER_LZ4       7
+#define COMPRESSION_FLAG_SERVER      0x10 /* bit 4 set = server-side */
+
+#define COMPRESSION_ALG_NONE         0x00
+#define COMPRESSION_ALG_GZIP         0x01
+#define COMPRESSION_ALG_ZSTD         0x02
+#define COMPRESSION_ALG_LZ4          0x03
+#define COMPRESSION_ALG_BZIP2        0x04
+
+#define COMPRESSION_NONE             0x00
+#define COMPRESSION_CLIENT_GZIP      0x01
+#define COMPRESSION_CLIENT_ZSTD      0x02
+#define COMPRESSION_CLIENT_LZ4       0x03
+#define COMPRESSION_CLIENT_BZIP2     0x04
+#define COMPRESSION_SERVER_GZIP      0x11
+#define COMPRESSION_SERVER_ZSTD      0x12
+#define COMPRESSION_SERVER_LZ4       0x13
+
+#define COMPRESSION_IS_SERVER(t)     ((t) & COMPRESSION_FLAG_SERVER)
+#define COMPRESSION_IS_CLIENT(t)     (!COMPRESSION_IS_SERVER(t) && (t) != COMPRESSION_NONE)
+#define COMPRESSION_ALGORITHM(t)     ((t) & 0x0F)
 
 #define STORAGE_ENGINE_LOCAL         1 << 0
 #define STORAGE_ENGINE_SSH           1 << 1

@@ -156,24 +156,21 @@ encryption_execute(char* name __attribute__((unused)), struct art* nodes)
    }
    else
    {
-      switch (config->compression_type)
+      switch (COMPRESSION_ALGORITHM(config->compression_type))
       {
-         case COMPRESSION_CLIENT_GZIP:
-         case COMPRESSION_SERVER_GZIP:
+         case COMPRESSION_ALG_GZIP:
             compress_suffix = ".gz";
             break;
-         case COMPRESSION_CLIENT_ZSTD:
-         case COMPRESSION_SERVER_ZSTD:
+         case COMPRESSION_ALG_ZSTD:
             compress_suffix = ".zstd";
             break;
-         case COMPRESSION_CLIENT_LZ4:
-         case COMPRESSION_SERVER_LZ4:
+         case COMPRESSION_ALG_LZ4:
             compress_suffix = ".lz4";
             break;
-         case COMPRESSION_CLIENT_BZIP2:
+         case COMPRESSION_ALG_BZIP2:
             compress_suffix = ".bz2";
             break;
-         case COMPRESSION_NONE:
+         case COMPRESSION_ALG_NONE:
             compress_suffix = "";
             break;
          default:

@@ -446,25 +446,24 @@ wf_backup(void)
    current->next = pgmoneta_create_hot_standby();
    current = current->next;
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(config->compression_type))
    {
-      current->next = pgmoneta_create_gzip(true);
-      current = current->next;
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      current->next = pgmoneta_create_zstd(true);
-      current = current->next;
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      current->next = pgmoneta_create_lz4(true);
-      current = current->next;
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      current->next = pgmoneta_create_bzip2(true);
-      current = current->next;
+      case COMPRESSION_ALG_GZIP:
+         current->next = pgmoneta_create_gzip(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         current->next = pgmoneta_create_zstd(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_LZ4:
+         current->next = pgmoneta_create_lz4(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         current->next = pgmoneta_create_bzip2(true);
+         current = current->next;
+         break;
    }
 
    if (config->encryption != ENCRYPTION_NONE)
@@ -541,25 +540,24 @@ wf_restore(struct backup* backup)
       current = current->next;
    }
 
-   if (backup->compression == COMPRESSION_CLIENT_GZIP || backup->compression == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(backup->compression))
    {
-      current->next = pgmoneta_create_gzip(false);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_ZSTD || backup->compression == COMPRESSION_SERVER_ZSTD)
-   {
-      current->next = pgmoneta_create_zstd(false);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_LZ4 || backup->compression == COMPRESSION_SERVER_LZ4)
-   {
-      current->next = pgmoneta_create_lz4(false);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      current->next = pgmoneta_create_bzip2(false);
-      current = current->next;
+      case COMPRESSION_ALG_GZIP:
+         current->next = pgmoneta_create_gzip(false);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         current->next = pgmoneta_create_zstd(false);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_LZ4:
+         current->next = pgmoneta_create_lz4(false);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         current->next = pgmoneta_create_bzip2(false);
+         current = current->next;
+         break;
    }
 
    current->next = pgmoneta_create_copy_wal();
@@ -649,25 +647,24 @@ wf_post_rollup(struct backup* backup)
    current->next = pgmoneta_storage_create_local();
    current = current->next;
 
-   if (backup->compression == COMPRESSION_CLIENT_GZIP || backup->compression == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(backup->compression))
    {
-      current->next = pgmoneta_create_gzip(true);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_ZSTD || backup->compression == COMPRESSION_SERVER_ZSTD)
-   {
-      current->next = pgmoneta_create_zstd(true);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_LZ4 || backup->compression == COMPRESSION_SERVER_LZ4)
-   {
-      current->next = pgmoneta_create_lz4(true);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      current->next = pgmoneta_create_bzip2(true);
-      current = current->next;
+      case COMPRESSION_ALG_GZIP:
+         current->next = pgmoneta_create_gzip(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         current->next = pgmoneta_create_zstd(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_LZ4:
+         current->next = pgmoneta_create_lz4(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         current->next = pgmoneta_create_bzip2(true);
+         current = current->next;
+         break;
    }
 
    if (backup->encryption != ENCRYPTION_NONE)
@@ -752,25 +749,24 @@ wf_incremental_backup(void)
    current->next = pgmoneta_create_hot_standby();
    current = current->next;
 
-   if (config->compression_type == COMPRESSION_CLIENT_GZIP || config->compression_type == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(config->compression_type))
    {
-      current->next = pgmoneta_create_gzip(true);
-      current = current->next;
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_ZSTD || config->compression_type == COMPRESSION_SERVER_ZSTD)
-   {
-      current->next = pgmoneta_create_zstd(true);
-      current = current->next;
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_LZ4 || config->compression_type == COMPRESSION_SERVER_LZ4)
-   {
-      current->next = pgmoneta_create_lz4(true);
-      current = current->next;
-   }
-   else if (config->compression_type == COMPRESSION_CLIENT_BZIP2)
-   {
-      current->next = pgmoneta_create_bzip2(true);
-      current = current->next;
+      case COMPRESSION_ALG_GZIP:
+         current->next = pgmoneta_create_gzip(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         current->next = pgmoneta_create_zstd(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_LZ4:
+         current->next = pgmoneta_create_lz4(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         current->next = pgmoneta_create_bzip2(true);
+         current = current->next;
+         break;
    }
 
    if (config->encryption != ENCRYPTION_NONE)
@@ -839,25 +835,24 @@ wf_verify(struct backup* backup)
       current = current->next;
    }
 
-   if (backup->compression == COMPRESSION_CLIENT_GZIP || backup->compression == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(backup->compression))
    {
-      current->next = pgmoneta_create_gzip(false);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_ZSTD || backup->compression == COMPRESSION_SERVER_ZSTD)
-   {
-      current->next = pgmoneta_create_zstd(false);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_LZ4 || backup->compression == COMPRESSION_SERVER_LZ4)
-   {
-      current->next = pgmoneta_create_lz4(false);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      current->next = pgmoneta_create_bzip2(false);
-      current = current->next;
+      case COMPRESSION_ALG_GZIP:
+         current->next = pgmoneta_create_gzip(false);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         current->next = pgmoneta_create_zstd(false);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_LZ4:
+         current->next = pgmoneta_create_lz4(false);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         current->next = pgmoneta_create_bzip2(false);
+         current = current->next;
+         break;
    }
 
    current->next = pgmoneta_restore_excluded_files();
@@ -893,27 +888,24 @@ wf_archive(struct backup* backup)
    head = pgmoneta_create_archive();
    current = head;
 
-   if (backup->compression == COMPRESSION_CLIENT_GZIP || backup->compression == COMPRESSION_SERVER_GZIP)
+   switch (COMPRESSION_ALGORITHM(backup->compression))
    {
-      current->next = pgmoneta_create_gzip(true);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_ZSTD || backup->compression == COMPRESSION_SERVER_ZSTD)
-   {
-      current->next = pgmoneta_create_zstd(true);
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_LZ4 || backup->compression == COMPRESSION_SERVER_LZ4)
-   {
-      current->next = pgmoneta_create_lz4(true);
-
-      current = current->next;
-   }
-   else if (backup->compression == COMPRESSION_CLIENT_BZIP2)
-   {
-      current->next = pgmoneta_create_bzip2(true);
-
-      current = current->next;
+      case COMPRESSION_ALG_GZIP:
+         current->next = pgmoneta_create_gzip(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_ZSTD:
+         current->next = pgmoneta_create_zstd(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_LZ4:
+         current->next = pgmoneta_create_lz4(true);
+         current = current->next;
+         break;
+      case COMPRESSION_ALG_BZIP2:
+         current->next = pgmoneta_create_bzip2(true);
+         current = current->next;
+         break;
    }
 
    if (backup->encryption != ENCRYPTION_NONE)
