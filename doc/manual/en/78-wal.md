@@ -324,6 +324,13 @@ char* format_v17(xl_end_of_recovery* wrapper, char* buf) {
 }
 ```
 
+**XID64 (64-bit Transaction IDs)**
+
+pgmoneta works with external PostgreSQL patches that introduce 64-bit Transaction IDs (FullTransactionId).
+
+No special configuration is required to enable this support; it is handled automatically based on the PostgreSQL version detected.
+
+
 ### WAL Change List
 
 This section lists the changes in the WAL format between different versions of PostgreSQL.
