@@ -296,6 +296,7 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   srv.workers = -1;
                   srv.backup_max_rate = -1;
                   srv.network_max_rate = -1;
+                  srv.progress = -1; // not configured
 
                   idx_server++;
                }
@@ -633,6 +634,16 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                         warnx("Hot standby configuration for server '%s' contains more than %d directories. Only the first %d will be used.", section, NUMBER_OF_HOT_STANDBY, NUMBER_OF_HOT_STANDBY);
                      }
                      free(paths);
+                  }
+               }
+               else if (!strcmp(key, "progress"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+                     {
+                        config->progress = true;
+                     }
                   }
                }
                else if (!strcmp(key, "metrics"))
@@ -4061,6 +4072,17 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
          if (as_retention(value, &srv->retention_days, &srv->retention_weeks, &srv->retention_months, &srv->retention_years))
          {
             unknown = true;
+         }
+      }
+      else if (!strcmp(key, "progress"))
+      {
+         if (!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "1"))
+         {
+            srv->progress = 1; // on
+         }
+         else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+         {
+            srv->progress = 0; // off
          }
       }
       else

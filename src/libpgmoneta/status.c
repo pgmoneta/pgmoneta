@@ -539,3 +539,93 @@ error:
 
    exit(1);
 }
+
+void
+pgmoneta_progress(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+{
+   char* server = NULL;
+   int srv = -1;
+   char* elapsed = NULL;
+   struct timespec start_t;
+   struct timespec end_t;
+   double total_seconds;
+   struct json* request = NULL;
+   struct json* response = NULL;
+   struct main_configuration* config;
+
+   pgmoneta_start_logging();
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
+#endif
+
+   request = (struct json*)pgmoneta_json_get(payload, MANAGEMENT_CATEGORY_REQUEST);
+   server = (char*)pgmoneta_json_get(request, MANAGEMENT_ARGUMENT_SERVER);
+
+   for (int i = 0; srv == -1 && i < config->common.number_of_servers; i++)
+   {
+      if (!strcmp(config->common.servers[i].name, server))
+      {
+         srv = i;
+      }
+   }
+
+   if (srv == -1)
+   {
+      pgmoneta_management_response_error(ssl, client_fd, server, MANAGEMENT_ERROR_PROGRESS_NOSERVER, NAME, compression, encryption, payload);
+      pgmoneta_log_error("Backup progress: No server %s", server);
+      goto error;
+   }
+
+   if (pgmoneta_management_create_response(payload, srv, &response))
+   {
+      goto error;
+   }
+
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_SERVER, (uintptr_t)config->common.servers[srv].name, ValueString);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_PROGRESS_STATE, (uintptr_t)atomic_load(&config->common.servers[srv].backup_progress.state), ValueInt32);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BYTES_DONE, (uintptr_t)atomic_load(&config->common.servers[srv].backup_progress.bytes_done), ValueInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_BYTES_TOTAL, (uintptr_t)atomic_load(&config->common.servers[srv].backup_progress.bytes_total), ValueInt64);
+   pgmoneta_json_put(response, MANAGEMENT_ARGUMENT_ELAPSED, (uintptr_t)atomic_load(&config->common.servers[srv].backup_progress.elapsed), ValueInt64);
+
+#ifdef HAVE_FREEBSD
+   clock_gettime(CLOCK_MONOTONIC_FAST, &end_t);
+#else
+   clock_gettime(CLOCK_MONOTONIC_RAW, &end_t);
+#endif
+
+   if (pgmoneta_management_response_ok(ssl, client_fd, start_t, end_t, compression, encryption, payload))
+   {
+      pgmoneta_management_response_error(ssl, client_fd, server, MANAGEMENT_ERROR_PROGRESS_NETWORK, NAME, compression, encryption, payload);
+      pgmoneta_log_error("Backup progress: Error sending response");
+      goto error;
+   }
+
+   elapsed = pgmoneta_get_timestamp_string(start_t, end_t, &total_seconds);
+
+   pgmoneta_log_info("Backup progress (Elapsed: %s)", elapsed);
+
+   free(elapsed);
+
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   exit(0);
+
+error:
+
+   pgmoneta_json_destroy(payload);
+
+   pgmoneta_disconnect(client_fd);
+
+   pgmoneta_stop_logging();
+
+   exit(1);
+}

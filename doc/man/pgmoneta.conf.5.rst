@@ -202,6 +202,9 @@ backup_max_rate
 network_max_rate
   The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable. Default is 0
 
+progress
+  Enable backup progress tracking. Default is off
+
 tls
   Enable Transport Layer Security (TLS). Default is false
 
@@ -312,6 +315,9 @@ backup_max_rate
 
 network_max_rate
   The number of bytes of tokens added every one second to limit the netowrk backup rate. Use 0 to disable, -1 means use the global settting. Default is -1
+
+progress
+  Enable backup progress tracking. Use on to enable, off to disable, -1 means use the global setting. Default is -1
 
 verification
   The time between verification of a backup. If this value is specified without units,

@@ -767,6 +767,25 @@ pgmoneta_get_backup_max_rate(int server)
 }
 
 bool
+pgmoneta_is_progress_enabled(int server)
+{
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+   if (config->common.servers[server].progress == 1)
+   {
+      return true;
+   }
+   else if (config->common.servers[server].progress == 0)
+   {
+      return false;
+   }
+
+   return config->progress;
+}
+
+bool
 pgmoneta_is_backup_valid(int server, char* identifier)
 {
    bool result = false;

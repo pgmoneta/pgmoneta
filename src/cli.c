@@ -79,6 +79,7 @@
 #define COMMAND_LIST_BACKUP    "list-backup"
 #define COMMAND_MODE           "mode"
 #define COMMAND_PING           "ping"
+#define COMMAND_PROGRESS       "progress"
 #define COMMAND_RELOAD         "reload"
 #define COMMAND_RESET          "reset"
 #define COMMAND_RESTORE        "restore"
@@ -114,6 +115,7 @@ static void help_clear(void);
 static void help_info(void);
 static void help_annotate(void);
 static void help_mode(void);
+static void help_progress(void);
 static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
@@ -141,6 +143,7 @@ static int compress_data_server(SSL* ssl, int socket, char* path, uint8_t compre
 static int info(SSL* ssl, int socket, char* server, char* backup, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int annotate(SSL* ssl, int socket, char* server, char* backup, char* command, char* key, char* comment, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int progress(SSL* ssl, int socket, char* server, char* command, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_ls(SSL* ssl, int socket, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_get(SSL* ssl, int socket, char* config_key, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int conf_set(SSL* ssl, int socket, char* config_key, char* config_value, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -226,6 +229,7 @@ usage(void)
    printf("  list-backup              List the backups for a server\n");
    printf("  mode                     Switch the mode for a server\n");
    printf("  ping                     Check if pgmoneta is alive\n");
+   printf("  progress                 Get progress for a command\n");
    printf("  restore                  Restore a backup from a server\n");
    printf("  retain                   Retain a backup from a server\n");
    printf("  shutdown                 Shutdown pgmoneta\n");
@@ -390,7 +394,13 @@ struct pgmoneta_command command_table[] = {
     .accepted_argument_count = {2},
     .action = MANAGEMENT_MODE,
     .deprecated = false,
-    .log_message = "<mode> [%s]"}};
+    .log_message = "<mode> [%s]"},
+   {.command = "progress",
+    .subcommand = "",
+    .accepted_argument_count = {2},
+    .action = MANAGEMENT_PROGRESS,
+    .deprecated = false,
+    .log_message = "<progress> [%s] [%s]"}};
 
 int
 main(int argc, char** argv)
@@ -1020,6 +1030,10 @@ execute:
    {
       exit_code = mode(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_PROGRESS)
+   {
+      exit_code = progress(s_ssl, socket, parsed.args[0], parsed.args[1], compression, encryption, output_format);
+   }
    else if (parsed.cmd->action == MANAGEMENT_CONF_LS)
    {
       exit_code = conf_ls(s_ssl, socket, compression, encryption, output_format);
@@ -1223,6 +1237,13 @@ help_mode(void)
 }
 
 static void
+help_progress(void)
+{
+   printf("Get progress for a command\n");
+   printf("  pgmoneta-cli progress <server> backup\n");
+}
+
+static void
 display_helper(char* command)
 {
    if (!strcmp(command, COMMAND_BACKUP))
@@ -1304,6 +1325,10 @@ display_helper(char* command)
    else if (!strcmp(command, COMMAND_MODE))
    {
       help_mode();
+   }
+   else if (!strcmp(command, COMMAND_PROGRESS))
+   {
+      help_progress();
    }
    else
    {
@@ -1900,6 +1925,26 @@ static int
 mode(SSL* ssl, int socket, char* server, char* action, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
    if (pgmoneta_management_request_mode(ssl, socket, server, action, compression, encryption, output_format))
+   {
+      goto error;
+   }
+
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+
+   return 0;
+
+error:
+
+   return 1;
+}
+
+static int
+progress(SSL* ssl, int socket, char* server, char* command, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_progress(ssl, socket, server, command, compression, encryption, output_format))
    {
       goto error;
    }
@@ -2552,6 +2597,9 @@ translate_command(int32_t cmd_code)
       case MANAGEMENT_MODE:
          command_output = pgmoneta_append(command_output, COMMAND_MODE);
          break;
+      case MANAGEMENT_PROGRESS:
+         command_output = pgmoneta_append(command_output, COMMAND_PROGRESS);
+         break;
       case MANAGEMENT_CONF_LS:
          command_output = pgmoneta_append(command_output, COMMAND_CONF);
          command_output = pgmoneta_append_char(command_output, ' ');
@@ -3192,6 +3240,8 @@ translate_json_object(struct json* j)
                translate_configuration(response);
                break;
             case MANAGEMENT_MODE:
+               break;
+            case MANAGEMENT_PROGRESS:
                break;
             default:
                break;
