@@ -87,6 +87,7 @@
 #define COMMAND_STATUS         "status"
 #define COMMAND_STATUS_DETAILS "status-details"
 #define COMMAND_VERIFY         "verify"
+#define COMMAND_S3             "s3"
 
 #define OUTPUT_FORMAT_JSON     "json"
 #define OUTPUT_FORMAT_TEXT     "text"
@@ -118,6 +119,7 @@ static void display_helper(char* command);
 
 static int backup(SSL* ssl, int socket, char* server, uint8_t compression, uint8_t encryption, char* incremental, int32_t output_format);
 static int list_backup(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
+static int list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int verify(SSL* ssl, int socket, char* server, char* backup_id, char* directory, char* files, uint8_t compression, uint8_t encryption, int32_t output_format);
 static int archive(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format);
@@ -253,6 +255,12 @@ struct pgmoneta_command command_table[] = {
       .deprecated = false,
       .log_message = "<list-backup> [%s]",
    },
+   {.command = "s3",
+    .subcommand = "ls",
+    .accepted_argument_count = {1, 2},
+    .action = MANAGEMENT_S3_LS,
+    .deprecated = false,
+    .log_message = "<s3 ls>"},
    {
       .command = "restore",
       .subcommand = "",
@@ -894,6 +902,10 @@ execute:
    {
       exit_code = list_backup(s_ssl, socket, parsed.args[0], sort_option, compression, encryption, output_format);
    }
+   else if (parsed.cmd->action == MANAGEMENT_S3_LS)
+   {
+      exit_code = list_s3_objects(s_ssl, socket, parsed.args[0], sort_option, compression, encryption, output_format);
+   }
    else if (parsed.cmd->action == MANAGEMENT_RESTORE)
    {
       if (parsed.args[3])
@@ -1092,6 +1104,12 @@ help_list_backup(void)
    printf("List backups for a server\n");
    printf("  pgmoneta-cli list-backup <server> [--sort asc|desc]\n");
 }
+static void
+help_s3(void)
+{
+   printf("Manage the s3\n");
+   printf("  pgmoneta-cli s3 [ls] <server> [--sort asc|desc]\n");
+}
 
 static void
 help_restore(void)
@@ -1233,6 +1251,10 @@ display_helper(char* command)
    {
       help_list_backup();
    }
+   else if (!strcmp(command, COMMAND_S3))
+   {
+      help_s3();
+   }
    else if (!strcmp(command, COMMAND_RESTORE))
    {
       help_restore();
@@ -1350,7 +1372,21 @@ error:
 
    return 1;
 }
-
+static int
+list_s3_objects(SSL* ssl, int socket, char* server, char* sort_order, uint8_t compression, uint8_t encryption, int32_t output_format)
+{
+   if (pgmoneta_management_request_list_s3_objects(ssl, socket, server, sort_order, compression, encryption, output_format))
+   {
+      goto error;
+   }
+   if (process_result(ssl, socket, output_format))
+   {
+      goto error;
+   }
+   return 0;
+error:
+   return 1;
+}
 static int
 restore(SSL* ssl, int socket, char* server, char* backup_id, char* position, char* directory, uint8_t compression, uint8_t encryption, int32_t output_format)
 {
@@ -2498,6 +2534,11 @@ translate_command(int32_t cmd_code)
       case MANAGEMENT_LIST_BACKUP:
          command_output = pgmoneta_append(command_output, COMMAND_LIST_BACKUP);
          break;
+      case MANAGEMENT_S3_LS:
+         command_output = pgmoneta_append(command_output, COMMAND_S3);
+         command_output = pgmoneta_append_char(command_output, ' ');
+         command_output = pgmoneta_append(command_output, "ls");
+         break;
       case MANAGEMENT_RESTORE:
          command_output = pgmoneta_append(command_output, COMMAND_RESTORE);
          break;
@@ -3168,6 +3209,16 @@ translate_json_object(struct json* j)
                   translate_backup_argument(backup);
                }
                pgmoneta_json_iterator_destroy(backup_it);
+               break;
+            case MANAGEMENT_S3_LS:
+               translate_response_argument(response);
+               servers = (struct json*)pgmoneta_json_get(response, MANAGEMENT_ARGUMENT_SERVERS);
+               pgmoneta_json_iterator_create(servers, &server_it);
+               while (pgmoneta_json_iterator_next(server_it))
+               {
+                  translate_servers_argument((struct json*)pgmoneta_value_data(server_it->value));
+               }
+               pgmoneta_json_iterator_destroy(server_it);
                break;
             case MANAGEMENT_STATUS_DETAILS:
                translate_response_argument(response);

@@ -52,6 +52,8 @@ extern "C" {
 #define WORKFLOW_TYPE_COMBINE_AS_IS      9
 #define WORKFLOW_TYPE_POST_ROLLUP        10
 
+#define WORKFLOW_TYPE_S3_LIST            100
+
 #define PERMISSION_TYPE_BACKUP           0
 #define PERMISSION_TYPE_RESTORE          1
 #define PERMISSION_TYPE_ARCHIVE          2
@@ -76,6 +78,7 @@ extern "C" {
 #define NODE_PRIMARY                     "primary"             /* Is the server a primary */
 #define NODE_RECOVERY_INFO               "recovery_info"       /* The recovery information */
 #define NODE_SERVER_BACKUP               "server_backup"       /* The backup directory of the server */
+#define NODE_S3_OBJECTS                  "s3_objects"          /* The list of S3 objects */
 #define NODE_SERVER_BASE                 "server_base"         /* The base directory of the server */
 #define NODE_SERVER_ID                   "server_id"           /* The server number */
 #define NODE_TARGET_BASE                 "target_base"         /* The target base directory */

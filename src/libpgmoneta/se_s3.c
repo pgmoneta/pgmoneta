@@ -28,6 +28,7 @@
 
 /* pgmoneta */
 #include <pgmoneta.h>
+#include <deque.h>
 #include <http.h>
 #include <logging.h>
 #include <security.h>
@@ -44,16 +45,22 @@
 static char* s3_storage_name(void);
 static int s3_storage_setup(char*, struct art*);
 static int s3_storage_execute(char*, struct art*);
+static int s3_storage_list(char*, struct art*);
 static int s3_storage_teardown(char*, struct art*);
 static int s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server);
 static int s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int server);
+static int s3_list_objects(char* relative_path, char* s3_list, int server, struct deque** objects);
+static int s3_send_list_request(char* relative_path, char* s3_list, int server, char* continuationToken, struct http_response** response);
 static int s3_add_request_headers(struct http_request* request, char* auth_value, char* file_sha256, char* long_date, char* storage_class);
 
 static char* s3_get_host(int server);
 static char* s3_get_basepath(int server, char* identifier);
+static char* s3_url_encode(char* str);
+static int xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuationToken);
+static int xml_parse_s3_list(char* xml, struct deque** keys);
 
 struct workflow*
-pgmoneta_storage_create_s3(void)
+pgmoneta_storage_create_s3(int workflow_type)
 {
    struct workflow* wf = NULL;
 
@@ -61,7 +68,20 @@ pgmoneta_storage_create_s3(void)
 
    wf->name = &s3_storage_name;
    wf->setup = &s3_storage_setup;
-   wf->execute = &s3_storage_execute;
+
+   switch (workflow_type)
+   {
+      case WORKFLOW_TYPE_BACKUP:
+         wf->execute = &s3_storage_execute;
+         break;
+      case WORKFLOW_TYPE_S3_LIST:
+         wf->execute = &s3_storage_list;
+         break;
+
+      default:
+         break;
+   }
+
    wf->teardown = &s3_storage_teardown;
    wf->next = NULL;
 
@@ -334,6 +354,52 @@ error:
 }
 
 static int
+s3_storage_list(char* name __attribute__((unused)), struct art* nodes)
+{
+   int server = -1;
+   char* label = NULL;
+   char* s3_root = NULL;
+   struct deque* objects = NULL;
+   struct main_configuration* config;
+
+   config = (struct main_configuration*)shmem;
+
+#ifdef DEBUG
+   pgmoneta_dump_art(nodes);
+
+   assert(pgmoneta_art_contains_key(nodes, NODE_SERVER_ID));
+   assert(pgmoneta_art_contains_key(nodes, NODE_LABEL));
+#endif
+
+   server = (int)pgmoneta_art_search(nodes, NODE_SERVER_ID);
+   label = (char*)pgmoneta_art_search(nodes, NODE_LABEL);
+
+   pgmoneta_log_debug("S3 storage engine (list): %s/%s",
+                      config->common.servers[server].name, label);
+   pgmoneta_log_debug("S3 effective config: bucket=%s, region=%s, endpoint=%s",
+                      s3_get_effective_bucket(server),
+                      s3_get_effective_region(server),
+                      s3_get_effective_endpoint(server));
+
+   s3_root = s3_get_basepath(server, label);
+
+   if (s3_list_objects("", s3_root, server, &objects))
+   {
+      goto error;
+   }
+   pgmoneta_art_insert(nodes, NODE_S3_OBJECTS, (uintptr_t)objects, ValueDeque);
+
+   free(s3_root);
+
+   return 0;
+
+error:
+   free(s3_root);
+   pgmoneta_deque_destroy(objects);
+   return 1;
+}
+
+static int
 s3_storage_teardown(char* name __attribute__((unused)), struct art* nodes)
 {
    int server = -1;
@@ -431,6 +497,301 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server
 error:
    closedir(dir);
    free(local_path);
+
+   return 1;
+}
+static int
+s3_list_objects(char* relative_path, char* s3_root, int server, struct deque** objects)
+{
+   struct http_response* response = NULL;
+   char* continuationToken = NULL;
+   bool is_truncated = true;
+
+   while (is_truncated)
+   {
+      if (s3_send_list_request(relative_path, s3_root, server, continuationToken, &response))
+      {
+         goto error;
+      }
+
+      free(continuationToken);
+      continuationToken = NULL;
+
+      if (xml_parse_s3_list_truncated(response->payload.data, &is_truncated, &continuationToken))
+      {
+         goto error;
+      }
+
+      if (xml_parse_s3_list(response->payload.data, objects))
+      {
+         goto error;
+      }
+
+      pgmoneta_http_response_destroy(response);
+      response = NULL;
+   }
+
+   return 0;
+
+error:
+   pgmoneta_http_response_destroy(response);
+   free(continuationToken);
+   return 1;
+}
+
+static int
+s3_send_list_request(char* relative_path, char* s3_root, int server, char* continuationToken, struct http_response** response)
+{
+   char short_date[SHORT_TIME_LENGTH];
+   char long_date[LONG_TIME_LENGTH];
+   char* canonical_request = NULL;
+   char* auth_value = NULL;
+   char* string_to_sign = NULL;
+   char* s3_host = NULL;
+   char* s3_path = NULL;
+   char* request_path = NULL;
+   char* canonical_request_sha256 = NULL;
+   char* key = NULL;
+   char* query_string = NULL;
+   unsigned char* date_key_hmac = NULL;
+   unsigned char* date_region_key_hmac = NULL;
+   unsigned char* date_region_service_key_hmac = NULL;
+   unsigned char* signing_key_hmac = NULL;
+   unsigned char* signature_hmac = NULL;
+   unsigned char* signature_hex = NULL;
+   int hmac_length = 0;
+   struct http* connection = NULL;
+   struct http_request* request = NULL;
+
+   char* effective_storage_class = s3_get_effective_storage_class(server);
+   char* effective_endpoint = s3_get_effective_endpoint(server);
+   char* effective_region = s3_get_effective_region(server);
+   char* effective_access_key_id = s3_get_effective_access_key_id(server);
+   char* effective_secret_access_key = s3_get_effective_secret_access_key(server);
+   char* effective_bucket = s3_get_effective_bucket(server);
+   int effective_port = s3_get_effective_port(server);
+   bool effective_use_tls = s3_get_effective_use_tls(server);
+   bool path_style = (strlen(effective_endpoint) > 0);
+
+   s3_path = pgmoneta_append(s3_path, s3_root);
+   if (strlen(relative_path) > 0)
+   {
+      if (!pgmoneta_ends_with(s3_root, "/"))
+      {
+         s3_path = pgmoneta_append(s3_path, "/");
+      }
+      s3_path = pgmoneta_append(s3_path, relative_path);
+   }
+
+   char* prefix = s3_path;
+   if (path_style)
+   {
+      char* slash = strchr(s3_path, '/');
+      if (slash)
+      {
+         prefix = slash + 1;
+      }
+   }
+
+   memset(&short_date[0], 0, sizeof(short_date));
+   memset(&long_date[0], 0, sizeof(long_date));
+
+   if (pgmoneta_get_timestamp_ISO8601_format(short_date, long_date))
+   {
+      goto error;
+   }
+
+   s3_host = s3_get_host(server);
+
+   if (continuationToken != NULL)
+   {
+      char* encoded_token = s3_url_encode(continuationToken);
+      query_string = pgmoneta_append(query_string, "continuation-token=");
+      query_string = pgmoneta_append(query_string, encoded_token);
+      query_string = pgmoneta_append(query_string, "&");
+      free(encoded_token);
+   }
+   char* encoded_prefix = s3_url_encode(prefix);
+   query_string = pgmoneta_append(query_string, "list-type=2&prefix=");
+   query_string = pgmoneta_append(query_string, encoded_prefix);
+   free(encoded_prefix);
+
+   canonical_request = pgmoneta_append(canonical_request, "GET\n/");
+   if (path_style)
+   {
+      canonical_request = pgmoneta_append(canonical_request, effective_bucket);
+   }
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, query_string);
+   canonical_request = pgmoneta_append(canonical_request, "\n");
+   canonical_request = pgmoneta_append(canonical_request, "host:");
+   canonical_request = pgmoneta_append(canonical_request, s3_host);
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-content-sha256:UNSIGNED-PAYLOAD");
+   canonical_request = pgmoneta_append(canonical_request, "\nx-amz-date:");
+   canonical_request = pgmoneta_append(canonical_request, long_date);
+   canonical_request = pgmoneta_append(canonical_request, "\n\nhost;x-amz-content-sha256;x-amz-date\n");
+   canonical_request = pgmoneta_append(canonical_request, "UNSIGNED-PAYLOAD");
+
+   pgmoneta_generate_string_sha256_hash(canonical_request, &canonical_request_sha256);
+
+   string_to_sign = pgmoneta_append(string_to_sign, "AWS4-HMAC-SHA256\n");
+   string_to_sign = pgmoneta_append(string_to_sign, long_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "\n");
+   string_to_sign = pgmoneta_append(string_to_sign, short_date);
+   string_to_sign = pgmoneta_append(string_to_sign, "/");
+   string_to_sign = pgmoneta_append(string_to_sign, effective_region);
+   string_to_sign = pgmoneta_append(string_to_sign, "/s3/aws4_request\n");
+   string_to_sign = pgmoneta_append(string_to_sign, canonical_request_sha256);
+
+   key = pgmoneta_append(key, "AWS4");
+   key = pgmoneta_append(key, effective_secret_access_key);
+
+   if (pgmoneta_generate_string_hmac_sha256_hash(key, strlen(key), short_date, SHORT_TIME_LENGTH - 1, &date_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_key_hmac, hmac_length, effective_region, strlen(effective_region), &date_region_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_key_hmac, hmac_length, "s3", strlen("s3"), &date_region_service_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)date_region_service_key_hmac, hmac_length, "aws4_request", strlen("aws4_request"), &signing_key_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_generate_string_hmac_sha256_hash((char*)signing_key_hmac, hmac_length, string_to_sign, strlen(string_to_sign), &signature_hmac, &hmac_length))
+   {
+      goto error;
+   }
+
+   pgmoneta_convert_base32_to_hex(signature_hmac, hmac_length, &signature_hex);
+
+   // Build authorization header with matching signed headers
+   auth_value = pgmoneta_append(auth_value, "AWS4-HMAC-SHA256 Credential=");
+   auth_value = pgmoneta_append(auth_value, effective_access_key_id);
+   auth_value = pgmoneta_append(auth_value, "/");
+   auth_value = pgmoneta_append(auth_value, short_date);
+   auth_value = pgmoneta_append(auth_value, "/");
+   auth_value = pgmoneta_append(auth_value, effective_region);
+   auth_value = pgmoneta_append(auth_value, "/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=");
+   auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
+
+   int s3_port;
+
+   if (effective_port != 0)
+   {
+      s3_port = effective_port;
+   }
+   else
+   {
+      s3_port = effective_use_tls ? 443 : 80;
+   }
+
+   bool use_tls = effective_use_tls;
+   if (s3_port == 443)
+   {
+      use_tls = true;
+   }
+
+   if (pgmoneta_http_create(s3_host, s3_port, use_tls, &connection))
+   {
+      goto error;
+   }
+
+   if (path_style)
+   {
+      request_path = pgmoneta_append(request_path, "/");
+      request_path = pgmoneta_append(request_path, effective_bucket);
+      request_path = pgmoneta_append(request_path, "?");
+   }
+   else
+   {
+      request_path = pgmoneta_append(request_path, "/?");
+   }
+   request_path = pgmoneta_append(request_path, query_string);
+
+   if (pgmoneta_http_request_create(PGMONETA_HTTP_GET, request_path, &request))
+   {
+      goto error;
+   }
+
+   if (s3_add_request_headers(request, auth_value, "UNSIGNED-PAYLOAD", long_date, effective_storage_class))
+   {
+      goto error;
+   }
+
+   if (pgmoneta_http_invoke(connection, request, response))
+   {
+      goto error;
+   }
+
+   if ((*response)->status_code >= 200 && (*response)->status_code < 300)
+   {
+      pgmoneta_log_info("Successfully listed files to URL: https://%s/%s", s3_host, s3_path);
+   }
+   else
+   {
+      pgmoneta_log_error("S3 listed failed with status code: %d. Failed to list files to S3 path: %s",
+                         (*response)->status_code, s3_path);
+      goto error;
+   }
+
+   free(s3_host);
+   free(request_path);
+   free(signature_hex);
+   free(signature_hmac);
+   free(signing_key_hmac);
+   free(date_region_service_key_hmac);
+   free(date_region_key_hmac);
+   free(date_key_hmac);
+   free(key);
+   free(s3_path);
+   free(canonical_request_sha256);
+   free(canonical_request);
+   free(string_to_sign);
+   free(auth_value);
+   free(query_string);
+
+   pgmoneta_http_request_destroy(request);
+   pgmoneta_http_destroy(connection);
+
+   return 0;
+
+error:
+
+   free(s3_host);
+   free(request_path);
+   free(signature_hex);
+   free(signature_hmac);
+
+   free(signing_key_hmac);
+   free(date_region_service_key_hmac);
+   free(date_region_key_hmac);
+   free(date_key_hmac);
+   free(key);
+   free(s3_path);
+   free(canonical_request_sha256);
+   free(canonical_request);
+   free(string_to_sign);
+   free(auth_value);
+   free(query_string);
+
+   if (connection != NULL)
+   {
+      pgmoneta_http_destroy(connection);
+   }
+
+   if (request != NULL)
+   {
+      pgmoneta_http_request_destroy(request);
+   }
 
    return 1;
 }
@@ -592,7 +953,6 @@ s3_send_upload_request(char* local_root, char* s3_root, char* relative_path, int
    }
 
    auth_value = pgmoneta_append(auth_value, (char*)signature_hex);
-
    file = fopen(local_path, "rb");
    if (file == NULL)
    {
@@ -837,6 +1197,129 @@ s3_add_request_headers(struct http_request* request, char* auth_value, char* fil
    if (strlen(storage_class) && pgmoneta_http_request_add_header(request, "x-amz-storage-class", storage_class))
    {
       return 1;
+   }
+
+   return 0;
+}
+static char*
+s3_url_encode(char* str)
+{
+   char* encoded = NULL;
+   char hex[4];
+   if (str == NULL)
+      return NULL;
+   for (int i = 0; str[i] != '\0'; i++)
+   {
+      unsigned char c = (unsigned char)str[i];
+      if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
+      {
+         char ch[2] = {c, '\0'};
+         encoded = pgmoneta_append(encoded, ch);
+      }
+      else
+      {
+         snprintf(hex, sizeof(hex), "%%%02X", c);
+         encoded = pgmoneta_append(encoded, hex);
+      }
+   }
+   return encoded;
+}
+
+static int
+xml_extract_tag(char* xml, char* tag, struct deque** values)
+{
+   char open_tag[1024];
+   char close_tag[1024];
+   char* ptr = xml;
+
+   if (xml == NULL || tag == NULL || values == NULL)
+   {
+      return 1;
+   }
+
+   if (*values == NULL)
+   {
+      if (pgmoneta_deque_create(false, values))
+      {
+         return 1;
+      }
+   }
+
+   snprintf(open_tag, sizeof(open_tag), "<%s>", tag);
+   snprintf(close_tag, sizeof(close_tag), "</%s>", tag);
+
+   while ((ptr = strstr(ptr, open_tag)) != NULL)
+   {
+      ptr += strlen(open_tag);
+      char* end = strstr(ptr, close_tag);
+      if (end != NULL)
+      {
+         int len = end - ptr;
+         char* val = malloc(len + 1);
+         if (val == NULL)
+         {
+            return 1;
+         }
+         memcpy(val, ptr, len);
+         val[len] = '\0';
+         pgmoneta_deque_add(*values, NULL, (uintptr_t)val, ValueString);
+         ptr = end + strlen(close_tag);
+         free(val);
+      }
+      else
+      {
+         break;
+      }
+   }
+
+   return 0;
+}
+
+static int
+xml_parse_s3_list(char* xml, struct deque** keys)
+{
+   return xml_extract_tag(xml, "Key", keys);
+}
+
+static int
+xml_parse_s3_list_truncated(char* xml, bool* is_truncated, char** continuation_token)
+{
+   struct deque* trunc_values = NULL;
+   struct deque* token_values = NULL;
+
+   if (xml == NULL || is_truncated == NULL || continuation_token == NULL)
+   {
+      return 1;
+   }
+
+   *is_truncated = false;
+   *continuation_token = NULL;
+
+   if (xml_extract_tag(xml, "IsTruncated", &trunc_values) == 0 && trunc_values != NULL && pgmoneta_deque_size(trunc_values) > 0)
+   {
+      char* val = (char*)pgmoneta_deque_peek(trunc_values, NULL);
+      if (val != NULL && strcmp(val, "true") == 0)
+      {
+         *is_truncated = true;
+      }
+   }
+
+   if (xml_extract_tag(xml, "NextContinuationToken", &token_values) == 0 && token_values != NULL && pgmoneta_deque_size(token_values) > 0)
+   {
+      char* val = (char*)pgmoneta_deque_peek(token_values, NULL);
+      if (val != NULL)
+      {
+         *continuation_token = strdup(val);
+      }
+   }
+
+   if (trunc_values != NULL)
+   {
+      pgmoneta_deque_destroy(trunc_values);
+   }
+   if (token_values != NULL)
+   {
+      pgmoneta_deque_destroy(token_values);
    }
 
    return 0;
