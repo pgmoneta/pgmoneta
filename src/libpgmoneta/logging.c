@@ -268,15 +268,26 @@ retry:
          else if (config->log_type == PGMONETA_LOGGING_TYPE_FILE)
          {
             buf[strftime(buf, sizeof(buf), config->log_line_prefix, tm)] = '\0';
-            fprintf(output, "%s %-5s %s:%d ",
-                    buf, levels[level - 1], filename, line);
-            vfprintf(output, fmt, vl);
-            fprintf(output, "\n");
-            fflush(output);
-
-            if (log_rotation_required())
+            if (log_file != NULL)
             {
-               log_file_rotate();
+               fprintf(output, "%s %-5s %s:%d ",
+                       buf, levels[level - 1], filename, line);
+               vfprintf(output, fmt, vl);
+               fprintf(output, "\n");
+               fflush(output);
+
+               if (log_rotation_required())
+               {
+                  log_file_rotate();
+               }
+            }
+            else
+            {
+               fprintf(stderr, "%s %-5s %s:%d ",
+                       buf, levels[level - 1], filename, line);
+               vfprintf(stderr, fmt, vl);
+               fprintf(stderr, "\n");
+               fflush(stderr);
             }
          }
          else if (config->log_type == PGMONETA_LOGGING_TYPE_SYSLOG)
