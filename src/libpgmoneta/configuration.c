@@ -91,6 +91,7 @@ static void copy_user(struct user* dst, struct user* src);
 static int restart_bool(char* name, bool e, bool n);
 static int restart_int(char* name, int e, int n);
 static int restart_string(char* name, char* e, char* n);
+static int restart_time(char* name, pgmoneta_time_t e, pgmoneta_time_t n, bool requires_restart);
 
 static void add_configuration_response(struct json* res);
 static void add_servers_configuration_response(struct json* res);
@@ -5682,7 +5683,13 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       changed = true;
    }
    config->metrics = reload->metrics;
-   config->metrics_cache_max_age = reload->metrics_cache_max_age;
+
+   if (restart_time("metrics_cache_max_age", config->metrics_cache_max_age, reload->metrics_cache_max_age, false))
+   {
+      changed = true;
+   }
+
+   memcpy(&config->metrics_cache_max_age, &reload->metrics_cache_max_age, sizeof(config->metrics_cache_max_age));
    if (restart_int("metrics_cache_max_size", config->metrics_cache_max_size, reload->metrics_cache_max_size))
    {
       changed = true;
@@ -5713,7 +5720,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
    }
    config->common.log_level = reload->common.log_level;
 
-   if (pgmoneta_time_convert(config->verification, FORMAT_TIME_S) != pgmoneta_time_convert(reload->verification, FORMAT_TIME_S))
+   if (restart_time("verification", config->verification, reload->verification, true))
    {
       changed = true;
    }
@@ -5762,8 +5769,19 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       changed = true;
    }
 
-   config->blocking_timeout = reload->blocking_timeout;
-   config->authentication_timeout = reload->authentication_timeout;
+   if (restart_time("blocking_timeout", config->blocking_timeout, reload->blocking_timeout, false))
+   {
+      changed = true;
+   }
+
+   memcpy(&config->blocking_timeout, &reload->blocking_timeout, sizeof(config->blocking_timeout));
+
+   if (restart_time("authentication_timeout", config->authentication_timeout, reload->authentication_timeout, false))
+   {
+      changed = true;
+   }
+
+   memcpy(&config->authentication_timeout, &reload->authentication_timeout, sizeof(config->authentication_timeout));
 
    if (strcmp("", reload->pidfile))
    {
@@ -5979,6 +5997,29 @@ restart_string(char* name, char* e, char* n)
    {
       pgmoneta_log_info("Restart required for %s - Existing %s New %s", name, e, n);
       return 1;
+   }
+
+   return 0;
+}
+
+static int
+restart_time(char* name, pgmoneta_time_t e, pgmoneta_time_t n, bool requires_restart)
+{
+   int64_t old_time = pgmoneta_time_convert(e, FORMAT_TIME_S);
+   int64_t new_time = pgmoneta_time_convert(n, FORMAT_TIME_S);
+
+   if (old_time != new_time)
+   {
+      if (requires_restart)
+      {
+         pgmoneta_log_info("Restart required for %s - Existing %" PRId64 " New %" PRId64, name, old_time, new_time);
+         return 1;
+      }
+      else
+      {
+         pgmoneta_log_debug("Reloaded %s - Existing %" PRId64 " New %" PRId64, name, old_time, new_time);
+         return 0;
+      }
    }
 
    return 0;
