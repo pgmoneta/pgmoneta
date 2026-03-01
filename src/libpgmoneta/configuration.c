@@ -32,6 +32,7 @@
 #include <configuration.h>
 #include <logging.h>
 #include <management.h>
+#include <memory.h>
 #include <network.h>
 #include <security.h>
 #include <shmem.h>
@@ -3491,6 +3492,7 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    double total_seconds;
 
    pgmoneta_start_logging();
+   pgmoneta_memory_init();
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -3532,6 +3534,7 @@ pgmoneta_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
    pgmoneta_disconnect(client_fd);
 
+   pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
    exit(0);
@@ -3545,6 +3548,7 @@ error:
 
    pgmoneta_disconnect(client_fd);
 
+   pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
    exit(1);
@@ -3568,6 +3572,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
    struct config_key_info key_info;
 
    pgmoneta_start_logging();
+   pgmoneta_memory_init();
 
 #ifdef HAVE_FREEBSD
    clock_gettime(CLOCK_MONOTONIC_FAST, &start_t);
@@ -3681,6 +3686,7 @@ pgmoneta_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encrypti
 
    pgmoneta_json_destroy(payload);
    pgmoneta_disconnect(client_fd);
+   pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
    pgmoneta_log_info("Configuration set operation completed successfully");
    return 0;
@@ -3697,6 +3703,7 @@ error:
 
    pgmoneta_json_destroy(payload);
    pgmoneta_disconnect(client_fd);
+   pgmoneta_memory_destroy();
    pgmoneta_stop_logging();
 
    // ADD PROPER ERROR LOGGING HERE
