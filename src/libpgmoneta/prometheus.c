@@ -38,6 +38,7 @@
 #include <shmem.h>
 #include <utils.h>
 #include <wal.h>
+#include <art.h>
 
 /* system */
 #include <ev.h>
@@ -54,15 +55,49 @@
 #define PAGE_METRICS 2
 #define BAD_REQUEST  3
 
+/**
+ * ART-based metric value with timestamp
+ */
+typedef struct prometheus_metric_value
+{
+   uint64_t timestamp;
+   char* value;
+   char* help;
+   char* type;
+   int sort_type;
+} prometheus_metric_value_t;
+
+/**
+ * ART-based metrics container for each category
+ */
+typedef struct prometheus_metrics_container
+{
+   struct art* general_metrics;
+   struct art* server_metrics;
+   struct art* storage_metrics;
+   struct art* wal_metrics;
+   struct art* backup_metrics;
+} prometheus_metrics_container_t;
+
+static void prometheus_metric_value_destroy_cb(uintptr_t data);
+static char* prometheus_metric_value_string_cb(uintptr_t data, int32_t format, char* tag, int indent);
+static int create_metrics_container(prometheus_metrics_container_t** container);
+static void destroy_metrics_container(prometheus_metrics_container_t* container);
+static int add_metric_to_art(struct art* art_tree, char* key, char* value,
+                             char* help, char* type, int sort_type);
+static void output_art_metrics(SSL* client_ssl, int client_fd, struct art* art_tree);
+static void output_all_metrics(SSL* client_ssl, int client_fd, prometheus_metrics_container_t* container);
+
 static int resolve_page(struct message* msg);
 static int unknown_page(SSL* client_ssl, int client_fd);
 static int home_page(SSL* client_ssl, int client_fd);
 static int metrics_page(SSL* client_ssl, int client_fd);
 static int bad_request(SSL* client_ssl, int client_fd);
 static int redirect_page(SSL* client_ssl, int client_fd, char* path);
-static void general_information(SSL* client_ssl, int client_fd);
-static void backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct backup*** backups);
-static void size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct backup*** backups);
+
+static void general_information(prometheus_metrics_container_t* container);
+static void backup_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
+static void size_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups);
 
 static int send_chunk(SSL* client_ssl, int client_fd, char* data);
 
@@ -1415,42 +1450,54 @@ retry_cache_locking:
          free(data);
          data = NULL;
 
-         general_information(client_ssl, client_fd);
+         /* Create ART metrics container */
+         prometheus_metrics_container_t* container = NULL;
 
-         /* Load backups once for all servers */
-         int* num_backups = NULL;
-         struct backup*** all_backups = NULL;
-
-         num_backups = malloc(config->common.number_of_servers * sizeof(int));
-         all_backups = malloc(config->common.number_of_servers * sizeof(struct backup**));
-
-         if (num_backups != NULL && all_backups != NULL)
+         if (create_metrics_container(&container) == 0)
          {
-            for (int i = 0; i < config->common.number_of_servers; i++)
-            {
-               char* d = pgmoneta_get_server_backup(i);
-               num_backups[i] = 0;
-               all_backups[i] = NULL;
-               pgmoneta_load_infos(d, &num_backups[i], &all_backups[i]);
-               free(d);
-            }
+            /* Collect all general metrics */
+            general_information(container);
 
-            backup_information(client_ssl, client_fd, num_backups, all_backups);
-            size_information(client_ssl, client_fd, num_backups, all_backups);
+            /* Load backups once for all servers */
+            int* num_backups = NULL;
+            struct backup*** all_backups = NULL;
 
-            /* Free all backups */
-            for (int i = 0; i < config->common.number_of_servers; i++)
+            num_backups = malloc(config->common.number_of_servers * sizeof(int));
+            all_backups = malloc(config->common.number_of_servers * sizeof(struct backup**));
+
+            if (num_backups != NULL && all_backups != NULL)
             {
-               for (int j = 0; j < num_backups[i]; j++)
+               for (int i = 0; i < config->common.number_of_servers; i++)
                {
-                  free(all_backups[i][j]);
+                  char* d = pgmoneta_get_server_backup(i);
+                  num_backups[i] = 0;
+                  all_backups[i] = NULL;
+                  pgmoneta_load_infos(d, &num_backups[i], &all_backups[i]);
+                  free(d);
                }
-               free(all_backups[i]);
-            }
-         }
 
-         free(num_backups);
-         free(all_backups);
+               backup_information(container, num_backups, all_backups);
+               size_information(container, num_backups, all_backups);
+
+               /* Free all backups */
+               for (int i = 0; i < config->common.number_of_servers; i++)
+               {
+                  for (int j = 0; j < num_backups[i]; j++)
+                  {
+                     free(all_backups[i][j]);
+                  }
+                  free(all_backups[i]);
+               }
+            }
+
+            free(num_backups);
+            free(all_backups);
+
+            /* Stream all ART-stored metrics to the client */
+            output_all_metrics(client_ssl, client_fd, container);
+
+            destroy_metrics_container(container);
+         }
 
          /* Footer */
          data = pgmoneta_append(data, "0\r\n\r\n");
@@ -1524,7 +1571,7 @@ bad_request(SSL* client_ssl, int client_fd)
 }
 
 static void
-general_information(SSL* client_ssl, int client_fd)
+general_information(prometheus_metrics_container_t* container)
 {
    char* d;
    unsigned long size;
@@ -1542,56 +1589,86 @@ general_information(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "pgmoneta_state ");
    data = pgmoneta_append(data, "1");
    data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_state", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_version The version of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_version gauge\n");
    data = pgmoneta_append(data, "pgmoneta_version{version=\"");
    data = pgmoneta_append(data, VERSION);
    data = pgmoneta_append(data, "\"} 1");
    data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_version", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_logging_info The number of INFO logging statements\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_logging_info gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_info ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_info));
    data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_logging_info", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_logging_warn The number of WARN logging statements\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_logging_warn gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_warn ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_warn));
    data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_logging_warn", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_logging_error The number of ERROR logging statements\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_logging_error gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_error ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_error));
    data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_logging_error", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_logging_fatal The number of FATAL logging statements\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_logging_fatal gauge\n");
    data = pgmoneta_append(data, "pgmoneta_logging_fatal ");
    data = pgmoneta_append_ulong(data, atomic_load(&config->common.prometheus.logging_fatal));
    data = pgmoneta_append(data, "\n\n");
+   add_metric_to_art(container->general_metrics, "pgmoneta_logging_fatal", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_days The retention days of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_days gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_days ");
    data = pgmoneta_append_int(data, config->retention_days <= 0 ? 0 : config->retention_days);
    data = pgmoneta_append(data, "\n\n");
 
+   add_metric_to_art(container->general_metrics, "pgmoneta_retention_days", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_weeks The retention weeks of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_weeks gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_weeks ");
    data = pgmoneta_append_int(data, config->retention_weeks <= 0 ? 0 : config->retention_weeks);
    data = pgmoneta_append(data, "\n\n");
 
+   add_metric_to_art(container->general_metrics, "pgmoneta_retention_weeks", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_months The retention months of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_months gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_months ");
    data = pgmoneta_append_int(data, config->retention_months <= 0 ? 0 : config->retention_months);
    data = pgmoneta_append(data, "\n\n");
 
+   add_metric_to_art(container->general_metrics, "pgmoneta_retention_months", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_years The retention years of pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_years gauge\n");
    data = pgmoneta_append(data, "pgmoneta_retention_years ");
    data = pgmoneta_append_int(data, config->retention_years <= 0 ? 0 : config->retention_years);
    data = pgmoneta_append(data, "\n\n");
 
+   add_metric_to_art(container->general_metrics, "pgmoneta_retention_years", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_retention_server The retention of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_retention_server gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1659,6 +1736,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->general_metrics, "pgmoneta_retention_server", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_compression The compression used\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_compression gauge\n");
    data = pgmoneta_append(data, "pgmoneta_compression ");
@@ -1672,6 +1752,9 @@ general_information(SSL* client_ssl, int client_fd)
 
    size = pgmoneta_directory_size(d);
 
+   add_metric_to_art(container->general_metrics, "pgmoneta_compression", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_used_space The disk space used for pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_used_space gauge\n");
    data = pgmoneta_append(data, "pgmoneta_used_space ");
@@ -1687,6 +1770,9 @@ general_information(SSL* client_ssl, int client_fd)
 
    size = pgmoneta_free_space(d);
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_used_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_free_space The free disk space for pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_free_space gauge\n");
    data = pgmoneta_append(data, "pgmoneta_free_space ");
@@ -1702,6 +1788,9 @@ general_information(SSL* client_ssl, int client_fd)
 
    size = pgmoneta_total_space(d);
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_free_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_total_space The total disk space for pgmoneta\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_total_space gauge\n");
    data = pgmoneta_append(data, "pgmoneta_total_space ");
@@ -1712,6 +1801,9 @@ general_information(SSL* client_ssl, int client_fd)
 
    d = NULL;
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_total_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping The disk space used for WAL shipping for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1741,6 +1833,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_used_space The disk space used for WAL shipping of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_used_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1769,6 +1864,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping_used_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_free_space The free disk space for WAL shipping of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_free_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1798,6 +1896,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping_free_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_shipping_total_space The total disk space for WAL shipping of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_shipping_total_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1832,6 +1933,9 @@ general_information(SSL* client_ssl, int client_fd)
    d = NULL;
 
    /* workspace */
+   add_metric_to_art(container->wal_metrics, "pgmoneta_wal_shipping_total_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_workspace The disk space used for workspace for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_workspace gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1861,6 +1965,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_workspace", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_workspace_free_space The free disk space for workspace of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_workspace_free_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1890,6 +1997,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_workspace_free_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_workspace_total_space The total disk space for workspace of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_workspace_total_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1920,6 +2030,9 @@ general_information(SSL* client_ssl, int client_fd)
    data = pgmoneta_append(data, "\n");
 
    /* hot_standby */
+   add_metric_to_art(container->storage_metrics, "pgmoneta_workspace_total_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby The disk space used for hot standby for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1952,6 +2065,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_hot_standby", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_free_space The free disk space for hot standby of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_free_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -1984,6 +2100,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_hot_standby_free_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_hot_standby_total_space The total disk space for hot standby of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_hot_standby_total_space gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2016,6 +2135,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->storage_metrics, "pgmoneta_hot_standby_total_space", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline The current timeline a server is on\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline counter\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2032,6 +2154,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_timeline", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_parent_tli The parent timeline of a timeline on a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_parent_tli gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2079,6 +2204,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_parent_tli", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_timeline_switchpos The WAL switch position of a timeline on a server (showed in hex as a parameter)\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_timeline_switchpos gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2134,6 +2262,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_timeline_switchpos", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_workers The numbeer of workers for a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_workers gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2152,6 +2283,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_workers", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_online Is the server in an online state\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_online gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2168,6 +2302,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_online", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_primary Is the server a primary\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_primary gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2184,6 +2321,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_primary", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_valid Is the server in a valid state\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_valid gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2200,6 +2340,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_valid", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_wal_streaming The WAL streaming status of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_wal_streaming gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2216,6 +2359,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->wal_metrics, "pgmoneta_wal_streaming", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_operation_count The count of client operations of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_operation_count gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2232,6 +2378,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_operation_count", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_failed_operation_count The count of failed client operations of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_failed_operation_count gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2248,6 +2397,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_failed_operation_count", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_last_operation_time The time of the latest client operation of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_operation_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2276,6 +2428,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_last_operation_time", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_last_failed_operation_time The time of the latest failed client operation of a server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_last_failed_operation_time gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2304,6 +2459,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_last_failed_operation_time", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_checksums Are checksums enabled\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_checksums gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2327,6 +2485,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_checksums", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_summarize_wal Is summarize_wal enabled\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_summarize_wal gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2350,6 +2511,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_summarize_wal", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_extensions_detected The number of extensions detected on server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_extensions_detected gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2363,6 +2527,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_extensions_detected", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_server_extension Information about installed extensions on server\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_server_extension gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2432,6 +2599,9 @@ general_information(SSL* client_ssl, int client_fd)
    }
    data = pgmoneta_append(data, "\n");
 
+   add_metric_to_art(container->server_metrics, "pgmoneta_server_extension", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
    data = pgmoneta_append(data, "#HELP pgmoneta_extension_pgmoneta_ext Status of the pgmoneta extension\n");
    data = pgmoneta_append(data, "#TYPE pgmoneta_extension_pgmoneta_ext gauge\n");
    for (int i = 0; i < config->common.number_of_servers; i++)
@@ -2485,17 +2655,14 @@ general_information(SSL* client_ssl, int client_fd)
       }
    }
    data = pgmoneta_append(data, "\n");
-   if (data != NULL)
-   {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
-      free(data);
-      data = NULL;
-   }
+
+   add_metric_to_art(container->general_metrics, "pgmoneta_extension_pgmoneta_ext", data, NULL, NULL, 0);
+   free(data);
+   data = NULL;
 }
 
 static void
-backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct backup*** backups)
+backup_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups)
 {
    bool valid;
    int valid_count = 0;
@@ -2536,8 +2703,7 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_oldest", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -2598,8 +2764,7 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_valid", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -2631,8 +2796,7 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_invalid", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -2673,8 +2837,7 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -2723,8 +2886,7 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_version", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3340,15 +3502,14 @@ backup_information(SSL* client_ssl, int client_fd, int* number_of_backups, struc
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_end_walpos", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
 }
 
 static void
-size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct backup*** backups)
+size_information(prometheus_metrics_container_t* container, int* number_of_backups, struct backup*** backups)
 {
    unsigned long size;
    bool valid;
@@ -3389,8 +3550,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_restore_newest_size", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3426,8 +3586,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_newest_size", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3471,8 +3630,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_restore_size", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3523,8 +3681,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_restore_size_increment", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3565,8 +3722,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_size", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3617,8 +3773,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_compression_ratio", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3668,8 +3823,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_throughput", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3719,8 +3873,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_basebackup_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3770,8 +3923,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_manifest_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3821,8 +3973,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_compression_zstd_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3872,8 +4023,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_compression_gzip_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3923,8 +4073,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_compression_bzip2_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -3974,8 +4123,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_compression_lz4_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4025,8 +4173,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_encryption_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4076,8 +4223,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_linking_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4127,8 +4273,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_remote_ssh_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4178,8 +4323,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_remote_s3_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4229,8 +4373,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_remote_azure_mbs", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4274,8 +4417,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_retain", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4304,8 +4446,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_backup_total_size", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4343,8 +4484,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_wal_total_size", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4545,8 +4685,7 @@ size_information(SSL* client_ssl, int client_fd, int* number_of_backups, struct 
 
    if (data != NULL)
    {
-      send_chunk(client_ssl, client_fd, data);
-      metrics_cache_append(data);
+      add_metric_to_art(container->backup_metrics, "pgmoneta_current_wal_lsn", data, NULL, NULL, 0);
       free(data);
       data = NULL;
    }
@@ -4809,4 +4948,209 @@ metrics_cache_finalize(void)
    now = time(NULL);
    cache->valid_until = now + pgmoneta_time_convert(config->metrics_cache_max_age, FORMAT_TIME_S);
    return cache->valid_until > now;
+}
+
+/**
+ * Destroy callback for prometheus_metric_value_t
+ */
+static void
+prometheus_metric_value_destroy_cb(uintptr_t data)
+{
+   prometheus_metric_value_t* m = NULL;
+
+   m = (prometheus_metric_value_t*)data;
+
+   if (m != NULL)
+   {
+      free(m->value);
+      free(m->help);
+      free(m->type);
+   }
+
+   free(m);
+}
+
+/**
+ * String callback for prometheus_metric_value_t (for JSON/debug output)
+ */
+static char*
+prometheus_metric_value_string_cb(uintptr_t data, int32_t format, char* tag, int indent)
+{
+   char* s = NULL;
+   prometheus_metric_value_t* m = NULL;
+
+   (void)format;
+   (void)tag;
+   (void)indent;
+
+   m = (prometheus_metric_value_t*)data;
+
+   if (m != NULL)
+   {
+      s = pgmoneta_append(s, m->value);
+   }
+
+   return s;
+}
+
+/**
+ * Create a metrics container with ARTs for each category
+ */
+static int
+create_metrics_container(prometheus_metrics_container_t** container)
+{
+   prometheus_metrics_container_t* c = NULL;
+
+   *container = NULL;
+
+   c = (prometheus_metrics_container_t*)malloc(sizeof(prometheus_metrics_container_t));
+   if (c == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate metrics container");
+      goto error;
+   }
+
+   memset(c, 0, sizeof(prometheus_metrics_container_t));
+
+   if (pgmoneta_art_create(&c->general_metrics) ||
+       pgmoneta_art_create(&c->server_metrics) ||
+       pgmoneta_art_create(&c->storage_metrics) ||
+       pgmoneta_art_create(&c->wal_metrics) ||
+       pgmoneta_art_create(&c->backup_metrics))
+   {
+      pgmoneta_log_error("Failed to create ART for metrics container");
+      goto error;
+   }
+
+   *container = c;
+
+   return 0;
+
+error:
+   destroy_metrics_container(c);
+   return 1;
+}
+
+/**
+ * Destroy a metrics container and all its ARTs
+ * The destroy callbacks will free all metric values
+ */
+static void
+destroy_metrics_container(prometheus_metrics_container_t* container)
+{
+   if (container == NULL)
+   {
+      return;
+   }
+
+   pgmoneta_art_destroy(container->general_metrics);
+   pgmoneta_art_destroy(container->server_metrics);
+   pgmoneta_art_destroy(container->storage_metrics);
+   pgmoneta_art_destroy(container->wal_metrics);
+   pgmoneta_art_destroy(container->backup_metrics);
+
+   free(container);
+}
+
+/**
+ * Add a metric to an ART with proper destroy callback
+ */
+static int
+add_metric_to_art(struct art* art_tree, char* key, char* value,
+                  char* help, char* type, int sort_type)
+{
+   prometheus_metric_value_t* m = NULL;
+   struct value_config vc = {.destroy_data = &prometheus_metric_value_destroy_cb,
+                             .to_string = &prometheus_metric_value_string_cb};
+
+   m = (prometheus_metric_value_t*)malloc(sizeof(prometheus_metric_value_t));
+   if (m == NULL)
+   {
+      pgmoneta_log_error("Failed to allocate metric value");
+      goto error;
+   }
+
+   memset(m, 0, sizeof(prometheus_metric_value_t));
+
+   m->timestamp = 0; /* Reserved for cache freshness validation */
+   m->value = value ? pgmoneta_append(NULL, value) : NULL;
+   m->help = help ? pgmoneta_append(NULL, help) : NULL;
+   m->type = type ? pgmoneta_append(NULL, type) : NULL;
+   m->sort_type = sort_type;
+
+   if (pgmoneta_art_insert_with_config(art_tree, key, (uintptr_t)m, &vc))
+   {
+      pgmoneta_log_error("Failed to insert metric into ART");
+      goto error;
+   }
+
+   return 0;
+
+error:
+   if (m != NULL)
+   {
+      free(m->value);
+      free(m->help);
+      free(m->type);
+      free(m);
+   }
+   return 1;
+}
+
+/**
+ * Output all metrics from an ART in sorted order
+ */
+static void
+output_art_metrics(SSL* client_ssl, int client_fd, struct art* art_tree)
+{
+   char* data = NULL;
+   struct art_iterator* iter = NULL;
+
+   if (art_tree == NULL)
+   {
+      return;
+   }
+
+   if (pgmoneta_art_iterator_create(art_tree, &iter))
+   {
+      return;
+   }
+
+   while (pgmoneta_art_iterator_next(iter))
+   {
+      prometheus_metric_value_t* m = (prometheus_metric_value_t*)iter->value->data;
+
+      if (m != NULL && m->value != NULL)
+      {
+         data = pgmoneta_append(data, m->value);
+         data = pgmoneta_append(data, "\n");
+      }
+   }
+
+   if (data != NULL)
+   {
+      send_chunk(client_ssl, client_fd, data);
+      metrics_cache_append(data);
+      free(data);
+   }
+
+   pgmoneta_art_iterator_destroy(iter);
+}
+
+/**
+ * Output all metrics from all categories in the container
+ */
+static void
+output_all_metrics(SSL* client_ssl, int client_fd, prometheus_metrics_container_t* container)
+{
+   if (container == NULL)
+   {
+      return;
+   }
+
+   output_art_metrics(client_ssl, client_fd, container->general_metrics);
+   output_art_metrics(client_ssl, client_fd, container->server_metrics);
+   output_art_metrics(client_ssl, client_fd, container->storage_metrics);
+   output_art_metrics(client_ssl, client_fd, container->wal_metrics);
+   output_art_metrics(client_ssl, client_fd, container->backup_metrics);
 }
