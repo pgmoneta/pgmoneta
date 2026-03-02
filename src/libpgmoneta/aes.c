@@ -756,16 +756,25 @@ pgmoneta_encrypt(char* plaintext, char* password, char** ciphertext, int* cipher
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
+   int ret;
+
+   memset(key, 0, sizeof(key));
+   memset(iv, 0, sizeof(iv));
+
+   if (derive_key_iv(password, key, iv, mode) != 0)
+   {
+      ret = 1;
+      goto cleanup;
+   }
+
+   ret = aes_encrypt(plaintext, key, iv, ciphertext, ciphertext_length, mode);
+
+cleanup:
 
    OPENSSL_cleanse(key, sizeof(key));
    OPENSSL_cleanse(iv, sizeof(iv));
 
-   if (derive_key_iv(password, key, iv, mode) != 0)
-   {
-      return 1;
-   }
-
-   return aes_encrypt(plaintext, key, iv, ciphertext, ciphertext_length, mode);
+   return ret;
 }
 
 int
@@ -773,16 +782,25 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
 {
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
+   int ret;
+
+   memset(key, 0, sizeof(key));
+   memset(iv, 0, sizeof(iv));
+
+   if (derive_key_iv(password, key, iv, mode) != 0)
+   {
+      ret = 1;
+      goto cleanup;
+   }
+
+   ret = aes_decrypt(ciphertext, ciphertext_length, key, iv, plaintext, mode);
+
+cleanup:
 
    OPENSSL_cleanse(key, sizeof(key));
    OPENSSL_cleanse(iv, sizeof(iv));
 
-   if (derive_key_iv(password, key, iv, mode) != 0)
-   {
-      return 1;
-   }
-
-   return aes_decrypt(ciphertext, ciphertext_length, key, iv, plaintext, mode);
+   return ret;
 }
 
 // [private]
@@ -975,6 +993,7 @@ encrypt_file(char* from, char* to, int enc)
    int inl = 0;
    int outl = 0;
    int f_len = 0;
+   int ret = 1;
 
    config = (struct main_configuration*)shmem;
    cipher_fp = get_cipher(config->encryption);
@@ -984,13 +1003,15 @@ encrypt_file(char* from, char* to, int enc)
    unsigned char inbuf[inbuf_size];
    unsigned char outbuf[outbuf_size];
 
+   memset(&key, 0, sizeof(key));
+   memset(&iv, 0, sizeof(iv));
+
    if (pgmoneta_get_master_key(&master_key))
    {
       pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
       goto error;
    }
-   memset(&key, 0, sizeof(key));
-   memset(&iv, 0, sizeof(iv));
+
    if (derive_key_iv(master_key, key, iv, config->encryption) != 0)
    {
       pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
@@ -1058,15 +1079,7 @@ encrypt_file(char* from, char* to, int enc)
       }
    }
 
-   if (ctx)
-   {
-      EVP_CIPHER_CTX_free(ctx);
-   }
-   free(master_key);
-   fclose(in);
-   fflush(out);
-   fclose(out);
-   return 0;
+   ret = 0;
 
 error:
    if (ctx)
@@ -1074,7 +1087,14 @@ error:
       EVP_CIPHER_CTX_free(ctx);
    }
 
-   free(master_key);
+   if (master_key != NULL)
+   {
+      OPENSSL_cleanse(master_key, strlen(master_key));
+      free(master_key);
+   }
+
+   OPENSSL_cleanse(key, sizeof(key));
+   OPENSSL_cleanse(iv, sizeof(iv));
 
    if (in != NULL)
    {
@@ -1087,7 +1107,7 @@ error:
       fclose(out);
    }
 
-   return 1;
+   return ret;
 }
 
 int
@@ -1114,6 +1134,8 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
    size_t outbuf_size = 0;
    size_t outl = 0;
    size_t f_len = 0;
+   unsigned char* out_buf = NULL;
+   int ret = 1;
 
    cipher_fp = get_cipher_buffer(mode);
    if (cipher_fp == NULL)
@@ -1133,8 +1155,8 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
       outbuf_size = origin_size;
    }
 
-   *res_buffer = (unsigned char*)malloc(outbuf_size + 1);
-   if (*res_buffer == NULL)
+   out_buf = (unsigned char*)malloc(outbuf_size + 1);
+   if (out_buf == NULL)
    {
       pgmoneta_log_error("pgmoneta_encrypt_decrypt_buffer: Allocation failure");
       goto error;
@@ -1167,31 +1189,27 @@ encrypt_decrypt_buffer(unsigned char* origin_buffer, size_t origin_size, unsigne
       goto error;
    }
 
-   if (EVP_CipherUpdate(ctx, *res_buffer, (int*)&outl, origin_buffer, origin_size) == 0)
+   if (EVP_CipherUpdate(ctx, out_buf, (int*)&outl, origin_buffer, origin_size) == 0)
    {
       pgmoneta_log_error("EVP_CipherUpdate: Failed to process data");
       goto error;
    }
 
-   *res_size = outl;
-
-   if (EVP_CipherFinal_ex(ctx, *res_buffer + outl, (int*)&f_len) == 0)
+   if (EVP_CipherFinal_ex(ctx, out_buf + outl, (int*)&f_len) == 0)
    {
       pgmoneta_log_error("EVP_CipherFinal_ex: Failed to finalize operation");
       goto error;
    }
 
-   *res_size += f_len;
+   *res_size = outl + f_len;
 
    if (enc == 0)
    {
-      (*res_buffer)[*res_size] = '\0';
+      out_buf[*res_size] = '\0';
    }
 
-   EVP_CIPHER_CTX_free(ctx);
-   free(master_key);
-
-   return 0;
+   *res_buffer = out_buf;
+   ret = 0;
 
 error:
    if (ctx)
@@ -1199,12 +1217,21 @@ error:
       EVP_CIPHER_CTX_free(ctx);
    }
 
-   free(*res_buffer);
-   *res_buffer = NULL;
+   if (master_key != NULL)
+   {
+      OPENSSL_cleanse(master_key, strlen(master_key));
+      free(master_key);
+   }
 
-   free(master_key);
+   OPENSSL_cleanse(key, sizeof(key));
+   OPENSSL_cleanse(iv, sizeof(iv));
 
-   return 1;
+   if (ret != 0)
+   {
+      free(out_buf);
+   }
+
+   return ret;
 }
 
 static const EVP_CIPHER* (*get_cipher_buffer(int mode))(void)
