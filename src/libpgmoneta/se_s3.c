@@ -368,58 +368,92 @@ static int
 s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server)
 {
    char* local_path = NULL;
-   char* relative_file;
-   DIR* dir;
+   char* relative_file = NULL;
+   DIR* dir = NULL;
    struct dirent* entry;
+   struct stat st;
 
    local_path = pgmoneta_append(local_path, local_root);
-   local_path = pgmoneta_append(local_path, relative_path);
 
-   if (!(dir = opendir(local_path)))
+   if (relative_path != NULL && strlen(relative_path) > 0)
    {
+      local_path = pgmoneta_append(local_path, "/");
+      local_path = pgmoneta_append(local_path, relative_path);
+   }
+
+   dir = opendir(local_path);
+   if (dir == NULL)
+   {
+      pgmoneta_log_error("Unable to open directory: %s", local_path);
       goto error;
    }
 
    while ((entry = readdir(dir)) != NULL)
    {
-      if (entry->d_type == DT_DIR)
+      char full_path[1024];
+
+      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      {
+         continue;
+      }
+
+      snprintf(full_path, sizeof(full_path), "%s/%s", local_path, entry->d_name);
+
+      // lstat doesn't follow symlinks
+      if (lstat(full_path, &st) != 0)
+      {
+         pgmoneta_log_error("lstat() failed for path: %s", full_path);
+         goto error;
+      }
+
+      if (S_ISLNK(st.st_mode))
+      {
+         pgmoneta_log_debug("Skipping symlink: %s", full_path);
+         continue;
+      }
+
+      if (S_ISDIR(st.st_mode))
       {
          char relative_dir[1024];
 
-         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+         if (relative_path != NULL && strlen(relative_path) > 0)
          {
-            continue;
-         }
-
-         if (strlen(relative_path) > 0)
-         {
-            snprintf(relative_dir, sizeof(relative_dir), "%s/%s", relative_path, entry->d_name);
+            snprintf(relative_dir, sizeof(relative_dir), "%s/%s",
+                     relative_path, entry->d_name);
          }
          else
          {
             snprintf(relative_dir, sizeof(relative_dir), "%s", entry->d_name);
          }
 
-         s3_upload_files(local_root, s3_root, relative_dir, server);
+         if (s3_upload_files(local_root, s3_root, relative_dir, server))
+         {
+            pgmoneta_log_error("Unable to upload files in directory: %s", relative_dir);
+            goto error;
+         }
       }
-      else
+      else if (S_ISREG(st.st_mode))
       {
          relative_file = NULL;
 
-         if (strlen(relative_path) > 0)
+         if (relative_path != NULL && strlen(relative_path) > 0)
          {
             relative_file = pgmoneta_append(relative_file, relative_path);
             relative_file = pgmoneta_append(relative_file, "/");
          }
+
          relative_file = pgmoneta_append(relative_file, entry->d_name);
 
          if (s3_send_upload_request(local_root, s3_root, relative_file, server))
          {
+            pgmoneta_log_error("Failed to upload file: %s", relative_file);
             free(relative_file);
+            relative_file = NULL;
             goto error;
          }
 
          free(relative_file);
+         relative_file = NULL;
       }
    }
 
@@ -429,8 +463,13 @@ s3_upload_files(char* local_root, char* s3_root, char* relative_path, int server
    return 0;
 
 error:
-   closedir(dir);
+   if (dir != NULL)
+   {
+      closedir(dir);
+   }
+
    free(local_path);
+   free(relative_file);
 
    return 1;
 }
