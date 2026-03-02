@@ -21,6 +21,9 @@
 * Daemon mode
 * User vault
 
+[pgmoneta](https://github.com/pgmoneta/pgmoneta) has a [Model Context Protocol](https://modelcontextprotocol.io/)
+server called [pgmoneta_mcp](https://github.com/pgmoneta/pgmoneta_mcp).
+
 ## Documentation
 
 * [User guide](https://pgmoneta.github.io/documentation.html)
