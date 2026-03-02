@@ -93,7 +93,7 @@ pgmoneta_read_walfile(int server, char* path, struct walfile** wf)
       goto error;
    }
 
-   new_wf = malloc(sizeof(struct walfile));
+   new_wf = calloc(1, sizeof(struct walfile));
    if (!new_wf)
    {
       pgmoneta_log_error("Memory allocation failed for WAL file structure");

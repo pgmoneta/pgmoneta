@@ -468,7 +468,10 @@ pgmoneta_encrypt_file(char* from, char* to)
       flag = 1;
    }
 
-   encrypt_file(from, to, 1);
+   if (encrypt_file(from, to, 1) != 0)
+   {
+      return 1;
+   }
 
    if (pgmoneta_exists(from))
    {
@@ -506,7 +509,15 @@ pgmoneta_decrypt_file(char* from, char* to)
       flag = 1;
    }
 
-   encrypt_file(from, to, 0);
+   if (encrypt_file(from, to, 0) != 0)
+   {
+      if (flag)
+      {
+         free(to);
+      }
+      return 1;
+   }
+
    if (pgmoneta_exists(from))
    {
       pgmoneta_delete_file(from, NULL);
@@ -1040,7 +1051,7 @@ encrypt_file(char* from, char* to, int enc)
 
    if (EVP_CipherInit_ex(ctx, cipher_fp(), NULL, key, iv, enc) == 0)
    {
-      pgmoneta_log_error("EVP_CipherInit_ex: ailed to initialize context");
+      pgmoneta_log_error("EVP_CipherInit_ex: Failed to initialize context");
       goto error;
    }
 
