@@ -98,7 +98,7 @@ static void verification_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void valid_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static void wal_streaming_cb(struct ev_loop* loop, ev_periodic* w, int revents);
 static bool accept_fatal(int error);
-static bool reload_configuration(void);
+static void reload_configuration(bool* restart);
 static void service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
 static bool reload_services_only(void);
@@ -1373,7 +1373,7 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       clock_gettime(CLOCK_MONOTONIC_RAW, &start_t);
 #endif
 
-      restart = reload_configuration();
+      reload_configuration(&restart);
 
       pgmoneta_management_create_response(payload, -1, &response);
 
@@ -1430,6 +1430,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_set_proc_title(1, ai->argv, "conf get", NULL);
          pgmoneta_conf_get(NULL, client_fd, compression, encryption, pyl);
+         pgmoneta_json_destroy(pyl);
+         exit(0);
       }
    }
    else if (id == MANAGEMENT_CONF_SET)
@@ -1451,6 +1453,8 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 
          pgmoneta_set_proc_title(1, ai->argv, "conf set", NULL);
          reload_set_configuration(NULL, client_fd, compression, encryption, pyl);
+         pgmoneta_json_destroy(pyl);
+         exit(0);
       }
    }
    else if (id == MANAGEMENT_STATUS)
@@ -2103,6 +2107,7 @@ accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       shutdown_ports();
       /* We are leaving the socket descriptor valid such that the client won't reuse it */
       pgmoneta_remote_management(client_fd, addr);
+      exit(0);
    }
 
    pgmoneta_disconnect(client_fd);
@@ -2242,8 +2247,9 @@ service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents)
 static void
 reload_cb(struct ev_loop* loop, ev_signal* w, int revents)
 {
+   bool restart = false;
    pgmoneta_log_debug("reload requested (%p, %p, %d)", loop, w, revents);
-   reload_configuration();
+   reload_configuration(&restart);
 }
 
 static void
@@ -2470,10 +2476,9 @@ accept_fatal(int error)
    return true;
 }
 
-static bool
-reload_configuration(void)
+static void
+reload_configuration(bool* restart)
 {
-   bool restart = false;
    int old_metrics;
    int old_management;
    struct main_configuration* config;
@@ -2483,7 +2488,7 @@ reload_configuration(void)
    old_metrics = config->metrics;
    old_management = config->management;
 
-   pgmoneta_reload_configuration(&restart);
+   pgmoneta_reload_configuration(restart);
 
    if (old_metrics != config->metrics)
    {
@@ -2549,7 +2554,7 @@ reload_configuration(void)
       }
    }
 
-   return restart;
+   return;
 }
 
 static void
