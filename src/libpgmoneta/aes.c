@@ -38,6 +38,7 @@
 /* System */
 #include <dirent.h>
 #include <errno.h>
+#include <limits.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
@@ -85,7 +86,68 @@ struct aes_encryptor
    unsigned char salt[PBKDF2_SALT_LENGTH];
    bool key_derived;
    int mode;
+   unsigned char* out_buf; /**< reusable output buffer */
+   size_t out_capacity;    /**< allocated capacity of out_buf */
 };
+
+struct noop_encryptor
+{
+   struct encryptor super;
+   unsigned char* out_buf; /**< reusable output buffer */
+   size_t out_capacity;    /**< allocated capacity of out_buf */
+};
+
+static int
+ensure_capacity(unsigned char** buf, size_t* capacity, size_t required)
+{
+   size_t new_cap;
+   unsigned char* tmp = NULL;
+
+   if (required == 0 || *capacity >= required)
+   {
+      return 0;
+   }
+
+   if (*capacity > SIZE_MAX / 2)
+   {
+      new_cap = required;
+   }
+   else if (*capacity == 0)
+   {
+      /* First allocation: add headroom to avoid immediate realloc */
+      if (required > SIZE_MAX - required / 4)
+      {
+         new_cap = required;
+      }
+      else
+      {
+         new_cap = required + required / 4;
+      }
+   }
+   else
+   {
+      new_cap = *capacity * 2;
+   }
+
+   if (new_cap < required)
+   {
+      new_cap = required;
+   }
+
+   pgmoneta_log_debug("ensure_capacity: grow buffer %zu -> %zu (required %zu)", *capacity, new_cap, required);
+
+   tmp = realloc(*buf, new_cap);
+   if (tmp == NULL)
+   {
+      pgmoneta_log_error("ensure_capacity: failed to allocate memory");
+      return 1;
+   }
+
+   *buf = tmp;
+   *capacity = new_cap;
+
+   return 0;
+}
 
 int
 pgmoneta_encrypt_data(char* d, struct workers* workers)
@@ -1561,13 +1623,22 @@ create_aes_encryptor(int mode, struct encryptor** encryptor)
 static int
 create_noop_encryptor(struct encryptor** encryptor)
 {
-   struct encryptor* e = NULL;
-   e = malloc(sizeof(struct encryptor));
-   e->close = noop_encryptor_close;
-   e->encrypt = noop_encryptor_encrypt;
-   e->decrypt = noop_encryptor_decrypt;
-   e->reset = noop_encryptor_reset;
-   *encryptor = e;
+   struct noop_encryptor* ne = NULL;
+
+   ne = (struct noop_encryptor*)malloc(sizeof(struct noop_encryptor));
+   if (ne == NULL)
+   {
+      pgmoneta_log_error("create_noop_encryptor: failed to allocate memory");
+      return 1;
+   }
+
+   memset(ne, 0, sizeof(struct noop_encryptor));
+   ne->super.close = noop_encryptor_close;
+   ne->super.encrypt = noop_encryptor_encrypt;
+   ne->super.decrypt = noop_encryptor_decrypt;
+   ne->super.reset = noop_encryptor_reset;
+
+   *encryptor = (struct encryptor*)ne;
    return 0;
 }
 
@@ -1596,15 +1667,21 @@ static void
 aes_encryptor_close(struct encryptor* encryptor)
 {
    struct aes_encryptor* this = (struct aes_encryptor*)encryptor;
+
    if (this == NULL)
    {
       return;
    }
+
    if (this->ctx)
    {
       EVP_CIPHER_CTX_free(this->ctx);
       this->ctx = NULL;
    }
+
+   free(this->out_buf);
+   this->out_buf = NULL;
+   this->out_capacity = 0;
 
    pgmoneta_cleanse(this->key, sizeof(this->key));
    pgmoneta_cleanse(this->iv, sizeof(this->iv));
@@ -1626,18 +1703,19 @@ static int
 aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, int enc, void** out_buf, size_t* out_size)
 {
    struct aes_encryptor* this = (struct aes_encryptor*)encryptor;
-   void* buf = NULL;
-   size_t capacity = 0;
+   size_t required = 0;
    int size = 0;
    int final_size = 0;
    bool write_header = false;
    int offset = 0;
+   int iv_len = 0;
    char* master_key = NULL;
 
    if (this == NULL || in_buf == NULL || in_size == 0)
    {
       goto error;
    }
+
    *out_buf = NULL;
    *out_size = 0;
 
@@ -1666,7 +1744,8 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
             this->key_derived = true;
          }
 
-         if (RAND_bytes(this->iv, EVP_CIPHER_iv_length(this->cipher_fp())) != 1)
+         iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
+         if (RAND_bytes(this->iv, iv_len) != 1)
          {
             pgmoneta_log_error("RAND_bytes: Failed to generate unique IV");
             goto error;
@@ -1676,7 +1755,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       }
       else
       {
-         int iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
+         iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
          if (in_size < (size_t)(PBKDF2_SALT_LENGTH + iv_len))
          {
             pgmoneta_log_error("Unable to load 32-byte Salt+IV header");
@@ -1714,28 +1793,54 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       }
    }
 
-   capacity = in_size + this->cipher_block_size - 1;
+   if (in_size > INT_MAX)
+   {
+      pgmoneta_log_error("aes_encryptor_process: input size exceeds INT_MAX");
+      goto error;
+   }
+
+   if (in_size > SIZE_MAX - (size_t)this->cipher_block_size)
+   {
+      pgmoneta_log_error("aes_encryptor_process: input size overflow");
+      goto error;
+   }
+   required = in_size + (size_t)this->cipher_block_size;
+
+   if (last_chunk)
+   {
+      if (required > SIZE_MAX - (size_t)this->cipher_block_size)
+      {
+         pgmoneta_log_error("aes_encryptor_process: capacity overflow for final chunk");
+         goto error;
+      }
+      required += (size_t)this->cipher_block_size;
+   }
 
    if (write_header)
    {
-      capacity += (PBKDF2_SALT_LENGTH + EVP_CIPHER_iv_length(this->cipher_fp()));
+      size_t header_size = PBKDF2_SALT_LENGTH + (size_t)iv_len;
+      if (required > SIZE_MAX - header_size)
+      {
+         pgmoneta_log_error("aes_encryptor_process: capacity overflow for header");
+         goto error;
+      }
+      required += header_size;
    }
-   buf = malloc(capacity);
-   if (buf == NULL)
+
+   if (ensure_capacity(&this->out_buf, &this->out_capacity, required))
    {
-      pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
+      pgmoneta_log_error("aes_encryptor_process: failed to ensure buffer capacity");
       goto error;
    }
 
    if (write_header)
    {
-      int iv_len = EVP_CIPHER_iv_length(this->cipher_fp());
-      memcpy(buf, this->salt, PBKDF2_SALT_LENGTH);
-      memcpy(buf + PBKDF2_SALT_LENGTH, this->iv, iv_len);
-      offset += (PBKDF2_SALT_LENGTH + iv_len);
+      memcpy(this->out_buf, this->salt, PBKDF2_SALT_LENGTH);
+      memcpy(this->out_buf + PBKDF2_SALT_LENGTH, this->iv, (size_t)iv_len);
+      offset += PBKDF2_SALT_LENGTH + iv_len;
    }
 
-   if (EVP_CipherUpdate(this->ctx, buf + offset, &size, in_buf, (int)in_size) == 0)
+   if (EVP_CipherUpdate(this->ctx, this->out_buf + offset, &size, in_buf, (int)in_size) == 0)
    {
       pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
       goto error;
@@ -1743,13 +1848,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
 
    if (last_chunk)
    {
-      buf = realloc(buf, size + capacity);
-      if (buf == NULL)
-      {
-         pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
-         goto error;
-      }
-      if (EVP_CipherFinal_ex(this->ctx, buf + size + offset, &final_size) == 0)
+      if (EVP_CipherFinal_ex(this->ctx, this->out_buf + size + offset, &final_size) == 0)
       {
          pgmoneta_log_error("EVP_CipherFinal_ex: failed to process final cipher block");
          goto error;
@@ -1757,7 +1856,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       size += final_size;
    }
 
-   *out_buf = (void*)buf;
+   *out_buf = (void*)this->out_buf;
    *out_size = (size_t)(size + offset);
 
    if (master_key != NULL)
@@ -1775,55 +1874,106 @@ error:
       pgmoneta_cleanse(master_key, strlen(master_key));
       free(master_key);
    }
-   free(buf);
+   if (out_buf != NULL)
+   {
+      *out_buf = NULL;
+   }
+   if (out_size != NULL)
+   {
+      *out_size = 0;
+   }
+
    return 1;
 }
 
 static void
 noop_encryptor_close(struct encryptor* encryptor)
 {
-   (void)encryptor;
+   struct noop_encryptor* this = (struct noop_encryptor*)encryptor;
+
+   if (this == NULL)
+   {
+      return;
+   }
+
+   free(this->out_buf);
+   this->out_buf = NULL;
+   this->out_capacity = 0;
 }
 
 static int
 noop_encryptor_encrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size)
 {
-   void* out = NULL;
+   struct noop_encryptor* this = (struct noop_encryptor*)encryptor;
 
-   if (encryptor == NULL || in_buf == NULL || in_size == 0)
+   if (this == NULL || in_buf == NULL || in_size == 0)
    {
       goto error;
    }
 
    (void)last_chunk;
-   out = malloc(in_size);
-   memcpy(out, in_buf, in_size);
-   *out_buf = out;
+
+   if (ensure_capacity(&this->out_buf, &this->out_capacity, in_size))
+   {
+      pgmoneta_log_error("noop_encryptor_encrypt: failed to ensure buffer capacity");
+      goto error;
+   }
+
+   memcpy(this->out_buf, in_buf, in_size);
+   *out_buf = (void*)this->out_buf;
    *out_size = in_size;
 
    return 0;
+
 error:
+
+   if (out_buf != NULL)
+   {
+      *out_buf = NULL;
+   }
+   if (out_size != NULL)
+   {
+      *out_size = 0;
+   }
+
    return 1;
 }
 
 static int
 noop_encryptor_decrypt(struct encryptor* encryptor, void* in_buf, size_t in_size, bool last_chunk, void** out_buf, size_t* out_size)
 {
-   void* out = NULL;
+   struct noop_encryptor* this = (struct noop_encryptor*)encryptor;
 
-   if (encryptor == NULL || in_buf == NULL || in_size == 0)
+   if (this == NULL || in_buf == NULL || in_size == 0)
    {
       goto error;
    }
 
    (void)last_chunk;
-   out = malloc(in_size);
-   memcpy(out, in_buf, in_size);
-   *out_buf = out;
+
+   if (ensure_capacity(&this->out_buf, &this->out_capacity, in_size))
+   {
+      pgmoneta_log_error("noop_encryptor_decrypt: failed to ensure buffer capacity");
+      goto error;
+   }
+
+   memcpy(this->out_buf, in_buf, in_size);
+   *out_buf = (void*)this->out_buf;
    *out_size = in_size;
 
    return 0;
+
 error:
+
+   if (out_buf != NULL)
+   {
+      *out_buf = NULL;
+   }
+   if (out_size != NULL)
+   {
+      *out_size = 0;
+   }
+
    return 1;
 }
 

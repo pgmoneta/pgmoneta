@@ -275,18 +275,14 @@ backup_stream_cb(struct streamer* this, bool last_chunk)
       pgmoneta_deque_iterator_destroy(vfile_iter);
       vfile_iter = NULL;
 
-      free(ebuf);
-      ebuf = NULL;
       ebuf_size = 0;
    }
 
    pgmoneta_deque_iterator_destroy(vfile_iter);
-   free(ebuf);
    return 0;
 
 error:
    pgmoneta_deque_iterator_destroy(vfile_iter);
-   free(ebuf);
    return 1;
 }
 
@@ -341,12 +337,10 @@ restore_stream_cb(struct streamer* this, bool last_chunk)
    }
 
    pgmoneta_deque_iterator_destroy(vfile_iter);
-   free(ebuf);
    return 0;
 
 error:
    pgmoneta_deque_iterator_destroy(vfile_iter);
-   free(ebuf);
    return 1;
 }
 

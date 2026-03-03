@@ -47,10 +47,12 @@ struct encryptor
    /**
     * Encrypt callback
     * @param encryptor The encryptor
-    * @param in_buf The input buffer size
+    * @param in_buf The input buffer
     * @param in_size The input buffer data size
     * @param last_chunk If current input is the last chunk
-    * @param out_buf [out] The output buffer
+    * @param out_buf [out] The output buffer, owned by the encryptor.
+    *        Valid until the next encrypt/decrypt call or close().
+    *        Caller must not free this buffer.
     * @param out_size [out] The output buffer data size
     * @return 0 upon success, 1 if otherwise
     */
@@ -59,10 +61,12 @@ struct encryptor
    /**
     * Decrypt callback
     * @param encryptor The encryptor
-    * @param in_buf The input buffer size
+    * @param in_buf The input buffer
     * @param in_size The input buffer data size
     * @param last_chunk If current input is the last chunk
-    * @param out_buf [out] The output buffer
+    * @param out_buf [out] The output buffer, owned by the encryptor.
+    *        Valid until the next encrypt/decrypt call or close().
+    *        Caller must not free this buffer.
     * @param out_size [out] The output buffer data size
     * @return 0 upon success, 1 if otherwise
     */
