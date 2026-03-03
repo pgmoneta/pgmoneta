@@ -470,6 +470,10 @@ pgmoneta_encrypt_file(char* from, char* to)
 
    if (encrypt_file(from, to, 1) != 0)
    {
+      if (flag)
+      {
+         free(to);
+      }
       return 1;
    }
 

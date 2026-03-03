@@ -111,6 +111,21 @@ pgmoneta_summarize_wal(int srv, char* dir, uint64_t start_lsn, uint64_t end_lsn,
 error:
    free(wal_dir);
    pgmoneta_brt_destroy(brt);
+
+   if (partial_record != NULL)
+   {
+      if (partial_record->xlog_record != NULL)
+      {
+         free(partial_record->xlog_record);
+      }
+      if (partial_record->data_buffer != NULL)
+      {
+         free(partial_record->data_buffer);
+      }
+      free(partial_record);
+      partial_record = NULL;
+   }
+
    return 1;
 }
 

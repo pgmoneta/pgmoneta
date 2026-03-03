@@ -129,16 +129,31 @@ START_TEST(test_pgmoneta_wal_summary)
 
    /* Create summary directory in the base_dir of a server if not already present */
    summary_dir = pgmoneta_get_server_summary(PRIMARY_SERVER);
-   ck_assert_msg(!pgmoneta_mkdir(summary_dir), "failed to create %s directory", summary_dir);
+   if (pgmoneta_mkdir(summary_dir))
+   {
+      free(summary_dir);
+      ck_abort_msg("failed to create directory");
+   }
 
    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);
 
    ck_assert_int_ge(e_lsn, s_lsn);
    ret = !pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn, &brt);
-   ck_assert_msg(ret, "failed to summarize the wal");
+   if (!ret)
+   {
+      free(summary_dir);
+      free(wal_dir);
+      ck_abort_msg("failed to summarize the wal");
+   }
 
    ret = !pgmoneta_wal_summary_save(PRIMARY_SERVER, s_lsn, e_lsn, brt);
-   ck_assert_msg(ret, "failed to save the wal summary to disk");
+   if (!ret)
+   {
+      free(summary_dir);
+      free(wal_dir);
+      pgmoneta_brt_destroy(brt);
+      ck_abort_msg("failed to save the wal summary to disk");
+   }
 
    pgmoneta_brt_destroy(brt);
    pgmoneta_disconnect(srv_socket);

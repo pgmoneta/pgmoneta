@@ -172,6 +172,7 @@ read_all_page_headers(FILE* file, struct xlog_long_page_header_data* long_header
       if (bytes_read != 1)
       {
          pgmoneta_log_error("Error: Failed to read the complete data");
+         free(page_header);
          goto error;
       }
       pgmoneta_deque_add(wal_file->page_headers, NULL, (uintptr_t)page_header, ValueRef);
@@ -275,6 +276,7 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    uint32_t next_record;
    int page_number = 0;
    wal_file->long_phd = long_header;
+   long_header = NULL;
    read_all_page_headers(file, wal_file->long_phd, wal_file);
 
    if (xlog_from_file_name(basename(path), &tli, &logSegNo, wal_segz_bytes))
@@ -284,12 +286,12 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    }
    XLOG_SEG_NO_OFFEST_TO_REC_PTR(logSegNo, 0, wal_segz_bytes, base);
 
-   if (long_header->std.xlp_rem_len > 0)
+   if (wal_file->long_phd->std.xlp_rem_len > 0)
    {
       next_record = MAXALIGN(
          ftell(file) +
-         ((long_header->std.xlp_rem_len / long_header->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
-         long_header->std.xlp_rem_len % long_header->xlp_xlog_blcksz);
+         ((wal_file->long_phd->std.xlp_rem_len / wal_file->long_phd->xlp_xlog_blcksz) * SIZE_OF_XLOG_SHORT_PHD) +
+         wal_file->long_phd->std.xlp_rem_len % wal_file->long_phd->xlp_xlog_blcksz);
 
       if (partial_record->xlog_record_bytes_read == 0)
       {
@@ -318,7 +320,6 @@ pgmoneta_wal_parse_wal_file(char* path, int server, struct walfile* wal_file)
    {
       next_record = SIZE_OF_XLOG_LONG_PHD;
    }
-   long_header = NULL;
    fseek(file, next_record, SEEK_SET);
    while (true)
    {
@@ -557,6 +558,7 @@ finish:
       decoded->next_lsn = lsn_array[idx++];
    }
 
+   decoded = (struct decoded_xlog_record*)pgmoneta_deque_peek_last(wal_file->records, NULL);
    if (decoded != NULL)
    {
       decoded->next_lsn = 0; // Handle last record
@@ -731,7 +733,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
                  blk->bimg_len == block_size))
             {
                pgmoneta_log_fatal(
-                  "BKPIMAGE_HAS_HOLE set, but hole offset %u length %u block image length %u at %X/%X");
+                  "BKPIMAGE_HAS_HOLE set, but hole offset %u length %u block image length %u at %s",
+                  blk->hole_offset, blk->hole_length, blk->bimg_len, pgmoneta_lsn_to_string(lsn));
                goto err;
             }
 
@@ -742,7 +745,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
             if (!(blk->bimg_info & BKPIMAGE_HAS_HOLE) &&
                 (blk->hole_offset != 0 || blk->hole_length != 0))
             {
-               pgmoneta_log_fatal("BKPIMAGE_HAS_HOLE not set, but hole offset %u length %u at %X/%X");
+               pgmoneta_log_fatal("BKPIMAGE_HAS_HOLE not set, but hole offset %u length %u at %s",
+                                  blk->hole_offset, blk->hole_length, pgmoneta_lsn_to_string(lsn));
                goto err;
             }
 
@@ -752,7 +756,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
             if (pgmoneta_wal_is_bkp_image_compressed(magic_value, blk->bimg_info) &&
                 blk->bimg_len == block_size)
             {
-               pgmoneta_log_fatal("BKPIMAGE_COMPRESSED set, but block image length %u at %X/%X");
+               pgmoneta_log_fatal("BKPIMAGE_COMPRESSED set, but block image length %u at %s",
+                                  blk->bimg_len, pgmoneta_lsn_to_string(lsn));
                goto err;
             }
 
@@ -765,7 +770,8 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
                 blk->bimg_len != block_size)
             {
                pgmoneta_log_fatal(
-                  "neither BKPIMAGE_HAS_HOLE nor BKPIMAGE_COMPRESSED set, but block image length is %u at %X/%X");
+                  "neither BKPIMAGE_HAS_HOLE nor BKPIMAGE_COMPRESSED set, but block image length is %u at %s",
+                  blk->bimg_len, pgmoneta_lsn_to_string(lsn));
                goto err;
             }
          }
@@ -778,7 +784,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
          {
             if (rlocator == NULL)
             {
-               pgmoneta_log_fatal("BKPBLOCK_SAME_REL set but no previous rel at %X/%X");
+               pgmoneta_log_fatal("BKPBLOCK_SAME_REL set but no previous rel at %s", pgmoneta_lsn_to_string(lsn));
                goto err;
             }
 
@@ -788,7 +794,7 @@ decode_xlog_record(char* buffer, struct decoded_xlog_record* decoded, struct xlo
       }
       else
       {
-         pgmoneta_log_fatal("Invalid block_id %u at %X/%X");
+         pgmoneta_log_fatal("Invalid block_id %u at %s", block_id, pgmoneta_lsn_to_string(lsn));
          goto err;
       }
    }
