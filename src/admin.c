@@ -665,6 +665,11 @@ username:
    while (fgets(line, sizeof(line), users_file))
    {
       ptr = strtok(line, ":");
+      if (ptr == NULL)
+      {
+         warnx("invalid users file line while adding user");
+         goto error;
+      }
       if (!strcmp(username, ptr))
       {
          warnx("Existing user: %s", username);
@@ -994,6 +999,11 @@ username:
       memcpy(&line_copy, &line, strlen(line));
 
       ptr = strtok(line, ":");
+      if (ptr == NULL)
+      {
+         warnx("invalid users file line while updating user");
+         goto error;
+      }
       if (!strcmp(username, ptr))
       {
          /* Password */
@@ -1317,6 +1327,11 @@ username:
       memcpy(&line_copy, &line, strlen(line));
 
       ptr = strtok(line, ":");
+      if (ptr == NULL)
+      {
+         warnx("invalid users file line while removing user");
+         goto error;
+      }
       if (!strcmp(username, ptr))
       {
          found = true;
@@ -1439,6 +1454,11 @@ list_users(char* users_path, int32_t output_format)
    while (fgets(line, sizeof(line), users_file))
    {
       ptr = strtok(line, ":");
+      if (ptr == NULL)
+      {
+         warnx("skipping malformed users file line while listing users");
+         continue;
+      }
       if (strchr(ptr, '\n'))
       {
          continue;
@@ -1573,6 +1593,11 @@ create_response(char* users_path, struct json* json, struct json** response)
    while (fgets(line, sizeof(line), users_file))
    {
       ptr = strtok(line, ":");
+      if (ptr == NULL)
+      {
+         warnx("skipping malformed users file line while creating response");
+         continue;
+      }
       if (strchr(ptr, '\n'))
       {
          continue;
