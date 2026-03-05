@@ -423,6 +423,14 @@ bool
 pgmoneta_compare_string(const char* str1, const char* str2);
 
 /**
+ * Cleanse memory
+ * @param data The data
+ * @param size The size
+ */
+void
+pgmoneta_cleanse(void* data, size_t size);
+
+/**
  * Is the machine big endian ?
  * @return True if big, otherwise false for little
  */

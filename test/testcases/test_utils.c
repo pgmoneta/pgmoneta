@@ -2280,3 +2280,23 @@ cleanup:
    pgmoneta_free_aligned(ptr2);
    MCTF_FINISH();
 }
+
+MCTF_TEST(test_utils_cleanse)
+{
+   char data[10];
+   memset(data, 'A', 10);
+
+   pgmoneta_cleanse(data, 10);
+
+   for (int i = 0; i < 10; i++)
+   {
+      MCTF_ASSERT(data[i] == 0, cleanup, "pgmoneta_cleanse failed to zero memory");
+   }
+
+   /* Test NULL and zero size - should not crash */
+   pgmoneta_cleanse(NULL, 10);
+   pgmoneta_cleanse(data, 0);
+
+cleanup:
+   MCTF_FINISH();
+}

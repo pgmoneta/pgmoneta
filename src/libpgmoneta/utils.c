@@ -61,6 +61,7 @@
 #include <unistd.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/crypto.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -605,6 +606,15 @@ pgmoneta_compare_string(const char* str1, const char* str2)
       return false;
    }
    return strcmp(str1, str2) == 0;
+}
+
+void
+pgmoneta_cleanse(void* data, size_t size)
+{
+   if (data != NULL && size > 0)
+   {
+      OPENSSL_cleanse(data, size);
+   }
 }
 
 bool

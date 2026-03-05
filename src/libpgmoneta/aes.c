@@ -862,8 +862,8 @@ cleanup:
    free(encrypted);
 
    /* Wipe key material from stack */
-   OPENSSL_cleanse(key, sizeof(key));
-   OPENSSL_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(key, sizeof(key));
+   pgmoneta_cleanse(iv, sizeof(iv));
 
    return ret;
 }
@@ -899,8 +899,8 @@ pgmoneta_decrypt(char* ciphertext, int ciphertext_length, char* password, char**
 
 cleanup:
    /* Wipe key material from stack */
-   OPENSSL_cleanse(key, sizeof(key));
-   OPENSSL_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(key, sizeof(key));
+   pgmoneta_cleanse(iv, sizeof(iv));
 
    return ret;
 }
@@ -935,7 +935,7 @@ derive_key_iv(char* password, unsigned char* salt, unsigned char* key, unsigned 
 
 cleanup:
    /* Wipe sensitive derived material */
-   OPENSSL_cleanse(derived, sizeof(derived));
+   pgmoneta_cleanse(derived, sizeof(derived));
 
    return ret;
 }
@@ -999,7 +999,11 @@ error:
       EVP_CIPHER_CTX_free(ctx);
    }
 
-   free(ct);
+   if (ct != NULL)
+   {
+      pgmoneta_cleanse(ct, size);
+      free(ct);
+   }
 
    return 1;
 }
@@ -1064,7 +1068,11 @@ error:
       EVP_CIPHER_CTX_free(ctx);
    }
 
-   free(pt);
+   if (pt != NULL)
+   {
+      pgmoneta_cleanse(pt, size);
+      free(pt);
+   }
 
    return 1;
 }
@@ -1256,12 +1264,12 @@ cleanup:
    }
 
    /* Wipe key material from stack */
-   OPENSSL_cleanse(key, sizeof(key));
-   OPENSSL_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(key, sizeof(key));
+   pgmoneta_cleanse(iv, sizeof(iv));
 
    if (master_key != NULL)
    {
-      OPENSSL_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, strlen(master_key));
       free(master_key);
    }
 
@@ -1452,17 +1460,18 @@ cleanup:
    }
 
    /* Wipe key material from stack */
-   OPENSSL_cleanse(key, sizeof(key));
-   OPENSSL_cleanse(iv, sizeof(iv));
+   pgmoneta_cleanse(key, sizeof(key));
+   pgmoneta_cleanse(iv, sizeof(iv));
 
    if (master_key != NULL)
    {
-      OPENSSL_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, strlen(master_key));
       free(master_key);
    }
 
    if (ret != 0 && *res_buffer != NULL)
    {
+      pgmoneta_cleanse(*res_buffer, outbuf_size);
       free(*res_buffer);
       *res_buffer = NULL;
    }
@@ -1520,7 +1529,7 @@ create_aes_encryptor(int mode, struct encryptor** encryptor)
 
    if (master_key != NULL)
    {
-      OPENSSL_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, strlen(master_key));
       free(master_key);
    }
 
@@ -1531,7 +1540,7 @@ create_aes_encryptor(int mode, struct encryptor** encryptor)
 error:
    if (master_key != NULL)
    {
-      OPENSSL_cleanse(master_key, strlen(master_key));
+      pgmoneta_cleanse(master_key, strlen(master_key));
       free(master_key);
    }
 
@@ -1562,7 +1571,11 @@ aes_encryptor_close(struct encryptor* encryptor)
    if (this->ctx)
    {
       EVP_CIPHER_CTX_free(this->ctx);
+      this->ctx = NULL;
    }
+
+   pgmoneta_cleanse(this->key, sizeof(this->key));
+   pgmoneta_cleanse(this->iv, sizeof(this->iv));
 }
 
 static int
