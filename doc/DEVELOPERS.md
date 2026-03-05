@@ -411,7 +411,7 @@ pgmoneta provides two WAL (Write-Ahead Log) tools for working with PostgreSQL WA
 - **pgmoneta-walinfo**: Read and display information about WAL files
 - **pgmoneta-walfilter**: Filter WAL files based on user-defined rules
 
-For detailed user documentation about these tools, please refer to the [WAL Tools chapter](./manual/en/17-wal-tools.md).
+For detailed user documentation about these tools, please refer to the [WAL Tools chapter](./manual/en/18-wal-tools.md).
 
 For developer information about the internal APIs and implementation details, see the [WAL developer guide](./manual/en/78-wal.md).
 

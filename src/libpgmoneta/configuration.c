@@ -161,6 +161,7 @@ pgmoneta_init_main_configuration(void* shm)
    config->storage_engine = STORAGE_ENGINE_LOCAL;
 
    config->workers = 0;
+   config->console = 0;
 
    config->retention_days = 7;
    config->retention_weeks = -1;
@@ -642,6 +643,20 @@ pgmoneta_read_main_configuration(void* shm, char* filename)
                   if (!strcmp(section, "pgmoneta"))
                   {
                      if (as_int(value, &config->metrics))
+                     {
+                        unknown = true;
+                     }
+                  }
+                  else
+                  {
+                     unknown = true;
+                  }
+               }
+               else if (!strcmp(key, "console"))
+               {
+                  if (!strcmp(section, "pgmoneta"))
+                  {
+                     if (as_int(value, &config->console))
                      {
                         unknown = true;
                      }
@@ -3317,6 +3332,7 @@ add_configuration_response(struct json* res)
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_UNIX_SOCKET_DIR, (uintptr_t)config->common.unix_socket_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_BASE_DIR, (uintptr_t)config->base_dir, ValueString);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS, (uintptr_t)config->metrics, ValueInt64);
+   pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_CONSOLE, (uintptr_t)config->console, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_AGE, (uintptr_t)pgmoneta_time_convert(config->metrics_cache_max_age, FORMAT_TIME_S), ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CACHE_MAX_SIZE, (uintptr_t)config->metrics_cache_max_size, ValueInt64);
    pgmoneta_json_put(res, CONFIGURATION_ARGUMENT_MANAGEMENT, (uintptr_t)config->management, ValueInt64);
@@ -4096,6 +4112,13 @@ apply_main_configuration(struct main_configuration* config, struct server* srv, 
             unknown = true;
          }
       }
+      else if (!strcmp(key, "console"))
+      {
+         if (as_int(value, &config->console))
+         {
+            unknown = true;
+         }
+      }
       else if (!strcmp(key, "management"))
       {
          if (as_int(value, &config->management))
@@ -4237,6 +4260,10 @@ write_config_value(char* buffer, char* config_key, size_t buffer_size)
          else if (!strcmp(key_info.key, "metrics"))
          {
             snprintf(buffer, buffer_size, "%d", config->metrics);
+         }
+         else if (!strcmp(key_info.key, "console"))
+         {
+            snprintf(buffer, buffer_size, "%d", config->console);
          }
          else if (!strcmp(key_info.key, "management"))
          {
@@ -5683,6 +5710,7 @@ transfer_configuration(struct main_configuration* config, struct main_configurat
       changed = true;
    }
    config->metrics = reload->metrics;
+   config->console = reload->console;
 
    if (restart_time("metrics_cache_max_age", config->metrics_cache_max_age, reload->metrics_cache_max_age, false))
    {

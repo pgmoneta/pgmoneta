@@ -2,7 +2,7 @@
 
 ### Overview
 
-This document provides an overview of the WAL (Write-Ahead Log) reader implementation, focusing on the internal APIs and developer interfaces. For user-facing documentation about the WAL tools, see the [WAL Tools chapter](17-wal-tools.md).
+This document provides an overview of the WAL (Write-Ahead Log) reader implementation, focusing on the internal APIs and developer interfaces. For user-facing documentation about the WAL tools, see the [WAL Tools chapter](18-wal-tools.md).
 
 The WAL reader provides the core functionality for parsing PostgreSQL Write-Ahead Log files, including support for encrypted and compressed WAL files. The implementation includes both high-level APIs for application use and low-level parsing functions for internal processing.
 

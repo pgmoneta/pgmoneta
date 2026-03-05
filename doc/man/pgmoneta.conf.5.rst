@@ -39,6 +39,9 @@ base_dir
 metrics
   The metrics port. Default is 0 (disabled)
 
+console
+  The web console port. Default is 0 (disabled)
+
 metrics_cache_max_age
   The time to keep a Prometheus (metrics) response in cache. If this value is specified without units,
   it is taken as seconds. Setting this parameter to 0 disables caching. It supports the following units

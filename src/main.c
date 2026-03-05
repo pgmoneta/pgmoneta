@@ -33,6 +33,7 @@
 #include <backup.h>
 #include <bzip2_compression.h>
 #include <cmd.h>
+#include <console.h>
 #include <configuration.h>
 #include <delete.h>
 #include <gzip_compression.h>
@@ -89,6 +90,7 @@
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_metrics_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
+static void accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void shutdown_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
@@ -128,6 +130,9 @@ static int unix_management_socket = -1;
 static struct accept_io io_metrics[MAX_FDS];
 static int* metrics_fds = NULL;
 static int metrics_fds_length = -1;
+static struct accept_io io_console[MAX_FDS];
+static int* console_fds = NULL;
+static int console_fds_length = -1;
 static struct accept_io io_management[MAX_FDS];
 static int* management_fds = NULL;
 static int management_fds_length = -1;
@@ -178,6 +183,32 @@ shutdown_metrics(void)
    {
       ev_io_stop(main_loop, (struct ev_io*)&io_metrics[i]);
       pgmoneta_disconnect(io_metrics[i].socket);
+      errno = 0;
+   }
+}
+
+static void
+start_console(void)
+{
+   for (int i = 0; i < console_fds_length; i++)
+   {
+      int sockfd = *(console_fds + i);
+
+      memset(&io_console[i], 0, sizeof(struct accept_io));
+      ev_io_init((struct ev_io*)&io_console[i], accept_console_cb, sockfd, EV_READ);
+      io_console[i].socket = sockfd;
+      io_console[i].argv = argv_ptr;
+      ev_io_start(main_loop, (struct ev_io*)&io_console[i]);
+   }
+}
+
+static void
+shutdown_console(void)
+{
+   for (int i = 0; i < console_fds_length; i++)
+   {
+      ev_io_stop(main_loop, (struct ev_io*)&io_console[i]);
+      pgmoneta_disconnect(io_console[i].socket);
       errno = 0;
    }
 }
@@ -251,6 +282,7 @@ main(int argc, char** argv)
    bool management_started = false;
    bool mgt_started = false;
    bool metrics_started = false;
+   bool console_started = false;
    pid_t pid, sid;
    struct signal_info signal_watcher[SIGNALS_NUMBER];
    struct ev_periodic retention;
@@ -819,6 +851,31 @@ main(int argc, char** argv)
       management_started = true;
    }
 
+   if (config->console > 0)
+   {
+      /* Bind console socket */
+      if (pgmoneta_bind(config->host, config->console, &console_fds, &console_fds_length))
+      {
+         pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->console);
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Could not bind to %s:%d", config->host, config->console);
+#endif
+         goto error;
+      }
+
+      if (console_fds_length > MAX_FDS)
+      {
+         pgmoneta_log_fatal("Too many descriptors %d", console_fds_length);
+#ifdef HAVE_SYSTEMD
+         sd_notifyf(0, "STATUS=Too many descriptors %d", console_fds_length);
+#endif
+         goto error;
+      }
+
+      start_console();
+      console_started = true;
+   }
+
    /* Create and/or validate replication slots */
    if (init_replication_slots())
    {
@@ -853,6 +910,10 @@ main(int argc, char** argv)
    for (int i = 0; i < management_fds_length; i++)
    {
       pgmoneta_log_debug("Remote management: %d", *(management_fds + i));
+   }
+   for (int i = 0; i < console_fds_length; i++)
+   {
+      pgmoneta_log_debug("Console: %d", *(console_fds + i));
    }
    pgmoneta_libev_engines();
    pgmoneta_log_debug("libev engine: %s", pgmoneta_libev_engine(ev_backend(main_loop)));
@@ -897,6 +958,7 @@ main(int argc, char** argv)
 
    shutdown_management();
    shutdown_metrics();
+   shutdown_console();
    shutdown_mgt();
 
    for (int i = 0; i < SIGNALS_NUMBER; i++)
@@ -907,6 +969,7 @@ main(int argc, char** argv)
    ev_loop_destroy(main_loop);
 
    free(metrics_fds);
+   free(console_fds);
    free(management_fds);
 
    remove_pidfile();
@@ -940,12 +1003,18 @@ error:
       shutdown_metrics();
    }
 
+   if (console_started)
+   {
+      shutdown_console();
+   }
+
    if (management_started)
    {
       shutdown_management();
    }
 
    free(metrics_fds);
+   free(console_fds);
    free(management_fds);
 
    config->running = false;
@@ -2078,6 +2147,75 @@ child_error:
 }
 
 static void
+accept_console_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
+{
+   struct sockaddr_in6 client_addr;
+   socklen_t client_addr_length;
+   int client_fd;
+   struct main_configuration* config;
+
+   if (EV_ERROR & revents)
+   {
+      pgmoneta_log_debug("accept_console_cb: invalid event: %s", strerror(errno));
+      errno = 0;
+      return;
+   }
+
+   config = (struct main_configuration*)shmem;
+
+   client_addr_length = sizeof(client_addr);
+   client_fd = accept(watcher->fd, (struct sockaddr*)&client_addr, &client_addr_length);
+   if (client_fd == -1)
+   {
+      if (accept_fatal(errno) && keep_running)
+      {
+         pgmoneta_log_warn("Restarting listening port due to: %s (%d)", strerror(errno), watcher->fd);
+
+         shutdown_console();
+
+         free(console_fds);
+         console_fds = NULL;
+         console_fds_length = 0;
+
+         if (pgmoneta_bind(config->host, config->console, &console_fds, &console_fds_length))
+         {
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->console);
+            exit(1);
+         }
+
+         if (console_fds_length > MAX_FDS)
+         {
+            pgmoneta_log_fatal("Too many descriptors %d", console_fds_length);
+            exit(1);
+         }
+
+         start_console();
+
+         for (int i = 0; i < console_fds_length; i++)
+         {
+            pgmoneta_log_debug("Console: %d", *(console_fds + i));
+         }
+      }
+      else
+      {
+         pgmoneta_log_debug("accept: %s (%d)", strerror(errno), watcher->fd);
+      }
+      errno = 0;
+      return;
+   }
+
+   if (!fork())
+   {
+      ev_loop_fork(loop);
+      shutdown_ports();
+      /* We are leaving the socket descriptor valid such that the client won't reuse it */
+      pgmoneta_console(NULL, client_fd);
+      exit(0);
+   }
+   pgmoneta_disconnect(client_fd);
+}
+
+static void
 accept_management_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
 {
    struct sockaddr_in6 client_addr;
@@ -2270,6 +2408,35 @@ reload_services_only(void)
       for (int i = 0; i < management_fds_length; i++)
       {
          pgmoneta_log_debug("Remote management: %d", *(management_fds + i));
+      }
+   }
+
+   shutdown_console();
+
+   free(console_fds);
+   console_fds = NULL;
+   console_fds_length = 0;
+
+   if (config->console > 0)
+   {
+      /* Bind console socket */
+      if (pgmoneta_bind(config->host, config->console, &console_fds, &console_fds_length))
+      {
+         pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->console);
+         goto error;
+      }
+
+      if (console_fds_length > MAX_FDS)
+      {
+         pgmoneta_log_fatal("Too many descriptors %d", console_fds_length);
+         goto error;
+      }
+
+      start_console();
+
+      for (int i = 0; i < console_fds_length; i++)
+      {
+         pgmoneta_log_debug("Console: %d", *(console_fds + i));
       }
    }
 
@@ -2523,12 +2690,14 @@ static void
 reload_configuration(bool* restart)
 {
    int old_metrics;
+   int old_console;
    int old_management;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
 
    old_metrics = config->metrics;
+   old_console = config->console;
    old_management = config->management;
 
    pgmoneta_reload_configuration(restart);
@@ -2593,6 +2762,38 @@ reload_configuration(bool* restart)
          for (int i = 0; i < management_fds_length; i++)
          {
             pgmoneta_log_debug("Remote management: %d", *(management_fds + i));
+         }
+      }
+   }
+
+   if (old_console != config->console)
+   {
+      shutdown_console();
+
+      free(console_fds);
+      console_fds = NULL;
+      console_fds_length = 0;
+
+      if (config->console > 0)
+      {
+         /* Bind console socket */
+         if (pgmoneta_bind(config->host, config->console, &console_fds, &console_fds_length))
+         {
+            pgmoneta_log_fatal("Could not bind to %s:%d", config->host, config->console);
+            exit(1);
+         }
+
+         if (console_fds_length > MAX_FDS)
+         {
+            pgmoneta_log_fatal("Too many descriptors %d", console_fds_length);
+            exit(1);
+         }
+
+         start_console();
+
+         for (int i = 0; i < console_fds_length; i++)
+         {
+            pgmoneta_log_debug("Console: %d", *(console_fds + i));
          }
       }
    }
@@ -2979,5 +3180,10 @@ shutdown_ports(void)
    if (config->management > 0)
    {
       shutdown_management();
+   }
+
+   if (config->console > 0)
+   {
+      shutdown_console();
    }
 }

@@ -15,6 +15,7 @@
 * WAL shipping support
 * Hot standby
 * Prometheus support
+* Web console
 * Remote management
 * Offline detection
 * Transport Layer Security (TLS) v1.2+ support
@@ -30,6 +31,7 @@ server called [pgmoneta_mcp](https://github.com/pgmoneta/pgmoneta_mcp).
 * [Developer guide](./doc/DEVELOPERS.md)
 * [Getting Started](./doc/GETTING_STARTED.md)
 * [Configuration](./doc/CONFIGURATION.md)
+* [Web Console](./doc/CONSOLE.md)
 
 ## Overview
 
