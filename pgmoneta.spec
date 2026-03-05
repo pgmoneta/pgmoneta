@@ -49,6 +49,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/Azure.md %{buildroot}%{_docdir}/%{name}/Azure.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CLI.md %{buildroot}%{_docdir}/%{name}/CLI.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CONFIGURATION.md %{buildroot}%{_docdir}/%{name}/CONFIGURATION.md
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/CONSOLE.md %{buildroot}%{_docdir}/%{name}/CONSOLE.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/DEVELOPERS.md %{buildroot}%{_docdir}/%{name}/DEVELOPERS.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/DISTRIBUTIONS.md %{buildroot}%{_docdir}/%{name}/DISTRIBUTIONS.md
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/ENCRYPTION.md %{buildroot}%{_docdir}/%{name}/ENCRYPTION.md
@@ -70,6 +71,9 @@ cmake -DCMAKE_BUILD_TYPE=Release -DDOCS=FALSE ..
 %{__mkdir_p} %{buildroot}%{_docdir}/%{name}/images/
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/grafana_datasource.jpg %{buildroot}%{_docdir}/%{name}/images/grafana_datasource.jpg
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/grafana_dashboard.jpg %{buildroot}%{_docdir}/%{name}/images/grafana_dashboard.jpg
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/console_home_simple.png %{buildroot}%{_docdir}/%{name}/images/console_home_simple.png
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/console_home_advanced.png %{buildroot}%{_docdir}/%{name}/images/console_home_advanced.png
+%{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/console_home_server_filter.png %{buildroot}%{_docdir}/%{name}/images/console_home_server_filter.png
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/prometheus_console.jpg %{buildroot}%{_docdir}/%{name}/images/prometheus_console.jpg
 %{__install} -m 644 %{_builddir}/%{name}-%{version}/doc/images/prometheus_graph.jpg %{buildroot}%{_docdir}/%{name}/images/prometheus_graph.jpg
 
@@ -125,6 +129,7 @@ cd %{buildroot}%{_libdir}/
 %{_docdir}/%{name}/CODE_OF_CONDUCT.md
 %{_docdir}/%{name}/CLI.md
 %{_docdir}/%{name}/CONFIGURATION.md
+%{_docdir}/%{name}/CONSOLE.md
 %{_docdir}/%{name}/DEVELOPERS.md
 %{_docdir}/%{name}/DISTRIBUTIONS.md
 %{_docdir}/%{name}/ENCRYPTION.md
@@ -156,6 +161,9 @@ cd %{buildroot}%{_libdir}/
 
 %{_docdir}/%{name}/images/grafana_datasource.jpg
 %{_docdir}/%{name}/images/grafana_dashboard.jpg
+%{_docdir}/%{name}/images/console_home_simple.png
+%{_docdir}/%{name}/images/console_home_advanced.png
+%{_docdir}/%{name}/images/console_home_server_filter.png
 %{_docdir}/%{name}/images/prometheus_console.jpg
 %{_docdir}/%{name}/images/prometheus_graph.jpg
 
