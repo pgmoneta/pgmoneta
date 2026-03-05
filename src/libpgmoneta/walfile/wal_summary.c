@@ -301,6 +301,12 @@ retry1:
       char* file = (char*)file_iterator->value->data;
       char* fn = NULL;
 
+      if (pgmoneta_ends_with(file, ".partial"))
+      {
+         pgmoneta_log_debug("summarize_walfiles: skipping in-progress segment %s", file);
+         continue;
+      }
+
       fn = get_wal_file_name(file);
 
       memset(file_path, 0, MAX_PATH);
