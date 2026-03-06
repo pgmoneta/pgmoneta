@@ -2108,8 +2108,6 @@ pgmoneta_console(SSL* client_ssl, int client_fd)
       }
    }
 
-   pgmoneta_log_info("pgmoneta_console: start");
-
    status = pgmoneta_read_timeout_message(client_ssl, client_fd,
                                           (int)pgmoneta_time_convert(config->authentication_timeout, FORMAT_TIME_S),
                                           &msg);
