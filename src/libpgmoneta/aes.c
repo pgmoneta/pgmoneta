@@ -1197,6 +1197,12 @@ encrypt_file(char* from, char* to, int enc)
       }
    }
 
+   if (pgmoneta_exists(to))
+   {
+      pgmoneta_log_error("encrypt_file: destination file %s already exists", to);
+      goto error;
+   }
+
    out = fopen(to, "w");
    if (out == NULL)
    {
