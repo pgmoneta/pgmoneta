@@ -87,13 +87,13 @@ extern "C" {
 #define MANAGEMENT_CONF_SET       23
 #define MANAGEMENT_MODE           24
 
-#define MANAGEMENT_MASTER_KEY     24
-#define MANAGEMENT_ADD_USER       25
-#define MANAGEMENT_UPDATE_USER    26
-#define MANAGEMENT_REMOVE_USER    27
-#define MANAGEMENT_LIST_USERS     28
+#define MANAGEMENT_MASTER_KEY     100
+#define MANAGEMENT_ADD_USER       101
+#define MANAGEMENT_UPDATE_USER    102
+#define MANAGEMENT_REMOVE_USER    103
+#define MANAGEMENT_LIST_USERS     104
 
-#define MANAGEMENT_S3_LS          100
+#define MANAGEMENT_S3_LS          200
 
 /**
  * Management categories
