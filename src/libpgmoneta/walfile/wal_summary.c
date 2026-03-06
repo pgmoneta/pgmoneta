@@ -40,7 +40,7 @@
 static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
 static int summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
 static int summarize_walfiles(int srv, char* dir_path, uint64_t start_lsn, uint64_t end_lsn, block_ref_table* brt);
-static char* get_wal_file_name(char* file);
+static char* get_wal_file_name(char* dir_path, char* file);
 
 /**
  * Handles summarization of arbitary range in a timeline only
@@ -316,7 +316,14 @@ retry1:
       char* file = (char*)file_iterator->value->data;
       char* fn = NULL;
 
-      fn = get_wal_file_name(file);
+      fn = get_wal_file_name(dir_path, file);
+
+      /* File needed but not available - error out */
+      if (fn == NULL)
+      {
+         pgmoneta_log_error("WAL summary: %s not available after waiting", file);
+         goto error;
+      }
 
       memset(file_path, 0, MAX_PATH);
       if (!pgmoneta_ends_with(dir_path, "/"))
@@ -331,34 +338,13 @@ retry1:
       free(fn);
       fn = NULL;
 
-      retry_count = 0;
+      pgmoneta_log_debug("WAL file at %s", file_path);
 
-retry2:
-      if (pgmoneta_exists(file_path))
+      if (summarize_walfile(file_path, start_lsn, end_lsn, brt))
       {
-         pgmoneta_log_debug("WAL file at %s", file_path);
-
-         if (summarize_walfile(file_path, start_lsn, end_lsn, brt))
-         {
-            pgmoneta_log_error("Summarize WAL error");
-            goto error;
-         }
-      }
-      else
-      {
-         pgmoneta_log_debug("WAL file at %s does not exist - retrying", file_path);
-         retry_count++;
-         active = false;
-
-         if (retry_count < 10)
-         {
-            SLEEP_AND_GOTO(500000000L, retry2);
-         }
-         else
-         {
-            pgmoneta_log_error("WAL file at %s does not exist", file_path);
-            goto error;
-         }
+         pgmoneta_log_error("Summarize WAL error: %s (start: %" PRIX64 ", end: %" PRIX64 ")",
+                            file_path, start_lsn, end_lsn);
+         goto error;
       }
    }
 
@@ -379,13 +365,23 @@ error:
 }
 
 static char*
-get_wal_file_name(char* file)
+get_wal_file_name(char* dir_path, char* file)
 {
    char* fn = NULL;
    char* suffix = NULL;
+   char compressed_path[MAX_PATH];
+   char uncompressed_path[MAX_PATH];
+   char partial_path[MAX_PATH];
+   int retry_count = 0;
+   long sleep_ns = 500000000L;       /* 500ms */
+   long max_sleep_ns = 30000000000L; /* 30s cap */
+   int max_retries = 10;
+   char* sep = NULL;
    struct main_configuration* config;
 
    config = (struct main_configuration*)shmem;
+
+   sep = pgmoneta_ends_with(dir_path, "/") ? "" : "/";
 
    if (pgmoneta_ends_with(file, ".partial"))
    {
@@ -418,11 +414,69 @@ get_wal_file_name(char* file)
       suffix = pgmoneta_append(suffix, ".aes");
    }
 
-   if (suffix != NULL && !pgmoneta_ends_with(file, suffix))
+   memset(compressed_path, 0, MAX_PATH);
+   memset(uncompressed_path, 0, MAX_PATH);
+   memset(partial_path, 0, MAX_PATH);
+
+   pgmoneta_snprintf(uncompressed_path, MAX_PATH, "%s%s%s", dir_path, sep, fn);
+
+   if (suffix != NULL)
    {
-      fn = pgmoneta_append(fn, suffix);
+      pgmoneta_snprintf(compressed_path, MAX_PATH, "%s%s%s%s", dir_path, sep, fn, suffix);
+   }
+   else
+   {
+      pgmoneta_snprintf(compressed_path, MAX_PATH, "%s%s%s", dir_path, sep, fn);
    }
 
+   pgmoneta_snprintf(partial_path, MAX_PATH, "%s%s%s.partial", dir_path, sep, fn);
+
+   /* Check for compressed, then uncompressed, then .partial with exponential backoff */
+   while (retry_count < max_retries)
+   {
+      if (pgmoneta_exists(compressed_path))
+      {
+         if (suffix != NULL)
+         {
+            fn = pgmoneta_append(fn, suffix);
+         }
+         goto found;
+      }
+
+      if (suffix != NULL && pgmoneta_exists(uncompressed_path))
+      {
+         goto found;
+      }
+
+      if (pgmoneta_exists(partial_path))
+      {
+         fn = pgmoneta_append(fn, ".partial");
+         pgmoneta_log_debug("WAL: using .partial file %s", partial_path);
+         goto found;
+      }
+
+      pgmoneta_log_debug("WAL: waiting for %s (retry %d/%d)", compressed_path, retry_count + 1, max_retries);
+
+      SLEEP_AND_GOTO(sleep_ns, retry_continue);
+
+retry_continue:
+      retry_count++;
+
+      if (sleep_ns < max_sleep_ns)
+      {
+         sleep_ns *= 2;
+         if (sleep_ns > max_sleep_ns)
+         {
+            sleep_ns = max_sleep_ns;
+         }
+      }
+   }
+
+   pgmoneta_log_error("WAL: %s not available", compressed_path);
+   free(fn);
+   fn = NULL;
+
+found:
    free(suffix);
 
    return fn;
