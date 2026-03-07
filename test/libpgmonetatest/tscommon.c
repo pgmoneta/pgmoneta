@@ -80,15 +80,19 @@ pgmoneta_test_environment_create(void)
    assert(conf_path != NULL);
    // Create the shared memory for the configuration
    size = sizeof(struct main_configuration);
-   assert(!pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem));
+   ret = pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem);
+   assert(!ret);
 
-   assert(!pgmoneta_init_main_configuration(shmem));
+   ret = pgmoneta_init_main_configuration(shmem);
+   assert(!ret);
 
    // Try reading configuration from the configuration path
-   assert(!pgmoneta_read_main_configuration(shmem, conf_path));
+   ret = pgmoneta_read_main_configuration(shmem, conf_path);
+   assert(!ret);
 
    // Validate the configuration is valid
-   assert(!pgmoneta_test_validate_configuration(shmem));
+   ret = pgmoneta_test_validate_configuration(shmem);
+   assert(!ret);
 
    config = (struct main_configuration*)shmem;
 
@@ -119,7 +123,8 @@ pgmoneta_test_environment_create(void)
    pgmoneta_start_logging();
 
    // Try reading the users configuration path
-   assert(!pgmoneta_read_users_configuration(shmem, user_conf_path));
+   ret = pgmoneta_read_users_configuration(shmem, user_conf_path);
+   assert(!ret);
 }
 
 void
