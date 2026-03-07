@@ -309,7 +309,7 @@ incr_backup_execute_14_to_16(char* name __attribute__((unused)), struct art* nod
    wal_dir = pgmoneta_get_server_wal(server);
 
    /* Do WAL Summarization */
-   if (pgmoneta_summarize_wal(server, wal_dir, prev_backup_chkpt_lsn, start_backup_lsn, &summarized_brt))
+   if (pgmoneta_summarize_wal(server, wal_dir, prev_backup_chkpt_lsn, start_backup_lsn, true, &summarized_brt))
    {
       pgmoneta_log_error("WAL summation for incremental backup failed");
       goto error;
