@@ -69,12 +69,14 @@ pgmoneta_test_environment_create(void)
    assert(conf_path != NULL);
    // Create the shared memory for the configuration
    size = sizeof(struct main_configuration);
-   assert(!pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem));
+   ret = pgmoneta_create_shared_memory(size, HUGEPAGE_OFF, &shmem);
+   assert(!ret);
 
    pgmoneta_init_main_configuration(shmem);
 
    // Try reading configuration from the configuration path
-   assert(!pgmoneta_read_main_configuration(shmem, conf_path));
+   ret = pgmoneta_read_main_configuration(shmem, conf_path);
+   assert(!ret);
    config = (struct main_configuration*)shmem;
 
    // some validations just to be safe
@@ -100,7 +102,8 @@ pgmoneta_test_environment_create(void)
    pgmoneta_start_logging();
 
    // Try reading the users configuration path
-   assert(!pgmoneta_read_users_configuration(shmem, user_conf_path));
+   ret = pgmoneta_read_users_configuration(shmem, user_conf_path);
+   assert(!ret);
 }
 
 void
@@ -129,10 +132,14 @@ pgmoneta_test_add_backup(void)
 void
 pgmoneta_test_add_backup_chain(void)
 {
+   int ret = 0;
    pgmoneta_test_setup();
-   assert((!pgmoneta_tsclient_backup("primary", NULL)));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
-   assert(!pgmoneta_tsclient_backup("primary", "newest"));
+   ret = pgmoneta_tsclient_backup("primary", NULL);
+   assert(!ret);
+   ret = pgmoneta_tsclient_backup("primary", "newest");
+   assert(!ret);
+   ret = pgmoneta_tsclient_backup("primary", "newest");
+   assert(!ret);
 }
 
 void
@@ -142,6 +149,7 @@ pgmoneta_test_basedir_cleanup(void)
    char* wal_dir = NULL;
    bool restart = false;
    struct main_configuration* config;
+   int ret = 0;
 
    config = (struct main_configuration*)shmem;
 
@@ -160,12 +168,15 @@ pgmoneta_test_basedir_cleanup(void)
    pgmoneta_mkdir(wal_dir);
 
    // restore pgmoneta.conf by overwriting it with pgmoneta.conf.sample
-   assert(!pgmoneta_delete_file(config->common.configuration_path, NULL));
-   assert(!pgmoneta_copy_file(TEST_CONFIG_SAMPLE_PATH, config->common.configuration_path, NULL));
+   ret = pgmoneta_delete_file(config->common.configuration_path, NULL);
+   assert(!ret);
+   ret = pgmoneta_copy_file(TEST_CONFIG_SAMPLE_PATH, config->common.configuration_path, NULL);
+   assert(!ret);
    pgmoneta_reload_configuration(&restart);
 
    // assuming server doesn't need to restart
-   assert(!pgmoneta_tsclient_reload());
+   ret = pgmoneta_tsclient_reload();
+   assert(!ret);
 
    free(backup_dir);
    free(wal_dir);
