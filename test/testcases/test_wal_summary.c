@@ -47,6 +47,8 @@
 #include <walfile/wal_reader.h>
 #include <walfile/wal_summary.h>
 #include <stdio.h>
+#include <dirent.h>
+#include <unistd.h>
 
 START_TEST(test_pgmoneta_wal_summary)
 {
@@ -89,6 +91,9 @@ START_TEST(test_pgmoneta_wal_summary)
 
    pgmoneta_server_info(PRIMARY_SERVER, srv_ssl, srv_socket);
 
+   /* Enable proactive WAL summarization for the test */
+   config->common.servers[PRIMARY_SERVER].summarize_wal = true;
+
    /* get the starting lsn for summary */
    ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &s_lsn, &tli);
    ck_assert_msg(ret, "failed to create a checkpoint");
@@ -111,6 +116,14 @@ START_TEST(test_pgmoneta_wal_summary)
    ret = !pgmoneta_server_checkpoint(PRIMARY_SERVER, srv_ssl, srv_socket, &e_lsn, &tli);
    ck_assert_msg(ret, "failed to create a checkpoint");
 
+   /* Create summary directory in the base_dir of a server if not already present */
+   summary_dir = pgmoneta_get_server_summary(PRIMARY_SERVER);
+   if (pgmoneta_mkdir(summary_dir))
+   {
+      free(summary_dir);
+      ck_abort_msg("failed to create directory");
+   }
+
    /* Switch the wal segment so that records won't appear in partial segments */
    ret = !pgmoneta_test_execute_query(PRIMARY_SERVER, srv_ssl, srv_socket, "SELECT pg_switch_wal();", &qr);
    ck_assert_msg(ret, "failed to execute a query 'SELECT pg_switch_wal()'");
@@ -125,37 +138,44 @@ START_TEST(test_pgmoneta_wal_summary)
    pgmoneta_free_query_response(qr);
    qr = NULL;
 
-   sleep(10);
-
-   /* Create summary directory in the base_dir of a server if not already present */
-   summary_dir = pgmoneta_get_server_summary(PRIMARY_SERVER);
-   if (pgmoneta_mkdir(summary_dir))
-   {
-      free(summary_dir);
-      ck_abort_msg("failed to create directory");
-   }
-
    wal_dir = pgmoneta_get_server_wal(PRIMARY_SERVER);
 
    ck_assert_int_ge(e_lsn, s_lsn);
-   ret = !pgmoneta_summarize_wal(PRIMARY_SERVER, wal_dir, s_lsn, e_lsn, &brt);
-   if (!ret)
+
+   /* Wait for backend to proactively create the summary file */
+   int attempts = 0;
+   bool found = false;
+   while (attempts < 20)
+   {
+      DIR* dir;
+      struct dirent* ent;
+      if ((dir = opendir(summary_dir)) != NULL)
+      {
+         while ((ent = readdir(dir)) != NULL)
+         {
+            if (ent->d_name[0] != '.')
+            {
+               found = true;
+               break;
+            }
+         }
+         closedir(dir);
+      }
+      if (found)
+      {
+         break;
+      }
+      sleep(1);
+      attempts++;
+   }
+
+   if (!found)
    {
       free(summary_dir);
       free(wal_dir);
-      ck_abort_msg("failed to summarize the wal");
+      ck_abort_msg("Proactive WAL summary was not generated in time");
    }
 
-   ret = !pgmoneta_wal_summary_save(PRIMARY_SERVER, s_lsn, e_lsn, brt);
-   if (!ret)
-   {
-      free(summary_dir);
-      free(wal_dir);
-      pgmoneta_brt_destroy(brt);
-      ck_abort_msg("failed to save the wal summary to disk");
-   }
-
-   pgmoneta_brt_destroy(brt);
    pgmoneta_disconnect(srv_socket);
    pgmoneta_disconnect(custom_user_socket);
 

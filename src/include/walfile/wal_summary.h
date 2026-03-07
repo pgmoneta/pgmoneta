@@ -47,7 +47,7 @@
  * @return 0 is success, otherwise failure
  */
 int
-pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn, block_ref_table** brt);
+pgmoneta_summarize_wal(int srv, char* wal_dir, uint64_t start_lsn, uint64_t end_lsn, bool lock, block_ref_table** brt);
 
 /**
  * Save the summarization output to a file

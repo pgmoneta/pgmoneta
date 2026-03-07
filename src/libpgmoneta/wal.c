@@ -38,7 +38,10 @@
 #include <server.h>
 #include <storage.h>
 #include <utils.h>
-#include <wal.h>
+#include <walfile.h>
+#include <walfile/wal_summary.h>
+#include <walfile/wal_reader.h>
+#include <walfile/rm_xlog.h>
 #include <zstandard_compression.h>
 
 /* system */
@@ -73,6 +76,143 @@ static int wal_find_streaming_start(char* basedir, int segsize, uint32_t* timeli
 static int wal_read_replication_slot(SSL* ssl, int socket, char* slot, char* name, int segsize, uint32_t* high32, uint32_t* low32, uint32_t* timeline);
 static int wal_shipping_setup(int srv, char** wal_shipping);
 static void update_wal_lsn(int srv, size_t xlogptr);
+
+#ifndef XLOG_BLCKSZ
+#define XLOG_BLCKSZ 8192
+#endif
+
+// State machine buffer for observing XLogRecords across packets without large allocations
+struct wal_checkpoint_scanner
+{
+   int state;
+   int saved_state;
+   uint32_t bytes_needed;
+   uint32_t bytes_mapped;
+   uint8_t buffer[40];
+   uint32_t skip_bytes;
+};
+
+static void
+pgmoneta_wal_scan_checkpoints(int srv, struct wal_checkpoint_scanner* st, char* data, size_t length, uint64_t xlogptr)
+{
+   size_t offset = 0;
+   while (offset < length)
+   {
+      uint64_t current_ptr = xlogptr + offset;
+
+      if (current_ptr % XLOG_BLCKSZ == 0 && st->state != 0)
+      {
+         st->saved_state = st->state;
+         st->state = 0;
+         st->bytes_needed = SIZE_OF_XLOG_SHORT_PHD;
+         st->bytes_mapped = 0;
+      }
+
+      if (st->state == 2)
+      {
+         size_t bytes_to_next_page = XLOG_BLCKSZ - (current_ptr % XLOG_BLCKSZ);
+         size_t to_skip = length - offset;
+         if (to_skip > st->skip_bytes)
+            to_skip = st->skip_bytes;
+         if (to_skip > bytes_to_next_page)
+            to_skip = bytes_to_next_page;
+
+         st->skip_bytes -= to_skip;
+         offset += to_skip;
+
+         if (st->skip_bytes == 0)
+         {
+            st->state = 1;
+            st->bytes_needed = SIZE_OF_XLOG_RECORD;
+            st->bytes_mapped = 0;
+         }
+      }
+      else
+      {
+         size_t bytes_to_next_page = XLOG_BLCKSZ - (current_ptr % XLOG_BLCKSZ);
+         size_t to_read = st->bytes_needed - st->bytes_mapped;
+         if (to_read > length - offset)
+            to_read = length - offset;
+         if (to_read > bytes_to_next_page)
+            to_read = bytes_to_next_page;
+
+         memcpy(st->buffer + st->bytes_mapped, data + offset, to_read);
+         st->bytes_mapped += to_read;
+         offset += to_read;
+
+         if (st->bytes_mapped == st->bytes_needed)
+         {
+            st->bytes_mapped = 0;
+
+            if (st->state == 0)
+            {
+               uint16_t xlp_info = *(uint16_t*)(st->buffer + 2);
+               if ((xlp_info & 0x0002) && st->bytes_needed == SIZE_OF_XLOG_SHORT_PHD)
+               {
+                  st->bytes_needed = SIZE_OF_XLOG_LONG_PHD;
+                  st->bytes_mapped = SIZE_OF_XLOG_SHORT_PHD;
+                  continue;
+               }
+
+               uint32_t xlp_rem_len = *(uint32_t*)(st->buffer + 16);
+               if (st->saved_state != 0)
+               {
+                  st->state = st->saved_state;
+                  st->saved_state = 0;
+               }
+               else
+               {
+                  if (xlp_rem_len > 0)
+                  {
+                     st->state = 2;
+                     st->skip_bytes = (xlp_rem_len + 7) & ~7;
+                  }
+                  else
+                  {
+                     st->state = 1;
+                     st->bytes_needed = SIZE_OF_XLOG_RECORD;
+                  }
+               }
+            }
+            else if (st->state == 1)
+            {
+               uint8_t xl_info = st->buffer[16];
+               uint8_t xl_rmid = st->buffer[17];
+
+               if (xl_rmid == 0) // RM_XLOG_ID
+               {
+                  uint8_t info = xl_info & ~0x0F;   // XLR_INFO_MASK
+                  if (info == 0x10 || info == 0x00) // ONLINE or SHUTDOWN
+                  {
+                     pgmoneta_log_info("WAL: CHECKPOINT detected in stream for server %s at LSN %08X/%08X",
+                                       shmem ? ((struct main_configuration*)shmem)->common.servers[srv].name : "unknown",
+                                       (uint32_t)((current_ptr - SIZE_OF_XLOG_RECORD) >> 32),
+                                       (uint32_t)(current_ptr - SIZE_OF_XLOG_RECORD));
+                  }
+               }
+
+               uint32_t logical_len = *(uint32_t*)(st->buffer);
+               if (logical_len < SIZE_OF_XLOG_RECORD)
+                  logical_len = SIZE_OF_XLOG_RECORD;
+
+               uint32_t data_len = logical_len - SIZE_OF_XLOG_RECORD;
+               uint32_t aligned_len = (data_len + 7) & ~7;
+
+               if (aligned_len > 0)
+               {
+                  st->state = 2;
+                  st->skip_bytes = aligned_len;
+               }
+               else
+               {
+                  st->state = 1;
+                  st->bytes_needed = SIZE_OF_XLOG_RECORD;
+               }
+            }
+         }
+      }
+   }
+}
 
 void
 pgmoneta_wal(int srv, char** argv)
@@ -318,6 +458,18 @@ pgmoneta_wal(int srv, char** argv)
       memset(config->common.servers[srv].current_wal_lsn, 0, MISC_LENGTH);
       snprintf(config->common.servers[srv].current_wal_lsn, MISC_LENGTH, "%s", cmd);
 
+      struct wal_checkpoint_scanner scanner = {0};
+      if (xlogptr % XLOG_BLCKSZ == 0)
+      {
+         scanner.state = 0;
+         scanner.bytes_needed = SIZE_OF_XLOG_SHORT_PHD;
+      }
+      else
+      {
+         scanner.state = 1;
+         scanner.bytes_needed = SIZE_OF_XLOG_RECORD;
+      }
+
       type = 0;
 
       // wait for the CopyBothResponse message
@@ -425,6 +577,10 @@ pgmoneta_wal(int srv, char** argv)
                   }
                   bytes_left = msg->length - hdrlen;
                   size_t bytes_written = 0;
+
+                  // Scan incoming payload for CHECKPOINT records
+                  pgmoneta_wal_scan_checkpoints(srv, &scanner, msg->data + hdrlen, bytes_left, xlogptr);
+
                   // write to the wal file
                   while (bytes_left > 0)
                   {
@@ -1813,14 +1969,39 @@ retry:
             }
          }
 
-         free(d);
-
          if (!scan)
          {
             pgmoneta_log_trace("WAL: Compressed/encrypted %s", wal_file);
+
+            if (config->common.servers[srv].summarize_wal)
+            {
+               uint32_t tli = 0;
+               uint32_t log = 0;
+               uint32_t seg = 0;
+
+               if (sscanf(wal_file, "%08X%08X%08X", &tli, &log, &seg) == 3)
+               {
+                  uint64_t logSegNo = (uint64_t)log * (0x100000000UL / config->common.servers[srv].wal_size) + seg;
+                  uint64_t start_lsn = logSegNo * config->common.servers[srv].wal_size;
+                  uint64_t end_lsn = start_lsn + config->common.servers[srv].wal_size;
+                  block_ref_table* brt = NULL;
+
+                  if (!pgmoneta_summarize_wal(srv, d, start_lsn, end_lsn, false, &brt))
+                  {
+                     pgmoneta_wal_summary_save(srv, start_lsn, end_lsn, brt);
+                     pgmoneta_brt_destroy(brt);
+                     pgmoneta_log_trace("WAL: Summarized segment %s", wal_file);
+                  }
+                  else
+                  {
+                     pgmoneta_log_error("WAL: Failed to summarize %s", wal_file);
+                  }
+               }
+            }
          }
 
          atomic_store(&config->common.servers[srv].wal_repository, false);
+         free(d);
       }
       else
       {
@@ -1828,7 +2009,7 @@ retry:
          retry_count++;
          scan = true;
 
-         if (retry_count < 10)
+         if (retry_count < 100)
          {
             SLEEP_AND_GOTO(50000000L, retry);
          }
