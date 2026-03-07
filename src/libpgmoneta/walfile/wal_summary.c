@@ -35,6 +35,7 @@
 #include <walfile/wal_summary.h>
 
 #include <dirent.h>
+#include <errno.h>
 #include <libgen.h>
 
 static char* summary_file_name(uint64_t s_lsn, uint64_t e_lsn);
@@ -205,11 +206,21 @@ summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_ta
    struct decoded_xlog_record* record = NULL;
    char* from = NULL;
    char* to = NULL;
+   int ret = 0;
+   char secure_temp_dir[MAX_PATH];
+   bool secure_temp_dir_created = false;
 
    from = pgmoneta_append(from, path);
-   /* Extract the wal file in /tmp/ */
-   to = pgmoneta_append(to, "/tmp/");
-   to = pgmoneta_append(to, basename(path));
+
+   pgmoneta_snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-wal-summary-XXXXXX");
+   if (mkdtemp(secure_temp_dir) == NULL)
+   {
+      pgmoneta_log_error("Failed to create secure temporary directory: %s", strerror(errno));
+      goto error;
+   }
+   secure_temp_dir_created = true;
+
+   to = pgmoneta_format_and_append(to, "%s/%s", secure_temp_dir, basename(path));
 
    if (pgmoneta_copy_and_extract_file(from, &to))
    {
@@ -241,30 +252,27 @@ summarize_walfile(char* path, uint64_t start_lsn, uint64_t end_lsn, block_ref_ta
       }
    }
 
-   free(from);
-   pgmoneta_deque_iterator_destroy(record_iterator);
-   pgmoneta_destroy_walfile(wf);
-
-   if (to != NULL)
-   {
-      pgmoneta_delete_file(to, NULL);
-      free(to);
-   }
-
-   return 0;
+   goto cleanup;
 
 error:
+   ret = 1;
+
+cleanup:
    free(from);
    pgmoneta_deque_iterator_destroy(record_iterator);
    pgmoneta_destroy_walfile(wf);
 
    if (to != NULL)
    {
-      pgmoneta_delete_file(to, NULL);
       free(to);
    }
 
-   return 1;
+   if (secure_temp_dir_created)
+   {
+      pgmoneta_delete_directory(secure_temp_dir);
+   }
+
+   return ret;
 }
 
 static int

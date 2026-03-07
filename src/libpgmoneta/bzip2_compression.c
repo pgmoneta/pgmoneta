@@ -41,6 +41,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -292,7 +293,6 @@ pgmoneta_bzip2_wal(char* directory)
             {
                pgmoneta_delete_file(from, NULL);
             }
-            pgmoneta_permission(to, 6, 0, 0);
          }
 
          free(from);
@@ -353,7 +353,6 @@ pgmoneta_bzip2_wal_file(char* directory, char* file)
          {
             pgmoneta_delete_file(from, NULL);
          }
-         pgmoneta_permission(to, 6, 0, 0);
       }
    }
 
@@ -741,7 +740,18 @@ bzip2_compress(char* from, int level, char* to)
       goto error;
    }
 
-   to_ptr = fopen(to, "wb");
+   {
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         goto error;
+      }
+
+      to_ptr = fdopen(fd_to, "wb");
+   }
    if (!to_ptr)
    {
       goto error;
@@ -818,7 +828,18 @@ bzip2_decompress(char* from, char* to)
       goto error;
    }
 
-   to_ptr = fopen(to, "wb");
+   {
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         goto error;
+      }
+
+      to_ptr = fdopen(fd_to, "wb");
+   }
    if (!to_ptr)
    {
       goto error;
@@ -896,7 +917,18 @@ bzip2_decompress_file(char* from, char* to)
       goto error;
    }
 
-   to_ptr = fopen(to, "wb");
+   {
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         goto error;
+      }
+
+      to_ptr = fdopen(fd_to, "wb");
+   }
    if (!to_ptr)
    {
       goto error;

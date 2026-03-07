@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zstd.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -164,7 +165,6 @@ pgmoneta_zstandardc_data(char* directory, struct workers* workers)
                {
                   pgmoneta_delete_file(from, NULL);
                }
-               pgmoneta_permission(to, 6, 0, 0);
 
                memset(zin, 0, zin_size);
                memset(zout, 0, zout_size);
@@ -343,7 +343,6 @@ pgmoneta_zstandardc_wal(char* directory)
             {
                pgmoneta_delete_file(from, NULL);
             }
-            pgmoneta_permission(to, 6, 0, 0);
 
             memset(zin, 0, zin_size);
             memset(zout, 0, zout_size);
@@ -466,7 +465,6 @@ pgmoneta_zstandardc_wal_file(char* directory, char* file)
          {
             pgmoneta_delete_file(from, NULL);
          }
-         pgmoneta_permission(to, 6, 0, 0);
 
          memset(zin, 0, zin_size);
          memset(zout, 0, zout_size);
@@ -983,7 +981,6 @@ pgmoneta_zstandardc_file(char* from, char* to)
       {
          pgmoneta_log_debug("%s doesn't exist", from);
       }
-      pgmoneta_permission(to, 6, 0, 0);
    }
 
    ZSTD_freeCCtx(cctx);
@@ -1119,12 +1116,24 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
       goto error;
    }
 
-   fout = fopen(to, "wb");
-
-   if (fout == NULL)
    {
-      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
-      goto error;
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
+         goto error;
+      }
+
+      fout = fdopen(fd_to, "wb");
+      if (fout == NULL)
+      {
+         pgmoneta_log_error("ZSTD: fdopen failure for %s", to);
+         close(fd_to);
+         goto error;
+      }
    }
 
    toRead = zin_size;
@@ -1172,6 +1181,8 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
    fclose(fout);
    fclose(fin);
 
+   pgmoneta_permission(to, 6, 0, 0);
+
    return 0;
 
 error:
@@ -1208,12 +1219,24 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
       goto error;
    }
 
-   fout = fopen(to, "wb");
-
-   if (fout == NULL)
    {
-      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
-      goto error;
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
+         goto error;
+      }
+
+      fout = fdopen(fd_to, "wb");
+      if (fout == NULL)
+      {
+         pgmoneta_log_error("ZSTD: fdopen failure for %s", to);
+         close(fd_to);
+         goto error;
+      }
    }
 
    toRead = zin_size;
@@ -1257,6 +1280,8 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    fclose(fin);
    fflush(fout);
    fclose(fout);
+
+   pgmoneta_permission(to, 6, 0, 0);
 
    return 0;
 

@@ -37,6 +37,13 @@
 /* System */
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
@@ -1046,11 +1053,22 @@ encrypt_file(char* from, char* to, int enc)
       goto error;
    }
 
-   out = fopen(to, "w");
-   if (out == NULL)
    {
-      pgmoneta_log_error("fopen: Could not open %s", to);
-      goto error;
+      int fd_out = -1;
+
+      fd_out = open(to, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+      if (fd_out < 0)
+      {
+         pgmoneta_log_error("open: Could not open %s", to);
+         goto error;
+      }
+      out = fdopen(fd_out, "w");
+      if (out == NULL)
+      {
+         pgmoneta_log_error("fdopen: Could not open %s", to);
+         close(fd_out);
+         goto error;
+      }
    }
 
    if (EVP_CipherInit_ex(ctx, cipher_fp(), NULL, key, iv, enc) == 0)

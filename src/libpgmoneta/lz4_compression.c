@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -231,7 +232,6 @@ pgmoneta_lz4c_wal(char* directory)
          {
             pgmoneta_delete_file(from, NULL);
          }
-         pgmoneta_permission(to, 6, 0, 0);
 
          free(from);
          free(to);
@@ -274,7 +274,6 @@ pgmoneta_lz4c_wal_file(char* directory, char* file)
       {
          pgmoneta_delete_file(from, NULL);
       }
-      pgmoneta_permission(to, 6, 0, 0);
    }
 
    free(from);
@@ -699,10 +698,22 @@ lz4_compress(char* from, char* to)
       goto error;
    }
 
-   fout = fopen(to, "wb");
-   if (fout == NULL)
    {
-      goto error;
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         goto error;
+      }
+
+      fout = fdopen(fd_to, "wb");
+      if (fout == NULL)
+      {
+         close(fd_to);
+         goto error;
+      }
    }
 
    for (;;)
@@ -740,6 +751,8 @@ lz4_compress(char* from, char* to)
    fclose(fout);
    fclose(fin);
    LZ4_freeStream(lz4Stream);
+
+   pgmoneta_permission(to, 6, 0, 0);
 
    return 0;
 
@@ -785,11 +798,22 @@ lz4_decompress(char* from, char* to)
       goto error;
    }
 
-   fout = fopen(to, "wb");
-
-   if (fout == NULL)
    {
-      goto error;
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         goto error;
+      }
+
+      fout = fdopen(fd_to, "wb");
+      if (fout == NULL)
+      {
+         close(fd_to);
+         goto error;
+      }
    }
 
    LZ4_setStreamDecode(lz4StreamDecode, NULL, 0);
@@ -844,6 +868,8 @@ lz4_decompress(char* from, char* to)
    fflush(fout);
    fclose(fout);
    fclose(fin);
+
+   pgmoneta_permission(to, 6, 0, 0);
 
    return 0;
 

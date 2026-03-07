@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -291,7 +292,6 @@ pgmoneta_gzip_wal(char* directory)
             {
                pgmoneta_log_debug("%s doesn't exist", from);
             }
-            pgmoneta_permission(to, 6, 0, 0);
          }
 
          free(from);
@@ -355,7 +355,6 @@ pgmoneta_gzip_wal_file(char* directory, char* file)
          {
             pgmoneta_log_debug("%s doesn't exist", from);
          }
-         pgmoneta_permission(to, 6, 0, 0);
       }
    }
 
@@ -963,6 +962,8 @@ gz_compress(char* from, int level, char* to)
       goto error;
    }
 
+   pgmoneta_permission(to, 6, 0, 0);
+
    return 0;
 
 error:
@@ -999,10 +1000,22 @@ gz_decompress(char* from, char* to)
       goto error;
    }
 
-   out = fopen(to, "wb");
-   if (out == NULL)
    {
-      goto error;
+      int fd_to = -1;
+      int permissions = S_IRUSR | S_IWUSR;
+
+      fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC, permissions);
+      if (fd_to < 0)
+      {
+         goto error;
+      }
+
+      out = fdopen(fd_to, "wb");
+      if (out == NULL)
+      {
+         close(fd_to);
+         goto error;
+      }
    }
 
    for (;;)
@@ -1036,6 +1049,8 @@ gz_decompress(char* from, char* to)
 
    fflush(out);
    fclose(out);
+
+   pgmoneta_permission(to, 6, 0, 0);
 
    return 0;
 

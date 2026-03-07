@@ -2345,7 +2345,7 @@ do_copy_file(struct worker_common* wc)
       goto error;
    }
 
-   fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC, permissions);
+   fd_to = open(to, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, permissions);
 
    if (fd_to < 0)
    {

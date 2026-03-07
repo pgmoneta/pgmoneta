@@ -49,6 +49,7 @@
 #include <unistd.h>
 #include <err.h>
 #include <libgen.h>
+#include <errno.h>
 #include <stdio.h>
 
 #define OPERATION_DELETE "DELETE"
@@ -497,10 +498,13 @@ main(int argc, char* argv[])
    struct walfile** walfiles = NULL;
    int walfile_count = 0;
    char* target_pg_wal_dir = NULL;
+   char secure_temp_dir[MAX_PATH];
+   int secure_temp_dir_created = 0;
    int optind = 0;
    char* yaml_file = NULL;
    int num_results = 0;
    int num_options = 0;
+   int ret = 0;
 
    cli_option options[] = {
       {"c", "config", true},
@@ -699,9 +703,20 @@ main(int argc, char* argv[])
 
       if (pgmoneta_is_encrypted(wal_path))
       {
+         if (!secure_temp_dir_created)
+         {
+            snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-walfilter-XXXXXX");
+            if (mkdtemp(secure_temp_dir) == NULL)
+            {
+               pgmoneta_log_fatal("Failed to create secure temporary directory: %s", strerror(errno));
+               goto error;
+            }
+            secure_temp_dir_created = 1;
+         }
+
          free(tmp_wal);
          tmp_wal = NULL;
-         tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
+         tmp_wal = pgmoneta_format_and_append(tmp_wal, "%s/%s", secure_temp_dir, basename(wal_path));
 
          pgmoneta_copy_file(wal_path, tmp_wal, NULL);
          copy = false;
@@ -711,7 +726,7 @@ main(int argc, char* argv[])
          free(wal_path);
          wal_path = NULL;
 
-         wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decrypted_file_name);
+         wal_path = pgmoneta_format_and_append(wal_path, "%s/%s", secure_temp_dir, decrypted_file_name);
          free(decrypted_file_name);
          decrypted_file_name = NULL;
 
@@ -727,7 +742,7 @@ main(int argc, char* argv[])
          free(tmp_wal);
          tmp_wal = NULL;
 
-         tmp_wal = pgmoneta_format_and_append(tmp_wal, "/tmp/%s", basename(wal_path));
+         tmp_wal = pgmoneta_format_and_append(tmp_wal, "%s/%s", secure_temp_dir, basename(wal_path));
 
          if (copy)
          {
@@ -739,7 +754,7 @@ main(int argc, char* argv[])
          free(wal_path);
          wal_path = NULL;
 
-         wal_path = pgmoneta_format_and_append(wal_path, "/tmp/%s", decompressed_file_name);
+         wal_path = pgmoneta_format_and_append(wal_path, "%s/%s", secure_temp_dir, decompressed_file_name);
          free(decompressed_file_name);
          decompressed_file_name = NULL;
 
@@ -900,12 +915,17 @@ main(int argc, char* argv[])
    pgmoneta_deque_destroy(files);
    cleanup_config(&yaml_config);
 
+   if (secure_temp_dir_created)
+   {
+      pgmoneta_delete_directory(secure_temp_dir);
+   }
+
    if (shmem != NULL)
    {
       pgmoneta_destroy_shared_memory(shmem, size);
    }
 
-   return 0;
+   goto cleanup;
 
 error:
    if (target_pg_wal_dir != NULL)
@@ -914,6 +934,10 @@ error:
       target_pg_wal_dir = NULL;
    }
 
+   ret = 1;
+   pgmoneta_log_error("An error occurred while processing WAL files. Please check the logs for details.");
+
+cleanup:
    if (walfiles != NULL)
    {
       for (int i = 0; i < walfile_count; i++)
@@ -959,15 +983,22 @@ error:
    }
 
    pgmoneta_deque_destroy(files);
-   pgmoneta_deque_iterator_destroy(file_iter);
+   if (file_iter != NULL)
+   {
+      pgmoneta_deque_iterator_destroy(file_iter);
+   }
 
    cleanup_config(&yaml_config);
-   pgmoneta_log_error("An error occurred while processing WAL files. Please check the logs for details.");
+
+   if (secure_temp_dir_created)
+   {
+      pgmoneta_delete_directory(secure_temp_dir);
+   }
 
    if (shmem != NULL)
    {
       pgmoneta_destroy_shared_memory(shmem, size);
    }
 
-   return 1;
+   return ret;
 }
