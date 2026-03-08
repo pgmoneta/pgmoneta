@@ -4129,17 +4129,17 @@ pgmoneta_get_permission_mode(int user, int group, int all, mode_t* mode)
    {
       case 7:
       {
-         *mode = S_IRUSR | S_IWUSR | S_IXUSR;
+         *mode |= S_IRUSR | S_IWUSR | S_IXUSR;
          break;
       }
       case 6:
       {
-         *mode = S_IRUSR | S_IWUSR;
+         *mode |= S_IRUSR | S_IWUSR;
          break;
       }
       case 4:
       {
-         *mode = S_IRUSR;
+         *mode |= S_IRUSR;
          break;
       }
       default:
@@ -4152,17 +4152,17 @@ pgmoneta_get_permission_mode(int user, int group, int all, mode_t* mode)
    {
       case 7:
       {
-         *mode = S_IRGRP | S_IWGRP | S_IXGRP;
+         *mode |= S_IRGRP | S_IWGRP | S_IXGRP;
          break;
       }
       case 6:
       {
-         *mode += S_IRGRP | S_IWGRP;
+         *mode |= S_IRGRP | S_IWGRP;
          break;
       }
       case 4:
       {
-         *mode += S_IRGRP;
+         *mode |= S_IRGRP;
          break;
       }
       default:
@@ -4175,17 +4175,17 @@ pgmoneta_get_permission_mode(int user, int group, int all, mode_t* mode)
    {
       case 7:
       {
-         *mode = S_IROTH | S_IWOTH | S_IXOTH;
+         *mode |= S_IROTH | S_IWOTH | S_IXOTH;
          break;
       }
       case 6:
       {
-         *mode += S_IROTH | S_IWOTH;
+         *mode |= S_IROTH | S_IWOTH;
          break;
       }
       case 4:
       {
-         *mode += S_IROTH;
+         *mode |= S_IROTH;
          break;
       }
       default:
