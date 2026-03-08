@@ -786,6 +786,8 @@ bzip2_compress(char* from, int level, char* to)
    fflush(to_ptr);
    fclose(to_ptr);
 
+   pgmoneta_permission(to, 6, 0, 0);
+
    return 0;
 
 error_zip:
@@ -874,6 +876,8 @@ bzip2_decompress(char* from, char* to)
    fclose(from_ptr);
    fflush(to_ptr);
    fclose(to_ptr);
+
+   pgmoneta_permission(to, 6, 0, 0);
 
    return 0;
 
@@ -964,6 +968,8 @@ bzip2_decompress_file(char* from, char* to)
    fclose(from_ptr);
    fflush(to_ptr);
    fclose(to_ptr);
+
+   pgmoneta_permission(to, 6, 0, 0);
 
    return 0;
 
