@@ -2441,9 +2441,7 @@ pgmoneta_receive_manifest_file(int srv, SSL* ssl, int socket, struct stream_buff
       pgmoneta_snprintf(tmp_file_path, sizeof(tmp_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
       pgmoneta_snprintf(file_path, sizeof(file_path), "%s/data/%s", basedir, "backup_manifest");
    }
-   file = fopen(tmp_file_path, "wb");
-
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(tmp_file_path, "wb", &file))
    {
       goto error;
    }
@@ -2573,20 +2571,18 @@ pgmoneta_receive_extra_files(SSL* ssl, int socket, char* username, char* source_
                      decoded_data = decode_base64(current_tuple->data[0], &decoded_len);
                      if (decoded_data != NULL)
                      {
-                        FILE* file = fopen(dest_path, "wb");
-                        if (file != NULL)
-                        {
-                           fwrite(decoded_data, 1, decoded_len, file);
-                           fflush(file);
-                           fclose(file);
-                        }
-                        else
+                        FILE* file = NULL;
+                        if (pgmoneta_fopen_secure(dest_path, "wb", &file))
                         {
                            pgmoneta_log_error("Retrieving extra files: Could not open file \"%s\" for writing", dest_path);
+                           free(decoded_data);
                            free(dest_dir);
                            free(dest_path);
                            goto error;
                         }
+                        fwrite(decoded_data, 1, decoded_len, file);
+                        fflush(file);
+                        fclose(file);
                         free(decoded_data);
                      }
                   }
@@ -2786,8 +2782,7 @@ pgmoneta_send_file(SSL* ssl, int socket, char* username, char* source_path, char
       qr = NULL;
 
       // Open the file for reading
-      file = fopen(source_path, "rb");
-      if (file == NULL)
+      if (pgmoneta_fopen_secure(source_path, "rb", &file))
       {
          pgmoneta_log_warn("Sending file: Failed to open file: %s", source_path);
          goto error;

@@ -522,8 +522,7 @@ azure_send_upload_request(char* local_root, char* azure_root, char* relative_pat
       goto error;
    }
 
-   file = fopen(local_path, "rb");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(local_path, "rb", &file))
    {
       goto error;
    }

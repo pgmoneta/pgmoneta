@@ -953,8 +953,7 @@ wal_fetch_history(char* basedir, int timeline, SSL* ssl, int socket)
 
    history_content = pgmoneta_query_response_get_data(timeline_history_response, 1);
 
-   history_file = fopen(path, "wb");
-   if (history_file == NULL)
+   if (pgmoneta_fopen_secure(path, "wb", &history_file))
    {
       goto error;
    }
@@ -1004,8 +1003,7 @@ wal_open(char* root, char* filename, int segsize)
       size_t size = pgmoneta_get_file_size(path);
       if (size == (size_t)segsize)
       {
-         file = fopen(path, "r+b");
-         if (file == NULL)
+         if (pgmoneta_fopen_secure(path, "r+b", &file))
          {
             pgmoneta_log_error("WAL error: %s", strerror(errno));
             errno = 0;
@@ -1024,9 +1022,7 @@ wal_open(char* root, char* filename, int segsize)
       }
    }
 
-   file = fopen(path, "wb");
-
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(path, "wb", &file))
    {
       pgmoneta_log_error("WAL error: %s", strerror(errno));
       errno = 0;
@@ -1037,8 +1033,6 @@ wal_open(char* root, char* filename, int segsize)
    {
       goto error;
    }
-
-   pgmoneta_permission(path, 6, 0, 0);
 
    pgmoneta_log_trace("WAL: Created %s", path);
 

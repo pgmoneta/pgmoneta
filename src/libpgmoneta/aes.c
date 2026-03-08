@@ -36,6 +36,9 @@
 #include <workers.h>
 
 /* System */
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
@@ -1376,10 +1379,9 @@ encrypt_file(char* from, char* to, int enc)
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "wb");
-   if (out == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
    {
-      pgmoneta_log_error("fopen: Could not open %s", tmp_to);
+      pgmoneta_log_error("pgmoneta_fopen_secure: Could not open %s", tmp_to);
       goto error;
    }
 
@@ -2682,8 +2684,7 @@ pgmoneta_cbc_decrypt_file(unsigned char* key, unsigned char* iv,
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "wb");
-   if (out == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
    {
       pgmoneta_log_error("pgmoneta_cbc_decrypt_file: could not open %s", tmp_to);
       goto error;
@@ -2841,8 +2842,7 @@ pgmoneta_cbc_decrypt_salted_file(char* digest, bool raw,
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   out = fopen(tmp_to, "wb");
-   if (out == NULL)
+   if (pgmoneta_fopen_secure(tmp_to, "wb", &out))
    {
       pgmoneta_log_error("pgmoneta_cbc_decrypt_salted_file: could not open %s", tmp_to);
       goto error;

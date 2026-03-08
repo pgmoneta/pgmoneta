@@ -804,6 +804,25 @@ pgmoneta_get_home_directory(void)
 }
 
 char*
+pgmoneta_get_tmpdir(void)
+{
+   char* dir = NULL;
+
+#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
+   dir = getenv("TMPDIR");
+#else
+   dir = secure_getenv("TMPDIR");
+#endif
+
+   if (dir == NULL || strlen(dir) == 0 || dir[0] != '/')
+   {
+      dir = "/tmp";
+   }
+
+   return dir;
+}
+
+char*
 pgmoneta_get_user_name(void)
 {
    struct passwd* pw = getpwuid(getuid());
@@ -2082,8 +2101,7 @@ pgmoneta_append_file_chunk(const char* tmp_path, const void* data, size_t data_s
    if (pgmoneta_mkdir(parent_dir))
       goto error;
    // create the file with append if exists
-   f = fopen(tmp_path, "a+");
-   if (f == NULL)
+   if (pgmoneta_fopen_secure(tmp_path, "a+", &f))
    {
       goto error;
    }
@@ -2884,6 +2902,142 @@ pgmoneta_move_file(char* from, char* to)
    }
 
    return ret;
+}
+
+int
+pgmoneta_fopen_secure(const char* path, const char* mode, FILE** file)
+{
+   int fd = -1;
+   int flags = 0;
+   int saved_errno = 0;
+   bool create = false;
+   bool read = false;
+   bool write = false;
+   bool append = false;
+   bool plus = false;
+   bool exclusive = false;
+   char fdmode[8];
+   size_t j = 0;
+   const char* p = mode;
+
+   if (file == NULL)
+   {
+      return 2;
+   }
+
+   *file = NULL;
+
+   if (path == NULL || mode == NULL)
+   {
+      return 2;
+   }
+
+   if (strchr(mode, 'r'))
+   {
+      read = true;
+   }
+   if (strchr(mode, 'w'))
+   {
+      write = true;
+      create = true;
+   }
+   if (strchr(mode, 'a'))
+   {
+      append = true;
+      create = true;
+   }
+   if (strchr(mode, '+'))
+   {
+      plus = true;
+   }
+   if (strchr(mode, 'x'))
+   {
+      exclusive = true;
+   }
+
+   if (plus)
+   {
+      flags |= O_RDWR;
+   }
+   else if (read)
+   {
+      flags |= O_RDONLY;
+   }
+   else
+   {
+      flags |= O_WRONLY;
+   }
+
+   if (create)
+   {
+      flags |= O_CREAT;
+      if (write)
+      {
+         flags |= O_TRUNC;
+      }
+      if (exclusive)
+      {
+         flags |= O_EXCL;
+      }
+   }
+
+   if (append)
+   {
+      flags |= O_APPEND;
+   }
+
+   if (create || write || append)
+   {
+      flags |= O_NOFOLLOW;
+   }
+   flags |= O_CLOEXEC;
+
+   if (create)
+   {
+      fd = open(path, flags, S_IRUSR | S_IWUSR);
+   }
+   else
+   {
+      fd = open(path, flags);
+   }
+
+   if (fd == -1)
+   {
+      return errno == EEXIST ? 1 : 2;
+   }
+
+   if (create)
+   {
+      if (fchmod(fd, S_IRUSR | S_IWUSR))
+      {
+         saved_errno = errno;
+         close(fd);
+         errno = saved_errno;
+         return 2;
+      }
+   }
+
+   /* fdopen() only accepts the access part of the mode, 'x' is already O_EXCL */
+   while (*p != '\0' && j < sizeof(fdmode) - 1)
+   {
+      if (*p == 'r' || *p == 'w' || *p == 'a' || *p == 'b' || *p == '+')
+      {
+         fdmode[j++] = *p;
+      }
+      p++;
+   }
+   fdmode[j] = '\0';
+
+   *file = fdopen(fd, fdmode);
+   if (*file == NULL)
+   {
+      saved_errno = errno;
+      close(fd);
+      errno = saved_errno;
+      return 2;
+   }
+
+   return 0;
 }
 
 int
@@ -4100,7 +4254,7 @@ pgmoneta_get_server_workspace(int server)
    }
    else
    {
-      ws = pgmoneta_append(ws, "/tmp/pgmoneta-workspace/");
+      ws = pgmoneta_format_and_append(ws, "%s/pgmoneta-workspace-%d/", pgmoneta_get_tmpdir(), getuid());
    }
 
    if (!pgmoneta_exists(ws))

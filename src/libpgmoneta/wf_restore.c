@@ -437,9 +437,7 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
          goto error;
       }
 
-      tfile = fopen(t, "w");
-
-      if (tfile == NULL)
+      if (pgmoneta_fopen_secure(t, "w", &tfile))
       {
          pgmoneta_log_error("Could not create %s", t);
          goto error;
@@ -631,29 +629,28 @@ recovery_info_execute(char* name __attribute__((unused)), struct art* nodes)
 
       if (pgmoneta_exists(f))
       {
-         ffile = fopen(f, "r");
-         tfile = fopen(t, "w");
-
-         if (tfile == NULL)
+         if (pgmoneta_fopen_secure(f, "r", &ffile))
+         {
+            pgmoneta_log_error("Could not open %s", f);
+            goto error;
+         }
+         if (pgmoneta_fopen_secure(t, "w", &tfile))
          {
             pgmoneta_log_error("Could not create %s", t);
             goto error;
          }
 
-         if (ffile != NULL)
+         while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
          {
-            while ((fgets(&buffer[0], sizeof(buffer), ffile)) != NULL)
+            if (pgmoneta_starts_with(&buffer[0], "primary_conninfo"))
             {
-               if (pgmoneta_starts_with(&buffer[0], "primary_conninfo"))
-               {
-                  memset(&line[0], 0, sizeof(line));
-                  pgmoneta_snprintf(&line[0], sizeof(line), "#%s", &buffer[0]);
-                  fputs(&line[0], tfile);
-               }
-               else
-               {
-                  fputs(&buffer[0], tfile);
-               }
+               memset(&line[0], 0, sizeof(line));
+               pgmoneta_snprintf(&line[0], sizeof(line), "#%s", &buffer[0]);
+               fputs(&line[0], tfile);
+            }
+            else
+            {
+               fputs(&buffer[0], tfile);
             }
          }
 

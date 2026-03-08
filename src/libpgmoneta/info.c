@@ -1378,8 +1378,7 @@ pgmoneta_save_info(char* directory, struct backup* backup)
    bck_info_file = pgmoneta_append(bck_info_file, backup->label);
    bck_info_file = pgmoneta_append(bck_info_file, "/backup.info");
 
-   sfile = fopen(bck_info_file, "w");
-   if (sfile == NULL)
+   if (pgmoneta_fopen_secure(bck_info_file, "w", &sfile))
    {
       pgmoneta_log_error("Could not open file %s due to %s", bck_info_file, strerror(errno));
       errno = 0;
@@ -1696,8 +1695,7 @@ create_info(char* directory, char* label, int status)
    s = pgmoneta_append(s, directory);
    s = pgmoneta_append(s, "/backup.info");
 
-   sfile = fopen(s, "w");
-   if (sfile == NULL)
+   if (pgmoneta_fopen_secure(s, "w", &sfile))
    {
       pgmoneta_log_error("Could not open file %s due to %s", s, strerror(errno));
       errno = 0;

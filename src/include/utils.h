@@ -451,6 +451,13 @@ char*
 pgmoneta_get_home_directory(void);
 
 /**
+ * Get the temporary directory
+ * @return The directory
+ */
+char*
+pgmoneta_get_tmpdir(void);
+
+/**
  * Get the user name
  * @return The user name
  */
@@ -802,6 +809,25 @@ pgmoneta_copy_file(char* from, char* to, struct workers* workers);
  */
 int
 pgmoneta_move_file(char* from, char* to);
+
+/**
+ * Open a file in a secure way
+ *
+ * Creating, writing or appending adds O_NOFOLLOW, so that the last part of the
+ * path can not be redirected through a symlink. A read only open will follow,
+ * since directory entries are resolved with stat(). O_CLOEXEC is always added.
+ *
+ * A created file is set to rw------- through the descriptor, which is the
+ * equivalent of pgmoneta_permission(path, 6, 0, 0) without resolving the path
+ * a second time.
+ *
+ * @param path The path
+ * @param mode The mode, like "w", "wb", "r" or "r+", where an 'x' means exclusive creation
+ * @param file The file
+ * @return 0 upon success, 1 if the file exists and the mode is exclusive, otherwise 2
+ */
+int
+pgmoneta_fopen_secure(const char* path, const char* mode, FILE** file);
 
 /**
  * Strip the extension of a file

@@ -337,8 +337,7 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          }
       }
       pgmoneta_mkdir(directory);
-      file = fopen(file_path, "wb");
-      if (file == NULL)
+      if (pgmoneta_fopen_secure(file_path, "wb", &file))
       {
          pgmoneta_log_error("Could not create archive tar file");
          goto error;
@@ -646,8 +645,7 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   }
                }
                pgmoneta_mkdir(directory);
-               file = fopen(file_path, "wb");
-               if (file == NULL)
+               if (pgmoneta_fopen_secure(file_path, "wb", &file))
                {
                   pgmoneta_log_error("Could not create archive tar file");
                   goto error;
@@ -687,7 +685,10 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   pgmoneta_snprintf(tmp_manifest_file_path, sizeof(tmp_manifest_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
                   pgmoneta_snprintf(manifest_file_path, sizeof(manifest_file_path), "%s/data/%s", basedir, "backup_manifest");
                }
-               file = fopen(tmp_manifest_file_path, "wb");
+               if (pgmoneta_fopen_secure(tmp_manifest_file_path, "wb", &file))
+               {
+                  goto error;
+               }
                break;
             }
             case 'd':

@@ -1156,15 +1156,13 @@ add_incremental_label_fields(char* label_file_path, char* prev_data)
    memset(label, 0, MAX_PATH);
    pgmoneta_snprintf(label, MAX_PATH, "%s/backup_label", prev_data);
 
-   label_file = fopen(label_file_path, "a");
-   if (label_file == NULL)
+   if (pgmoneta_fopen_secure(label_file_path, "a", &label_file))
    {
       pgmoneta_log_error("Unable to open backup_label file: %s", label_file_path);
       goto error;
    }
 
-   prev_label_file = fopen(label, "r");
-   if (prev_label_file == NULL)
+   if (pgmoneta_fopen_secure(label, "r", &prev_label_file))
    {
       pgmoneta_log_error("Unable to open backup_label file: %s", label);
       goto error;
@@ -1412,8 +1410,7 @@ write_incremental_file(int server, SSL* ssl, int socket, char* backup_data,
    filepath = pgmoneta_append(filepath, file_name);
 
    /* Open the file in write mode, if not present create one */
-   file = fopen(filepath, "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(filepath, "w+", &file))
    {
       pgmoneta_log_error("Write incremental file: failed to open the file at %s", relative_filename);
       goto error;
@@ -1541,8 +1538,7 @@ write_full_file(int server, SSL* ssl, int socket, char* backup_data,
    filepath = pgmoneta_append(filepath, backup_data);
    filepath = pgmoneta_append(filepath, relative_filename);
    /* Open the file in write mode, if not present create one */
-   file = fopen(filepath, "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(filepath, "w+", &file))
    {
       pgmoneta_log_error("Write full file: failed to open the file at %s", relative_filename);
       goto error;

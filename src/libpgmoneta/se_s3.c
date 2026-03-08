@@ -1034,19 +1034,29 @@ s3_bootstrap(char* s3_root, int server, char* local_root)
       goto error;
    }
 
-   if (fgets(&buffer[0], sizeof(buffer), sha512_file) == NULL)
+   // backup.sha512 is in worker completion order, so scan for the entry
+   while (fgets(&buffer[0], sizeof(buffer), sha512_file) != NULL)
    {
-      pgmoneta_log_error("S3 bootstrap: backup.sha512 is empty");
-      goto error;
+      char* eol = strchr(&buffer[0], '\n');
+
+      if (eol != NULL)
+      {
+         *eol = '\0';
+      }
+
+      if (pgmoneta_ends_with(&buffer[0], " *./backup.info"))
+      {
+         expected_hash = strtok(&buffer[0], " ");
+         break;
+      }
    }
 
    fclose(sha512_file);
    sha512_file = NULL;
 
-   expected_hash = strtok(&buffer[0], " ");
    if (expected_hash == NULL)
    {
-      pgmoneta_log_error("S3 bootstrap: backup.sha512 format error");
+      pgmoneta_log_error("S3 bootstrap: no backup.info entry in backup.sha512");
       goto error;
    }
 
