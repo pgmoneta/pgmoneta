@@ -79,6 +79,8 @@ struct aes_encryptor
    int cipher_block_size;
    unsigned char key[EVP_MAX_KEY_LENGTH];
    unsigned char iv[EVP_MAX_IV_LENGTH];
+   unsigned char salt[PBKDF2_SALT_LENGTH];
+   int mode;
 };
 
 int
@@ -1509,49 +1511,20 @@ static int
 create_aes_encryptor(int mode, struct encryptor** encryptor)
 {
    struct aes_encryptor* ae = NULL;
-   char* master_key = NULL;
-   unsigned char salt[PBKDF2_SALT_LENGTH];
 
    ae = (struct aes_encryptor*)malloc(sizeof(struct aes_encryptor));
    memset(ae, 0, sizeof(struct aes_encryptor));
-   memset(salt, 0, sizeof(salt));
 
    ae->super.close = aes_encryptor_close;
    ae->super.decrypt = aes_encryptor_decrypt;
    ae->super.encrypt = aes_encryptor_encrypt;
    ae->cipher_fp = get_cipher(mode);
    ae->cipher_block_size = EVP_CIPHER_block_size(ae->cipher_fp());
-   if (pgmoneta_get_master_key(&master_key))
-   {
-      pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
-      goto error;
-   }
-
-   if (derive_key_iv(master_key, salt, ae->key, ae->iv, mode) != 0)
-   {
-      pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
-      goto error;
-   }
-
-   if (master_key != NULL)
-   {
-      pgmoneta_cleanse(master_key, strlen(master_key));
-      free(master_key);
-   }
+   ae->mode = mode;
 
    *encryptor = (struct encryptor*)ae;
 
    return 0;
-
-error:
-   if (master_key != NULL)
-   {
-      pgmoneta_cleanse(master_key, strlen(master_key));
-      free(master_key);
-   }
-
-   pgmoneta_encryptor_destroy((struct encryptor*)ae);
-   return 1;
 }
 
 static int
@@ -1604,6 +1577,9 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
    size_t capacity = 0;
    int size = 0;
    int final_size = 0;
+   bool write_salt = false;
+   int offset = 0;
+   char* master_key = NULL;
 
    if (this == NULL || in_buf == NULL || in_size == 0)
    {
@@ -1612,16 +1588,41 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
    *out_buf = NULL;
    *out_size = 0;
 
-   capacity = in_size + this->cipher_block_size - 1;
-   buf = malloc(capacity);
-   if (buf == NULL)
-   {
-      pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
-      goto error;
-   }
-
    if (this->ctx == NULL)
    {
+      if (pgmoneta_get_master_key(&master_key))
+      {
+         pgmoneta_log_error("pgmoneta_get_master_key: Invalid master key");
+         goto error;
+      }
+
+      if (enc == 1)
+      {
+         if (RAND_bytes(this->salt, PBKDF2_SALT_LENGTH) != 1)
+         {
+            pgmoneta_log_error("RAND_bytes: Failed to generate salt");
+            goto error;
+         }
+         write_salt = true;
+      }
+      else
+      {
+         if (in_size < PBKDF2_SALT_LENGTH)
+         {
+            pgmoneta_log_error("Unable to load salt");
+            goto error;
+         }
+         memcpy(this->salt, in_buf, PBKDF2_SALT_LENGTH);
+         in_buf = in_buf + PBKDF2_SALT_LENGTH;
+         in_size -= PBKDF2_SALT_LENGTH;
+      }
+
+      if (derive_key_iv(master_key, this->salt, this->key, this->iv, this->mode) != 0)
+      {
+         pgmoneta_log_error("derive_key_iv: Failed to derive key and iv");
+         goto error;
+      }
+
       if (!(this->ctx = EVP_CIPHER_CTX_new()))
       {
          pgmoneta_log_error("EVP_CIPHER_CTX_new: Failed to get context");
@@ -1635,7 +1636,26 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
       }
    }
 
-   if (EVP_CipherUpdate(this->ctx, buf, &size, in_buf, (int)in_size) == 0)
+   capacity = in_size + this->cipher_block_size - 1;
+
+   if (write_salt)
+   {
+      capacity += PBKDF2_SALT_LENGTH;
+   }
+   buf = malloc(capacity);
+   if (buf == NULL)
+   {
+      pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
+      goto error;
+   }
+
+   if (write_salt)
+   {
+      memcpy(buf, this->salt, PBKDF2_SALT_LENGTH);
+      offset += PBKDF2_SALT_LENGTH;
+   }
+
+   if (EVP_CipherUpdate(this->ctx, buf + offset, &size, in_buf, (int)in_size) == 0)
    {
       pgmoneta_log_error("EVP_CipherUpdate: failed to process block");
       goto error;
@@ -1649,7 +1669,7 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
          pgmoneta_log_error("aes_encryptor_process: failed to allocate memory");
          goto error;
       }
-      if (EVP_CipherFinal_ex(this->ctx, buf + size, &final_size) == 0)
+      if (EVP_CipherFinal_ex(this->ctx, buf + size + offset, &final_size) == 0)
       {
          pgmoneta_log_error("EVP_CipherFinal_ex: failed to process final cipher block");
          goto error;
@@ -1658,10 +1678,22 @@ aes_encryptor_process(struct encryptor* encryptor, void* in_buf, size_t in_size,
    }
 
    *out_buf = (void*)buf;
-   *out_size = (size_t)size;
+   *out_size = (size_t)(size + offset);
+
+   if (master_key != NULL)
+   {
+      pgmoneta_cleanse(master_key, strlen(master_key));
+      free(master_key);
+   }
 
    return 0;
 error:
+
+   if (master_key != NULL)
+   {
+      pgmoneta_cleanse(master_key, strlen(master_key));
+      free(master_key);
+   }
    free(buf);
    return 1;
 }
