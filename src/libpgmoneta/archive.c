@@ -336,8 +336,12 @@ pgmoneta_receive_archive_files(int srv, SSL* ssl, int socket, struct stream_buff
          }
       }
       pgmoneta_mkdir(directory);
-      file = fopen(file_path, "wb");
-      if (file == NULL)
+      if (pgmoneta_exists(file_path))
+      {
+         pgmoneta_delete_file(file_path, NULL);
+      }
+
+      if (pgmoneta_fopen_secure(file_path, "wb", &file))
       {
          pgmoneta_log_error("Could not create archive tar file");
          goto error;
@@ -631,8 +635,11 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   }
                }
                pgmoneta_mkdir(directory);
-               file = fopen(file_path, "wb");
-               if (file == NULL)
+               if (pgmoneta_exists(file_path))
+               {
+                  pgmoneta_delete_file(file_path, NULL);
+               }
+               if (pgmoneta_fopen_secure(file_path, "wb", &file))
                {
                   pgmoneta_log_error("Could not create archive tar file");
                   goto error;
@@ -672,7 +679,14 @@ pgmoneta_receive_archive_stream(int srv, SSL* ssl, int socket, struct stream_buf
                   pgmoneta_snprintf(tmp_manifest_file_path, sizeof(tmp_manifest_file_path), "%s/data/%s", basedir, "backup_manifest.tmp");
                   pgmoneta_snprintf(manifest_file_path, sizeof(manifest_file_path), "%s/data/%s", basedir, "backup_manifest");
                }
-               file = fopen(tmp_manifest_file_path, "wb");
+               if (pgmoneta_exists(tmp_manifest_file_path))
+               {
+                  pgmoneta_delete_file(tmp_manifest_file_path, NULL);
+               }
+               if (pgmoneta_fopen_secure(tmp_manifest_file_path, "wb", &file))
+               {
+                  goto error;
+               }
                break;
             }
             case 'd':
@@ -861,6 +875,10 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art*
          goto error;
       }
 
+      if (pgmoneta_exists(archive_name))
+      {
+         pgmoneta_delete_file(archive_name, NULL);
+      }
       if (pgmoneta_vfile_create_local(archive_name, "wb", &writer))
       {
          pgmoneta_log_error("Failed to create writer at %s", archive_name);
@@ -974,6 +992,10 @@ pgmoneta_extract_backup_tar_file(char* file_path, char* destination, struct art*
          if (strm->get_dest_file_name(strm, dst_path, &dest))
          {
             goto error;
+         }
+         if (pgmoneta_exists(dest))
+         {
+            pgmoneta_delete_file(dest, NULL);
          }
          if (pgmoneta_vfile_create_local(dest, "wb", &writer))
          {

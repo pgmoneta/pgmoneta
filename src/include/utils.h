@@ -786,6 +786,19 @@ int
 pgmoneta_move_file(char* from, char* to);
 
 /**
+ * Create a file securely for writing or appending.
+ * Use O_NOFOLLOW to prevent symlink attacks.
+ * Use 'x' in mode (e.g. "wx") for exclusive creation (O_EXCL).
+ * Calls pgmoneta_permission(path, 6, 0, 0) right after creation.
+ * @param path The file path
+ * @param mode The fopen mode string (e.g., "w", "wb", "wx", "r", "r+")
+ * @param file [out] The resulting FILE pointer
+ * @return 0 on success, 1 if file already exists (for exclusive write modes), 2 for other errors
+ */
+int
+pgmoneta_fopen_secure(char* path, char* mode, FILE** file);
+
+/**
  * Strip the extension of a file
  * @param s The string
  * @param name The name of the file

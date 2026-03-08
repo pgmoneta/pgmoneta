@@ -646,6 +646,97 @@ cleanup:
    MCTF_FINISH();
 }
 
+MCTF_TEST(test_utils_fopen_secure)
+{
+   char* path = "test_fopen_secure.tmp";
+   FILE* f = NULL;
+   struct stat st;
+
+   /* Standard Write Mode "w" (should create) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w", &f), 0, cleanup, "standard w failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after w");
+   fclose(f);
+   f = NULL;
+
+   /* Permission Check (should be 0600) */
+   MCTF_ASSERT_INT_EQ(stat(path, &st), 0, cleanup, "stat failed");
+   MCTF_ASSERT_INT_EQ(st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO), S_IRUSR | S_IWUSR, cleanup, "permissions not 0600");
+
+   /* Standard Write Mode "w" on existing file (should truncate) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w", &f), 0, cleanup, "standard w update failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after update w");
+   fclose(f);
+   f = NULL;
+
+   /* Exclusive Write Mode "wx" on existing file (should FAIL with 1) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "wx", &f), 1, cleanup, "exclusive wx didn't fail on exist");
+   MCTF_ASSERT_PTR_NULL(f, cleanup, "f should be null after failed wx");
+
+   /* Standard Read Mode "r" on existing file */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "r", &f), 0, cleanup, "standard r failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after r");
+   fclose(f);
+   f = NULL;
+
+   /* Cleanup for fresh start */
+   pgmoneta_delete_file(path, NULL);
+
+   /* Exclusive Write Mode "wx" on NON-existing file (should succeed) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "wx", &f), 0, cleanup, "exclusive wx failed on new file");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after success wx");
+   fclose(f);
+   f = NULL;
+
+   /* Cleanup for mixed modes */
+   pgmoneta_delete_file(path, NULL);
+
+   /* Read/Write Mode "w+" (should create and allow writing/reading) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w+", &f), 0, cleanup, "w+ failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after w+");
+   MCTF_ASSERT_INT_EQ(fprintf(f, "test"), 4, cleanup, "writing to w+ failed");
+   rewind(f);
+   char buf[32];
+   MCTF_ASSERT_PTR_NONNULL(fgets(buf, sizeof(buf), f), cleanup, "reading from w+ failed");
+   MCTF_ASSERT_STR_EQ(buf, "test", cleanup, "content mismatch in w+");
+   fclose(f);
+   f = NULL;
+
+   /* Exclusive Read/Write Mode "w+x" on NON-existing file (should succeed) */
+   pgmoneta_delete_file(path, NULL);
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w+x", &f), 0, cleanup, "w+x failed on new file");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after w+x");
+   MCTF_ASSERT_INT_EQ(fprintf(f, "exclusive"), 9, cleanup, "writing to w+x failed");
+   rewind(f);
+   MCTF_ASSERT_PTR_NONNULL(fgets(buf, sizeof(buf), f), cleanup, "reading from w+x failed");
+   MCTF_ASSERT_STR_EQ(buf, "exclusive", cleanup, "content mismatch in w+x");
+   fclose(f);
+   f = NULL;
+
+   /* Exclusive Read/Write Mode "w+x" on existing file (should fail) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "w+x", &f), 1, cleanup, "w+x should fail on existing file");
+   MCTF_ASSERT_PTR_NULL(f, cleanup, "f should be null after failed w+x");
+
+   /* Read/Append Mode "a+" (should allow reading and appending) */
+   MCTF_ASSERT_INT_EQ(pgmoneta_fopen_secure(path, "a+", &f), 0, cleanup, "a+ failed");
+   MCTF_ASSERT_PTR_NONNULL(f, cleanup, "f is null after a+");
+   MCTF_ASSERT_INT_EQ(fprintf(f, "-more"), 5, cleanup, "appending to a+ failed");
+   rewind(f);
+   /* File should now contain "exclusive-more" */
+   MCTF_ASSERT_PTR_NONNULL(fgets(buf, sizeof(buf), f), cleanup, "reading from a+ failed");
+   MCTF_ASSERT_STR_EQ(buf, "exclusive-more", cleanup, "content mismatch in a+");
+   fclose(f);
+   f = NULL;
+
+cleanup:
+   if (f != NULL)
+   {
+      fclose(f);
+      f = NULL;
+   }
+   pgmoneta_delete_file(path, NULL);
+   MCTF_FINISH();
+}
+
 MCTF_TEST(test_utils_snprintf)
 {
    char buf[100];

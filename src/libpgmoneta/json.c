@@ -63,7 +63,7 @@ pgmoneta_json_reader_init(char* path, struct json_reader** reader)
 {
    int fd = -1;
    struct json_reader* r = NULL;
-   fd = open(path, O_RDONLY);
+   fd = open(path, O_RDONLY | O_NOFOLLOW);
    if (fd < 0)
    {
       goto error;
@@ -1401,9 +1401,7 @@ pgmoneta_json_read_file(char* path, struct json** obj)
       goto error;
    }
 
-   file = fopen(path, "r");
-
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(path, "r", &file))
    {
       pgmoneta_log_error("Failed to open json file %s", path);
       goto error;
@@ -1457,8 +1455,7 @@ pgmoneta_json_write_file(char* path, struct json* obj)
       goto error;
    }
 
-   file = fopen(path, "wb");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(path, "wb", &file))
    {
       pgmoneta_log_error("Failed to create json file %s", path);
       goto error;

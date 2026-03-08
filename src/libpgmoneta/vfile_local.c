@@ -51,6 +51,7 @@ int
 pgmoneta_vfile_create_local(char* file_path, char* mode, struct vfile** vfile)
 {
    struct vfile_local* file = NULL;
+
    file = malloc(sizeof(struct vfile_local));
    memset(file, 0, sizeof(struct vfile_local));
 
@@ -59,15 +60,14 @@ pgmoneta_vfile_create_local(char* file_path, char* mode, struct vfile** vfile)
    file->super.read = vfile_local_read;
    file->super.write = vfile_local_write;
 
-   file->fp = fopen(file_path, mode);
-   if (file->fp == NULL)
+   if (pgmoneta_fopen_secure(file_path, mode, &file->fp))
    {
       pgmoneta_log_error("vfile_local: Failed to open file '%s' (mode='%s'): %s",
                          file_path, mode, strerror(errno));
       errno = 0;
       goto error;
    }
-   memcpy(file->file_path, file_path, strlen(file_path));
+   pgmoneta_snprintf(file->file_path, sizeof(file->file_path), "%s", file_path);
 
    *vfile = (struct vfile*)file;
    return 0;

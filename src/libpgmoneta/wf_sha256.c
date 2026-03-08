@@ -99,8 +99,7 @@ sha256_execute(char* name __attribute__((unused)), struct art* nodes)
    sha256_path = pgmoneta_append(sha256_path, root);
    sha256_path = pgmoneta_append(sha256_path, "backup.sha256");
 
-   sha256_file = fopen(sha256_path, "w");
-   if (sha256_file == NULL)
+   if (pgmoneta_fopen_secure(sha256_path, "w", &sha256_file))
    {
       goto error;
    }

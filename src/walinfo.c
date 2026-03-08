@@ -46,6 +46,7 @@
 
 /* system */
 #include <err.h>
+#include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <libgen.h>
@@ -388,31 +389,37 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
    struct walfile* wf = NULL;
    char* from = NULL;
    char* to = NULL;
+   struct deque_iterator* iter = NULL;
+   int ret = 0;
+   char secure_temp_dir[MAX_PATH];
+   bool secure_temp_dir_created = false;
 
    /* Extract compressed WAL file if needed */
+   pgmoneta_snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-walinfo-XXXXXX");
+   if (mkdtemp(secure_temp_dir) == NULL)
+   {
+      fprintf(stderr, "Failed to create temporary directory '%s': %s\n", secure_temp_dir, strerror(errno));
+      goto error;
+   }
+   secure_temp_dir_created = true;
+
    from = pgmoneta_append(from, wal_filename);
-   to = pgmoneta_append(to, "/tmp/");
-   to = pgmoneta_append(to, basename((char*)wal_filename));
+   to = pgmoneta_format_and_append(to, "%s/%s", secure_temp_dir, basename((char*)wal_filename));
 
    if (pgmoneta_extract_file(from, 0, true, &to))
    {
-      free(from);
-      free(to);
-      return -1;
+      goto error;
    }
 
    /* Read the WAL file using pgmoneta's function */
    if (pgmoneta_read_walfile(-1, to, &wf) != 0)
    {
-      pgmoneta_delete_file(to, NULL);
-      free(from);
-      free(to);
-      return -1;
+      goto error;
    }
 
    if (wf == NULL || wf->records == NULL)
    {
-      return -1;
+      goto error;
    }
 
    state->record_count = 0;
@@ -428,19 +435,16 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
 
       if (new_records == NULL)
       {
-         pgmoneta_destroy_walfile(wf);
-         return -1;
+         goto error;
       }
 
       state->records = new_records;
    }
 
    /* Create iterator to walk through records */
-   struct deque_iterator* iter = NULL;
    if (pgmoneta_deque_iterator_create(wf->records, &iter) != 0)
    {
-      pgmoneta_destroy_walfile(wf);
-      return -1;
+      goto error;
    }
 
    /* Process each record */
@@ -464,9 +468,7 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
 
          if (new_records == NULL)
          {
-            pgmoneta_deque_iterator_destroy(iter);
-            pgmoneta_destroy_walfile(wf);
-            return -1;
+            goto error;
          }
 
          state->records = new_records;
@@ -552,18 +554,30 @@ wal_interactive_load_records(struct ui_state* state, char* wal_filename)
       state->record_count++;
    }
 
-   pgmoneta_deque_iterator_destroy(iter);
    state->wf = wf;
+   ret = 0;
+   goto cleanup;
 
-   /* Clean up temporary extracted file */
+error:
+   ret = -1;
+   pgmoneta_destroy_walfile(wf);
+
+cleanup:
+   if (iter != NULL)
+   {
+      pgmoneta_deque_iterator_destroy(iter);
+   }
    if (to != NULL)
    {
-      pgmoneta_delete_file(to, NULL);
       free(to);
+   }
+   if (secure_temp_dir_created)
+   {
+      pgmoneta_delete_directory(secure_temp_dir);
    }
    free(from);
 
-   return 0;
+   return ret;
 }
 
 static void
@@ -2758,7 +2772,10 @@ main(int argc, char** argv)
    }
    else
    {
-      out = fopen(output, "w");
+      if (pgmoneta_fopen_secure(output, "w", &out))
+      {
+         goto error;
+      }
       color = false;
    }
 
@@ -3134,15 +3151,26 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
    struct column_widths local_widths = {0};
    struct column_widths* widths = provided_widths ? provided_widths : &local_widths;
 
+   char secure_temp_dir[MAX_PATH];
+   bool secure_temp_dir_created = false;
+   int ret = 0;
+
    if (!pgmoneta_is_file(path))
    {
       pgmoneta_log_error("WAL file at %s does not exist", path);
       goto error;
    }
 
+   pgmoneta_snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-walinfo-XXXXXX");
+   if (mkdtemp(secure_temp_dir) == NULL)
+   {
+      pgmoneta_log_error("Failed to create secure temporary directory: %s", strerror(errno));
+      goto error;
+   }
+   secure_temp_dir_created = true;
+
    from = pgmoneta_append(from, path);
-   to = pgmoneta_append(to, "/tmp/");
-   to = pgmoneta_append(to, basename(path));
+   to = pgmoneta_format_and_append(to, "%s/%s", secure_temp_dir, basename(path));
 
    if (pgmoneta_extract_file(from, 0, true, &to))
    {
@@ -3210,30 +3238,28 @@ describe_walfile_internal(char* path, enum value_type type, FILE* out, bool quie
       }
    }
 
-   free(from);
-   pgmoneta_deque_iterator_destroy(record_iterator);
-   pgmoneta_destroy_walfile(wf);
-
-   if (to != NULL)
-   {
-      pgmoneta_delete_file(to, NULL);
-      free(to);
-   }
-
-   return 0;
+   ret = 0;
+   goto cleanup;
 
 error:
-   free(from);
-   pgmoneta_destroy_walfile(wf);
+   ret = 1;
+
+cleanup:
    pgmoneta_deque_iterator_destroy(record_iterator);
+   pgmoneta_destroy_walfile(wf);
+   free(from);
 
    if (to != NULL)
    {
-      pgmoneta_delete_file(to, NULL);
       free(to);
    }
 
-   return 1;
+   if (secure_temp_dir_created)
+   {
+      pgmoneta_delete_directory(secure_temp_dir);
+   }
+
+   return ret;
 }
 
 static int
@@ -3267,12 +3293,27 @@ describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* outpu
             continue;
          }
 
+         char secure_temp_dir[MAX_PATH];
+         pgmoneta_snprintf(secure_temp_dir, sizeof(secure_temp_dir), "/tmp/pgmoneta-walinfo-XXXXXX");
+         if (mkdtemp(secure_temp_dir) == NULL)
+         {
+            free(from);
+            from = NULL;
+            continue;
+         }
+
          from = pgmoneta_append(from, file_path);
-         to = pgmoneta_append(to, "/tmp/");
-         to = pgmoneta_append(to, basename(file_path));
+         if (from == NULL)
+         {
+            pgmoneta_delete_directory(secure_temp_dir);
+            continue;
+         }
+
+         to = pgmoneta_format_and_append(to, "%s/%s", secure_temp_dir, basename(file_path));
 
          if (pgmoneta_extract_file(from, 0, true, &to))
          {
+            pgmoneta_delete_directory(secure_temp_dir);
             free(from);
             free(to);
             from = NULL;
@@ -3289,10 +3330,10 @@ describe_walfiles_in_directory(char* dir_path, enum value_type type, FILE* outpu
 
          if (to != NULL)
          {
-            pgmoneta_delete_file(to, NULL);
             free(to);
             to = NULL;
          }
+         pgmoneta_delete_directory(secure_temp_dir);
          free(from);
          from = NULL;
       }
@@ -3327,7 +3368,6 @@ error:
    free(from);
    if (to != NULL)
    {
-      pgmoneta_delete_file(to, NULL);
       free(to);
    }
    pgmoneta_destroy_walfile(wf);
