@@ -550,11 +550,14 @@ zstd_compress(char* from, char* to, ZSTD_CCtx* cctx, size_t zin_size, void* zin,
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   fout = fopen(tmp_to, "wb");
-
-   if (fout == NULL)
+   if (pgmoneta_exists(tmp_to))
    {
-      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
+      pgmoneta_delete_file(tmp_to, NULL);
+   }
+
+   if (pgmoneta_fopen_secure(tmp_to, "wbx", &fout))
+   {
+      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", tmp_to, strerror(errno));
       goto error;
    }
 
@@ -655,11 +658,14 @@ zstd_decompress(char* from, char* to, ZSTD_DCtx* dctx, size_t zin_size, void* zi
    tmp_to = pgmoneta_append(tmp_to, to);
    tmp_to = pgmoneta_append(tmp_to, ".tmp");
 
-   fout = fopen(tmp_to, "wb");
-
-   if (fout == NULL)
+   if (pgmoneta_exists(tmp_to))
    {
-      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", to, strerror(errno));
+      pgmoneta_delete_file(tmp_to, NULL);
+   }
+
+   if (pgmoneta_fopen_secure(tmp_to, "wbx", &fout))
+   {
+      pgmoneta_log_error("ZSTD: Could not open output file %s: %s", tmp_to, strerror(errno));
       goto error;
    }
 

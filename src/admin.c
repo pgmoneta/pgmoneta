@@ -423,8 +423,7 @@ master_key(char* password, bool generate_pwd, int pwd_length, int32_t output_for
       }
    }
 
-   file = fopen(&buf[0], "w+");
-   if (file == NULL)
+   if (pgmoneta_fopen_secure(&buf[0], "w+x", &file))
    {
       warn("Could not write to master key file '%s'", &buf[0]);
       goto error;
@@ -673,8 +672,7 @@ add_user(char* users_path, char* username, char* password, bool generate_pwd, in
       do_free = false;
    }
 
-   users_file = fopen(users_path, "a+");
-   if (users_file == NULL)
+   if (pgmoneta_fopen_secure(users_path, "a+", &users_file))
    {
       warn("Could not append to users file '%s'", users_path);
       goto error;
@@ -1018,18 +1016,24 @@ update_user(char* users_path, char* username, char* password, bool generate_pwd,
       do_free = false;
    }
 
-   users_file = fopen(users_path, "r");
-   if (!users_file)
+   if (pgmoneta_fopen_secure(users_path, "r", &users_file))
    {
       warnx("%s not found\n", users_path);
       goto error;
    }
 
-   pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
-   users_file_tmp = fopen(tmpfilename, "w+");
+   pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%sXXXXXX", users_path);
+   int fd = mkstemp(tmpfilename);
+   if (fd == -1)
+   {
+      warn("Could not create temporary file");
+      goto error;
+   }
+   users_file_tmp = fdopen(fd, "w+");
    if (users_file_tmp == NULL)
    {
-      warn("Could not write to temporary user file '%s'", tmpfilename);
+      warn("Could not open temporary file");
+      close(fd);
       goto error;
    }
 
@@ -1351,19 +1355,25 @@ remove_user(char* users_path, char* username, int32_t output_format)
       goto error;
    }
 
-   users_file = fopen(users_path, "r");
-   if (!users_file)
+   if (pgmoneta_fopen_secure(users_path, "r", &users_file))
    {
       warnx("%s not found", users_path);
       goto error;
    }
 
    memset(&tmpfilename, 0, sizeof(tmpfilename));
-   pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%s.tmp", users_path);
-   users_file_tmp = fopen(tmpfilename, "w+");
+   pgmoneta_snprintf(tmpfilename, sizeof(tmpfilename), "%sXXXXXX", users_path);
+   int fd = mkstemp(tmpfilename);
+   if (fd == -1)
+   {
+      warn("Could not create temporary file");
+      goto error;
+   }
+   users_file_tmp = fdopen(fd, "w+");
    if (users_file_tmp == NULL)
    {
-      warn("Could not write to temporary user file '%s'", tmpfilename);
+      warn("Could not open temporary file");
+      close(fd);
       goto error;
    }
 
@@ -1511,8 +1521,7 @@ list_users(char* users_path, int32_t output_format)
       goto error;
    }
 
-   users_file = fopen(users_path, "r");
-   if (!users_file)
+   if (pgmoneta_fopen_secure(users_path, "r", &users_file))
    {
       goto error;
    }
@@ -1651,8 +1660,7 @@ create_response(char* users_path, struct json* json, struct json** response)
       goto error;
    }
 
-   users_file = fopen(users_path, "r");
-   if (!users_file)
+   if (pgmoneta_fopen_secure(users_path, "r", &users_file))
    {
       goto error;
    }

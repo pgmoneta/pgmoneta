@@ -1890,8 +1890,7 @@ pgmoneta_get_master_key(char** masterkey, size_t* masterkey_length, unsigned cha
       }
    }
 
-   master_key_file = fopen(&buf[0], "r");
-   if (master_key_file == NULL)
+   if (pgmoneta_fopen_secure(&buf[0], "r", &master_key_file))
    {
       pgmoneta_log_error("Unable to open master key file");
       goto error;

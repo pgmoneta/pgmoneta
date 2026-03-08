@@ -687,10 +687,10 @@ log_file_open(void)
          log_rotation_disable();
       }
 
-      log_file = fopen(current_log_path, (config->log_mode == PGMONETA_LOGGING_MODE_CREATE && log_file == NULL) ? "w" : "a");
-
-      if (!log_file)
+      if (pgmoneta_fopen_secure(current_log_path, (config->log_mode == PGMONETA_LOGGING_MODE_CREATE && log_file == NULL) ? "w" : "a", &log_file))
       {
+         fprintf(stderr, "Log file error: %s\n", strerror(errno));
+         errno = 0;
          goto error;
       }
 

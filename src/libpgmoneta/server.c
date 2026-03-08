@@ -715,8 +715,7 @@ pgmoneta_server_stop_backup(int srv, SSL* ssl, int socket, char* backup_data, ch
       backup_label_file = pgmoneta_append(backup_label_file, backup_data);
       backup_label_file = pgmoneta_append(backup_label_file, "/backup_label");
 
-      file = fopen(backup_label_file, "w+");
-      if (file == NULL)
+      if (pgmoneta_fopen_secure(backup_label_file, "w+", &file))
       {
          pgmoneta_log_error("Failed to open the file at %s", backup_label_file);
          goto error;
